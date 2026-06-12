@@ -1,0 +1,97 @@
+export interface SecurityEvent {
+  id: string;
+  timestamp: string;
+  category: "file_system" | "command_exec" | "network" | "permission_change";
+  action: string;
+  details: string;
+  status: "allow" | "deny" | "warning" | "info";
+}
+
+export interface SystemMemory {
+  total: number;
+  free: number;
+  percentageUsed: number;
+}
+
+export interface OSInfo {
+  platform: string;
+  release: string;
+  arch: string;
+  uptime: number;
+}
+
+export interface LoadedModel {
+  name: string;
+  model: string;
+  size: number;
+  digest: string;
+  details: {
+    parent_model: string;
+    format: string;
+    family: string;
+    families: string[] | null;
+    parameter_size: string;
+    quantization_level: string;
+  };
+  expires_at: string;
+}
+
+export interface HealthTelemetry {
+  mode: "live" | "degraded-live" | "demo";
+  isLive: boolean;
+  os: OSInfo;
+  metrics: {
+    cpuLoad1Min: number;
+    memory: SystemMemory;
+    ollamaVersion: string;
+    loadedModels: LoadedModel[];
+  };
+  workspacePath: string;
+  permissions: {
+    fileRead: boolean;
+    fileWrite: boolean;
+    commandExec: boolean;
+    git: boolean;
+  };
+  hasBackupEnabled: boolean;
+}
+
+export interface FileItem {
+  name: string;
+  relativePath: string;
+  isDirectory: boolean;
+  size?: number;
+  gitStatus?: "untracked" | "modified" | "staged" | "none";
+  children?: FileItem[];
+}
+
+export interface TestGateReport {
+  status: "PASS" | "FAIL" | "WARN";
+  details: string;
+}
+
+export type SelfTestReport = Record<string, TestGateReport>;
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  modelId: string;
+  providerId: string;
+  messages: ChatMessage[];
+  updatedAt: string;
+}
+
+export interface PipelineStageState {
+  stage: "architect" | "coder" | "reviewer" | "self_improve";
+  status: "pending" | "running" | "done" | "fail";
+  text: string;
+  tokensPerSec?: number;
+  elapsed?: number;
+}

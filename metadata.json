@@ -1,0 +1,6 @@
+{
+  "name": "LLM Mission Control",
+  "description": "A privacy-secure workstation multi-agent development cockpit and API routing dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
