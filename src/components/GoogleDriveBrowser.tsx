@@ -9,7 +9,7 @@ interface DriveFile {
 }
 
 export function GoogleDriveBrowser() {
-  const { token, needsAuth, handleLogin, isLoggingIn } = useAuth();
+  const { token, needsAuth, handleLogin, isLoggingIn, authError } = useAuth();
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +65,12 @@ export function GoogleDriveBrowser() {
         <h2 className="text-sm font-bold text-slate-100 font-mono tracking-wider uppercase mb-2">Connect Google Drive</h2>
         <p className="text-xs text-slate-400 mb-6 max-w-sm">Sign in with Google to browse and manage your Drive files directly from this cockpit.</p>
         
+        {authError && (
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs px-4 py-3 rounded mb-6 max-w-md font-mono text-left">
+            <strong>Authentication Error:</strong> {authError}
+          </div>
+        )}
+
         <button 
           onClick={handleLogin} 
           disabled={isLoggingIn}

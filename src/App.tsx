@@ -30,9 +30,9 @@ export default function App() {
     }, 4000);
   };
 
-  const fetchTelemetry = async () => {
-    // Skip if page is hidden to conserve Mac energy (Performance Budget §6)
-    if (document.hidden) return;
+  const fetchTelemetry = async (force: boolean = false) => {
+    // Skip if page is hidden to conserve Mac energy (Performance Budget §6), unless forced initially
+    if (document.hidden && !force) return;
     try {
       const res = await fetch("/api/health");
       if (res.ok) {
@@ -45,8 +45,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 5000); // Poll every 5 seconds
+    fetchTelemetry(true);
+    const interval = setInterval(() => fetchTelemetry(false), 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, []);
 

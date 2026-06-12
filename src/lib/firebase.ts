@@ -1,9 +1,30 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
+import { 
+  getAuth, 
+  initializeAuth, 
+  indexedDBLocalPersistence, 
+  browserLocalPersistence, 
+  inMemoryPersistence, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  User,
+  onAuthStateChanged
+} from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// Safe auth boot supporting sandboxed iframes
+let auth: any;
+try {
+  auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
+
+export { auth };
 
 const provider = new GoogleAuthProvider();
 // Request Workspace scopes

@@ -21,14 +21,13 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
  * L1: Dynamic Environment Detection
  */
 async function detectMode(): Promise<"live" | "degraded-live" | "demo"> {
-  const isCloud = !!(
+  const isHardCloud = !!(
     process.env.K_SERVICE || 
     process.env.GOOGLE_CLOUD_RUN || 
-    process.env.CODESANDBOX_SSE ||
-    os.platform() !== "darwin"
+    process.env.CODESANDBOX_SSE
   );
   
-  if (isCloud) {
+  if (isHardCloud) {
     return "demo";
   }
 
@@ -330,7 +329,10 @@ async function initializeServer() {
     const isLive = CURRENT_MODE !== "demo";
     try {
       const treeData = await FilesystemManager.getTree(isLive, db.data.workspacePath);
-      res.json(treeData);
+      res.json({
+        ...treeData,
+        mode: CURRENT_MODE,
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -420,8 +422,8 @@ async function initializeServer() {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const sendProgress = (stage: string, status: "pending" | "running" | "done" | "fail", resultText: string = "", tokensPerSec: number = 0, elapsed: number = 0) => {
-      res.write(`data: ${JSON.stringify({ stage, status, text: resultText, tokensPerSec, elapsed })}\n\n`);
+    const sendProgress = (stage: string, status: "pending" | "running" | "done" | "fail", resultText: string = "", tokensPerSec: number = 0, elapsed: number = 0, fallback?: string) => {
+      res.write(`data: ${JSON.stringify({ stage, status, text: resultText, tokensPerSec, elapsed, fallback })}\n\n`);
     };
 
     const isLive = CURRENT_MODE !== "demo";
@@ -443,6 +445,8 @@ OUTPUT: Set out clear module hierarchies, files to be created, and complete spec
         provider: architectProvider,
         model: architectModel,
         messages: [{ role: "user", content: archPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("architect", "running", "", 0, 0, `fallback: ${from} → ${to}`);
       });
       architectOutput = archResult.text;
       const elapsedArch = Date.now() - startArch;
@@ -463,6 +467,8 @@ Followed immediately by a markdown fenced code block containing the complete sou
         provider: coderProvider,
         model: coderModel,
         messages: [{ role: "user", content: coderPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("coder", "running", "", 0, 0, `fallback: ${from} → ${to}`);
       });
       coderOutput = coderResult.text;
       const elapsedCoder = Date.now() - startCoder;
@@ -522,6 +528,8 @@ Validate code correctness, structural logic, and perform a solid Big-O performan
         provider: reviewerProvider,
         model: reviewerModel,
         messages: [{ role: "user", content: reviewerPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("reviewer", "running", "", 0, 0, `fallback: ${from} → ${to}`);
       });
       reviewerOutput = reviewerResult.text;
       const elapsedReview = Date.now() - startReview;

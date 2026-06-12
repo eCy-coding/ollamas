@@ -37,7 +37,8 @@ export class ProviderRouter {
    */
   public static async generate(
     config: GenerateConfig,
-    onStreamChunk?: (text: string) => void
+    onStreamChunk?: (text: string) => void,
+    onFallback?: (from: string, to: string, error: string) => void
   ): Promise<GenerateResult> {
     const start = Date.now();
     const providersToTry = this.getFallbackChain(config.provider);
@@ -64,7 +65,14 @@ export class ProviderRouter {
       } catch (err: any) {
         console.warn(`[Router] Provider ${prov} failed: ${err?.message || err}. Retrying fallback...`);
         lastError = err;
-        // Proceed to next fallback provider
+        
+        const nextIndex = providersToTry.indexOf(prov) + 1;
+        if (nextIndex < providersToTry.length) {
+          const nextProv = providersToTry[nextIndex];
+          if (onFallback) {
+            onFallback(prov, nextProv, err?.message || "Unknown error");
+          }
+        }
       }
     }
 

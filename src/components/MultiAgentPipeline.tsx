@@ -11,6 +11,7 @@ interface StageState {
   text: string;
   tokensPerSec?: number;
   elapsed?: number;
+  fallback?: string;
 }
 
 export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspacePath }) => {
@@ -178,6 +179,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
                   text: data.text || prev[data.stage]?.text || "",
                   tokensPerSec: data.tokensPerSec !== undefined ? data.tokensPerSec : prev[data.stage]?.tokensPerSec,
                   elapsed: data.elapsed !== undefined ? data.elapsed : prev[data.stage]?.elapsed,
+                  fallback: data.fallback !== undefined ? data.fallback : prev[data.stage]?.fallback,
                 },
               }));
             }
@@ -431,7 +433,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-white block">Architect</span>
             <span className="text-[9px] font-mono text-slate-500 block truncate">{architectModel}</span>
             {stages.architect.tokensPerSec !== undefined && stages.architect.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{stages.architect.tokensPerSec} tokens/s</span>
+              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.architect.tokensPerSec).toFixed(1)} tokens/s</span>
+            )}
+            {stages.architect.fallback && stages.architect.status === "running" && (
+              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.architect.fallback}>{stages.architect.fallback}</span>
             )}
           </div>
         </div>
@@ -448,7 +453,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-white block">Developer Coder</span>
             <span className="text-[9px] font-mono text-slate-500 block truncate">{coderModel}</span>
             {stages.coder.tokensPerSec !== undefined && stages.coder.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{stages.coder.tokensPerSec} tokens/s</span>
+              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.coder.tokensPerSec).toFixed(1)} tokens/s</span>
+            )}
+            {stages.coder.fallback && stages.coder.status === "running" && (
+              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.coder.fallback}>{stages.coder.fallback}</span>
             )}
           </div>
         </div>
@@ -465,7 +473,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-white block">Inspector Reviewer</span>
             <span className="text-[9px] font-mono text-slate-500 block truncate">{reviewerModel}</span>
             {stages.reviewer.tokensPerSec !== undefined && stages.reviewer.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{stages.reviewer.tokensPerSec} tokens/s</span>
+              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.reviewer.tokensPerSec).toFixed(1)} tokens/s</span>
+            )}
+            {stages.reviewer.fallback && stages.reviewer.status === "running" && (
+              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.reviewer.fallback}>{stages.reviewer.fallback}</span>
             )}
           </div>
         </div>

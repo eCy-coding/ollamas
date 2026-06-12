@@ -16,6 +16,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
   const [editorContent, setEditorContent] = useState("");
   const [newFileName, setNewFileName] = useState("");
   const [pathInput, setPathInput] = useState(activePath);
+  const [treeMode, setTreeMode] = useState<string>("demo");
 
   const fetchTree = async () => {
     setLoading(true);
@@ -24,6 +25,9 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
       if (res.ok) {
         const data = await res.json();
         setTree(data.tree || []);
+        if (data.mode) {
+          setTreeMode(data.mode);
+        }
         if (data.workspaceRoot && data.workspaceRoot !== activePath) {
           onPathChange(data.workspaceRoot);
           setPathInput(data.workspaceRoot);
@@ -267,7 +271,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
             <div className="flex-1 flex flex-col justify-center items-center text-center text-slate-500">
               <FolderOpen className="w-8 h-8 text-slate-700 mb-2" />
               <p className="text-xs font-mono">Select a file from the explorer on the left to read or write</p>
-              {!isLive && (
+              {treeMode === "demo" && (
                 <span className="text-[10px] mt-1.5 text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-mono">
                   DEMO Workspace emulated
                 </span>
