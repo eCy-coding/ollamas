@@ -57,6 +57,7 @@ When executing in **LIVE** mode locally, the cockpit binds GPU-backed Ollama:
 - **Decrypted Vault Keys (M1):** Keys configured within settings (Google Gemini, OpenAI, Claude, OpenRouter) are handled only on server space and saved at-rest encrypted with AES-256-GCM.
 - **Command Guardrails (M5):** The CLI console intercepts input parameters. It completely rejects command chains with shell metacharacters (`,`, `&&`, etc.) or blocked tokens (like `rm` or `sudo`), returning clean exit alerts with status 126.
 - **AES-256-GCM Zero-Knowledge Backups (M8):** Gzip compresses configuration settings databases in local memory, wraps it with double-pass AES-256-GCM, and syncs encrypted ciphertext only to target S3 or WebDAV directories. Plaintext keys never leave your machine boundary.
+- **Firebase Web API Key Security:** The public API key listed in `firebase-applet-config.json` is purely for client-side Authentication / OAuth. It has been strictly restricted at the Google Cloud/Firebase Console level to only allow authorized application domain callbacks, making it fully safe to commit to version control.
 
 ---
 
