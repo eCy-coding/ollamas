@@ -14,9 +14,11 @@ export interface SecurityEvent {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool" | string;
   content: string;
   timestamp: string;
+  name?: string;
+  tool_call_id?: string;
 }
 
 export interface ChatSession {

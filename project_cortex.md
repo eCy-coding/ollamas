@@ -41,5 +41,7 @@
 - [x] Implement multi-provider server engine (`server/providers.ts`) with real metrics & tool calls streaming.
 - [x] Design terminal, filesystem, and secure backup services with advanced path-escape checks & cancelable SSE pipeline.
 - [x] Create custom ReAct Specialized Agent tab with active status trace, dynamic model fetch, unified diffs, and validation loops.
+- [x] Integrate full-stack ReAct Agent Session Management (M6 / AC-A6); added session list sidebar for start, select, automatic backup, and deletion of past conversations.
+- [x] Expand high-fidelity self-test verification suite (G8: Agent Tool Loop) ensuring seamless live-sandbox execution loops.
 - [x] Build React 19 visual cockpit dashboard.
 - [x] Full compilation and static verification validation success.

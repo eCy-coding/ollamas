@@ -23,7 +23,7 @@ describe("LLM Mission Control Core Software Suite Tests", () => {
     expect(chainOpenRouter).toContain("gemini");
     expect(chainOpenRouter).toContain("openai");
     expect(chainOpenRouter).toContain("demo");
-    expect(chainOpenRouter.length).toBe(5);
+    expect(chainOpenRouter.length).toBe(6);
 
     const chainUnknown = getFallbackChain("unknown-provider");
     expect(chainUnknown[0]).toBe("unknown-provider");

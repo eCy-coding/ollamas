@@ -4,6 +4,7 @@ import {
   Terminal, ShieldCheck, History, RefreshCw, AlertCircle, 
   FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft
 } from "lucide-react";
+import { ChatSession } from "../types";
 
 interface TraceStep {
   stepNum: number;
@@ -43,6 +44,112 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [autoApply, setAutoApply] = useState<boolean>(true);
   const [currentStepInfo, setCurrentStepInfo] = useState<string>("");
+
+  // ReAct Sessions Memory States
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [loadingSessions, setLoadingSessions] = useState<boolean>(false);
+
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await fetch("/api/agent/sessions");
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+        return data;
+      }
+    } catch {
+      onNotify("Failed to fetch past sessions config list.", "error");
+    } finally {
+      setLoadingSessions(false);
+    }
+    return [];
+  };
+
+  const selectSession = async (id: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/agent/sessions/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveSessionId(data.id);
+        setProvider(data.providerId || "gemini");
+        setModel(data.modelId || "gemini-3.5-flash");
+        setMessages(data.messages.length > 0 ? data.messages : [
+          {
+            role: "assistant",
+            content: "Welcome back! How can I help you proceed with this ReAct session?"
+          }
+        ]);
+        setTraceSteps([]);
+        setPendingApproval(null);
+      } else {
+        onNotify("Failed to load chosen agent session context.", "error");
+      }
+    } catch {
+      onNotify("Error restoring active session state.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startNewSession = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/agent/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "New ReAct Session",
+          providerId: provider,
+          modelId: model
+        })
+      });
+      if (res.ok) {
+        const newSess = await res.json();
+        setActiveSessionId(newSess.id);
+        setMessages([
+          {
+            role: "assistant",
+            content: "Session initialized successfully. Provide a software goal, and we can inspect local code files, make edits, and verify changes."
+          }
+        ]);
+        setTraceSteps([]);
+        setPendingApproval(null);
+        await loadSessions();
+      }
+    } catch {
+      onNotify("Could not create persistent agent session.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteSession = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this conversation session?")) return;
+    try {
+      const res = await fetch(`/api/agent/sessions/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        onNotify("Session deleted.", "success");
+        if (activeSessionId === id) {
+          setActiveSessionId(null);
+          setMessages([
+            {
+              role: "assistant",
+              content: "Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely."
+            }
+          ]);
+          setTraceSteps([]);
+          setPendingApproval(null);
+        }
+        await loadSessions();
+      }
+    } catch {
+      onNotify("Failed to delete the chosen session.", "error");
+    }
+  };
 
   // Pending write approval state (for when autoApply is OFF)
   const [pendingApproval, setPendingApproval] = useState<{
@@ -89,7 +196,23 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     }
   };
 
+  // Load initial sessions and fetch model lists on mount
+  const hasLoadedInit = useRef<boolean>(false);
   useEffect(() => {
+    const init = async () => {
+      await fetchModels(provider);
+      const loaded = await loadSessions();
+      if (loaded && loaded.length > 0) {
+        await selectSession(loaded[0].id);
+      }
+      hasLoadedInit.current = true;
+    };
+    init();
+  }, []);
+
+  // Sync models list only when provider changes, ignoring double activation on mount
+  useEffect(() => {
+    if (!hasLoadedInit.current) return;
     fetchModels(provider);
   }, [provider]);
 
@@ -106,11 +229,34 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     setInputMessage("");
     setPendingApproval(null);
 
-    const newMessages = [...messages, { role: "user", content: userText } as Message];
-    setMessages(newMessages);
     setIsLoading(true);
     setTraceSteps([]);
     setCurrentStepInfo("Spinning up local ReAct engine context...");
+
+    let currentSessionId = activeSessionId;
+    if (!currentSessionId) {
+      try {
+        const res = await fetch("/api/agent/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
+            providerId: provider,
+            modelId: model
+          })
+        });
+        if (res.ok) {
+          const newSess = await res.json();
+          currentSessionId = newSess.id;
+          setActiveSessionId(newSess.id);
+        }
+      } catch (err) {
+        console.error("Auto session generation failed", err);
+      }
+    }
+
+    const newMessages = [...messages, { role: "user", content: userText } as any];
+    setMessages(newMessages);
 
     try {
       const response = await fetch("/api/agent/chat", {
@@ -121,7 +267,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           model,
           messages: newMessages,
           autoApply,
-          maxSteps: 10
+          maxSteps: 10,
+          sessionId: currentSessionId
         })
       });
 
@@ -211,6 +358,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       setCurrentStepInfo("Agent pipeline disrupted.");
     } finally {
       setIsLoading(false);
+      loadSessions();
     }
   };
 
@@ -339,14 +487,70 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       </div>
 
       {/* Main Workspace Frame */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+
+        {/* Sessions Sidebar Column picker (M6 / AC-A6) */}
+        <div className="bg-[#08090d] border border-white/5 rounded-lg p-4 flex flex-col justify-start space-y-3 xl:col-span-1 h-[470px]">
+          <div className="flex items-center justify-between pb-2 border-b border-white/5">
+            <div className="flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-slate-400" />
+              <label className="text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">ReAct Sessions</label>
+            </div>
+            <button
+              onClick={startNewSession}
+              disabled={isLoading}
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none"
+            >
+              + NEW
+            </button>
+          </div>
+
+          <div className="space-y-1.5 flex-1 overflow-y-auto scrollbar-thin pr-1">
+            {loadingSessions && sessions.length === 0 ? (
+              <div className="text-[10px] font-mono text-slate-500 text-center py-4">Loading sessions...</div>
+            ) : sessions.length === 0 ? (
+              <div className="text-[10px] font-mono text-slate-500 text-center py-4">No active sessions located. Click "+ NEW" to begin.</div>
+            ) : (
+              sessions.map((sess) => {
+                const isActive = sess.id === activeSessionId;
+                const formattedDate = new Date(sess.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div
+                    key={sess.id}
+                    onClick={() => !isLoading && selectSession(sess.id)}
+                    className={`group w-full text-left p-2 rounded cursor-pointer transition flex items-center justify-between border ${
+                      isActive 
+                        ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                        : "bg-slate-900/30 border-white/5 hover:bg-slate-900/60 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <div className="flex flex-col min-w-0 pr-1 truncate">
+                      <span className="text-xs font-mono font-medium truncate leading-tight group-hover:text-slate-100">{sess.title}</span>
+                      <span className="text-[9px] text-slate-600 font-mono mt-0.5">{formattedDate} • {sess.modelId.split("/").pop()}</span>
+                    </div>
+                    <button
+                      onClick={(e) => deleteSession(e, sess.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition shrink-0"
+                      title="Delete Session"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
         
-        {/* Left Hand: High Fidelity Chats */}
-        <div className="lg:col-span-2 space-y-4 flex flex-col min-h-[500px]">
+        {/* Right Hand: Chat and Tools area wrapper */}
+        <div className="xl:col-span-3 grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Chat Bubble Console */}
-          <div className="flex-1 bg-[#08090d] border border-white/5 rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin">
-            {messages.map((m, idx) => (
+          {/* Left Hand: High Fidelity Chats */}
+          <div className="lg:col-span-2 space-y-4 flex flex-col min-h-[500px]">
+            
+            {/* Chat Bubble Console */}
+            <div className="flex-1 bg-[#08090d] border border-white/5 rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin">
+              {messages.filter(m => m.role === "user" || m.role === "assistant").map((m, idx) => (
               <div 
                 key={idx}
                 className={`flex gap-3 max-w-[85%] ${
@@ -499,6 +703,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           )}
         </div>
       </div>
+    </div>
 
       {/* Real-time Steps Trace execution stream */}
       {traceSteps.length > 0 && (

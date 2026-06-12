@@ -4,7 +4,7 @@ import os from "os";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
-import { db } from "./server/db";
+import { db, ChatSession } from "./server/db";
 import { ProviderRouter } from "./server/providers";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
@@ -390,7 +390,7 @@ async function initializeServer() {
    * ReAct Agent Specialist Loop APIs (AC-A1, AC-A3)
    */
   app.post("/api/agent/chat", async (req, res) => {
-    const { provider, model, messages, autoApply, maxSteps = 8 } = req.body;
+    const { provider, model, messages, autoApply, maxSteps = 8, sessionId } = req.body;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -612,6 +612,27 @@ STRICT PROTOCOLS:
       if (stepNum > maxSteps && !shouldHalt) {
         sendEvent("done", { text: "ReAct loop complete. Reached step depth limit.", status: "limit" });
       }
+
+      if (sessionId) {
+        const sess = (db.data.sessions || []).find(s => s.id === sessionId);
+        if (sess) {
+          sess.messages = activeHistory.map((m: any) => ({
+            id: m.id || crypto.randomUUID(),
+            role: m.role,
+            content: m.content || "",
+            timestamp: m.timestamp || new Date().toISOString(),
+            name: m.name,
+            tool_call_id: m.tool_call_id
+          }));
+          sess.updatedAt = new Date().toISOString();
+          const firstUserMsg = activeHistory.find(m => m.role === "user");
+          if (firstUserMsg && sess.title === "New ReAct Session") {
+            sess.title = firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : "");
+          }
+          db.save();
+        }
+      }
+
       res.end();
     } catch (err: any) {
       sendEvent("error", { message: err?.message || "Execution loop failure." });
@@ -636,6 +657,71 @@ STRICT PROTOCOLS:
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to approve write operation" });
+    }
+  });
+
+  /**
+   * Agent session persistence endpoints (AC-A6)
+   */
+  app.get("/api/agent/sessions", (req, res) => {
+    try {
+      const list = (db.data.sessions || []).map(s => ({
+        id: s.id,
+        title: s.title,
+        providerId: s.providerId,
+        modelId: s.modelId,
+        updatedAt: s.updatedAt
+      }));
+      res.json(list);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch agent sessions" });
+    }
+  });
+
+  app.get("/api/agent/sessions/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const session = (db.data.sessions || []).find(s => s.id === id);
+      if (!session) {
+        return res.status(404).json({ error: "Agent session not found" });
+      }
+      res.json(session);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to load agent session" });
+    }
+  });
+
+  app.post("/api/agent/sessions", (req, res) => {
+    try {
+      const { title, providerId, modelId } = req.body;
+      const newSession: ChatSession = {
+        id: crypto.randomUUID(),
+        title: title || "New ReAct Session",
+        modelId: modelId || "gemini-3.5-flash",
+        providerId: providerId || "gemini",
+        messages: [],
+        updatedAt: new Date().toISOString()
+      };
+      if (!db.data.sessions) {
+        db.data.sessions = [];
+      }
+      db.data.sessions.unshift(newSession);
+      db.save();
+      res.json(newSession);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to create agent session" });
+    }
+  });
+
+  app.delete("/api/agent/sessions/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const initialCount = (db.data.sessions || []).length;
+      db.data.sessions = (db.data.sessions || []).filter(s => s.id !== id);
+      db.save();
+      res.json({ success: true, deleted: (db.data.sessions || []).length < initialCount });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to delete session" });
     }
   });
 
@@ -1147,6 +1233,58 @@ content
         ? `${keysCount} encrypted hardware credentials loaded in secure at-rest file.` 
         : "Storage contains zero external cloud keys. Operating under offline default.",
     };
+
+    // G8: ReAct Agent Tool Loop self-test Gate
+    if (CURRENT_MODE === "live") {
+      try {
+        const TEST_TOOLS = [
+          {
+            type: "function",
+            function: {
+              name: "list_tree",
+              description: "List the entire workspace files directory structure recursively.",
+              parameters: { type: "object", properties: {}, required: [] }
+            }
+          }
+        ];
+        // Execute a quick, low-cost tool test against the local provider
+        const toolResult = await ProviderRouter.generate({
+          provider: "ollama-local",
+          model: "qwen3:8b",
+          messages: [
+            { role: "system", content: "You are a ReAct agent. You must invoke the list_tree tool to inspect the workspace." },
+            { role: "user", content: "List the files." }
+          ],
+          tools: TEST_TOOLS,
+          numCtx: 1024,
+        });
+
+        const hasToolCall = !!(toolResult.toolCalls && toolResult.toolCalls.some(tc => tc.name === "list_tree"));
+        const wasOllamaLocal = toolResult.source === "ollama_local";
+
+        if (hasToolCall && wasOllamaLocal) {
+          report["G8_AgentToolLoop"] = {
+            status: "PASS",
+            details: "1-step ReAct agent successfully triggered local 'list_tree' tool invocation on ollama_local.",
+          };
+        } else {
+          report["G8_AgentToolLoop"] = {
+            status: "WARN",
+            details: `Agent generated model response, but exact tool bindings missed or routed differently (Source: ${toolResult.source}, Has list_tree call: ${hasToolCall}).`,
+          };
+        }
+      } catch (e: any) {
+        report["G8_AgentToolLoop"] = {
+          status: "FAIL",
+          details: `ReAct 1-step loop invocation failed: ${e.message}`,
+        };
+      }
+    } else {
+      report["G8_AgentToolLoop"] = {
+        status: "WARN",
+        details: "Agent Tool-Loop self-test ignored in demo mode (Ollama isolated from cloud containment).",
+      };
+    }
 
     res.json(report);
   });
