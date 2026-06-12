@@ -34,8 +34,10 @@
 
 ## EXECUTION LOG
 - [x] Context and constraints established in `project_cortex.md`.
-- [ ] Implement `package.json` configurations for Express server in Vite.
+- [x] Integrate Google Drive functionality (`GoogleDriveBrowser.tsx`).
+- [x] Configure Firebase integration (`src/lib/firebase.ts`) and Auth Hook (`useAuth.ts`).
+- [x] Added Client-side OAuth with `drive` scope using `signInWithPopup`.
 - [ ] Implement secure database engine (`server/db.ts`) with master credentials key.
 - [ ] Implement multi-provider server engine (`server/providers.ts`).
 - [ ] Design terminal, filesystem, and secure backup services.
-- [ ] Build React 19 visual cockpit dashboard.
+- [x] Build React 19 visual cockpit dashboard.

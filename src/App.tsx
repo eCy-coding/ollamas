@@ -5,6 +5,7 @@ import {
 import { KeyVault } from "./components/KeyVault";
 import { MultiAgentPipeline } from "./components/MultiAgentPipeline";
 import { WorkspaceTree } from "./components/WorkspaceTree";
+import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
 import { SelfTestGates } from "./components/SelfTestGates";
@@ -53,6 +54,7 @@ export default function App() {
     { id: "telemetry", label: "Cockpit Dashboard", icon: <Cpu className="w-4 h-4" /> },
     { id: "pipeline", label: "Pipeline Agent", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
     { id: "files", label: "Files Explorer", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
+    { id: "drive", label: "Google Drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
     { id: "terminal", label: "Interactive CLI", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
     { id: "keys", label: "Hardware Vault", icon: <Key className="w-4 h-4 text-indigo-400" /> },
     { id: "security", label: "Guard Policies", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
@@ -236,6 +238,12 @@ export default function App() {
                 onPathChange={(newPath) => setTelemetry((p) => p ? { ...p, workspacePath: newPath } : null)}
                 isLive={telemetry ? telemetry.mode !== "demo" : false}
               />
+            </div>
+          )}
+
+          {activeTab === "drive" && (
+            <div className="animate-fade-in">
+              <GoogleDriveBrowser />
             </div>
           )}
 
