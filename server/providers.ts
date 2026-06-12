@@ -14,6 +14,13 @@ export interface GenerateConfig {
   numCtx?: number;
   temperature?: number;
   stream?: boolean;
+  tools?: any[];
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: any;
 }
 
 export interface GenerateResult {
@@ -22,6 +29,7 @@ export interface GenerateResult {
   modelUsed: string;
   latencyMs: number;
   tokensPerSec?: number;
+  toolCalls?: ToolCall[];
 }
 
 // In-Memory Latency Tracker
@@ -65,6 +73,20 @@ export class ProviderRouter {
       } catch (err: any) {
         console.warn(`[Router] Provider ${prov} failed: ${err?.message || err}. Retrying fallback...`);
         lastError = err;
+
+        // Smart fallback check: stop falling back on authentication details (transient vs 401/403)
+        const lowercaseMsg = (err?.message || "").toLowerCase();
+        const isAuthError = 
+          lowercaseMsg.includes("401") || 
+          lowercaseMsg.includes("403") || 
+          lowercaseMsg.includes("unauthorized") || 
+          lowercaseMsg.includes("forbidden") || 
+          lowercaseMsg.includes("api key") || 
+          lowercaseMsg.includes("not set");
+        
+        if (isAuthError) {
+          throw new Error(`Authentication failure: invalid or missing key for ${prov}. Error: ${err.message || err}`);
+        }
         
         const nextIndex = providersToTry.indexOf(prov) + 1;
         if (nextIndex < providersToTry.length) {
@@ -88,7 +110,7 @@ export class ProviderRouter {
    * Determine fallback chain based on selected initial provider
    */
   private static getFallbackChain(initial: string): string[] {
-    const defaults = ["ollama-local", "openrouter", "gemini", "openai", "demo"];
+    const defaults = ["ollama-local", "openrouter", "gemini", "openai", "ollama-cloud", "demo"];
     const index = defaults.indexOf(initial);
     if (index === -1) {
       return [initial, ...defaults];
@@ -103,7 +125,7 @@ export class ProviderRouter {
     return typeof key === "string" && key.trim().length > 0;
   }
 
-  private static getDecryptedKey(provider: string): string {
+  public static getDecryptedKey(provider: string): string {
     const encryptedKey = db.data.keys[provider];
     if (encryptedKey) {
       const decrypted = db.decrypt(encryptedKey);
@@ -129,7 +151,7 @@ export class ProviderRouter {
   private static async executeProvider(
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void
-  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number }> {
+  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; toolCalls?: ToolCall[] }> {
     const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
     const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
 
@@ -151,6 +173,7 @@ export class ProviderRouter {
             },
             think: false, // Prevent reasoning bloat output according to L6 Spec
             stream: !!onStreamChunk,
+            tools: config.tools,
           }),
           signal: AbortSignal.timeout(300000), // Massive timeout for slow-loading local models (L12)
         });
@@ -205,7 +228,98 @@ export class ProviderRouter {
           if (resultJson.eval_count && resultJson.eval_duration) {
              tokensPerSec = resultJson.eval_count / (resultJson.eval_duration / 1e9);
           }
-          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec };
+
+          let toolCalls: ToolCall[] | undefined;
+          if (resultJson?.message?.tool_calls) {
+            toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
+              id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            }));
+          }
+
+          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec, toolCalls };
+        }
+      }
+
+      case "ollama-cloud": {
+        const apiKey = this.getDecryptedKey("ollama-cloud");
+        if (!apiKey) throw new Error("Ollama Cloud Key is not set");
+        const ollamaHost = "https://ollama.com/api";
+        const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
+        
+        const response = await fetch(`${ollamaHost}/chat`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: config.model || "qwen3:8b",
+            messages: config.messages,
+            options: {
+              num_ctx: numCtx,
+              temperature: config.temperature ?? 0.7,
+            },
+            think: false,
+            stream: !!onStreamChunk,
+            tools: config.tools,
+          }),
+          signal: AbortSignal.timeout(300000),
+        });
+
+        if (!response.ok) {
+          const errMsg = await response.text().catch(() => "");
+          throw new Error(`Ollama Cloud returned status ${response.status}: ${errMsg || response.statusText}`);
+        }
+
+        if (onStreamChunk && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let accumulated = "";
+          let fullText = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            accumulated += decoder.decode(value, { stream: true });
+            const lines = accumulated.split("\n");
+            accumulated = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const parsed = JSON.parse(line);
+                const chunkText = parsed?.message?.content || "";
+                if (chunkText) {
+                  onStreamChunk(chunkText);
+                  fullText += chunkText;
+                }
+                if (parsed.done && parsed.eval_count && parsed.eval_duration) {
+                  return { text: fullText, source: "cloud:ollama-cloud", modelUsed: config.model, tokensPerSec: parsed.eval_count / (parsed.eval_duration / 1e9) };
+                }
+              } catch (e) {}
+            }
+          }
+          return { text: fullText, source: "cloud:ollama-cloud", modelUsed: config.model };
+        } else {
+          const resultJson = await response.json();
+          let reply = resultJson?.message?.content || "";
+          let tokensPerSec: number | undefined;
+          if (resultJson.eval_count && resultJson.eval_duration) {
+             tokensPerSec = resultJson.eval_count / (resultJson.eval_duration / 1e9);
+          }
+
+          let toolCalls: ToolCall[] | undefined;
+          if (resultJson?.message?.tool_calls) {
+            toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
+              id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
+              name: tc.function?.name,
+              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            }));
+          }
+
+          return { text: reply, source: "cloud:ollama-cloud", modelUsed: config.model, tokensPerSec, toolCalls };
         }
       }
 
@@ -238,6 +352,15 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              ...(config.tools ? {
+                tools: config.tools.map((t: any) => ({
+                  functionDeclarations: [{
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters
+                  }]
+                }))
+              } : {})
             },
           });
 
@@ -257,9 +380,31 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              ...(config.tools ? {
+                tools: config.tools.map((t: any) => ({
+                  functionDeclarations: [{
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters
+                  }]
+                }))
+              } : {})
             },
           });
-          return { text: response.text || "", source: "cloud:gemini", modelUsed: geminiModel };
+
+          const fcs = response.functionCalls || [];
+          const toolCalls = fcs.map((fc: any) => ({
+            id: `tc-${crypto.randomUUID().slice(0, 8)}`,
+            name: fc.name,
+            arguments: fc.args
+          }));
+
+          return { 
+            text: response.text || "", 
+            source: "cloud:gemini", 
+            modelUsed: geminiModel,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined
+          };
         }
       }
 
@@ -280,6 +425,7 @@ export class ProviderRouter {
             messages: config.messages,
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
+            tools: config.tools,
           }),
         });
 
@@ -317,10 +463,18 @@ export class ProviderRouter {
           return { text: fullText, source: "cloud:openrouter", modelUsed: config.model };
         } else {
           const json = await response.json();
+          const tcs = json.choices?.[0]?.message?.tool_calls;
+          const toolCalls = tcs?.map((tc: any) => ({
+            id: tc.id,
+            name: tc.function?.name,
+            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+          }));
+
           return {
             text: json.choices?.[0]?.message?.content || "",
             source: "cloud:openrouter",
             modelUsed: config.model,
+            toolCalls: toolCalls?.length ? toolCalls : undefined,
           };
         }
       }
@@ -347,6 +501,7 @@ export class ProviderRouter {
             messages: config.messages,
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
+            tools: config.tools,
           }),
         });
 
@@ -384,10 +539,18 @@ export class ProviderRouter {
           return { text: fullText, source: `cloud:${keyProvider}`, modelUsed: config.model };
         } else {
           const json = await response.json();
+          const tcs = json.choices?.[0]?.message?.tool_calls;
+          const toolCalls = tcs?.map((tc: any) => ({
+            id: tc.id,
+            name: tc.function?.name,
+            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+          }));
+
           return {
             text: json.choices?.[0]?.message?.content || "",
             source: `cloud:${keyProvider}`,
             modelUsed: config.model,
+            toolCalls: toolCalls?.length ? toolCalls : undefined,
           };
         }
       }
@@ -411,6 +574,11 @@ export class ProviderRouter {
             max_tokens: 4096,
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
+            tools: config.tools ? config.tools.map((t: any) => ({
+              name: t.function.name,
+              description: t.function.description,
+              input_schema: t.function.parameters
+            })) : undefined,
           }),
         });
 
@@ -448,8 +616,20 @@ export class ProviderRouter {
           return { text: fullText, source: "cloud:anthropic", modelUsed: config.model };
         } else {
           const json = await response.json();
-          const reply = json.content?.[0]?.text || "";
-          return { text: reply, source: "cloud:anthropic", modelUsed: config.model };
+          const reply = json.content?.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") || "";
+          const toolUses = json.content?.filter((c: any) => c.type === "tool_use");
+          const toolCalls = toolUses?.map((tu: any) => ({
+            id: tu.id,
+            name: tu.name,
+            arguments: tu.input
+          }));
+
+          return { 
+            text: reply, 
+            source: "cloud:anthropic", 
+            modelUsed: config.model,
+            toolCalls: toolCalls?.length ? toolCalls : undefined
+          };
         }
       }
 

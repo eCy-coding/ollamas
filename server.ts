@@ -251,28 +251,92 @@ async function initializeServer() {
           const names = (list.models || []).map((m: any) => m.name);
           return res.json(names);
         }
-        return res.json([]);
+        return res.json(["qwen3:8b", "qwen3:4b"]);
+      }
+
+      if (prov === "ollama-cloud") {
+        const key = ProviderRouter.getDecryptedKey("ollama-cloud");
+        if (!key) {
+          return res.json(["API key not set for Ollama Cloud - please configure it in the Vault"]);
+        }
+        return res.json(["qwen3:8b", "qwen3:4b", "qwen3-coder:30b", "deepseek-r1:32b", "llama3.3:70b"]);
       }
 
       if (prov === "openrouter") {
+        const key = ProviderRouter.getDecryptedKey("openrouter");
+        if (!key) {
+          return res.json(["API key not set for OpenRouter - please configure it in the Vault"]);
+        }
         const response = await fetch("https://openrouter.ai/api/v1/models");
         if (response.ok) {
           const list = await response.json();
-          const names = (list.data || []).map((m: any) => m.id);
+          let names = (list.data || []).map((m: any) => m.id);
+          if (req.query.freeOnly === "true") {
+            names = names.filter((id: string) => id.endsWith(":free"));
+          }
           return res.json(names);
         }
         return res.json(["google/gemini-2.5-flash-lite:free", "meta-llama/llama-3-8b-instruct:free"]);
       }
 
       if (prov === "gemini") {
+        const key = ProviderRouter.getDecryptedKey("gemini");
+        if (!key) {
+          return res.json(["API key not set for Gemini - please configure it in the Vault"]);
+        }
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+          if (response.ok) {
+            const list = await response.json();
+            const names = (list.models || [])
+              .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+              .map((m: any) => m.name.replace("models/", ""));
+            return res.json(names);
+          }
+        } catch (e) {}
         return res.json(["gemini-3.5-flash", "gemini-3.1-pro-preview"]);
       }
 
       if (prov === "anthropic") {
+        const key = ProviderRouter.getDecryptedKey("anthropic");
+        if (!key) {
+          return res.json(["API key not set for Anthropic - please configure it in the Vault"]);
+        }
+        try {
+          const response = await fetch("https://api.anthropic.com/v1/models", {
+            headers: {
+              "x-api-key": key,
+              "anthropic-version": "2023-06-01"
+            }
+          });
+          if (response.ok) {
+            const list = await response.json();
+            const names = (list.data || []).map((m: any) => m.id);
+            return res.json(names);
+          }
+        } catch (e) {}
         return res.json(["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"]);
       }
 
       if (prov === "openai") {
+        const key = ProviderRouter.getDecryptedKey("openai");
+        if (!key) {
+          return res.json(["API key not set for OpenAI - please configure it in the Vault"]);
+        }
+        try {
+          const response = await fetch("https://api.openai.com/v1/models", {
+            headers: {
+              "Authorization": `Bearer ${key}`
+            }
+          });
+          if (response.ok) {
+            const list = await response.json();
+            const names = (list.data || [])
+              .map((m: any) => m.id)
+              .filter((id: string) => id.startsWith("gpt-") || id.startsWith("o1-") || id.startsWith("o3-"));
+            return res.json(names);
+          }
+        } catch (e) {}
         return res.json(["gpt-4o-mini", "gpt-4o"]);
       }
 
@@ -319,6 +383,259 @@ async function initializeServer() {
       } catch (err: any) {
         res.status(500).json({ error: err?.message || "Execution engine failure" });
       }
+    }
+  });
+
+  /**
+   * ReAct Agent Specialist Loop APIs (AC-A1, AC-A3)
+   */
+  app.post("/api/agent/chat", async (req, res) => {
+    const { provider, model, messages, autoApply, maxSteps = 8 } = req.body;
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const sendEvent = (type: string, payload: any) => {
+      res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+    };
+
+    const isLive = CURRENT_MODE !== "demo";
+    const workspaceRoot = db.data.workspacePath;
+
+    // Define tool schemas (OpenAI format; routed dynamically inside ProviderRouter)
+    const AGENT_TOOLS = [
+      {
+        type: "function",
+        function: {
+          name: "list_tree",
+          description: "List the entire workspace files directory structure recursively.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "read_file",
+          description: "Read full contents of a file at the specified workspace path.",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "The workspace-relative path of the target file to load." }
+            },
+            required: ["path"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "write_file",
+          description: "Propose or write updated full content to a file at the specified workspace relative path. If autoApply is false, this returns a unified diff for user approval before saving.",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "The workspace-relative path of the file." },
+              content: { type: "string", description: "The full file content to write." }
+            },
+            required: ["path", "content"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "run_command",
+          description: "Execute a command against the safe shell terminal environment (e.g. pytest, git, ls, date). Restricted system operations are blocked.",
+          parameters: {
+            type: "object",
+            properties: {
+              command: { type: "string", description: "The shell terminal command line parameters to execute." }
+            },
+            required: ["command"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "grep_search",
+          description: "Search for clean text matches inside files inside the project recursively.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "The pattern query string to scan." }
+            },
+            required: ["query"]
+          }
+        }
+      }
+    ];
+
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, and grep_search.
+Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
+
+STRICT PROTOCOLS:
+1. Work step-by-step. At each step, explain your brief thoughts about your next action, and selectively call appropriate tools.
+2. Read the files first to get context before writing any edits.
+3. Once any file changes are completed, run pytest, format, or static tests to verify that your changes are error-free.
+4. Keep your replies concise and technical. Use Markdown format.`;
+
+    let activeHistory = [...messages];
+    if (!activeHistory.some(m => m.role === "system")) {
+      activeHistory.unshift({ role: "system", content: customSystemPrompt });
+    }
+
+    try {
+      let stepNum = 1;
+      let shouldHalt = false;
+
+      while (stepNum <= maxSteps && !shouldHalt) {
+        sendEvent("thought", { text: `Thinking on Step ${stepNum}...` });
+        const start = Date.now();
+
+        const result = await ProviderRouter.generate({
+          provider,
+          model,
+          messages: activeHistory,
+          tools: AGENT_TOOLS,
+          stream: false,
+        });
+
+        // Collect LLM reply text
+        if (result.text && result.text.trim()) {
+          sendEvent("message", { text: result.text, step: stepNum });
+          activeHistory.push({ role: "assistant", content: result.text });
+        }
+
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          sendEvent("thought", { text: `Evaluating tool activation...`, toolCalls: result.toolCalls });
+
+          for (const tc of result.toolCalls) {
+            const toolName = tc.name;
+            const args = tc.arguments || {};
+            const toolCallId = tc.id;
+            let output: any;
+            let ok = true;
+            let diff = "";
+            let fileApplied = false;
+
+            const toolStart = Date.now();
+
+            try {
+              if (toolName === "list_tree") {
+                const tree = await FilesystemManager.getTree(isLive, workspaceRoot);
+                output = tree.tree;
+                db.logSecurity("file_system", "Agent list_tree", "Traced files tree dynamically", "allow");
+              } else if (toolName === "read_file") {
+                const filePath = args.path;
+                if (!filePath) throw new Error("Missing 'path' argument.");
+                const text = FilesystemManager.readFile(isLive, workspaceRoot, filePath);
+                output = text;
+                db.logSecurity("file_system", `Agent read_file: ${filePath}`, "Opened file contents securely", "allow");
+              } else if (toolName === "write_file") {
+                const filePath = args.path;
+                const fileContent = args.content;
+                if (!filePath || fileContent === undefined) {
+                  throw new Error("Missing 'path' or 'content' in write_file parameters.");
+                }
+
+                let oldContent = "";
+                try {
+                  oldContent = FilesystemManager.readFile(isLive, workspaceRoot, filePath);
+                } catch (e) {}
+
+                diff = FilesystemManager.generateUnifiedDiff(filePath, oldContent, fileContent);
+
+                if (autoApply) {
+                  FilesystemManager.writeFile(isLive, workspaceRoot, filePath, fileContent);
+                  fileApplied = true;
+                  db.logSecurity("file_system", `Agent write_file (auto-apply): ${filePath}`, "Wrote code modifications directly into workspace", "allow");
+                  output = "Changes written to disk successfully.";
+                } else {
+                  fileApplied = false;
+                  output = "File write is pending authorization. Diffs are stored and waiting for manual approval.";
+                  shouldHalt = true; // Pause execution for manual validation
+                }
+              } else if (toolName === "run_command") {
+                const cmdString = args.command;
+                if (!cmdString) throw new Error("Missing 'command' argument.");
+                const execRes = await TerminalManager.execute(isLive, workspaceRoot, cmdString);
+                output = execRes;
+              } else if (toolName === "grep_search") {
+                const q = args.query;
+                if (!q) throw new Error("Missing 'query' parameter.");
+                const execRes = await TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${q}" .`);
+                output = execRes;
+              } else {
+                throw new Error(`Unrecognized framework tool: '${toolName}'`);
+              }
+            } catch (err: any) {
+              ok = false;
+              output = { error: err.message || "Execution exception" };
+            }
+
+            const toolElapsed = Date.now() - toolStart;
+
+            sendEvent("step", {
+              stepNum,
+              tool: toolName,
+              args,
+              ok,
+              latency: toolElapsed,
+              result: output,
+              diff,
+              applied: fileApplied
+            });
+
+            activeHistory.push({
+              role: "tool" as any,
+              name: toolName,
+              tool_call_id: toolCallId,
+              content: typeof output === "string" ? output : JSON.stringify(output)
+            });
+          }
+
+          if (shouldHalt) {
+            sendEvent("paused", { message: "System paused. Waiting for file approval." });
+            break;
+          }
+        } else {
+          // Final reply reached
+          sendEvent("done", { text: result.text || "", status: "complete" });
+          break;
+        }
+
+        stepNum++;
+      }
+
+      if (stepNum > maxSteps && !shouldHalt) {
+        sendEvent("done", { text: "ReAct loop complete. Reached step depth limit.", status: "limit" });
+      }
+      res.end();
+    } catch (err: any) {
+      sendEvent("error", { message: err?.message || "Execution loop failure." });
+      res.end();
+    }
+  });
+
+  app.post("/api/agent/approve-write", async (req, res) => {
+    const { path: filePath, content } = req.body;
+    const isLive = CURRENT_MODE !== "demo";
+    const workspaceRoot = db.data.workspacePath;
+
+    try {
+      if (!filePath || content === undefined) {
+        return res.status(400).json({ error: "Missing path or content parameters" });
+      }
+
+      FilesystemManager.writeFile(isLive, workspaceRoot, filePath, content);
+      db.logSecurity("file_system", `Agent write_file (user-approved): ${filePath}`, "Wrote code changes following user approval", "allow");
+      db.save();
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to approve write operation" });
     }
   });
 

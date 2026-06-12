@@ -212,4 +212,32 @@ export class FilesystemManager {
       fs.unlinkSync(safePath);
     }
   }
+
+  /**
+   * Generates a unified diff format representing changes between oldContent and newContent
+   */
+  public static generateUnifiedDiff(filePath: string, oldContent: string, newContent: string): string {
+    const oldLines = oldContent.split(/\r?\n/);
+    const newLines = newContent.split(/\r?\n/);
+    const diff: string[] = [];
+    diff.push(`--- a/${filePath}`);
+    diff.push(`+++ b/${filePath}`);
+
+    let i = 0;
+    let j = 0;
+    while (i < oldLines.length || j < newLines.length) {
+      if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+        diff.push(`  ${oldLines[i]}`);
+        i++;
+        j++;
+      } else if (i < oldLines.length && (j >= newLines.length || !newLines.slice(j).includes(oldLines[i]))) {
+        diff.push(`- ${oldLines[i]}`);
+        i++;
+      } else if (j < newLines.length) {
+        diff.push(`+ ${newLines[j]}`);
+        j++;
+      }
+    }
+    return diff.join("\n");
+  }
 }

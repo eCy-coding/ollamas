@@ -4,6 +4,7 @@ import {
 } from "./components/TelemetryCockpit";
 import { KeyVault } from "./components/KeyVault";
 import { MultiAgentPipeline } from "./components/MultiAgentPipeline";
+import { ReactAgentTab } from "./components/ReactAgentTab";
 import { WorkspaceTree } from "./components/WorkspaceTree";
 import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
@@ -53,6 +54,7 @@ export default function App() {
   const tabs = [
     { id: "telemetry", label: "Cockpit Dashboard", icon: <Cpu className="w-4 h-4" /> },
     { id: "pipeline", label: "Pipeline Agent", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
+    { id: "react-agent", label: "ReAct Specialist", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
     { id: "files", label: "Files Explorer", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
     { id: "drive", label: "Google Drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
     { id: "terminal", label: "Interactive CLI", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
@@ -227,6 +229,12 @@ export default function App() {
                 onNotify={notify} 
                 workspacePath={telemetry ? telemetry.workspacePath : ""} 
               />
+            </div>
+          )}
+
+          {activeTab === "react-agent" && (
+            <div className="animate-fade-in">
+              <ReactAgentTab onNotify={notify} />
             </div>
           )}
 
