@@ -447,7 +447,7 @@ OUTPUT: Set out clear module hierarchies, files to be created, and complete spec
       architectOutput = archResult.text;
       const elapsedArch = Date.now() - startArch;
       // Synthesize estimated tokens per sec metrics matching real values (L11)
-      const archTokensPerSec = Math.round((architectOutput.length / 4) / (elapsedArch / 1000 || 1));
+      const archTokensPerSec = archResult.tokensPerSec !== undefined ? archResult.tokensPerSec : Math.round((architectOutput.length / 4) / (elapsedArch / 1000 || 1));
       sendProgress("architect", "done", architectOutput, archTokensPerSec, elapsedArch);
 
       // 2. CODER STAGE
@@ -466,7 +466,7 @@ Followed immediately by a markdown fenced code block containing the complete sou
       });
       coderOutput = coderResult.text;
       const elapsedCoder = Date.now() - startCoder;
-      const coderTokensPerSec = Math.round((coderOutput.length / 4) / (elapsedCoder / 1000 || 1));
+      const coderTokensPerSec = coderResult.tokensPerSec !== undefined ? coderResult.tokensPerSec : Math.round((coderOutput.length / 4) / (elapsedCoder / 1000 || 1));
       sendProgress("coder", "done", coderOutput, coderTokensPerSec, elapsedCoder);
 
       // Apply write operations internally if permitted
@@ -525,7 +525,7 @@ Validate code correctness, structural logic, and perform a solid Big-O performan
       });
       reviewerOutput = reviewerResult.text;
       const elapsedReview = Date.now() - startReview;
-      const reviewTokensPerSec = Math.round((reviewerOutput.length / 4) / (elapsedReview / 1000 || 1));
+      const reviewTokensPerSec = reviewerResult.tokensPerSec !== undefined ? reviewerResult.tokensPerSec : Math.round((reviewerOutput.length / 4) / (elapsedReview / 1000 || 1));
       sendProgress("reviewer", "done", reviewerOutput, reviewTokensPerSec, elapsedReview);
 
       // Optional Bounded Self-Improve loop using workspace tests results (L12, M3 AC-12)
@@ -721,12 +721,13 @@ content
     // G3: Sequential Pipeline Fallback Check
     try {
       const pipelineResult = await ProviderRouter.generate({
-        provider: "demo",
-        model: "simulation",
+        provider: CURRENT_MODE === "live" ? "ollama-local" : "demo",
+        model: CURRENT_MODE === "live" ? "qwen3:8b" : "simulation",
         messages: [{ role: "user", content: "test design target" }],
       });
+      const expectedSource = CURRENT_MODE === "live" ? "ollama_local" : "demo";
       report["G3_PipelineFallback"] = {
-        status: pipelineResult.source === "demo" ? "PASS" : "WARN",
+        status: pipelineResult.source === expectedSource ? "PASS" : "WARN",
         details: `Adaptive router fallback responsive. Source traced: ${pipelineResult.source}`,
       };
     } catch (e: any) {

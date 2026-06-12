@@ -21,6 +21,7 @@ export interface GenerateResult {
   source: string; // e.g. "ollama_local", "cloud:gemini", "cloud:openrouter", "demo"
   modelUsed: string;
   latencyMs: number;
+  tokensPerSec?: number;
 }
 
 // In-Memory Latency Tracker
@@ -120,7 +121,7 @@ export class ProviderRouter {
   private static async executeProvider(
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void
-  ): Promise<{ text: string; source: string; modelUsed: string }> {
+  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number }> {
     const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
     const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
 
@@ -175,6 +176,9 @@ export class ProviderRouter {
                   onStreamChunk(chunkText);
                   fullText += chunkText;
                 }
+                if (parsed.done && parsed.eval_count && parsed.eval_duration) {
+                  return { text: fullText, source: "ollama_local", modelUsed: config.model, tokensPerSec: parsed.eval_count / (parsed.eval_duration / 1e9) };
+                }
               } catch (e) {
                 // Keep moving on parse anomalies
               }
@@ -189,7 +193,11 @@ export class ProviderRouter {
           if (!reply && resultJson?.message?.thinking) {
             reply = resultJson.message.thinking;
           }
-          return { text: reply, source: "ollama_local", modelUsed: config.model };
+          let tokensPerSec: number | undefined;
+          if (resultJson.eval_count && resultJson.eval_duration) {
+             tokensPerSec = resultJson.eval_count / (resultJson.eval_duration / 1e9);
+          }
+          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec };
         }
       }
 

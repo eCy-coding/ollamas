@@ -40,6 +40,35 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
   });
 
   const [writeCount, setWriteCount] = useState<number | null>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setRunning(false);
+      onNotify("Pipeline sequence aborted.", "info");
+      
+      // Mark currently running stage as failed
+      setStages((prev) => {
+        const newStages = { ...prev };
+        for (const key of Object.keys(newStages)) {
+          if (newStages[key].status === "running") {
+            newStages[key] = { ...newStages[key], status: "fail", text: "Aborted by user." };
+          }
+        }
+        return newStages;
+      });
+    }
+  };
 
   const providers = [
     { id: "ollama-local", label: "Ollama (Local)" },
@@ -97,9 +126,13 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
     });
 
     try {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+
       const res = await fetch("/api/pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortControllerRef.current.signal,
         body: JSON.stringify({
           prompt,
           architectProvider: architectProv,
@@ -156,16 +189,40 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             }
 
             if (data.error) {
+              setStages((prev) => {
+                const newStages = { ...prev };
+                for (const key of Object.keys(newStages)) {
+                  if (newStages[key].status === "running") {
+                    newStages[key] = { ...newStages[key], status: "fail", text: data.error };
+                  }
+                }
+                return newStages;
+              });
               onNotify(`Pipeline encountered error: ${data.error}`, "error");
+              break;
             }
           } catch (e) {}
         }
       }
-      onNotify("Pipeline sequence finished successfully!", "success");
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        onNotify("Pipeline sequence finished successfully!", "success");
+      }
     } catch (err: any) {
+      if (err.name === "AbortError") return;
+      
+      setStages((prev) => {
+        const newStages = { ...prev };
+        for (const key of Object.keys(newStages)) {
+          if (newStages[key].status === "running") {
+            newStages[key] = { ...newStages[key], status: "fail", text: err.message };
+          }
+        }
+        return newStages;
+      });
       onNotify(`Pipeline failed to resolve: ${err.message}`, "error");
     } finally {
       setRunning(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -341,14 +398,24 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
         <div className="text-[10px] text-slate-500 font-mono italic">
           Target Workspace: <span className="text-slate-400">{workspacePath}</span>
         </div>
-        <button
-          onClick={handleRun}
-          disabled={running}
-          className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs px-5 py-2 rounded disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-        >
-          {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-          Execute Pipeline
-        </button>
+        <div className="flex gap-2">
+          {running && (
+            <button
+              onClick={handleStop}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 font-mono font-bold text-xs px-5 py-2 rounded transition cursor-pointer"
+            >
+              Stop
+            </button>
+          )}
+          <button
+            onClick={handleRun}
+            disabled={running}
+            className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs px-5 py-2 rounded disabled:opacity-50 flex items-center gap-2 cursor-pointer transition"
+          >
+            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Execute Pipeline
+          </button>
+        </div>
       </div>
 
       {/* DAG GRAPH GRAPHICS */}

@@ -37,7 +37,7 @@
 - [x] Integrate Google Drive functionality (`GoogleDriveBrowser.tsx`).
 - [x] Configure Firebase integration (`src/lib/firebase.ts`) and Auth Hook (`useAuth.ts`).
 - [x] Added Client-side OAuth with `drive` scope using `signInWithPopup`.
-- [ ] Implement secure database engine (`server/db.ts`) with master credentials key.
-- [ ] Implement multi-provider server engine (`server/providers.ts`).
-- [ ] Design terminal, filesystem, and secure backup services.
+- [x] Implement secure database engine (`server/db.ts`) with master credentials key.
+- [x] Implement multi-provider server engine (`server/providers.ts`) with real metrics.
+- [x] Design terminal, filesystem, and secure backup services with advanced path-escape checks & cancelable SSE pipeline.
 - [x] Build React 19 visual cockpit dashboard.

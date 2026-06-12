@@ -100,18 +100,34 @@ export class BackupService {
 
       if (config.type === "s3" && config.endpoint && config.bucket) {
         // Build direct PUT request to match S3 REST upload API
+        // Modified: To avoid complex AWS Signature V4 logic locally, 
+        // this supports pre-signed URLs provided in the endpoint field,
+        // or a simple public unauthenticated bucket if accessKeys are not checked.
         const hostUrl = config.endpoint.replace(/\/$/, "");
-        const uploadUrl = `${hostUrl}/${config.bucket}/${filename}`;
+        
+        let uploadUrl = "";
+        let authHeaders: Record<string, string> = {};
 
-        // Compute minimal S3 signature auth or standard Authorization header
+        // If it looks like a pre-signed S3 URL (contains query params like X-Amz-Signature), 
+        // we upload directly to it.
+        if (config.endpoint.includes("X-Amz-Signature") || config.endpoint.includes("?")) {
+          uploadUrl = config.endpoint;
+        } else {
+           uploadUrl = `${hostUrl}/${config.bucket}/${filename}`;
+           // We fallback to simple header auth or public which works in some non-AWS compatible buckets like simple MinIO configs
+           if (config.accessKey) {
+             // For genuine AWS Signature V4, this requires a complex crypto signing process. 
+             // Without it, this relies on a pre-signed URL approach.
+             // We'll leave AWS fallback Authorization just in case it's a proxy that accepts it.
+             authHeaders["Authorization"] = `AWS ${config.accessKey}:${config.secretKey}`;
+           }
+        }
+
         const res = await fetch(uploadUrl, {
           method: "PUT",
           headers: {
             "Content-Type": "application/octet-stream",
-            // Note: In local development, the user can configure a local MinIO with public PUT access, 
-            // or we add basic bearer headers for generic target endpoint auth.
-            "X-Amz-Content-Sha256": crypto.createHash("sha256").update(cipherText).digest("hex"),
-            ...(config.accessKey ? { "Authorization": `AWS ${config.accessKey}:${config.secretKey}` } : {}),
+            ...authHeaders
           },
           body: cipherText,
         });

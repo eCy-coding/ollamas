@@ -1,0 +1,47 @@
+{
+  "keys": {},
+  "workspacePath": "/demo/workspace",
+  "ollamaNumCtx": 8192,
+  "backup": {
+    "type": "none",
+    "endpoint": "",
+    "bucket": "",
+    "accessKey": "",
+    "secretKey": "",
+    "intervalMinutes": 120,
+    "enabled": false
+  },
+  "permissions": {
+    "fileRead": true,
+    "fileWrite": true,
+    "commandExec": true,
+    "git": true
+  },
+  "sessions": [],
+  "securityLog": [
+    {
+      "id": "5ed3342b-0e4b-461c-b5a1-e5cdf38057ba",
+      "timestamp": "2026-06-12T17:13:59.056Z",
+      "category": "command_exec",
+      "action": "ls ; echo HAcked",
+      "details": "Command refused: contains forbidden metacharacter ';'.",
+      "status": "deny"
+    },
+    {
+      "id": "c1001542-68fb-4f08-94e0-8a03999bc95b",
+      "timestamp": "2026-06-12T17:13:59.056Z",
+      "category": "command_exec",
+      "action": "sudo apt-get install haproxy",
+      "details": "Command refused: contains restricted binary/operation 'sudo'.",
+      "status": "deny"
+    },
+    {
+      "id": "e8874412-f1e5-4b36-ac0d-e499517b2818",
+      "timestamp": "2026-06-12T17:13:59.055Z",
+      "category": "command_exec",
+      "action": "rm -rf /",
+      "details": "Command refused: contains restricted binary/operation 'rm'.",
+      "status": "deny"
+    }
+  ]
+}

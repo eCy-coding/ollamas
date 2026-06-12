@@ -31,7 +31,8 @@ export class FilesystemManager {
     const resolvedTarget = path.resolve(path.join(resolvedRoot, relativeTarget));
     
     // Safety check: Does the target resolve under the workspace root?
-    if (!resolvedTarget.startsWith(resolvedRoot)) {
+    const rootWithSep = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
+    if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(rootWithSep)) {
       throw new Error("Path traversal security block: target path escapes workspace root.");
     }
     return resolvedTarget;
