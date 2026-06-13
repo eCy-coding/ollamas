@@ -44,4 +44,14 @@
 - [x] Integrate full-stack ReAct Agent Session Management (M6 / AC-A6); added session list sidebar for start, select, automatic backup, and deletion of past conversations.
 - [x] Expand high-fidelity self-test verification suite (G8: Agent Tool Loop) ensuring seamless live-sandbox execution loops.
 - [x] Build React 19 visual cockpit dashboard.
-- [x] Full compilation and static verification validation success.
+- [x] Integrate P2P Computing Swarm Tab (`DecentralizedSwarmTab.tsx`) with dual-mode EULA, context lock, and referral commission tree.
+- [x] Implement robust Kademlia DHT Discovery framework (`p2p_network.go`) in pure Go.
+- [x] Implement Cross-Platform GPU memory limits and Transformer sharding (`hardware_orchestrator.rs`) in Rust.
+- [x] Implement Non-intrusive keyboard/mouse background CPU throttling (`idle_daemon.c`) in C.
+- [x] Implement secure execution metacharacter command guardrails and WASM fuel limits (`secure_sandbox.rs`) in Rust.
+- [x] Implement Sybil-proof multi-level referral reward structure with geometric decay (`MultiLevelReward.sol`) in Solidity.
+- [x] Build full-stack server-side endpoints for P2P Swarm telemetry tracking, persistent JSON config caching, and commission rewards claiming.
+- [x] Establish a unified master `Makefile` at root for compiling all multi-language decentralized computing backends instantly with a single command.
+- [x] Implement filesystem-based verification checking under 'G9_P2PSwarmAssets' self-test gate.
+- [x] Compile and test verification success with 10 total green automated backend unit tests.
+

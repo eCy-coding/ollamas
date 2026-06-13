@@ -30,6 +30,16 @@ export interface ChatSession {
   updatedAt: string;
 }
 
+export interface SwarmConfig {
+  eulaApproved: boolean;
+  peerId: string;
+  nodeActive: boolean;
+  referralId: string;
+  referredBy: string;
+  earnings: number;
+  numCtxLimit: number;
+}
+
 export interface DBConfig {
   keys: Record<string, string>; // encrypted strings
   workspacePath: string;
@@ -51,6 +61,7 @@ export interface DBConfig {
   };
   sessions: ChatSession[];
   securityLog: SecurityEvent[];
+  swarm: SwarmConfig;
 }
 
 const DEFAULT_CONFIG: DBConfig = {
@@ -74,6 +85,15 @@ const DEFAULT_CONFIG: DBConfig = {
   },
   sessions: [],
   securityLog: [],
+  swarm: {
+    eulaApproved: false,
+    peerId: "",
+    nodeActive: false,
+    referralId: "",
+    referredBy: "",
+    earnings: 0.1425,
+    numCtxLimit: 8192,
+  },
 };
 
 export class SecureDB {
