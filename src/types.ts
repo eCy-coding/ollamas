@@ -97,3 +97,31 @@ export interface PipelineStageState {
   tokensPerSec?: number;
   elapsed?: number;
 }
+
+export interface NodeCapability {
+  nodeId: string;
+  os: string;
+  cpuCores: number;
+  totalRAM: number;
+  gpuType: "metal" | "cuda" | "directml" | "none";
+  vramGB: number;
+  maxLayers: number;
+}
+
+export interface ClusterNode extends NodeCapability {
+  active: boolean;
+  load: number;
+  assignedLayers: number[];
+}
+
+export interface ClusterConsent {
+  approved: boolean;
+  timestamp: string;
+  termsHash: string;
+}
+
+export interface ClusterTelemetry {
+  consent: ClusterConsent;
+  peers: ClusterNode[];
+  isJoined: boolean;
+}
