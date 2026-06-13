@@ -28,7 +28,7 @@ build-all: $(BIN_DIR) build-p2p build-orchestrator build-sandbox build-idle
 build-p2p: $(BIN_DIR)
 	@echo "[+] Compiling Go P2P Network Daemon..."
 	@if command -v go >/dev/null 2>&1; then \
-		go build -o $(BIN_DIR)/p2p_network p2p_network.go; \
+		go build -o $(BIN_DIR)/p2p_network backend/mesh/p2p_network.go; \
 		echo "    -> Compiled: $(BIN_DIR)/p2p_network"; \
 	else \
 		echo "    [-] Skipping Go build: 'go' is not installed on the system."; \
@@ -38,7 +38,7 @@ build-p2p: $(BIN_DIR)
 build-orchestrator: $(BIN_DIR)
 	@echo "[+] Compiling Rust Hardware Orchestrator..."
 	@if command -v rustc >/dev/null 2>&1; then \
-		rustc -C opt-level=3 -o $(BIN_DIR)/hardware_orchestrator hardware_orchestrator.rs; \
+		rustc -C opt-level=3 -o $(BIN_DIR)/hardware_orchestrator backend/orchestrator/hardware_orchestrator.rs; \
 		echo "    -> Compiled: $(BIN_DIR)/hardware_orchestrator"; \
 	else \
 		echo "    [-] Skipping Rust build: 'rustc' is not installed on the system."; \
@@ -48,7 +48,7 @@ build-orchestrator: $(BIN_DIR)
 build-sandbox: $(BIN_DIR)
 	@echo "[+] Compiling Rust WebAssembly Sandbox Guard..."
 	@if command -v rustc >/dev/null 2>&1; then \
-		rustc -C opt-level=3 -o $(BIN_DIR)/secure_sandbox secure_sandbox.rs; \
+		rustc -C opt-level=3 -o $(BIN_DIR)/secure_sandbox backend/sandbox/secure_sandbox.rs; \
 		echo "    -> Compiled: $(BIN_DIR)/secure_sandbox"; \
 	else \
 		echo "    [-] Skipping Rust build: 'rustc' is not installed on the system."; \
@@ -58,10 +58,10 @@ build-sandbox: $(BIN_DIR)
 build-idle: $(BIN_DIR)
 	@echo "[+] Compiling ANSI C Dynamic Idle Monitor Daemon..."
 	@if command -v gcc >/dev/null 2>&1; then \
-		gcc -O2 -o $(BIN_DIR)/idle_daemon idle_daemon.c; \
+		gcc -O2 -o $(BIN_DIR)/idle_daemon backend/daemon/idle_daemon.c; \
 		echo "    -> Compiled: $(BIN_DIR)/idle_daemon"; \
 	elif command -v clang >/dev/null 2>&1; then \
-		clang -O2 -o $(BIN_DIR)/idle_daemon idle_daemon.c; \
+		clang -O2 -o $(BIN_DIR)/idle_daemon backend/daemon/idle_daemon.c; \
 		echo "    -> Compiled: $(BIN_DIR)/idle_daemon"; \
 	else \
 		echo "    [-] Skipping C build: 'gcc' or 'clang' is not installed on the system."; \
