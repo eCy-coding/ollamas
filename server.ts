@@ -34,6 +34,8 @@ async function runOnHostTerminal(target: string | undefined, command: string, ti
 
 // Run a command directly on the host via the bridge /exec (no terminal mutex).
 const HOST_TOOLS_DIR = "/Users/emrecnyngmail.com/Desktop/ollamas/bin/host-bridge/tools";
+// Single-quote-escape an argument for safe interpolation into a shell command.
+function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 async function execOnHost(command: string, timeoutMs = 95000) {
   const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
     method: "POST",
@@ -581,10 +583,42 @@ async function initializeServer() {
           description: "Aggregate health of the whole stack (bridge, app, ollama, terminals) plus a live terminal log snapshot.",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "lint_format",
+          description: "Typecheck the project (tsc --noEmit) and return whether it is clean plus any type errors.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "git_commit",
+          description: "Stage all changes and create a git commit with the given message (does NOT push).",
+          parameters: { type: "object", properties: { message: { type: "string", description: "Commit message." } }, required: ["message"] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "build_app",
+          description: "Rebuild and recreate the app container (docker compose build + up -d) and report whether it came back healthy.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "kill_process",
+          description: "Kill a host process by PID, or all listeners on a port (pass ':<port>'). Requires an explicit target.",
+          parameters: { type: "object", properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>' (e.g. ':3000')." } }, required: ["target"] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe (run the project's own self-built host tools).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -694,6 +728,16 @@ STRICT PROTOCOLS:
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/process_port.mjs ${port}`);
               } else if (toolName === "health_probe") {
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/health_probe.mjs`);
+              } else if (toolName === "lint_format") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/lint_format.mjs`, 250000);
+              } else if (toolName === "git_commit") {
+                if (!args.message) throw new Error("Missing 'message'.");
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_commit.mjs ${shArg(args.message)}`);
+              } else if (toolName === "build_app") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/build_app.mjs`, 220000);
+              } else if (toolName === "kill_process") {
+                if (!args.target) throw new Error("Missing 'target' (pid or :port).");
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/kill_process.mjs ${shArg(String(args.target))}`);
               } else {
                 throw new Error(`Unrecognized framework tool: '${toolName}'`);
               }
