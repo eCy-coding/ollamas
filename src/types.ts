@@ -1,3 +1,12 @@
+export interface InputEvent {
+  type: 'keyboard' | 'mouse';
+  payload: {
+    key?: string;
+    x?: number;
+    y?: number;
+  };
+}
+
 export interface SecurityEvent {
   id: string;
   timestamp: string;

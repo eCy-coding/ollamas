@@ -9,6 +9,7 @@ import { ProviderRouter } from "./server/providers";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
+import { OrchestratorCoordinator } from "./server/orchestrator";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -1098,25 +1099,32 @@ content
     }
     db.save();
 
-    const { execSync } = require('child_process');
-    let orchestratorReport = null;
-    try {
-      // Fine-tuning for M4 Pro Max / ARM64: add performance flags if configured
-      const perfFlags = db.data.cluster.performanceFlags || "--metal --threads 12";
-      const output = execSync(`./bin/hardware_orchestrator --report ${perfFlags}`, { encoding: 'utf-8' });
-      orchestratorReport = JSON.parse(output);
-    } catch (e) {}
+    const orchestratorReport = OrchestratorCoordinator.getCapabilities();
 
     res.json({
       config: db.data.cluster,
       isLiveMode: CURRENT_MODE === "live",
-      status: orchestratorReport ? "active" : "disconnected",
-      peers: orchestratorReport?.peers || [],
+      status: "active",
+      peers: [],
       statistics: {
-        totalGlobalCores: db.data.cluster.nodeActive ? (orchestratorReport?.localCores || 1) : 0,
+        totalGlobalCores: db.data.cluster.nodeActive ? (orchestratorReport.threads || 1) : 0,
         networkThroughputGb: 0.0,
       }
     });
+  });
+
+  app.post("/api/cluster/execute", async (req, res) => {
+    const { toolName, payload } = req.body;
+    try {
+      const result = await OrchestratorCoordinator.executeTool(toolName, payload);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/cluster/capabilities", (req, res) => {
+    res.json(OrchestratorCoordinator.getCapabilities());
   });
 
   app.post("/api/cluster/config", (req, res) => {

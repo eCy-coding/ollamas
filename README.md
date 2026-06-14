@@ -12,23 +12,32 @@ LLM Mission Control, kişisel bilgisayarların GPU/RAM kaynaklarını birleştir
 Bu proje macOS (ARM64) üzerinde en yüksek performans için optimize edilmiştir.
 M4 Pro Max için "Master" seviyesi ince ayarlar:
 
-1. **Ön Gereksinimler:**
-   - **Ollama:** [ollama.com](https://ollama.com) adresinden indirin.
-   - **Geliştirme:** `brew install rust go`
-   - **Orchestrator:** `cd bin && go build -o hardware_orchestrator .`
+### 1. E2E Master Workflow (iTerm2 / Terminal)
 
-2. **İnce Performans Ayarları (M4 Pro Max için):**
+1. **Ön Hazırlık:**
+   ```bash
+   chmod +x setup.sh
+   ./setup.sh
+   ```
+
+2. **Server Başlatma:**
+   ```bash
+   npm run dev
+   # Port 3000 üzerinde orchestrator aktif olur.
+   ```
+
+3. **Cluster Mesh'e Dahil Olma:**
+   - Web arayüzünden informed consent onayını verin.
+   - Orchestrator M4 Pro Max çip mimarisini otomatik olarak kalibre edecektir (`./bin/hardware_orchestrator` üzerinden).
+
+4. **Doğrulama Görevleri:**
+   - `G-Cluster` ve `G-Sandbox` testlerini `G-Gates` panelinden tetikleyin.
+   - Şüpheli bir durumda `project_cortex.md` dosyasını `tail -f project_cortex.md` komutuyla izleyin, tüm hatalar buraya düşer.
+
+### 2. İnce Performans Ayarları (M4 Pro Max için):
    - Cluster ayarlarından `Performance Flags` kısmına şunu girmenizi öneririz:
      `--metal --threads 12 --batch-size 512`
    - Bu, Apple Metal hızlandırmasını tetikler ve M4'ün yüksek-performans çekirdeklerini optimize eder.
-
-3. **Mesh Ağına Katılım:**
-   - **Terminal/iTerm2'yi açın:**
-     ```bash
-     chmod +x join-cluster.sh
-     ./join-cluster.sh
-     ```
-   - **Onay:** Ekrana gelen "Terms of Service" metnini okuyun ve `y` ile onaylayın.
 
 ## Doğrulama Kapıları (G-Gates)
 Sistemin dürüstlüğünü kanıtlayan kapılar:

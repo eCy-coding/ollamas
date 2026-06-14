@@ -12,10 +12,12 @@ import { BackupControl } from "./components/BackupControl";
 import { SelfTestGates } from "./components/SelfTestGates";
 import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
+import { VirtualController } from "./components/VirtualController";
 import { HealthTelemetry } from "./types";
 import { 
   Cpu, Key, Sparkles, FolderOpen, Terminal, 
-  ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network
+  ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
+  MousePointer2
 } from "lucide-react";
 
 export default function App() {
@@ -63,6 +65,7 @@ export default function App() {
     { id: "keys", label: "Hardware Vault", icon: <Key className="w-4 h-4 text-indigo-400" /> },
     { id: "security", label: "Guard Policies", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
     { id: "backup", label: "AES Cloud Backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
+    { id: "automation", label: "Virtual Controller", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
     { id: "selftest", label: "Verify Gates", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
   ];
 
@@ -285,6 +288,12 @@ export default function App() {
           {activeTab === "backup" && (
             <div className="animate-fade-in">
               <BackupControl onNotify={notify} />
+            </div>
+          )}
+
+          {activeTab === "automation" && (
+            <div className="animate-fade-in">
+              <VirtualController />
             </div>
           )}
 

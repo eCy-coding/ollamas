@@ -1,0 +1,150 @@
+{
+  "registry_version": "2.1.0",
+  "tools": {
+    "claude": {
+      "category": "General",
+      "capability": "API",
+      "entryPoint": "proxy",
+      "selfHealing": true
+    },
+    "chatgpt": {
+      "category": "General",
+      "capability": "API",
+      "entryPoint": "proxy",
+      "selfHealing": true
+    },
+    "browser_search": {
+      "category": "Discovery",
+      "capability": "BrowserAutomation",
+      "entryPoint": "node ./server/tools/search_browser.ts",
+      "requiresEnv": [],
+      "selfHealing": true
+    },
+    "input_bridge": {
+      "category": "Input",
+      "capability": "Automation",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "desktop_commander": {
+      "category": "System",
+      "capability": "Kernel",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "cpu_monitor": {
+      "category": "System",
+      "capability": "Monitoring",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "mem_usage": {
+      "category": "System",
+      "capability": "Monitoring",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "network_scan": {
+      "category": "Network",
+      "capability": "Discovery",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "port_check": {
+      "category": "Network",
+      "capability": "Discovery",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "file_search": {
+      "category": "FileSystem",
+      "capability": "Management",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "file_encryptor": {
+      "category": "Security",
+      "capability": "Management",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "git_quick_commit": {
+      "category": "Dev",
+      "capability": "Management",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": true
+    },
+    "code_ast_analyzer": {
+      "category": "Dev",
+      "capability": "Analysis",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "log_aggregator": {
+      "category": "System",
+      "capability": "Monitoring",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "process_manager": {
+      "category": "System",
+      "capability": "Management",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "clipboard_manager": {
+      "category": "System",
+      "capability": "Management",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "screenshot_tool": {
+      "category": "System",
+      "capability": "Automation",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "keyboard_macro": {
+      "category": "Input",
+      "capability": "Automation",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "app_launcher": {
+      "category": "System",
+      "capability": "Automation",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "hardware_calibrator": {
+      "category": "System",
+      "capability": "Optimization",
+      "entryPoint": "internal",
+      "requiresEnv": [],
+      "selfHealing": false
+    },
+    "binary_orchestrator": {
+      "category": "Native",
+      "capability": "Kernel",
+      "entryPoint": "./bin/hardware_orchestrator",
+      "requiresEnv": [],
+      "selfHealing": false
+    }
+  }
+}
