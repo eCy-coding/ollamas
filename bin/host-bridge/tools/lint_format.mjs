@@ -1,26 +1,31 @@
 #!/usr/bin/env node
-// lint_format — typecheck gate. Runs `tsc --noEmit` (the project's `lint`
-// script). typescript is a devDep absent from the runtime container, so we run
-// it in the builder-target image (has full deps; layers are cached). Driven
-// through the bridge so it stays a real bridge-integrated tool.
-import { readFileSync } from "fs";
-import os from "os";
-import { join } from "path";
+// lint_format — typecheck gate (tsc --noEmit). typescript is a devDep absent
+// from the runtime container, so it runs in the builder-target image.
+// Efficiency: only rebuild that image when Dockerfile/package*.json change
+// (hash-stamped); otherwise reuse the cached `ollamas-lint` image.
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
+import os from "node:os";
+import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 
-const TOKEN = readFileSync(join(os.homedir(), ".llm-mission-control", "bridge.token"), "utf8").trim();
-const REPO = "/Users/emrecnyngmail.com/Desktop/ollamas";
+main(async () => {
+  // Hash the inputs that affect the builder image.
+  const inputs = ["Dockerfile", "package.json", "package-lock.json"]
+    .map((f) => { try { return readFileSync(join(REPO, f)); } catch { return Buffer.alloc(0); } });
+  const hash = createHash("sha256").update(Buffer.concat(inputs)).digest("hex").slice(0, 16);
+  const stampFile = join(os.homedir(), ".llm-mission-control", ".lint-image-hash");
+  const cached = existsSync(stampFile) ? readFileSync(stampFile, "utf8").trim() : "";
 
-const cmd =
-  `cd ${REPO} && docker build -q --target builder -t ollamas-lint . >/dev/null 2>&1 && ` +
-  `docker run --rm ollamas-lint npx tsc --noEmit 2>&1 | tail -20`;
+  // Build only if inputs changed or the image is missing.
+  const needBuild = cached !== hash;
+  const buildPart = needBuild
+    ? `docker build -q --target builder -t ollamas-lint ${REPO} >/dev/null 2>&1 && `
+    : `(docker image inspect ollamas-lint >/dev/null 2>&1 || docker build -q --target builder -t ollamas-lint ${REPO} >/dev/null 2>&1) && `;
+  const r = await bridgeRun(`cd ${REPO} && ${buildPart}docker run --rm ollamas-lint npx tsc --noEmit 2>&1 | tail -20`, { timeoutMs: 240000 });
+  if (needBuild && r.exitCode === 0) writeFileSync(stampFile, hash);
 
-const res = await fetch("http://127.0.0.1:7345/run", {
-  method: "POST",
-  headers: { "X-Bridge-Token": TOKEN, "Content-Type": "application/json" },
-  body: JSON.stringify({ target: "terminal", command: cmd, timeoutMs: 240000 }),
+  const out = (r.output || "").trim();
+  const clean = r.exitCode === 0 && !r.timedOut && !/error TS\d+/.test(out);
+  emit({ ok: clean, clean, rebuilt: needBuild, errors: out.split("\n").filter((l) => /error TS\d+/.test(l)).slice(0, 10), tail: out.slice(-200) });
 });
-const r = await res.json();
-const out = (r.output || "").trim();
-const clean = r.ok === true && r.exitCode === 0 && !r.timedOut && !/error TS\d+/.test(out);
-console.log(JSON.stringify({ clean, exitCode: r.exitCode, timedOut: !!r.timedOut, errors: out.split("\n").filter((l) => /error TS\d+/.test(l)).slice(0, 10), tail: out.slice(-300) }, null, 2));
-process.exit(clean ? 0 : 1);
