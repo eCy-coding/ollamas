@@ -3,9 +3,12 @@ import { db } from "./db";
 
 // Allowed structural commands
 const ALLOWED_BINARIES = [
-  "git", "pytest", "python", "python3", "pip", "pip3", "ls", "pwd", "echo", 
-  "cat", "head", "tail", "wc", "grep", "find", "which", "node", "npm", 
-  "npx", "tsc", "ruff", "black", "mkdir", "date", "whoami", "uname"
+  "git", "pytest", "python", "python3", "pip", "pip3", "ls", "pwd", "echo",
+  "cat", "head", "tail", "wc", "grep", "find", "which", "node", "npm",
+  "npx", "tsc", "ruff", "black", "mkdir", "date", "whoami", "uname",
+  // expanded safe text/dev utilities (read/transform only; blocklist still applies)
+  "sed", "awk", "sort", "uniq", "cut", "tr", "diff", "env", "make",
+  "realpath", "basename", "dirname", "test", "jq", "vitest", "printf", "sleep", "true", "false"
 ];
 
 // Structural dangerous tokens or shell bindings

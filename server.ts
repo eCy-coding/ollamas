@@ -655,17 +655,32 @@ async function initializeServer() {
           description: "Self-test the whole bridge toolkit and return a health matrix (which tools pass/fail).",
           parameters: { type: "object", properties: {}, required: [] }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "shell_check",
+          description: "Lint a shell command/script for bugs and macOS/BSD portability issues (shellcheck + heuristics) BEFORE running it. Run this on any non-trivial command, fix what it reports, then use macos_terminal.",
+          parameters: { type: "object", properties: { command: { type: "string", description: "The shell command/script to lint." } }, required: ["command"] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor (run the project's own self-built host tools).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor / shell_check (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
 1. Work step-by-step. At each step, explain your brief thoughts about your next action, and selectively call appropriate tools.
 2. Read the files first to get context before writing any edits.
 3. Once any file changes are completed, run pytest, format, or static tests to verify that your changes are error-free.
-4. Keep your replies concise and technical. Use Markdown format.`;
+4. Keep your replies concise and technical. Use Markdown format.
+
+macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via macos_terminal):
+- Before running any non-trivial shell command, call shell_check on it, fix what it reports, THEN run it. Minimize errors.
+- BSD ≠ GNU: base64 decode is \`-D\` (not \`-d\`); \`sed -i ''\` needs the empty backup arg; no \`timeout\` (rely on the bridge watchdog); \`grep\` has no \`-P\`; \`xargs\` has no \`-r\`; date math is \`date -v\`.
+- Always double-quote expansions ("$var"). Use \`set -euo pipefail\` for multi-step scripts. Feed \`< /dev/null\` to commands that might read stdin (e.g. docker compose exec -T).
+- This runtime is Node 24: global \`fetch\` exists — never import node-fetch/undici and never use Deno APIs. .mjs uses import, not require.
+- To author host files use write_host_file (not heredocs).`;
 
     let activeHistory = [...messages];
     if (!activeHistory.some(m => m.role === "system")) {
@@ -791,6 +806,9 @@ STRICT PROTOCOLS:
                 } else throw new Error("Missing 'query' or 'url'.");
               } else if (toolName === "tools_doctor") {
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000);
+              } else if (toolName === "shell_check") {
+                if (!args.command) throw new Error("Missing 'command'.");
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/shell_check.mjs ${shArg(String(args.command))}`, 60000);
               } else if (toolName === "apply_patch") {
                 if (!args.diff) throw new Error("Missing 'diff'.");
                 output = await execOnHost(`printf '%s' ${shArg(String(args.diff))} | node ${HOST_TOOLS_DIR}/apply_patch.mjs`);
