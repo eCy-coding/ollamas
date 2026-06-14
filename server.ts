@@ -32,6 +32,22 @@ async function runOnHostTerminal(target: string | undefined, command: string, ti
   return res.json();
 }
 
+// Run a command directly on the host via the bridge /exec (no terminal mutex).
+const HOST_TOOLS_DIR = "/Users/emrecnyngmail.com/Desktop/ollamas/bin/host-bridge/tools";
+async function execOnHost(command: string, timeoutMs = 95000) {
+  const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
+    body: JSON.stringify({ command, timeoutMs }),
+    signal: AbortSignal.timeout(timeoutMs + 5000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Host exec bridge error ${res.status}: ${err.error || ""}`);
+  }
+  return res.json();
+}
+
 // Write a file directly to the macOS host filesystem via the bridge (base64).
 async function writeHostFile(filePath: string, content: string) {
   const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
@@ -533,10 +549,42 @@ async function initializeServer() {
             required: ["path", "content"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "run_tests",
+          description: "Run the project's test suite (vitest unit tests in the container) and return pass/fail summary.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "git_ops",
+          description: "Show the repository git status (short) plus the last few commits.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "process_port",
+          description: "List the process(es) listening on a TCP port on the host.",
+          parameters: { type: "object", properties: { port: { type: "number", description: "TCP port number, e.g. 3000." } }, required: ["port"] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "health_probe",
+          description: "Aggregate health of the whole stack (bridge, app, ollama, terminals) plus a live terminal log snapshot.",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), and write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -637,6 +685,15 @@ STRICT PROTOCOLS:
               } else if (toolName === "write_host_file") {
                 if (!args.path || args.content === undefined) throw new Error("Missing 'path' or 'content'.");
                 output = await writeHostFile(args.path, args.content);
+              } else if (toolName === "run_tests") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/run_tests.mjs`);
+              } else if (toolName === "git_ops") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_ops.mjs`);
+              } else if (toolName === "process_port") {
+                const port = Number(args.port) || 3000;
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/process_port.mjs ${port}`);
+              } else if (toolName === "health_probe") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/health_probe.mjs`);
               } else {
                 throw new Error(`Unrecognized framework tool: '${toolName}'`);
               }

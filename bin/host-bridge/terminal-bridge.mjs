@@ -219,6 +219,24 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, await readBuffer(url.searchParams.get("target")));
   }
 
+  // Run a command directly on the host (child_process, NOT a terminal session).
+  // Holds no terminal mutex, so host tools that themselves call /run won't
+  // deadlock. Used by the agent's first-class bridge tools.
+  if (req.method === "POST" && url.pathname === "/exec") {
+    if (!authed(req)) return send(res, 401, { ok: false, error: "bad token" });
+    const body = await readBody(req);
+    if (!body.command) return send(res, 400, { ok: false, error: "command required" });
+    try {
+      const { stdout, stderr } = await execFileP("bash", ["-lc", body.command], {
+        timeout: body.timeoutMs || 90000,
+        maxBuffer: 8 * 1024 * 1024,
+      });
+      return send(res, 200, { ok: true, exitCode: 0, output: (stdout || "") + (stderr || "") });
+    } catch (e) {
+      return send(res, 200, { ok: false, exitCode: e.code ?? 1, output: ((e.stdout || "") + (e.stderr || "")) || String(e.message || e) });
+    }
+  }
+
   // Write a file straight to the host filesystem (base64 body) — reliable host
   // authoring without fragile heredoc-over-keystrokes.
   if (req.method === "POST" && url.pathname === "/write") {
