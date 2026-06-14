@@ -20,6 +20,7 @@ const PLAN = [
   ["log_stream", ["5"], "run"],
   ["web_search", ["bridge automation"], "run"],
   ["shell_check", ['echo "ok"'], "run"],
+  ["logbook", ["tail", "1"], "run"],
   ["run_tests", [], "check"],
   ["lint_format", [], "check"],
   ["build_app", [], "check"],
