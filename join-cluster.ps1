@@ -13,5 +13,10 @@ if ($response -ne "y") {
 }
 
 Write-Host "[+] Starting daemon..."
-# .\bin\hardware_orchestrator.exe --daemon
-Write-Host "[+] Node joined."
+# Real implementation:
+if (Test-Path ".\bin\hardware_orchestrator.exe") {
+    Start-Process -FilePath ".\bin\hardware_orchestrator.exe" -ArgumentList "--daemon"
+    Write-Host "[+] Node joined."
+} else {
+    Write-Host "[-] Error: hardware_orchestrator.exe binary not found. Please run build."
+}

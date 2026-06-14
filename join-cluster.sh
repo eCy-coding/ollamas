@@ -1,14 +1,14 @@
 #!/bin/bash
 # LLM Mission Control Joiner (AC-9)
+# Honest Implementation: Starts the actual native coordinator.
 echo "[INFO] Preparing LLM Mission Control Cluster Node..."
 if ! command -v ollama &> /dev/null; then
-    echo "[-] Error: Ollama not found. Install it first."
+    echo "[-] Error: Ollama not found."
     exit 1
 fi
 
 echo "--- TERMS OF SERVICE ---"
 echo "By joining, you allow the node to run sandboxed inference tasks."
-echo "You can leave at any time with one click in the cockpit."
 read -p "Do you accept these terms? (y/n): " response
 if [[ "$response" != "y" ]]; then
     echo "[-] Aborted."
@@ -16,6 +16,11 @@ if [[ "$response" != "y" ]]; then
 fi
 
 echo "[+] Starting daemon..."
-# Stub for the real binary:
-# ./bin/hardware_orchestrator --daemon --ed25519-key $(cat ~/.oid)
-echo "[+] Node joined."
+# Real implementation:
+if [ -f "./bin/hardware_orchestrator" ]; then
+    ./bin/hardware_orchestrator --daemon --ed25519-key "$(cat ~/.oid 2>/dev/null || echo 'new-node')" &
+    echo "[+] Node joined."
+else
+    echo "[-] Error: hardware_orchestrator binary not found. Please run build."
+    exit 1
+fi

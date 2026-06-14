@@ -30,13 +30,10 @@ export interface ChatSession {
   updatedAt: string;
 }
 
-export interface SwarmConfig {
+export interface ClusterConfig {
   eulaApproved: boolean;
   peerId: string;
   nodeActive: boolean;
-  referralId: string;
-  referredBy: string;
-  earnings: number;
   numCtxLimit: number;
 }
 
@@ -61,7 +58,7 @@ export interface DBConfig {
   };
   sessions: ChatSession[];
   securityLog: SecurityEvent[];
-  swarm: SwarmConfig;
+  cluster: ClusterConfig;
 }
 
 const DEFAULT_CONFIG: DBConfig = {
@@ -85,13 +82,10 @@ const DEFAULT_CONFIG: DBConfig = {
   },
   sessions: [],
   securityLog: [],
-  swarm: {
+  cluster: {
     eulaApproved: false,
     peerId: "",
     nodeActive: false,
-    referralId: "",
-    referredBy: "",
-    earnings: 0.1425,
     numCtxLimit: 8192,
   },
 };

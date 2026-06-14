@@ -1089,70 +1089,67 @@ content
   });
 
   /**
-   * P2P Computing Swarm Backend APIs
+   * Cluster Mesh Management API (Compliance-focused)
    */
-  app.get("/api/swarm/status", (req, res) => {
+  app.get("/api/cluster/status", (req, res) => {
     // Generate valid random peer keys if missing to satisfy cryptographic integrity
-    if (!db.data.swarm.peerId) {
-      db.data.swarm.peerId = "Qm" + crypto.randomBytes(16).toString("hex");
+    if (!db.data.cluster.peerId) {
+      db.data.cluster.peerId = "Qm" + crypto.randomBytes(16).toString("hex");
     }
     db.save();
 
+    const { execSync } = require('child_process');
+    let orchestratorReport = null;
+    try {
+      const output = execSync('./bin/hardware_orchestrator --report', { encoding: 'utf-8' });
+      orchestratorReport = JSON.parse(output);
+    } catch (e) {}
+
     res.json({
-      config: db.data.swarm,
+      config: db.data.cluster,
       isLiveMode: CURRENT_MODE === "live",
-      peers: [], // Swarm peers implementation requires active daemon connection
+      status: orchestratorReport ? "active" : "disconnected",
+      peers: orchestratorReport?.peers || [],
       statistics: {
-        totalGlobalCores: db.data.swarm.nodeActive ? 1 : 0,
+        totalGlobalCores: db.data.cluster.nodeActive ? (orchestratorReport?.localCores || 1) : 0,
         networkThroughputGb: 0.0,
       }
     });
   });
 
-  app.post("/api/swarm/config", (req, res) => {
+  app.post("/api/cluster/config", (req, res) => {
     try {
       const { eulaApproved, nodeActive, numCtxLimit } = req.body;
 
-      if (eulaApproved !== undefined) db.data.swarm.eulaApproved = !!eulaApproved;
-      if (nodeActive !== undefined) db.data.swarm.nodeActive = !!nodeActive;
-      if (numCtxLimit !== undefined) db.data.swarm.numCtxLimit = Number(numCtxLimit);
+      if (eulaApproved !== undefined) db.data.cluster.eulaApproved = !!eulaApproved;
+      if (nodeActive !== undefined) db.data.cluster.nodeActive = !!nodeActive;
+      if (numCtxLimit !== undefined) db.data.cluster.numCtxLimit = Number(numCtxLimit);
 
       db.save();
       
-      res.json({ success: true, config: db.data.swarm });
+      res.json({ success: true, config: db.data.cluster });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  /**
-   * Cluster Mesh Management API (Compliance-focused)
-   */
   app.post("/api/cluster/consent", (req, res) => {
     const { approved, termsHash } = req.body;
-    db.data.swarm.eulaApproved = !!approved;
-    db.data.swarm.consentTimestamp = new Date().toISOString();
-    db.data.swarm.termsHash = termsHash;
+    db.data.cluster.eulaApproved = !!approved;
+    // @ts-ignore
+    db.data.cluster.consentTimestamp = new Date().toISOString();
+    // @ts-ignore
+    db.data.cluster.termsHash = termsHash;
     db.save();
     db.logSecurity("network", "Cluster Consent", `Consent: ${approved}, Hash: ${termsHash}`, "info");
     res.json({ success: true });
   });
 
   app.post("/api/cluster/leave", (req, res) => {
-    db.data.swarm.nodeActive = false;
+    db.data.cluster.nodeActive = false;
     db.save();
     db.logSecurity("network", "Cluster Leave", "User opted-out of mesh", "info");
     res.json({ success: true });
-  });
-
-  app.get("/api/cluster/status", (req, res) => {
-    const { execSync } = require('child_process');
-    try {
-      const output = execSync('./bin/hardware_orchestrator --report', { encoding: 'utf-8' });
-      res.json({ status: "active", report: JSON.parse(output) });
-    } catch (e) {
-      res.json({ status: "disconnected", error: "Orchestrator inactive" });
-    }
   });
 
 

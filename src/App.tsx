@@ -11,7 +11,7 @@ import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
 import { SelfTestGates } from "./components/SelfTestGates";
 import { SecurityPolicies } from "./components/SecurityPolicies";
-import { DecentralizedSwarmTab } from "./components/DecentralizedSwarmTab";
+import { ClusterManager } from "./components/ClusterManager";
 import { HealthTelemetry } from "./types";
 import { 
   Cpu, Key, Sparkles, FolderOpen, Terminal, 
@@ -290,7 +290,7 @@ export default function App() {
 
           {activeTab === "swarm" && (
             <div className="animate-fade-in">
-              <DecentralizedSwarmTab onNotify={notify} />
+              <ClusterManager onNotify={notify} />
             </div>
           )}
 
