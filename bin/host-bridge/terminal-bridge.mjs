@@ -219,6 +219,22 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, await readBuffer(url.searchParams.get("target")));
   }
 
+  // Write a file straight to the host filesystem (base64 body) — reliable host
+  // authoring without fragile heredoc-over-keystrokes.
+  if (req.method === "POST" && url.pathname === "/write") {
+    if (!authed(req)) return send(res, 401, { ok: false, error: "bad token" });
+    const body = await readBody(req);
+    if (!body.path) return send(res, 400, { ok: false, error: "path required" });
+    try {
+      const buf = Buffer.from(body.contentB64 || "", "base64");
+      fs.mkdirSync(path.dirname(body.path), { recursive: true });
+      fs.writeFileSync(body.path, buf);
+      return send(res, 200, { ok: true, path: body.path, bytes: buf.length });
+    } catch (e) {
+      return send(res, 500, { ok: false, error: String(e.message || e) });
+    }
+  }
+
   send(res, 404, { ok: false, error: "not found" });
 });
 
