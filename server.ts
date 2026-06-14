@@ -615,10 +615,42 @@ async function initializeServer() {
           description: "Kill a host process by PID, or all listeners on a port (pass ':<port>'). Requires an explicit target.",
           parameters: { type: "object", properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>' (e.g. ':3000')." } }, required: ["target"] }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "log_stream",
+          description: "Show the last N lines of the app container logs (default 40).",
+          parameters: { type: "object", properties: { lines: { type: "number", description: "How many log lines to show." } }, required: [] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "pkg_install",
+          description: "Install a package via npm (in the container), pip, or brew. Requires manager + package.",
+          parameters: { type: "object", properties: { manager: { type: "string", enum: ["npm", "pip", "brew"] }, package: { type: "string" } }, required: ["manager", "package"] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "web_search",
+          description: "Search the web (DuckDuckGo) and return the top result titles + URLs for a query.",
+          parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "apply_patch",
+          description: "Apply a unified-diff patch to the repository (git apply, checked first). Pass the full diff text.",
+          parameters: { type: "object", properties: { diff: { type: "string", description: "Unified diff text." } }, required: ["diff"] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process (run the project's own self-built host tools).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -738,6 +770,17 @@ STRICT PROTOCOLS:
               } else if (toolName === "kill_process") {
                 if (!args.target) throw new Error("Missing 'target' (pid or :port).");
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/kill_process.mjs ${shArg(String(args.target))}`);
+              } else if (toolName === "log_stream") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/log_stream.mjs ${Number(args.lines) || 40}`);
+              } else if (toolName === "pkg_install") {
+                if (!args.manager || !args.package) throw new Error("Missing 'manager' or 'package'.");
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/pkg_install.mjs ${shArg(String(args.manager))} ${shArg(String(args.package))}`, 150000);
+              } else if (toolName === "web_search") {
+                if (!args.query) throw new Error("Missing 'query'.");
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs ${shArg(String(args.query))}`);
+              } else if (toolName === "apply_patch") {
+                if (!args.diff) throw new Error("Missing 'diff'.");
+                output = await execOnHost(`printf '%s' ${shArg(String(args.diff))} | node ${HOST_TOOLS_DIR}/apply_patch.mjs`);
               } else {
                 throw new Error(`Unrecognized framework tool: '${toolName}'`);
               }
