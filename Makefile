@@ -6,7 +6,7 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down
 
 # Output binary folder
 BIN_DIR = bin
@@ -76,6 +76,14 @@ install-deps:
 run-cockpit:
 	@echo "[+] Launching LLM Mission Control..."
 	npm run dev
+
+## up: One command — bring the whole stack up end-to-end (bridge + container + health)
+up:
+	@./start.sh
+
+## down: Stop the stack (container + host bridge)
+down:
+	@./stop.sh
 
 ## clean: Remove all compiled target files and caches
 clean:
