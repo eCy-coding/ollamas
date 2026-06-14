@@ -44,5 +44,10 @@ RUN npm install -g esbuild tsx
 
 EXPOSE 3000
 
+# Health: Node global fetch (no curl needed in the slim image). Lets
+# `docker compose up --wait` block until the app actually serves /api/health.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=40s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 # Run in production mode using tsx server compiler
 CMD ["tsx", "server.ts"]
