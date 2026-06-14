@@ -16,6 +16,10 @@ services:
       - NODE_ENV=production
       - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_NUM_CTX=8192
+      # Calibrated (M4 Max benchmark): warm model + 12 P-cores + all layers on Metal GPU
+      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_NUM_THREAD=12
+      - OLLAMA_NUM_GPU=999
       # Persist vault + master key on the mounted volume (survives recreate)
       - MISSION_CONTROL_DATA_DIR=/root/.llm-mission-control
       # Host-side macOS terminal bridge (iTerm2 / Terminal.app)

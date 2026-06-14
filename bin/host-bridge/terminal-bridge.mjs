@@ -85,8 +85,15 @@ const READSCRIPT = {
   terminal: `tell application "Terminal" to return contents of selected tab of window 1`,
 };
 
+// Calibrated default terminal (from benchmark), falls back to iterm2.
+let CAL_DEFAULT = "iterm2";
+try {
+  const cal = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".llm-mission-control/calibration.json"), "utf8"));
+  if (cal.bestTerminal) CAL_DEFAULT = cal.bestTerminal;
+} catch {}
+
 function normTarget(t) {
-  const v = (t || "iterm2").toLowerCase();
+  const v = (t || CAL_DEFAULT).toLowerCase();
   if (v === "terminal" || v === "terminal.app") return "terminal";
   return "iterm"; // iterm2 / iterm / default
 }
@@ -120,8 +127,12 @@ async function runCommandInner(target, command, timeoutMs) {
   // shape. `cat` shows the code (visible), then bash runs it; output + exit code
   // captured to files for deterministic readback.
   fs.writeFileSync(shFile, String(command) + "\n");
+  // Watchdog: kill the command a few seconds before our poll deadline so a hung
+  // command (infinite loop / waiting on input) can never poison the reused
+  // session — the shell always returns to a prompt. rc 143/137 => killed.
+  const tmoSec = Math.max(5, Math.ceil((timeoutMs || 60000) / 1000) - 5);
   const wrapped =
-    `cat ${shq(shFile)}; echo '——— run ———'; bash ${shq(shFile)} > ${shq(outFile)} 2>&1; echo $? > ${shq(rcFile)}; cat ${shq(outFile)}`;
+    `cat ${shq(shFile)}; echo '——— run ———'; ( bash ${shq(shFile)} > ${shq(outFile)} 2>&1 ) & __bp=$!; ( sleep ${tmoSec}; kill -TERM $__bp 2>/dev/null; sleep 1; kill -KILL $__bp 2>/dev/null ) & __wp=$!; wait $__bp 2>/dev/null; __rc=$?; kill $__wp 2>/dev/null; echo $__rc > ${shq(rcFile)}; cat ${shq(outFile)}`;
 
   const started = Date.now();
   const usedId = (await osa(APPLESCRIPT[t], wrapped, winState[t])).trim();
@@ -141,6 +152,7 @@ async function runCommandInner(target, command, timeoutMs) {
   }
   const partial = fs.existsSync(outFile) ? fs.readFileSync(outFile, "utf8") : "";
   cleanup(outFile, rcFile, shFile);
+  winState[t] = ""; // drop the (possibly stuck) window so next run opens a fresh one
   return { ok: false, target: t, timedOut: true, output: partial, durationMs: Date.now() - started };
 }
 
