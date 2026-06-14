@@ -170,7 +170,14 @@ export class ProviderRouter {
             options: {
               num_ctx: numCtx,
               temperature: config.temperature ?? 0.7,
+              // Calibrated for Apple Silicon: pin threads to performance cores,
+              // keep all layers on the GPU. Env-driven (omitted if unset).
+              ...(process.env.OLLAMA_NUM_THREAD ? { num_thread: Number(process.env.OLLAMA_NUM_THREAD) } : {}),
+              ...(process.env.OLLAMA_NUM_GPU ? { num_gpu: Number(process.env.OLLAMA_NUM_GPU) } : {}),
             },
+            // Keep the model warm in Metal VRAM so repeat calls skip the reload
+            // cost (stable low latency). Default 30m; "0" disables.
+            keep_alive: process.env.OLLAMA_KEEP_ALIVE || "30m",
             think: false, // Prevent reasoning bloat output according to L6 Spec
             stream: !!onStreamChunk,
             tools: config.tools,
