@@ -18,7 +18,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
 const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
 
-async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 120000) {
+async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000) {
   const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
@@ -28,6 +28,21 @@ async function runOnHostTerminal(target: string | undefined, command: string, ti
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`Host terminal bridge error ${res.status}: ${err.error || ""}${err.hint ? " (" + err.hint + ")" : ""}`);
+  }
+  return res.json();
+}
+
+// Write a file directly to the macOS host filesystem via the bridge (base64).
+async function writeHostFile(filePath: string, content: string) {
+  const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
+    body: JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Host write bridge error ${res.status}: ${err.error || ""}`);
   }
   return res.json();
 }
@@ -503,10 +518,25 @@ async function initializeServer() {
             required: ["command"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "write_host_file",
+          description: "Write a file directly to the macOS HOST filesystem at an absolute path (creates parent dirs). Use this — not write_file — to author host scripts/tools (e.g. under bin/host-bridge/tools). Reliable for multi-line content; no shell/heredoc needed.",
+          parameters: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "Absolute host path, e.g. /Users/.../bin/host-bridge/tools/x.mjs" },
+              content: { type: "string", description: "Full file content." }
+            },
+            required: ["path", "content"]
+          }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, and macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host — use it when the user wants to watch coding happen in a real terminal).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), and write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -604,6 +634,9 @@ STRICT PROTOCOLS:
               } else if (toolName === "macos_terminal") {
                 if (!args.command) throw new Error("Missing 'command' argument.");
                 output = await runOnHostTerminal(args.target, args.command);
+              } else if (toolName === "write_host_file") {
+                if (!args.path || args.content === undefined) throw new Error("Missing 'path' or 'content'.");
+                output = await writeHostFile(args.path, args.content);
               } else {
                 throw new Error(`Unrecognized framework tool: '${toolName}'`);
               }
