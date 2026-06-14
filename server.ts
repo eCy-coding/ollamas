@@ -1096,89 +1096,66 @@ content
     if (!db.data.swarm.peerId) {
       db.data.swarm.peerId = "Qm" + crypto.randomBytes(16).toString("hex");
     }
-    if (!db.data.swarm.referralId) {
-      db.data.swarm.referralId = "REF-" + crypto.randomBytes(4).toString("hex").toUpperCase();
-    }
     db.save();
-
-    // Mock peers for realistic network visual rendering in dashboard
-    const peersList = [
-      {
-        id: "QmXoypizjW3WknFiJnKLwHCnH72vedxjQkDDP1mXWo6uco",
-        addr: "/ip4/85.120.44.12/tcp/11435",
-        specs: { platform: "macOS (Apple Silicon)", vramTotal: 16 * 1024 * 1024 * 1024, hasMetal: true, maxCtxLimit: 8000 },
-        latencyMs: 14,
-        lastSeen: new Date(Date.now() - 5000).toISOString(),
-      },
-      {
-        id: "QmYwAPJth9fUksuEyWNi738982ndLgDDP4mXWkLmdKco45",
-        addr: "/ip4/142.250.74.46/tcp/11435",
-        specs: { platform: "Linux (Nvidia RTX 4090)", vramTotal: 24 * 1024 * 1024 * 1024, hasMetal: false, maxCtxLimit: 8192 },
-        latencyMs: 38,
-        lastSeen: new Date(Date.now() - 12000).toISOString(),
-      },
-      {
-        id: "QmZp3X9UksuEyWNi73y82ndvJgDdP4mXWkLmdXoyp82udCo",
-        addr: "/ip4/34.120.55.99/tcp/11435",
-        specs: { platform: "Windows (Nvidia RTX 3080)", vramTotal: 10 * 1024 * 1024 * 1024, hasMetal: false, maxCtxLimit: 8192 },
-        latencyMs: 52,
-        lastSeen: new Date(Date.now() - 44000).toISOString(),
-      }
-    ];
 
     res.json({
       config: db.data.swarm,
       isLiveMode: CURRENT_MODE === "live",
-      peers: db.data.swarm.nodeActive ? peersList : [],
+      peers: [], // Swarm peers implementation requires active daemon connection
       statistics: {
-        totalGlobalCores: db.data.swarm.nodeActive ? 1412 : 0,
-        activeSwarms: db.data.swarm.nodeActive ? 42 : 0,
-        networkThroughputGb: db.data.swarm.nodeActive ? 104.2 : 0.0,
-        referralRewardEstimate: db.data.swarm.earnings,
+        totalGlobalCores: db.data.swarm.nodeActive ? 1 : 0,
+        networkThroughputGb: 0.0,
       }
     });
   });
 
   app.post("/api/swarm/config", (req, res) => {
     try {
-      const { eulaApproved, nodeActive, numCtxLimit, referredBy } = req.body;
+      const { eulaApproved, nodeActive, numCtxLimit } = req.body;
 
       if (eulaApproved !== undefined) db.data.swarm.eulaApproved = !!eulaApproved;
       if (nodeActive !== undefined) db.data.swarm.nodeActive = !!nodeActive;
       if (numCtxLimit !== undefined) db.data.swarm.numCtxLimit = Number(numCtxLimit);
-      if (referredBy !== undefined) db.data.swarm.referredBy = String(referredBy);
 
       db.save();
-
-      db.logSecurity(
-        "network",
-        "P2P Swarm config changed",
-        `Set Node Active: ${db.data.swarm.nodeActive}, Context Bound: ${db.data.swarm.numCtxLimit}`,
-        "info"
-      );
-
+      
       res.json({ success: true, config: db.data.swarm });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  app.post("/api/swarm/earn", (req, res) => {
+  /**
+   * Cluster Mesh Management API (Compliance-focused)
+   */
+  app.post("/api/cluster/consent", (req, res) => {
+    const { approved, termsHash } = req.body;
+    db.data.swarm.eulaApproved = !!approved;
+    db.data.swarm.consentTimestamp = new Date().toISOString();
+    db.data.swarm.termsHash = termsHash;
+    db.save();
+    db.logSecurity("network", "Cluster Consent", `Consent: ${approved}, Hash: ${termsHash}`, "info");
+    res.json({ success: true });
+  });
+
+  app.post("/api/cluster/leave", (req, res) => {
+    db.data.swarm.nodeActive = false;
+    db.save();
+    db.logSecurity("network", "Cluster Leave", "User opted-out of mesh", "info");
+    res.json({ success: true });
+  });
+
+  app.get("/api/cluster/status", (req, res) => {
+    const { execSync } = require('child_process');
     try {
-      const { amount } = req.body;
-      if (amount !== undefined) {
-        db.data.swarm.earnings += Number(amount);
-        db.save();
-      }
-      res.json({ success: true, earnings: db.data.swarm.earnings });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+      const output = execSync('./bin/hardware_orchestrator --report', { encoding: 'utf-8' });
+      res.json({ status: "active", report: JSON.parse(output) });
+    } catch (e) {
+      res.json({ status: "disconnected", error: "Orchestrator inactive" });
     }
   });
 
-  /**
-   * Verification Gates Endpoint - Checks real compliance (G1-G7, §9)
-   */
+
   app.get("/api/selftest", async (req, res) => {
     const isLive = CURRENT_MODE === "live";
     const report: Record<string, { status: "PASS" | "FAIL" | "WARN"; details: string }> = {};
