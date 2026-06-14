@@ -1,40 +1,21 @@
 #!/usr/bin/env node
+// kill_process — kill a PID, or all listeners on a port (':<port>').
+// Optional signal: --sig TERM|KILL|INT (default TERM).
+import { bridgeRun, emit, main } from "./lib/bridge-client.mjs";
 
-import { readFileSync } from 'fs';
-import os from 'os';
-import { join } from 'path';
+const SIGNALS = { TERM: "TERM", KILL: "KILL", INT: "INT", HUP: "HUP" };
 
-const token = join(os.homedir(), '.llm-mission-control', 'bridge.token');
+main(async () => {
+  const args = process.argv.slice(2);
+  const sigIdx = args.indexOf("--sig");
+  const sig = sigIdx >= 0 ? (SIGNALS[(args[sigIdx + 1] || "").toUpperCase()] || "TERM") : "TERM";
+  const target = args.filter((a, i) => a !== "--sig" && i !== sigIdx + 1)[0];
+  if (!target) throw new Error("target required: a PID or ':<port>'");
 
-// Node 24 has global fetch; no external lib needed.
-const target = process.argv[2];
-
-if (!target) {
-  console.error('pid or :port required');
-  process.exit(1);
-}
-
-let command;
-
-if (target.startsWith(':')) {
-  // Treat as port
-  command = `lsof -ti${target} | xargs kill 2>&1 || echo no-proc`;
-} else {
-  // Treat as pid
-  command = `kill ${target} 2>&1 && echo killed || echo no-such-pid`;
-}
-
-const resp = await fetch('http://127.0.0.1:7345/run', {
-  method: 'POST',
-  headers: {
-    'X-Bridge-Token': readFileSync(token, 'utf-8').trim(),
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    target: 'terminal',
-    command,
-    timeoutMs: 15000
-  })
+  const command = target.startsWith(":")
+    ? `lsof -ti${target} | xargs kill -${sig} 2>&1 && echo killed || echo no-proc`
+    : `kill -${sig} ${target} 2>&1 && echo killed || echo no-such-pid`;
+  const r = await bridgeRun(command, { timeoutMs: 15000 });
+  const out = (r.output || "").trim();
+  emit({ ok: out.includes("killed"), target, signal: sig, output: out });
 });
-
-console.log(JSON.stringify({ok: (await resp.json()).output}));

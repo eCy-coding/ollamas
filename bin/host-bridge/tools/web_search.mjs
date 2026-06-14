@@ -1,12 +1,10 @@
 #!/usr/bin/env node
-// web_search — quick web research for the agent. Fetches DuckDuckGo's HTML
-// endpoint (no API key) and extracts the top result titles + URLs. Pure HTTP
-// (Node 24 global fetch); does not need the bridge.
-//   node web_search.mjs <query...>
-const q = process.argv.slice(2).join(" ").trim();
-if (!q) { console.error("query required"); process.exit(1); }
+// web_search — web research for the agent (pure HTTP, no API key, no bridge).
+//   node web_search.mjs <query...>       -> top DuckDuckGo results
+//   node web_search.mjs --fetch <url>    -> readable text of a page
+import { main, emit } from "./lib/bridge-client.mjs";
 
-try {
+async function search(q) {
   const res = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), {
     headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
     signal: AbortSignal.timeout(15000),
@@ -22,9 +20,28 @@ try {
     if (uddg) url = decodeURIComponent(uddg[1]);
     if (title) results.push({ title, url });
   }
-  console.log(JSON.stringify({ query: q, count: results.length, results: results.length ? results : `no results parsed (html ${html.length} bytes)` }, null, 2));
-  process.exit(results.length ? 0 : 1);
-} catch (e) {
-  console.error(JSON.stringify({ query: q, error: String(e.message || e) }));
-  process.exit(1);
+  return { ok: results.length > 0, mode: "search", query: q, count: results.length, results };
 }
+
+async function fetchPage(url) {
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000) });
+  const html = await res.text();
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim();
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").trim();
+  return { ok: res.ok, mode: "fetch", url, status: res.status, title, text: text.slice(0, 2000) };
+}
+
+main(async () => {
+  const args = process.argv.slice(2);
+  if (args[0] === "--fetch") {
+    const url = args[1];
+    if (!url) throw new Error("--fetch requires a URL");
+    emit(await fetchPage(url));
+  } else {
+    const q = args.join(" ").trim();
+    if (!q) throw new Error("query required");
+    emit(await search(q));
+  }
+});

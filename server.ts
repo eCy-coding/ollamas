@@ -564,8 +564,8 @@ async function initializeServer() {
         type: "function",
         function: {
           name: "git_ops",
-          description: "Show the repository git status (short) plus the last few commits.",
-          parameters: { type: "object", properties: {}, required: [] }
+          description: "Read-only git inspection. sub: status (default) | diff | branch | log.",
+          parameters: { type: "object", properties: { sub: { type: "string", enum: ["status", "diff", "branch", "log"] } }, required: [] }
         }
       },
       {
@@ -596,8 +596,8 @@ async function initializeServer() {
         type: "function",
         function: {
           name: "git_commit",
-          description: "Stage all changes and create a git commit with the given message (does NOT push).",
-          parameters: { type: "object", properties: { message: { type: "string", description: "Commit message." } }, required: ["message"] }
+          description: "Stage all changes and commit with the given message. Set push=true to also push.",
+          parameters: { type: "object", properties: { message: { type: "string", description: "Commit message." }, push: { type: "boolean", description: "Also push after committing." } }, required: ["message"] }
         }
       },
       {
@@ -612,8 +612,8 @@ async function initializeServer() {
         type: "function",
         function: {
           name: "kill_process",
-          description: "Kill a host process by PID, or all listeners on a port (pass ':<port>'). Requires an explicit target.",
-          parameters: { type: "object", properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>' (e.g. ':3000')." } }, required: ["target"] }
+          description: "Kill a host process by PID, or all listeners on a port (':<port>'). Optional signal.",
+          parameters: { type: "object", properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>'." }, signal: { type: "string", enum: ["TERM", "KILL", "INT", "HUP"] } }, required: ["target"] }
         }
       },
       {
@@ -636,8 +636,8 @@ async function initializeServer() {
         type: "function",
         function: {
           name: "web_search",
-          description: "Search the web (DuckDuckGo) and return the top result titles + URLs for a query.",
-          parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] }
+          description: "Web research. Pass query for DuckDuckGo results, OR url to fetch+extract a page's text.",
+          parameters: { type: "object", properties: { query: { type: "string" }, url: { type: "string", description: "If set, fetch this page's readable text instead of searching." } }, required: [] }
         }
       },
       {
@@ -647,10 +647,18 @@ async function initializeServer() {
           description: "Apply a unified-diff patch to the repository (git apply, checked first). Pass the full diff text.",
           parameters: { type: "object", properties: { diff: { type: "string", description: "Unified diff text." } }, required: ["diff"] }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "tools_doctor",
+          description: "Self-test the whole bridge toolkit and return a health matrix (which tools pass/fail).",
+          parameters: { type: "object", properties: {}, required: [] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch (run the project's own self-built host tools).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -754,7 +762,7 @@ STRICT PROTOCOLS:
               } else if (toolName === "run_tests") {
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/run_tests.mjs`);
               } else if (toolName === "git_ops") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_ops.mjs`);
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_ops.mjs ${shArg(String(args.sub || "status"))}`);
               } else if (toolName === "process_port") {
                 const port = Number(args.port) || 3000;
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/process_port.mjs ${port}`);
@@ -764,20 +772,25 @@ STRICT PROTOCOLS:
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/lint_format.mjs`, 250000);
               } else if (toolName === "git_commit") {
                 if (!args.message) throw new Error("Missing 'message'.");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_commit.mjs ${shArg(args.message)}`);
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_commit.mjs ${args.push ? "--push " : ""}${shArg(String(args.message))}`);
               } else if (toolName === "build_app") {
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/build_app.mjs`, 220000);
               } else if (toolName === "kill_process") {
                 if (!args.target) throw new Error("Missing 'target' (pid or :port).");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/kill_process.mjs ${shArg(String(args.target))}`);
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/kill_process.mjs ${args.signal ? "--sig " + shArg(String(args.signal)) + " " : ""}${shArg(String(args.target))}`);
               } else if (toolName === "log_stream") {
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/log_stream.mjs ${Number(args.lines) || 40}`);
               } else if (toolName === "pkg_install") {
                 if (!args.manager || !args.package) throw new Error("Missing 'manager' or 'package'.");
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/pkg_install.mjs ${shArg(String(args.manager))} ${shArg(String(args.package))}`, 150000);
               } else if (toolName === "web_search") {
-                if (!args.query) throw new Error("Missing 'query'.");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs ${shArg(String(args.query))}`);
+                if (args.url) {
+                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs --fetch ${shArg(String(args.url))}`);
+                } else if (args.query) {
+                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs ${shArg(String(args.query))}`);
+                } else throw new Error("Missing 'query' or 'url'.");
+              } else if (toolName === "tools_doctor") {
+                output = await execOnHost(`node ${HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000);
               } else if (toolName === "apply_patch") {
                 if (!args.diff) throw new Error("Missing 'diff'.");
                 output = await execOnHost(`printf '%s' ${shArg(String(args.diff))} | node ${HOST_TOOLS_DIR}/apply_patch.mjs`);

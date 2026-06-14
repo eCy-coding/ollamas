@@ -1,30 +1,18 @@
-import { readFile } from 'fs/promises';
-import { homedir } from 'os';
-import { join } from 'path';
+#!/usr/bin/env node
+// git_ops — read-only git inspection. Subcommand: status|diff|branch|log (default status).
+import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 
-async function run() {
-  try {
-    // Bridge token lives in the user's mission-control state dir.
-    const token = await readFile(join(homedir(), '.llm-mission-control', 'bridge.token'), 'utf8');
-    
-    const response = await fetch('http://127.0.0.1:7345/run', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Bridge-Token': token.trim()
-      },
-      body: JSON.stringify({
-        target: 'terminal',
-        command: 'cd /Users/emrecnyngmail.com/Desktop/ollamas && git status --short && echo --- && git log --oneline -3',
-        timeoutMs: 20000
-      })
-    });
+const SUBS = {
+  status: "git status --short && echo '---' && git log --oneline -3",
+  diff: "git --no-pager diff --stat && echo '---' && git --no-pager diff | head -200",
+  branch: "git branch -a && echo '---' && git status -sb | head -1",
+  log: "git --no-pager log --oneline -15",
+};
 
-    const resp = await response.json();
-    console.log(resp.output);
-  } catch (error) {
-    console.error('Error:', error.message);
-  }
-}
-
-run();
+main(async () => {
+  const sub = (process.argv[2] || "status").toLowerCase();
+  const gitCmd = SUBS[sub];
+  if (!gitCmd) throw new Error(`unknown subcommand '${sub}' (use: ${Object.keys(SUBS).join("|")})`);
+  const r = await bridgeRun(`cd ${REPO} && ${gitCmd}`, { timeoutMs: 20000 });
+  emit({ ok: r.exitCode === 0, sub, output: (r.output || "").trim() });
+});

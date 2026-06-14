@@ -1,27 +1,12 @@
-import { readFileSync } from 'fs';
+#!/usr/bin/env node
+// run_tests — run the project's vitest unit suite inside the container.
+import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 
-try {
-  const token = readFileSync(`${process.env.HOME}/.llm-mission-control/bridge.token`, 'utf8').trim();
-  
-  const response = await fetch('http://127.0.0.1:7345/run', {
-    method: 'POST',
-    headers: {
-      'X-Bridge-Token': token,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      target: 'terminal',
-      // Run the project's real test suite inside the container (vitest). Avoids
-      // nesting bridge calls, which would deadlock the bridge's serialization mutex.
-      command: 'cd /Users/emrecnyngmail.com/Desktop/ollamas && docker compose exec -T mission-control npx vitest run tests/MissionControl.test.ts < /dev/null 2>&1 | tail -6',
-      timeoutMs: 90000
-    })
-  });
-
-  const resp = await response.json();
-  const out = resp.output || '';
-  const passed = /Tests\s+\d+\s+passed/.test(out) || resp.exitCode === 0;
-  console.log(JSON.stringify({ exitCode: resp.exitCode, passed, summary: out.trim().split('\n').slice(-3).join(' | ') }));
-} catch (error) {
-  console.error('Error:', error);
-}
+main(async () => {
+  const r = await bridgeRun(
+    `cd ${REPO} && docker compose exec -T mission-control npx vitest run tests/MissionControl.test.ts < /dev/null 2>&1 | tail -8`,
+    { timeoutMs: 90000 }
+  );
+  const out = r.output || "";
+  emit({ ok: r.exitCode === 0, passed: r.exitCode === 0, exitCode: r.exitCode, summary: out.split("\n").filter((l) => /Tests|passed|failed/.test(l)).join(" | ") || out.slice(-200) });
+});
