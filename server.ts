@@ -1101,7 +1101,9 @@ content
     const { execSync } = require('child_process');
     let orchestratorReport = null;
     try {
-      const output = execSync('./bin/hardware_orchestrator --report', { encoding: 'utf-8' });
+      // Fine-tuning for M4 Pro Max / ARM64: add performance flags if configured
+      const perfFlags = db.data.cluster.performanceFlags || "--metal --threads 12";
+      const output = execSync(`./bin/hardware_orchestrator --report ${perfFlags}`, { encoding: 'utf-8' });
       orchestratorReport = JSON.parse(output);
     } catch (e) {}
 

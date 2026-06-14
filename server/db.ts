@@ -35,6 +35,7 @@ export interface ClusterConfig {
   peerId: string;
   nodeActive: boolean;
   numCtxLimit: number;
+  performanceFlags?: string;
 }
 
 export interface DBConfig {
