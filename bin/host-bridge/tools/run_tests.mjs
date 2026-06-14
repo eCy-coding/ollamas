@@ -13,7 +13,7 @@ try {
       target: 'terminal',
       // Run the project's real test suite inside the container (vitest). Avoids
       // nesting bridge calls, which would deadlock the bridge's serialization mutex.
-      command: 'cd /Users/emrecnyngmail.com/Desktop/ollamas && docker compose exec -T mission-control npx vitest run tests/MissionControl.test.ts 2>&1 | tail -6',
+      command: 'cd /Users/emrecnyngmail.com/Desktop/ollamas && docker compose exec -T mission-control npx vitest run tests/MissionControl.test.ts < /dev/null 2>&1 | tail -6',
       timeoutMs: 90000
     })
   });
