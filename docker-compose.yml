@@ -6,13 +6,18 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: llm-mission-control
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
     environment:
       - PORT=3000
       - NODE_ENV=production
       - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_NUM_CTX=8192
+      # Persist vault + master key on the mounted volume (survives recreate)
+      - MISSION_CONTROL_DATA_DIR=/root/.llm-mission-control
     volumes:
       - ~/.llm-mission-control:/root/.llm-mission-control
     extra_hosts:

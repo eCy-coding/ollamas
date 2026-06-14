@@ -98,8 +98,13 @@ export class SecureDB {
 
   constructor() {
     // 1. Resolve storage path
+    // Explicit override (e.g. a mounted Docker volume) always wins so the vault
+    // + master key survive container recreation. Without it, non-darwin hosts
+    // (Linux containers) fall back to an ephemeral in-image dir.
     const isCloud = process.env.K_SERVICE || process.env.GOOGLE_CLOUD_RUN || os.platform() !== "darwin";
-    const dir = isCloud 
+    const dir = process.env.MISSION_CONTROL_DATA_DIR
+      ? process.env.MISSION_CONTROL_DATA_DIR
+      : isCloud
       ? path.join(process.cwd(), ".ephemeral-data")
       : path.join(os.homedir(), ".llm-mission-control");
 

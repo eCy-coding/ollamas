@@ -3,6 +3,10 @@ FROM node:24-slim AS builder
 
 WORKDIR /app
 
+# Puppeteer: skip bundled Chrome download (slim image lacks extraction tools);
+# the runtime stage provides a system Chromium instead.
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Pre-packaged deps install
 COPY package*.json ./
 RUN npm ci
@@ -17,6 +21,13 @@ FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# System Chromium for puppeteer (skips bundled download which fails on slim image)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium fonts-liberation ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Install production dependencies only
 COPY package*.json ./
 RUN npm ci --only=production
@@ -25,6 +36,8 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/tools.json ./tools.json
+COPY --from=builder /app/backend ./backend
 
 # Install esbuild/tsx globally or use pre-installed dependency bundles
 RUN npm install -g esbuild tsx

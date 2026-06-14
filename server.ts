@@ -1361,11 +1361,11 @@ content
     // G9: Decentralized Computing Swarm Multi-Language Backends Prober
     try {
       const sources = [
-        { path: "p2p_network.go", lang: "Go" },
-        { path: "hardware_orchestrator.rs", lang: "Rust" },
-        { path: "secure_sandbox.rs", lang: "Rust" },
-        { path: "idle_daemon.c", lang: "C" },
-        { path: "MultiLevelReward.sol", lang: "Solidity" },
+        { path: "backend/mesh/p2p_network.go", lang: "Go" },
+        { path: "backend/orchestrator/hardware_orchestrator.rs", lang: "Rust" },
+        { path: "backend/sandbox/secure_sandbox.rs", lang: "Rust" },
+        { path: "backend/daemon/idle_daemon.c", lang: "C" },
+        { path: "backend/contracts/MultiLevelReward.sol", lang: "Solidity" },
       ];
 
       const binFolderExists = fs.existsSync(path.join(process.cwd(), "bin"));

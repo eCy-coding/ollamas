@@ -5,9 +5,12 @@ import { expect, test } from 'vitest';
  * Focuses on M4 Pro Max configuration sanity and Orchestrator interaction.
  */
 
+// Live server base. Node fetch needs an absolute URL; override via TEST_BASE_URL.
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:3000';
+
 test('Cluster Mesh orchestrator integration (mocked)', async () => {
     // 1. Consent flow
-    const consentRes = await fetch('/api/cluster/consent', {
+    const consentRes = await fetch(`${BASE}/api/cluster/consent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved: true, termsHash: 'test-hash' })
@@ -15,7 +18,7 @@ test('Cluster Mesh orchestrator integration (mocked)', async () => {
     expect(consentRes.status).toBe(200);
 
     // 2. Status verification
-    const statusRes = await fetch('/api/cluster/status');
+    const statusRes = await fetch(`${BASE}/api/cluster/status`);
     const statusData = await statusRes.json();
     expect(statusData).toHaveProperty('status');
     
