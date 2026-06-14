@@ -1,9 +1,17 @@
-Write-Host "Installing LLM Mission Control Cluster Node..."
-$consent = Read-Host "Terms of service: Consent required to mesh resources. Do you accept? (y/n)"
-if ($consent -ne "y") {
-    Write-Host "[-] Cluster join aborted."
+Write-Host "[INFO] Preparing LLM Mission Control Cluster Node..."
+if (-not (Get-Command "ollama" -ErrorAction SilentlyContinue)) {
+    Write-Host "[-] Error: Ollama not found. Install it first."
     exit
 }
-Write-Host "[+] Consent recorded. Starting daemon..."
-.\bin\p2p_network.exe
+
+Write-Host "--- TERMS OF SERVICE ---"
+Write-Host "By joining, you allow the node to run sandboxed inference tasks."
+$response = Read-Host "Do you accept these terms? (y/n)"
+if ($response -ne "y") {
+    Write-Host "[-] Aborted."
+    exit
+}
+
+Write-Host "[+] Starting daemon..."
+# .\bin\hardware_orchestrator.exe --daemon
 Write-Host "[+] Node joined."

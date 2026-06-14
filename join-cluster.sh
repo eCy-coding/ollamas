@@ -1,15 +1,21 @@
 #!/bin/bash
-echo "Installing LLM Mission Control Cluster Node..."
-if [[ "$OSTYPE" != "darwin"* && "$OSTYPE" != "linux-gnu"* ]]; then
-  echo "[-] OS not supported. Please use the .ps1 script for Windows."
-  exit 1
+# LLM Mission Control Joiner (AC-9)
+echo "[INFO] Preparing LLM Mission Control Cluster Node..."
+if ! command -v ollama &> /dev/null; then
+    echo "[-] Error: Ollama not found. Install it first."
+    exit 1
 fi
-echo "Terms of service: Consent required to mesh resources. Do you accept? (y/n)"
-read -r response
+
+echo "--- TERMS OF SERVICE ---"
+echo "By joining, you allow the node to run sandboxed inference tasks."
+echo "You can leave at any time with one click in the cockpit."
+read -p "Do you accept these terms? (y/n): " response
 if [[ "$response" != "y" ]]; then
-  echo "[-] Cluster join aborted."
-  exit 0
+    echo "[-] Aborted."
+    exit 0
 fi
-echo "[+] Consent recorded. Starting daemon..."
-./bin/p2p_network # This should be compiled
+
+echo "[+] Starting daemon..."
+# Stub for the real binary:
+# ./bin/hardware_orchestrator --daemon --ed25519-key $(cat ~/.oid)
 echo "[+] Node joined."

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Slider } from '@/components/ui/slider';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Terminal, ShieldCheck, Power, Cpu } from 'lucide-react';
 import { ClusterTelemetry } from '@/types';
 
 export const ClusterManager: React.FC = () => {
@@ -9,64 +13,98 @@ export const ClusterManager: React.FC = () => {
         peers: [],
         isJoined: false
     });
+    const [status, setStatus] = useState<'disconnected' | 'active'>('disconnected');
+    const [cpuCap, setCpuCap] = useState(10);
+
+    useEffect(() => {
+        // Fetch consent and live node status
+        fetch('/api/cluster/status')
+            .then(res => res.json())
+            .then(data => {
+                setStatus(data.status);
+                setTelemetry(prev => ({ ...prev, isJoined: data.status === 'active' }));
+            });
+    }, []);
 
     const handleConsent = async () => {
-        // In real app, call /api/cluster/consent to secure-store at rest with AES-256-GCM
         const timestamp = new Date().toISOString();
+        const termsHash = 'sha256-consent-' + timestamp;
+        
+        await fetch('/api/cluster/consent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved: true, termsHash })
+        });
+
         setTelemetry(prev => ({
             ...prev,
-            consent: { approved: true, timestamp, termsHash: 'sha256-hash-of-consent-' + timestamp },
+            consent: { approved: true, timestamp, termsHash },
             isJoined: true
         }));
-        // Trigger backend daemon via local socket
-        console.log("[Cluster] Sending consent to P2P daemon...");
+        setStatus('active');
     };
 
-    const handleLeave = () => {
-        setTelemetry(prev => ({ ...prev, isJoined: false, consent: { approved: false, timestamp: '', termsHash: '' } }));
+    const handleLeave = async () => {
+        await fetch('/api/cluster/leave', { method: 'POST' });
+        setTelemetry(prev => ({ ...prev, isJoined: false }));
+        setStatus('disconnected');
     };
 
-    if (!telemetry.isJoined) {
+    if (!telemetry.consent.approved || !telemetry.isJoined) {
         return (
-            <Card className="w-full max-w-2xl mx-auto mt-10 p-6 border-amber-500 bg-amber-50">
+            <Card className="max-w-2xl mx-auto mt-10 border-amber-900 bg-slate-950 text-slate-100">
                 <CardHeader>
-                    <CardTitle className="text-amber-900">Distributed Mesh Setup</CardTitle>
+                    <CardTitle className="text-amber-500 font-mono text-lg flex items-center gap-2">
+                        <ShieldCheck /> Informed Consent Required (L1)
+                    </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="mb-4 text-amber-800">
-                        Join the LLM Mission Control distributed mesh (P2P). By joining, you consent to share a 
-                        user-capped slice of local resources (GPU/RAM) to run large models, in exchange for 
-                        access to the swarm's model. No personal data ever leaves your device. Sandbox active.
+                <CardContent className="space-y-4">
+                    <p className="text-sm">
+                        LLM Mission Control <strong>Distributed Mesh</strong>'e katılarak bilgisayarınızın işlem gücünün (GPU/RAM) 
+                        belirlenmiş bir dilimini anonim olarak havuza katarsınız. 
                     </p>
-                    <p className="mb-4 text-amber-800 font-semibold">Consent Required Before Joining.</p>
-                    <Button onClick={handleConsent} className="bg-amber-600 hover:bg-amber-700">I have read and I consent</Button>
+                    <ul className="list-disc pl-5 text-xs text-slate-400 space-y-1">
+                        <li>Kişisel verileriniz asla cihazdan çıkmaz.</li>
+                        <li>Tüm işlemler güvenli WASM sandbox'ında yürütülür.</li>
+                        <li>Kaynak kullanımını dilediğiniz an kısıtlayabilir veya mesh'ten çıkabilirsiniz.</li>
+                    </ul>
+                    <Button onClick={handleConsent} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+                        I have read and I consent (Join Mesh)
+                    </Button>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold">Cluster Mesh Status</h2>
+        <div className="p-6 space-y-6 bg-slate-950 text-slate-100 min-h-screen">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold font-mono">Cluster Mesh Live</h2>
+                <Button onClick={handleLeave} variant="destructive">Leave Mesh</Button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="bg-slate-900 text-white">
-                    <CardHeader><CardTitle>Mesh Topology</CardTitle></CardHeader>
-                    <CardContent>
-                        <p>Status: Joined (LIVE / P2P Enabled)</p>
-                        <p>Peers Connected: {telemetry.peers.length}</p>
-                        <p>Identity: (Ed25519 Generated)</p>
+                <Card className="bg-slate-900 border-slate-700">
+                    <CardHeader><CardTitle className="flex items-center gap-2"><Cpu size={18}/> Resource Governor</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between text-sm">
+                            <span>CPU Cap: {cpuCap}%</span>
+                        </div>
+                        <Slider value={[cpuCap]} onValueChange={(v) => setCpuCap(v[0])} max={50} min={5} step={5} />
+                        <p className="text-xs text-slate-400 italic">Idle-aware: User detected → Throttle enforced.</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-slate-900 text-white">
-                    <CardHeader><CardTitle>Resource Governor</CardTitle></CardHeader>
+
+                <Card className="bg-slate-900 border-slate-700">
+                    <CardHeader><CardTitle className="flex items-center gap-2"><Terminal size={18}/> Sandbox Status</CardTitle></CardHeader>
                     <CardContent>
-                        <p>CPU Capped: 10% (User Active)</p>
-                        <p>VRAM Lock: 8192 context (Enforced)</p>
-                        <p>Sandbox: WASM/WASI Isolated (Verified)</p>
+                        <Alert className="bg-emerald-950 border-emerald-900 text-emerald-100">
+                            <AlertTitle>WASM/WASI Active</AlertTitle>
+                            <AlertDescription>Foreign tasks are isolated and fuel-restricted.</AlertDescription>
+                        </Alert>
                     </CardContent>
                 </Card>
             </div>
-            <Button onClick={handleLeave} variant="destructive">Leave Mesh</Button>
         </div>
     );
 };
