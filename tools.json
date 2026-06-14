@@ -27,6 +27,14 @@
       "requiresEnv": [],
       "selfHealing": false
     },
+    "macos_terminal": {
+      "category": "Input",
+      "capability": "TerminalAutomation",
+      "entryPoint": "host-bridge:7345/run",
+      "requiresEnv": ["HOST_BRIDGE_URL", "HOST_BRIDGE_TOKEN"],
+      "targets": ["iterm2", "terminal"],
+      "selfHealing": false
+    },
     "desktop_commander": {
       "category": "System",
       "capability": "Kernel",

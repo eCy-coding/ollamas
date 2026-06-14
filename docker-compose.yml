@@ -18,6 +18,9 @@ services:
       - OLLAMA_NUM_CTX=8192
       # Persist vault + master key on the mounted volume (survives recreate)
       - MISSION_CONTROL_DATA_DIR=/root/.llm-mission-control
+      # Host-side macOS terminal bridge (iTerm2 / Terminal.app)
+      - HOST_BRIDGE_URL=http://host.docker.internal:7345
+      - HOST_BRIDGE_TOKEN=${HOST_BRIDGE_TOKEN}
     volumes:
       - ~/.llm-mission-control:/root/.llm-mission-control
     extra_hosts:
