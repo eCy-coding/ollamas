@@ -14,6 +14,24 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Host-side macOS terminal bridge (drives real iTerm2 / Terminal.app).
+const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
+const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
+
+async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 120000) {
+  const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
+    body: JSON.stringify({ target: target || "iterm2", command, timeoutMs }),
+    signal: AbortSignal.timeout(timeoutMs + 5000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Host terminal bridge error ${res.status}: ${err.error || ""}${err.hint ? " (" + err.hint + ")" : ""}`);
+  }
+  return res.json();
+}
+
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -470,10 +488,25 @@ async function initializeServer() {
             required: ["query"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "macos_terminal",
+          description: "Run a shell command in a REAL, visible macOS terminal window (iTerm2 or Terminal.app) on the host, in real time, and return its output and exit code. Use for live coding sessions the user can watch. Unlike run_command this has no sandbox/allowlist — full host privileges.",
+          parameters: {
+            type: "object",
+            properties: {
+              command: { type: "string", description: "The shell command to type and run in the visible terminal." },
+              target: { type: "string", enum: ["iterm2", "terminal"], description: "Which terminal app to drive. Defaults to iterm2." }
+            },
+            required: ["command"]
+          }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, and grep_search.
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, and macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host — use it when the user wants to watch coding happen in a real terminal).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -568,6 +601,9 @@ STRICT PROTOCOLS:
                 if (!q) throw new Error("Missing 'query' parameter.");
                 const execRes = await TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${q}" .`);
                 output = execRes;
+              } else if (toolName === "macos_terminal") {
+                if (!args.command) throw new Error("Missing 'command' argument.");
+                output = await runOnHostTerminal(args.target, args.command);
               } else {
                 throw new Error(`Unrecognized framework tool: '${toolName}'`);
               }
@@ -805,6 +841,22 @@ STRICT PROTOCOLS:
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * Real macOS terminal (iTerm2 / Terminal.app) via host-side bridge.
+   * Runs commands in a visible window in real time — full host privileges.
+   */
+  app.post("/api/macos-terminal", async (req, res) => {
+    const { command, target, timeoutMs } = req.body;
+    if (!command) return res.status(400).json({ error: "command required" });
+    try {
+      db.logSecurity("command_exec", `Host terminal (${target || "iterm2"})`, command, "allow");
+      const result = await runOnHostTerminal(target, command, timeoutMs);
+      res.json(result);
+    } catch (e: any) {
+      res.status(502).json({ error: e.message });
     }
   });
 
