@@ -19,6 +19,7 @@ const PLAN = [
   ["process_port", ["3000"], "run"],
   ["log_stream", ["5"], "run"],
   ["web_search", ["bridge automation"], "run"],
+  ["shell_check", ['echo "ok"'], "run"],
   ["run_tests", [], "check"],
   ["lint_format", [], "check"],
   ["build_app", [], "check"],
