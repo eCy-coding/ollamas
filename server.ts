@@ -14,6 +14,17 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Seyir Defteri (logbook): append a structured entry to the mounted volume so
+// host tools + the app share one ship's log. Fire-and-forget; never throws.
+const SEYIR_DIR = process.env.MISSION_CONTROL_DATA_DIR || path.join(os.homedir(), ".llm-mission-control");
+const SEYIR_FILE = path.join(SEYIR_DIR, "seyir-defteri.jsonl");
+function logSeyir(entry: Record<string, any>) {
+  try {
+    fs.mkdirSync(SEYIR_DIR, { recursive: true });
+    fs.appendFileSync(SEYIR_FILE, JSON.stringify({ ts: new Date().toISOString(), ...entry }) + "\n");
+  } catch { /* best-effort */ }
+}
+
 // Host-side macOS terminal bridge (drives real iTerm2 / Terminal.app).
 const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
 const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
@@ -663,10 +674,18 @@ async function initializeServer() {
           description: "Lint a shell command/script for bugs and macOS/BSD portability issues (shellcheck + heuristics) BEFORE running it. Run this on any non-trivial command, fix what it reports, then use macos_terminal.",
           parameters: { type: "object", properties: { command: { type: "string", description: "The shell command/script to lint." } }, required: ["command"] }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "logbook",
+          description: "Ship's log (seyir defteri). action 'add' with text records a note; action 'tail' returns recent entries (agent steps are auto-logged).",
+          parameters: { type: "object", properties: { action: { type: "string", enum: ["add", "tail"] }, text: { type: "string" }, n: { type: "number" } }, required: ["action"] }
+        }
       }
     ];
 
-    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor / shell_check (run the project's own self-built host tools).
+    const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor / shell_check / logbook (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
 
 STRICT PROTOCOLS:
@@ -809,6 +828,12 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
               } else if (toolName === "shell_check") {
                 if (!args.command) throw new Error("Missing 'command'.");
                 output = await execOnHost(`node ${HOST_TOOLS_DIR}/shell_check.mjs ${shArg(String(args.command))}`, 60000);
+              } else if (toolName === "logbook") {
+                if (args.action === "add") {
+                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/logbook.mjs add ${shArg(String(args.text || ""))}`);
+                } else {
+                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/logbook.mjs tail ${Number(args.n) || 20}`);
+                }
               } else if (toolName === "apply_patch") {
                 if (!args.diff) throw new Error("Missing 'diff'.");
                 output = await execOnHost(`printf '%s' ${shArg(String(args.diff))} | node ${HOST_TOOLS_DIR}/apply_patch.mjs`);
@@ -831,6 +856,18 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
               result: output,
               diff,
               applied: fileApplied
+            });
+
+            // Seyir defteri: record this action (what/how/result), args trimmed.
+            logSeyir({
+              kind: "agent_step",
+              sessionId: sessionId || null,
+              step: stepNum,
+              tool: toolName,
+              args: JSON.stringify(args).slice(0, 200),
+              ok,
+              latencyMs: toolElapsed,
+              summary: (typeof output === "string" ? output : JSON.stringify(output)).slice(0, 160),
             });
 
             activeHistory.push({
@@ -1050,6 +1087,27 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  /**
+   * Seyir Defteri (logbook) — read the last N structured log entries.
+   */
+  app.get("/api/logbook", (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 500);
+    try {
+      const lines = fs.existsSync(SEYIR_FILE) ? fs.readFileSync(SEYIR_FILE, "utf8").trim().split("\n") : [];
+      const entries = lines.slice(-limit).map((l) => { try { return JSON.parse(l); } catch { return { raw: l }; } });
+      res.json({ count: entries.length, total: lines.length, entries });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Manual logbook append (used by the logbook host tool / agent).
+  app.post("/api/logbook", (req, res) => {
+    if (!req.body || req.body.entry === undefined) return res.status(400).json({ error: "entry required" });
+    logSeyir({ kind: "note", entry: req.body.entry });
+    res.json({ ok: true });
   });
 
   /**
