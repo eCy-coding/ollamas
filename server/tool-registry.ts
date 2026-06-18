@@ -349,23 +349,38 @@ const TOOLS: Record<string, ToolDef> = {
   },
 };
 
+// Tools merged in at runtime from upstream MCP servers (consume side, Faz 1).
+// Namespaced `mcp__<server>__<tool>` so they never collide with built-ins.
+const DYNAMIC: Record<string, ToolDef> = {};
+
+function get(name: string): ToolDef | undefined {
+  return TOOLS[name] || DYNAMIC[name];
+}
+
 export const ToolRegistry = {
   /** OpenAI-format schemas for the ReAct loop (`tools:` param). */
   schemas(): ToolSchema[] {
-    return Object.values(TOOLS).map((t) => t.schema);
+    return [...Object.values(TOOLS), ...Object.values(DYNAMIC)].map((t) => t.schema);
   },
 
-  /** Tool names + tiers (for MCP expose + per-plan allowlisting). */
-  list(): { name: string; tier: ToolTier; schema: ToolSchema }[] {
-    return Object.entries(TOOLS).map(([name, t]) => ({ name, tier: t.tier, schema: t.schema }));
+  /** Tool names + tiers (for MCP expose + per-plan allowlisting). Optionally tier-filtered. */
+  list(tiers?: ToolTier[]): { name: string; tier: ToolTier; schema: ToolSchema }[] {
+    return [...Object.entries(TOOLS), ...Object.entries(DYNAMIC)]
+      .filter(([, t]) => !tiers || tiers.includes(t.tier))
+      .map(([name, t]) => ({ name, tier: t.tier, schema: t.schema }));
+  },
+
+  /** Register an upstream MCP tool into the choke-point (consume side). */
+  register(name: string, def: { tier: ToolTier; schema: ToolSchema; invoke: ToolDef["invoke"] }): void {
+    DYNAMIC[name] = def;
   },
 
   has(name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(TOOLS, name);
+    return !!get(name);
   },
 
   tier(name: string): ToolTier | undefined {
-    return TOOLS[name]?.tier;
+    return get(name)?.tier;
   },
 
   /**
@@ -373,7 +388,7 @@ export const ToolRegistry = {
    * output/error/diff/halt and never throws — the caller reads `ok`.
    */
   async execute(name: string, args: any, ctx: ToolCtx): Promise<ToolResult> {
-    const tool = TOOLS[name];
+    const tool = get(name);
     const start = Date.now();
     const emit = (ok: boolean) =>
       ctx.onUsage?.({ tool: name, tier: tool?.tier ?? "safe", ok, latencyMs: Date.now() - start, tenantId: ctx.tenantId });

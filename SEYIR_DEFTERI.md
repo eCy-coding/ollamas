@@ -57,6 +57,7 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Master prompt:** `AGENTS.md` (roller + değişmez prensipler + kalite kapısı + güvenlik tier'leri); `server.ts` runtime system prompt'a operating-contract enjekte (commit bb05060).
 - **Faz 0 (tek choke-point):** `server/tool-registry.ts` — 22 workspace tool tek `ToolRegistry.execute(name,args,ctx)`'ten geçer; schema/diff/halt/metering-hook/allowlist tek nokta. `server.ts` ReAct dispatch switch'i (~100 satır) registry çağrısına indi; `AGENT_TOOLS` literal → `ToolRegistry.schemas()`. tsc temiz, 6/7 test (1 pre-existing consent-401 fail).
 - **Niçin:** MCP-expose, MCP-consume, auth, rate-limit, billing — hepsi tek noktaya takılacak; ikinci dispatch yolu yasak (AGENTS.md §4).
+- **Faz 1 (MCP gateway):** `@modelcontextprotocol/sdk` 1.29. EXPOSE: `server/mcp/server.ts` low-level Server + stateless Streamable HTTP → `app.all("/mcp")`; registry JSON-Schema'ları doğrudan MCP `inputSchema`. CONSUME: `server/mcp/client.ts` stdio/http upstream → tool'lar `mcp__<server>__<tool>` olarak registry'ye merge → ReAct + /mcp ikisi de çağırır. tools.json `mcpServers` config. Kanıt: MCP client listTools = 22 tool (LIVE :3939); yerel stdio mini-MCP consume → `mcp__local__ping` → "pong" choke-point'ten. tier-filter `MCP_EXPOSE_TIERS` (§5 güvenlik).
 
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,

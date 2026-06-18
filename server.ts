@@ -10,7 +10,9 @@ import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
-import { ToolRegistry, type ToolDeps } from "./server/tool-registry";
+import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
+import { handleMcpRequest } from "./server/mcp/server";
+import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -127,6 +129,22 @@ let CURRENT_MODE: "live" | "degraded-live" | "demo" = "demo";
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
+
+  // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
+  // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
+  // into ToolRegistry as `mcp__<server>__<tool>`. Best-effort — a dead upstream
+  // never blocks boot.
+  try {
+    const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
+    const upstreams: UpstreamConfig[] = reg.mcpServers || [];
+    if (upstreams.length) {
+      for (const r of await connectAllUpstreams(upstreams)) {
+        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
+  }
   
   // Set default workspace path if empty dynamically
   if (!db.data.workspacePath) {
@@ -1130,6 +1148,34 @@ content
         networkThroughputGb: 0.0,
       }
     });
+  });
+
+  // --- MCP gateway: EXPOSE the workspace tools over Streamable HTTP (Faz 1) ---
+  // Tiers advertised/runnable to MCP clients. Default = all (localhost single-user);
+  // Faz 3 replaces this with a per-tenant allowlist from the API key. Privileged
+  // tools (macos_terminal/write_host_file) are full-host — narrow this before any
+  // remote exposure (AGENTS.md §5).
+  const MCP_EXPOSE_TIERS = (process.env.MCP_EXPOSE_TIERS || "safe,host,privileged")
+    .split(",").map(s => s.trim()).filter(Boolean) as ToolTier[];
+
+  const mcpCtxFactory = (_req: express.Request): ToolCtx => ({
+    isLive: CURRENT_MODE !== "demo",
+    workspaceRoot: db.data.workspacePath,
+    autoApply: true, // MCP clients have no interactive approval channel.
+    deps: TOOL_DEPS,
+    allowedTiers: MCP_EXPOSE_TIERS,
+  });
+
+  app.all("/mcp", async (req, res) => {
+    try {
+      await handleMcpRequest(req, res, mcpCtxFactory);
+    } catch (err: any) {
+      if (!res.headersSent) res.status(500).json({ error: err?.message || "MCP request failed" });
+    }
+  });
+
+  app.get("/api/mcp/upstreams", (_req, res) => {
+    res.json({ exposeTiers: MCP_EXPOSE_TIERS, exposedTools: ToolRegistry.list(MCP_EXPOSE_TIERS).map(t => t.name), upstreams: listUpstreams() });
   });
 
   app.post("/api/cluster/execute", async (req, res) => {
