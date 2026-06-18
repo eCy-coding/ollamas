@@ -1,6 +1,14 @@
 {
   "registry_version": "2.1.0",
-  "mcpServers": [],
+  "mcpServers": [
+    {
+      "name": "ukp",
+      "transport": "stdio",
+      "command": "python3",
+      "args": ["/Users/emrecnyngmail.com/Desktop/uk-pipeline/ukp.py", "--mcp-server"],
+      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest"]
+    }
+  ],
   "tools": {
     "claude": {
       "category": "General",
