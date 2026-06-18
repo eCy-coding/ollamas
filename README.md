@@ -97,6 +97,13 @@ Birleşik **async store**: sqlite default, Postgres opt-in — yatay ölçek iç
 - **Yerel pg:** `docker compose --profile postgres up -d` → `DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ollamas` (`.env`). `DB_POOL_SIZE` (default 5) replica başına havuz.
 - **Dialect farkları (adapter içinde gizli):** `?`→`$n` param rewrite, `AUTOINCREMENT`↔`GENERATED ALWAYS AS IDENTITY`, PRAGMA yalnız sqlite, pg COUNT/SUM string→`Number()` coercion, çift-tırnaklı mixed-case alias (pg lowercase-folding).
 
+### v1.4 (Faz 13 — Production Operations Hardening, zero-dep)
+Multi-replica yaşam döngüsünü güvenli kılan işletim katmanı:
+- **Graceful shutdown:** `SIGTERM`/`SIGINT` → yeni bağlantı durdur, webhook worker'ı kapat, uçuştaki istekleri `SHUTDOWN_GRACE_MS` (10s) içinde drain et, pg pool'u kapat, `exit 0`. K8s rolling deploy stream/teslimat koparmaz.
+- **Versiyonlu schema migrations:** `server/store/migrations.ts` — sıralı, append-only `MIGRATIONS` + `schema_migrations` tablosu, iki dialect. Boot'ta **advisory-lock** altında uygulanır (çok-replica boot çift-uygulamaz). Standalone: `tsx server.ts --migrate-only` (K8s pre-upgrade Job / Helm hook). Fresh DB baseline DDL'den, sonraki evrim migration kaydından.
+- **Gerçek readiness:** `GET /api/ready` artık **DB ping** eder (`SELECT 1`) — pg down iken 503 (LB trafiği başka replica'ya yönlendirir). `GET /api/health` `db: up/down` raporlar ama liveness'a bağlamaz (DB blip pod restart etmez).
+- **Deploy:** K8s `migration-job.yaml` (`--migrate-only`, `terminationGracePeriodSeconds: 30`) + `DATABASE_URL` Secret; Helm `pre-install/pre-upgrade` migration hook + Chart `appVersion 1.4.0`; compose `stop_grace_period: 30s`. Migration app içinden koşar — image'da `psql` GEREKMEZ.
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

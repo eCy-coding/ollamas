@@ -11,6 +11,7 @@ spec:
     metadata:
       labels: { app: {{ .Release.Name }} }
     spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001

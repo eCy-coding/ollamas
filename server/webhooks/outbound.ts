@@ -71,3 +71,7 @@ export function startWebhookWorker(): void {
   timer = setInterval(() => { processDeliveries().catch(() => {}); }, interval);
   timer.unref?.();
 }
+/** Stop the background delivery worker (idempotent) — called on graceful shutdown. */
+export function stopWebhookWorker(): void {
+  if (timer) { clearInterval(timer); timer = null; }
+}

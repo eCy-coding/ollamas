@@ -53,6 +53,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    # Drain in-flight requests + webhook deliveries on stop/SIGTERM before Docker
+    # SIGKILLs (matches server.ts SHUTDOWN_GRACE_MS, Faz 13A).
+    stop_grace_period: 30s
+    # With `--profile postgres`, run the one-shot migrator before first boot:
+    #   docker compose --profile postgres run --rm mission-control tsx server.ts --migrate-only
     deploy:
       resources:
         limits:

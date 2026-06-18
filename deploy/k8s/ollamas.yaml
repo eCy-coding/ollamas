@@ -13,6 +13,8 @@ data:
   SAAS_ENFORCE: "1"
   MCP_EXPOSE_TIERS: "safe"        # narrow: no host/privileged host tools in cloud
   LOG_LEVEL: "info"
+  DB_POOL_SIZE: "5"              # pg connections per replica (Faz 12/13)
+  SHUTDOWN_GRACE_MS: "10000"     # graceful drain budget on SIGTERM (Faz 13A)
 ---
 apiVersion: v1
 kind: Secret
@@ -25,6 +27,9 @@ stringData:
   STRIPE_API_KEY: ""
   STRIPE_WEBHOOK_SECRET: ""
   REDIS_URL: ""
+  # Postgres for multi-replica scale (Faz 12/13). Empty → falls back to a
+  # per-pod sqlite file (NOT shared — set this for replicas > 1).
+  DATABASE_URL: ""
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -39,6 +44,9 @@ spec:
     metadata:
       labels: { app: ollamas }
     spec:
+      # Give in-flight /mcp streams + webhook deliveries time to drain on SIGTERM
+      # before the kubelet SIGKILLs (Faz 13A graceful shutdown).
+      terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001

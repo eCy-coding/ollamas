@@ -21,8 +21,8 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
-import { startWebhookWorker } from "./server/webhooks/outbound";
+import { initStore, closeStore, pingStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
+import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
@@ -135,10 +135,13 @@ app.get("/metrics", async (_req, res) => {
   res.set("Content-Type", metricsRegister.contentType);
   res.end(await metricsRegister.metrics());
 });
-// Readiness probe (Faz 9D): 200 only when the app is live + workspace bound.
-app.get("/api/ready", (_req, res) => {
-  const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath;
-  res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE });
+// Readiness probe (Faz 9D + 13C): 200 only when the app is live, workspace bound,
+// AND the store answers a query. A pg-down replica reports 503 so the load
+// balancer routes away instead of serving 500s.
+app.get("/api/ready", async (_req, res) => {
+  const dbOk = await pingStore();
+  const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath && dbOk;
+  res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE, db: dbOk ? "up" : "down" });
 });
 // OpenAPI 3.1 spec + Swagger UI (Faz 10C).
 app.get("/api/openapi.json", (_req, res) => res.json(openApiSpec));
@@ -195,7 +198,15 @@ async function initializeServer() {
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
 
   // SaaS store. node:sqlite default, or Postgres when DATABASE_URL is set (Faz 12).
+  // initStore runs versioned migrations under an advisory lock (Faz 13B).
   await initStore();
+  // Migrate-only mode (Faz 13B): K8s pre-upgrade Job / Helm hook runs schema
+  // migrations to completion, then exits — Pods start only after the DB is ready.
+  if (process.argv.includes("--migrate-only")) {
+    console.log("[Migrate] schema up-to-date — exiting (--migrate-only).");
+    await closeStore();
+    process.exit(0);
+  }
   // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
   // Background outbound-webhook delivery worker (Faz 11B).
@@ -249,6 +260,9 @@ async function initializeServer() {
 
     let loadedModels: any[] = [];
     let ollamaVersion = "unavailable";
+    // Reported, not gated: a DB blip shouldn't restart the pod (liveness),
+    // only steer traffic via /api/ready (Faz 13C).
+    const dbUp = await pingStore();
 
     if (CURRENT_MODE !== "demo") {
       try {
@@ -284,6 +298,7 @@ async function initializeServer() {
       workspacePath: db.data.workspacePath,
       permissions: db.data.permissions,
       hasBackupEnabled: db.data.backup.enabled,
+      db: dbUp ? "up" : "down",
     });
   });
 
@@ -1775,9 +1790,35 @@ content
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Cockpit] Console backend is listening on http://0.0.0.0:${PORT}`);
   });
+
+  // Graceful shutdown (Faz 13A): on SIGTERM/SIGINT (K8s rolling deploy) stop
+  // accepting connections, halt the webhook worker, drain in-flight requests up
+  // to SHUTDOWN_GRACE_MS, close the DB pool, then exit. Double-signal guarded.
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[Shutdown] ${signal} received — draining…`);
+    const graceMs = Number(process.env.SHUTDOWN_GRACE_MS || 10000);
+    const force = setTimeout(() => { console.warn("[Shutdown] grace timeout — forcing exit"); process.exit(1); }, graceMs);
+    force.unref?.();
+    try {
+      stopWebhookWorker();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await closeStore();
+      clearTimeout(force);
+      console.log("[Shutdown] clean exit");
+      process.exit(0);
+    } catch (e) {
+      console.error("[Shutdown] error during drain", e);
+      process.exit(1);
+    }
+  };
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 }
 
 // Start full stack Express services

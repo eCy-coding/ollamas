@@ -17,6 +17,10 @@ export interface DbClient {
   query(sql: string, params?: any[]): Promise<DbResult>;
   run(sql: string, params?: any[]): Promise<DbRun>;
   exec(sql: string): Promise<void>;
+  close(): Promise<void>;
+  /** Run fn under a cross-replica mutex (pg advisory lock). sqlite is single-
+   *  writer so it just runs fn. Used to serialize schema migrations at boot. */
+  withLock(key: number, fn: () => Promise<void>): Promise<void>;
 }
 
 class SqliteAdapter implements DbClient {
@@ -31,6 +35,8 @@ class SqliteAdapter implements DbClient {
     return { changes: Number(r.changes), lastId: r.lastInsertRowid };
   }
   async exec(sql: string): Promise<void> { this.raw.exec(sql); }
+  async close(): Promise<void> { this.raw.close(); }
+  async withLock(_key: number, fn: () => Promise<void>): Promise<void> { await fn(); }
 }
 
 // Rewrite `?` positional params → `$1, $2, ...` for Postgres. Our SQL has no `?`
@@ -49,6 +55,19 @@ class PostgresAdapter implements DbClient {
     return { changes: r.rowCount ?? 0, lastId: r.rows?.[0]?.id };
   }
   async exec(sql: string): Promise<void> { await this.pool.query(sql); } // simple query → multi-statement ok
+  async close(): Promise<void> { await this.pool.end(); }
+  // Hold a session-level advisory lock on a dedicated connection for the whole
+  // fn — other replicas booting concurrently block here until migrations finish.
+  async withLock(key: number, fn: () => Promise<void>): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("SELECT pg_advisory_lock($1)", [key]);
+      await fn();
+    } finally {
+      await client.query("SELECT pg_advisory_unlock($1)", [key]).catch(() => {});
+      client.release();
+    }
+  }
 }
 
 /** Build the adapter: Postgres when DATABASE_URL is set, else node:sqlite. */
