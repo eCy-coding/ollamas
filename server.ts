@@ -194,8 +194,8 @@ async function initializeServer() {
   CURRENT_MODE = await detectMode();
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
 
-  // SaaS store (tenants/keys/plans/usage). Zero-dep node:sqlite (Faz 2).
-  initStore();
+  // SaaS store. node:sqlite default, or Postgres when DATABASE_URL is set (Faz 12).
+  await initStore();
   // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
   // Background outbound-webhook delivery worker (Faz 11B).
@@ -214,7 +214,7 @@ async function initializeServer() {
       }
     }
     // Per-tenant upstreams persisted in the SaaS store (Faz 9E), namespaced by tenant.
-    for (const u of allUpstreamServers()) {
+    for (const u of await allUpstreamServers()) {
       const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools });
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
@@ -1336,111 +1336,107 @@ content
     }
     next();
   };
-  app.get("/api/saas/plans", adminGuard, (_req, res) => res.json(listPlans()));
-  app.get("/api/saas/tenants", adminGuard, (_req, res) => res.json(listTenants()));
-  app.get("/api/saas/keys", adminGuard, (req, res) => {
+  app.get("/api/saas/plans", adminGuard, async (_req, res) => res.json(await listPlans()));
+  app.get("/api/saas/tenants", adminGuard, async (_req, res) => res.json(await listTenants()));
+  app.get("/api/saas/keys", adminGuard, async (req, res) => {
     const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : "";
     if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId' query" });
-    res.json(listKeys(tenantId)); // metadata only — never hash/plaintext
+    res.json(await listKeys(tenantId)); // metadata only — never hash/plaintext
   });
-  app.post("/api/saas/tenants", adminGuard, (req, res) => {
+  app.post("/api/saas/tenants", adminGuard, async (req, res) => {
     try {
       const { name, plan, stripeCustomerId } = req.body || {};
       if (!name) return res.status(400).json({ error: "Missing 'name'" });
-      const tenant = createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null);
+      const tenant = await createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null);
       ensureCustomer(tenant.id).catch(() => {}); // Stripe customer if configured (no-op otherwise)
       res.json(tenant);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
-  app.post("/api/saas/keys", adminGuard, (req, res) => {
+  app.post("/api/saas/keys", adminGuard, async (req, res) => {
     try {
       const { tenantId, label, ttlDays, scopes } = req.body || {};
       if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId'" });
-      res.json(issueApiKey(String(tenantId), label ? String(label) : "", ttlDays != null ? Number(ttlDays) : undefined, scopes ? String(scopes) : "")); // plaintext key returned ONCE
+      res.json(await issueApiKey(String(tenantId), label ? String(label) : "", ttlDays != null ? Number(ttlDays) : undefined, scopes ? String(scopes) : "")); // plaintext key returned ONCE
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
-  app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
-    revokeApiKey(req.params.id);
+  app.post("/api/saas/keys/:id/revoke", adminGuard, async (req, res) => {
+    await revokeApiKey(req.params.id);
     res.json({ revoked: req.params.id });
   });
-  app.get("/api/saas/audit", adminGuard, (req, res) => {
+  app.get("/api/saas/audit", adminGuard, async (req, res) => {
     const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 100;
-    res.json(listAudit(tenantId, limit));
+    res.json(await listAudit(tenantId, limit));
   });
 
-  // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. Tools are
-  // merged into the registry namespaced `mcp__<tenantId>_<name>__*` at host_upstream
-  // tier (excluded from default expose). ---
-  app.get("/api/saas/upstreams", authMiddleware(true), (req, res) => res.json(listUpstreamServers(req.tenant!.tenantId)));
+  // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. ---
+  app.get("/api/saas/upstreams", authMiddleware(true), async (req, res) => res.json(await listUpstreamServers(req.tenant!.tenantId)));
   app.post("/api/saas/upstreams", authMiddleware(true), async (req, res) => {
     try {
       const tId = req.tenant!.tenantId;
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
-      const { id } = addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
+      const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
       const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools });
       res.json({ id, connect });
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
-  app.delete("/api/saas/upstreams/:id", authMiddleware(true), (req, res) => {
+  app.delete("/api/saas/upstreams/:id", authMiddleware(true), async (req, res) => {
     const tId = req.tenant!.tenantId;
-    const up = listUpstreamServers(tId).find(u => u.id === req.params.id);
+    const up = (await listUpstreamServers(tId)).find(u => u.id === req.params.id);
     if (!up) return res.status(404).json({ error: "Not found" });
-    deleteUpstreamServer(tId, req.params.id);
+    await deleteUpstreamServer(tId, req.params.id);
     const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
     res.json({ deleted: req.params.id, toolsRemoved: removed });
   });
 
-  // --- Tenant SELF-SERVE (Faz 10B). Authenticated by the tenant's OWN API key +
-  // scope; every action targets only the caller's tenant. No admin token. ---
+  // --- Tenant SELF-SERVE (Faz 10B). Tenant's OWN API key + scope; no admin token. ---
   const requireScope = (scope: string) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (!req.tenant?.scopes?.includes(scope)) return res.status(403).json({ error: `insufficient_scope: '${scope}' required` });
     next();
   };
-  app.get("/api/saas/self/usage", authMiddleware(true), requireScope("usage:read"), (req, res) => {
+  app.get("/api/saas/self/usage", authMiddleware(true), requireScope("usage:read"), async (req, res) => {
     const t = req.tenant!;
-    res.json({ tenantId: t.tenantId, plan: t.plan.id, quota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId), period: new Date().toISOString().slice(0, 7) });
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, quota: t.plan.monthly_quota, used: await monthToDateUsage(t.tenantId), period: new Date().toISOString().slice(0, 7) });
   });
-  app.get("/api/saas/usage/timeseries", authMiddleware(true), requireScope("usage:read"), (req, res) => {
-    res.json({ tenantId: req.tenant!.tenantId, series: usageTimeseries(req.tenant!.tenantId) });
+  app.get("/api/saas/usage/timeseries", authMiddleware(true), requireScope("usage:read"), async (req, res) => {
+    res.json({ tenantId: req.tenant!.tenantId, series: await usageTimeseries(req.tenant!.tenantId) });
   });
-  app.get("/api/saas/self/keys", authMiddleware(true), requireScope("keys:read"), (req, res) => {
-    res.json(listKeys(req.tenant!.tenantId));
+  app.get("/api/saas/self/keys", authMiddleware(true), requireScope("keys:read"), async (req, res) => {
+    res.json(await listKeys(req.tenant!.tenantId));
   });
-  app.post("/api/saas/self/keys", authMiddleware(true), requireScope("keys:write"), (req, res) => {
+  app.post("/api/saas/self/keys", authMiddleware(true), requireScope("keys:write"), async (req, res) => {
     const { label, ttlDays } = req.body || {};
-    // Self-issued keys are scoped to self-service read (least privilege).
-    res.json(issueApiKey(req.tenant!.tenantId, label ? String(label) : "self", ttlDays != null ? Number(ttlDays) : undefined, "keys:read usage:read"));
+    res.json(await issueApiKey(req.tenant!.tenantId, label ? String(label) : "self", ttlDays != null ? Number(ttlDays) : undefined, "keys:read usage:read"));
   });
-  app.post("/api/saas/self/keys/:id/revoke", authMiddleware(true), requireScope("keys:write"), (req, res) => {
-    const owned = listKeys(req.tenant!.tenantId).some(k => k.id === req.params.id);
+  app.post("/api/saas/self/keys/:id/revoke", authMiddleware(true), requireScope("keys:write"), async (req, res) => {
+    const owned = (await listKeys(req.tenant!.tenantId)).some(k => k.id === req.params.id);
     if (!owned) return res.status(404).json({ error: "Key not found for this tenant" });
-    revokeApiKey(req.params.id);
+    await revokeApiKey(req.params.id);
     res.json({ revoked: req.params.id });
   });
 
   // --- Tenant webhooks (Faz 11B). Outbound HMAC-signed event delivery. ---
-  app.get("/api/saas/webhooks", authMiddleware(true), (req, res) => res.json(listWebhooks(req.tenant!.tenantId)));
-  app.post("/api/saas/webhooks", authMiddleware(true), requireScope("webhooks:write"), (req, res) => {
+  app.get("/api/saas/webhooks", authMiddleware(true), async (req, res) => res.json(await listWebhooks(req.tenant!.tenantId)));
+  app.post("/api/saas/webhooks", authMiddleware(true), requireScope("webhooks:write"), async (req, res) => {
     const { url, events } = req.body || {};
     if (!url || !Array.isArray(events) || !events.length) return res.status(400).json({ error: "Missing 'url' or 'events[]'" });
-    res.json(addWebhook(req.tenant!.tenantId, String(url), events.map(String))); // secret returned ONCE
+    res.json(await addWebhook(req.tenant!.tenantId, String(url), events.map(String))); // secret returned ONCE
   });
-  app.delete("/api/saas/webhooks/:id", authMiddleware(true), requireScope("webhooks:write"), (req, res) => {
-    res.json({ deleted: deleteWebhook(req.tenant!.tenantId, req.params.id) });
+  app.delete("/api/saas/webhooks/:id", authMiddleware(true), requireScope("webhooks:write"), async (req, res) => {
+    res.json({ deleted: await deleteWebhook(req.tenant!.tenantId, req.params.id) });
   });
-  app.get("/api/saas/webhooks/deliveries", authMiddleware(true), (req, res) => res.json(listDeliveries(req.tenant!.tenantId)));
+  app.get("/api/saas/webhooks/deliveries", authMiddleware(true), async (req, res) => res.json(await listDeliveries(req.tenant!.tenantId)));
 
   // A tenant's own current-month usage summary (authenticated).
-  app.get("/api/saas/usage", authMiddleware(true), (req, res) => {
+  app.get("/api/saas/usage", authMiddleware(true), async (req, res) => {
     const t = req.tenant!;
-    res.json({ tenantId: t.tenantId, plan: t.plan.id, monthlyQuota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId) });
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, monthlyQuota: t.plan.monthly_quota, used: await monthToDateUsage(t.tenantId) });
   });
 
   // --- Billing (AGENTS.md Faz 4). Dry-run unless STRIPE_API_KEY is set. ---
-  app.get("/api/billing/preview", adminGuard, (req, res) => {
-    res.json(computeRun(typeof req.query.period === "string" ? req.query.period : undefined));
+  app.get("/api/billing/preview", adminGuard, async (req, res) => {
+    res.json(await computeRun(typeof req.query.period === "string" ? req.query.period : undefined));
   });
   app.post("/api/billing/run", adminGuard, async (req, res) => {
     try {

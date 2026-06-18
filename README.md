@@ -90,6 +90,13 @@ Tüm prod özellikleri **dış secret olmadan** çalışır; secret girilince ot
 - **Self-service dashboard:** SaaS UI panel (tenant key) — pure-SVG usage charts, webhooks CRUD, upstreams, billing portal button.
 - **Deploy:** `deploy/helm/ollamas/` Helm chart (`helm install ollamas deploy/helm/ollamas`) + `release-please` (conventional commits → semver tag → GHCR image via `publish.yml`).
 
+### v1.3 (Faz 12 — Postgres, multi-replica scale)
+Birleşik **async store**: sqlite default, Postgres opt-in — yatay ölçek için.
+- **Store:** `DATABASE_URL` unset → `node:sqlite` (tek-yazar, tek replica, sıfır kurulum). Set → `pg` Pool (async, çok-replica). Aynı `npx vitest run` suite **iki dialect'te de yeşil**; CI matrix (`db: [sqlite, postgres]` × Node 22/24) ikisini de koşar.
+- **Multi-replica-safe webhook worker:** Postgres'te `FOR UPDATE SKIP LOCKED` + `RETURNING` ile job-claim → iki replica aynı delivery'i çift göndermez; sqlite'ta tek-call unique claim token aynı garantiyi tek-yazar altında verir.
+- **Yerel pg:** `docker compose --profile postgres up -d` → `DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ollamas` (`.env`). `DB_POOL_SIZE` (default 5) replica başına havuz.
+- **Dialect farkları (adapter içinde gizli):** `?`→`$n` param rewrite, `AUTOINCREMENT`↔`GENERATED ALWAYS AS IDENTITY`, PRAGMA yalnız sqlite, pg COUNT/SUM string→`Number()` coercion, çift-tırnaklı mixed-case alias (pg lowercase-folding).
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

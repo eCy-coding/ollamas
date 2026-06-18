@@ -85,8 +85,8 @@ export function rateLimitMiddleware() {
     const t = req.tenant;
     if (!t) return next(); // single-user / unauthenticated path is unmetered.
 
-    if (t.plan.monthly_quota > 0 && monthToDateUsage(t.tenantId) >= t.plan.monthly_quota) {
-      queueWebhookEvent(t.tenantId, "usage.quota_exceeded", { quota: t.plan.monthly_quota, plan: t.plan.id });
+    if (t.plan.monthly_quota > 0 && (await monthToDateUsage(t.tenantId)) >= t.plan.monthly_quota) {
+      queueWebhookEvent(t.tenantId, "usage.quota_exceeded", { quota: t.plan.monthly_quota, plan: t.plan.id }).catch(() => {});
       return res.status(429).json({ error: "Monthly quota exceeded", quota: t.plan.monthly_quota, plan: t.plan.id });
     }
 

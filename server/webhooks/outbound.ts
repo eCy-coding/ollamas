@@ -4,7 +4,7 @@
 // tenants can verify with standard libraries. Zero deps (node:crypto + fetch).
 
 import crypto from "node:crypto";
-import { pendingDeliveries, markDelivery, getWebhookSecret } from "../store";
+import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl } from "../store";
 
 const MAX_ATTEMPTS = Number(process.env.WEBHOOK_RETRY_MAX_ATTEMPTS || 5);
 const TIMEOUT_MS = Number(process.env.WEBHOOK_REQUEST_TIMEOUT_MS || 15000);
@@ -28,22 +28,13 @@ export function verifyWebhook(secret: string, body: string, header: string, tole
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Deliver one pending row. Returns true if it should be retried later. */
+/** Deliver one claimed row; reschedules or dead-letters on failure. */
 async function deliverOne(row: any): Promise<void> {
-  const secret = getWebhookSecret(row.webhook_id);
-  if (!secret) { markDelivery(row.id, "dead_letter", row.attempt, null); return; }
+  const secret = await getWebhookSecret(row.webhook_id);
+  const url = await getWebhookUrl(row.webhook_id);
   const attempt = row.attempt + 1;
+  if (!secret || !url) { await markDelivery(row.id, "dead_letter", attempt, null); return; }
   const body = row.payload as string;
-  // Look up the URL via a second query through the secret owner — store exposes
-  // it indirectly; we re-read here to avoid widening the Delivery shape.
-  let url = "";
-  try {
-    const { listWebhooks } = await import("../store");
-    // webhook_id → url; cheap lookup across the tenant's hooks.
-    url = (listWebhooks(row.tenant_id).find((h) => h.id === row.webhook_id) as any)?.url || "";
-  } catch { /* */ }
-  if (!url) { markDelivery(row.id, "dead_letter", attempt, null); return; }
-
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -51,26 +42,23 @@ async function deliverOne(row: any): Promise<void> {
       body,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (res.ok) { markDelivery(row.id, "delivered", attempt, null, res.status); return; }
-    // 4xx (except 429) = permanent; else retry.
-    if (res.status >= 400 && res.status < 500 && res.status !== 429) {
-      markDelivery(row.id, "dead_letter", attempt, null, res.status); return;
-    }
-    scheduleRetry(row.id, attempt, res.status);
+    if (res.ok) { await markDelivery(row.id, "delivered", attempt, null, res.status); return; }
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) { await markDelivery(row.id, "dead_letter", attempt, null, res.status); return; }
+    await scheduleRetry(row.id, attempt, res.status);
   } catch {
-    scheduleRetry(row.id, attempt, 0); // network/timeout → retry
+    await scheduleRetry(row.id, attempt, 0); // network/timeout → retry
   }
 }
 
-function scheduleRetry(id: string, attempt: number, code: number) {
-  if (attempt >= MAX_ATTEMPTS) { markDelivery(id, "dead_letter", attempt, null, code); return; }
+async function scheduleRetry(id: string, attempt: number, code: number) {
+  if (attempt >= MAX_ATTEMPTS) { await markDelivery(id, "dead_letter", attempt, null, code); return; }
   const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)];
-  markDelivery(id, "pending", attempt, new Date(Date.now() + delay).toISOString(), code);
+  await markDelivery(id, "pending", attempt, new Date(Date.now() + delay).toISOString(), code);
 }
 
-/** Process due deliveries (called on an interval by the worker). */
+/** Claim + process due deliveries (multi-replica safe). */
 export async function processDeliveries(): Promise<number> {
-  const rows = pendingDeliveries();
+  const rows = await claimDeliveries();
   for (const r of rows) await deliverOne(r);
   return rows.length;
 }
