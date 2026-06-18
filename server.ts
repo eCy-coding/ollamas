@@ -17,8 +17,8 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
-import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit } from "./server/store";
+import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession } from "./server/billing/stripe";
@@ -189,6 +189,11 @@ async function initializeServer() {
       for (const r of await connectAllUpstreams(upstreams)) {
         console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
       }
+    }
+    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), namespaced by tenant.
+    for (const u of allUpstreamServers()) {
+      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools });
+      console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
@@ -1338,6 +1343,29 @@ content
     const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 100;
     res.json(listAudit(tenantId, limit));
+  });
+
+  // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. Tools are
+  // merged into the registry namespaced `mcp__<tenantId>_<name>__*` at host_upstream
+  // tier (excluded from default expose). ---
+  app.get("/api/saas/upstreams", authMiddleware(true), (req, res) => res.json(listUpstreamServers(req.tenant!.tenantId)));
+  app.post("/api/saas/upstreams", authMiddleware(true), async (req, res) => {
+    try {
+      const tId = req.tenant!.tenantId;
+      const { name, transport, url, command, args, allowedTools } = req.body || {};
+      if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
+      const { id } = addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
+      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools });
+      res.json({ id, connect });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.delete("/api/saas/upstreams/:id", authMiddleware(true), (req, res) => {
+    const tId = req.tenant!.tenantId;
+    const up = listUpstreamServers(tId).find(u => u.id === req.params.id);
+    if (!up) return res.status(404).json({ error: "Not found" });
+    deleteUpstreamServer(tId, req.params.id);
+    const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
+    res.json({ deleted: req.params.id, toolsRemoved: removed });
   });
 
   // A tenant's own current-month usage summary (authenticated).

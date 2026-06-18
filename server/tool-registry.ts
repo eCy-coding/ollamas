@@ -383,6 +383,13 @@ export const ToolRegistry = {
     DYNAMIC[name] = def;
   },
 
+  /** Remove dynamic tools whose name starts with `prefix` (e.g. on upstream delete). Returns count removed. */
+  unregisterByPrefix(prefix: string): number {
+    let n = 0;
+    for (const k of Object.keys(DYNAMIC)) if (k.startsWith(prefix)) { delete DYNAMIC[k]; n++; }
+    return n;
+  },
+
   has(name: string): boolean {
     return !!get(name);
   },

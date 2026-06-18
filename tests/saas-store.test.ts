@@ -130,6 +130,22 @@ describe("store: usage + billing idempotency", () => {
   });
 });
 
+describe("per-tenant upstream servers (Faz 9E)", () => {
+  test("add → list → delete (tenant-scoped)", () => {
+    const t = store.createTenant("upco", "enterprise");
+    const { id } = store.addUpstreamServer(t.id, { name: "fs", transport: "stdio", command: "node", args: ["x.mjs"], allowed_tools: ["read"] });
+    const list = store.listUpstreamServers(t.id);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id, name: "fs", transport: "stdio" });
+    expect(list[0].args).toEqual(["x.mjs"]);
+    // tenant isolation: another tenant sees none
+    const other = store.createTenant("upco2", "free");
+    expect(store.listUpstreamServers(other.id)).toHaveLength(0);
+    expect(store.deleteUpstreamServer(t.id, id)).toBe(true);
+    expect(store.listUpstreamServers(t.id)).toHaveLength(0);
+  });
+});
+
 describe("audit log (Faz 6C)", () => {
   test("recordAudit + listAudit (newest-first, tenant-scoped)", () => {
     const t = store.createTenant("audco", "enterprise");

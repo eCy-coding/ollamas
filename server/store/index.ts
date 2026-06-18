@@ -102,6 +102,14 @@ export function initStore(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events(tenant_id, ts);
     CREATE TABLE IF NOT EXISTS billing_config (k TEXT PRIMARY KEY, v TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, ts TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS upstream_servers (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      name TEXT NOT NULL, transport TEXT NOT NULL,
+      url TEXT, command TEXT, args TEXT, allowed_tools TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_upstream_tenant ON upstream_servers(tenant_id);
   `);
   migrate();
   seedPlans();
@@ -294,6 +302,32 @@ export function stripeEventSeen(eventId: string): boolean {
   const seen = !!d().prepare("SELECT 1 FROM stripe_events WHERE id = ?").get(eventId);
   if (!seen) d().prepare("INSERT INTO stripe_events (id, ts) VALUES (?,?)").run(eventId, nowIso());
   return seen;
+}
+
+// --- Per-tenant upstream MCP servers (Faz 9E) ---
+export interface UpstreamServer {
+  id: string; tenant_id: string; name: string; transport: "stdio" | "http";
+  url?: string | null; command?: string | null; args?: string[]; allowed_tools?: string[];
+}
+export function addUpstreamServer(tenantId: string, s: Omit<UpstreamServer, "id" | "tenant_id">): { id: string } {
+  const id = `ups_${crypto.randomBytes(6).toString("hex")}`;
+  d().prepare("INSERT INTO upstream_servers (id, tenant_id, name, transport, url, command, args, allowed_tools, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id, tenantId, s.name, s.transport, s.url ?? null, s.command ?? null, JSON.stringify(s.args ?? []), JSON.stringify(s.allowed_tools ?? []), nowIso());
+  return { id };
+}
+const rowToUpstream = (r: any): UpstreamServer => ({
+  id: r.id, tenant_id: r.tenant_id, name: r.name, transport: r.transport,
+  url: r.url, command: r.command, args: JSON.parse(r.args || "[]"), allowed_tools: JSON.parse(r.allowed_tools || "[]"),
+});
+export function listUpstreamServers(tenantId: string): UpstreamServer[] {
+  return (d().prepare("SELECT * FROM upstream_servers WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[]).map(rowToUpstream);
+}
+export function allUpstreamServers(): UpstreamServer[] {
+  return (d().prepare("SELECT * FROM upstream_servers").all() as any[]).map(rowToUpstream);
+}
+export function deleteUpstreamServer(tenantId: string, id: string): boolean {
+  const r = d().prepare("DELETE FROM upstream_servers WHERE id = ? AND tenant_id = ?").run(id, tenantId);
+  return r.changes > 0;
 }
 
 export { monthKey };
