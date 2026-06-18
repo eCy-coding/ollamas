@@ -6,6 +6,7 @@ import { register as metricsRegister, httpDuration, recordToolMetric } from "./s
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
+import { signRequest } from "./server/bridge-hmac";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
@@ -42,12 +43,24 @@ function logSeyir(entry: Record<string, any>) {
 // Host-side macOS terminal bridge (drives real iTerm2 / Terminal.app).
 const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
 const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
+const HOST_BRIDGE_HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
+
+// Auth headers for a bridge call: HMAC-SHA256 request signing when a secret is set
+// (replay-protected), else the plain token (backward-compat, Faz 10E).
+function bridgeHeaders(bridgePath: string, body: string): Record<string, string> {
+  if (HOST_BRIDGE_HMAC_SECRET) {
+    const { signature, timestamp, nonce } = signRequest(HOST_BRIDGE_HMAC_SECRET, "POST", bridgePath, body);
+    return { "x-bridge-signature": signature, "x-bridge-timestamp": timestamp, "x-bridge-nonce": nonce };
+  }
+  return HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {};
+}
 
 async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000) {
+  const body = JSON.stringify({ target: target || "iterm2", command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ target: target || "iterm2", command, timeoutMs }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/run", body) },
+    body,
     signal: AbortSignal.timeout(timeoutMs + 5000),
   });
   if (!res.ok) {
@@ -65,10 +78,11 @@ const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cwd(), "b
 // Single-quote-escape an argument for safe interpolation into a shell command.
 function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 async function execOnHost(command: string, timeoutMs = 95000) {
+  const body = JSON.stringify({ command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ command, timeoutMs }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/exec", body) },
+    body,
     signal: AbortSignal.timeout(timeoutMs + 5000),
   });
   if (!res.ok) {
@@ -80,10 +94,11 @@ async function execOnHost(command: string, timeoutMs = 95000) {
 
 // Write a file directly to the macOS host filesystem via the bridge (base64).
 async function writeHostFile(filePath: string, content: string) {
+  const body = JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") });
   const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/write", body) },
+    body,
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) {
