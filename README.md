@@ -74,6 +74,16 @@ yoksa **dry-run** (önizleme: `GET /api/billing/preview`). Tenant başına `stri
 - **Audit:** host/privileged/upstream çağrıları `audit_events`'e; `GET /api/saas/audit` (admin).
 - **Token metering:** in-app LLM token (eval_count) `usage_events tool=__llm__` olarak ayrı dimension.
 
+### v1.0 Production GA (Faz 9 — fallback-first)
+Tüm prod özellikleri **dış secret olmadan** çalışır; secret girilince otomatik aktifleşir:
+- **Auth:** API-key lifecycle (expiry `API_KEY_MAX_TTL_DAYS`, scopes, last-used) + opsiyonel OAuth JWT (`OAUTH_ISSUER` → JWKS doğrulama, audience, `tools:<tier>` scope). Opaque key hep çalışır.
+- **Rate-limit:** `REDIS_URL` varsa atomik Redis token-bucket (çok-instance); yoksa in-memory.
+- **Billing:** `STRIPE_API_KEY` varsa Meter/Price/Customer otomasyonu + `/api/billing/{portal,checkout}` + webhook dedup; yoksa dry-run.
+- **Observability:** `GET /metrics` (Prometheus: http latency + `mcp_tool_calls_total`), `GET /api/ready`, pino JSON log (`LOG_LEVEL`).
+- **Per-tenant upstream MCP:** `GET/POST/DELETE /api/saas/upstreams` (tenant-auth).
+- **Güvenlik:** AES-GCM authTagLength pinned, path-traversal guard, non-root Docker, helmet.
+- **CI:** `.github/workflows/ci.yml` (tsc + vitest + build, Node 22/24).
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

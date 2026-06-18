@@ -31,6 +31,7 @@ export interface ResolvedKey {
   tenantId: string;
   keyId: string;
   plan: Plan;
+  scopes: string[];
 }
 export interface UsageEvent {
   tenantId: string;
@@ -99,6 +100,16 @@ export function initStore(): DatabaseSync {
       ok INTEGER NOT NULL, ts TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events(tenant_id, ts);
+    CREATE TABLE IF NOT EXISTS billing_config (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, ts TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS upstream_servers (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      name TEXT NOT NULL, transport TEXT NOT NULL,
+      url TEXT, command TEXT, args TEXT, allowed_tools TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_upstream_tenant ON upstream_servers(tenant_id);
   `);
   migrate();
   seedPlans();
@@ -108,10 +119,14 @@ export function initStore(): DatabaseSync {
 // Idempotent column adds for DBs created before a column existed (node:sqlite
 // has no IF NOT EXISTS on ADD COLUMN, so probe table_info first).
 function migrate() {
-  const cols = (d().prepare("PRAGMA table_info(tenants)").all() as any[]).map((c) => c.name);
-  if (!cols.includes("stripe_customer_id")) {
+  const tcols = (d().prepare("PRAGMA table_info(tenants)").all() as any[]).map((c) => c.name);
+  if (!tcols.includes("stripe_customer_id")) {
     d().exec("ALTER TABLE tenants ADD COLUMN stripe_customer_id TEXT");
   }
+  // API-key lifecycle (Faz 9B): expiry + last-used tracking.
+  const kcols = (d().prepare("PRAGMA table_info(api_keys)").all() as any[]).map((c) => c.name);
+  if (!kcols.includes("expires_at")) d().exec("ALTER TABLE api_keys ADD COLUMN expires_at TEXT");
+  if (!kcols.includes("last_used_at")) d().exec("ALTER TABLE api_keys ADD COLUMN last_used_at TEXT");
 }
 
 function d(): DatabaseSync {
@@ -157,17 +172,25 @@ export function listTenants(): Tenant[] {
 }
 
 /** API-key metadata for a tenant (never the hash/plaintext). */
-export function listKeys(tenantId: string): { id: string; label: string; revoked: number; created_at: string }[] {
-  return d().prepare("SELECT id, label, revoked, created_at FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[];
+export function listKeys(tenantId: string): { id: string; label: string; revoked: number; scopes: string; expires_at: string | null; last_used_at: string | null; created_at: string }[] {
+  return d().prepare("SELECT id, label, revoked, scopes, expires_at, last_used_at, created_at FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[];
 }
 
-/** Mint an API key. Returns the plaintext ONCE — only its hash is stored. */
-export function issueApiKey(tenantId: string, label = ""): { id: string; key: string } {
+const DEFAULT_TTL_DAYS = Number(process.env.API_KEY_MAX_TTL_DAYS || 0); // 0 = never
+
+/**
+ * Mint an API key. Returns the plaintext ONCE — only its hash is stored.
+ * @param ttlDays expiry in days (0/undefined = never; falls back to API_KEY_MAX_TTL_DAYS)
+ * @param scopes space-separated scope grants (Faz 9B)
+ */
+export function issueApiKey(tenantId: string, label = "", ttlDays?: number, scopes = ""): { id: string; key: string; expiresAt: string | null } {
   const key = `olm_${crypto.randomBytes(24).toString("hex")}`;
   const id = `key_${crypto.randomBytes(6).toString("hex")}`;
-  d().prepare("INSERT INTO api_keys (id, tenant_id, key_hash, label, created_at) VALUES (?,?,?,?,?)")
-    .run(id, tenantId, sha256(key), label, nowIso());
-  return { id, key };
+  const days = ttlDays ?? DEFAULT_TTL_DAYS;
+  const expiresAt = days > 0 ? new Date(Date.now() + days * 86400_000).toISOString() : null;
+  d().prepare("INSERT INTO api_keys (id, tenant_id, key_hash, label, scopes, expires_at, created_at) VALUES (?,?,?,?,?,?,?)")
+    .run(id, tenantId, sha256(key), label, scopes, expiresAt, nowIso());
+  return { id, key, expiresAt };
 }
 
 export function revokeApiKey(keyId: string): void {
@@ -183,11 +206,15 @@ export function revokeApiKey(keyId: string): void {
 export function resolveKey(plaintext: string): ResolvedKey | null {
   const row = d().prepare("SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0").get(sha256(plaintext)) as any;
   if (!row) return null;
+  // Expiry (Faz 9B): reject keys past expires_at.
+  if (row.expires_at && row.expires_at <= nowIso()) return null;
   const tenant = d().prepare("SELECT * FROM tenants WHERE id = ?").get(row.tenant_id) as any;
   if (!tenant) return null;
   const plan = getPlan(tenant.plan_id);
   if (!plan) return null;
-  return { tenantId: tenant.id, keyId: row.id, plan };
+  d().prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(nowIso(), row.id);
+  const scopes = String(row.scopes || "").split(/\s+/).filter(Boolean);
+  return { tenantId: tenant.id, keyId: row.id, plan, scopes };
 }
 
 export function recordUsage(e: UsageEvent): void {
@@ -260,6 +287,47 @@ export function recordInvoice(tenantId: string, period: string, amount: number):
   d().prepare("INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) VALUES (?,?,?,?,?,?)")
     .run(id, tenantId, period, amount, "open", nowIso());
   return { id, created: true };
+}
+
+// --- Billing config (Stripe meter/price/product ids) + webhook dedup (Faz 9C) ---
+export function getBillingConfig(key: string): string | null {
+  const r = d().prepare("SELECT v FROM billing_config WHERE k = ?").get(key) as any;
+  return r ? r.v : null;
+}
+export function setBillingConfig(key: string, value: string): void {
+  d().prepare("INSERT INTO billing_config (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(key, value);
+}
+/** Returns true if this Stripe event was already processed (idempotency). Marks it otherwise. */
+export function stripeEventSeen(eventId: string): boolean {
+  const seen = !!d().prepare("SELECT 1 FROM stripe_events WHERE id = ?").get(eventId);
+  if (!seen) d().prepare("INSERT INTO stripe_events (id, ts) VALUES (?,?)").run(eventId, nowIso());
+  return seen;
+}
+
+// --- Per-tenant upstream MCP servers (Faz 9E) ---
+export interface UpstreamServer {
+  id: string; tenant_id: string; name: string; transport: "stdio" | "http";
+  url?: string | null; command?: string | null; args?: string[]; allowed_tools?: string[];
+}
+export function addUpstreamServer(tenantId: string, s: Omit<UpstreamServer, "id" | "tenant_id">): { id: string } {
+  const id = `ups_${crypto.randomBytes(6).toString("hex")}`;
+  d().prepare("INSERT INTO upstream_servers (id, tenant_id, name, transport, url, command, args, allowed_tools, created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id, tenantId, s.name, s.transport, s.url ?? null, s.command ?? null, JSON.stringify(s.args ?? []), JSON.stringify(s.allowed_tools ?? []), nowIso());
+  return { id };
+}
+const rowToUpstream = (r: any): UpstreamServer => ({
+  id: r.id, tenant_id: r.tenant_id, name: r.name, transport: r.transport,
+  url: r.url, command: r.command, args: JSON.parse(r.args || "[]"), allowed_tools: JSON.parse(r.allowed_tools || "[]"),
+});
+export function listUpstreamServers(tenantId: string): UpstreamServer[] {
+  return (d().prepare("SELECT * FROM upstream_servers WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[]).map(rowToUpstream);
+}
+export function allUpstreamServers(): UpstreamServer[] {
+  return (d().prepare("SELECT * FROM upstream_servers").all() as any[]).map(rowToUpstream);
+}
+export function deleteUpstreamServer(tenantId: string, id: string): boolean {
+  const r = d().prepare("DELETE FROM upstream_servers WHERE id = ? AND tenant_id = ?").run(id, tenantId);
+  return r.changes > 0;
 }
 
 export { monthKey };

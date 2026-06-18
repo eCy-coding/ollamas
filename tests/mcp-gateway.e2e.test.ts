@@ -88,6 +88,20 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
   });
 
   // --- Faz 6A: MCP spec-compliance ---
+  // --- Faz 9D: observability ---
+  test("/metrics serves Prometheus metrics", async () => {
+    const res = await fetch(`${BASE}/metrics`);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toMatch(/process_cpu_user_seconds_total|http_request_duration_ms|mcp_tool_calls_total/);
+  });
+
+  test("/api/ready returns a readiness verdict", async () => {
+    const res = await fetch(`${BASE}/api/ready`);
+    expect([200, 503]).toContain(res.status);
+    expect(typeof (await res.json()).ready).toBe("boolean");
+  });
+
   test("RFC 9728 protected-resource metadata is served", async () => {
     const j = await (await fetch(`${BASE}/.well-known/oauth-protected-resource`)).json() as any;
     expect(String(j.resource)).toMatch(/\/mcp$/);

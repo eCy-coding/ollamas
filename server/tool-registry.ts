@@ -38,6 +38,9 @@ export interface ToolCtx {
   deps: ToolDeps;
   /** When set, only these tiers may run (per-tenant allowlist, Faz 3). */
   allowedTiers?: ToolTier[];
+  /** OAuth scopes granted to the caller. When non-empty, non-safe tools require
+   *  the matching `tools:<tier>` scope (Faz 9B). Empty = no scope restriction. */
+  scopes?: string[];
   /** Tenant identifier for metering/audit (Faz 4). */
   tenantId?: string;
   /** Metering hook, invoked after every call (Faz 4). */
@@ -380,6 +383,13 @@ export const ToolRegistry = {
     DYNAMIC[name] = def;
   },
 
+  /** Remove dynamic tools whose name starts with `prefix` (e.g. on upstream delete). Returns count removed. */
+  unregisterByPrefix(prefix: string): number {
+    let n = 0;
+    for (const k of Object.keys(DYNAMIC)) if (k.startsWith(prefix)) { delete DYNAMIC[k]; n++; }
+    return n;
+  },
+
   has(name: string): boolean {
     return !!get(name);
   },
@@ -406,6 +416,12 @@ export const ToolRegistry = {
     if (ctx.allowedTiers && !ctx.allowedTiers.includes(tool.tier)) {
       emit(false);
       return { ok: false, output: { error: `Tool '${name}' (tier=${tool.tier}) not permitted for this plan.` }, diff: "", applied: false, halt: false };
+    }
+    // OAuth scope enforcement (Faz 9B). Only when scopes are present (JWT/scoped key);
+    // non-safe tools require the matching `tools:<tier>` scope.
+    if (ctx.scopes && ctx.scopes.length && tool.tier !== "safe" && !ctx.scopes.includes(`tools:${tool.tier}`)) {
+      emit(false);
+      return { ok: false, output: { error: `insufficient_scope: '${name}' requires scope 'tools:${tool.tier}'.` }, diff: "", applied: false, halt: false };
     }
 
     try {

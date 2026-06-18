@@ -26,6 +26,11 @@ export class DesktopCommander {
                 throw new Error("Invalid Python script.");
             }
             const scriptPath = path.join(this.SCRIPTS_DIR, scriptName);
+            // Path-traversal guard: resolved path must stay under SCRIPTS_DIR.
+            const root = path.resolve(this.SCRIPTS_DIR);
+            if (!path.resolve(scriptPath).startsWith(root + path.sep)) {
+                throw new Error("Path traversal blocked.");
+            }
             if (!fs.existsSync(scriptPath)) {
                 throw new Error("Script not found.");
             }

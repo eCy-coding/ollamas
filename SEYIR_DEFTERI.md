@@ -86,6 +86,16 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **adobemre1/ollamas:** BLOK — repo'lar GitHub'da fork-linked değil (bağımsız) → cross-repo PR reddedildi; ayrıca yazma yetkisi yok (pull-only). Merge/PR mevcut yetkiyle MÜMKÜN DEĞİL. Çözüm: adobemre1 yazma izni ver VEYA fork-network kur.
 - **Niçin:** Faz 0-6 canonical repo'ya (eCy-coding) indi; ollamas artık main'de MCP-gateway + tools-as-SaaS.
 
+## Faz 12 — v1.0 Production-Ready GA (Faz 9, fallback-first)
+- **Ne:** prototipten dağıtılabilir ürüne. 3-ajan WEB araştırması (MCP/OAuth spec, Stripe prod, deploy/CI/sec — cited) → prod-gap'ler → fix. Branch `feat/v1.0-ga`. Karar: tüm alt-faz + fallback-first (dış secret yok, secret girilince auto-live).
+- **9A güvenlik** (`5baf828`): GCM authTagLength=16 pin + short-tag reddi (db/backup), path-traversal guard (commander), Dockerfile non-root nodeapp, helmet, justified nosemgrep.
+- **9B auth** (`9d820ff`): api_keys expires_at/last_used + ttl/scopes; dual-path auth (opaque `olm_` + OAuth JWT/JWKS jose, audience RFC 8707); `tools:<tier>` scope enforcement.
+- **9C rate-limit+billing** (`d43d623`): ioredis Lua token-bucket + in-memory fallback; Stripe Meter/Price/Customer otomasyon + portal/checkout + webhook event.id dedup + invoice/subscription handler.
+- **9D observability** (`7a84195`): prom-client `/metrics` (http latency + `mcp_tool_calls_total`), pino + pino-http, `/api/ready`.
+- **9E per-tenant upstream** (`7fb3ab4`): `upstream_servers` tablo + CRUD `/api/saas/upstreams` + namespaced host_upstream merge + boot reconnect.
+- **9F CI+UI+docs:** GitHub Actions CI (tsc+vitest+build, Node 22/24); SaaS UI audit viewer + mount-nit fix; README v1.0 + AGENTS roadmap + .env.example.
+- **Kanıt:** tsc temiz; **52 passed/1 skipped** (registry/store/auth/rate-limit/billing/audit/upstream/observability); vite build yeşil. 6 yeni dep (jose/ioredis/prom-client/pino/pino-http/helmet) runtime-opsiyonel.
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

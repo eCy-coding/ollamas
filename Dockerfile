@@ -42,6 +42,14 @@ COPY --from=builder /app/backend ./backend
 # Install esbuild/tsx globally or use pre-installed dependency bundles
 RUN npm install -g esbuild tsx
 
+# Run as non-root (Faz 9A hardening, semgrep missing-user). Global installs above
+# ran as root; here we create nodeapp and own /app + the data dir. The app uses
+# os.homedir() for MISSION_CONTROL_DATA_DIR, so it follows the user's home.
+RUN useradd -m -u 1001 nodeapp \
+ && mkdir -p /home/nodeapp/.llm-mission-control \
+ && chown -R nodeapp:nodeapp /app /home/nodeapp
+USER nodeapp
+
 EXPOSE 3000
 
 # Health: Node global fetch (no curl needed in the slim image). Lets

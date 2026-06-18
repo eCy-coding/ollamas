@@ -1,5 +1,9 @@
 import express from "express";
+import helmet from "helmet";
+import pinoHttp from "pino-http";
 import path from "path";
+import { register as metricsRegister, httpDuration, recordToolMetric } from "./server/metrics";
+import { logger } from "./server/logger";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
@@ -13,11 +17,11 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
-import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit } from "./server/store";
+import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
+import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -92,6 +96,33 @@ const TOOL_DEPS: ToolDeps = {
   FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
 };
 
+// Security headers (helmet, Faz 9A). CSP/COEP disabled: the app serves a Vite
+// SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
+// (HSTS, X-Frame-Options, noSniff, etc.) apply without breaking those flows.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// Observability (Faz 9D): structured request logs (skip noisy polling) + Prometheus
+// HTTP latency histogram on every response.
+app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/api/health" || req.url === "/metrics" } }));
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const route = (req.route?.path || req.path || "unknown").toString();
+    httpDuration.labels(req.method, route, String(res.statusCode)).observe(Date.now() - start);
+  });
+  next();
+});
+// Prometheus scrape endpoint.
+app.get("/metrics", async (_req, res) => {
+  res.set("Content-Type", metricsRegister.contentType);
+  res.end(await metricsRegister.metrics());
+});
+// Readiness probe (Faz 9D): 200 only when the app is live + workspace bound.
+app.get("/api/ready", (_req, res) => {
+  const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath;
+  res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE });
+});
+
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
@@ -144,6 +175,8 @@ async function initializeServer() {
 
   // SaaS store (tenants/keys/plans/usage). Zero-dep node:sqlite (Faz 2).
   initStore();
+  // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
+  ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -156,6 +189,11 @@ async function initializeServer() {
       for (const r of await connectAllUpstreams(upstreams)) {
         console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
       }
+    }
+    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), namespaced by tenant.
+    for (const u of allUpstreamServers()) {
+      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools });
+      console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
@@ -585,6 +623,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
               tenantId: "local",
               onUsage: (e) => {
                 recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+                recordToolMetric(e.tool, e.tier, e.ok);
                 if (e.tier !== "safe") recordAudit({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok });
               },
             });
@@ -1203,10 +1242,12 @@ content
       autoApply: MCP_AUTO_APPLY,
       deps: TOOL_DEPS,
       allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
+      scopes: t?.scopes,
       tenantId: t?.tenantId,
       onUsage: t
         ? (e) => {
             recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+            recordToolMetric(e.tool, e.tier, e.ok);
             if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
           }
         : undefined,
@@ -1282,14 +1323,16 @@ content
     try {
       const { name, plan, stripeCustomerId } = req.body || {};
       if (!name) return res.status(400).json({ error: "Missing 'name'" });
-      res.json(createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null));
+      const tenant = createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null);
+      ensureCustomer(tenant.id).catch(() => {}); // Stripe customer if configured (no-op otherwise)
+      res.json(tenant);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post("/api/saas/keys", adminGuard, (req, res) => {
     try {
-      const { tenantId, label } = req.body || {};
+      const { tenantId, label, ttlDays, scopes } = req.body || {};
       if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId'" });
-      res.json(issueApiKey(String(tenantId), label ? String(label) : "")); // plaintext key returned ONCE
+      res.json(issueApiKey(String(tenantId), label ? String(label) : "", ttlDays != null ? Number(ttlDays) : undefined, scopes ? String(scopes) : "")); // plaintext key returned ONCE
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
@@ -1300,6 +1343,29 @@ content
     const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : 100;
     res.json(listAudit(tenantId, limit));
+  });
+
+  // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. Tools are
+  // merged into the registry namespaced `mcp__<tenantId>_<name>__*` at host_upstream
+  // tier (excluded from default expose). ---
+  app.get("/api/saas/upstreams", authMiddleware(true), (req, res) => res.json(listUpstreamServers(req.tenant!.tenantId)));
+  app.post("/api/saas/upstreams", authMiddleware(true), async (req, res) => {
+    try {
+      const tId = req.tenant!.tenantId;
+      const { name, transport, url, command, args, allowedTools } = req.body || {};
+      if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
+      const { id } = addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
+      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools });
+      res.json({ id, connect });
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.delete("/api/saas/upstreams/:id", authMiddleware(true), (req, res) => {
+    const tId = req.tenant!.tenantId;
+    const up = listUpstreamServers(tId).find(u => u.id === req.params.id);
+    if (!up) return res.status(404).json({ error: "Not found" });
+    deleteUpstreamServer(tId, req.params.id);
+    const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
+    res.json({ deleted: req.params.id, toolsRemoved: removed });
   });
 
   // A tenant's own current-month usage summary (authenticated).
@@ -1322,6 +1388,19 @@ content
       const out = await handleWebhook(req.body as Buffer, String(req.headers["stripe-signature"] || ""));
       res.json(out);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
+  app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {
+    try {
+      const url = await createPortalSession(req.tenant!.tenantId);
+      url ? res.json({ url }) : res.status(501).json({ error: "Billing not configured (set STRIPE_API_KEY)" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/billing/checkout", authMiddleware(true), async (req, res) => {
+    try {
+      const url = await createCheckoutSession(req.tenant!.tenantId);
+      url ? res.json({ url }) : res.status(501).json({ error: "Billing not configured (set STRIPE_API_KEY)" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.post("/api/cluster/execute", async (req, res) => {
