@@ -80,6 +80,21 @@ describe("ToolRegistry choke-point", () => {
     expect(r.ok).toBe(true);
   });
 
+  test("per-tenant tool visibility isolation (Faz 10A)", () => {
+    const def = (n: string) => ({ tier: "host_upstream" as const, schema: { type: "function" as const, function: { name: n, description: "", parameters: { type: "object", properties: {} } } }, invoke: async () => "ok" });
+    ToolRegistry.register("mcp__tnt_AAA_up__x", def("mcp__tnt_AAA_up__x"));
+    ToolRegistry.register("mcp__tnt_BBB_up__y", def("mcp__tnt_BBB_up__y"));
+    ToolRegistry.register("mcp__global__z", def("mcp__global__z"));
+    const names = (tenantId?: string) => ToolRegistry.list(undefined, tenantId).map((t) => t.name);
+    // Tenant AAA sees its own + global, not BBB's.
+    expect(names("tnt_AAA")).toContain("mcp__tnt_AAA_up__x");
+    expect(names("tnt_AAA")).not.toContain("mcp__tnt_BBB_up__y");
+    expect(names("tnt_AAA")).toContain("mcp__global__z");
+    // No tenant → tenant-scoped hidden, global visible.
+    expect(names()).not.toContain("mcp__tnt_AAA_up__x");
+    expect(names()).toContain("mcp__global__z");
+  });
+
   test("register() merges a dynamic (consume) tool reachable via execute", async () => {
     ToolRegistry.register("mcp__x__ping", {
       tier: "host",

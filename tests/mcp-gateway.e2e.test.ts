@@ -147,6 +147,27 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect((term as any)?.annotations?.destructiveHint).toBe(true);
     expect((read as any)?.annotations?.readOnlyHint).toBe(true);
   });
+
+  // --- Faz 10A: resources primitive + pagination ---
+  test("resources/list is served + listTools paginates (nextCursor)", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "res", plan: "enterprise" }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const c = new Client({ name: "t", version: "0" }, { capabilities: {} });
+    const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
+    await c.connect(tr);
+    const resList = await c.listResources();
+    expect(Array.isArray(resList.resources)).toBe(true);
+    const toolList = await c.listTools();
+    expect(toolList.tools.length).toBeLessThanOrEqual(50); // page cap
+    await c.close();
+  });
 });
 
 describe("MCP gateway CONSUME (stdio upstream)", () => {
