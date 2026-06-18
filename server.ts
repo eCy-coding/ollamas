@@ -2,7 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
-import { register as metricsRegister, httpDuration, recordToolMetric } from "./server/metrics";
+import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal } from "./server/metrics";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -21,7 +21,7 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -207,6 +207,8 @@ async function initializeServer() {
     await closeStore();
     process.exit(0);
   }
+  // Pull-time store gauges for /metrics: pool, migration version, queue depth (Faz 14C).
+  registerStoreMetrics({ poolStats, migrationVersion, pendingDeliveryCount });
   // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
   // Background outbound-webhook delivery worker (Faz 11B).
@@ -1801,6 +1803,7 @@ content
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
+    shutdownTotal.inc();
     console.log(`[Shutdown] ${signal} received — draining…`);
     const graceMs = Number(process.env.SHUTDOWN_GRACE_MS || 10000);
     const force = setTimeout(() => { console.warn("[Shutdown] grace timeout — forcing exit"); process.exit(1); }, graceMs);

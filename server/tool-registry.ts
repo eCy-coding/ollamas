@@ -66,7 +66,7 @@ export interface ToolResult {
 /** OpenAI function-calling schema (also used directly as MCP inputSchema). */
 export interface ToolSchema {
   type: "function";
-  function: { name: string; description: string; parameters: any };
+  function: { name: string; description: string; parameters: any; outputSchema?: any };
 }
 
 interface ToolDef {
@@ -406,6 +406,12 @@ export const ToolRegistry = {
 
   tier(name: string): ToolTier | undefined {
     return get(name)?.tier;
+  },
+
+  /** Tier + schema for one tool (MCP logging severity + outputSchema, Faz 14). */
+  info(name: string): { tier: ToolTier; schema: ToolSchema } | undefined {
+    const t = get(name);
+    return t ? { tier: t.tier, schema: t.schema } : undefined;
   },
 
   /**
