@@ -13,7 +13,7 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
 import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
@@ -51,7 +51,10 @@ async function runOnHostTerminal(target: string | undefined, command: string, ti
 }
 
 // Run a command directly on the host via the bridge /exec (no terminal mutex).
-const HOST_TOOLS_DIR = "/Users/emrecnyngmail.com/Desktop/ollamas/bin/host-bridge/tools";
+// Bridge tools execute on the HOST filesystem, so this must be the host path.
+// In dev (tsx on host) process.cwd() is the repo; in Docker, set HOST_TOOLS_DIR
+// to the host repo's bin/host-bridge/tools (the container path would be wrong).
+const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cwd(), "bin/host-bridge/tools");
 // Single-quote-escape an argument for safe interpolation into a shell command.
 function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 async function execOnHost(command: string, timeoutMs = 95000) {
@@ -568,7 +571,13 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
             const toolStart = Date.now();
 
-            const r = await ToolRegistry.execute(toolName, args, { isLive, workspaceRoot, autoApply, deps: TOOL_DEPS });
+            // Meter the in-app agent path too, under the synthetic "local" tenant
+            // (the single-user owner), so usage_events covers all tool traffic.
+            const r = await ToolRegistry.execute(toolName, args, {
+              isLive, workspaceRoot, autoApply, deps: TOOL_DEPS,
+              tenantId: "local",
+              onUsage: (e) => recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs }),
+            });
             output = r.output;
             ok = r.ok;
             diff = r.diff;
@@ -1169,6 +1178,11 @@ content
   const MCP_EXPOSE_TIERS = (process.env.MCP_EXPOSE_TIERS || "safe,host,privileged")
     .split(",").map(s => s.trim()).filter(Boolean) as ToolTier[];
 
+  // MCP clients have no interactive approval channel, so write_file auto-applies.
+  // Set MCP_AUTO_APPLY=0 to make /mcp writes return a diff (halt) instead — paired
+  // with narrowing MCP_EXPOSE_TIERS to exclude privileged host writes (AGENTS.md §5).
+  const MCP_AUTO_APPLY = process.env.MCP_AUTO_APPLY !== "0";
+
   // Per-request ToolCtx. Authenticated tenants get their plan's tier allowlist +
   // usage metering; the unauthenticated single-user path keeps full default tiers.
   const mcpCtxFactory = (req: express.Request): ToolCtx => {
@@ -1176,7 +1190,7 @@ content
     return {
       isLive: CURRENT_MODE !== "demo",
       workspaceRoot: db.data.workspacePath,
-      autoApply: true, // MCP clients have no interactive approval channel.
+      autoApply: MCP_AUTO_APPLY,
       deps: TOOL_DEPS,
       allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
       tenantId: t?.tenantId,
@@ -1201,20 +1215,41 @@ content
   });
 
   // --- SaaS admin: provision tenants + API keys (AGENTS.md Faz 3). Guarded by
-  // X-Admin-Token when SAAS_ADMIN_TOKEN is set; open on localhost dev otherwise. ---
+  // X-Admin-Token. When SAAS_ENFORCE=1 (multi-tenant/production), a token is
+  // MANDATORY — admin routes refuse to serve without one, so enabling enforcement
+  // never silently leaves provisioning open. Pure single-user dev (enforce off,
+  // no token) stays open for convenience. ---
+  if (process.env.SAAS_ENFORCE === "1" && !process.env.SAAS_ADMIN_TOKEN) {
+    console.warn("[SaaS] SAAS_ENFORCE=1 but SAAS_ADMIN_TOKEN unset — /api/saas + /api/billing admin routes are LOCKED (set SAAS_ADMIN_TOKEN).");
+  }
   const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const required = process.env.SAAS_ADMIN_TOKEN;
-    if (required && req.headers["x-admin-token"] !== required) {
-      return res.status(401).json({ error: "Bad admin token" });
+    if (required) {
+      // Timing-safe compare to avoid leaking the token via response timing.
+      const got = String(req.headers["x-admin-token"] || "");
+      const a = Buffer.from(got);
+      const b = Buffer.from(required);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return res.status(401).json({ error: "Bad admin token" });
+      }
+    } else if (process.env.SAAS_ENFORCE === "1") {
+      // Enforcement on but no token configured → refuse rather than expose.
+      return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
     }
     next();
   };
   app.get("/api/saas/plans", adminGuard, (_req, res) => res.json(listPlans()));
+  app.get("/api/saas/tenants", adminGuard, (_req, res) => res.json(listTenants()));
+  app.get("/api/saas/keys", adminGuard, (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : "";
+    if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId' query" });
+    res.json(listKeys(tenantId)); // metadata only — never hash/plaintext
+  });
   app.post("/api/saas/tenants", adminGuard, (req, res) => {
     try {
-      const { name, plan } = req.body || {};
+      const { name, plan, stripeCustomerId } = req.body || {};
       if (!name) return res.status(400).json({ error: "Missing 'name'" });
-      res.json(createTenant(String(name), plan ? String(plan) : "free"));
+      res.json(createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null));
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post("/api/saas/keys", adminGuard, (req, res) => {

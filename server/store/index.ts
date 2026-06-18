@@ -24,6 +24,7 @@ export interface Tenant {
   id: string;
   name: string;
   plan_id: string;
+  stripe_customer_id?: string | null;
   created_at: string;
 }
 export interface ResolvedKey {
@@ -45,6 +46,9 @@ let db: DatabaseSync | null = null;
 
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const nowIso = () => new Date().toISOString();
+// Billing period key. UTC by contract — quotas reset at 00:00 UTC on the 1st,
+// the same instant for every tenant regardless of local timezone. Consistent and
+// audit-friendly; document this for tenants in other zones.
 const monthKey = (d = new Date()) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 
 /** Idempotent: create the DB + tables and seed default plans. Call once at boot. */
@@ -63,6 +67,7 @@ export function initStore(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY, name TEXT NOT NULL,
       plan_id TEXT NOT NULL REFERENCES plans(id),
+      stripe_customer_id TEXT,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS api_keys (
@@ -73,6 +78,7 @@ export function initStore(): DatabaseSync {
       revoked INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
     CREATE TABLE IF NOT EXISTS usage_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tenant_id TEXT NOT NULL, tool TEXT NOT NULL, tier TEXT NOT NULL,
@@ -86,9 +92,20 @@ export function initStore(): DatabaseSync {
       period TEXT NOT NULL, amount REAL NOT NULL,
       status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_invoices_tenant_period ON invoices(tenant_id, period);
   `);
+  migrate();
   seedPlans();
   return db;
+}
+
+// Idempotent column adds for DBs created before a column existed (node:sqlite
+// has no IF NOT EXISTS on ADD COLUMN, so probe table_info first).
+function migrate() {
+  const cols = (d().prepare("PRAGMA table_info(tenants)").all() as any[]).map((c) => c.name);
+  if (!cols.includes("stripe_customer_id")) {
+    d().exec("ALTER TABLE tenants ADD COLUMN stripe_customer_id TEXT");
+  }
 }
 
 function d(): DatabaseSync {
@@ -117,11 +134,25 @@ export function listPlans(): Plan[] {
   return (d().prepare("SELECT * FROM plans").all() as any[]).map((r) => ({ ...r, allowed_tiers: parseTiers(r.allowed_tiers) }));
 }
 
-export function createTenant(name: string, planId = "free"): Tenant {
+export function createTenant(name: string, planId = "free", stripeCustomerId: string | null = null): Tenant {
   if (!getPlan(planId)) throw new Error(`Unknown plan: ${planId}`);
-  const t: Tenant = { id: `tnt_${crypto.randomBytes(8).toString("hex")}`, name, plan_id: planId, created_at: nowIso() };
-  d().prepare("INSERT INTO tenants (id, name, plan_id, created_at) VALUES (?,?,?,?)").run(t.id, t.name, t.plan_id, t.created_at);
+  const t: Tenant = { id: `tnt_${crypto.randomBytes(8).toString("hex")}`, name, plan_id: planId, stripe_customer_id: stripeCustomerId, created_at: nowIso() };
+  d().prepare("INSERT INTO tenants (id, name, plan_id, stripe_customer_id, created_at) VALUES (?,?,?,?,?)")
+    .run(t.id, t.name, t.plan_id, t.stripe_customer_id, t.created_at);
   return t;
+}
+
+export function setTenantStripeCustomer(id: string, customerId: string): void {
+  d().prepare("UPDATE tenants SET stripe_customer_id = ? WHERE id = ?").run(customerId, id);
+}
+
+export function listTenants(): Tenant[] {
+  return d().prepare("SELECT * FROM tenants ORDER BY created_at DESC").all() as any[];
+}
+
+/** API-key metadata for a tenant (never the hash/plaintext). */
+export function listKeys(tenantId: string): { id: string; label: string; revoked: number; created_at: string }[] {
+  return d().prepare("SELECT id, label, revoked, created_at FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[];
 }
 
 /** Mint an API key. Returns the plaintext ONCE — only its hash is stored. */
@@ -137,7 +168,12 @@ export function revokeApiKey(keyId: string): void {
   d().prepare("UPDATE api_keys SET revoked = 1 WHERE id = ?").run(keyId);
 }
 
-/** Resolve a plaintext key → tenant + plan. Null if unknown/revoked. */
+/**
+ * Resolve a plaintext key → tenant + plan. Null if unknown/revoked.
+ * Lookup is by SHA-256 hash over a UNIQUE-indexed column: the secret is never
+ * byte-compared in JS, so there is no string-compare timing side-channel to
+ * leak — the index probe is on the 256-bit digest, not the plaintext.
+ */
 export function resolveKey(plaintext: string): ResolvedKey | null {
   const row = d().prepare("SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0").get(sha256(plaintext)) as any;
   if (!row) return null;
@@ -160,6 +196,10 @@ export function monthToDateUsage(tenantId: string): number {
 
 export function getTenant(id: string): Tenant | null {
   return (d().prepare("SELECT * FROM tenants WHERE id = ?").get(id) as any) || null;
+}
+
+export function getTenantByStripeCustomer(customerId: string): Tenant | null {
+  return (d().prepare("SELECT * FROM tenants WHERE stripe_customer_id = ?").get(customerId) as any) || null;
 }
 
 export function setTenantPlan(id: string, planId: string): void {
@@ -185,11 +225,19 @@ export function aggregateUsage(month = monthKey()): UsageAgg[] {
   return rows.map((r) => ({ tenantId: r.tenantId, calls: r.calls, okCalls: r.okCalls || 0, tokens: r.tokens || 0, latencyMs: r.latencyMs || 0 }));
 }
 
-export function recordInvoice(tenantId: string, period: string, amount: number): { id: string } {
+/** True if an invoice already exists for (tenant, period) — billing idempotency. */
+export function hasInvoice(tenantId: string, period: string): boolean {
+  return !!d().prepare("SELECT 1 FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1").get(tenantId, period);
+}
+
+/** Idempotent: returns the existing invoice id for (tenant, period) or creates one. */
+export function recordInvoice(tenantId: string, period: string, amount: number): { id: string; created: boolean } {
+  const existing = d().prepare("SELECT id FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1").get(tenantId, period) as any;
+  if (existing) return { id: existing.id, created: false };
   const id = `inv_${crypto.randomBytes(8).toString("hex")}`;
   d().prepare("INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) VALUES (?,?,?,?,?,?)")
     .run(id, tenantId, period, amount, "open", nowIso());
-  return { id };
+  return { id, created: true };
 }
 
 export { monthKey };

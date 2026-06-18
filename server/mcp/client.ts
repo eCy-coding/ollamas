@@ -58,10 +58,13 @@ export async function connectUpstream(cfg: UpstreamConfig): Promise<UpstreamResu
         invoke: async (args: any) => {
           const r: any = await client.callTool({ name: t.name, arguments: args || {} });
           // Flatten MCP content blocks to text for the ReAct loop.
-          if (Array.isArray(r?.content)) {
-            return r.content.map((c: any) => (c.type === "text" ? c.text : JSON.stringify(c))).join("\n");
-          }
-          return r;
+          const text = Array.isArray(r?.content)
+            ? r.content.map((c: any) => (c.type === "text" ? c.text : JSON.stringify(c))).join("\n")
+            : JSON.stringify(r);
+          // Propagate upstream failure so the choke-point records ok=false
+          // instead of silently returning an error string as success.
+          if (r?.isError) throw new Error(text || `Upstream tool ${cfg.name}:${t.name} failed`);
+          return text;
         },
       });
     }
