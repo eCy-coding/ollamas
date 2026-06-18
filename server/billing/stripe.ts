@@ -42,14 +42,15 @@ export function isLive(): boolean {
 export function sendMeterEventAsync(tenantId: string, value = 1): void {
   const s = getStripe();
   if (!s) return;
-  const customer = getTenant(tenantId)?.stripe_customer_id;
-  if (!customer) return;
-  const identifier = `${tenantId}:${Date.now()}:${Math.round(Math.random() * 1e9).toString(36)}`;
-  s.billing.meterEvents.create({
-    event_name: METER_EVENT_NAME,
-    identifier,
-    payload: { stripe_customer_id: customer, value: String(value) },
-  }).catch((e: any) => console.warn(`[Meter] ${tenantId}: ${e?.message || e}`));
+  (async () => {
+    const customer = (await getTenant(tenantId))?.stripe_customer_id;
+    if (!customer) return;
+    const identifier = `${tenantId}:${Date.now()}:${Math.round(Math.random() * 1e9).toString(36)}`;
+    await s.billing.meterEvents.create({
+      event_name: METER_EVENT_NAME, identifier,
+      payload: { stripe_customer_id: customer, value: String(value) },
+    });
+  })().catch((e: any) => console.warn(`[Meter] ${tenantId}: ${e?.message || e}`));
 }
 
 /**
@@ -59,15 +60,15 @@ export function sendMeterEventAsync(tenantId: string, value = 1): void {
 export async function ensureBillingConfig(): Promise<{ meterId: string; priceId: string } | null> {
   const s = getStripe();
   if (!s) return null;
-  let meterId = getBillingConfig("meter_id");
-  let priceId = getBillingConfig("price_id");
+  let meterId = await getBillingConfig("meter_id");
+  let priceId = await getBillingConfig("price_id");
   if (meterId && priceId) return { meterId, priceId };
   const meter = await s.billing.meters.create({
     display_name: "ollamas tool calls",
     event_name: METER_EVENT_NAME,
     default_aggregation: { formula: "sum" },
   });
-  meterId = meter.id; setBillingConfig("meter_id", meterId);
+  meterId = meter.id; await setBillingConfig("meter_id", meterId);
   const product = await s.products.create({ name: "ollamas API usage" });
   // Params cast to any: metered-price shape (recurring.meter, unit_amount_decimal)
   // is runtime-validated by Stripe; SDK type unions drift across versions.
@@ -78,7 +79,7 @@ export async function ensureBillingConfig(): Promise<{ meterId: string; priceId:
     billing_scheme: "per_unit",
     unit_amount_decimal: String(UNIT_PRICE),
   } as any);
-  priceId = price.id; setBillingConfig("price_id", priceId);
+  priceId = price.id; await setBillingConfig("price_id", priceId);
   return { meterId, priceId };
 }
 
@@ -86,10 +87,10 @@ export async function ensureBillingConfig(): Promise<{ meterId: string; priceId:
 export async function ensureCustomer(tenantId: string): Promise<string | null> {
   const s = getStripe();
   if (!s) return null;
-  const existing = getTenant(tenantId)?.stripe_customer_id;
+  const existing = (await getTenant(tenantId))?.stripe_customer_id;
   if (existing) return existing;
   const cus = await s.customers.create({ metadata: { tenantId } });
-  setTenantStripeCustomer(tenantId, cus.id);
+  await setTenantStripeCustomer(tenantId, cus.id);
   return cus.id;
 }
 
@@ -121,8 +122,8 @@ export async function createCheckoutSession(tenantId: string): Promise<string | 
 }
 
 /** Roll up usage → billing lines for a period (default current month). */
-export function computeRun(period = monthKey()): BillingRun {
-  const lines = aggregateUsage(period).map((u) => ({ ...u, amount: u.calls * UNIT_PRICE }));
+export async function computeRun(period = monthKey()): Promise<BillingRun> {
+  const lines = (await aggregateUsage(period)).map((u) => ({ ...u, amount: u.calls * UNIT_PRICE }));
   return { period, dryRun: !getStripe(), lines, total: lines.reduce((s, l) => s + l.amount, 0) };
 }
 
@@ -131,15 +132,15 @@ export function computeRun(period = monthKey()): BillingRun {
  * Dry-run (no STRIPE_API_KEY): computes + persists invoices but skips Stripe.
  */
 export async function runBilling(period = monthKey()): Promise<BillingRun> {
-  const run = computeRun(period);
+  const run = await computeRun(period);
   const s = getStripe();
   for (const line of run.lines) {
     // Idempotent: a second run for the same (tenant, period) won't re-bill.
-    const inv = recordInvoice(line.tenantId, period, line.amount);
+    const inv = await recordInvoice(line.tenantId, period, line.amount);
     if (!inv.created) continue;
     if (s) {
       // Stripe needs the real customer id, not our internal tnt_ id.
-      const customerId = getTenant(line.tenantId)?.stripe_customer_id;
+      const customerId = (await getTenant(line.tenantId))?.stripe_customer_id;
       if (!customerId) {
         console.warn(`[Billing] tenant ${line.tenantId} has no stripe_customer_id — skipping Stripe push.`);
         continue;
@@ -165,28 +166,28 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
   const event = s.webhooks.constructEvent(rawBody, signature, secret);
 
   // Idempotency: skip events already processed (Stripe retries deliver duplicates).
-  if (stripeEventSeen(event.id)) return { type: event.type, handled: false };
+  if (await stripeEventSeen(event.id)) return { type: event.type, handled: false };
 
-  const tenantFromSub = (sub: Stripe.Subscription) =>
-    (sub.metadata?.tenantId as string) || getTenantByStripeCustomer(String(sub.customer))?.id || "";
+  const tenantFromSub = async (sub: Stripe.Subscription) =>
+    (sub.metadata?.tenantId as string) || (await getTenantByStripeCustomer(String(sub.customer)))?.id || "";
 
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
       const planId = (sub.metadata?.planId as string) || "";
-      const tenantId = tenantFromSub(sub);
-      if (tenantId && planId && getTenant(tenantId)) {
-        try { setTenantPlan(tenantId, planId); queueWebhookEvent(tenantId, "subscription.updated", { planId }); return { type: event.type, handled: true }; } catch { /* unknown plan */ }
+      const tenantId = await tenantFromSub(sub);
+      if (tenantId && planId && (await getTenant(tenantId))) {
+        try { await setTenantPlan(tenantId, planId); await queueWebhookEvent(tenantId, "subscription.updated", { planId }); return { type: event.type, handled: true }; } catch { /* unknown plan */ }
       }
       break;
     }
     case "customer.subscription.deleted": {
       // Subscription ended → drop the tenant to the free plan (revoke paid tiers).
       const sub = event.data.object as Stripe.Subscription;
-      const tenantId = tenantFromSub(sub);
-      if (tenantId && getTenant(tenantId)) {
-        try { setTenantPlan(tenantId, "free"); return { type: event.type, handled: true }; } catch { /* */ }
+      const tenantId = await tenantFromSub(sub);
+      if (tenantId && (await getTenant(tenantId))) {
+        try { await setTenantPlan(tenantId, "free"); return { type: event.type, handled: true }; } catch { /* */ }
       }
       break;
     }

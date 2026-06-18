@@ -12,6 +12,28 @@ jobs:
       fail-fast: false
       matrix:
         node: [22, 24]
+        db: [sqlite, postgres]
+    # Postgres service is always provisioned but only exercised when
+    # matrix.db=postgres (DATABASE_URL set below). For sqlite runs it sits idle —
+    # cheap, keeps the matrix uniform. Both dialects run the same vitest suite.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ollamas_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Empty → node:sqlite default; set → pg adapter (multi-replica path).
+      DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql://postgres:postgres@localhost:5432/ollamas_ci' || '' }}
+      DB_POOL_SIZE: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +43,7 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Test
+      - name: Test (${{ matrix.db }})
         run: npx vitest run
       - name: Build
         run: npx vite build

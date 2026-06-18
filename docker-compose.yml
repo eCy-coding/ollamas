@@ -35,6 +35,11 @@ services:
       - MCP_AUTO_APPLY=${MCP_AUTO_APPLY:-1}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      # v1.3 (Faz 12): unset → node:sqlite on the volume (default, single replica).
+      # Set → Postgres async store (multi-replica safe). Start a local pg with the
+      # `postgres` profile: `docker compose --profile postgres up -d`.
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-5}
     volumes:
       # Bind mount persists both the bridge token and the SaaS store (saas.db).
       # Target = non-root nodeapp's home (Faz 9A).
@@ -53,3 +58,33 @@ services:
         limits:
           cpus: '2'
           memory: 4G
+
+  # Optional Postgres for the multi-replica async store (v1.3). Opt-in:
+  #   docker compose --profile postgres up -d
+  # then set DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ollamas
+  # (in .env) so mission-control uses it instead of the sqlite volume.
+  postgres:
+    image: postgres:17
+    profiles: ["postgres"]
+    container_name: llm-mission-control-pg
+    restart: unless-stopped
+    # Block setuid/setgid privilege escalation. (read_only omitted: Postgres needs
+    # a writable data dir — persisted to the named volume below, not the rootfs.)
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ollamas
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ollamas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ollamas-pgdata:

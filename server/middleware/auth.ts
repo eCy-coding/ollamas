@@ -50,9 +50,9 @@ async function verifyJwt(token: string, audience: string): Promise<ResolvedKey |
       audience: process.env.OAUTH_AUDIENCE || audience, // RFC 8707 resource binding
     });
     const tenantId = String((payload as any).tenantId || payload.sub || "");
-    const tenant = tenantId ? getTenant(tenantId) : null;
+    const tenant = tenantId ? await getTenant(tenantId) : null;
     if (!tenant) return null;
-    const plan = getPlan(tenant.plan_id);
+    const plan = await getPlan(tenant.plan_id);
     if (!plan) return null;
     const scopes = String((payload as any).scope || "").split(/\s+/).filter(Boolean);
     return { tenantId: tenant.id, keyId: `jwt:${payload.jti || "?"}`, plan, scopes };
@@ -79,7 +79,7 @@ export function authMiddleware(required = false) {
     if (key) {
       // Opaque API keys carry the `olm_` prefix; everything else is treated as a JWT.
       const resolved = key.startsWith("olm_")
-        ? resolveKey(key)
+        ? await resolveKey(key)
         : await verifyJwt(key, `${base}/mcp`);
       if (!resolved) return unauthorized("Invalid, expired, or unverifiable credential");
       req.tenant = resolved;

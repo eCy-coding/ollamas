@@ -113,6 +113,14 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **11D Helm + release-please:** `deploy/helm/ollamas/` (helm template → 6 kaynak OK) + `.github/workflows/release-please.yml` (conventional commit→semver→tag→GHCR).
 - **Kanıt:** tsc temiz; **67 passed/1 skipped** (yeni: mcp-prompts e2e, webhook sign/verify+canlı-deliver+fan-out); vite build yeşil; helm render OK. **SIFIR yeni npm dep.**
 
+## Faz 15 — v1.3 (Postgres + async-store, multi-replica scale, branch feat/v1.3)
+- **Ne:** v1.2'de bilinçli ertelenen TEK büyük mimari iş. node:sqlite (sync, tek-dosya) çok-replica K8s'i bloklar. Birleşik async store (sqlite default + Postgres opt-in) → yatay ölçek. Araştırma (cited): node-postgres pool/param, `FOR UPDATE SKIP LOCKED` job-queue, sqlite WAL+RETURNING, GitHub Actions pg service. v1.2 PR #4 main'e merge → `feat/v1.3`. `npm i pg @types/pg`.
+- **12A adapter:** `server/store/db-adapter.ts` — `DbClient {query,run,exec}`; `SqliteAdapter` (DatabaseSync sync→`Promise.resolve`) / `PostgresAdapter` (pg Pool, `?`→`$n` rewrite); `createAdapter()` `DATABASE_URL` → pg, yoksa sqlite. Dialect-aware DDL: `AUTOINCREMENT`↔`GENERATED ALWAYS AS IDENTITY`, PRAGMA yalnız sqlite.
+- **12B async dönüşüm:** 36 store export → `async`/`await d().query/run`; 5 caller (auth/rate-limit/billing/server.ts ~24 site/webhooks) + test suite `await`. tsc-rehberli (await eksiği = derleme hatası). pg coercion: COUNT/SUM string→`Number()`, mixed-case alias çift-tırnak (pg lowercase-folding gotcha).
+- **12C multi-replica worker:** `claimDeliveries(limit)` — pg `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING *`; sqlite per-call unique claim-token (`claimed_<rand>`) → iki paralel worker disjoint satır seçer, çift-teslimat YOK. Test: 2 paralel `processDeliveries` × 3 event → receiver tam 3.
+- **12D CI+docker+docs:** ci.yml matrix `db:[sqlite,postgres]` × Node 22/24 + `postgres:17` service; docker-compose `postgres` profili + pgdata volume; `.env.example` DATABASE_URL/DB_POOL_SIZE; README "v1.3" + AGENTS Faz 12 ✅.
+- **Kanıt:** tsc temiz; **sqlite 68 passed/1 skipped** + **Postgres (yerel pg:17, DATABASE_URL set) 68 passed/1 skipped** — aynı suite iki dialect'te yeşil, e2e self-boot pg üzerinde dahil. **Yeni dep: `pg` (yalnız DATABASE_URL set ise Pool açar).**
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

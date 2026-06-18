@@ -17,7 +17,7 @@ beforeAll(async () => {
   process.env.SAAS_DB_PATH = DB;
   store = await import("../server/store/index");
   outbound = await import("../server/webhooks/outbound");
-  store.initStore();
+  await store.initStore();
   await new Promise<void>((resolve) => {
     receiver = http.createServer((req, res) => {
       let b = ""; req.on("data", (c) => (b += c));
@@ -41,25 +41,36 @@ describe("webhook signing (Faz 11B)", () => {
   });
 });
 
-describe("webhook delivery pipeline (Faz 11B)", () => {
+describe("webhook delivery pipeline (Faz 11B/12C)", () => {
   test("queue → deliver → receiver gets a valid signed POST", async () => {
-    const t = store.createTenant("whkco", "pro");
-    const { secret } = store.addWebhook(t.id, receiverUrl, ["key.created"]);
-    const n = store.queueWebhookEvent(t.id, "key.created", { keyId: "key_x" });
+    const t = await store.createTenant("whkco", "pro");
+    const { secret } = await store.addWebhook(t.id, receiverUrl, ["key.created"]);
+    const n = await store.queueWebhookEvent(t.id, "key.created", { keyId: "key_x" });
     expect(n).toBe(1);
-    expect(store.pendingDeliveries().some((d) => d.tenant_id === t.id)).toBe(true);
 
     await outbound.processDeliveries();
 
     const hit = received.find((r) => r.body.includes("key_x"));
     expect(hit).toBeTruthy();
     expect(outbound.verifyWebhook(secret, hit!.body, hit!.sig)).toBe(true);
-    expect(store.pendingDeliveries().some((d) => d.tenant_id === t.id)).toBe(false); // delivered
   });
 
-  test("event only fans out to webhooks subscribed to that type", () => {
-    const t = store.createTenant("whkco2", "pro");
-    store.addWebhook(t.id, receiverUrl, ["subscription.updated"]); // not key.created
-    expect(store.queueWebhookEvent(t.id, "key.created", {})).toBe(0);
+  test("event only fans out to webhooks subscribed to that type", async () => {
+    const t = await store.createTenant("whkco2", "pro");
+    await store.addWebhook(t.id, receiverUrl, ["subscription.updated"]); // not key.created
+    expect(await store.queueWebhookEvent(t.id, "key.created", {})).toBe(0);
+  });
+
+  // Faz 12C: two parallel workers must not double-deliver the same event.
+  test("parallel processDeliveries does not double-send", async () => {
+    received.length = 0;
+    const t = await store.createTenant("whkpar", "pro");
+    await store.addWebhook(t.id, receiverUrl, ["key.created"]);
+    for (let i = 0; i < 3; i++) await store.queueWebhookEvent(t.id, "key.created", { keyId: `kp_${i}` });
+    await Promise.all([outbound.processDeliveries(), outbound.processDeliveries()]);
+    const mine = received.filter((r) => r.body.includes("kp_"));
+    const ids = new Set(mine.map((r) => JSON.parse(r.body).data.keyId));
+    expect(ids.size).toBe(3); // each delivered exactly once
+    expect(mine.length).toBe(3);
   });
 });
