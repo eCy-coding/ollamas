@@ -1,0 +1,57 @@
+{
+  "_schema": {
+    "description": "Scripts domain kalıcı hata DB. SCRIPTS_AGENTS.md §9: bir hatayı asla tekrarlama; tekrar = recurrence_count++ + prevention_rule güçlendir.",
+    "fields": {
+      "id": "ERR-SCR-NNN",
+      "ts": "ISO 8601",
+      "version": "vN (ROADMAP_SCRIPTS)",
+      "file": "etkilenen dosya yolu",
+      "category": "shell | hmac | ios | bench | registration | portability",
+      "severity": "CRITICAL | high | med",
+      "root_cause": "semptom değil kök neden",
+      "evidence": "komut + çıktı",
+      "fix": "uygulanan düzeltme",
+      "prevention_rule": "gelecekte aynı sınıfı engelleyen tek cümle",
+      "test_added": "regresyon testi yolu",
+      "recurrence_count": 0
+    }
+  },
+  "known_risks_preloaded": [
+    {
+      "id": "RISK-SCR-001",
+      "category": "hmac",
+      "severity": "high",
+      "note": "iOS ±5dk clock skew imzayı kırar. Prevention: NTP-aware timestamp; bench öncesi server saat farkını ölç.",
+      "applies_version": "v3"
+    },
+    {
+      "id": "RISK-SCR-002",
+      "category": "registration",
+      "severity": "CRITICAL",
+      "note": "Register-seam dışında server iş-mantığına dokunmak §3 ihlali. Prevention: server edit'i yalnız ToolRegistry.register() satırı; derini escalate.",
+      "applies_version": "v5"
+    },
+    {
+      "id": "RISK-SCR-003",
+      "category": "portability",
+      "severity": "med",
+      "note": "BSD vs GNU divergence (sed -i, date, readlink, grep -P). Prevention: macOS'ta BSD varyantı test et; shellcheck hepsini yakalamaz.",
+      "applies_version": "v6"
+    },
+    {
+      "id": "RISK-SCR-004",
+      "category": "ios",
+      "severity": "high",
+      "note": "iOS sandbox keyfi shell çalıştıramaz. Prevention: iOS = consumer-only tier; asla host-exec target tasarlama.",
+      "applies_version": "v3"
+    },
+    {
+      "id": "RISK-SCR-005",
+      "category": "registration",
+      "severity": "high",
+      "note": "Komşu CLI sekmesi aynı repo'da. Prevention: her commit öncesi git status; cli/ değişikliği görürsen dur, senin işin değil.",
+      "applies_version": "all"
+    }
+  ],
+  "errors": []
+}
