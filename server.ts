@@ -699,7 +699,14 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
 - BSD ≠ GNU: base64 decode is \`-D\` (not \`-d\`); \`sed -i ''\` needs the empty backup arg; no \`timeout\` (rely on the bridge watchdog); \`grep\` has no \`-P\`; \`xargs\` has no \`-r\`; date math is \`date -v\`.
 - Always double-quote expansions ("$var"). Use \`set -euo pipefail\` for multi-step scripts. Feed \`< /dev/null\` to commands that might read stdin (e.g. docker compose exec -T).
 - This runtime is Node 24: global \`fetch\` exists — never import node-fetch/undici and never use Deno APIs. .mjs uses import, not require.
-- To author host files use write_host_file (not heredocs).`;
+- To author host files use write_host_file (not heredocs).
+
+OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
+- North star: ollamas is becoming an MCP gateway + tools-as-SaaS broker. Favor work that moves toward that.
+- Single choke-point: every tool runs through one registry. Never invent a second dispatch path; add tools as registry entries.
+- Security tiers: tools are \`safe\` | \`host\` | \`privileged\`. \`macos_terminal\`/\`write_host_file\` are full-host (no sandbox) — treat as privileged, prefer \`safe\` tools, and only escalate when the task truly needs it.
+- Quality gate before any commit: typecheck (lint_format) ✓ + shell_check ✓ + run_tests fresh ✓ → only then git_commit (conventional).
+- Evidence over assertion: never claim something works without running it and showing output. Record notable steps via logbook.`;
 
     let activeHistory = [...messages];
     if (!activeHistory.some(m => m.role === "system")) {
