@@ -108,9 +108,17 @@ sandbox YOK). Dış tenant'a açmak ciddi sınır.
 - ✅ `Faz 3` auth+rate-limit (`server/middleware/`)
 - ✅ `Faz 4` metering+billing (`server/billing/`)
 - ✅ `Faz 5` E2E sertleştirme — flag triage + hermetik test suite (`tests/`) + SaaS admin UI (`src/components/SaaSAdmin.tsx`) + portability/docs
+- ✅ `Faz 6` Araştırma-temelli spec-uyum + güvenlik — RFC 9728 metadata + WWW-Authenticate + Origin guard + tool annotations; consume untrusted `host_upstream` tier + allowlist + output sanitization + manifest hash; audit_events + `/api/saas/audit`; token metering (`tool=__llm__`)
 
 Sonraki işler aynı sözleşmeyle: yeşil kapı (§3) + logbook (§6) + conventional commit.
 Detay: `~/.claude/plans/ollamas-projesini-a-ve-atomic-wand.md`.
+
+### Backlog (araştırma-onaylı, henüz YAPILMADI)
+Bilinçli ertelendi (ayrı altyapı ister; localhost tek-instance'ta şu an gereksiz):
+- Tam **OAuth 2.1** authorization-server + token issuance + RFC 8707 audience validation (şu an opaque API key; RFC 9728 discovery advertise ediliyor).
+- **Redis**-backed dağıtık rate-limit (şu an in-memory tek-instance; yatay ölçekte tenant replica-spray bypass riski).
+- Host-bridge token **HMAC + TTL + TLS/unix-socket** (şu an plaintext `X-Bridge-Token`, localhost).
+- **Per-call gerçek-zamanlı** Stripe meter (şu an nightly batch, idempotent).
 
 **Güvenlik sözleşmesi (§5 ek):** `/mcp` üzerinden write_file auto-apply eder
 (`MCP_AUTO_APPLY=0` ile diff/halt). Privileged tier (`macos_terminal`/`write_host_file`)

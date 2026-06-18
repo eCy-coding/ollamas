@@ -70,6 +70,15 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **5D docs:** `.env.example` 9 SaaS var; README "MCP Gateway + tools-as-SaaS" bölümü (claude mcp add, plan tier'leri, billing); docker-compose HOST_TOOLS_DIR + SaaS env + saas.db volume notu; start.sh HOST_TOOLS_DIR export; AGENTS.md §7 roadmap ✅.
 - **Niçin:** "interaktif en verimli yöntem" = otomatik E2E ile flag tespit→fix→kanıt; ollamas artık test-korumalı + UI'lı + dökümante MCP-gateway/SaaS.
 
+## Faz 10 — Araştırma-temelli spec-uyum + güvenlik (Faz 6)
+- **Ne:** 3-ajan WEB araştırması (MCP spec 2025-06/11, RFC 9728/8707, MCP güvenlik best-practice, Stripe meter) → somut gap'ler → fix + E2E test + gerçek-zamanlı kanıt.
+- **6A spec-uyum:** RFC 9728 `/.well-known/oauth-protected-resource` (`server/mcp/oauth-metadata.ts`); 401'de `WWW-Authenticate` resource_metadata; `/mcp` Origin allowlist (DNS-rebinding); tool annotations (readOnly/destructiveHint tier'den).
+- **6B consume güvenlik:** `host_upstream` untrusted tier (default expose DIŞI = tenant'a default-deny); per-upstream `allowedTools` + isim-çakışma blok; output sanitization (prompt-injection); manifest SHA-256 (rug-pull tespiti).
+- **6C audit:** `audit_events` tablosu + choke-point onUsage host/privileged/upstream kaydı + `GET /api/saas/audit` (admin).
+- **6D token metering:** `providers.ts` GenerateResult.tokens (ollama eval_count); ReAct loop `usage_events tool=__llm__`; aggregate token toplar.
+- **Kanıt:** tsc temiz; **41 passed / 1 skipped** (yeni: mcp-compliance e2e, consume-security, audit, token-aggregate). Canlı: metadata JSON, 401+WWW-Authenticate header, bad-Origin 403. Commit f26fdb0.
+- **Backlog (dürüstçe ertelendi):** tam OAuth 2.1 server + RFC 8707 audience · Redis dağıtık rate-limit · host-bridge HMAC/TLS · per-call Stripe meter. (AGENTS.md Backlog.)
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

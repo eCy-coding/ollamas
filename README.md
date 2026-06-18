@@ -66,6 +66,14 @@ Tool çağrıları `usage_events`'e metrelenir (`~/.llm-mission-control/saas.db`
 `POST /api/billing/run` ay-bazlı rollup'ı Stripe metered usage'a yazar; `STRIPE_API_KEY`
 yoksa **dry-run** (önizleme: `GET /api/billing/preview`). Tenant başına `stripe_customer_id`.
 
+### Spec-uyum + güvenlik (Faz 6, araştırma-temelli)
+- **MCP Authorization keşfi (RFC 9728):** `GET /.well-known/oauth-protected-resource` + her 401'de `WWW-Authenticate: Bearer resource_metadata="..."`. Standart MCP client'lar auth'u keşfeder. (Opaque API key; tam OAuth 2.1 server backlog'da.)
+- **DNS-rebinding koruması:** `/mcp` Origin allowlist (`ALLOWED_ORIGINS`, default localhost).
+- **Tool annotations:** tier'den türetilen `readOnlyHint`/`destructiveHint` (privileged→destructive).
+- **Untrusted upstream izolasyonu:** consume edilen MCP tool'ları `host_upstream` tier'de — default expose DIŞI; `allowedTools` allowlist + isim-çakışma blok + output sanitization (prompt-injection) + manifest hash (rug-pull tespiti).
+- **Audit:** host/privileged/upstream çağrıları `audit_events`'e; `GET /api/saas/audit` (admin).
+- **Token metering:** in-app LLM token (eval_count) `usage_events tool=__llm__` olarak ayrı dimension.
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.
