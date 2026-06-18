@@ -2,6 +2,9 @@
 # LLM Mission Control teardown assistant
 
 set -e
+# DRY_RUN=1 → no side effects; destructive ops (docker down -v, rm -rf, purge
+# prompt) are echoed as [DRY] instead of executed (prova/test).
+DRY_RUN="${DRY_RUN:-0}"
 
 failure_handler() {
     echo "==============================================="
@@ -17,20 +20,23 @@ echo "==============================================="
 
 if command -v docker &> /dev/null; then
     echo "[+] Stopping containers and tearing down network stacks..."
-    docker compose down -v
+    if [ "$DRY_RUN" = "1" ]; then echo "[DRY] would run: docker compose down -v"; else docker compose down -v; fi
 fi
 
-# Disable exit on error for reading input confirmation comfortably
-set +e
-read -p "[?] Do you want to purge local key databases at ~/.llm-mission-control (y/N)? " answer
-set -e
-
-if [[ "$answer" =~ ^[Yy]$ ]]; then
-    echo "[+] Purging local data paths completely..."
-    rm -rf ~/.llm-mission-control
-    echo "[+] Local databases deleted."
+if [ "$DRY_RUN" = "1" ]; then
+    echo "[DRY] would prompt to purge ~/.llm-mission-control (skipped in dry-run)"
 else
-    echo "[*] Statically preserving ~/.llm-mission-control configuration caches (safe)."
+    # Disable exit on error for reading input confirmation comfortably
+    set +e
+    read -p "[?] Do you want to purge local key databases at ~/.llm-mission-control (y/N)? " answer
+    set -e
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        echo "[+] Purging local data paths completely..."
+        rm -rf ~/.llm-mission-control
+        echo "[+] Local databases deleted."
+    else
+        echo "[*] Statically preserving ~/.llm-mission-control configuration caches (safe)."
+    fi
 fi
 
 echo "==============================================="

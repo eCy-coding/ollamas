@@ -14,10 +14,10 @@
 import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { verifyHmacHeaders } from "./hmac.mjs";
 
 const execFileP = promisify(execFile);
 
@@ -28,24 +28,18 @@ const TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
 // signed message MUST stay byte-identical. Server uses HMAC; host-side tools
 // (bridge-client.mjs) keep using the token — both accepted.
 const HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
-const HMAC_WINDOW_MS = 5 * 60 * 1000;
 const seenNonces = new Set();
-function canonicalMessage(method, p, body, ts, nonce) {
-  return `${method.toUpperCase()}\n${p}\n${body}\n${ts}\n${nonce}`;
-}
+// Verify a signed request. Canonical fields live in ./hmac.mjs (single source,
+// byte-identical to server/bridge-hmac.ts). Bridge always signs method POST.
 function verifyHmac(req, raw, bridgePath) {
-  const sig = req.headers["x-bridge-signature"];
-  const ts = req.headers["x-bridge-timestamp"];
-  const nonce = req.headers["x-bridge-nonce"];
-  if (!sig || !ts || !nonce) return false;
-  if (Math.abs(Date.now() - parseInt(ts, 10)) > HMAC_WINDOW_MS) return false;
-  if (seenNonces.has(nonce)) return false;
-  const expected = crypto.createHmac("sha256", HMAC_SECRET).update(canonicalMessage("POST", bridgePath, raw, ts, nonce)).digest("hex");
-  const a = Buffer.from(String(sig)), b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
-  seenNonces.add(nonce);
-  setTimeout(() => seenNonces.delete(nonce), HMAC_WINDOW_MS).unref?.();
-  return true;
+  return verifyHmacHeaders(HMAC_SECRET, {
+    method: "POST",
+    path: bridgePath,
+    body: raw,
+    signature: req.headers["x-bridge-signature"],
+    timestamp: req.headers["x-bridge-timestamp"],
+    nonce: req.headers["x-bridge-nonce"],
+  }, seenNonces);
 }
 const WORK = path.join(os.tmpdir(), "llm-bridge");
 fs.mkdirSync(WORK, { recursive: true });

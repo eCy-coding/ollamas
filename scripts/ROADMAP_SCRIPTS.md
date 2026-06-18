@@ -2,11 +2,13 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 🔵** (governance kurulumu).
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅** (test harness, 86 pass/1 skip), **v3 NEXT**.
+>
+> ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
 ---
 
-## v1 — Foundation & Inventory 🔵
+## v1 — Foundation & Inventory ✅ (inventory.json → v6'ya ertelendi)
 
 **Tema:** Scripts domain'ini kendi kendini yöneten bir motora çevir; tüm script varlıklarını sınıfla.
 
@@ -23,9 +25,9 @@
 
 ---
 
-## v2 — Script Test Harness ⬜
+## v2 — Script Test Harness ✅
 
-**Tema:** Scriptlerin yan etkisiz test edilebilirliği.
+**Tema:** Scriptlerin yan etkisiz test edilebilirliği. **DONE** — 18 yeni test (hmac-parity 5 + mock-bridge 4 + dryrun 5 + golden 4); HMAC tek-kaynak `bin/host-bridge/hmac.mjs`; DRY_RUN guard 3 lifecycle script. Ertelenen: setup/install/setup-keys/join-cluster DRY_RUN + class-C tool golden → v6/v7.
 
 **Phases:**
 1. `scripts/tests/hmac-parity.test.ts` — server `signRequest` ↔ bridge client HMAC byte-identical assertion.

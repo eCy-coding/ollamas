@@ -53,5 +53,48 @@
       "applies_version": "all"
     }
   ],
-  "errors": []
+  "errors": [
+    {
+      "id": "ERR-SCR-001",
+      "ts": "2026-06-19",
+      "version": "v2",
+      "file": "(git working tree)",
+      "category": "registration",
+      "severity": "CRITICAL",
+      "root_cause": "Scripts tab shared the single working tree ~/Desktop/ollamas with several other active tabs. A concurrent tab ran git checkout (scripts-v1 -> main -> v1.4 -> frontend-vf1), yanking the branch underneath this tab: v1 governance files vanished from view and finished+green v2 edits ended up on the FRONTEND branch, not feat/scripts-v1. Committing there would have contaminated another tab's branch (RISK-SCR-005 realized).",
+      "evidence": "git reflog: 'checkout: moving from feat/scripts-v1 to main' then ...to v1.4 to frontend-vf1; git branch --show-current => feat/frontend-vf1; v1 commit dbb8f9c safe but unreachable from HEAD.",
+      "fix": "Recovered via isolated worktree: git worktree add ~/Desktop/ollamas-scripts-wt feat/scripts-v1; copied v2 files in; committed there. Shared tree left untouched.",
+      "prevention_rule": "Scripts tab MUST work only in its own git worktree (~/Desktop/ollamas-scripts-wt), never the shared ~/Desktop/ollamas tree. At every session start verify the worktree branch == feat/scripts-* before any work or commit.",
+      "test_added": "",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-002",
+      "ts": "2026-06-19",
+      "version": "v2",
+      "file": "vitest.config.ts",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "In the shared tree the frontend lane's untracked projects-based vitest.config.ts restricted the node project include to tests/**, so scripts/tests/ was collected by NOTHING (false-green risk). Plan wrongly assumed the default recursive glob applied.",
+      "evidence": "npx vitest run scripts/tests/... -> 'No test files found'; include: tests/**/*.test.ts.",
+      "fix": "In the isolated worktree there is no vitest.config.ts, so vitest's default glob collects scripts/tests/ automatically — no config needed (shared-tree-only artifact).",
+      "prevention_rule": "After adding tests, always confirm they are actually collected (test-file count increased). A projects-based vitest.config.ts overrides the default glob; isolation avoids cross-lane config contamination.",
+      "test_added": "scripts/tests/*.test.ts (4 files collected by default glob)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-003",
+      "ts": "2026-06-19",
+      "version": "v2",
+      "file": "bin/host-bridge/tools/lib/bridge-client.mjs",
+      "category": "portability",
+      "severity": "med",
+      "root_cause": "Line 9 hardcodes REPO to an absolute home path; breaks on any other machine/user/checkout. Found while surveying golden-test candidates.",
+      "evidence": "bridge-client.mjs:9 export const REPO = absolute home path literal;",
+      "fix": "DEFERRED to v6 (Hardening & Portability); recorded so it is not lost.",
+      "prevention_rule": "No hardcoded absolute paths in scripts. Derive repo root from import.meta.url / env, never a literal home path.",
+      "test_added": "",
+      "recurrence_count": 0
+    }
+  ]
 }
