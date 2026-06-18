@@ -18,7 +18,7 @@ import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./serve
 import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
+import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -150,6 +150,8 @@ async function initializeServer() {
 
   // SaaS store (tenants/keys/plans/usage). Zero-dep node:sqlite (Faz 2).
   initStore();
+  // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
+  ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -1289,7 +1291,9 @@ content
     try {
       const { name, plan, stripeCustomerId } = req.body || {};
       if (!name) return res.status(400).json({ error: "Missing 'name'" });
-      res.json(createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null));
+      const tenant = createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null);
+      ensureCustomer(tenant.id).catch(() => {}); // Stripe customer if configured (no-op otherwise)
+      res.json(tenant);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post("/api/saas/keys", adminGuard, (req, res) => {
@@ -1329,6 +1333,19 @@ content
       const out = await handleWebhook(req.body as Buffer, String(req.headers["stripe-signature"] || ""));
       res.json(out);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
+  app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {
+    try {
+      const url = await createPortalSession(req.tenant!.tenantId);
+      url ? res.json({ url }) : res.status(501).json({ error: "Billing not configured (set STRIPE_API_KEY)" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/billing/checkout", authMiddleware(true), async (req, res) => {
+    try {
+      const url = await createCheckoutSession(req.tenant!.tenantId);
+      url ? res.json({ url }) : res.status(501).json({ error: "Billing not configured (set STRIPE_API_KEY)" });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
   app.post("/api/cluster/execute", async (req, res) => {

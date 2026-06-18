@@ -100,6 +100,8 @@ export function initStore(): DatabaseSync {
       ok INTEGER NOT NULL, ts TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events(tenant_id, ts);
+    CREATE TABLE IF NOT EXISTS billing_config (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, ts TEXT NOT NULL);
   `);
   migrate();
   seedPlans();
@@ -277,6 +279,21 @@ export function recordInvoice(tenantId: string, period: string, amount: number):
   d().prepare("INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) VALUES (?,?,?,?,?,?)")
     .run(id, tenantId, period, amount, "open", nowIso());
   return { id, created: true };
+}
+
+// --- Billing config (Stripe meter/price/product ids) + webhook dedup (Faz 9C) ---
+export function getBillingConfig(key: string): string | null {
+  const r = d().prepare("SELECT v FROM billing_config WHERE k = ?").get(key) as any;
+  return r ? r.v : null;
+}
+export function setBillingConfig(key: string, value: string): void {
+  d().prepare("INSERT INTO billing_config (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").run(key, value);
+}
+/** Returns true if this Stripe event was already processed (idempotency). Marks it otherwise. */
+export function stripeEventSeen(eventId: string): boolean {
+  const seen = !!d().prepare("SELECT 1 FROM stripe_events WHERE id = ?").get(eventId);
+  if (!seen) d().prepare("INSERT INTO stripe_events (id, ts) VALUES (?,?)").run(eventId, nowIso());
+  return seen;
 }
 
 export { monthKey };

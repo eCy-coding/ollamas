@@ -105,6 +105,22 @@ describe("store: usage + billing idempotency", () => {
     expect(run.total).toBeGreaterThanOrEqual(0);
   });
 
+  test("Stripe helpers degrade gracefully without a key (Faz 9C)", async () => {
+    expect(billing.isLive()).toBe(false);
+    expect(await billing.ensureBillingConfig()).toBeNull();
+    const t = store.createTenant("nostripe", "pro");
+    expect(await billing.ensureCustomer(t.id)).toBeNull();
+    expect(await billing.createPortalSession(t.id)).toBeNull();
+    expect(await billing.createCheckoutSession(t.id)).toBeNull();
+  });
+
+  test("billing_config roundtrip + stripe event dedup (Faz 9C)", () => {
+    store.setBillingConfig("meter_id", "mtr_123");
+    expect(store.getBillingConfig("meter_id")).toBe("mtr_123");
+    expect(store.stripeEventSeen("evt_1")).toBe(false); // first time
+    expect(store.stripeEventSeen("evt_1")).toBe(true);  // duplicate
+  });
+
   test("token dimension (tool=__llm__) aggregates tokens (Faz 6D)", () => {
     const t = store.createTenant("tok", "pro");
     store.recordUsage({ tenantId: t.id, tool: "__llm__", tier: "safe", ok: true, latencyMs: 100, tokens: 250 });
@@ -154,33 +170,32 @@ describe("auth middleware", () => {
   });
 });
 
-describe("rate-limit middleware", () => {
-  test("token bucket exhausts → 429", () => {
+describe("rate-limit middleware (in-memory fallback, no REDIS_URL)", () => {
+  test("token bucket exhausts → 429", async () => {
     const tenant = { tenantId: "rl1", keyId: "k", plan: { id: "tiny", name: "t", rate_per_min: 2, monthly_quota: 0, allowed_tiers: ["safe"] as any } };
     const mw = rl.rateLimitMiddleware();
     let pass = 0, blocked = 0;
     for (let i = 0; i < 5; i++) {
       const res = mkRes(); const next = vi.fn();
-      mw({ tenant } as any, res, next);
+      await mw({ tenant } as any, res, next);
       if (next.mock.calls.length) pass++; else if (res.statusCode === 429) blocked++;
     }
     expect(pass).toBe(2);
     expect(blocked).toBe(3);
   });
 
-  test("monthly quota exceeded → 429", () => {
-    const t = store.createTenant("quota", "free"); // free quota = 1000
-    // Spoof: tiny quota plan inline
+  test("monthly quota exceeded → 429", async () => {
+    const t = store.createTenant("quota", "free");
     const tenant = { tenantId: t.id, keyId: "k", plan: { id: "q", name: "q", rate_per_min: 1000, monthly_quota: 1, allowed_tiers: ["safe"] as any } };
     store.recordUsage({ tenantId: t.id, tool: "x", tier: "safe", ok: true, latencyMs: 1 });
     const res = mkRes(); const next = vi.fn();
-    rl.rateLimitMiddleware()({ tenant } as any, res, next);
+    await rl.rateLimitMiddleware()({ tenant } as any, res, next);
     expect(res.statusCode).toBe(429);
   });
 
-  test("unauthenticated request passes through unmetered", () => {
+  test("unauthenticated request passes through unmetered", async () => {
     const res = mkRes(); const next = vi.fn();
-    rl.rateLimitMiddleware()({} as any, res, next);
+    await rl.rateLimitMiddleware()({} as any, res, next);
     expect(next).toHaveBeenCalled();
   });
 });
