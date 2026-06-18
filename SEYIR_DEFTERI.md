@@ -52,6 +52,12 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Ne:** logbook sistemi + müdahalesiz otonomi ölçümü.
 - **Nasıl:** `server.ts` her agent step'i `seyir-defteri.jsonl`'e otomatik yazar; `logbook` aracı + `/api/logbook`. Gerçek kullanıcı istekleri agent'a verilip ne/nasıl/niçin sorgulandı.
 
+## Faz 8 — MCP Gateway + tools-as-SaaS (devam ediyor)
+- **Ne:** ollamas'ı MCP gateway + SaaS broker'a dönüştürme. Önce master prompt + tek choke-point.
+- **Master prompt:** `AGENTS.md` (roller + değişmez prensipler + kalite kapısı + güvenlik tier'leri); `server.ts` runtime system prompt'a operating-contract enjekte (commit bb05060).
+- **Faz 0 (tek choke-point):** `server/tool-registry.ts` — 22 workspace tool tek `ToolRegistry.execute(name,args,ctx)`'ten geçer; schema/diff/halt/metering-hook/allowlist tek nokta. `server.ts` ReAct dispatch switch'i (~100 satır) registry çağrısına indi; `AGENT_TOOLS` literal → `ToolRegistry.schemas()`. tsc temiz, 6/7 test (1 pre-existing consent-401 fail).
+- **Niçin:** MCP-expose, MCP-consume, auth, rate-limit, billing — hepsi tek noktaya takılacak; ikinci dispatch yolu yasak (AGENTS.md §4).
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

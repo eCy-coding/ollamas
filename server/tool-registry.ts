@@ -1,0 +1,403 @@
+// Single choke-point for ALL workspace tool execution (AGENTS.md §4).
+// The ReAct loop (server.ts), the MCP server (expose, Faz 1) and the MCP client
+// (consume, Faz 1) all run tools through ToolRegistry.execute — never a second
+// dispatch path. Metering/auth/rate-limit/per-tenant allowlist all hook here.
+//
+// Host helpers (execOnHost, runOnHostTerminal, ...) live in server.ts and are
+// injected via ToolDeps to avoid a circular import and keep host-bridge state
+// owned by one module.
+
+import type { FilesystemManager } from "./files";
+import type { TerminalManager } from "./terminal";
+
+/** Security tier — gates which tenant plans may call a tool (AGENTS.md §5). */
+export type ToolTier = "safe" | "host" | "privileged";
+
+/** Host-side helpers the tool thunks need, owned by server.ts and injected. */
+export interface ToolDeps {
+  FilesystemManager: typeof FilesystemManager;
+  TerminalManager: typeof TerminalManager;
+  runOnHostTerminal: (target: string | undefined, command: string) => Promise<any>;
+  writeHostFile: (filePath: string, content: string) => Promise<any>;
+  execOnHost: (command: string, timeoutMs?: number) => Promise<any>;
+  HOST_TOOLS_DIR: string;
+  shArg: (s: string) => string;
+  db: { logSecurity: (cat: string, what: string, how: string, decision: string) => void };
+}
+
+/** Per-call context flowing through the choke-point. */
+export interface ToolCtx {
+  isLive: boolean;
+  workspaceRoot: string;
+  autoApply: boolean;
+  deps: ToolDeps;
+  /** When set, only these tiers may run (per-tenant allowlist, Faz 3). */
+  allowedTiers?: ToolTier[];
+  /** Tenant identifier for metering/audit (Faz 4). */
+  tenantId?: string;
+  /** Metering hook, invoked after every call (Faz 4). */
+  onUsage?: (e: { tool: string; tier: ToolTier; ok: boolean; latencyMs: number; tenantId?: string }) => void;
+}
+
+/** Normalized result the ReAct loop and MCP layer consume. */
+export interface ToolResult {
+  ok: boolean;
+  output: any;
+  /** Unified diff for write_file (approval flow). */
+  diff: string;
+  /** Whether a file write was actually applied to disk. */
+  applied: boolean;
+  /** Pause the ReAct loop for manual approval (write_file, autoApply=false). */
+  halt: boolean;
+}
+
+/** OpenAI function-calling schema (also used directly as MCP inputSchema). */
+export interface ToolSchema {
+  type: "function";
+  function: { name: string; description: string; parameters: any };
+}
+
+interface ToolDef {
+  tier: ToolTier;
+  schema: ToolSchema;
+  /** Returns output (string|object), or a partial ToolResult for diff/halt cases. */
+  invoke: (args: any, ctx: ToolCtx) => Promise<any | { output: any; diff?: string; applied?: boolean; halt?: boolean }>;
+}
+
+const fn = (name: string, description: string, parameters: any): ToolSchema => ({
+  type: "function",
+  function: { name, description, parameters },
+});
+const NO_ARGS = { type: "object", properties: {}, required: [] };
+
+const TOOLS: Record<string, ToolDef> = {
+  list_tree: {
+    tier: "safe",
+    schema: fn("list_tree", "List the entire workspace files directory structure recursively.", NO_ARGS),
+    invoke: async (_args, { isLive, workspaceRoot, deps }) => {
+      const tree = await deps.FilesystemManager.getTree(isLive, workspaceRoot);
+      deps.db.logSecurity("file_system", "Agent list_tree", "Traced files tree dynamically", "allow");
+      return tree.tree;
+    },
+  },
+
+  read_file: {
+    tier: "safe",
+    schema: fn("read_file", "Read full contents of a file at the specified workspace path.", {
+      type: "object",
+      properties: { path: { type: "string", description: "The workspace-relative path of the target file to load." } },
+      required: ["path"],
+    }),
+    invoke: async (args, { isLive, workspaceRoot, deps }) => {
+      if (!args.path) throw new Error("Missing 'path' argument.");
+      const text = deps.FilesystemManager.readFile(isLive, workspaceRoot, args.path);
+      deps.db.logSecurity("file_system", `Agent read_file: ${args.path}`, "Opened file contents securely", "allow");
+      return text;
+    },
+  },
+
+  write_file: {
+    tier: "safe",
+    schema: fn(
+      "write_file",
+      "Propose or write updated full content to a file at the specified workspace relative path. If autoApply is false, this returns a unified diff for user approval before saving.",
+      {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "The workspace-relative path of the file." },
+          content: { type: "string", description: "The full file content to write." },
+        },
+        required: ["path", "content"],
+      }
+    ),
+    invoke: async (args, { isLive, workspaceRoot, autoApply, deps }) => {
+      if (!args.path || args.content === undefined) {
+        throw new Error("Missing 'path' or 'content' in write_file parameters.");
+      }
+      let oldContent = "";
+      try {
+        oldContent = deps.FilesystemManager.readFile(isLive, workspaceRoot, args.path);
+      } catch {}
+      const diff = deps.FilesystemManager.generateUnifiedDiff(args.path, oldContent, args.content);
+
+      if (autoApply) {
+        deps.FilesystemManager.writeFile(isLive, workspaceRoot, args.path, args.content);
+        deps.db.logSecurity("file_system", `Agent write_file (auto-apply): ${args.path}`, "Wrote code modifications directly into workspace", "allow");
+        return { output: "Changes written to disk successfully.", diff, applied: true };
+      }
+      // Pause the loop for manual validation; diff is surfaced for approval.
+      return { output: "File write is pending authorization. Diffs are stored and waiting for manual approval.", diff, applied: false, halt: true };
+    },
+  },
+
+  run_command: {
+    tier: "safe",
+    schema: fn("run_command", "Execute a command against the safe shell terminal environment (e.g. pytest, git, ls, date). Restricted system operations are blocked.", {
+      type: "object",
+      properties: { command: { type: "string", description: "The shell terminal command line parameters to execute." } },
+      required: ["command"],
+    }),
+    invoke: async (args, { isLive, workspaceRoot, deps }) => {
+      if (!args.command) throw new Error("Missing 'command' argument.");
+      return await deps.TerminalManager.execute(isLive, workspaceRoot, args.command);
+    },
+  },
+
+  grep_search: {
+    tier: "safe",
+    schema: fn("grep_search", "Search for clean text matches inside files inside the project recursively.", {
+      type: "object",
+      properties: { query: { type: "string", description: "The pattern query string to scan." } },
+      required: ["query"],
+    }),
+    invoke: async (args, { isLive, workspaceRoot, deps }) => {
+      if (!args.query) throw new Error("Missing 'query' parameter.");
+      return await deps.TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${args.query}" .`);
+    },
+  },
+
+  macos_terminal: {
+    tier: "privileged",
+    schema: fn(
+      "macos_terminal",
+      "Run a shell command in a REAL, visible macOS terminal window (iTerm2 or Terminal.app) on the host, in real time, and return its output and exit code. Use for live coding sessions the user can watch. Unlike run_command this has no sandbox/allowlist — full host privileges.",
+      {
+        type: "object",
+        properties: {
+          command: { type: "string", description: "The shell command to type and run in the visible terminal." },
+          target: { type: "string", enum: ["iterm2", "terminal"], description: "Which terminal app to drive. Defaults to iterm2." },
+        },
+        required: ["command"],
+      }
+    ),
+    invoke: async (args, { deps }) => {
+      if (!args.command) throw new Error("Missing 'command' argument.");
+      return await deps.runOnHostTerminal(args.target, args.command);
+    },
+  },
+
+  write_host_file: {
+    tier: "privileged",
+    schema: fn(
+      "write_host_file",
+      "Write a file directly to the macOS HOST filesystem at an absolute path (creates parent dirs). Use this — not write_file — to author host scripts/tools (e.g. under bin/host-bridge/tools). Reliable for multi-line content; no shell/heredoc needed.",
+      {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Absolute host path, e.g. /Users/.../bin/host-bridge/tools/x.mjs" },
+          content: { type: "string", description: "Full file content." },
+        },
+        required: ["path", "content"],
+      }
+    ),
+    invoke: async (args, { deps }) => {
+      if (!args.path || args.content === undefined) throw new Error("Missing 'path' or 'content'.");
+      return await deps.writeHostFile(args.path, args.content);
+    },
+  },
+
+  run_tests: {
+    tier: "safe",
+    schema: fn("run_tests", "Run the project's test suite (vitest unit tests in the container) and return pass/fail summary.", NO_ARGS),
+    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/run_tests.mjs`),
+  },
+
+  git_ops: {
+    tier: "safe",
+    schema: fn("git_ops", "Read-only git inspection. sub: status (default) | diff | branch | log.", {
+      type: "object",
+      properties: { sub: { type: "string", enum: ["status", "diff", "branch", "log"] } },
+      required: [],
+    }),
+    invoke: async (args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/git_ops.mjs ${deps.shArg(String(args.sub || "status"))}`),
+  },
+
+  process_port: {
+    tier: "safe",
+    schema: fn("process_port", "List the process(es) listening on a TCP port on the host.", {
+      type: "object",
+      properties: { port: { type: "number", description: "TCP port number, e.g. 3000." } },
+      required: ["port"],
+    }),
+    invoke: async (args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/process_port.mjs ${Number(args.port) || 3000}`),
+  },
+
+  health_probe: {
+    tier: "safe",
+    schema: fn("health_probe", "Aggregate health of the whole stack (bridge, app, ollama, terminals) plus a live terminal log snapshot.", NO_ARGS),
+    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/health_probe.mjs`),
+  },
+
+  lint_format: {
+    tier: "safe",
+    schema: fn("lint_format", "Typecheck the project (tsc --noEmit) and return whether it is clean plus any type errors.", NO_ARGS),
+    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/lint_format.mjs`, 250000),
+  },
+
+  git_commit: {
+    tier: "host",
+    schema: fn("git_commit", "Stage all changes and commit with the given message. Set push=true to also push.", {
+      type: "object",
+      properties: { message: { type: "string", description: "Commit message." }, push: { type: "boolean", description: "Also push after committing." } },
+      required: ["message"],
+    }),
+    invoke: async (args, { deps }) => {
+      if (!args.message) throw new Error("Missing 'message'.");
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/git_commit.mjs ${args.push ? "--push " : ""}${deps.shArg(String(args.message))}`);
+    },
+  },
+
+  build_app: {
+    tier: "host",
+    schema: fn("build_app", "Rebuild and recreate the app container (docker compose build + up -d) and report whether it came back healthy.", NO_ARGS),
+    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/build_app.mjs`, 220000),
+  },
+
+  kill_process: {
+    tier: "host",
+    schema: fn("kill_process", "Kill a host process by PID, or all listeners on a port (':<port>'). Optional signal.", {
+      type: "object",
+      properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>'." }, signal: { type: "string", enum: ["TERM", "KILL", "INT", "HUP"] } },
+      required: ["target"],
+    }),
+    invoke: async (args, { deps }) => {
+      if (!args.target) throw new Error("Missing 'target' (pid or :port).");
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/kill_process.mjs ${args.signal ? "--sig " + deps.shArg(String(args.signal)) + " " : ""}${deps.shArg(String(args.target))}`);
+    },
+  },
+
+  log_stream: {
+    tier: "safe",
+    schema: fn("log_stream", "Show the last N lines of the app container logs (default 40).", {
+      type: "object",
+      properties: { lines: { type: "number", description: "How many log lines to show." } },
+      required: [],
+    }),
+    invoke: async (args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/log_stream.mjs ${Number(args.lines) || 40}`),
+  },
+
+  pkg_install: {
+    tier: "host",
+    schema: fn("pkg_install", "Install a package via npm (in the container), pip, or brew. Requires manager + package.", {
+      type: "object",
+      properties: { manager: { type: "string", enum: ["npm", "pip", "brew"] }, package: { type: "string" } },
+      required: ["manager", "package"],
+    }),
+    invoke: async (args, { deps }) => {
+      if (!args.manager || !args.package) throw new Error("Missing 'manager' or 'package'.");
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/pkg_install.mjs ${deps.shArg(String(args.manager))} ${deps.shArg(String(args.package))}`, 150000);
+    },
+  },
+
+  web_search: {
+    tier: "safe",
+    schema: fn("web_search", "Web research. Pass query for DuckDuckGo results, OR url to fetch+extract a page's text.", {
+      type: "object",
+      properties: { query: { type: "string" }, url: { type: "string", description: "If set, fetch this page's readable text instead of searching." } },
+      required: [],
+    }),
+    invoke: async (args, { deps }) => {
+      if (args.url) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs --fetch ${deps.shArg(String(args.url))}`);
+      if (args.query) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${deps.shArg(String(args.query))}`);
+      throw new Error("Missing 'query' or 'url'.");
+    },
+  },
+
+  apply_patch: {
+    tier: "host",
+    schema: fn("apply_patch", "Apply a unified-diff patch to the repository (git apply, checked first). Pass the full diff text.", {
+      type: "object",
+      properties: { diff: { type: "string", description: "Unified diff text." } },
+      required: ["diff"],
+    }),
+    invoke: async (args, { deps }) => {
+      if (!args.diff) throw new Error("Missing 'diff'.");
+      return deps.execOnHost(`printf '%s' ${deps.shArg(String(args.diff))} | node ${deps.HOST_TOOLS_DIR}/apply_patch.mjs`);
+    },
+  },
+
+  tools_doctor: {
+    tier: "safe",
+    schema: fn("tools_doctor", "Self-test the whole bridge toolkit and return a health matrix (which tools pass/fail).", NO_ARGS),
+    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000),
+  },
+
+  shell_check: {
+    tier: "safe",
+    schema: fn(
+      "shell_check",
+      "Lint a shell command/script for bugs and macOS/BSD portability issues (shellcheck + heuristics) BEFORE running it. Run this on any non-trivial command, fix what it reports, then use macos_terminal.",
+      { type: "object", properties: { command: { type: "string", description: "The shell command/script to lint." } }, required: ["command"] }
+    ),
+    invoke: async (args, { deps }) => {
+      if (!args.command) throw new Error("Missing 'command'.");
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/shell_check.mjs ${deps.shArg(String(args.command))}`, 60000);
+    },
+  },
+
+  logbook: {
+    tier: "safe",
+    schema: fn("logbook", "Ship's log (seyir defteri). action 'add' with text records a note; action 'tail' returns recent entries (agent steps are auto-logged).", {
+      type: "object",
+      properties: { action: { type: "string", enum: ["add", "tail"] }, text: { type: "string" }, n: { type: "number" } },
+      required: ["action"],
+    }),
+    invoke: async (args, { deps }) => {
+      if (args.action === "add") return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/logbook.mjs add ${deps.shArg(String(args.text || ""))}`);
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/logbook.mjs tail ${Number(args.n) || 20}`);
+    },
+  },
+};
+
+export const ToolRegistry = {
+  /** OpenAI-format schemas for the ReAct loop (`tools:` param). */
+  schemas(): ToolSchema[] {
+    return Object.values(TOOLS).map((t) => t.schema);
+  },
+
+  /** Tool names + tiers (for MCP expose + per-plan allowlisting). */
+  list(): { name: string; tier: ToolTier; schema: ToolSchema }[] {
+    return Object.entries(TOOLS).map(([name, t]) => ({ name, tier: t.tier, schema: t.schema }));
+  },
+
+  has(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(TOOLS, name);
+  },
+
+  tier(name: string): ToolTier | undefined {
+    return TOOLS[name]?.tier;
+  },
+
+  /**
+   * THE choke-point. Every workspace tool call flows through here. Normalizes
+   * output/error/diff/halt and never throws — the caller reads `ok`.
+   */
+  async execute(name: string, args: any, ctx: ToolCtx): Promise<ToolResult> {
+    const tool = TOOLS[name];
+    const start = Date.now();
+    const emit = (ok: boolean) =>
+      ctx.onUsage?.({ tool: name, tier: tool?.tier ?? "safe", ok, latencyMs: Date.now() - start, tenantId: ctx.tenantId });
+
+    if (!tool) {
+      emit(false);
+      return { ok: false, output: { error: `Unrecognized framework tool: '${name}'` }, diff: "", applied: false, halt: false };
+    }
+    // Per-tenant allowlist (AGENTS.md §5). No allowlist set = single-user/full access.
+    if (ctx.allowedTiers && !ctx.allowedTiers.includes(tool.tier)) {
+      emit(false);
+      return { ok: false, output: { error: `Tool '${name}' (tier=${tool.tier}) not permitted for this plan.` }, diff: "", applied: false, halt: false };
+    }
+
+    try {
+      const r = await tool.invoke(args, ctx);
+      emit(true);
+      if (r && typeof r === "object" && ("output" in r || "diff" in r || "halt" in r || "applied" in r)) {
+        return { ok: true, output: r.output, diff: r.diff || "", applied: !!r.applied, halt: !!r.halt };
+      }
+      return { ok: true, output: r, diff: "", applied: false, halt: false };
+    } catch (err: any) {
+      emit(false);
+      return { ok: false, output: { error: err?.message || "Execution exception" }, diff: "", applied: false, halt: false };
+    }
+  },
+};
