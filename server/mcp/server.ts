@@ -1,40 +1,46 @@
-// MCP server (EXPOSE side, AGENTS.md Faz 1). Publishes the workspace tools from
-// the single ToolRegistry choke-point over Streamable HTTP at /mcp, so external
-// MCP clients (Claude Code, the MCP Inspector, ...) can listTools / callTool.
+// MCP server (EXPOSE side, Faz 1 + 10A). Publishes the workspace tools from the
+// single ToolRegistry choke-point over Streamable HTTP at /mcp. v1.1 completes the
+// protocol surface: per-tenant tool visibility, cursor pagination, workspace
+// `resources`, and progress notifications for long tool calls.
 //
-// Stateless transport: a fresh Server+transport per request (no session state),
-// which is the simplest robust pattern for a multi-tenant gateway — per-tenant
-// context is supplied by the caller via ctxFactory.
+// Stateless transport: a fresh Server+transport per request; per-tenant context
+// is supplied by the caller via ctxFactory.
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema, ListToolsRequestSchema,
+  ListResourcesRequestSchema, ReadResourceRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
 
+const PAGE = 50;
+const encodeCursor = (n: number) => Buffer.from(String(n)).toString("base64");
+const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toString(), 10) || 0 : 0);
+
 function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
-    { name: "ollamas-gateway", version: "0.1.0" },
-    { capabilities: { tools: {} } }
+    { name: "ollamas-gateway", version: "1.1.0" },
+    { capabilities: { tools: {}, resources: {} } }
   );
 
-  // Only advertise tools this caller is allowed to run (AGENTS.md §5).
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ToolRegistry.list(allowed).map((t) => {
-      // Human title + behavioral hints (MCP Tools spec). Hints derive from the
-      // security tier: only `safe` tools are non-destructive; everything else
-      // (host/privileged/upstream) can mutate the host or run untrusted code.
+  // --- tools/list (per-tenant visibility + cursor pagination) ---
+  server.setRequestHandler(ListToolsRequestSchema, async (req) => {
+    const all = ToolRegistry.list(allowed, ctx.tenantId);
+    const start = decodeCursor(req.params?.cursor);
+    const page = all.slice(start, start + PAGE);
+    const tools = page.map((t) => {
       const title = t.name.startsWith("mcp__")
         ? t.name.replace(/^mcp__/, "").replace(/__/g, ": ")
         : t.name.replace(/_/g, " ");
       return {
-        name: t.name,
-        title,
+        name: t.name, title,
         description: t.schema.function.description,
         inputSchema: t.schema.function.parameters,
         annotations: {
@@ -44,14 +50,49 @@ function buildServer(ctx: ToolCtx): Server {
           openWorldHint: t.tier === "host_upstream",
         },
       };
-    }),
-  }));
+    });
+    const nextCursor = start + PAGE < all.length ? encodeCursor(start + PAGE) : undefined;
+    return { tools, nextCursor };
+  });
 
+  // --- tools/call (with progress notifications around the call) ---
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { name, arguments: args } = req.params;
-    const r = await ToolRegistry.execute(name, args || {}, ctx);
+    const progressToken = (req.params?._meta as any)?.progressToken;
+    const onProgress = progressToken
+      ? (progress: number, total?: number, message?: string) =>
+          server.notification({ method: "notifications/progress", params: { progressToken, progress, total, message } }).catch(() => {})
+      : undefined;
+    onProgress?.(0, 1, `starting ${name}`);
+    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress });
+    onProgress?.(1, 1, `done ${name}`);
     const text = typeof r.output === "string" ? r.output : JSON.stringify(r.output);
     return { content: [{ type: "text" as const, text }], isError: !r.ok };
+  });
+
+  // --- resources/list + resources/read (workspace files, tenant-scoped) ---
+  server.setRequestHandler(ListResourcesRequestSchema, async (req) => {
+    let files: string[] = [];
+    try {
+      const tree = await ctx.deps.FilesystemManager.getTree(ctx.isLive, ctx.workspaceRoot);
+      // getTree returns a printed tree string; extract file-ish lines conservatively.
+      files = String(tree.tree || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.endsWith("/")).slice(0, 200);
+    } catch { /* best-effort */ }
+    const start = decodeCursor(req.params?.cursor);
+    const page = files.slice(start, start + PAGE);
+    return {
+      resources: page.map((f) => ({ uri: `file://${f}`, name: f, mimeType: "text/plain" })),
+      nextCursor: start + PAGE < files.length ? encodeCursor(start + PAGE) : undefined,
+    };
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+    const uri = String(req.params.uri || "");
+    const rel = uri.replace(/^file:\/\//, "");
+    let text = "";
+    try { text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel); }
+    catch (e: any) { text = `Error reading resource: ${e?.message || e}`; }
+    return { contents: [{ uri, mimeType: "text/plain", text }] };
   });
 
   return server;

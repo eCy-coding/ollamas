@@ -4,6 +4,9 @@ import pinoHttp from "pino-http";
 import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric } from "./server/metrics";
 import { logger } from "./server/logger";
+import { openApiSpec } from "./server/openapi";
+import swaggerUi from "swagger-ui-express";
+import { signRequest } from "./server/bridge-hmac";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
@@ -18,10 +21,10 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession } from "./server/billing/stripe";
+import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -40,12 +43,24 @@ function logSeyir(entry: Record<string, any>) {
 // Host-side macOS terminal bridge (drives real iTerm2 / Terminal.app).
 const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
 const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
+const HOST_BRIDGE_HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
+
+// Auth headers for a bridge call: HMAC-SHA256 request signing when a secret is set
+// (replay-protected), else the plain token (backward-compat, Faz 10E).
+function bridgeHeaders(bridgePath: string, body: string): Record<string, string> {
+  if (HOST_BRIDGE_HMAC_SECRET) {
+    const { signature, timestamp, nonce } = signRequest(HOST_BRIDGE_HMAC_SECRET, "POST", bridgePath, body);
+    return { "x-bridge-signature": signature, "x-bridge-timestamp": timestamp, "x-bridge-nonce": nonce };
+  }
+  return HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {};
+}
 
 async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000) {
+  const body = JSON.stringify({ target: target || "iterm2", command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ target: target || "iterm2", command, timeoutMs }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/run", body) },
+    body,
     signal: AbortSignal.timeout(timeoutMs + 5000),
   });
   if (!res.ok) {
@@ -63,10 +78,11 @@ const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cwd(), "b
 // Single-quote-escape an argument for safe interpolation into a shell command.
 function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 async function execOnHost(command: string, timeoutMs = 95000) {
+  const body = JSON.stringify({ command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ command, timeoutMs }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/exec", body) },
+    body,
     signal: AbortSignal.timeout(timeoutMs + 5000),
   });
   if (!res.ok) {
@@ -78,10 +94,11 @@ async function execOnHost(command: string, timeoutMs = 95000) {
 
 // Write a file directly to the macOS host filesystem via the bridge (base64).
 async function writeHostFile(filePath: string, content: string) {
+  const body = JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") });
   const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {}) },
-    body: JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") }),
+    headers: { "Content-Type": "application/json", ...bridgeHeaders("/write", body) },
+    body,
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) {
@@ -122,6 +139,9 @@ app.get("/api/ready", (_req, res) => {
   const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath;
   res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE });
 });
+// OpenAPI 3.1 spec + Swagger UI (Faz 10C).
+app.get("/api/openapi.json", (_req, res) => res.json(openApiSpec));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
@@ -1248,6 +1268,7 @@ content
         ? (e) => {
             recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
             recordToolMetric(e.tool, e.tier, e.ok);
+            sendMeterEventAsync(e.tenantId!, 1); // real-time Stripe meter (no-op without key)
             if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
           }
         : undefined,
@@ -1366,6 +1387,34 @@ content
     deleteUpstreamServer(tId, req.params.id);
     const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
     res.json({ deleted: req.params.id, toolsRemoved: removed });
+  });
+
+  // --- Tenant SELF-SERVE (Faz 10B). Authenticated by the tenant's OWN API key +
+  // scope; every action targets only the caller's tenant. No admin token. ---
+  const requireScope = (scope: string) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!req.tenant?.scopes?.includes(scope)) return res.status(403).json({ error: `insufficient_scope: '${scope}' required` });
+    next();
+  };
+  app.get("/api/saas/self/usage", authMiddleware(true), requireScope("usage:read"), (req, res) => {
+    const t = req.tenant!;
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, quota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId), period: new Date().toISOString().slice(0, 7) });
+  });
+  app.get("/api/saas/usage/timeseries", authMiddleware(true), requireScope("usage:read"), (req, res) => {
+    res.json({ tenantId: req.tenant!.tenantId, series: usageTimeseries(req.tenant!.tenantId) });
+  });
+  app.get("/api/saas/self/keys", authMiddleware(true), requireScope("keys:read"), (req, res) => {
+    res.json(listKeys(req.tenant!.tenantId));
+  });
+  app.post("/api/saas/self/keys", authMiddleware(true), requireScope("keys:write"), (req, res) => {
+    const { label, ttlDays } = req.body || {};
+    // Self-issued keys are scoped to self-service read (least privilege).
+    res.json(issueApiKey(req.tenant!.tenantId, label ? String(label) : "self", ttlDays != null ? Number(ttlDays) : undefined, "keys:read usage:read"));
+  });
+  app.post("/api/saas/self/keys/:id/revoke", authMiddleware(true), requireScope("keys:write"), (req, res) => {
+    const owned = listKeys(req.tenant!.tenantId).some(k => k.id === req.params.id);
+    if (!owned) return res.status(404).json({ error: "Key not found for this tenant" });
+    revokeApiKey(req.params.id);
+    res.json({ revoked: req.params.id });
   });
 
   // A tenant's own current-month usage summary (authenticated).

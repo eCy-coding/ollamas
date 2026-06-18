@@ -87,6 +87,28 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(res.status).toBe(401);
   });
 
+  // --- Faz 10B: tenant self-serve (scoped, no admin token) ---
+  test("self-serve usage requires the usage:read scope", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "selfsvc", plan: "pro" }),
+    }));
+    const scoped = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id, scopes: "usage:read" }),
+    }));
+    const plain = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const ok = await fetch(`${BASE}/api/saas/self/usage`, { headers: { Authorization: `Bearer ${scoped.key}` } });
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).tenantId).toBe(t.id);
+    const denied = await fetch(`${BASE}/api/saas/self/usage`, { headers: { Authorization: `Bearer ${plain.key}` } });
+    expect(denied.status).toBe(403);
+  });
+
   // --- Faz 6A: MCP spec-compliance ---
   // --- Faz 9D: observability ---
   test("/metrics serves Prometheus metrics", async () => {
@@ -100,6 +122,16 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const res = await fetch(`${BASE}/api/ready`);
     expect([200, 503]).toContain(res.status);
     expect(typeof (await res.json()).ready).toBe("boolean");
+  });
+
+  // --- Faz 10C: OpenAPI ---
+  test("/api/openapi.json is a valid 3.1 spec + /api/docs serves UI", async () => {
+    const spec = await (await fetch(`${BASE}/api/openapi.json`)).json() as any;
+    expect(spec.openapi).toBe("3.1.0");
+    expect(spec.paths["/mcp"]).toBeTruthy();
+    expect(spec.paths["/api/saas/self/usage"]).toBeTruthy();
+    const docs = await fetch(`${BASE}/api/docs/`);
+    expect(docs.status).toBe(200);
   });
 
   test("RFC 9728 protected-resource metadata is served", async () => {
@@ -146,6 +178,27 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const read = tools.find((x) => x.name === "read_file");
     expect((term as any)?.annotations?.destructiveHint).toBe(true);
     expect((read as any)?.annotations?.readOnlyHint).toBe(true);
+  });
+
+  // --- Faz 10A: resources primitive + pagination ---
+  test("resources/list is served + listTools paginates (nextCursor)", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "res", plan: "enterprise" }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const c = new Client({ name: "t", version: "0" }, { capabilities: {} });
+    const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
+    await c.connect(tr);
+    const resList = await c.listResources();
+    expect(Array.isArray(resList.resources)).toBe(true);
+    const toolList = await c.listTools();
+    expect(toolList.tools.length).toBeLessThanOrEqual(50); // page cap
+    await c.close();
   });
 });
 

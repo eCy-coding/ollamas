@@ -89,6 +89,17 @@ describe("store: usage + billing idempotency", () => {
     expect(agg?.calls).toBe(4);
   });
 
+  test("usageTimeseries returns daily calls+tokens (Faz 10B)", () => {
+    const t = store.createTenant("ts", "pro");
+    store.recordUsage({ tenantId: t.id, tool: "read_file", tier: "safe", ok: true, latencyMs: 3, tokens: 10 });
+    store.recordUsage({ tenantId: t.id, tool: "read_file", tier: "safe", ok: true, latencyMs: 3, tokens: 5 });
+    const series = store.usageTimeseries(t.id);
+    expect(series.length).toBeGreaterThanOrEqual(1);
+    expect(series[0]).toHaveProperty("day");
+    expect(series.reduce((s, r) => s + r.calls, 0)).toBe(2);
+    expect(series.reduce((s, r) => s + r.tokens, 0)).toBe(15);
+  });
+
   test("recordInvoice is idempotent per (tenant, period)", () => {
     const t = store.createTenant("inv", "pro");
     const first = store.recordInvoice(t.id, "2026-06", 10);

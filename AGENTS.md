@@ -110,6 +110,7 @@ sandbox YOK). Dış tenant'a açmak ciddi sınır.
 - ✅ `Faz 5` E2E sertleştirme — flag triage + hermetik test suite (`tests/`) + SaaS admin UI (`src/components/SaaSAdmin.tsx`) + portability/docs
 - ✅ `Faz 6` Araştırma-temelli spec-uyum + güvenlik — RFC 9728 metadata + WWW-Authenticate + Origin guard + tool annotations; consume untrusted `host_upstream` tier + allowlist + output sanitization + manifest hash; audit_events + `/api/saas/audit`; token metering (`tool=__llm__`)
 - ✅ `Faz 9` v1.0 Production GA (fallback-first) — 9A GCM authTagLength + path guard + non-root Docker + helmet; 9B API-key lifecycle (expiry/scopes) + OAuth JWT dual-path + scope enforcement; 9C Redis rate-limit fallback + Stripe Meter/Price/Customer/portal/checkout + webhook dedup; 9D prom-client `/metrics` + pino + `/api/ready`; 9E per-tenant `upstream_servers` CRUD; 9F GitHub Actions CI + SaaS UI audit viewer
+- ✅ `Faz 10` v1.1 (ürünü tamamla) — 10A tam MCP (per-tenant tool izolasyon + pagination + resources + progress); 10B tenant self-serve scoped endpoint + usage timeseries + per-call async Stripe meter; 10C OpenAPI 3.1 + Swagger UI; 10D GHCR publish workflow + K8s manifest; 10E host-bridge HMAC-SHA256 imzalama (token geriye-uyum)
 
 Sonraki işler aynı sözleşmeyle: yeşil kapı (§3) + logbook (§6) + conventional commit.
 Detay: `~/.claude/plans/ollamas-projesini-a-ve-atomic-wand.md`.

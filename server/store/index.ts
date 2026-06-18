@@ -222,6 +222,14 @@ export function recordUsage(e: UsageEvent): void {
     .run(e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, e.latencyMs, e.tokens ?? 0, e.cost ?? 0, monthKey(), nowIso());
 }
 
+/** Daily usage timeseries for a tenant in a period (Faz 10B). */
+export function usageTimeseries(tenantId: string, month = monthKey()): { day: string; calls: number; tokens: number }[] {
+  return d().prepare(
+    `SELECT substr(ts,1,10) AS day, COUNT(*) AS calls, SUM(tokens) AS tokens
+     FROM usage_events WHERE tenant_id = ? AND month = ? GROUP BY day ORDER BY day`
+  ).all(tenantId, month) as any[];
+}
+
 /** Count of usage events for a tenant in the current UTC month (quota check). */
 export function monthToDateUsage(tenantId: string): number {
   return (d().prepare("SELECT COUNT(*) AS n FROM usage_events WHERE tenant_id = ? AND month = ?").get(tenantId, monthKey()) as any).n;

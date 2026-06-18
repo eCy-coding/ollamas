@@ -43,6 +43,10 @@ export interface ToolCtx {
   scopes?: string[];
   /** Tenant identifier for metering/audit (Faz 4). */
   tenantId?: string;
+  /** MCP progress token from request `_meta` (Faz 10A). */
+  progressToken?: string | number;
+  /** Emit an MCP progress notification during a long tool call (Faz 10A). */
+  onProgress?: (progress: number, total?: number, message?: string) => void;
   /** Metering hook, invoked after every call (Faz 4). */
   onUsage?: (e: { tool: string; tier: ToolTier; ok: boolean; latencyMs: number; tenantId?: string }) => void;
 }
@@ -371,10 +375,16 @@ export const ToolRegistry = {
     return [...Object.values(TOOLS), ...Object.values(DYNAMIC)].map((t) => t.schema);
   },
 
-  /** Tool names + tiers (for MCP expose + per-plan allowlisting). Optionally tier-filtered. */
-  list(tiers?: ToolTier[]): { name: string; tier: ToolTier; schema: ToolSchema }[] {
+  /**
+   * Tool names + tiers (for MCP expose + per-plan allowlisting). Optionally
+   * tier-filtered. When `tenantId` is given, per-tenant upstream tools
+   * (namespaced `mcp__tnt_<id>_...`) are visible ONLY to their owner; built-ins
+   * and global upstreams stay visible to all (Faz 10A tenant isolation).
+   */
+  list(tiers?: ToolTier[], tenantId?: string): { name: string; tier: ToolTier; schema: ToolSchema }[] {
     return [...Object.entries(TOOLS), ...Object.entries(DYNAMIC)]
       .filter(([, t]) => !tiers || tiers.includes(t.tier))
+      .filter(([name]) => !name.startsWith("mcp__tnt_") || (!!tenantId && name.startsWith(`mcp__${tenantId}_`)))
       .map(([name, t]) => ({ name, tier: t.tier, schema: t.schema }));
   },
 

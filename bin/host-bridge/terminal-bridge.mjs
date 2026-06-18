@@ -14,6 +14,7 @@
 import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,6 +24,29 @@ const execFileP = promisify(execFile);
 const PORT = Number(process.env.PORT) || 7345;
 const BIND = process.env.BRIDGE_BIND || "127.0.0.1";
 const TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
+// HMAC-SHA256 request signing (Faz 10E). Mirrors server/bridge-hmac.ts — the
+// signed message MUST stay byte-identical. Server uses HMAC; host-side tools
+// (bridge-client.mjs) keep using the token — both accepted.
+const HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
+const HMAC_WINDOW_MS = 5 * 60 * 1000;
+const seenNonces = new Set();
+function canonicalMessage(method, p, body, ts, nonce) {
+  return `${method.toUpperCase()}\n${p}\n${body}\n${ts}\n${nonce}`;
+}
+function verifyHmac(req, raw, bridgePath) {
+  const sig = req.headers["x-bridge-signature"];
+  const ts = req.headers["x-bridge-timestamp"];
+  const nonce = req.headers["x-bridge-nonce"];
+  if (!sig || !ts || !nonce) return false;
+  if (Math.abs(Date.now() - parseInt(ts, 10)) > HMAC_WINDOW_MS) return false;
+  if (seenNonces.has(nonce)) return false;
+  const expected = crypto.createHmac("sha256", HMAC_SECRET).update(canonicalMessage("POST", bridgePath, raw, ts, nonce)).digest("hex");
+  const a = Buffer.from(String(sig)), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  seenNonces.add(nonce);
+  setTimeout(() => seenNonces.delete(nonce), HMAC_WINDOW_MS).unref?.();
+  return true;
+}
 const WORK = path.join(os.tmpdir(), "llm-bridge");
 fs.mkdirSync(WORK, { recursive: true });
 
@@ -180,10 +204,12 @@ function readBody(req) {
   return new Promise((resolve) => {
     let d = "";
     req.on("data", (c) => (d += c));
-    req.on("end", () => { try { resolve(d ? JSON.parse(d) : {}); } catch { resolve({}); } });
+    req.on("end", () => { let json = {}; try { json = d ? JSON.parse(d) : {}; } catch {} resolve({ raw: d, body: json }); });
   });
 }
-function authed(req) {
+// Accept a valid HMAC signature (server) OR the plain token (host tools / dev).
+function authed(req, raw = "", bridgePath = "") {
+  if (HMAC_SECRET && req.headers["x-bridge-signature"]) return verifyHmac(req, raw, bridgePath);
   if (!TOKEN) return true; // no token configured => open (dev)
   return req.headers["x-bridge-token"] === TOKEN;
 }
@@ -202,8 +228,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/run") {
-    if (!authed(req)) return send(res, 401, { ok: false, error: "bad token" });
-    const body = await readBody(req);
+    const { raw, body } = await readBody(req);
+    if (!authed(req, raw, "/run")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.command) return send(res, 400, { ok: false, error: "command required" });
     try {
       const r = await runCommand(body.target, body.command, body.timeoutMs);
@@ -223,8 +249,8 @@ const server = http.createServer(async (req, res) => {
   // Holds no terminal mutex, so host tools that themselves call /run won't
   // deadlock. Used by the agent's first-class bridge tools.
   if (req.method === "POST" && url.pathname === "/exec") {
-    if (!authed(req)) return send(res, 401, { ok: false, error: "bad token" });
-    const body = await readBody(req);
+    const { raw, body } = await readBody(req);
+    if (!authed(req, raw, "/exec")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.command) return send(res, 400, { ok: false, error: "command required" });
     try {
       const { stdout, stderr } = await execFileP("bash", ["-lc", body.command], {
@@ -240,8 +266,8 @@ const server = http.createServer(async (req, res) => {
   // Write a file straight to the host filesystem (base64 body) — reliable host
   // authoring without fragile heredoc-over-keystrokes.
   if (req.method === "POST" && url.pathname === "/write") {
-    if (!authed(req)) return send(res, 401, { ok: false, error: "bad token" });
-    const body = await readBody(req);
+    const { raw, body } = await readBody(req);
+    if (!authed(req, raw, "/write")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.path) return send(res, 400, { ok: false, error: "path required" });
     try {
       const buf = Buffer.from(body.contentB64 || "", "base64");

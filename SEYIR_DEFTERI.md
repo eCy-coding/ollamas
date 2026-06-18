@@ -96,6 +96,15 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **9F CI+UI+docs:** GitHub Actions CI (tsc+vitest+build, Node 22/24); SaaS UI audit viewer + mount-nit fix; README v1.0 + AGENTS roadmap + .env.example.
 - **Kanıt:** tsc temiz; **52 passed/1 skipped** (registry/store/auth/rate-limit/billing/audit/upstream/observability); vite build yeşil. 6 yeni dep (jose/ioredis/prom-client/pino/pino-http/helmet) runtime-opsiyonel.
 
+## Faz 13 — v1.1 (gateway ürününü tamamla, branch feat/v1.1)
+- **Ne:** v1.0 prod-hazır üzerine tam ürün yüzeyi. 3-ajan WEB araştırması (MCP resources/prompts/pagination/progress, Stripe realtime + OpenAPI, K8s/GHCR/HMAC — cited). v1.0 PR #2 main'e merge (`183860a`), v1.1 main'den.
+- **10A tam MCP** (`58c2ffe`): per-tenant tool görünürlük izolasyonu (`list(tiers,tenantId)`), ListTools cursor pagination, `resources/list`+`read` (workspace file://), progress notifications (`_meta.progressToken`).
+- **10B self-serve + realtime billing** (`fb78ec5`): `/api/saas/self/{usage,keys}` + `/api/saas/usage/timeseries` (scope-gated), per-call async `sendMeterEventAsync` (best-effort, no-op'suz key).
+- **10C OpenAPI** (`b6fe381`): `server/openapi.ts` 3.1 spec + `/api/openapi.json` + `/api/docs` Swagger UI.
+- **10D deploy** (`1a6846c`): `.github/workflows/publish.yml` GHCR (tag v*) + `deploy/k8s/` (Deployment/Service/CM/Secret/HPA/PDB) + README (host-bridge K8s-çalışmaz caveat).
+- **10E bridge HMAC**: `server/bridge-hmac.ts` (canonical) + `terminal-bridge.mjs` verify (±5dk freshness + nonce dedup + timingSafeEqual); `HOST_BRIDGE_HMAC_SECRET` yoksa token geriye-uyum.
+- **Kanıt:** tsc temiz; **63 passed/1 skipped** (yeni: tenant-isolation, resources e2e, self-serve scope, timeseries, openapi e2e, HMAC roundtrip+stale+replay). 3 yeni dep swagger-jsdoc/swagger-ui-express.
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
