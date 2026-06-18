@@ -1,6 +1,9 @@
 import express from "express";
 import helmet from "helmet";
+import pinoHttp from "pino-http";
 import path from "path";
+import { register as metricsRegister, httpDuration, recordToolMetric } from "./server/metrics";
+import { logger } from "./server/logger";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
@@ -97,6 +100,28 @@ const TOOL_DEPS: ToolDeps = {
 // SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
 // (HSTS, X-Frame-Options, noSniff, etc.) apply without breaking those flows.
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// Observability (Faz 9D): structured request logs (skip noisy polling) + Prometheus
+// HTTP latency histogram on every response.
+app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === "/api/health" || req.url === "/metrics" } }));
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const route = (req.route?.path || req.path || "unknown").toString();
+    httpDuration.labels(req.method, route, String(res.statusCode)).observe(Date.now() - start);
+  });
+  next();
+});
+// Prometheus scrape endpoint.
+app.get("/metrics", async (_req, res) => {
+  res.set("Content-Type", metricsRegister.contentType);
+  res.end(await metricsRegister.metrics());
+});
+// Readiness probe (Faz 9D): 200 only when the app is live + workspace bound.
+app.get("/api/ready", (_req, res) => {
+  const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath;
+  res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE });
+});
 
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
@@ -593,6 +618,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
               tenantId: "local",
               onUsage: (e) => {
                 recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+                recordToolMetric(e.tool, e.tier, e.ok);
                 if (e.tier !== "safe") recordAudit({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok });
               },
             });
@@ -1216,6 +1242,7 @@ content
       onUsage: t
         ? (e) => {
             recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+            recordToolMetric(e.tool, e.tier, e.ok);
             if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
           }
         : undefined,
