@@ -155,7 +155,8 @@ export class SecureDB {
   public encrypt(plaintext: string): string {
     if (!plaintext) return "";
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv("aes-256-gcm", this.masterKey, iv);
+    // authTagLength pinned to 16 bytes (128-bit) — prevents short-tag forgery (Node #52327).
+    const cipher = crypto.createCipheriv("aes-256-gcm", this.masterKey, iv, { authTagLength: 16 });
     let encrypted = cipher.update(plaintext, "utf8", "hex");
     encrypted += cipher.final("hex");
     const tag = cipher.getAuthTag().toString("hex");
@@ -173,7 +174,8 @@ export class SecureDB {
       const iv = Buffer.from(parts[0], "hex");
       const tag = Buffer.from(parts[1], "hex");
       const encrypted = parts[2];
-      const decipher = crypto.createDecipheriv("aes-256-gcm", this.masterKey, iv);
+      if (tag.length !== 16) return ""; // reject short/forged auth tags
+      const decipher = crypto.createDecipheriv("aes-256-gcm", this.masterKey, iv, { authTagLength: 16 });
       decipher.setAuthTag(tag);
       let decrypted = decipher.update(encrypted, "hex", "utf8");
       decrypted += decipher.final("utf8");

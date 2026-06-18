@@ -116,6 +116,9 @@ export class TerminalManager {
     );
 
     return new Promise((resolve) => {
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
+      // Justified: `trimmed` passes a strict binary allowlist + shell-metachar block
+      // + permission gate + audit log above; not raw user shell.
       exec(
         trimmed,
         {

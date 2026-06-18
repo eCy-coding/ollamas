@@ -21,7 +21,7 @@ services:
       - OLLAMA_NUM_THREAD=12
       - OLLAMA_NUM_GPU=999
       # Persist vault + master key on the mounted volume (survives recreate)
-      - MISSION_CONTROL_DATA_DIR=/root/.llm-mission-control
+      - MISSION_CONTROL_DATA_DIR=/home/nodeapp/.llm-mission-control
       # Host-side macOS terminal bridge (iTerm2 / Terminal.app)
       - HOST_BRIDGE_URL=http://host.docker.internal:7345
       - HOST_BRIDGE_TOKEN=${HOST_BRIDGE_TOKEN}
@@ -37,7 +37,8 @@ services:
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
     volumes:
       # Bind mount persists both the bridge token and the SaaS store (saas.db).
-      - ~/.llm-mission-control:/root/.llm-mission-control
+      # Target = non-root nodeapp's home (Faz 9A).
+      - ~/.llm-mission-control:/home/nodeapp/.llm-mission-control
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # Deterministic readiness so `docker compose up -d --wait` blocks until /api/health serves.

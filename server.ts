@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import path from "path";
 import os from "os";
 import fs from "fs";
@@ -91,6 +92,11 @@ async function writeHostFile(filePath: string, content: string) {
 const TOOL_DEPS: ToolDeps = {
   FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
 };
+
+// Security headers (helmet, Faz 9A). CSP/COEP disabled: the app serves a Vite
+// SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
+// (HSTS, X-Frame-Options, noSniff, etc.) apply without breaking those flows.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).

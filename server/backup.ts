@@ -26,7 +26,7 @@ export class BackupService {
     const encryptionKey = db["masterKey"]; // 32-byte key
     const iv = crypto.randomBytes(12);
 
-    const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey, iv);
+    const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey, iv, { authTagLength: 16 });
     const cipherText = Buffer.concat([
       salt, // Prefix salt
       iv,   // Prefix IV
@@ -56,7 +56,7 @@ export class BackupService {
       const cipherText = blob.subarray(28, blob.length - 16);
 
       const encryptionKey = db["masterKey"];
-      const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey, iv);
+      const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey, iv, { authTagLength: 16 });
       decipher.setAuthTag(authTag);
 
       const decompressed = Buffer.concat([
