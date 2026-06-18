@@ -28,6 +28,19 @@
 
 ---
 
+## v3 — iOS Bridge (Swift CLI + Shortcuts + HMAC parity)
+
+- `[2026-06-19] kind=phase | Mimari pivot | araştırma: iOS host bridge'e erişemez (127.0.0.1) → app API tüketicisi (Bearer). ROADMAP "Swift HMAC client" yeniden hizalandı: API-client birincil + HMAC Swift mirror parity-asset | Swift 6.2.4 + Xcode teyit`
+- `[2026-06-19] kind=phase | P0 Swift Package | bin/ios-bridge OllamasKit (HMAC.swift CryptoKit + Config.swift env + Client.swift URLSession) + Package.swift | swift build OK (4s)`
+- `[2026-06-19] kind=phase | P1 CLI | ollamas-ios health|generate|tools (semaphore async driver) | build OK`
+- `[2026-06-19] kind=phase | P2 HMAC parity | gen-vectors.mjs (hmac.mjs tek-kaynak) → hmac-vectors.json fixture; HMACParityTests.swift #filePath ile okur; ios-hmac-vectors.test.ts node drift guard | Swift 3 + node 2 test`
+- `[2026-06-19] kind=phase | P3 ClientTests.swift | URL/Bearer/body/envelope/config saf assertion | 5 test`
+- `[2026-06-19] kind=fix | ios-hmac-vectors.test.ts kendi test bug'ım | adversarial vector body "a\nb\nc" gömülü \n → canonical.split(\n) 7 parça (5 değil). Düzeltme: field-count yerine structural prefix/suffix check. Parity'nin kendisi geçmişti; evidence-before-claim yakaladı.`
+- `[2026-06-19] kind=phase | P4 Shortcuts | bin/ios-bridge/Shortcuts/README.md reçete (binary .shortcut text-author edilemez → dokümante HTTP blok) | -`
+- `[2026-06-19] kind=phase | P5 gate | swift build OK + swift test 8 pass + node vitest 88 pass/1 skip | YEŞİL`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack

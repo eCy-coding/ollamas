@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅** (test harness, 86 pass/1 skip), **v3 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅** (iOS bridge: Swift 8 + node 88/1 skip), **v4 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -42,9 +42,9 @@
 
 ---
 
-## v3 — iOS Bridge (Shortcuts + Swift CLI) ⬜
+## v3 — iOS Bridge (Shortcuts + Swift CLI) ✅
 
-**Tema:** Yeteneği iPhone'a ulaştır — HTTP/MCP-only, app-iç coupling yok.
+**Tema:** Yeteneği iPhone'a ulaştır — HTTP/MCP-only, app-iç coupling yok. **DONE** — `bin/ios-bridge/` Swift Package: OllamasKit (HMAC CryptoKit + Config env + URLSession Client) + `ollamas-ios` CLI (health/generate/tools) + cross-lang HMAC parity (hmac-vectors.json fixture, Swift 3 + node drift 2 test) + Shortcuts reçetesi. **Mimari karar:** iOS = app API tüketicisi (Bearer); host bridge erişilemez (127.0.0.1) → HMAC parity-asset olarak korundu. Gate: swift 8 + node 88/1.
 
 **Phases:**
 1. `bin/ios-bridge/` Swift CLI: `Package.swift` + `URLSession` HTTP client, MacBook'a `/mcp` + `/api/generate`.
