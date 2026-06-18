@@ -18,10 +18,10 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession } from "./server/billing/stripe";
+import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -1248,6 +1248,7 @@ content
         ? (e) => {
             recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
             recordToolMetric(e.tool, e.tier, e.ok);
+            sendMeterEventAsync(e.tenantId!, 1); // real-time Stripe meter (no-op without key)
             if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
           }
         : undefined,
@@ -1366,6 +1367,34 @@ content
     deleteUpstreamServer(tId, req.params.id);
     const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
     res.json({ deleted: req.params.id, toolsRemoved: removed });
+  });
+
+  // --- Tenant SELF-SERVE (Faz 10B). Authenticated by the tenant's OWN API key +
+  // scope; every action targets only the caller's tenant. No admin token. ---
+  const requireScope = (scope: string) => (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!req.tenant?.scopes?.includes(scope)) return res.status(403).json({ error: `insufficient_scope: '${scope}' required` });
+    next();
+  };
+  app.get("/api/saas/self/usage", authMiddleware(true), requireScope("usage:read"), (req, res) => {
+    const t = req.tenant!;
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, quota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId), period: new Date().toISOString().slice(0, 7) });
+  });
+  app.get("/api/saas/usage/timeseries", authMiddleware(true), requireScope("usage:read"), (req, res) => {
+    res.json({ tenantId: req.tenant!.tenantId, series: usageTimeseries(req.tenant!.tenantId) });
+  });
+  app.get("/api/saas/self/keys", authMiddleware(true), requireScope("keys:read"), (req, res) => {
+    res.json(listKeys(req.tenant!.tenantId));
+  });
+  app.post("/api/saas/self/keys", authMiddleware(true), requireScope("keys:write"), (req, res) => {
+    const { label, ttlDays } = req.body || {};
+    // Self-issued keys are scoped to self-service read (least privilege).
+    res.json(issueApiKey(req.tenant!.tenantId, label ? String(label) : "self", ttlDays != null ? Number(ttlDays) : undefined, "keys:read usage:read"));
+  });
+  app.post("/api/saas/self/keys/:id/revoke", authMiddleware(true), requireScope("keys:write"), (req, res) => {
+    const owned = listKeys(req.tenant!.tenantId).some(k => k.id === req.params.id);
+    if (!owned) return res.status(404).json({ error: "Key not found for this tenant" });
+    revokeApiKey(req.params.id);
+    res.json({ revoked: req.params.id });
   });
 
   // A tenant's own current-month usage summary (authenticated).

@@ -87,6 +87,28 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(res.status).toBe(401);
   });
 
+  // --- Faz 10B: tenant self-serve (scoped, no admin token) ---
+  test("self-serve usage requires the usage:read scope", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "selfsvc", plan: "pro" }),
+    }));
+    const scoped = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id, scopes: "usage:read" }),
+    }));
+    const plain = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const ok = await fetch(`${BASE}/api/saas/self/usage`, { headers: { Authorization: `Bearer ${scoped.key}` } });
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).tenantId).toBe(t.id);
+    const denied = await fetch(`${BASE}/api/saas/self/usage`, { headers: { Authorization: `Bearer ${plain.key}` } });
+    expect(denied.status).toBe(403);
+  });
+
   // --- Faz 6A: MCP spec-compliance ---
   // --- Faz 9D: observability ---
   test("/metrics serves Prometheus metrics", async () => {

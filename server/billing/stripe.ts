@@ -35,6 +35,24 @@ export function isLive(): boolean {
 }
 
 /**
+ * Per-call real-time meter event (Faz 10B). Fire-and-forget from the choke-point;
+ * best-effort, never throws (logs on failure). No-op without Stripe / customer.
+ * Idempotency via a unique identifier (tenant:ts:rand) — Stripe dedupes within 24h.
+ */
+export function sendMeterEventAsync(tenantId: string, value = 1): void {
+  const s = getStripe();
+  if (!s) return;
+  const customer = getTenant(tenantId)?.stripe_customer_id;
+  if (!customer) return;
+  const identifier = `${tenantId}:${Date.now()}:${Math.round(Math.random() * 1e9).toString(36)}`;
+  s.billing.meterEvents.create({
+    event_name: METER_EVENT_NAME,
+    identifier,
+    payload: { stripe_customer_id: customer, value: String(value) },
+  }).catch((e: any) => console.warn(`[Meter] ${tenantId}: ${e?.message || e}`));
+}
+
+/**
  * Idempotently ensure the Stripe Meter + Product + Price exist; cache their ids
  * in billing_config (Faz 9C). No-op without STRIPE_API_KEY. Safe to call at boot.
  */
