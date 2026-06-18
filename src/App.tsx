@@ -13,11 +13,12 @@ import { SelfTestGates } from "./components/SelfTestGates";
 import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
 import { VirtualController } from "./components/VirtualController";
+import { SaaSAdmin } from "./components/SaaSAdmin";
 import { HealthTelemetry } from "./types";
 import { 
   Cpu, Key, Sparkles, FolderOpen, Terminal, 
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2
+  MousePointer2, Building2
 } from "lucide-react";
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
   const tabs = [
     { id: "telemetry", label: "Cockpit Dashboard", icon: <Cpu className="w-4 h-4" /> },
     { id: "swarm", label: "P2P Computing Swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
+    { id: "saas", label: "SaaS Gateway", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
     { id: "pipeline", label: "Pipeline Agent", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
     { id: "react-agent", label: "ReAct Specialist", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
     { id: "files", label: "Files Explorer", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
@@ -300,6 +302,12 @@ export default function App() {
           {activeTab === "swarm" && (
             <div className="animate-fade-in">
               <ClusterManager onNotify={notify} />
+            </div>
+          )}
+
+          {activeTab === "saas" && (
+            <div className="animate-fade-in">
+              <SaaSAdmin onNotify={notify} />
             </div>
           )}
 
