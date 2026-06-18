@@ -5,7 +5,7 @@
 // enforced against usage_events. Unauthenticated requests pass through.
 
 import type { Request, Response, NextFunction } from "express";
-import { monthToDateUsage } from "../store";
+import { monthToDateUsage, queueWebhookEvent } from "../store";
 
 interface Bucket {
   tokens: number;
@@ -86,6 +86,7 @@ export function rateLimitMiddleware() {
     if (!t) return next(); // single-user / unauthenticated path is unmetered.
 
     if (t.plan.monthly_quota > 0 && monthToDateUsage(t.tenantId) >= t.plan.monthly_quota) {
+      queueWebhookEvent(t.tenantId, "usage.quota_exceeded", { quota: t.plan.monthly_quota, plan: t.plan.id });
       return res.status(429).json({ error: "Monthly quota exceeded", quota: t.plan.monthly_quota, plan: t.plan.id });
     }
 

@@ -21,7 +21,8 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
+import { startWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
@@ -197,6 +198,8 @@ async function initializeServer() {
   initStore();
   // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
+  // Background outbound-webhook delivery worker (Faz 11B).
+  startWebhookWorker();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -1416,6 +1419,18 @@ content
     revokeApiKey(req.params.id);
     res.json({ revoked: req.params.id });
   });
+
+  // --- Tenant webhooks (Faz 11B). Outbound HMAC-signed event delivery. ---
+  app.get("/api/saas/webhooks", authMiddleware(true), (req, res) => res.json(listWebhooks(req.tenant!.tenantId)));
+  app.post("/api/saas/webhooks", authMiddleware(true), requireScope("webhooks:write"), (req, res) => {
+    const { url, events } = req.body || {};
+    if (!url || !Array.isArray(events) || !events.length) return res.status(400).json({ error: "Missing 'url' or 'events[]'" });
+    res.json(addWebhook(req.tenant!.tenantId, String(url), events.map(String))); // secret returned ONCE
+  });
+  app.delete("/api/saas/webhooks/:id", authMiddleware(true), requireScope("webhooks:write"), (req, res) => {
+    res.json({ deleted: deleteWebhook(req.tenant!.tenantId, req.params.id) });
+  });
+  app.get("/api/saas/webhooks/deliveries", authMiddleware(true), (req, res) => res.json(listDeliveries(req.tenant!.tenantId)));
 
   // A tenant's own current-month usage summary (authenticated).
   app.get("/api/saas/usage", authMiddleware(true), (req, res) => {

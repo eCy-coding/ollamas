@@ -110,6 +110,19 @@ export function initStore(): DatabaseSync {
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_upstream_tenant ON upstream_servers(tenant_id);
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
+      url TEXT NOT NULL, events TEXT NOT NULL, secret TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhooks_tenant ON webhooks(tenant_id);
+    CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id TEXT PRIMARY KEY, webhook_id TEXT NOT NULL, tenant_id TEXT NOT NULL,
+      event_type TEXT NOT NULL, payload TEXT NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending',
+      last_code INTEGER, next_retry_at TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_deliveries_pending ON webhook_deliveries(status, next_retry_at);
   `);
   migrate();
   seedPlans();
@@ -190,11 +203,14 @@ export function issueApiKey(tenantId: string, label = "", ttlDays?: number, scop
   const expiresAt = days > 0 ? new Date(Date.now() + days * 86400_000).toISOString() : null;
   d().prepare("INSERT INTO api_keys (id, tenant_id, key_hash, label, scopes, expires_at, created_at) VALUES (?,?,?,?,?,?,?)")
     .run(id, tenantId, sha256(key), label, scopes, expiresAt, nowIso());
+  queueWebhookEvent(tenantId, "key.created", { keyId: id, label, expiresAt });
   return { id, key, expiresAt };
 }
 
 export function revokeApiKey(keyId: string): void {
+  const row = d().prepare("SELECT tenant_id FROM api_keys WHERE id = ?").get(keyId) as any;
   d().prepare("UPDATE api_keys SET revoked = 1 WHERE id = ?").run(keyId);
+  if (row?.tenant_id) queueWebhookEvent(row.tenant_id, "key.revoked", { keyId });
 }
 
 /**
@@ -336,6 +352,53 @@ export function allUpstreamServers(): UpstreamServer[] {
 export function deleteUpstreamServer(tenantId: string, id: string): boolean {
   const r = d().prepare("DELETE FROM upstream_servers WHERE id = ? AND tenant_id = ?").run(id, tenantId);
   return r.changes > 0;
+}
+
+// --- Tenant webhooks (Faz 11B) ---
+export interface Webhook { id: string; tenant_id: string; url: string; events: string[]; active: number; created_at: string; }
+export function addWebhook(tenantId: string, url: string, events: string[]): { id: string; secret: string } {
+  const id = `whk_${crypto.randomBytes(8).toString("hex")}`;
+  const secret = `whsec_${crypto.randomBytes(24).toString("hex")}`;
+  d().prepare("INSERT INTO webhooks (id, tenant_id, url, events, secret, created_at) VALUES (?,?,?,?,?,?)")
+    .run(id, tenantId, url, events.join(","), secret, nowIso());
+  return { id, secret }; // secret returned ONCE — tenant verifies signatures with it
+}
+export function listWebhooks(tenantId: string): Webhook[] {
+  return (d().prepare("SELECT id, tenant_id, url, events, active, created_at FROM webhooks WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as any[])
+    .map((r) => ({ ...r, events: String(r.events).split(",").filter(Boolean) }));
+}
+export function deleteWebhook(tenantId: string, id: string): boolean {
+  return d().prepare("DELETE FROM webhooks WHERE id = ? AND tenant_id = ?").run(id, tenantId).changes > 0;
+}
+export function getWebhookSecret(id: string): string | null {
+  const r = d().prepare("SELECT secret FROM webhooks WHERE id = ?").get(id) as any;
+  return r ? r.secret : null;
+}
+
+export interface Delivery { id: string; webhook_id: string; tenant_id: string; event_type: string; payload: string; attempt: number; status: string; next_retry_at: string; }
+/** Fan a tenant event out to matching active webhooks as pending deliveries (Faz 11B). */
+export function queueWebhookEvent(tenantId: string, eventType: string, payload: Record<string, any>): number {
+  const hooks = d().prepare("SELECT id, url, events FROM webhooks WHERE tenant_id = ? AND active = 1").all(tenantId) as any[];
+  const body = JSON.stringify({ type: eventType, tenantId, ts: nowIso(), data: payload });
+  let n = 0;
+  for (const h of hooks) {
+    if (!String(h.events).split(",").includes(eventType)) continue;
+    const id = `whd_${crypto.randomBytes(8).toString("hex")}`;
+    d().prepare("INSERT INTO webhook_deliveries (id, webhook_id, tenant_id, event_type, payload, next_retry_at, created_at) VALUES (?,?,?,?,?,?,?)")
+      .run(id, h.id, tenantId, eventType, body, nowIso(), nowIso());
+    n++;
+  }
+  return n;
+}
+export function pendingDeliveries(limit = 50): Delivery[] {
+  return d().prepare("SELECT * FROM webhook_deliveries WHERE status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at LIMIT ?").all(nowIso(), limit) as any[];
+}
+export function markDelivery(id: string, status: string, attempt: number, nextRetryAt: string | null, code?: number): void {
+  d().prepare("UPDATE webhook_deliveries SET status = ?, attempt = ?, next_retry_at = ?, last_code = ? WHERE id = ?")
+    .run(status, attempt, nextRetryAt ?? nowIso(), code ?? null, id);
+}
+export function listDeliveries(tenantId: string, limit = 50): any[] {
+  return d().prepare("SELECT id, webhook_id, event_type, attempt, status, last_code, created_at FROM webhook_deliveries WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?").all(tenantId, Math.min(limit, 200)) as any[];
 }
 
 export { monthKey };
