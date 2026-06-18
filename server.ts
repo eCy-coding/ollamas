@@ -4,6 +4,8 @@ import pinoHttp from "pino-http";
 import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric } from "./server/metrics";
 import { logger } from "./server/logger";
+import { openApiSpec } from "./server/openapi";
+import swaggerUi from "swagger-ui-express";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
@@ -122,6 +124,9 @@ app.get("/api/ready", (_req, res) => {
   const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath;
   res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE });
 });
+// OpenAPI 3.1 spec + Swagger UI (Faz 10C).
+app.get("/api/openapi.json", (_req, res) => res.json(openApiSpec));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).

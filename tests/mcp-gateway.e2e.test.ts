@@ -124,6 +124,16 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(typeof (await res.json()).ready).toBe("boolean");
   });
 
+  // --- Faz 10C: OpenAPI ---
+  test("/api/openapi.json is a valid 3.1 spec + /api/docs serves UI", async () => {
+    const spec = await (await fetch(`${BASE}/api/openapi.json`)).json() as any;
+    expect(spec.openapi).toBe("3.1.0");
+    expect(spec.paths["/mcp"]).toBeTruthy();
+    expect(spec.paths["/api/saas/self/usage"]).toBeTruthy();
+    const docs = await fetch(`${BASE}/api/docs/`);
+    expect(docs.status).toBe(200);
+  });
+
   test("RFC 9728 protected-resource metadata is served", async () => {
     const j = await (await fetch(`${BASE}/.well-known/oauth-protected-resource`)).json() as any;
     expect(String(j.resource)).toMatch(/\/mcp$/);
