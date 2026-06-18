@@ -13,6 +13,9 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
 import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage } from "./server/store";
+import { authMiddleware } from "./server/middleware/auth";
+import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -129,6 +132,9 @@ let CURRENT_MODE: "live" | "degraded-live" | "demo" = "demo";
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
+
+  // SaaS store (tenants/keys/plans/usage). Zero-dep node:sqlite (Faz 2).
+  initStore();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -1158,15 +1164,26 @@ content
   const MCP_EXPOSE_TIERS = (process.env.MCP_EXPOSE_TIERS || "safe,host,privileged")
     .split(",").map(s => s.trim()).filter(Boolean) as ToolTier[];
 
-  const mcpCtxFactory = (_req: express.Request): ToolCtx => ({
-    isLive: CURRENT_MODE !== "demo",
-    workspaceRoot: db.data.workspacePath,
-    autoApply: true, // MCP clients have no interactive approval channel.
-    deps: TOOL_DEPS,
-    allowedTiers: MCP_EXPOSE_TIERS,
-  });
+  // Per-request ToolCtx. Authenticated tenants get their plan's tier allowlist +
+  // usage metering; the unauthenticated single-user path keeps full default tiers.
+  const mcpCtxFactory = (req: express.Request): ToolCtx => {
+    const t = req.tenant;
+    return {
+      isLive: CURRENT_MODE !== "demo",
+      workspaceRoot: db.data.workspacePath,
+      autoApply: true, // MCP clients have no interactive approval channel.
+      deps: TOOL_DEPS,
+      allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
+      tenantId: t?.tenantId,
+      onUsage: t
+        ? (e) => recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs })
+        : undefined,
+    };
+  };
 
-  app.all("/mcp", async (req, res) => {
+  // SAAS_ENFORCE=1 → a valid API key is required on /mcp. Default off keeps the
+  // current single-user localhost behavior. auth → rate-limit → handler.
+  app.all("/mcp", authMiddleware(process.env.SAAS_ENFORCE === "1"), rateLimitMiddleware(), async (req, res) => {
     try {
       await handleMcpRequest(req, res, mcpCtxFactory);
     } catch (err: any) {
@@ -1176,6 +1193,35 @@ content
 
   app.get("/api/mcp/upstreams", (_req, res) => {
     res.json({ exposeTiers: MCP_EXPOSE_TIERS, exposedTools: ToolRegistry.list(MCP_EXPOSE_TIERS).map(t => t.name), upstreams: listUpstreams() });
+  });
+
+  // --- SaaS admin: provision tenants + API keys (AGENTS.md Faz 3). Guarded by
+  // X-Admin-Token when SAAS_ADMIN_TOKEN is set; open on localhost dev otherwise. ---
+  const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const required = process.env.SAAS_ADMIN_TOKEN;
+    if (required && req.headers["x-admin-token"] !== required) {
+      return res.status(401).json({ error: "Bad admin token" });
+    }
+    next();
+  };
+  app.get("/api/saas/plans", adminGuard, (_req, res) => res.json(listPlans()));
+  app.post("/api/saas/tenants", adminGuard, (req, res) => {
+    try {
+      const { name, plan } = req.body || {};
+      if (!name) return res.status(400).json({ error: "Missing 'name'" });
+      res.json(createTenant(String(name), plan ? String(plan) : "free"));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/saas/keys", adminGuard, (req, res) => {
+    try {
+      const { tenantId, label } = req.body || {};
+      if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId'" });
+      res.json(issueApiKey(String(tenantId), label ? String(label) : "")); // plaintext key returned ONCE
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
+    revokeApiKey(req.params.id);
+    res.json({ revoked: req.params.id });
   });
 
   app.post("/api/cluster/execute", async (req, res) => {
