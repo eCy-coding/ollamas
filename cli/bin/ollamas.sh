@@ -4,6 +4,7 @@
 #
 #   ollamas.sh doctor
 #   ollamas.sh chat "why is the sky blue"
+#   ollamas.sh agent "list files and run tests"   (auto-apply writes; SSE -> stdout)
 #
 # Config via env: OLLAMAS_GATEWAY (default http://localhost:3000), OLLAMAS_API_KEY,
 # OLLAMAS_MODEL (default qwen3:8b), OLLAMAS_PROVIDER (default ollama-local).
@@ -18,6 +19,9 @@ AUTH=""
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift || true
 
+# JSON-escape a string (backslash + double-quote) via a tiny awk pass.
+esc() { printf '%s' "$1" | awk 'BEGIN{ORS=""} {gsub(/\\/,"\\\\");gsub(/"/,"\\\"");print} END{print ""}'; }
+
 case "$cmd" in
   doctor)
     # shellcheck disable=SC2086
@@ -27,19 +31,27 @@ case "$cmd" in
   chat)
     prompt="$*"
     [ -n "$prompt" ] || { echo "usage: ollamas.sh chat \"prompt\"" >&2; exit 2; }
-    # JSON-escape the prompt (quotes, backslashes, newlines) via a tiny awk pass.
-    esc=$(printf '%s' "$prompt" | awk 'BEGIN{ORS=""} {gsub(/\\/,"\\\\");gsub(/"/,"\\\"");print} END{print ""}')
     body=$(printf '{"provider":"%s","model":"%s","stream":false,"messages":[{"role":"user","content":"%s"}]}' \
-      "$PROVIDER" "$MODEL" "$esc")
+      "$PROVIDER" "$MODEL" "$(esc "$prompt")")
     # shellcheck disable=SC2086
     curl -fsS $AUTH -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/generate"
     echo
     ;;
+  agent)
+    task="$*"
+    [ -n "$task" ] || { echo "usage: ollamas.sh agent \"task\"" >&2; exit 2; }
+    # auto-apply on the bridge path (no TTY for approval); raw SSE -> stdout.
+    body=$(printf '{"provider":"%s","model":"%s","autoApply":true,"messages":[{"role":"user","content":"%s"}]}' \
+      "$PROVIDER" "$MODEL" "$(esc "$task")")
+    # shellcheck disable=SC2086
+    curl -fsS -N $AUTH -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/agent/chat"
+    echo
+    ;;
   help|--help|-h)
-    echo "ollamas.sh <doctor|chat> — POSIX curl bridge to $GATEWAY"
+    echo "ollamas.sh <doctor|chat|agent> — POSIX curl bridge to $GATEWAY"
     ;;
   *)
-    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|help)" >&2
+    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|agent|help)" >&2
     exit 2
     ;;
 esac

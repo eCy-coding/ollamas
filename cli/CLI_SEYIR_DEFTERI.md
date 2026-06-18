@@ -28,3 +28,21 @@
 - **Gözlem**: `/api/health` → `platform=linux, arch=arm64, release=…linuxkit`. Bu sekme native macOS değil, container içinde.
 - **Etki**: v4 dual-target benchmark "Mac native" hedefini gerçek macOS host'ta koşmalı; container ölçümü Metal/Apple-Silicon temsili değil.
 - **ÖNLEME KURALI**: benchmark sonucu yazarken host platform'unu (`os.platform/arch/release`) etikete göm; container ≠ Mac-native.
+
+---
+
+## v2 — Agent sürücü + completeness sweep (2026-06-19)
+
+### E-003 · Eşzamanlı worker branch-switch → commit'siz v2 işi silindi (KRİTİK)
+- **Semptom**: v2 editlerinin ortasında tüm cli/ değişiklikleri kayboldu; `index.ts` v1.0.0'a döndü, `agent.ts`/`io.ts` silindi, package.json pristine.
+- **Kök neden**: bu repo'da **başka bir eşzamanlı worker** `feat/v1.3` (Postgres async store) üzerinde çalışıyor. reflog: `checkout: moving from feat/cli-v2 to feat/v1.3` + worker'ın commit'i benim `feat/cli-v2` branch'ime bindi (7e49465). Branch ana checkout'tan altımdan değişti; commit'siz working-tree değişikliklerim discard oldu. v1 commit `7f63164` git'te sağ kaldı.
+- **Fix**: **izole git worktree** — `git worktree add ../ollamas-cli-wt feat/cli-v2-clean 7f63164` (temiz v1 base). Tüm v2 işi orada; `node_modules` ana repo'dan symlink. Branch-switch artık worktree'yi etkilemez. Tamamlayınca **hemen commit**.
+- **ÖNLEME KURALI**: paylaşılan repo'da (eşzamanlı worker varsa) CLI işini **kendi worktree'sinde** yap; commit'siz uzun süre durma — her phase sonrası commit. Branch'i ana checkout'ta paylaşma. Başlamadan `git worktree` aç.
+
+### N-003 (not) · agent path 401 vermedi (chat N-001 aksine)
+- **Gözlem**: canlı `agent --json` 401 olmadan çalıştı (thought→message→done), oysa v1'de `/api/generate` 401 vermişti.
+- **Not**: gateway auth durumu endpoint/oturuma göre değişebilir; CLI her iki halde de doğru (401→ipucu, açık→akış). Live E2E öncesi `doctor` ile durumu gör.
+
+### N-004 (mimari sınır) · agent resume tam tool-history taşımıyor
+- **Gözlem**: write-onay sonrası resume, yalnız assistant history + "approved, continue" turu gönderir; tam tool-result history server session'da.
+- **Not**: server loop'u `messages` param'ından çalışır, session'ı yalnız sonda yazar → istemci-tarafı tam-history resume mümkün değil. Pragmatik resume yeterli; cap 12 round. v3+ session-load-into-loop server desteği gerekirse genişlet.

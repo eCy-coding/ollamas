@@ -9,8 +9,13 @@ export async function runDoctor(argv: string[]): Promise<number> {
   const { values } = parseArgs({
     args: argv,
     strict: false,
-    options: { json: { type: "boolean" } },
+    options: { json: { type: "boolean" }, help: { type: "boolean" } },
   });
+
+  if (values.help) {
+    process.stdout.write("ollamas doctor — health of gateway + ollama + bridge + ready + agent\n  --json   machine-readable\n");
+    return 0;
+  }
 
   const cfg = loadConfig();
   const client = new GatewayClient(cfg.gateway, cfg.apiKey);

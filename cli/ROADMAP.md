@@ -6,8 +6,8 @@
 | Ver | Tema | Çekirdek | Durum |
 |-----|------|----------|-------|
 | **v1** | İskelet + chat | `node:util` parseArgs router, `chat` (one-shot+REPL+SSE), `doctor`, `config`, TTY/`--json`/NO_COLOR, `bin`, POSIX köprü iskelet, governance docs | ✅ DONE |
-| **v2** | Agent sürücü | `ollamas agent "<task>"` ReAct loop (`/api/agent/chat` SSE); terminal tool-onayı (autoApply tier saygı); oturum persist (`/api/agent/sessions`); `--yolo`/`--safe`; thought→step→result render | ▶ NEXT |
-| **v3** | SaaS/admin | `ollamas saas tenant\|key\|plan\|usage\|billing` → `/api/saas/*` + admin token; tablo çıktı; idempotency | |
+| **v2** | Agent sürücü + sweep | `ollamas agent` ReAct loop (`/api/agent/chat` SSE); write-onay akışı (`/api/agent/approve-write`); oturum (`/api/agent/sessions`); `--yolo`/`--safe`; + 10 v1-gap (G1-G10) | ✅ DONE |
+| **v3** | SaaS/admin | `ollamas saas tenant\|key\|plan\|usage\|billing` → `/api/saas/*` + admin token; tablo çıktı; idempotency | ▶ NEXT |
 | **v4** | Bench/calibration | Dual-target (Mac-native + remote/iOS-proxy) benchmark; `~/.llm-mission-control/cli-bench.json`; en verimli model/ctx/Metal flag auto-pick; `benchmark.mjs` yükselt; host-platform etiket (N-002) | |
 | **v5** | MCP client | `ollamas mcp add\|list\|call\|tools` — upstream register/consume `/api/mcp/upstreams` + `/mcp`; choke-point üzerinden çağrı | |
 | **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (agent/saas); remote-exposure doc (tailscale/LAN + key) | |
@@ -25,10 +25,19 @@
 - Canlı: `doctor --json` healthy=true (gateway/ollama/bridge); POSIX köprü curl health OK
 - Choke-point: `grep -r ToolRegistry cli/` = yalnız yorum (gerçek import yok)
 
-## v2 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/commands/agent.ts` — `/api/agent/chat` SSE tüket; event tipleri: `thought|step|tool|result|halt`.
-2. `cli/lib/client.ts` → `agentStream(messages, {autoApply, maxSteps, sessionId}, onEvent)`.
-3. Terminal tool-onayı: `host`/`privileged` tier'da `--safe` ise prompt, `--yolo` ise autoApply.
-4. Oturum: `/api/agent/sessions` list/create/resume; `--session <id>`.
-5. Testler: agent SSE event-router saf-fonksiyon; mock-fetch multi-event stream.
-6. doctor'a `agent` reachability ekle.
+## v2 — DONE (kanıt)
+- `cli/commands/agent.ts` + `cli/lib/io.ts` (stdin/confirm) yeni; `agent` (task/sessions/rm), write-onay akışı, `--yolo`/`--safe`
+- `client.ts`: `agentStream`/`approveWrite`/`{list,get,create,delete}Session`/`ready`; baseUrl normalize (G3); stream timeout (G4)
+- `output.ts`: `formatStep`/`formatDiff`; doctor 5 satır (+ready+agent, G6)
+- sweep: G1 per-cmd help · G2 stdin-pipe · G5 `--version` route · G7 POSIX agent · G8 cli/README · G9 main-dispatch test · G10 `--gateway`
+- Testler: `tests/cli-{parser,output,chat,agent}.test.ts` — **35 pass** (saf-fn + mock-fetch); full suite **102 pass/1 skip**
+- Canlı: `doctor` 5 satır healthy (sessions=46); `agent --json` gerçek SSE thought→message→done; `agent sessions` tablo; POSIX köprü agent
+- Choke-point korunur; VERSION 2.0.0
+
+## v3 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/commands/saas.ts` — alt-eylemler `tenant|key|plan|usage|billing` (list/create/revoke).
+2. `cli/lib/client.ts` → SaaS metodları: `listTenants/createTenant`, `listKeys/createKey/revokeKey`, `listPlans`, `usage`, `billingPreview` → `/api/saas/*` + `/api/billing/preview` (adminGuard: `SAAS_ADMIN_TOKEN`).
+3. Admin token: `config saasAdminToken` veya `OLLAMAS_SAAS_ADMIN` env → `X-Admin-Token` / bearer header.
+4. `cli/lib/output.ts` → `formatTable(rows, cols)` (TTY hizalı, `--json` ham).
+5. Idempotency: key/tenant create'te idempotency-key başlığı (store idempotency).
+6. Testler: saas client mock-fetch + `formatTable` saf-fn; doctor'a `saas` reachability (opsiyonel).

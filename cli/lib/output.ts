@@ -36,11 +36,15 @@ export function c(code: keyof typeof CODES, s: string, enabled: boolean): string
 export function formatDoctor(report: DoctorReport, ctx: OutputCtx): string {
   if (ctx.json) return JSON.stringify(report, null, 2);
   const ok = (b: boolean) => c(b ? "green" : "red", b ? "● up" : "● down", ctx.color);
+  const row = (label: string, comp: { ok: boolean; detail: string }) =>
+    `  ${label.padEnd(8)} ${ok(comp.ok)}  ${c("dim", comp.detail, ctx.color)}`;
   const lines = [
     c("bold", "ollamas doctor", ctx.color),
-    `  gateway  ${ok(report.gateway.ok)}  ${c("dim", report.gateway.detail, ctx.color)}`,
-    `  ollama   ${ok(report.ollama.ok)}  ${c("dim", report.ollama.detail, ctx.color)}`,
-    `  bridge   ${ok(report.bridge.ok)}  ${c("dim", report.bridge.detail, ctx.color)}`,
+    row("gateway", report.gateway),
+    row("ollama", report.ollama),
+    row("bridge", report.bridge),
+    row("ready", report.ready),
+    row("agent", report.agent),
     "",
     report.healthy
       ? c("green", "healthy", ctx.color)
@@ -55,6 +59,26 @@ export interface DoctorReport {
   gateway: { ok: boolean; detail: string };
   ollama: { ok: boolean; detail: string };
   bridge: { ok: boolean; detail: string };
+  ready: { ok: boolean; detail: string };
+  agent: { ok: boolean; detail: string };
+}
+
+// One line per agent tool step: tool · ok · latency · trimmed result/diff hint.
+export function formatStep(ev: { stepNum?: number; tool?: string; ok?: boolean; latency?: number; diff?: string; applied?: boolean }, ctx: OutputCtx): string {
+  const mark = c(ev.ok ? "green" : "red", ev.ok ? "✓" : "✗", ctx.color);
+  const lat = typeof ev.latency === "number" ? c("dim", `${ev.latency}ms`, ctx.color) : "";
+  const tag = ev.diff ? c("yellow", ev.applied ? "(applied)" : "(diff)", ctx.color) : "";
+  return `  ${mark} ${c("cyan", `[${ev.stepNum ?? "?"}] ${ev.tool ?? "?"}`, ctx.color)} ${lat} ${tag}`.trimEnd();
+}
+
+// Colorize a unified-diff string (+ green / − red) when color is enabled.
+export function formatDiff(diff: string, ctx: OutputCtx): string {
+  if (!diff) return "";
+  if (!ctx.color) return diff;
+  return diff
+    .split("\n")
+    .map((l) => (l.startsWith("+") ? c("green", l, true) : l.startsWith("-") ? c("red", l, true) : l))
+    .join("\n");
 }
 
 // Final one-line footer after a streamed answer: source + speed.

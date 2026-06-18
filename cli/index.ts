@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 // ollamas — unified CLI for the LLM Mission Control gateway.
-// v1: chat, doctor, config. Subcommands grow per cli/ROADMAP.md.
+// Subcommands grow per cli/ROADMAP.md.
 // The CLI is a thin HTTP/MCP client; all tool side effects cross the gateway
 // choke-point (AGENTS.md §4). It never imports server/tool-registry.
 import { runChat } from "./commands/chat";
 import { runDoctor } from "./commands/doctor";
+import { runAgent } from "./commands/agent";
 import { loadConfig, saveConfig, configPath, type CliConfig } from "./lib/config";
 
-const VERSION = "1.0.0";
+const VERSION = "2.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
-usage: ollamas <command> [options]
+usage: ollamas [--gateway <url>] <command> [options]
 
 commands:
   chat [prompt]      one-shot or interactive REPL against the gateway
-  doctor             health of gateway + ollama + host-bridge
+  agent [task]       drive the ReAct agent loop (streams thought→step→done)
+    agent sessions   list persisted agent sessions
+    agent rm <id>    delete a session
+  doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|profile)
   help               this message
   version            print version
@@ -25,15 +29,38 @@ global env:
   OLLAMAS_API_KEY    bearer key for SAAS-enforced gateways
   OLLAMAS_MODEL      default model (default qwen3:8b)
   NO_COLOR           disable color
+global flags:
+  --gateway <url>    override gateway for this invocation
 common flags:
-  --json             machine-readable output
-  -m, --model        override model        -p, --provider   override provider
+  --json             machine-readable output      --timeout <ms>  stream timeout
+  -m, --model        override model               -p, --provider  override provider
+run 'ollamas <command> --help' for per-command options.
 `;
 
+// Pull global flags (currently --gateway <url>) out of argv. Pure → testable.
+export function extractGlobalFlags(argv: string[]): { gateway?: string; rest: string[] } {
+  const rest: string[] = [];
+  let gateway: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--gateway" && i + 1 < argv.length) {
+      gateway = argv[++i];
+    } else if (argv[i].startsWith("--gateway=")) {
+      gateway = argv[i].slice("--gateway=".length);
+    } else {
+      rest.push(argv[i]);
+    }
+  }
+  return { gateway, rest };
+}
+
 // Split argv into the command and its remaining args. Pure → unit-testable.
+// Leading global flags with no subcommand map to version/help (G5).
 export function route(argv: string[]): { command: string; rest: string[] } {
   const idx = argv.findIndex((a) => !a.startsWith("-"));
-  if (idx === -1) return { command: argv.length ? "help" : "help", rest: argv };
+  if (idx === -1) {
+    if (argv.includes("--version") || argv.includes("-v")) return { command: "version", rest: argv };
+    return { command: "help", rest: argv };
+  }
   return { command: argv[idx], rest: [...argv.slice(0, idx), ...argv.slice(idx + 1)] };
 }
 
@@ -60,10 +87,14 @@ function runConfig(rest: string[]): number {
 }
 
 export async function main(argv: string[]): Promise<number> {
-  const { command, rest } = route(argv);
+  const g = extractGlobalFlags(argv);
+  if (g.gateway) process.env.OLLAMAS_GATEWAY = g.gateway; // env wins in loadConfig (G10)
+  const { command, rest } = route(g.rest);
   switch (command) {
     case "chat":
       return runChat(rest);
+    case "agent":
+      return runAgent(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":

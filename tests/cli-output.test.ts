@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, type DoctorReport } from "../cli/lib/output";
+import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, formatStep, formatDiff, type DoctorReport } from "../cli/lib/output";
 
 describe("shouldColor", () => {
   it("color only on a real TTY", () => {
@@ -32,6 +32,8 @@ const sample: DoctorReport = {
   gateway: { ok: true, detail: "mode=live" },
   ollama: { ok: false, detail: "ECONNREFUSED" },
   bridge: { ok: false, detail: "not running (macOS-only)" },
+  ready: { ok: true, detail: "ready" },
+  agent: { ok: true, detail: "sessions=2" },
 };
 
 describe("formatDoctor", () => {
@@ -41,8 +43,38 @@ describe("formatDoctor", () => {
   it("human mode is plain and mentions degraded", () => {
     const out = formatDoctor(sample, { color: false, json: false });
     expect(out).toContain("gateway");
+    expect(out).toContain("ready");
+    expect(out).toContain("agent");
     expect(out).toContain("degraded");
     expect(out).not.toContain("\x1b["); // no color when disabled
+  });
+});
+
+describe("formatStep", () => {
+  it("renders ok mark, step/tool and latency without color", () => {
+    const out = formatStep({ stepNum: 2, tool: "run_command", ok: true, latency: 30 }, { color: false, json: false });
+    expect(out).toContain("[2] run_command");
+    expect(out).toContain("30ms");
+    expect(out).toContain("✓");
+    expect(out).not.toContain("\x1b[");
+  });
+  it("flags a diff/applied tag", () => {
+    const out = formatStep({ stepNum: 1, tool: "write_file", ok: true, diff: "+a", applied: false }, { color: false, json: false });
+    expect(out).toContain("(diff)");
+  });
+});
+
+describe("formatDiff", () => {
+  it("returns plain diff when color off", () => {
+    expect(formatDiff("+a\n-b\n c", { color: false, json: false })).toBe("+a\n-b\n c");
+  });
+  it("colorizes +/- lines when color on", () => {
+    const out = formatDiff("+a\n-b", { color: true, json: false });
+    expect(out).toContain("\x1b[32m"); // green +
+    expect(out).toContain("\x1b[31m"); // red -
+  });
+  it("empty diff → empty string", () => {
+    expect(formatDiff("", { color: true, json: false })).toBe("");
   });
 });
 
