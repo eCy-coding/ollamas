@@ -39,17 +39,30 @@ export function parseSSEBuffer(buffer: string): { events: any[]; rest: string } 
 export class GatewayClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
+  private readonly adminToken?: string;
 
-  constructor(baseUrl: string, apiKey?: string) {
+  constructor(baseUrl: string, apiKey?: string, adminToken?: string) {
     // Normalize: drop trailing slashes so `${base}/api/x` never doubles up (G3).
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.apiKey = apiKey;
+    this.adminToken = adminToken;
   }
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {
     const h: Record<string, string> = { ...extra };
     if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
     return h;
+  }
+
+  // Admin-scoped headers carry X-Admin-Token (adminGuard, server.ts:1323).
+  private adminHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    const h = this.headers(extra);
+    if (this.adminToken) h["X-Admin-Token"] = this.adminToken;
+    return h;
+  }
+
+  hasAdminToken(): boolean {
+    return !!this.adminToken;
   }
 
   async health(timeoutMs = 8000): Promise<any> {
@@ -170,6 +183,113 @@ export class GatewayClient {
     if (!r.ok) throw new Error(`gateway ${path} → ${r.status}`);
     return r.json();
   }
+
+  // --- SaaS / billing admin surface (v3) — all behind adminGuard (X-Admin-Token).
+
+  listPlans(): Promise<Plan[]> {
+    return this.adminGet("/api/saas/plans");
+  }
+  listTenants(): Promise<Tenant[]> {
+    return this.adminGet("/api/saas/tenants");
+  }
+  listKeys(tenantId: string): Promise<ApiKeyMeta[]> {
+    return this.adminGet(`/api/saas/keys?tenantId=${encodeURIComponent(tenantId)}`);
+  }
+  listAudit(opts: { tenantId?: string; limit?: number } = {}): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (opts.tenantId) q.set("tenantId", opts.tenantId);
+    if (opts.limit) q.set("limit", String(opts.limit));
+    const qs = q.toString();
+    return this.adminGet(`/api/saas/audit${qs ? `?${qs}` : ""}`);
+  }
+  createTenant(body: { name: string; plan?: string; stripeCustomerId?: string }): Promise<Tenant> {
+    return this.adminPost("/api/saas/tenants", body);
+  }
+  // Returns the plaintext key ONCE (olm_…). Caller must surface + warn; never log.
+  createKey(body: { tenantId: string; label?: string; ttlDays?: number; scopes?: string }): Promise<NewApiKey> {
+    return this.adminPost("/api/saas/keys", body);
+  }
+  revokeKey(id: string): Promise<{ revoked: string }> {
+    return this.adminPost(`/api/saas/keys/${encodeURIComponent(id)}/revoke`, {});
+  }
+  billingPreview(period?: string): Promise<BillingReport> {
+    return this.adminGet(`/api/billing/preview${period ? `?period=${encodeURIComponent(period)}` : ""}`);
+  }
+  billingRun(period?: string): Promise<BillingReport> {
+    return this.adminPost("/api/billing/run", period ? { period } : {});
+  }
+
+  private async adminGet(path: string): Promise<any> {
+    const r = await fetch(`${this.baseUrl}${path}`, {
+      headers: this.adminHeaders(),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(adminError(path, r.status));
+    return r.json();
+  }
+  private async adminPost(path: string, body: any): Promise<any> {
+    const r = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: this.adminHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(adminError(path, r.status));
+    return r.json();
+  }
+}
+
+// adminGuard rejects with 401 (bad token) / 403 (enforce on, no token). Map to
+// an actionable hint instead of a bare status (H3).
+function adminError(path: string, status: number): string {
+  const base = `gateway ${path} → ${status}`;
+  if (status === 401 || status === 403) {
+    return `${base}\n  hint: admin auth — set OLLAMAS_SAAS_ADMIN or 'ollamas config saasAdminToken <token>' (gateway SAAS_ADMIN_TOKEN)`;
+  }
+  return base;
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  rate_per_min?: number;
+  monthly_quota?: number;
+  allowed_tiers?: string;
+}
+export interface Tenant {
+  id: string;
+  name: string;
+  plan_id?: string;
+  stripe_customer_id?: string | null;
+  created_at?: string;
+}
+export interface ApiKeyMeta {
+  id: string;
+  label?: string;
+  revoked?: number | string;
+  scopes?: string;
+  expires_at?: string | null;
+  last_used_at?: string | null;
+  created_at?: string;
+}
+export interface NewApiKey {
+  id: string;
+  key: string;
+  expiresAt: string | null;
+}
+export interface BillingLine {
+  tenantId: string;
+  calls: number;
+  okCalls: number;
+  tokens: number;
+  latencyMs: number;
+  amount: number;
+}
+export interface BillingReport {
+  period: string;
+  dryRun: boolean;
+  lines: BillingLine[];
+  total: number;
 }
 
 export interface AgentOpts {
@@ -249,6 +369,9 @@ export async function buildDoctorReport(
   });
   const ready = await safeProbe(() => client.ready());
   const agent = await safeProbe(() => client.listSessions());
+  // SaaS probe only when an admin token is configured; otherwise report skipped
+  // (don't gate overall health on it).
+  const saas = client.hasAdminToken() ? await safeProbe(() => client.listPlans()) : null;
 
   return {
     ts: nowIso,
@@ -258,6 +381,7 @@ export async function buildDoctorReport(
     bridge: { ok: bridge.ok, detail: bridge.ok ? `terminals=${countOf(bridge.value?.terminals)}` : "not running (macOS-only)" },
     ready: { ok: ready.ok, detail: ready.ok ? "ready" : ready.error },
     agent: { ok: agent.ok, detail: agent.ok ? `sessions=${countOf(agent.value)}` : agent.error },
+    saas: saas ? { ok: saas.ok, detail: saas.ok ? `plans=${countOf(saas.value)}` : saas.error } : { ok: true, detail: "skipped (no admin token)" },
   };
 }
 

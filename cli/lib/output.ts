@@ -45,6 +45,7 @@ export function formatDoctor(report: DoctorReport, ctx: OutputCtx): string {
     row("bridge", report.bridge),
     row("ready", report.ready),
     row("agent", report.agent),
+    row("saas", report.saas),
     "",
     report.healthy
       ? c("green", "healthy", ctx.color)
@@ -61,6 +62,7 @@ export interface DoctorReport {
   bridge: { ok: boolean; detail: string };
   ready: { ok: boolean; detail: string };
   agent: { ok: boolean; detail: string };
+  saas: { ok: boolean; detail: string };
 }
 
 // One line per agent tool step: tool · ok · latency · trimmed result/diff hint.
@@ -79,6 +81,18 @@ export function formatDiff(diff: string, ctx: OutputCtx): string {
     .split("\n")
     .map((l) => (l.startsWith("+") ? c("green", l, true) : l.startsWith("-") ? c("red", l, true) : l))
     .join("\n");
+}
+
+// Render an aligned text table. Pure → unit-testable. Header dim; columns sized
+// to the widest cell. Caller handles --json separately (raw data, not this).
+export function formatTable(headers: string[], rows: unknown[][], ctx: OutputCtx): string {
+  // Coerce every cell to string — callers may pass numbers/arrays (E-004).
+  const cell = (v: unknown): string => (v == null ? "" : String(v));
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => cell(r[i]).length)));
+  const pad = (cells: unknown[]) => cells.map((v, i) => cell(v).padEnd(widths[i])).join("  ").trimEnd();
+  const head = c("dim", pad(headers), ctx.color);
+  if (!rows.length) return head + "\n" + c("dim", "(empty)", ctx.color);
+  return [head, ...rows.map((r) => pad(r))].join("\n");
 }
 
 // Final one-line footer after a streamed answer: source + speed.

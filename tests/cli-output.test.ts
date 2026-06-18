@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, formatStep, formatDiff, type DoctorReport } from "../cli/lib/output";
+import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, formatStep, formatDiff, formatTable, type DoctorReport } from "../cli/lib/output";
 
 describe("shouldColor", () => {
   it("color only on a real TTY", () => {
@@ -34,6 +34,7 @@ const sample: DoctorReport = {
   bridge: { ok: false, detail: "not running (macOS-only)" },
   ready: { ok: true, detail: "ready" },
   agent: { ok: true, detail: "sessions=2" },
+  saas: { ok: true, detail: "skipped (no admin token)" },
 };
 
 describe("formatDoctor", () => {
@@ -75,6 +76,19 @@ describe("formatDiff", () => {
   });
   it("empty diff → empty string", () => {
     expect(formatDiff("", { color: true, json: false })).toBe("");
+  });
+});
+
+describe("formatTable", () => {
+  it("aligns columns to the widest cell", () => {
+    const out = formatTable(["id", "name"], [["a", "short"], ["bbbb", "x"]], { color: false, json: false });
+    const lines = out.split("\n");
+    expect(lines[0]).toBe("id    name");
+    expect(lines[1]).toBe("a     short");
+    expect(lines[2]).toBe("bbbb  x");
+  });
+  it("shows (empty) for no rows", () => {
+    expect(formatTable(["id"], [], { color: false, json: false })).toContain("(empty)");
   });
 });
 

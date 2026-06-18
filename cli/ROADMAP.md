@@ -7,8 +7,8 @@
 |-----|------|----------|-------|
 | **v1** | İskelet + chat | `node:util` parseArgs router, `chat` (one-shot+REPL+SSE), `doctor`, `config`, TTY/`--json`/NO_COLOR, `bin`, POSIX köprü iskelet, governance docs | ✅ DONE |
 | **v2** | Agent sürücü + sweep | `ollamas agent` ReAct loop (`/api/agent/chat` SSE); write-onay akışı (`/api/agent/approve-write`); oturum (`/api/agent/sessions`); `--yolo`/`--safe`; + 10 v1-gap (G1-G10) | ✅ DONE |
-| **v3** | SaaS/admin | `ollamas saas tenant\|key\|plan\|usage\|billing` → `/api/saas/*` + admin token; tablo çıktı; idempotency | ▶ NEXT |
-| **v4** | Bench/calibration | Dual-target (Mac-native + remote/iOS-proxy) benchmark; `~/.llm-mission-control/cli-bench.json`; en verimli model/ctx/Metal flag auto-pick; `benchmark.mjs` yükselt; host-platform etiket (N-002) | |
+| **v3** | SaaS/admin + sweep | `ollamas saas plans\|tenants\|tenant new\|keys\|key new\|revoke\|audit\|usage\|billing` → `/api/saas/*`+`/api/billing/*` (X-Admin-Token); `formatTable`; secret-once key; revoke confirm; doctor saas satırı; H1-H8 | ✅ DONE |
+| **v4** | Bench/calibration | Dual-target (Mac-native + remote/iOS-proxy) benchmark; `~/.llm-mission-control/cli-bench.json`; en verimli model/ctx/Metal flag auto-pick; `benchmark.mjs` yükselt; host-platform etiket (N-002) | ▶ NEXT |
 | **v5** | MCP client | `ollamas mcp add\|list\|call\|tools` — upstream register/consume `/api/mcp/upstreams` + `/mcp`; choke-point üzerinden çağrı | |
 | **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (agent/saas); remote-exposure doc (tailscale/LAN + key) | |
 | **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | |
@@ -34,10 +34,18 @@
 - Canlı: `doctor` 5 satır healthy (sessions=46); `agent --json` gerçek SSE thought→message→done; `agent sessions` tablo; POSIX köprü agent
 - Choke-point korunur; VERSION 2.0.0
 
-## v3 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/commands/saas.ts` — alt-eylemler `tenant|key|plan|usage|billing` (list/create/revoke).
-2. `cli/lib/client.ts` → SaaS metodları: `listTenants/createTenant`, `listKeys/createKey/revokeKey`, `listPlans`, `usage`, `billingPreview` → `/api/saas/*` + `/api/billing/preview` (adminGuard: `SAAS_ADMIN_TOKEN`).
-3. Admin token: `config saasAdminToken` veya `OLLAMAS_SAAS_ADMIN` env → `X-Admin-Token` / bearer header.
-4. `cli/lib/output.ts` → `formatTable(rows, cols)` (TTY hizalı, `--json` ham).
-5. Idempotency: key/tenant create'te idempotency-key başlığı (store idempotency).
-6. Testler: saas client mock-fetch + `formatTable` saf-fn; doctor'a `saas` reachability (opsiyonel).
+## v3 — DONE (kanıt)
+- `cli/commands/saas.ts` yeni; `client.ts`: `listPlans/listTenants/listKeys/listAudit/createTenant/createKey/revokeKey/billingPreview/billingRun` + `adminHeaders` (X-Admin-Token) + `adminError` 401/403 ipucu
+- `output.ts`: `formatTable` (savunmacı String-coerce, E-004); `config.ts`+`index.ts`: `saasAdminToken` (env `OLLAMAS_SAAS_ADMIN`, redaksiyon)
+- sweep H1-H8: admin token config/env · formatTable · 401/403 hint · secret-once key · revoke confirm (`--yes`) · doctor saas satırı · README+help · remote-admin TLS notu
+- Testler: `tests/cli-saas.test.ts` + output/parser ek — **46 pass**; full suite **113 pass/1 skip**
+- Canlı (kendi izole gateway :3009, SAAS_ENFORCE=1, token=ecytest): `saas plans` hizalı tablo · `tenant new`→tnt_… · `key new` secret-once olm_… + uyarı · `keys` liste · `revoke --yes` · `usage` · `doctor` saas up plans=3 healthy; enforced gateway'de token'sız → 401 ipucu
+- Choke-point korunur (`server/store` import yok); VERSION 3.0.0; **Idempotency: server'da create idempotency-key YOK → plandan çıkarıldı**
+
+## v4 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/commands/bench.ts` — dual-target: `--target mac|remote|both`; ölçüm TTFB, tok/s, total, correctness.
+2. `cli/lib/client.ts` → `generateTimed(messages, opts)` (TTFB + tok/s yakala) veya mevcut `generateStream` meta'sını kullan; her model/ctx kombinasyonu için tur.
+3. `~/.llm-mission-control/cli-bench.json` yaz; host platform etiketi göm (N-002: container ≠ Mac-native).
+4. En verimli model/ctx/Metal-flag auto-pick → `config` öner/yaz; `benchmark.mjs` mantığını CLI'a yükselt (reuse `bin/host-bridge/benchmark.mjs`).
+5. `--json` rapor; tablo (model · ctx · TTFB · tok/s · correct).
+6. Testler: bench hesap saf-fn (tok/s, TTFB derive) + mock-fetch; doctor'a değişiklik yok.

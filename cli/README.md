@@ -24,8 +24,9 @@ npm link               # exposes `ollamas` globally (bin field in package.json)
 | `ollamas agent [task]` | drive the ReAct agent loop; streams thought→step→done; prompts before writes (`--yolo` to auto-apply) |
 | `ollamas agent sessions` | list persisted agent sessions |
 | `ollamas agent rm <id>` | delete a session |
-| `ollamas doctor` | health of gateway + ollama + bridge + ready + agent |
-| `ollamas config [k] [v]` | show config, or set `gateway\|model\|provider\|apiKey\|profile` |
+| `ollamas saas <action>` | admin: `plans\|tenants\|keys\|audit\|usage\|billing`, `tenant new`, `key new\|revoke` |
+| `ollamas doctor` | health of gateway + ollama + bridge + ready + agent + saas |
+| `ollamas config [k] [v]` | show config, or set `gateway\|model\|provider\|apiKey\|saasAdminToken\|profile` |
 
 Run `ollamas <command> --help` for per-command flags. Common flags: `--json`,
 `--timeout <ms>`, `-m/--model`, `-p/--provider`. Global: `--gateway <url>`.
@@ -35,12 +36,25 @@ Run `ollamas <command> --help` for per-command flags. Common flags: `--json`,
 Config file: `~/.ollamas/cli.json` (mode 0600). Env overrides file overrides defaults:
 
 ```
-OLLAMAS_GATEWAY   gateway base url (default http://localhost:3000)
-OLLAMAS_API_KEY   bearer key for SAAS-enforced gateways (chat/agent need this when 401)
-OLLAMAS_MODEL     default model (default qwen3:8b)
-OLLAMAS_PROVIDER  default provider (default ollama-local)
-NO_COLOR          disable ANSI color
+OLLAMAS_GATEWAY    gateway base url (default http://localhost:3000)
+OLLAMAS_API_KEY    bearer key for SAAS-enforced gateways (chat/agent need this when 401)
+OLLAMAS_SAAS_ADMIN admin token (X-Admin-Token) for saas/billing commands
+OLLAMAS_MODEL      default model (default qwen3:8b)
+OLLAMAS_PROVIDER   default provider (default ollama-local)
+NO_COLOR           disable ANSI color
 ```
+
+## SaaS / admin
+
+`ollamas saas …` drives the gateway's multi-tenant layer (server `adminGuard`,
+`X-Admin-Token` = the gateway's `SAAS_ADMIN_TOKEN`). Set the token via
+`OLLAMAS_SAAS_ADMIN` or `ollamas config saasAdminToken <token>`. A 401/403 prints
+a hint. `saas key new` shows the plaintext key **once** — the gateway keeps only a
+hash. `saas key revoke` prompts unless `--yes`/`--json`.
+
+> **Security:** the admin token grants tenant/key/billing control. Send it to a
+> remote gateway only over TLS or a private tunnel (tailscale/LAN) — never plain
+> HTTP across an untrusted network.
 
 ## Remote / iOS
 

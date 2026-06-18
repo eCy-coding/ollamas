@@ -61,6 +61,12 @@ describe("main dispatch (G9)", () => {
     silence();
     expect(await main(["bogus"])).toBe(2);
   });
+
+  it("routes saas: --help exits 0, no action exits 2 (no network)", async () => {
+    silence();
+    expect(await main(["saas", "--help"])).toBe(0);
+    expect(await main(["saas"])).toBe(2);
+  });
 });
 
 describe("config resolution precedence", () => {

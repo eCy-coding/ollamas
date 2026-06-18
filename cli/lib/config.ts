@@ -8,6 +8,7 @@ import { join } from "node:path";
 export interface CliConfig {
   gateway: string;
   apiKey?: string;
+  saasAdminToken?: string; // X-Admin-Token for /api/saas/* + /api/billing/* (v3)
   provider: string;
   model: string;
   profile: string;
@@ -29,6 +30,7 @@ export function resolveConfig(fileData: Partial<CliConfig>, env: NodeJS.ProcessE
   return {
     gateway: env.OLLAMAS_GATEWAY || fileData.gateway || DEFAULTS.gateway,
     apiKey: env.OLLAMAS_API_KEY || fileData.apiKey,
+    saasAdminToken: env.OLLAMAS_SAAS_ADMIN || fileData.saasAdminToken,
     provider: env.OLLAMAS_PROVIDER || fileData.provider || DEFAULTS.provider,
     model: env.OLLAMAS_MODEL || fileData.model || DEFAULTS.model,
     profile: env.OLLAMAS_PROFILE || fileData.profile || DEFAULTS.profile,

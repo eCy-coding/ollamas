@@ -6,9 +6,10 @@
 import { runChat } from "./commands/chat";
 import { runDoctor } from "./commands/doctor";
 import { runAgent } from "./commands/agent";
+import { runSaas } from "./commands/saas";
 import { loadConfig, saveConfig, configPath, type CliConfig } from "./lib/config";
 
-const VERSION = "2.0.0";
+const VERSION = "3.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
@@ -19,14 +20,16 @@ commands:
   agent [task]       drive the ReAct agent loop (streams thought→step→done)
     agent sessions   list persisted agent sessions
     agent rm <id>    delete a session
+  saas <action>      manage the SaaS layer (plans|tenants|keys|audit|usage|billing)
   doctor             health of gateway + ollama + bridge + ready + agent
-  config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|profile)
+  config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken|profile)
   help               this message
   version            print version
 
 global env:
   OLLAMAS_GATEWAY    gateway base url (default http://localhost:3000)
   OLLAMAS_API_KEY    bearer key for SAAS-enforced gateways
+  OLLAMAS_SAAS_ADMIN admin token (X-Admin-Token) for saas/billing commands
   OLLAMAS_MODEL      default model (default qwen3:8b)
   NO_COLOR           disable color
 global flags:
@@ -68,11 +71,15 @@ function runConfig(rest: string[]): number {
   const [key, value] = rest.filter((a) => !a.startsWith("-"));
   if (!key) {
     const cfg = loadConfig();
-    const redacted = { ...cfg, apiKey: cfg.apiKey ? "***set***" : undefined };
+    const redacted = {
+      ...cfg,
+      apiKey: cfg.apiKey ? "***set***" : undefined,
+      saasAdminToken: cfg.saasAdminToken ? "***set***" : undefined,
+    };
     process.stdout.write(JSON.stringify({ path: configPath(), ...redacted }, null, 2) + "\n");
     return 0;
   }
-  const allowed = ["gateway", "model", "provider", "apiKey", "profile"];
+  const allowed = ["gateway", "model", "provider", "apiKey", "saasAdminToken", "profile"];
   if (!allowed.includes(key)) {
     process.stderr.write(`config: unknown key '${key}' (allowed: ${allowed.join(", ")})\n`);
     return 2;
@@ -95,6 +102,8 @@ export async function main(argv: string[]): Promise<number> {
       return runChat(rest);
     case "agent":
       return runAgent(rest);
+    case "saas":
+      return runSaas(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":

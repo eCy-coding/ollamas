@@ -18,7 +18,7 @@ export async function runDoctor(argv: string[]): Promise<number> {
   }
 
   const cfg = loadConfig();
-  const client = new GatewayClient(cfg.gateway, cfg.apiKey);
+  const client = new GatewayClient(cfg.gateway, cfg.apiKey, cfg.saasAdminToken);
   const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
   const ctx = resolveOutputCtx(process.env, !!process.stdout.isTTY, !!values.json);
 

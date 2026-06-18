@@ -43,6 +43,20 @@
 - **Gözlem**: canlı `agent --json` 401 olmadan çalıştı (thought→message→done), oysa v1'de `/api/generate` 401 vermişti.
 - **Not**: gateway auth durumu endpoint/oturuma göre değişebilir; CLI her iki halde de doğru (401→ipucu, açık→akış). Live E2E öncesi `doctor` ile durumu gör.
 
+---
+
+## v3 — SaaS/admin + sweep (2026-06-19)
+
+### E-004 · `formatTable` non-string hücre → `.padEnd is not a function` (E-002 tekrarı!)
+- **Semptom**: canlı `saas plans` → `saas error: (cell ?? "").padEnd is not a function`.
+- **Kök neden**: `formatTable` tüm hücreleri string varsaydı; `plans[].allowed_tiers` **array** (`["safe"]`) döndü. `(cell ?? "").padEnd` array üzerinde patlar. **E-002 ile aynı sınıf hata** (bilinmeyen payload'ı ham kullanma) — ÖNLEME KURALI'na rağmen formatTable'da tekrarlandı.
+- **Fix**: `formatTable` her hücreyi `String()`-coerce eder (savunmacı; çağıranlara güvenme). Tek noktadan tüm tablolar korunur.
+- **ÖNLEME KURALI (güçlendirildi)**: generic render util'leri **girdiyi coerce etmeli**, çağırana güvenmemeli. Yeni bir formatter yazınca ilk satır = `String(v)` coercion. E-002 yalnız çağıran tarafı düzeltti; util tarafı da zorla.
+
+### N-005 (ortam notu) · gateway SAAS_ENFORCE durumu reused-instance'a göre değişir
+- **Gözlem**: v2'de fresh-boot gateway enforce kapalı (agent 200); v3'te reused gateway enforce **açık** (ready/agent/saas 401). CLI her iki halde doğru (401→ipucu, açık→akış).
+- **ÖNLEME/NOT**: SaaS başarı yolunu kanıtlamak için **kendi izole gateway'ini farklı portta boot et** (`PORT=3009 SAAS_ADMIN_TOKEN=… SAAS_ENFORCE=1 SAAS_DB_PATH=/tmp/…`), `OLLAMAS_GATEWAY`+`OLLAMAS_SAAS_ADMIN` ile sür. Başkasının :3000 gateway'ine **dokunma** (eşzamanlı worker olabilir).
+
 ### N-004 (mimari sınır) · agent resume tam tool-history taşımıyor
 - **Gözlem**: write-onay sonrası resume, yalnız assistant history + "approved, continue" turu gönderir; tam tool-result history server session'da.
 - **Not**: server loop'u `messages` param'ından çalışır, session'ı yalnız sonda yazar → istemci-tarafı tam-history resume mümkün değil. Pragmatik resume yeterli; cap 12 round. v3+ session-load-into-loop server desteği gerekirse genişlet.
