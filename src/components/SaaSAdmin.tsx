@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Building2, KeyRound, Gauge, Receipt, Network, Plus, Trash2, RefreshCw, Copy } from "lucide-react";
+import { Building2, KeyRound, Gauge, Receipt, Network, Plus, Trash2, RefreshCw, Copy, ShieldAlert } from "lucide-react";
 
 interface Props {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -21,6 +21,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const [usage, setUsage] = useState<any>(null);
   const [gateway, setGateway] = useState<any>(null);
   const [billing, setBilling] = useState<any>(null);
+  const [audit, setAudit] = useState<any[]>([]);
   const [newName, setNewName] = useState("");
   const [newPlan, setNewPlan] = useState("free");
   const [freshKey, setFreshKey] = useState<string>("");
@@ -41,13 +42,16 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
       setPlans(await api("/api/saas/plans"));
       setTenants(await api("/api/saas/tenants"));
       setGateway(await (await fetch("/api/mcp/upstreams")).json());
+      setAudit(await api("/api/saas/audit?limit=10"));
     } catch (e: any) {
       onNotify(`SaaS admin: ${e.message}`, "error");
     }
   };
 
   useEffect(() => { if (adminToken !== "") localStorage.setItem("saasAdminToken", adminToken); }, [adminToken]);
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, []);
+  // Only auto-load when a token is already present (avoids a spurious 401 toast on
+  // first mount before the operator types the admin token, Faz 9F).
+  useEffect(() => { if (adminToken) refresh(); /* eslint-disable-next-line */ }, []);
 
   const loadTenant = async (t: Tenant) => {
     setSelected(t); setFreshKey(""); setUsage(null);
@@ -171,6 +175,23 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
             </ul>
           </div>
         )}
+      </div>
+
+      {/* Audit log (host/privileged/upstream tool calls) */}
+      <div className={card}>
+        <div className="flex items-center gap-2 text-sm text-slate-200 mb-2"><ShieldAlert className="w-4 h-4 text-rose-400" /> Security Audit (recent)</div>
+        {audit.length === 0 && <div className="text-xs text-slate-500">No host/privileged tool calls recorded yet.</div>}
+        <ul className="space-y-0.5 max-h-56 overflow-auto">
+          {audit.map((a) => (
+            <li key={a.id} className="text-xs font-mono text-slate-400 flex items-center gap-2">
+              <span className={a.ok ? "text-emerald-400" : "text-rose-400"}>{a.ok ? "✓" : "✗"}</span>
+              <span className="text-slate-300">{a.tool}</span>
+              <span className="text-amber-300">[{a.tier}]</span>
+              <span className="text-slate-500">{a.tenant_id}</span>
+              <span className="text-slate-600 ml-auto">{a.ts?.slice(11, 19)}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

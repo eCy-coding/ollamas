@@ -109,16 +109,18 @@ sandbox YOK). Dış tenant'a açmak ciddi sınır.
 - ✅ `Faz 4` metering+billing (`server/billing/`)
 - ✅ `Faz 5` E2E sertleştirme — flag triage + hermetik test suite (`tests/`) + SaaS admin UI (`src/components/SaaSAdmin.tsx`) + portability/docs
 - ✅ `Faz 6` Araştırma-temelli spec-uyum + güvenlik — RFC 9728 metadata + WWW-Authenticate + Origin guard + tool annotations; consume untrusted `host_upstream` tier + allowlist + output sanitization + manifest hash; audit_events + `/api/saas/audit`; token metering (`tool=__llm__`)
+- ✅ `Faz 9` v1.0 Production GA (fallback-first) — 9A GCM authTagLength + path guard + non-root Docker + helmet; 9B API-key lifecycle (expiry/scopes) + OAuth JWT dual-path + scope enforcement; 9C Redis rate-limit fallback + Stripe Meter/Price/Customer/portal/checkout + webhook dedup; 9D prom-client `/metrics` + pino + `/api/ready`; 9E per-tenant `upstream_servers` CRUD; 9F GitHub Actions CI + SaaS UI audit viewer
 
 Sonraki işler aynı sözleşmeyle: yeşil kapı (§3) + logbook (§6) + conventional commit.
 Detay: `~/.claude/plans/ollamas-projesini-a-ve-atomic-wand.md`.
 
 ### Backlog (araştırma-onaylı, henüz YAPILMADI)
-Bilinçli ertelendi (ayrı altyapı ister; localhost tek-instance'ta şu an gereksiz):
-- Tam **OAuth 2.1** authorization-server + token issuance + RFC 8707 audience validation (şu an opaque API key; RFC 9728 discovery advertise ediliyor).
-- **Redis**-backed dağıtık rate-limit (şu an in-memory tek-instance; yatay ölçekte tenant replica-spray bypass riski).
+Faz 9 sonrası kalanlar (ayrı altyapı ister):
+- Tam **OAuth 2.1 authorization-server** (token issuance/refresh). *JWT validation + RFC 8707 audience Faz 9B'de yapıldı; eksik olan kendi AS'imizi çalıştırmak.*
 - Host-bridge token **HMAC + TTL + TLS/unix-socket** (şu an plaintext `X-Bridge-Token`, localhost).
 - **Per-call gerçek-zamanlı** Stripe meter (şu an nightly batch, idempotent).
+- **K8s manifest** + Redis HA + tam **OpenAPI** spec + MCP `resources`/`prompts` primitive.
+- Per-tenant upstream tool **visibility izolasyonu** (şu an host_upstream tier + plan ile gate; registry global).
 
 **Güvenlik sözleşmesi (§5 ek):** `/mcp` üzerinden write_file auto-apply eder
 (`MCP_AUTO_APPLY=0` ile diff/halt). Privileged tier (`macos_terminal`/`write_host_file`)
