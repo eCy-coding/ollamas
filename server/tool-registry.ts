@@ -10,8 +10,13 @@
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 
-/** Security tier — gates which tenant plans may call a tool (AGENTS.md §5). */
-export type ToolTier = "safe" | "host" | "privileged";
+/**
+ * Security tier — gates which tenant plans may call a tool (AGENTS.md §5).
+ * `host_upstream` = tools merged from an UNTRUSTED upstream MCP server (consume
+ * side); excluded from default MCP expose so they never reach a tenant unless a
+ * plan/admin explicitly allows that tier.
+ */
+export type ToolTier = "safe" | "host" | "privileged" | "host_upstream";
 
 /** Host-side helpers the tool thunks need, owned by server.ts and injected. */
 export interface ToolDeps {

@@ -93,6 +93,12 @@ export function initStore(): DatabaseSync {
       status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_invoices_tenant_period ON invoices(tenant_id, period);
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL, tool TEXT NOT NULL, tier TEXT NOT NULL,
+      ok INTEGER NOT NULL, ts TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events(tenant_id, ts);
   `);
   migrate();
   seedPlans();
@@ -223,6 +229,22 @@ export function aggregateUsage(month = monthKey()): UsageAgg[] {
      FROM usage_events WHERE month = ? GROUP BY tenant_id`
   ).all(month) as any[];
   return rows.map((r) => ({ tenantId: r.tenantId, calls: r.calls, okCalls: r.okCalls || 0, tokens: r.tokens || 0, latencyMs: r.latencyMs || 0 }));
+}
+
+export interface AuditEvent { tenantId: string; tool: string; tier: ToolTier; ok: boolean; }
+
+/** Security audit: record a host/privileged/upstream tool invocation (AGENTS.md 6C). */
+export function recordAudit(e: AuditEvent): void {
+  d().prepare("INSERT INTO audit_events (tenant_id, tool, tier, ok, ts) VALUES (?,?,?,?,?)")
+    .run(e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, nowIso());
+}
+
+/** Recent audit events, newest first; optionally scoped to a tenant. */
+export function listAudit(tenantId?: string, limit = 100): any[] {
+  const lim = Math.min(Math.max(1, limit), 1000);
+  return tenantId
+    ? d().prepare("SELECT * FROM audit_events WHERE tenant_id = ? ORDER BY id DESC LIMIT ?").all(tenantId, lim) as any[]
+    : d().prepare("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?").all(lim) as any[];
 }
 
 /** True if an invoice already exists for (tenant, period) — billing idempotency. */

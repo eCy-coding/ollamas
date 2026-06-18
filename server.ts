@@ -12,8 +12,9 @@ import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
+import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
 import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
@@ -551,6 +552,12 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           stream: false,
         });
 
+        // Meter LLM output tokens (Faz 6D) — a billing dimension distinct from
+        // per-tool-call usage, under the single-user "local" tenant.
+        if (result.tokens && result.tokens > 0) {
+          recordUsage({ tenantId: "local", tool: "__llm__", tier: "safe", ok: true, latencyMs: result.latencyMs || 0, tokens: result.tokens });
+        }
+
         // Collect LLM reply text
         if (result.text && result.text.trim()) {
           sendEvent("message", { text: result.text, step: stepNum });
@@ -576,7 +583,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
             const r = await ToolRegistry.execute(toolName, args, {
               isLive, workspaceRoot, autoApply, deps: TOOL_DEPS,
               tenantId: "local",
-              onUsage: (e) => recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs }),
+              onUsage: (e) => {
+                recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+                if (e.tier !== "safe") recordAudit({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok });
+              },
             });
             output = r.output;
             ok = r.ok;
@@ -1195,14 +1205,37 @@ content
       allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
       tenantId: t?.tenantId,
       onUsage: t
-        ? (e) => recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs })
+        ? (e) => {
+            recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+            if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
+          }
         : undefined,
     };
   };
 
+  // RFC 9728 Protected Resource Metadata (public). MCP clients fetch this after a
+  // 401's WWW-Authenticate to discover how to authenticate (AGENTS.md Faz 6A).
+  app.get(PROTECTED_RESOURCE_PATH, (req, res) => {
+    res.json(buildResourceMetadata(`${req.protocol}://${req.get("host") || "localhost"}`));
+  });
+
+  // Origin allowlist for /mcp — DNS-rebinding protection (MCP Transports spec).
+  // Default localhost only; override with ALLOWED_ORIGINS (CSV). A request with no
+  // Origin (server-to-server MCP clients) is allowed.
+  const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  const originAllowed = (origin?: string) => {
+    if (!origin) return true; // non-browser MCP clients send no Origin
+    if (ALLOWED_ORIGINS.length) return ALLOWED_ORIGINS.includes(origin);
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  };
+
   // SAAS_ENFORCE=1 → a valid API key is required on /mcp. Default off keeps the
-  // current single-user localhost behavior. auth → rate-limit → handler.
-  app.all("/mcp", authMiddleware(process.env.SAAS_ENFORCE === "1"), rateLimitMiddleware(), async (req, res) => {
+  // current single-user localhost behavior. origin → auth → rate-limit → handler.
+  app.all("/mcp", (req, res, next) => {
+    if (!originAllowed(req.headers.origin)) return res.status(403).json({ error: "Origin not allowed (DNS-rebinding protection)" });
+    next();
+  }, authMiddleware(process.env.SAAS_ENFORCE === "1"), rateLimitMiddleware(), async (req, res) => {
     try {
       await handleMcpRequest(req, res, mcpCtxFactory);
     } catch (err: any) {
@@ -1262,6 +1295,11 @@ content
   app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
     revokeApiKey(req.params.id);
     res.json({ revoked: req.params.id });
+  });
+  app.get("/api/saas/audit", adminGuard, (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    res.json(listAudit(tenantId, limit));
   });
 
   // A tenant's own current-month usage summary (authenticated).

@@ -5,6 +5,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { resolveKey, type ResolvedKey } from "../store";
+import { resourceMetadataUrl } from "../mcp/oauth-metadata";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -30,13 +31,21 @@ function extractKey(req: Request): string | undefined {
  */
 export function authMiddleware(required = false) {
   return (req: Request, res: Response, next: NextFunction) => {
+    // RFC 9728: point unauthenticated clients at the resource-metadata document
+    // so standard MCP clients can discover how to authenticate.
+    const unauthorized = (msg: string) => {
+      const host = (typeof req.get === "function" ? req.get("host") : (req.headers?.host as string)) || "localhost";
+      const base = `${req.protocol || "http"}://${host}`;
+      res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl(base)}"`);
+      return res.status(401).json({ error: msg });
+    };
     const key = extractKey(req);
     if (key) {
       const resolved = resolveKey(key);
-      if (!resolved) return res.status(401).json({ error: "Invalid or revoked API key" });
+      if (!resolved) return unauthorized("Invalid or revoked API key");
       req.tenant = resolved;
     } else if (required) {
-      return res.status(401).json({ error: "Missing API key" });
+      return unauthorized("Missing API key");
     }
     next();
   };

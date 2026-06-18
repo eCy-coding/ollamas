@@ -86,6 +86,53 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const res = await fetch(`${BASE}/api/saas/plans`, { headers: { "x-admin-token": "wrong" } });
     expect(res.status).toBe(401);
   });
+
+  // --- Faz 6A: MCP spec-compliance ---
+  test("RFC 9728 protected-resource metadata is served", async () => {
+    const j = await (await fetch(`${BASE}/.well-known/oauth-protected-resource`)).json() as any;
+    expect(String(j.resource)).toMatch(/\/mcp$/);
+    expect(j.bearer_methods_supported).toContain("header");
+  });
+
+  test("401 carries WWW-Authenticate pointing at resource metadata", async () => {
+    const res = await fetch(`${BASE}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate") || "").toContain("resource_metadata=");
+  });
+
+  test("bad Origin is rejected (DNS-rebinding protection)", async () => {
+    const res = await fetch(`${BASE}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://evil.example.com" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test("tool annotations reflect security tier (destructiveHint)", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "ent", plan: "enterprise" }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const c = new Client({ name: "t", version: "0" }, { capabilities: {} });
+    const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
+    await c.connect(tr);
+    const { tools } = await c.listTools();
+    await c.close();
+    const term = tools.find((x) => x.name === "macos_terminal");
+    const read = tools.find((x) => x.name === "read_file");
+    expect((term as any)?.annotations?.destructiveHint).toBe(true);
+    expect((read as any)?.annotations?.readOnlyHint).toBe(true);
+  });
 });
 
 describe("MCP gateway CONSUME (stdio upstream)", () => {

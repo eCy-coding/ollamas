@@ -25,11 +25,26 @@ function buildServer(ctx: ToolCtx): Server {
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: ToolRegistry.list(allowed).map((t) => ({
-      name: t.name,
-      description: t.schema.function.description,
-      inputSchema: t.schema.function.parameters,
-    })),
+    tools: ToolRegistry.list(allowed).map((t) => {
+      // Human title + behavioral hints (MCP Tools spec). Hints derive from the
+      // security tier: only `safe` tools are non-destructive; everything else
+      // (host/privileged/upstream) can mutate the host or run untrusted code.
+      const title = t.name.startsWith("mcp__")
+        ? t.name.replace(/^mcp__/, "").replace(/__/g, ": ")
+        : t.name.replace(/_/g, " ");
+      return {
+        name: t.name,
+        title,
+        description: t.schema.function.description,
+        inputSchema: t.schema.function.parameters,
+        annotations: {
+          title,
+          readOnlyHint: t.tier === "safe",
+          destructiveHint: t.tier !== "safe",
+          openWorldHint: t.tier === "host_upstream",
+        },
+      };
+    }),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {

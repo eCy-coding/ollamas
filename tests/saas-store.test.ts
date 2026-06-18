@@ -92,6 +92,27 @@ describe("store: usage + billing idempotency", () => {
     expect(run.dryRun).toBe(true);
     expect(run.total).toBeGreaterThanOrEqual(0);
   });
+
+  test("token dimension (tool=__llm__) aggregates tokens (Faz 6D)", () => {
+    const t = store.createTenant("tok", "pro");
+    store.recordUsage({ tenantId: t.id, tool: "__llm__", tier: "safe", ok: true, latencyMs: 100, tokens: 250 });
+    store.recordUsage({ tenantId: t.id, tool: "__llm__", tier: "safe", ok: true, latencyMs: 90, tokens: 150 });
+    const agg = store.aggregateUsage().find((a) => a.tenantId === t.id);
+    expect(agg?.tokens).toBe(400);
+  });
+});
+
+describe("audit log (Faz 6C)", () => {
+  test("recordAudit + listAudit (newest-first, tenant-scoped)", () => {
+    const t = store.createTenant("audco", "enterprise");
+    store.recordAudit({ tenantId: t.id, tool: "macos_terminal", tier: "privileged", ok: true });
+    store.recordAudit({ tenantId: t.id, tool: "git_commit", tier: "host", ok: false });
+    const rows = store.listAudit(t.id);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].tool).toBe("git_commit"); // newest first
+    expect(rows[0].ok).toBe(0);
+    expect(rows[1].tier).toBe("privileged");
+  });
 });
 
 describe("auth middleware", () => {
