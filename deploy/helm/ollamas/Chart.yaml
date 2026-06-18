@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ollamas
+description: ollamas — MCP gateway + tools-as-SaaS
+type: application
+version: 0.1.0
+appVersion: "1.2.0"

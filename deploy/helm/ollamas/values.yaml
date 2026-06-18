@@ -1,0 +1,39 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/ecy-coding/ollamas
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 3000
+
+# Plain config (non-secret). MCP_EXPOSE_TIERS=safe because host tools don't run in K8s.
+config:
+  NODE_ENV: production
+  PORT: "3000"
+  SAAS_ENFORCE: "1"
+  MCP_EXPOSE_TIERS: safe
+  LOG_LEVEL: info
+
+# Secrets — override or source from an external secret manager.
+secrets:
+  SAAS_ADMIN_TOKEN: change-me
+  STRIPE_API_KEY: ""
+  STRIPE_WEBHOOK_SECRET: ""
+  REDIS_URL: ""
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "2", memory: 2Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
