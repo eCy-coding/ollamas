@@ -13,9 +13,10 @@ import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
 import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage } from "./server/store";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant } from "./server/store";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
+import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -86,6 +87,10 @@ async function writeHostFile(filePath: string, content: string) {
 const TOOL_DEPS: ToolDeps = {
   FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
 };
+
+// Stripe webhook needs the RAW body for signature verification — register the
+// raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
+app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -1222,6 +1227,28 @@ content
   app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
     revokeApiKey(req.params.id);
     res.json({ revoked: req.params.id });
+  });
+
+  // A tenant's own current-month usage summary (authenticated).
+  app.get("/api/saas/usage", authMiddleware(true), (req, res) => {
+    const t = req.tenant!;
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, monthlyQuota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId) });
+  });
+
+  // --- Billing (AGENTS.md Faz 4). Dry-run unless STRIPE_API_KEY is set. ---
+  app.get("/api/billing/preview", adminGuard, (req, res) => {
+    res.json(computeRun(typeof req.query.period === "string" ? req.query.period : undefined));
+  });
+  app.post("/api/billing/run", adminGuard, async (req, res) => {
+    try {
+      res.json(await runBilling(typeof req.body?.period === "string" ? req.body.period : undefined));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/billing/webhook", async (req, res) => {
+    try {
+      const out = await handleWebhook(req.body as Buffer, String(req.headers["stripe-signature"] || ""));
+      res.json(out);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
   app.post("/api/cluster/execute", async (req, res) => {

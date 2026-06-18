@@ -158,4 +158,38 @@ export function monthToDateUsage(tenantId: string): number {
   return (d().prepare("SELECT COUNT(*) AS n FROM usage_events WHERE tenant_id = ? AND month = ?").get(tenantId, monthKey()) as any).n;
 }
 
+export function getTenant(id: string): Tenant | null {
+  return (d().prepare("SELECT * FROM tenants WHERE id = ?").get(id) as any) || null;
+}
+
+export function setTenantPlan(id: string, planId: string): void {
+  if (!getPlan(planId)) throw new Error(`Unknown plan: ${planId}`);
+  d().prepare("UPDATE tenants SET plan_id = ? WHERE id = ?").run(planId, id);
+}
+
+export interface UsageAgg {
+  tenantId: string;
+  calls: number;
+  okCalls: number;
+  tokens: number;
+  latencyMs: number;
+}
+
+/** Per-tenant usage rollup for a billing period (default = current month). */
+export function aggregateUsage(month = monthKey()): UsageAgg[] {
+  const rows = d().prepare(
+    `SELECT tenant_id AS tenantId, COUNT(*) AS calls,
+            SUM(ok) AS okCalls, SUM(tokens) AS tokens, SUM(latency_ms) AS latencyMs
+     FROM usage_events WHERE month = ? GROUP BY tenant_id`
+  ).all(month) as any[];
+  return rows.map((r) => ({ tenantId: r.tenantId, calls: r.calls, okCalls: r.okCalls || 0, tokens: r.tokens || 0, latencyMs: r.latencyMs || 0 }));
+}
+
+export function recordInvoice(tenantId: string, period: string, amount: number): { id: string } {
+  const id = `inv_${crypto.randomBytes(8).toString("hex")}`;
+  d().prepare("INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) VALUES (?,?,?,?,?,?)")
+    .run(id, tenantId, period, amount, "open", nowIso());
+  return { id };
+}
+
 export { monthKey };
