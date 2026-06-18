@@ -1,14 +1,17 @@
 import { expect, test } from 'vitest';
 
 /**
- * E2E test for Cluster Mesh.
- * Focuses on M4 Pro Max configuration sanity and Orchestrator interaction.
+ * LIVE E2E for Cluster Mesh — requires an already-running server.
+ * Opt-in via RUN_LIVE_E2E=1 (with the server up on TEST_BASE_URL or :3000),
+ * so the default `vitest run` stays hermetic. The hermetic gateway E2E lives in
+ * mcp-gateway.e2e.test.ts (self-boots its own server).
  */
 
 // Live server base. Node fetch needs an absolute URL; override via TEST_BASE_URL.
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:3000';
+const live = process.env.RUN_LIVE_E2E === '1';
 
-test('Cluster Mesh orchestrator integration (mocked)', async () => {
+test.skipIf(!live)('Cluster Mesh orchestrator integration (live)', async () => {
     // 1. Consent flow
     const consentRes = await fetch(`${BASE}/api/cluster/consent`, {
         method: 'POST',

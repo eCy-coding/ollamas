@@ -23,12 +23,44 @@ export interface ToolCall {
   arguments: any;
 }
 
+// Some local models (e.g. qwen3) emit tool calls as TEXT instead of the
+// structured tool_calls field — `<function=NAME>{json}</function>`,
+// `<tool_call>{"name":..,"arguments":..}</tool_call>`, or a fenced/bare JSON
+// object. This recovers them so the ReAct loop doesn't stall/loop. Returns
+// undefined if nothing parseable is found.
+export function extractTextToolCalls(text: string): ToolCall[] | undefined {
+  if (!text) return undefined;
+  const calls: ToolCall[] = [];
+  const mk = (name: string, args: any) => calls.push({ id: `tc-${crypto.randomUUID().slice(0, 8)}`, name, arguments: args || {} });
+  const safeParse = (s: string) => { try { return JSON.parse(s); } catch { return undefined; } };
+
+  // 1) <function=NAME ...>{args}</function>  or  <function=NAME></function>
+  for (const m of text.matchAll(/<function=([a-z_][\w-]*)\s*>([\s\S]*?)<\/function>/gi)) {
+    const body = m[2].trim();
+    mk(m[1], body ? (safeParse(body) ?? {}) : {});
+  }
+  // 2) <tool_call>{"name":..,"arguments":..}</tool_call>
+  for (const m of text.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi)) {
+    const o = safeParse(m[1].trim());
+    if (o && o.name) mk(o.name, o.arguments ?? o.parameters ?? {});
+  }
+  // 3) fenced ```json {"name":..,"arguments":..} ``` (only if it looks like a tool call)
+  if (calls.length === 0) {
+    for (const m of text.matchAll(/```(?:json|tool_code)?\s*([\s\S]*?)```/gi)) {
+      const o = safeParse(m[1].trim());
+      if (o && o.name && (o.arguments !== undefined || o.parameters !== undefined)) mk(o.name, o.arguments ?? o.parameters ?? {});
+    }
+  }
+  return calls.length ? calls : undefined;
+}
+
 export interface GenerateResult {
   text: string;
   source: string; // e.g. "ollama_local", "cloud:gemini", "cloud:openrouter", "demo"
   modelUsed: string;
   latencyMs: number;
   tokensPerSec?: number;
+  tokens?: number; // output tokens (eval_count) when the provider reports them
   toolCalls?: ToolCall[];
 }
 
@@ -151,7 +183,7 @@ export class ProviderRouter {
   private static async executeProvider(
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void
-  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; toolCalls?: ToolCall[] }> {
+  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; toolCalls?: ToolCall[] }> {
     const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
     const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
 
@@ -244,8 +276,10 @@ export class ProviderRouter {
               arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
             }));
           }
+          // Fallback: some models emit tool calls as text — recover them.
+          if (!toolCalls || toolCalls.length === 0) toolCalls = extractTextToolCalls(reply) ?? toolCalls;
 
-          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec, toolCalls };
+          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
         }
       }
 
@@ -326,7 +360,9 @@ export class ProviderRouter {
             }));
           }
 
-          return { text: reply, source: "cloud:ollama-cloud", modelUsed: config.model, tokensPerSec, toolCalls };
+          if (!toolCalls || toolCalls.length === 0) toolCalls = extractTextToolCalls(reply) ?? toolCalls;
+
+          return { text: reply, source: "cloud:ollama-cloud", modelUsed: config.model, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
         }
       }
 

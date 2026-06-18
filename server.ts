@@ -10,6 +10,14 @@ import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
+import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
+import { handleMcpRequest } from "./server/mcp/server";
+import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
+import { connectAllUpstreams, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { initStore, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, getTenant, listTenants, listKeys, recordAudit, listAudit } from "./server/store";
+import { authMiddleware } from "./server/middleware/auth";
+import { rateLimitMiddleware } from "./server/middleware/rate-limit";
+import { runBilling, computeRun, handleWebhook } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -44,7 +52,10 @@ async function runOnHostTerminal(target: string | undefined, command: string, ti
 }
 
 // Run a command directly on the host via the bridge /exec (no terminal mutex).
-const HOST_TOOLS_DIR = "/Users/emrecnyngmail.com/Desktop/ollamas/bin/host-bridge/tools";
+// Bridge tools execute on the HOST filesystem, so this must be the host path.
+// In dev (tsx on host) process.cwd() is the repo; in Docker, set HOST_TOOLS_DIR
+// to the host repo's bin/host-bridge/tools (the container path would be wrong).
+const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cwd(), "bin/host-bridge/tools");
 // Single-quote-escape an argument for safe interpolation into a shell command.
 function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 async function execOnHost(command: string, timeoutMs = 95000) {
@@ -75,6 +86,15 @@ async function writeHostFile(filePath: string, content: string) {
   }
   return res.json();
 }
+
+// Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
+const TOOL_DEPS: ToolDeps = {
+  FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
+};
+
+// Stripe webhook needs the RAW body for signature verification — register the
+// raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
+app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -121,6 +141,25 @@ let CURRENT_MODE: "live" | "degraded-live" | "demo" = "demo";
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
+
+  // SaaS store (tenants/keys/plans/usage). Zero-dep node:sqlite (Faz 2).
+  initStore();
+
+  // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
+  // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
+  // into ToolRegistry as `mcp__<server>__<tool>`. Best-effort — a dead upstream
+  // never blocks boot.
+  try {
+    const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
+    const upstreams: UpstreamConfig[] = reg.mcpServers || [];
+    if (upstreams.length) {
+      for (const r of await connectAllUpstreams(upstreams)) {
+        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
+  }
   
   // Set default workspace path if empty dynamically
   if (!db.data.workspacePath) {
@@ -466,224 +505,8 @@ async function initializeServer() {
     const isLive = CURRENT_MODE !== "demo";
     const workspaceRoot = db.data.workspacePath;
 
-    // Define tool schemas (OpenAI format; routed dynamically inside ProviderRouter)
-    const AGENT_TOOLS = [
-      {
-        type: "function",
-        function: {
-          name: "list_tree",
-          description: "List the entire workspace files directory structure recursively.",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "read_file",
-          description: "Read full contents of a file at the specified workspace path.",
-          parameters: {
-            type: "object",
-            properties: {
-              path: { type: "string", description: "The workspace-relative path of the target file to load." }
-            },
-            required: ["path"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "write_file",
-          description: "Propose or write updated full content to a file at the specified workspace relative path. If autoApply is false, this returns a unified diff for user approval before saving.",
-          parameters: {
-            type: "object",
-            properties: {
-              path: { type: "string", description: "The workspace-relative path of the file." },
-              content: { type: "string", description: "The full file content to write." }
-            },
-            required: ["path", "content"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "run_command",
-          description: "Execute a command against the safe shell terminal environment (e.g. pytest, git, ls, date). Restricted system operations are blocked.",
-          parameters: {
-            type: "object",
-            properties: {
-              command: { type: "string", description: "The shell terminal command line parameters to execute." }
-            },
-            required: ["command"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "grep_search",
-          description: "Search for clean text matches inside files inside the project recursively.",
-          parameters: {
-            type: "object",
-            properties: {
-              query: { type: "string", description: "The pattern query string to scan." }
-            },
-            required: ["query"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "macos_terminal",
-          description: "Run a shell command in a REAL, visible macOS terminal window (iTerm2 or Terminal.app) on the host, in real time, and return its output and exit code. Use for live coding sessions the user can watch. Unlike run_command this has no sandbox/allowlist — full host privileges.",
-          parameters: {
-            type: "object",
-            properties: {
-              command: { type: "string", description: "The shell command to type and run in the visible terminal." },
-              target: { type: "string", enum: ["iterm2", "terminal"], description: "Which terminal app to drive. Defaults to iterm2." }
-            },
-            required: ["command"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "write_host_file",
-          description: "Write a file directly to the macOS HOST filesystem at an absolute path (creates parent dirs). Use this — not write_file — to author host scripts/tools (e.g. under bin/host-bridge/tools). Reliable for multi-line content; no shell/heredoc needed.",
-          parameters: {
-            type: "object",
-            properties: {
-              path: { type: "string", description: "Absolute host path, e.g. /Users/.../bin/host-bridge/tools/x.mjs" },
-              content: { type: "string", description: "Full file content." }
-            },
-            required: ["path", "content"]
-          }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "run_tests",
-          description: "Run the project's test suite (vitest unit tests in the container) and return pass/fail summary.",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "git_ops",
-          description: "Read-only git inspection. sub: status (default) | diff | branch | log.",
-          parameters: { type: "object", properties: { sub: { type: "string", enum: ["status", "diff", "branch", "log"] } }, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "process_port",
-          description: "List the process(es) listening on a TCP port on the host.",
-          parameters: { type: "object", properties: { port: { type: "number", description: "TCP port number, e.g. 3000." } }, required: ["port"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "health_probe",
-          description: "Aggregate health of the whole stack (bridge, app, ollama, terminals) plus a live terminal log snapshot.",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "lint_format",
-          description: "Typecheck the project (tsc --noEmit) and return whether it is clean plus any type errors.",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "git_commit",
-          description: "Stage all changes and commit with the given message. Set push=true to also push.",
-          parameters: { type: "object", properties: { message: { type: "string", description: "Commit message." }, push: { type: "boolean", description: "Also push after committing." } }, required: ["message"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "build_app",
-          description: "Rebuild and recreate the app container (docker compose build + up -d) and report whether it came back healthy.",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "kill_process",
-          description: "Kill a host process by PID, or all listeners on a port (':<port>'). Optional signal.",
-          parameters: { type: "object", properties: { target: { type: "string", description: "A PID (e.g. '4123') or a port as ':<port>'." }, signal: { type: "string", enum: ["TERM", "KILL", "INT", "HUP"] } }, required: ["target"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "log_stream",
-          description: "Show the last N lines of the app container logs (default 40).",
-          parameters: { type: "object", properties: { lines: { type: "number", description: "How many log lines to show." } }, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "pkg_install",
-          description: "Install a package via npm (in the container), pip, or brew. Requires manager + package.",
-          parameters: { type: "object", properties: { manager: { type: "string", enum: ["npm", "pip", "brew"] }, package: { type: "string" } }, required: ["manager", "package"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "web_search",
-          description: "Web research. Pass query for DuckDuckGo results, OR url to fetch+extract a page's text.",
-          parameters: { type: "object", properties: { query: { type: "string" }, url: { type: "string", description: "If set, fetch this page's readable text instead of searching." } }, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "apply_patch",
-          description: "Apply a unified-diff patch to the repository (git apply, checked first). Pass the full diff text.",
-          parameters: { type: "object", properties: { diff: { type: "string", description: "Unified diff text." } }, required: ["diff"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "tools_doctor",
-          description: "Self-test the whole bridge toolkit and return a health matrix (which tools pass/fail).",
-          parameters: { type: "object", properties: {}, required: [] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "shell_check",
-          description: "Lint a shell command/script for bugs and macOS/BSD portability issues (shellcheck + heuristics) BEFORE running it. Run this on any non-trivial command, fix what it reports, then use macos_terminal.",
-          parameters: { type: "object", properties: { command: { type: "string", description: "The shell command/script to lint." } }, required: ["command"] }
-        }
-      },
-      {
-        type: "function",
-        function: {
-          name: "logbook",
-          description: "Ship's log (seyir defteri). action 'add' with text records a note; action 'tail' returns recent entries (agent steps are auto-logged).",
-          parameters: { type: "object", properties: { action: { type: "string", enum: ["add", "tail"] }, text: { type: "string" }, n: { type: "number" } }, required: ["action"] }
-        }
-      }
-    ];
+    // Tool schemas come from the single registry (AGENTS.md §4 choke-point).
+    const AGENT_TOOLS = ToolRegistry.schemas();
 
     const customSystemPrompt = `You are a highly capable workspace Agent operating in ReAct (Reasoning and Action) mode. You have direct access to local developer workspace tools: list_tree, read_file, write_file, run_command, grep_search, macos_terminal (runs commands live in a real iTerm2/Terminal.app window on the host), write_host_file (writes a file directly to an absolute HOST path — use this to author host scripts/tools, then macos_terminal to run them), and the bridge tools run_tests / git_ops / process_port / health_probe / lint_format / git_commit / build_app / kill_process / log_stream / pkg_install / web_search / apply_patch / tools_doctor / shell_check / logbook (run the project's own self-built host tools).
 Your mission is to help the user inspect, edit, coordinate, and test code dynamically in their workspace.
@@ -699,7 +522,14 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
 - BSD ≠ GNU: base64 decode is \`-D\` (not \`-d\`); \`sed -i ''\` needs the empty backup arg; no \`timeout\` (rely on the bridge watchdog); \`grep\` has no \`-P\`; \`xargs\` has no \`-r\`; date math is \`date -v\`.
 - Always double-quote expansions ("$var"). Use \`set -euo pipefail\` for multi-step scripts. Feed \`< /dev/null\` to commands that might read stdin (e.g. docker compose exec -T).
 - This runtime is Node 24: global \`fetch\` exists — never import node-fetch/undici and never use Deno APIs. .mjs uses import, not require.
-- To author host files use write_host_file (not heredocs).`;
+- To author host files use write_host_file (not heredocs).
+
+OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
+- North star: ollamas is becoming an MCP gateway + tools-as-SaaS broker. Favor work that moves toward that.
+- Single choke-point: every tool runs through one registry. Never invent a second dispatch path; add tools as registry entries.
+- Security tiers: tools are \`safe\` | \`host\` | \`privileged\`. \`macos_terminal\`/\`write_host_file\` are full-host (no sandbox) — treat as privileged, prefer \`safe\` tools, and only escalate when the task truly needs it.
+- Quality gate before any commit: typecheck (lint_format) ✓ + shell_check ✓ + run_tests fresh ✓ → only then git_commit (conventional).
+- Evidence over assertion: never claim something works without running it and showing output. Record notable steps via logbook.`;
 
     let activeHistory = [...messages];
     if (!activeHistory.some(m => m.role === "system")) {
@@ -722,6 +552,12 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
           stream: false,
         });
 
+        // Meter LLM output tokens (Faz 6D) — a billing dimension distinct from
+        // per-tool-call usage, under the single-user "local" tenant.
+        if (result.tokens && result.tokens > 0) {
+          recordUsage({ tenantId: "local", tool: "__llm__", tier: "safe", ok: true, latencyMs: result.latencyMs || 0, tokens: result.tokens });
+        }
+
         // Collect LLM reply text
         if (result.text && result.text.trim()) {
           sendEvent("message", { text: result.text, step: stepNum });
@@ -742,108 +578,21 @@ macOS / bash EXPERTISE (this host is macOS = BSD userland; commands run via maco
 
             const toolStart = Date.now();
 
-            try {
-              if (toolName === "list_tree") {
-                const tree = await FilesystemManager.getTree(isLive, workspaceRoot);
-                output = tree.tree;
-                db.logSecurity("file_system", "Agent list_tree", "Traced files tree dynamically", "allow");
-              } else if (toolName === "read_file") {
-                const filePath = args.path;
-                if (!filePath) throw new Error("Missing 'path' argument.");
-                const text = FilesystemManager.readFile(isLive, workspaceRoot, filePath);
-                output = text;
-                db.logSecurity("file_system", `Agent read_file: ${filePath}`, "Opened file contents securely", "allow");
-              } else if (toolName === "write_file") {
-                const filePath = args.path;
-                const fileContent = args.content;
-                if (!filePath || fileContent === undefined) {
-                  throw new Error("Missing 'path' or 'content' in write_file parameters.");
-                }
-
-                let oldContent = "";
-                try {
-                  oldContent = FilesystemManager.readFile(isLive, workspaceRoot, filePath);
-                } catch (e) {}
-
-                diff = FilesystemManager.generateUnifiedDiff(filePath, oldContent, fileContent);
-
-                if (autoApply) {
-                  FilesystemManager.writeFile(isLive, workspaceRoot, filePath, fileContent);
-                  fileApplied = true;
-                  db.logSecurity("file_system", `Agent write_file (auto-apply): ${filePath}`, "Wrote code modifications directly into workspace", "allow");
-                  output = "Changes written to disk successfully.";
-                } else {
-                  fileApplied = false;
-                  output = "File write is pending authorization. Diffs are stored and waiting for manual approval.";
-                  shouldHalt = true; // Pause execution for manual validation
-                }
-              } else if (toolName === "run_command") {
-                const cmdString = args.command;
-                if (!cmdString) throw new Error("Missing 'command' argument.");
-                const execRes = await TerminalManager.execute(isLive, workspaceRoot, cmdString);
-                output = execRes;
-              } else if (toolName === "grep_search") {
-                const q = args.query;
-                if (!q) throw new Error("Missing 'query' parameter.");
-                const execRes = await TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${q}" .`);
-                output = execRes;
-              } else if (toolName === "macos_terminal") {
-                if (!args.command) throw new Error("Missing 'command' argument.");
-                output = await runOnHostTerminal(args.target, args.command);
-              } else if (toolName === "write_host_file") {
-                if (!args.path || args.content === undefined) throw new Error("Missing 'path' or 'content'.");
-                output = await writeHostFile(args.path, args.content);
-              } else if (toolName === "run_tests") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/run_tests.mjs`);
-              } else if (toolName === "git_ops") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_ops.mjs ${shArg(String(args.sub || "status"))}`);
-              } else if (toolName === "process_port") {
-                const port = Number(args.port) || 3000;
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/process_port.mjs ${port}`);
-              } else if (toolName === "health_probe") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/health_probe.mjs`);
-              } else if (toolName === "lint_format") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/lint_format.mjs`, 250000);
-              } else if (toolName === "git_commit") {
-                if (!args.message) throw new Error("Missing 'message'.");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/git_commit.mjs ${args.push ? "--push " : ""}${shArg(String(args.message))}`);
-              } else if (toolName === "build_app") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/build_app.mjs`, 220000);
-              } else if (toolName === "kill_process") {
-                if (!args.target) throw new Error("Missing 'target' (pid or :port).");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/kill_process.mjs ${args.signal ? "--sig " + shArg(String(args.signal)) + " " : ""}${shArg(String(args.target))}`);
-              } else if (toolName === "log_stream") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/log_stream.mjs ${Number(args.lines) || 40}`);
-              } else if (toolName === "pkg_install") {
-                if (!args.manager || !args.package) throw new Error("Missing 'manager' or 'package'.");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/pkg_install.mjs ${shArg(String(args.manager))} ${shArg(String(args.package))}`, 150000);
-              } else if (toolName === "web_search") {
-                if (args.url) {
-                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs --fetch ${shArg(String(args.url))}`);
-                } else if (args.query) {
-                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/web_search.mjs ${shArg(String(args.query))}`);
-                } else throw new Error("Missing 'query' or 'url'.");
-              } else if (toolName === "tools_doctor") {
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000);
-              } else if (toolName === "shell_check") {
-                if (!args.command) throw new Error("Missing 'command'.");
-                output = await execOnHost(`node ${HOST_TOOLS_DIR}/shell_check.mjs ${shArg(String(args.command))}`, 60000);
-              } else if (toolName === "logbook") {
-                if (args.action === "add") {
-                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/logbook.mjs add ${shArg(String(args.text || ""))}`);
-                } else {
-                  output = await execOnHost(`node ${HOST_TOOLS_DIR}/logbook.mjs tail ${Number(args.n) || 20}`);
-                }
-              } else if (toolName === "apply_patch") {
-                if (!args.diff) throw new Error("Missing 'diff'.");
-                output = await execOnHost(`printf '%s' ${shArg(String(args.diff))} | node ${HOST_TOOLS_DIR}/apply_patch.mjs`);
-              } else {
-                throw new Error(`Unrecognized framework tool: '${toolName}'`);
-              }
-            } catch (err: any) {
-              ok = false;
-              output = { error: err.message || "Execution exception" };
-            }
+            // Meter the in-app agent path too, under the synthetic "local" tenant
+            // (the single-user owner), so usage_events covers all tool traffic.
+            const r = await ToolRegistry.execute(toolName, args, {
+              isLive, workspaceRoot, autoApply, deps: TOOL_DEPS,
+              tenantId: "local",
+              onUsage: (e) => {
+                recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+                if (e.tier !== "safe") recordAudit({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok });
+              },
+            });
+            output = r.output;
+            ok = r.ok;
+            diff = r.diff;
+            fileApplied = r.applied;
+            if (r.halt) shouldHalt = true;
 
             const toolElapsed = Date.now() - toolStart;
 
@@ -1429,6 +1178,150 @@ content
         networkThroughputGb: 0.0,
       }
     });
+  });
+
+  // --- MCP gateway: EXPOSE the workspace tools over Streamable HTTP (Faz 1) ---
+  // Tiers advertised/runnable to MCP clients. Default = all (localhost single-user);
+  // Faz 3 replaces this with a per-tenant allowlist from the API key. Privileged
+  // tools (macos_terminal/write_host_file) are full-host — narrow this before any
+  // remote exposure (AGENTS.md §5).
+  const MCP_EXPOSE_TIERS = (process.env.MCP_EXPOSE_TIERS || "safe,host,privileged")
+    .split(",").map(s => s.trim()).filter(Boolean) as ToolTier[];
+
+  // MCP clients have no interactive approval channel, so write_file auto-applies.
+  // Set MCP_AUTO_APPLY=0 to make /mcp writes return a diff (halt) instead — paired
+  // with narrowing MCP_EXPOSE_TIERS to exclude privileged host writes (AGENTS.md §5).
+  const MCP_AUTO_APPLY = process.env.MCP_AUTO_APPLY !== "0";
+
+  // Per-request ToolCtx. Authenticated tenants get their plan's tier allowlist +
+  // usage metering; the unauthenticated single-user path keeps full default tiers.
+  const mcpCtxFactory = (req: express.Request): ToolCtx => {
+    const t = req.tenant;
+    return {
+      isLive: CURRENT_MODE !== "demo",
+      workspaceRoot: db.data.workspacePath,
+      autoApply: MCP_AUTO_APPLY,
+      deps: TOOL_DEPS,
+      allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
+      tenantId: t?.tenantId,
+      onUsage: t
+        ? (e) => {
+            recordUsage({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
+            if (e.tier !== "safe") recordAudit({ tenantId: e.tenantId!, tool: e.tool, tier: e.tier, ok: e.ok });
+          }
+        : undefined,
+    };
+  };
+
+  // RFC 9728 Protected Resource Metadata (public). MCP clients fetch this after a
+  // 401's WWW-Authenticate to discover how to authenticate (AGENTS.md Faz 6A).
+  app.get(PROTECTED_RESOURCE_PATH, (req, res) => {
+    res.json(buildResourceMetadata(`${req.protocol}://${req.get("host") || "localhost"}`));
+  });
+
+  // Origin allowlist for /mcp — DNS-rebinding protection (MCP Transports spec).
+  // Default localhost only; override with ALLOWED_ORIGINS (CSV). A request with no
+  // Origin (server-to-server MCP clients) is allowed.
+  const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "")
+    .split(",").map(s => s.trim()).filter(Boolean);
+  const originAllowed = (origin?: string) => {
+    if (!origin) return true; // non-browser MCP clients send no Origin
+    if (ALLOWED_ORIGINS.length) return ALLOWED_ORIGINS.includes(origin);
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  };
+
+  // SAAS_ENFORCE=1 → a valid API key is required on /mcp. Default off keeps the
+  // current single-user localhost behavior. origin → auth → rate-limit → handler.
+  app.all("/mcp", (req, res, next) => {
+    if (!originAllowed(req.headers.origin)) return res.status(403).json({ error: "Origin not allowed (DNS-rebinding protection)" });
+    next();
+  }, authMiddleware(process.env.SAAS_ENFORCE === "1"), rateLimitMiddleware(), async (req, res) => {
+    try {
+      await handleMcpRequest(req, res, mcpCtxFactory);
+    } catch (err: any) {
+      if (!res.headersSent) res.status(500).json({ error: err?.message || "MCP request failed" });
+    }
+  });
+
+  app.get("/api/mcp/upstreams", (_req, res) => {
+    res.json({ exposeTiers: MCP_EXPOSE_TIERS, exposedTools: ToolRegistry.list(MCP_EXPOSE_TIERS).map(t => t.name), upstreams: listUpstreams() });
+  });
+
+  // --- SaaS admin: provision tenants + API keys (AGENTS.md Faz 3). Guarded by
+  // X-Admin-Token. When SAAS_ENFORCE=1 (multi-tenant/production), a token is
+  // MANDATORY — admin routes refuse to serve without one, so enabling enforcement
+  // never silently leaves provisioning open. Pure single-user dev (enforce off,
+  // no token) stays open for convenience. ---
+  if (process.env.SAAS_ENFORCE === "1" && !process.env.SAAS_ADMIN_TOKEN) {
+    console.warn("[SaaS] SAAS_ENFORCE=1 but SAAS_ADMIN_TOKEN unset — /api/saas + /api/billing admin routes are LOCKED (set SAAS_ADMIN_TOKEN).");
+  }
+  const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const required = process.env.SAAS_ADMIN_TOKEN;
+    if (required) {
+      // Timing-safe compare to avoid leaking the token via response timing.
+      const got = String(req.headers["x-admin-token"] || "");
+      const a = Buffer.from(got);
+      const b = Buffer.from(required);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return res.status(401).json({ error: "Bad admin token" });
+      }
+    } else if (process.env.SAAS_ENFORCE === "1") {
+      // Enforcement on but no token configured → refuse rather than expose.
+      return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
+    }
+    next();
+  };
+  app.get("/api/saas/plans", adminGuard, (_req, res) => res.json(listPlans()));
+  app.get("/api/saas/tenants", adminGuard, (_req, res) => res.json(listTenants()));
+  app.get("/api/saas/keys", adminGuard, (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : "";
+    if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId' query" });
+    res.json(listKeys(tenantId)); // metadata only — never hash/plaintext
+  });
+  app.post("/api/saas/tenants", adminGuard, (req, res) => {
+    try {
+      const { name, plan, stripeCustomerId } = req.body || {};
+      if (!name) return res.status(400).json({ error: "Missing 'name'" });
+      res.json(createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/saas/keys", adminGuard, (req, res) => {
+    try {
+      const { tenantId, label } = req.body || {};
+      if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId'" });
+      res.json(issueApiKey(String(tenantId), label ? String(label) : "")); // plaintext key returned ONCE
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {
+    revokeApiKey(req.params.id);
+    res.json({ revoked: req.params.id });
+  });
+  app.get("/api/saas/audit", adminGuard, (req, res) => {
+    const tenantId = typeof req.query.tenantId === "string" ? req.query.tenantId : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    res.json(listAudit(tenantId, limit));
+  });
+
+  // A tenant's own current-month usage summary (authenticated).
+  app.get("/api/saas/usage", authMiddleware(true), (req, res) => {
+    const t = req.tenant!;
+    res.json({ tenantId: t.tenantId, plan: t.plan.id, monthlyQuota: t.plan.monthly_quota, used: monthToDateUsage(t.tenantId) });
+  });
+
+  // --- Billing (AGENTS.md Faz 4). Dry-run unless STRIPE_API_KEY is set. ---
+  app.get("/api/billing/preview", adminGuard, (req, res) => {
+    res.json(computeRun(typeof req.query.period === "string" ? req.query.period : undefined));
+  });
+  app.post("/api/billing/run", adminGuard, async (req, res) => {
+    try {
+      res.json(await runBilling(typeof req.body?.period === "string" ? req.body.period : undefined));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post("/api/billing/webhook", async (req, res) => {
+    try {
+      const out = await handleWebhook(req.body as Buffer, String(req.headers["stripe-signature"] || ""));
+      res.json(out);
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
 
   app.post("/api/cluster/execute", async (req, res) => {

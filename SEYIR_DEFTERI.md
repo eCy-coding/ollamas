@@ -52,6 +52,33 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Ne:** logbook sistemi + müdahalesiz otonomi ölçümü.
 - **Nasıl:** `server.ts` her agent step'i `seyir-defteri.jsonl`'e otomatik yazar; `logbook` aracı + `/api/logbook`. Gerçek kullanıcı istekleri agent'a verilip ne/nasıl/niçin sorgulandı.
 
+## Faz 8 — MCP Gateway + tools-as-SaaS (devam ediyor)
+- **Ne:** ollamas'ı MCP gateway + SaaS broker'a dönüştürme. Önce master prompt + tek choke-point.
+- **Master prompt:** `AGENTS.md` (roller + değişmez prensipler + kalite kapısı + güvenlik tier'leri); `server.ts` runtime system prompt'a operating-contract enjekte (commit bb05060).
+- **Faz 0 (tek choke-point):** `server/tool-registry.ts` — 22 workspace tool tek `ToolRegistry.execute(name,args,ctx)`'ten geçer; schema/diff/halt/metering-hook/allowlist tek nokta. `server.ts` ReAct dispatch switch'i (~100 satır) registry çağrısına indi; `AGENT_TOOLS` literal → `ToolRegistry.schemas()`. tsc temiz, 6/7 test (1 pre-existing consent-401 fail).
+- **Niçin:** MCP-expose, MCP-consume, auth, rate-limit, billing — hepsi tek noktaya takılacak; ikinci dispatch yolu yasak (AGENTS.md §4).
+- **Faz 1 (MCP gateway):** `@modelcontextprotocol/sdk` 1.29. EXPOSE: `server/mcp/server.ts` low-level Server + stateless Streamable HTTP → `app.all("/mcp")`; registry JSON-Schema'ları doğrudan MCP `inputSchema`. CONSUME: `server/mcp/client.ts` stdio/http upstream → tool'lar `mcp__<server>__<tool>` olarak registry'ye merge → ReAct + /mcp ikisi de çağırır. tools.json `mcpServers` config. Kanıt: MCP client listTools = 22 tool (LIVE :3939); yerel stdio mini-MCP consume → `mcp__local__ping` → "pong" choke-point'ten. tier-filter `MCP_EXPOSE_TIERS` (§5 güvenlik).
+- **Faz 2 (multi-tenant store):** `server/store/index.ts` — Node 24 built-in `node:sqlite` (ZERO dep, docker native-rebuild yok). Tablolar: plans (free/pro/enterprise seed, tier escalation), tenants, api_keys (SHA-256 hash, plaintext ONCE), usage_events (ay-bazlı index), invoices. `~/.llm-mission-control/saas.db`.
+- **Faz 3 (auth + rate-limit):** `server/middleware/auth.ts` Bearer/X-API-Key → resolveKey → `req.tenant`; `rate-limit.ts` plan-bazlı token-bucket + aylık kota. `/mcp` = auth→rate-limit→handler. `SAAS_ENFORCE=1` key zorunlu (default off = tek-kullanıcı geriye-uyum). ctxFactory tenant ise plan.allowed_tiers + metering. Admin: `/api/saas/{plans,tenants,keys,keys/:id/revoke}` (`SAAS_ADMIN_TOKEN` guard). **Metering hook canlı** (`onUsage`→`recordUsage`). Kanıt (:3940 SAAS_ENFORCE): keysiz `/mcp`=401; free-key listTools=15 safe tool (host/privileged filtre); `git_commit` (host) "not permitted"; usage_events satırı yazıldı.
+- **Faz 4 (billing):** `server/billing/stripe.ts` — `aggregateUsage` ay-bazlı tenant rollup → `computeRun`/`runBilling` Stripe metered events + invoice satırı; Stripe LAZY + `STRIPE_API_KEY` yoksa **dry-run** (sıfır billing config ile çalışır). `handleWebhook` imza-doğrulamalı (raw-body mount, plan değişimi→`setTenantPlan`). Endpoint: `/api/billing/{preview,run,webhook}` + tenant `/api/saas/usage`. stripe@22.2.1. Kanıt (:3941 pro-key): 3× read_file → usage `used:3`; preview `dryRun:true total:3`; run invoice yazdı. **Tüm 5 faz E2E doğrulandı; ollamas artık MCP gateway + tools-as-SaaS.**
+
+## Faz 9 — E2E sertleştirme (Faz 5: fix + test + UI + docs)
+- **Ne:** 3-ajan audit'in flag'lerini düzelt, ilk commit'li otomatik test suite, SaaS admin UI, portability/docs.
+- **5A fix (tüm flag'ler):** HOST_TOOLS_DIR env-override (hardcoded abs yol → portability); rate-limit Map bounded + idle-TTL eviction (DoS); adminGuard SAAS_ENFORCE=1 iken token ZORUNLU + timing-safe compare; Stripe gerçek `stripe_customer_id` (kolon+idempotent migration); invoice idempotency; agent-loop metering ("local" tenant); consume `isError` → ok=false; sqlite ek index; orchestrator dürüst "legacy-cluster-stub"; `MCP_AUTO_APPLY` env.
+- **5B test (hermetik, vitest):** tool-registry (tier gating/halt/onUsage/register), saas-store (tenant/key/resolve/revoke/usage/aggregate/invoice-idempotency/auth/rate-limit), mcp-gateway.e2e (**self-boot** server: keysiz 401, free=15 tier filtre, bad-admin 401, stdio consume ping→pong); ClusterE2ELive `RUN_LIVE_E2E` gate. **31 passed / 1 skipped.**
+- **5C UI:** `src/components/SaaSAdmin.tsx` — admin-token, plan/tenant/key/usage/billing/gateway paneli; App tab "SaaS Gateway". vite build yeşil; canlı endpoint doğrulandı (key metadata-only).
+- **5D docs:** `.env.example` 9 SaaS var; README "MCP Gateway + tools-as-SaaS" bölümü (claude mcp add, plan tier'leri, billing); docker-compose HOST_TOOLS_DIR + SaaS env + saas.db volume notu; start.sh HOST_TOOLS_DIR export; AGENTS.md §7 roadmap ✅.
+- **Niçin:** "interaktif en verimli yöntem" = otomatik E2E ile flag tespit→fix→kanıt; ollamas artık test-korumalı + UI'lı + dökümante MCP-gateway/SaaS.
+
+## Faz 10 — Araştırma-temelli spec-uyum + güvenlik (Faz 6)
+- **Ne:** 3-ajan WEB araştırması (MCP spec 2025-06/11, RFC 9728/8707, MCP güvenlik best-practice, Stripe meter) → somut gap'ler → fix + E2E test + gerçek-zamanlı kanıt.
+- **6A spec-uyum:** RFC 9728 `/.well-known/oauth-protected-resource` (`server/mcp/oauth-metadata.ts`); 401'de `WWW-Authenticate` resource_metadata; `/mcp` Origin allowlist (DNS-rebinding); tool annotations (readOnly/destructiveHint tier'den).
+- **6B consume güvenlik:** `host_upstream` untrusted tier (default expose DIŞI = tenant'a default-deny); per-upstream `allowedTools` + isim-çakışma blok; output sanitization (prompt-injection); manifest SHA-256 (rug-pull tespiti).
+- **6C audit:** `audit_events` tablosu + choke-point onUsage host/privileged/upstream kaydı + `GET /api/saas/audit` (admin).
+- **6D token metering:** `providers.ts` GenerateResult.tokens (ollama eval_count); ReAct loop `usage_events tool=__llm__`; aggregate token toplar.
+- **Kanıt:** tsc temiz; **41 passed / 1 skipped** (yeni: mcp-compliance e2e, consume-security, audit, token-aggregate). Canlı: metadata JSON, 401+WWW-Authenticate header, bad-Origin 403. Commit f26fdb0.
+- **Backlog (dürüstçe ertelendi):** tam OAuth 2.1 server + RFC 8707 audience · Redis dağıtık rate-limit · host-bridge HMAC/TLS · per-call Stripe meter. (AGENTS.md Backlog.)
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

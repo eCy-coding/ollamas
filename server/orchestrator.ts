@@ -86,9 +86,13 @@ export class OrchestratorCoordinator {
         return { executed: true, protocol: 'safe-proxy', payload };
     }
 
+    // NOTE: This is the legacy cluster-tool path (tools.json `capability: MCP`),
+    // NOT the real MCP gateway. Actual MCP expose/consume lives in server/mcp/
+    // (ToolRegistry choke-point). This stub is retained only for the cluster
+    // universe (/api/cluster/execute) and does not perform a real MCP call.
     private static async invokeMCP(tool: any, payload: any) {
-        console.log(`[MCP-Bridge] Secure hook: ${tool.entryPoint}`);
-        return { executed: true, protocol: 'mcp-v1', payload };
+        console.log(`[Cluster-Stub] (legacy, not the /mcp gateway) entryPoint: ${tool.entryPoint}`);
+        return { executed: true, protocol: 'legacy-cluster-stub', payload };
     }
 
     public static async sendInputEvent(type: 'keyboard' | 'mouse', event: any) {

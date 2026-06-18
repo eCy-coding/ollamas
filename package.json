@@ -14,6 +14,7 @@
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^2.4.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
@@ -24,6 +25,7 @@
     "puppeteer": "^25.1.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "stripe": "^22.2.1",
     "vite": "^6.2.3"
   },
   "devDependencies": {

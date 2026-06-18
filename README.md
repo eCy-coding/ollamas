@@ -39,6 +39,46 @@ M4 Pro Max için "Master" seviyesi ince ayarlar:
      `--metal --threads 12 --batch-size 512`
    - Bu, Apple Metal hızlandırmasını tetikler ve M4'ün yüksek-performans çekirdeklerini optimize eder.
 
+## MCP Gateway + tools-as-SaaS
+
+ollamas, 22 workspace tool'unu **MCP gateway** olarak hem dışarı açar (expose) hem
+dışarıdaki MCP server'ları tüketir (consume). Tüm tool çağrıları tek choke-point'ten
+geçer (`server/tool-registry.ts`); üstünde multi-tenant auth + rate-limit + usage
+metering + Stripe billing katmanı vardır. Operasyon sözleşmesi: `AGENTS.md`.
+
+### Claude Code'u (veya herhangi bir MCP client'ı) bağlama
+`/mcp` Streamable HTTP transport sunar:
+```
+claude mcp add --transport http ollamas http://localhost:3000/mcp
+```
+`SAAS_ENFORCE=1` ise `Authorization: Bearer <API_KEY>` gerekir.
+
+### Tek-kullanıcı vs SaaS
+- **Tek-kullanıcı (default):** `SAAS_ENFORCE` kapalı → `/mcp` localhost'ta keysiz,
+  tüm tier'ler (`MCP_EXPOSE_TIERS`). Mevcut davranış korunur.
+- **SaaS (multi-tenant):** `SAAS_ENFORCE=1` + `SAAS_ADMIN_TOKEN=<token>`. Web'deki
+  **SaaS Gateway** sekmesinden (ya da `/api/saas/*`) tenant oluştur, API key issue et.
+  Plan tier allowlist'i belirler (free=safe · pro=safe+host · enterprise=+privileged),
+  rate-limit + aylık kota uygulanır.
+
+### Billing
+Tool çağrıları `usage_events`'e metrelenir (`~/.llm-mission-control/saas.db`).
+`POST /api/billing/run` ay-bazlı rollup'ı Stripe metered usage'a yazar; `STRIPE_API_KEY`
+yoksa **dry-run** (önizleme: `GET /api/billing/preview`). Tenant başına `stripe_customer_id`.
+
+### Spec-uyum + güvenlik (Faz 6, araştırma-temelli)
+- **MCP Authorization keşfi (RFC 9728):** `GET /.well-known/oauth-protected-resource` + her 401'de `WWW-Authenticate: Bearer resource_metadata="..."`. Standart MCP client'lar auth'u keşfeder. (Opaque API key; tam OAuth 2.1 server backlog'da.)
+- **DNS-rebinding koruması:** `/mcp` Origin allowlist (`ALLOWED_ORIGINS`, default localhost).
+- **Tool annotations:** tier'den türetilen `readOnlyHint`/`destructiveHint` (privileged→destructive).
+- **Untrusted upstream izolasyonu:** consume edilen MCP tool'ları `host_upstream` tier'de — default expose DIŞI; `allowedTools` allowlist + isim-çakışma blok + output sanitization (prompt-injection) + manifest hash (rug-pull tespiti).
+- **Audit:** host/privileged/upstream çağrıları `audit_events`'e; `GET /api/saas/audit` (admin).
+- **Token metering:** in-app LLM token (eval_count) `usage_events tool=__llm__` olarak ayrı dimension.
+
+### Güvenlik notu (§5)
+`macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
+Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.
+Tüm env var'lar `.env.example`'da. Tüm SaaS yolları hermetik test altında (`npx vitest run`).
+
 ## Doğrulama Kapıları (G-Gates)
 Sistemin dürüstlüğünü kanıtlayan kapılar:
 - **G-Cluster:** İletişim testi.
