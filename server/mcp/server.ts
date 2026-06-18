@@ -12,6 +12,7 @@ import {
   CallToolRequestSchema, ListToolsRequestSchema,
   ListResourcesRequestSchema, ReadResourceRequestSchema,
   ListPromptsRequestSchema, GetPromptRequestSchema, CompleteRequestSchema,
+  SetLevelRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
@@ -24,13 +25,36 @@ const PAGE = 50;
 const encodeCursor = (n: number) => Buffer.from(String(n)).toString("base64");
 const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toString(), 10) || 0 : 0);
 
+// RFC 5424 severities, MCP logging order (low → high). A message is sent when its
+// severity is at or above the connection's current level.
+const LOG_LEVELS = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"] as const;
+type LogLevel = (typeof LOG_LEVELS)[number];
+const rank = (l: string) => { const i = LOG_LEVELS.indexOf(l as LogLevel); return i < 0 ? 1 : i; };
+
 function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
-    { name: "ollamas-gateway", version: "1.2.0" },
-    { capabilities: { tools: {}, resources: {}, prompts: {}, completions: {} } }
+    { name: "ollamas-gateway", version: "1.5.0" },
+    // Advertise only what we implement (Faz 14A): tools/resources/prompts/
+    // completions + structured logging. listChanged is false (stateless transport).
+    { capabilities: { tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {} } }
   );
 
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
+
+  // Per-connection log level (stateless transport → per request). Base from env;
+  // logging/setLevel raises/lowers it for the rest of this connection.
+  let logLevel: LogLevel = (process.env.MCP_LOG_LEVEL as LogLevel) || "info";
+  const emitLog = (level: LogLevel, data: unknown): Promise<void> => {
+    if (rank(level) < rank(logLevel)) return Promise.resolve();
+    return server.notification({ method: "notifications/message", params: { level, logger: "ollamas", data } }).catch(() => {});
+  };
+
+  // --- logging/setLevel (Faz 14A) ---
+  server.setRequestHandler(SetLevelRequestSchema, async (req) => {
+    const lvl = String(req.params?.level || "");
+    if (LOG_LEVELS.includes(lvl as LogLevel)) logLevel = lvl as LogLevel;
+    return {};
+  });
 
   // --- tools/list (per-tenant visibility + cursor pagination) ---
   server.setRequestHandler(ListToolsRequestSchema, async (req) => {
@@ -45,6 +69,8 @@ function buildServer(ctx: ToolCtx): Server {
         name: t.name, title,
         description: t.schema.function.description,
         inputSchema: t.schema.function.parameters,
+        // Advertise a declared output schema when the tool provides one (Faz 14B).
+        ...(t.schema.function.outputSchema ? { outputSchema: t.schema.function.outputSchema } : {}),
         annotations: {
           title,
           readOnlyHint: t.tier === "safe",
@@ -57,7 +83,7 @@ function buildServer(ctx: ToolCtx): Server {
     return { tools, nextCursor };
   });
 
-  // --- tools/call (with progress notifications around the call) ---
+  // --- tools/call (progress + structured-log notifications around the call) ---
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { name, arguments: args } = req.params;
     const progressToken = (req.params?._meta as any)?.progressToken;
@@ -65,11 +91,21 @@ function buildServer(ctx: ToolCtx): Server {
       ? (progress: number, total?: number, message?: string) =>
           server.notification({ method: "notifications/progress", params: { progressToken, progress, total, message } }).catch(() => {})
       : undefined;
+    const def = ToolRegistry.info(name);
+    // Surface host/privileged invocations at a higher severity (Faz 14A). Awaited
+    // so the message is flushed on the response stream before the result.
+    await emitLog(def && def.tier !== "safe" ? "notice" : "info", { msg: `tool.call ${name}`, tier: def?.tier, tenant: ctx.tenantId });
     onProgress?.(0, 1, `starting ${name}`);
     const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress });
     onProgress?.(1, 1, `done ${name}`);
+    await emitLog(r.ok ? "info" : "error", { msg: `tool.done ${name}`, ok: r.ok });
     const text = typeof r.output === "string" ? r.output : JSON.stringify(r.output);
-    return { content: [{ type: "text" as const, text }], isError: !r.ok };
+    // Structured content (Faz 14B): keep the text block (backwards-compatible) and
+    // add structuredContent when the tool declares an output schema + object output.
+    const structured = def?.schema.function.outputSchema && r.output && typeof r.output === "object"
+      ? { structuredContent: r.output as Record<string, unknown> }
+      : {};
+    return { content: [{ type: "text" as const, text }], ...structured, isError: !r.ok };
   });
 
   // --- resources/list + resources/read (workspace files, tenant-scoped) ---

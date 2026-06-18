@@ -11,6 +11,7 @@ import fs from "node:fs";
 export type Dialect = "sqlite" | "pg";
 export interface DbResult { rows: any[]; rowCount: number; }
 export interface DbRun { changes: number; lastId?: number | bigint; }
+export interface PoolStats { total: number; idle: number; waiting: number; }
 
 export interface DbClient {
   dialect: Dialect;
@@ -21,6 +22,8 @@ export interface DbClient {
   /** Run fn under a cross-replica mutex (pg advisory lock). sqlite is single-
    *  writer so it just runs fn. Used to serialize schema migrations at boot. */
   withLock(key: number, fn: () => Promise<void>): Promise<void>;
+  /** pg connection-pool counters for metrics; null on sqlite (no pool). */
+  stats(): PoolStats | null;
 }
 
 class SqliteAdapter implements DbClient {
@@ -37,6 +40,7 @@ class SqliteAdapter implements DbClient {
   async exec(sql: string): Promise<void> { this.raw.exec(sql); }
   async close(): Promise<void> { this.raw.close(); }
   async withLock(_key: number, fn: () => Promise<void>): Promise<void> { await fn(); }
+  stats(): PoolStats | null { return null; } // single-writer file, no pool
 }
 
 // Rewrite `?` positional params → `$1, $2, ...` for Postgres. Our SQL has no `?`
@@ -68,6 +72,7 @@ class PostgresAdapter implements DbClient {
       client.release();
     }
   }
+  stats(): PoolStats { return { total: this.pool.totalCount ?? 0, idle: this.pool.idleCount ?? 0, waiting: this.pool.waitingCount ?? 0 }; }
 }
 
 /** Build the adapter: Postgres when DATABASE_URL is set, else node:sqlite. */

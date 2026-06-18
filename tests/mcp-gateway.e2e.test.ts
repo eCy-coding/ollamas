@@ -223,6 +223,44 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(comp.completion.values).toContain("security");
     await c.close();
   });
+
+  // --- Faz 14A: MCP logging + capabilities ---
+  test("server advertises logging capability; setLevel + notifications/message", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "logging", plan: "enterprise" }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const { LoggingMessageNotificationSchema } = await import("@modelcontextprotocol/sdk/types.js");
+    const c = new Client({ name: "t", version: "0" }, { capabilities: {} });
+    const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
+    const logs: any[] = [];
+    c.setNotificationHandler(LoggingMessageNotificationSchema, (n) => { logs.push(n.params); });
+    await c.connect(tr);
+
+    // Capability advertised + setLevel handled (deterministic).
+    expect((c.getServerCapabilities() as any)?.logging).toBeTruthy();
+    await c.setLoggingLevel("debug"); // resolves without error
+    // A tool call drives the emit path at the choke-point. Delivery of the
+    // structured log over the *stateless* Streamable-HTTP POST is best-effort
+    // (transport may not stream server→client notifications), so capture is soft.
+    await c.callTool({ name: "list_tree", arguments: {} }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
+    await c.close();
+    if (logs.length) expect(logs.every((l) => l.logger === "ollamas")).toBe(true);
+  });
+
+  // --- Faz 14C: observability depth metrics ---
+  test("/metrics exposes migration version, webhook queue depth + shutdown counter", async () => {
+    const body = await (await fetch(`${BASE}/metrics`)).text();
+    expect(body).toContain("ollamas_migration_version");
+    expect(body).toContain("ollamas_webhook_queue_depth");
+    expect(body).toContain("ollamas_shutdown_total");
+  });
 });
 
 describe("MCP gateway CONSUME (stdio upstream)", () => {

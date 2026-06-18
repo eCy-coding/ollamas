@@ -50,6 +50,21 @@ export async function appliedVersions(): Promise<number[]> {
   return (await d().query("SELECT version FROM schema_migrations ORDER BY version")).rows.map((r) => Number(r.version));
 }
 
+// --- Observability accessors (Faz 14C) — null-safe before initStore() ---
+/** pg connection-pool counters; null on sqlite or before init. */
+export function poolStats() { return db ? db.stats() : null; }
+/** Highest applied migration version (0 if none / not initialized). */
+export async function migrationVersion(): Promise<number> {
+  if (!db) return 0;
+  try { const v = await appliedVersions(); return v.length ? Math.max(...v) : 0; } catch { return 0; }
+}
+/** Count of webhook deliveries still pending (queue depth). */
+export async function pendingDeliveryCount(): Promise<number> {
+  if (!db) return 0;
+  try { return Number((await d().query("SELECT COUNT(*) AS n FROM webhook_deliveries WHERE status='pending'")).rows[0].n); }
+  catch { return 0; }
+}
+
 // Postgres can race when several replicas run `CREATE TABLE IF NOT EXISTS` / seed
 // concurrently at boot — the shared catalog raises transient unique/duplicate
 // errors even though each statement is idempotent. Retry so concurrent boots

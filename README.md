@@ -104,6 +104,13 @@ Multi-replica yaşam döngüsünü güvenli kılan işletim katmanı:
 - **Gerçek readiness:** `GET /api/ready` artık **DB ping** eder (`SELECT 1`) — pg down iken 503 (LB trafiği başka replica'ya yönlendirir). `GET /api/health` `db: up/down` raporlar ama liveness'a bağlamaz (DB blip pod restart etmez).
 - **Deploy:** K8s `migration-job.yaml` (`--migrate-only`, `terminationGracePeriodSeconds: 30`) + `DATABASE_URL` Secret; Helm `pre-install/pre-upgrade` migration hook + Chart `appVersion 1.4.0`; compose `stop_grace_period: 30s`. Migration app içinden koşar — image'da `psql` GEREKMEZ.
 
+### v1.5 (Faz 14 — MCP Protocol Completeness + Observability, zero-dep)
+MCP spec yüzeyini derinleştir + multi-replica sistemin gözlemlenebilirliği:
+- **MCP logging:** server `logging` capability ilan eder; `logging/setLevel` (RFC 5424 seviyeleri) + tool çağrılarında choke-point'ten `notifications/message` (level-gated; host/privileged tier `notice`). `MCP_LOG_LEVEL` taban. *(Not: stateless Streamable HTTP'de server→client notification teslimi best-effort.)*
+- **Dürüst capabilities:** boş `{}` yerine gerçek yüzey ilan (`tools.listChanged:false`, `logging:{}`); server version 1.5.0.
+- **Tool `outputSchema` + structured content:** `ToolDef` opsiyonel `outputSchema`; ListTools ilan eder; CallTool obje çıktıda `structuredContent` döner (text bloğu geriye-uyumlu korunur).
+- **Observability depth (`/metrics`):** yeni Prometheus serileri — `ollamas_db_pool_connections{state}` (pg), `ollamas_migration_version`, `ollamas_webhook_queue_depth`, `ollamas_shutdown_total`. prom-client async `collect` ile store'dan pull. Zero-dep.
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

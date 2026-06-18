@@ -26,3 +26,51 @@ export const toolCalls = new client.Counter({
 export function recordToolMetric(tool: string, tier: string, ok: boolean) {
   toolCalls.labels(tool, tier, String(ok)).inc();
 }
+
+// --- Observability depth (Faz 14C) ---
+
+/** Graceful-shutdown counter — incremented once on SIGTERM/SIGINT. */
+export const shutdownTotal = new client.Counter({
+  name: "ollamas_shutdown_total",
+  help: "Number of graceful shutdowns initiated",
+  registers: [register],
+});
+
+/**
+ * Pull-time gauges sourced from the store at scrape (prom-client async collect).
+ * Lazily registered once at boot so this module has no import cycle with the store.
+ */
+let storeMetricsRegistered = false;
+export function registerStoreMetrics(store: {
+  poolStats: () => { total: number; idle: number; waiting: number } | null;
+  migrationVersion: () => Promise<number>;
+  pendingDeliveryCount: () => Promise<number>;
+}) {
+  if (storeMetricsRegistered) return; // idempotent — prom-client throws on dup names
+  storeMetricsRegistered = true;
+  new client.Gauge({
+    name: "ollamas_db_pool_connections",
+    help: "Postgres pool connections by state (pg only; absent on sqlite)",
+    labelNames: ["state"],
+    registers: [register],
+    async collect() {
+      const s = store.poolStats();
+      if (!s) return; // sqlite: no pool
+      this.labels("total").set(s.total);
+      this.labels("idle").set(s.idle);
+      this.labels("waiting").set(s.waiting);
+    },
+  });
+  new client.Gauge({
+    name: "ollamas_migration_version",
+    help: "Highest applied schema migration version",
+    registers: [register],
+    async collect() { this.set(await store.migrationVersion()); },
+  });
+  new client.Gauge({
+    name: "ollamas_webhook_queue_depth",
+    help: "Webhook deliveries still pending",
+    registers: [register],
+    async collect() { this.set(await store.pendingDeliveryCount()); },
+  });
+}
