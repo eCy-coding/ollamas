@@ -1,0 +1,35 @@
+# Schema migration Job (Faz 13B). Run BEFORE rolling out a new image so the
+# Postgres schema is current before any Pod serves traffic:
+#   kubectl apply -f deploy/k8s/migration-job.yaml
+#   kubectl wait --for=condition=complete job/ollamas-migrate --timeout=120s
+#   kubectl apply -f deploy/k8s/ollamas.yaml
+#
+# The Job runs `tsx server.ts --migrate-only`: it opens the store, applies
+# pending migrations under a pg advisory lock, then exits 0. Safe to run
+# repeatedly (idempotent) and concurrently (advisory-locked). No-op on sqlite.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollamas-migrate
+  labels: { app: ollamas, component: migrate }
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels: { app: ollamas, component: migrate }
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: migrate
+          image: ghcr.io/ecy-coding/ollamas:latest
+          command: ["tsx", "server.ts", "--migrate-only"]
+          envFrom:
+            - configMapRef: { name: ollamas-config }
+            - secretRef: { name: ollamas-secrets }
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "512Mi" }

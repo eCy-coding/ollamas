@@ -7,6 +7,8 @@
 import crypto from "node:crypto";
 import type { ToolTier } from "../tool-registry";
 import { createAdapter, type DbClient } from "./db-adapter";
+import { runMigrations } from "./migrations";
+export { runMigrations, MIGRATIONS } from "./migrations";
 
 export interface Plan { id: string; name: string; rate_per_min: number; monthly_quota: number; allowed_tiers: ToolTier[]; }
 export interface Tenant { id: string; name: string; plan_id: string; stripe_customer_id?: string | null; created_at: string; }
@@ -23,6 +25,29 @@ const monthKey = (d = new Date()) => `${d.getUTCFullYear()}-${String(d.getUTCMon
 function d(): DbClient {
   if (!db) throw new Error("Store not initialized — call initStore() first.");
   return db;
+}
+
+/** Close the DB (pg pool.end / sqlite close) and reset. Idempotent — safe on
+ *  graceful shutdown and between test runs. After this, initStore() re-opens. */
+export async function closeStore(): Promise<void> {
+  if (!db) return;
+  const cur = db;
+  db = null;
+  await cur.close();
+}
+
+/** Liveness check for readiness probes: true if the DB answers a trivial query.
+ *  Never throws — returns false on any error (pg down, not initialized). */
+export async function pingStore(): Promise<boolean> {
+  try { await d().query("SELECT 1 AS ok"); return true; }
+  catch { return false; }
+}
+
+/** Run pending schema migrations against the live store; returns applied versions. */
+export async function migrateNow(): Promise<number[]> { return runMigrations(d()); }
+/** Recorded migration versions (ascending). */
+export async function appliedVersions(): Promise<number[]> {
+  return (await d().query("SELECT version FROM schema_migrations ORDER BY version")).rows.map((r) => Number(r.version));
 }
 
 // Postgres can race when several replicas run `CREATE TABLE IF NOT EXISTS` / seed
@@ -45,6 +70,7 @@ async function withInitRetry(fn: () => Promise<void>): Promise<void> {
 export async function initStore(): Promise<DbClient> {
   if (db) return db;
   db = await createAdapter();
+  console.log(`[Store] dialect=${db.dialect}${db.dialect === "pg" ? ` poolSize=${process.env.DB_POOL_SIZE || 5}` : ""}`);
   // Dialect-specific auto-increment PK; PRAGMA only on sqlite.
   const AUTO = db.dialect === "pg" ? "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
   if (db.dialect === "sqlite") await db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
@@ -100,6 +126,7 @@ export async function initStore(): Promise<DbClient> {
   `));
   await migrate();
   await withInitRetry(seedPlans);
+  await runMigrations(db); // versioned schema evolution (Faz 13B), advisory-locked
   return db;
 }
 
