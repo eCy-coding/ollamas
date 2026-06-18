@@ -25,7 +25,18 @@ services:
       # Host-side macOS terminal bridge (iTerm2 / Terminal.app)
       - HOST_BRIDGE_URL=http://host.docker.internal:7345
       - HOST_BRIDGE_TOKEN=${HOST_BRIDGE_TOKEN}
+      # Bridge tools run on the HOST, so this must be the host repo path (the
+      # container cwd would be wrong). start.sh exports it; default in .env.
+      - HOST_TOOLS_DIR=${HOST_TOOLS_DIR}
+      # MCP gateway + tools-as-SaaS (see README). saas.db persists via the volume below.
+      - SAAS_ENFORCE=${SAAS_ENFORCE:-0}
+      - SAAS_ADMIN_TOKEN=${SAAS_ADMIN_TOKEN:-}
+      - MCP_EXPOSE_TIERS=${MCP_EXPOSE_TIERS:-safe,host,privileged}
+      - MCP_AUTO_APPLY=${MCP_AUTO_APPLY:-1}
+      - STRIPE_API_KEY=${STRIPE_API_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
     volumes:
+      # Bind mount persists both the bridge token and the SaaS store (saas.db).
       - ~/.llm-mission-control:/root/.llm-mission-control
     extra_hosts:
       - "host.docker.internal:host-gateway"

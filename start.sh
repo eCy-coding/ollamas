@@ -78,6 +78,9 @@ else
 fi
 
 # 6) Container: build + up + healthcheck-backed wait ----------------------
+# Bridge tools run on the host, so the container needs the HOST repo path. Export
+# it (unless already set) so docker-compose's ${HOST_TOOLS_DIR} passthrough works.
+export HOST_TOOLS_DIR="${HOST_TOOLS_DIR:-$(pwd)/bin/host-bridge/tools}"
 log "container build + up --wait..."
 if docker compose up -d --build --wait >/dev/null 2>&1; then
   st_container="healthy"

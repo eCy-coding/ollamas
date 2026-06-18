@@ -100,13 +100,22 @@ sandbox YOK). Dış tenant'a açmak ciddi sınır.
 
 ---
 
-## 7. Yol Haritası (fazlar, sırayla)
+## 7. Yol Haritası (fazlar)
 
-`Faz 0` Tek choke-point (`tool-registry.ts`) → `Faz 1` MCP expose+consume →
-`Faz 2` multi-tenant store → `Faz 3` auth+rate-limit → `Faz 4` metering+billing.
+- ✅ `Faz 0` Tek choke-point (`tool-registry.ts`)
+- ✅ `Faz 1` MCP expose+consume (`server/mcp/`)
+- ✅ `Faz 2` multi-tenant store (`server/store/`, node:sqlite)
+- ✅ `Faz 3` auth+rate-limit (`server/middleware/`)
+- ✅ `Faz 4` metering+billing (`server/billing/`)
+- ✅ `Faz 5` E2E sertleştirme — flag triage + hermetik test suite (`tests/`) + SaaS admin UI (`src/components/SaaSAdmin.tsx`) + portability/docs
 
-Her faz: yeşil kapı (§3) + logbook (§6) + conventional commit. Faz 0 ilk; gerisi ona takılır.
+Sonraki işler aynı sözleşmeyle: yeşil kapı (§3) + logbook (§6) + conventional commit.
 Detay: `~/.claude/plans/ollamas-projesini-a-ve-atomic-wand.md`.
+
+**Güvenlik sözleşmesi (§5 ek):** `/mcp` üzerinden write_file auto-apply eder
+(`MCP_AUTO_APPLY=0` ile diff/halt). Privileged tier (`macos_terminal`/`write_host_file`)
+uzak tenant'a yalnız plan allowlist'i izin verirse açılır. `SAAS_ENFORCE=1` iken
+`SAAS_ADMIN_TOKEN` zorunlu (yoksa admin route'lar kilitli).
 
 ---
 
