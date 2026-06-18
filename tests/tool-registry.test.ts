@@ -67,6 +67,19 @@ describe("ToolRegistry choke-point", () => {
     expect(typeof seen[0].latencyMs).toBe("number");
   });
 
+  test("scope enforcement: non-safe tool needs tools:<tier> scope (Faz 9B)", async () => {
+    const denied = await ToolRegistry.execute("macos_terminal", { command: "ls" }, ctx({ scopes: ["tools:safe"] }));
+    expect(denied.ok).toBe(false);
+    expect(JSON.stringify(denied.output)).toContain("insufficient_scope");
+    const allowed = await ToolRegistry.execute("macos_terminal", { command: "ls" }, ctx({ scopes: ["tools:privileged"] }));
+    expect(allowed.ok).toBe(true);
+  });
+
+  test("empty scopes → no scope restriction (backward compatible)", async () => {
+    const r = await ToolRegistry.execute("macos_terminal", { command: "ls" }, ctx({ scopes: [] }));
+    expect(r.ok).toBe(true);
+  });
+
   test("register() merges a dynamic (consume) tool reachable via execute", async () => {
     ToolRegistry.register("mcp__x__ping", {
       tier: "host",

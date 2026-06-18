@@ -1209,6 +1209,7 @@ content
       autoApply: MCP_AUTO_APPLY,
       deps: TOOL_DEPS,
       allowedTiers: t ? t.plan.allowed_tiers : MCP_EXPOSE_TIERS,
+      scopes: t?.scopes,
       tenantId: t?.tenantId,
       onUsage: t
         ? (e) => {
@@ -1293,9 +1294,9 @@ content
   });
   app.post("/api/saas/keys", adminGuard, (req, res) => {
     try {
-      const { tenantId, label } = req.body || {};
+      const { tenantId, label, ttlDays, scopes } = req.body || {};
       if (!tenantId) return res.status(400).json({ error: "Missing 'tenantId'" });
-      res.json(issueApiKey(String(tenantId), label ? String(label) : "")); // plaintext key returned ONCE
+      res.json(issueApiKey(String(tenantId), label ? String(label) : "", ttlDays != null ? Number(ttlDays) : undefined, scopes ? String(scopes) : "")); // plaintext key returned ONCE
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
   app.post("/api/saas/keys/:id/revoke", adminGuard, (req, res) => {

@@ -64,7 +64,19 @@ describe("store: tenants, keys, plans", () => {
     store.issueApiKey(t.id, "k1");
     const keys = store.listKeys(t.id);
     expect(keys).toHaveLength(1);
-    expect(Object.keys(keys[0])).toEqual(["id", "label", "revoked", "created_at"]);
+    expect(Object.keys(keys[0]).sort()).toEqual(["created_at", "expires_at", "id", "label", "last_used_at", "revoked", "scopes"]);
+  });
+
+  test("API-key lifecycle: scopes returned, expiry enforced (Faz 9B)", async () => {
+    const t = store.createTenant("life", "pro");
+    const scoped = store.issueApiKey(t.id, "scoped", 0, "tools:host tools:privileged");
+    expect(scoped.expiresAt).toBeNull();
+    expect(store.resolveKey(scoped.key)!.scopes).toEqual(["tools:host", "tools:privileged"]);
+    // ~0.86s TTL → expired after a 1s wait.
+    const shortLived = store.issueApiKey(t.id, "tmp", 0.00001);
+    expect(typeof shortLived.expiresAt).toBe("string");
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(store.resolveKey(shortLived.key)).toBeNull();
   });
 });
 
