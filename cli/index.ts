@@ -7,9 +7,10 @@ import { runChat } from "./commands/chat";
 import { runDoctor } from "./commands/doctor";
 import { runAgent } from "./commands/agent";
 import { runSaas } from "./commands/saas";
+import { runBench } from "./commands/bench";
 import { loadConfig, saveConfig, configPath, type CliConfig } from "./lib/config";
 
-const VERSION = "3.0.0";
+const VERSION = "4.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
@@ -21,6 +22,7 @@ commands:
     agent sessions   list persisted agent sessions
     agent rm <id>    delete a session
   saas <action>      manage the SaaS layer (plans|tenants|keys|audit|usage|billing)
+  bench              benchmark models (tok/s, TTFB) and pick the fastest
   doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken|profile)
   help               this message
@@ -104,6 +106,8 @@ export async function main(argv: string[]): Promise<number> {
       return runAgent(rest);
     case "saas":
       return runSaas(rest);
+    case "bench":
+      return runBench(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":

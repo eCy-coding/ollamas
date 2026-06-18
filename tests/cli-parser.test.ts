@@ -67,6 +67,11 @@ describe("main dispatch (G9)", () => {
     expect(await main(["saas", "--help"])).toBe(0);
     expect(await main(["saas"])).toBe(2);
   });
+
+  it("routes bench --help to exit 0 (no network)", async () => {
+    silence();
+    expect(await main(["bench", "--help"])).toBe(0);
+  });
 });
 
 describe("config resolution precedence", () => {

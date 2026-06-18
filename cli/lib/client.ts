@@ -12,6 +12,7 @@ export interface StreamMeta {
   source?: string;
   latencyMs?: number;
   tokensPerSec?: number;
+  ttfbMs?: number; // time-to-first-byte (first stream chunk) — derived client-side (I1)
 }
 
 // Split an accumulating SSE buffer into complete events + remainder.
@@ -90,6 +91,7 @@ export class GatewayClient {
     onChunk: (text: string) => void,
   ): Promise<StreamMeta> {
     const { timeoutMs, ...gen } = opts;
+    const t0 = Date.now();
     const r = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: this.headers({ "Content-Type": "application/json" }),
@@ -99,12 +101,27 @@ export class GatewayClient {
     if (!r.ok || !r.body) throw new Error(`gateway /api/generate → ${r.status}`);
 
     let meta: StreamMeta = {};
+    let ttfbMs: number | undefined;
     await consumeSSE(r.body, (ev) => {
       if (ev.error) throw new Error(String(ev.error));
-      if (typeof ev.chunk === "string") onChunk(ev.chunk);
+      if (typeof ev.chunk === "string") {
+        if (ttfbMs === undefined) ttfbMs = Date.now() - t0; // first chunk = TTFB (I1)
+        onChunk(ev.chunk);
+      }
       if (ev.done) meta = { source: ev.source, latencyMs: ev.latencyMs, tokensPerSec: ev.tokensPerSec };
     });
-    return meta;
+    return { ...meta, ttfbMs };
+  }
+
+  // List installed model names via the gateway (proxies ollama /api/tags) (I2).
+  async listModels(provider = "ollama-local"): Promise<string[]> {
+    const r = await fetch(`${this.baseUrl}/api/models/${encodeURIComponent(provider)}`, {
+      headers: this.headers(),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) throw new Error(`gateway /api/models/${provider} → ${r.status}`);
+    const data = await r.json();
+    return Array.isArray(data) ? data : [];
   }
 
   // Drive the ReAct agent loop. Forwards every SSE event to onEvent; resolves

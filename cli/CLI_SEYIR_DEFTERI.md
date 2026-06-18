@@ -57,6 +57,20 @@
 - **Gözlem**: v2'de fresh-boot gateway enforce kapalı (agent 200); v3'te reused gateway enforce **açık** (ready/agent/saas 401). CLI her iki halde doğru (401→ipucu, açık→akış).
 - **ÖNLEME/NOT**: SaaS başarı yolunu kanıtlamak için **kendi izole gateway'ini farklı portta boot et** (`PORT=3009 SAAS_ADMIN_TOKEN=… SAAS_ENFORCE=1 SAAS_DB_PATH=/tmp/…`), `OLLAMAS_GATEWAY`+`OLLAMAS_SAAS_ADMIN` ile sür. Başkasının :3000 gateway'ine **dokunma** (eşzamanlı worker olabilir).
 
+---
+
+## v4 — Bench/calibration (2026-06-19)
+
+### N-006 · Bench correctness prompt-echo false-positive
+- **Semptom**: `bench` correctRatio=100% ama tok/s=0 — şüpheli. Default prompt `"Reply with exactly: PONG"`, correctness `output.includes("PONG")`. Prompt'un kendisi "PONG" içerdiği için model echo/tekrar etse bile **trivially** eşleşir.
+- **Fix**: echo-proof default → prompt `"What is two plus two? Reply with only the number."`, expected `"4"`. Beklenen token **prompt'ta yok** → yalnız gerçek yanıt skorlar.
+- **ÖNLEME KURALI**: substring-correctness benchmark'ında beklenen cevap **prompt metninde geçmemeli** (echo bypass). Deterministik soru + prompt-dışı cevap kullan.
+
+### N-007 (ortam notu) · gateway eval-timing yüzeye çıkarmıyor → tok/s=0
+- **Gözlem**: canlı bench tok/s=0; total 137ms (gerçek 8b değil). Bu container-gateway `tokensPerSec` (ollama `eval_count/eval_duration`) döndürmüyor (demo/fallback olabilir). `pickBest` null döndü (savunmacı, doğru).
+- **Not**: bench FEATURE doğru (ttfb/total/json/host-etiket/tablo + unit-test'li hesap). Gerçek tok/s yalnız **Mac+native-ollama**'da dolar (`providers.ts:250`). cli-bench.json host=`darwin/arm64` (CLI Mac host'ta koşuyor) ama inference backend container → N-002 ile birlikte: host-etiketi CLI tarafını yansıtır, gateway URL raporda ayrı.
+- **ÖNLEME/NOT**: throughput sayısı gerekiyorsa gateway'in gerçek ollama'ya bağlı olduğunu doğrula (`doctor` ollama up + gerçek model yüklü); demo/fallback'ta tok/s anlamsız.
+
 ### N-004 (mimari sınır) · agent resume tam tool-history taşımıyor
 - **Gözlem**: write-onay sonrası resume, yalnız assistant history + "approved, continue" turu gönderir; tam tool-result history server session'da.
 - **Not**: server loop'u `messages` param'ından çalışır, session'ı yalnız sonda yazar → istemci-tarafı tam-history resume mümkün değil. Pragmatik resume yeterli; cap 12 round. v3+ session-load-into-loop server desteği gerekirse genişlet.

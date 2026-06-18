@@ -8,8 +8,8 @@
 | **v1** | İskelet + chat | `node:util` parseArgs router, `chat` (one-shot+REPL+SSE), `doctor`, `config`, TTY/`--json`/NO_COLOR, `bin`, POSIX köprü iskelet, governance docs | ✅ DONE |
 | **v2** | Agent sürücü + sweep | `ollamas agent` ReAct loop (`/api/agent/chat` SSE); write-onay akışı (`/api/agent/approve-write`); oturum (`/api/agent/sessions`); `--yolo`/`--safe`; + 10 v1-gap (G1-G10) | ✅ DONE |
 | **v3** | SaaS/admin + sweep | `ollamas saas plans\|tenants\|tenant new\|keys\|key new\|revoke\|audit\|usage\|billing` → `/api/saas/*`+`/api/billing/*` (X-Admin-Token); `formatTable`; secret-once key; revoke confirm; doctor saas satırı; H1-H8 | ✅ DONE |
-| **v4** | Bench/calibration | Dual-target (Mac-native + remote/iOS-proxy) benchmark; `~/.llm-mission-control/cli-bench.json`; en verimli model/ctx/Metal flag auto-pick; `benchmark.mjs` yükselt; host-platform etiket (N-002) | ▶ NEXT |
-| **v5** | MCP client | `ollamas mcp add\|list\|call\|tools` — upstream register/consume `/api/mcp/upstreams` + `/mcp`; choke-point üzerinden çağrı | |
+| **v4** | Bench/calibration | `ollamas bench` dual-target (mac + remote/iOS-proxy); warmup'lı TTFB/tok/s/total; `cli-bench.json` host-etiketli; `pickBest` + `--apply`; I1-I6 | ✅ DONE |
+| **v5** | MCP client | `ollamas mcp add\|list\|call\|tools` — upstream register/consume `/api/mcp/upstreams` + `/mcp`; choke-point üzerinden çağrı | ▶ NEXT |
 | **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (agent/saas); remote-exposure doc (tailscale/LAN + key) | |
 | **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | |
 | **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | |
@@ -42,10 +42,20 @@
 - Canlı (kendi izole gateway :3009, SAAS_ENFORCE=1, token=ecytest): `saas plans` hizalı tablo · `tenant new`→tnt_… · `key new` secret-once olm_… + uyarı · `keys` liste · `revoke --yes` · `usage` · `doctor` saas up plans=3 healthy; enforced gateway'de token'sız → 401 ipucu
 - Choke-point korunur (`server/store` import yok); VERSION 3.0.0; **Idempotency: server'da create idempotency-key YOK → plandan çıkarıldı**
 
-## v4 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/commands/bench.ts` — dual-target: `--target mac|remote|both`; ölçüm TTFB, tok/s, total, correctness.
-2. `cli/lib/client.ts` → `generateTimed(messages, opts)` (TTFB + tok/s yakala) veya mevcut `generateStream` meta'sını kullan; her model/ctx kombinasyonu için tur.
-3. `~/.llm-mission-control/cli-bench.json` yaz; host platform etiketi göm (N-002: container ≠ Mac-native).
-4. En verimli model/ctx/Metal-flag auto-pick → `config` öner/yaz; `benchmark.mjs` mantığını CLI'a yükselt (reuse `bin/host-bridge/benchmark.mjs`).
-5. `--json` rapor; tablo (model · ctx · TTFB · tok/s · correct).
-6. Testler: bench hesap saf-fn (tok/s, TTFB derive) + mock-fetch; doctor'a değişiklik yok.
+## v4 — DONE (kanıt)
+- `cli/lib/bench.ts` (saf-fn: `median/mean/aggregate/pickBest`) + `cli/commands/bench.ts` yeni
+- `client.ts`: `generateStream` meta'ya `ttfbMs` (I1, ilk-chunk); `listModels` (I2, `/api/models/:provider`)
+- warmup turu (I3, cold-start discard); host platform etiketi `cli-bench.json` (I4, N-002); `pickBest`+`--apply` (I5); help/README/VERSION 4.0.0 (I6)
+- dual-target: `mac`(local) + `remote`(--remote-gateway, iOS-proxy) + `both`; no-silent-cap (remote URL yoksa uyar)
+- Testler: `tests/cli-bench.test.ts` + chat/parser ek — **122 pass/1 skip** (v3:113)
+- Canlı (kendi gateway :3009): `bench` tablo (ttfb 108-112ms, host **darwin/arm64**=CLI Mac host), `cli-bench.json` host-etiketli yazıldı, `--json` çalışır
+- Bench ollama'ya doğrudan gitmez (yalnız `/api/generate`+`/api/models`); VERSION 4.0.0
+- **Gotcha**: N-006 echo-proof correctness (prompt'ta beklenen token olmamalı); N-007 bu gateway eval-timing yüzeye çıkarmıyor → tok/s=0 (gerçek Mac+native-ollama'da dolar)
+
+## v5 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/commands/mcp.ts` — alt-eylemler `list|add|rm|tools|call`.
+2. `cli/lib/client.ts` → `listUpstreams()`/`addUpstream(body)`/`removeUpstream(id)` → `/api/saas/upstreams` (authMiddleware tenant — apiKey gerekir, adminToken değil); `mcpTools()`/`mcpCall(tool,args)` → `/mcp` Streamable HTTP (JSON-RPC `tools/list`+`tools/call`).
+3. `/mcp` JSON-RPC istemci yardımcı (initialize→tools/list→tools/call), choke-point üzerinden.
+4. `formatTable` upstream/tool listesi; `--json` ham.
+5. auth: upstream CRUD tenant apiKey (`OLLAMAS_API_KEY`); `/mcp` Origin allowlist (DNS-rebinding guard, Faz 6) → `Origin` header doğru ver.
+6. Testler: mcp client mock-fetch (JSON-RPC envelope); `formatTable` reuse; doctor'a `mcp` opsiyonel.

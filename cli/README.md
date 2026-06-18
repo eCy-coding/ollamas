@@ -25,6 +25,7 @@ npm link               # exposes `ollamas` globally (bin field in package.json)
 | `ollamas agent sessions` | list persisted agent sessions |
 | `ollamas agent rm <id>` | delete a session |
 | `ollamas saas <action>` | admin: `plans\|tenants\|keys\|audit\|usage\|billing`, `tenant new`, `key new\|revoke` |
+| `ollamas bench` | benchmark models (tok/s, TTFB) across mac/remote targets; `--apply` picks the fastest |
 | `ollamas doctor` | health of gateway + ollama + bridge + ready + agent + saas |
 | `ollamas config [k] [v]` | show config, or set `gateway\|model\|provider\|apiKey\|saasAdminToken\|profile` |
 
@@ -75,6 +76,18 @@ loop. `--yolo` sets `autoApply` so the gateway applies writes without pausing.
 > Note: on resume the CLI re-primes the agent with the assistant history plus an
 > "approved and wrote X — continue" turn; full tool-result history lives in the
 > server session. Multi-write tasks loop until done (cap 12 rounds).
+
+## Benchmark
+
+`ollamas bench` times each model through `/api/generate` (real ollama tok/s from
+`eval_count/eval_duration`) and derives TTFB from the first stream chunk. It runs
+a discarded **warmup** call first (cold-start loads the model into Metal VRAM;
+`keep_alive=30m` keeps it warm) so the timed runs are fair. Median for latencies,
+mean for throughput. Writes `~/.llm-mission-control/cli-bench.json` tagged with the
+**host platform** (`platform/arch/release`) — a container reading is not a
+Mac-native reading. `--target both --remote-gateway <url>` also benchmarks the
+remote endpoint an iOS Shortcut would hit. `--apply` saves the fastest correct
+model to config.
 
 ## Tests
 

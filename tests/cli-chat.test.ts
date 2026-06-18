@@ -47,7 +47,8 @@ describe("GatewayClient.generateStream", () => {
       const chunks: string[] = [];
       const meta = await client.generateStream([{ role: "user", content: "hi" }], {}, (c) => chunks.push(c));
       expect(chunks.join("")).toBe("Hello");
-      expect(meta).toEqual({ source: "ollama_local", latencyMs: 42, tokensPerSec: 30 });
+      expect(meta).toMatchObject({ source: "ollama_local", latencyMs: 42, tokensPerSec: 30 });
+      expect(typeof meta.ttfbMs).toBe("number");
     } finally {
       globalThis.fetch = original;
     }
@@ -77,6 +78,44 @@ describe("GatewayClient base url normalization (G3)", () => {
       const client = new GatewayClient("http://x:3000/");
       await client.health();
       expect(calledUrl).toBe("http://x:3000/api/health");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
+describe("GatewayClient.generateStream TTFB (I1)", () => {
+  it("reports a ttfbMs derived from the first chunk", async () => {
+    const frames = [
+      'data: {"chunk":"a"}\n\n',
+      'data: {"done":true,"source":"ollama_local","tokensPerSec":25}\n\n',
+    ];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(readableFrom(frames), { status: 200 })) as any;
+    try {
+      const client = new GatewayClient("http://x");
+      const meta = await client.generateStream([{ role: "user", content: "hi" }], {}, () => {});
+      expect(typeof meta.ttfbMs).toBe("number");
+      expect(meta.ttfbMs).toBeGreaterThanOrEqual(0);
+      expect(meta.tokensPerSec).toBe(25);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
+describe("GatewayClient.listModels (I2)", () => {
+  it("returns the gateway model name array", async () => {
+    const original = globalThis.fetch;
+    let url = "";
+    globalThis.fetch = (async (u: string) => {
+      url = u;
+      return new Response(JSON.stringify(["qwen3:8b", "qwen3:4b"]), { status: 200 });
+    }) as any;
+    try {
+      const models = await new GatewayClient("http://x").listModels("ollama-local");
+      expect(models).toEqual(["qwen3:8b", "qwen3:4b"]);
+      expect(url).toBe("http://x/api/models/ollama-local");
     } finally {
       globalThis.fetch = original;
     }
