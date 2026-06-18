@@ -79,6 +79,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tsc temiz; **41 passed / 1 skipped** (yeni: mcp-compliance e2e, consume-security, audit, token-aggregate). Canlı: metadata JSON, 401+WWW-Authenticate header, bad-Origin 403. Commit f26fdb0.
 - **Backlog (dürüstçe ertelendi):** tam OAuth 2.1 server + RFC 8707 audience · Redis dağıtık rate-limit · host-bridge HMAC/TLS · per-call Stripe meter. (AGENTS.md Backlog.)
 
+## Faz 11 — main'e merge (PR)
+- **Ne:** `feat/mcp-gateway-saas` (10 commit, Faz 0-6) main'e merge.
+- **Ship kapısı:** tsc temiz · vitest 41 pass/1 skip · vite build yeşil.
+- **eCy-coding/ollamas:** PR #1 → MERGED (merge commit `2406767`); local+remote main senkron. (https://github.com/eCy-coding/ollamas/pull/1)
+- **adobemre1/ollamas:** BLOK — repo'lar GitHub'da fork-linked değil (bağımsız) → cross-repo PR reddedildi; ayrıca yazma yetkisi yok (pull-only). Merge/PR mevcut yetkiyle MÜMKÜN DEĞİL. Çözüm: adobemre1 yazma izni ver VEYA fork-network kur.
+- **Niçin:** Faz 0-6 canonical repo'ya (eCy-coding) indi; ollamas artık main'de MCP-gateway + tools-as-SaaS.
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
