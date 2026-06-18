@@ -200,6 +200,29 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(toolList.tools.length).toBeLessThanOrEqual(50); // page cap
     await c.close();
   });
+
+  // --- Faz 11A: prompts + completions ---
+  test("prompts/list + get + completion (3-stage pipeline)", async () => {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: "prompts", plan: "enterprise" }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const c = new Client({ name: "t", version: "0" }, { capabilities: {} });
+    const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
+    await c.connect(tr);
+    const prompts = await c.listPrompts();
+    expect(prompts.prompts.map((p) => p.name).sort()).toEqual(["architect", "coder", "reviewer"]);
+    const got = await c.getPrompt({ name: "coder", arguments: { spec: "build a CLI", language: "rust" } });
+    expect(JSON.stringify(got.messages)).toContain("rust");
+    const comp = await c.complete({ ref: { type: "ref/prompt", name: "reviewer" }, argument: { name: "focus", value: "sec" } });
+    expect(comp.completion.values).toContain("security");
+    await c.close();
+  });
 });
 
 describe("MCP gateway CONSUME (stdio upstream)", () => {

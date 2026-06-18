@@ -11,9 +11,11 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import {
   CallToolRequestSchema, ListToolsRequestSchema,
   ListResourcesRequestSchema, ReadResourceRequestSchema,
+  ListPromptsRequestSchema, GetPromptRequestSchema, CompleteRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
+import { PROMPTS, getPrompt, completeArg } from "./prompts";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
@@ -24,8 +26,8 @@ const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toSt
 
 function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
-    { name: "ollamas-gateway", version: "1.1.0" },
-    { capabilities: { tools: {}, resources: {} } }
+    { name: "ollamas-gateway", version: "1.2.0" },
+    { capabilities: { tools: {}, resources: {}, prompts: {}, completions: {} } }
   );
 
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
@@ -93,6 +95,27 @@ function buildServer(ctx: ToolCtx): Server {
     try { text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel); }
     catch (e: any) { text = `Error reading resource: ${e?.message || e}`; }
     return { contents: [{ uri, mimeType: "text/plain", text }] };
+  });
+
+  // --- prompts/list + prompts/get (3-stage pipeline as MCP prompts, Faz 11A) ---
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+    prompts: PROMPTS.map((p) => ({ name: p.name, title: p.title, description: p.description, arguments: p.arguments })),
+  }));
+  server.setRequestHandler(GetPromptRequestSchema, async (req) => {
+    const p = getPrompt(req.params.name);
+    if (!p) throw new Error(`Unknown prompt: ${req.params.name}`);
+    return {
+      description: p.description,
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: p.render((req.params.arguments as any) || {}) } }],
+    };
+  });
+
+  // --- completion/complete (enum autocomplete for prompt args) ---
+  server.setRequestHandler(CompleteRequestSchema, async (req) => {
+    const ref = req.params.ref as any;
+    const arg = req.params.argument as any;
+    const values = ref?.type === "ref/prompt" ? completeArg(ref.name, arg?.name, arg?.value) : [];
+    return { completion: { values, total: values.length, hasMore: false } };
   });
 
   return server;
