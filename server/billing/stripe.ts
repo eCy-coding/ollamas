@@ -4,7 +4,7 @@
 // a key everything runs in dry-run so the gateway works with zero billing config.
 
 import Stripe from "stripe";
-import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, monthKey, type UsageAgg } from "../store";
+import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 const METER_EVENT_NAME = "ollamas_tool_calls";
@@ -177,7 +177,7 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
       const planId = (sub.metadata?.planId as string) || "";
       const tenantId = tenantFromSub(sub);
       if (tenantId && planId && getTenant(tenantId)) {
-        try { setTenantPlan(tenantId, planId); return { type: event.type, handled: true }; } catch { /* unknown plan */ }
+        try { setTenantPlan(tenantId, planId); queueWebhookEvent(tenantId, "subscription.updated", { planId }); return { type: event.type, handled: true }; } catch { /* unknown plan */ }
       }
       break;
     }

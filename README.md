@@ -84,6 +84,12 @@ Tüm prod özellikleri **dış secret olmadan** çalışır; secret girilince ot
 - **Güvenlik:** AES-GCM authTagLength pinned, path-traversal guard, non-root Docker, helmet.
 - **CI:** `.github/workflows/ci.yml` (tsc + vitest + build, Node 22/24).
 
+### v1.2 (Faz 11 — zero-dep)
+- **MCP prompts/completions:** `prompts/list`+`get` (architect/coder/reviewer) + `completion/complete` (enum autocomplete).
+- **Tenant webhooks:** `POST /api/saas/webhooks {url,events[]}` → HMAC-signed (`X-Ollamas-Signature: t=..,v1=..`, Stripe-compatible) outbound delivery with retry + dead-letter. Events: `key.created/revoked`, `usage.quota_exceeded`, `subscription.updated`.
+- **Self-service dashboard:** SaaS UI panel (tenant key) — pure-SVG usage charts, webhooks CRUD, upstreams, billing portal button.
+- **Deploy:** `deploy/helm/ollamas/` Helm chart (`helm install ollamas deploy/helm/ollamas`) + `release-please` (conventional commits → semver tag → GHCR image via `publish.yml`).
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

@@ -1,0 +1,20 @@
+name: release-please
+
+# Parses conventional commits on main → opens a Release PR (version bump +
+# CHANGELOG). Merging it creates a GitHub Release + tag `vX.Y.Z`, which triggers
+# publish.yml to build + push the GHCR image.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: node

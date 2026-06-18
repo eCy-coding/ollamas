@@ -26,7 +26,43 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const [newPlan, setNewPlan] = useState("free");
   const [freshKey, setFreshKey] = useState<string>("");
 
+  // Self-service (tenant key): usage chart, webhooks, upstreams, billing portal.
+  const [tenantKey, setTenantKey] = useState<string>(() => localStorage.getItem("saasTenantKey") || "");
+  const [selfUsage, setSelfUsage] = useState<any>(null);
+  const [series, setSeries] = useState<any[]>([]);
+  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [upstreams, setUpstreams] = useState<any[]>([]);
+  const [whUrl, setWhUrl] = useState("");
+  const [whEvents, setWhEvents] = useState("key.created,usage.quota_exceeded");
+
   const hdr = () => ({ "Content-Type": "application/json", "x-admin-token": adminToken });
+  const thdr = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${tenantKey}` });
+  const tapi = async (p: string, init?: RequestInit) => {
+    const r = await fetch(p, { ...init, headers: { ...thdr(), ...(init?.headers || {}) } });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `${r.status}`);
+    return r.json();
+  };
+  const loadSelf = async () => {
+    if (!tenantKey) return;
+    localStorage.setItem("saasTenantKey", tenantKey);
+    try {
+      setSelfUsage(await tapi("/api/saas/self/usage"));
+      setSeries((await tapi("/api/saas/usage/timeseries")).series || []);
+      setWebhooks(await tapi("/api/saas/webhooks"));
+      setUpstreams(await tapi("/api/saas/upstreams"));
+    } catch (e: any) { onNotify(`Self-service: ${e.message} (key needs usage:read scope)`, "error"); }
+  };
+  const addHook = async () => {
+    try {
+      const r = await tapi("/api/saas/webhooks", { method: "POST", body: JSON.stringify({ url: whUrl, events: whEvents.split(",").map(s => s.trim()).filter(Boolean) }) });
+      onNotify(`Webhook created — secret (once): ${r.secret.slice(0, 16)}…`, "success"); copy(r.secret); setWhUrl(""); loadSelf();
+    } catch (e: any) { onNotify(e.message, "error"); }
+  };
+  const delHook = async (id: string) => { try { await tapi(`/api/saas/webhooks/${id}`, { method: "DELETE" }); loadSelf(); } catch (e: any) { onNotify(e.message, "error"); } };
+  const openPortal = async () => {
+    try { const r = await tapi("/api/billing/portal", { method: "POST", body: "{}" }); if (r.url) window.open(r.url, "_blank"); }
+    catch (e: any) { onNotify(`Portal: ${e.message}`, "error"); }
+  };
 
   const api = async (path: string, init?: RequestInit) => {
     const res = await fetch(path, { ...init, headers: { ...hdr(), ...(init?.headers || {}) } });
@@ -87,6 +123,19 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
 
   const card = "bg-white/[0.03] border border-white/10 rounded-xl p-4";
   const btn = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition";
+
+  // Zero-dep pure-SVG sparkline for the usage timeseries.
+  const Spark: React.FC<{ data: number[]; color: string; label: string }> = ({ data, color, label }) => {
+    if (!data.length) return <div className="text-xs text-slate-500">{label}: no data</div>;
+    const max = Math.max(...data, 1), w = Math.max(data.length * 8, 40), h = 48;
+    const pts = data.map((v, i) => `${i * 8},${h - (v / max) * h}`).join(" ");
+    return (
+      <div>
+        <div className="text-xs text-slate-400 mb-1">{label} <span className="text-slate-500">(peak {max})</span></div>
+        <svg width={w} height={h} className="border border-white/10 rounded bg-black/20"><polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" /></svg>
+      </div>
+    );
+  };
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -192,6 +241,58 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* Tenant Self-Service (uses a tenant API key, not the admin token) */}
+      <div className={card}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-sm text-slate-200"><KeyRound className="w-4 h-4 text-cyan-300" /> Self-Service (tenant key)</div>
+          <button onClick={openPortal} className={`${btn} bg-amber-500/15 text-amber-300 hover:bg-amber-500/25`}><Receipt className="w-3.5 h-3.5" /> Billing portal</button>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <input value={tenantKey} onChange={(e) => setTenantKey(e.target.value)} type="password" placeholder="olm_… (needs usage:read / webhooks:write scopes)"
+            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 font-mono" />
+          <button onClick={loadSelf} className={`${btn} bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25`}><RefreshCw className="w-3.5 h-3.5" /> Load</button>
+        </div>
+        {selfUsage && <div className="text-xs font-mono text-slate-400 mb-2">plan {selfUsage.plan} · used {selfUsage.used}{selfUsage.quota ? ` / ${selfUsage.quota}` : ""}</div>}
+        {series.length > 0 && (
+          <div className="flex gap-6 mb-3">
+            <Spark data={series.map((s) => s.calls)} color="#22d3ee" label="daily calls" />
+            <Spark data={series.map((s) => s.tokens || 0)} color="#a78bfa" label="daily tokens" />
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Webhooks */}
+          <div>
+            <div className="text-xs text-slate-300 mb-1">Webhooks</div>
+            <div className="flex gap-1 mb-1">
+              <input value={whUrl} onChange={(e) => setWhUrl(e.target.value)} placeholder="https://your.app/hook" className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-200" />
+              <button onClick={addHook} className={`${btn} bg-emerald-500/15 text-emerald-300`}><Plus className="w-3 h-3" /></button>
+            </div>
+            <input value={whEvents} onChange={(e) => setWhEvents(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-500 mb-1" />
+            <ul className="space-y-0.5">
+              {webhooks.map((w) => (
+                <li key={w.id} className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                  <span className="truncate flex-1">{w.url}</span><span className="text-slate-600">{(w.events || []).length}ev</span>
+                  <button onClick={() => delHook(w.id)} className="text-rose-400"><Trash2 className="w-3 h-3" /></button>
+                </li>
+              ))}
+              {webhooks.length === 0 && <li className="text-xs text-slate-600">none</li>}
+            </ul>
+          </div>
+          {/* Upstreams */}
+          <div>
+            <div className="text-xs text-slate-300 mb-1">Upstream MCP servers</div>
+            <ul className="space-y-0.5">
+              {upstreams.map((u) => (
+                <li key={u.id} className="text-xs font-mono text-slate-400 flex items-center gap-2">
+                  <span className="text-slate-300">{u.name}</span><span className="text-slate-600">[{u.transport}]</span>
+                </li>
+              ))}
+              {upstreams.length === 0 && <li className="text-xs text-slate-600">none (POST /api/saas/upstreams)</li>}
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

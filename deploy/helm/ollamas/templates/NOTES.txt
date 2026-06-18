@@ -1,0 +1,9 @@
+ollamas {{ .Chart.AppVersion }} deployed as "{{ .Release.Name }}".
+
+  kubectl get pods -l app={{ .Release.Name }}
+  kubectl port-forward svc/{{ .Release.Name }} 8080:{{ .Values.service.port }}
+  open http://localhost:8080/api/docs
+
+NOTE: host-bridge tools (macos_terminal, etc.) do NOT run in K8s — only the
+gateway/SaaS API. MCP_EXPOSE_TIERS is "safe" by default. Set REDIS_URL for
+multi-replica rate-limiting and an Ingress to /api/billing/webhook for Stripe.

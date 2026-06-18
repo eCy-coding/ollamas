@@ -105,6 +105,14 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **10E bridge HMAC**: `server/bridge-hmac.ts` (canonical) + `terminal-bridge.mjs` verify (±5dk freshness + nonce dedup + timingSafeEqual); `HOST_BRIDGE_HMAC_SECRET` yoksa token geriye-uyum.
 - **Kanıt:** tsc temiz; **63 passed/1 skipped** (yeni: tenant-isolation, resources e2e, self-serve scope, timeseries, openapi e2e, HMAC roundtrip+stale+replay). 3 yeni dep swagger-jsdoc/swagger-ui-express.
 
+## Faz 14 — v1.2 (protokol + ekosistem, branch feat/v1.2, zero-dep)
+- **Ne:** v1.1 üzerine düşük-risk completer'lar. 3-ajan WEB araştırması (MCP prompts/completion, Svix/Stripe webhook, recharts-vs-SVG+Helm+release-please — cited). v1.1 PR #3 main'e merge (`488b323`). Postgres v1.3'e ertelendi (sync→async store refactor riski).
+- **11A MCP prompts** (`fd049ce`): `server/mcp/prompts.ts` architect/coder/reviewer → prompts/list+get + completion/complete (language/focus enum). Capabilities {tools,resources,prompts,completions}.
+- **11B webhooks** (`b603efe`): `webhooks`+`webhook_deliveries` tablo + `server/webhooks/outbound.ts` (Stripe-uyumlu `t=,v1=` imza + retry 0/1m/10m/1h/12h + dead-letter + worker); fire: key.created/revoked/quota_exceeded/subscription.updated; CRUD `/api/saas/webhooks`.
+- **11C dashboard** (`77fdf88`): SaaSAdmin self-service paneli — pure-SVG usage sparkline + webhooks CRUD + upstreams + billing portal butonu (tenant-key ile).
+- **11D Helm + release-please:** `deploy/helm/ollamas/` (helm template → 6 kaynak OK) + `.github/workflows/release-please.yml` (conventional commit→semver→tag→GHCR).
+- **Kanıt:** tsc temiz; **67 passed/1 skipped** (yeni: mcp-prompts e2e, webhook sign/verify+canlı-deliver+fan-out); vite build yeşil; helm render OK. **SIFIR yeni npm dep.**
+
 ---
 **Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
