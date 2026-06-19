@@ -72,6 +72,13 @@ export interface ToolCtx {
   /** Cooperative cancellation (Faz 17D). Aborted before/while a tool runs → the
    *  call returns ok:false `cancelled` promptly (the MCP CancelledNotification path). */
   abortSignal?: AbortSignal;
+  /** Server→client elicitation (Faz 18). Set ONLY when the connected client
+   *  advertises the `elicitation` capability (bidirectional stdio). A tool may
+   *  ask the user a structured question; undefined → tool falls back (e.g. halt). */
+  onElicit?: (message: string, requestedSchema: any) => Promise<{ action: "accept" | "decline" | "cancel"; content?: any }>;
+  /** Server→client sampling (Faz 18). Set ONLY when the client advertises the
+   *  `sampling` capability. A tool may ask the client's LLM to generate text. */
+  onSample?: (params: { messages: any[]; systemPrompt?: string; maxTokens?: number }) => Promise<{ text: string }>;
 }
 
 /** Normalized result the ReAct loop and MCP layer consume. */
@@ -145,7 +152,8 @@ const TOOLS: Record<string, ToolDef> = {
         required: ["path", "content"],
       }
     ),
-    invoke: async (args, { isLive, workspaceRoot, autoApply, deps }) => {
+    invoke: async (args, ctx) => {
+      const { isLive, workspaceRoot, autoApply, deps } = ctx;
       if (!args.path || args.content === undefined) {
         throw new Error("Missing 'path' or 'content' in write_file parameters.");
       }
@@ -155,11 +163,31 @@ const TOOLS: Record<string, ToolDef> = {
       } catch {}
       const diff = deps.FilesystemManager.generateUnifiedDiff(args.path, oldContent, args.content);
 
-      if (autoApply) {
+      const apply = () => {
         deps.FilesystemManager.writeFile(isLive, workspaceRoot, args.path, args.content);
-        deps.db.logSecurity("file_system", `Agent write_file (auto-apply): ${args.path}`, "Wrote code modifications directly into workspace", "allow");
+        deps.db.logSecurity("file_system", `Agent write_file: ${args.path}`, "Wrote code modifications into workspace", "allow");
+      };
+
+      if (autoApply) {
+        apply();
         return { output: "Changes written to disk successfully.", diff, applied: true };
       }
+
+      // Faz 18B: when the client supports elicitation (bidirectional stdio), ask the
+      // user to approve INSTEAD of halting the loop. Falls back to halt otherwise.
+      if (ctx.onElicit) {
+        const res = await ctx.onElicit(`Apply write to ${args.path}?`, {
+          type: "object",
+          properties: { approve: { type: "boolean", title: `Apply changes to ${args.path}?` } },
+          required: ["approve"],
+        });
+        if (res.action === "accept" && res.content?.approve) {
+          apply();
+          return { output: "Changes written after elicited approval.", diff, applied: true };
+        }
+        return { output: `Write declined (${res.action}).`, diff, applied: false };
+      }
+
       // Pause the loop for manual validation; diff is surfaced for approval.
       return { output: "File write is pending authorization. Diffs are stored and waiting for manual approval.", diff, applied: false, halt: true };
     },

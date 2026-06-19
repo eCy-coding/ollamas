@@ -105,11 +105,27 @@ export function buildServer(ctx: ToolCtx): Server {
           server.notification({ method: "notifications/progress", params: { progressToken, progress, total, message } }).catch(() => {})
       : undefined;
     const def = ToolRegistry.info(name);
+    // Faz 18: server→client elicitation/sampling, wired ONLY when the connected
+    // client advertises the matching capability (bidirectional stdio). Undefined
+    // otherwise → tools fall back (e.g. write_file halt) — no HTTP regression.
+    const caps = server.getClientCapabilities();
+    const onElicit = caps?.elicitation
+      ? async (message: string, requestedSchema: any) => {
+          const e = await server.elicitInput({ message, requestedSchema });
+          return { action: e.action, content: e.content };
+        }
+      : undefined;
+    const onSample = caps?.sampling
+      ? async (p: { messages: any[]; systemPrompt?: string; maxTokens?: number }) => {
+          const m = await server.createMessage({ messages: p.messages, systemPrompt: p.systemPrompt, maxTokens: p.maxTokens ?? 1024 });
+          return { text: (m.content as any)?.type === "text" ? String((m.content as any).text) : "" };
+        }
+      : undefined;
     // Surface host/privileged invocations at a higher severity (Faz 14A). Awaited
     // so the message is flushed on the response stream before the result.
     await emitLog(def && def.tier !== "safe" ? "notice" : "info", { msg: `tool.call ${name}`, tier: def?.tier, tenant: ctx.tenantId });
     onProgress?.(0, 1, `starting ${name}`);
-    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress, abortSignal: extra?.signal });
+    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress, abortSignal: extra?.signal, onElicit, onSample });
     onProgress?.(1, 1, `done ${name}`);
     await emitLog(r.ok ? "info" : "error", { msg: `tool.done ${name}`, ok: r.ok });
     const text = typeof r.output === "string" ? r.output : JSON.stringify(r.output);

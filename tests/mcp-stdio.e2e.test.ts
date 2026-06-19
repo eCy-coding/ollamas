@@ -61,6 +61,29 @@ describe("MCP stdio EXPOSE (npx ollamas-mcp)", () => {
     expect(tools.length).toBeGreaterThan(15);
   }, 40000);
 
+  // --- Faz 18B: elicitation over stdio replaces write_file's halt path ---
+  test("write_file elicits approval; accept writes, decline does not", async () => {
+    const { ElicitRequestSchema } = await import("@modelcontextprotocol/sdk/types.js");
+    const run = async (decision: "accept" | "decline", file: string) => {
+      const c = new Client({ name: "elicit", version: "0" }, { capabilities: { elicitation: {} } });
+      c.setRequestHandler(ElicitRequestSchema, async () => (decision === "accept" ? { action: "accept", content: { approve: true } } : { action: "decline" }));
+      const tr = new StdioClientTransport({
+        command: "npx", args: ["tsx", "bin/mcp-stdio.ts"], cwd: ROOT,
+        env: { ...process.env, OLLAMAS_WORKSPACE: WS, MCP_AUTO_APPLY: "0" } as Record<string, string>,
+      });
+      await c.connect(tr);
+      const res: any = await c.callTool({ name: "write_file", arguments: { path: file, content: "elicited body" } });
+      await c.close();
+      return res;
+    };
+    const okRes = await run("accept", "elicited-ok.txt");
+    expect(okRes.isError).toBeFalsy();
+    expect(fs.readFileSync(path.join(WS, "elicited-ok.txt"), "utf8")).toBe("elicited body");
+
+    await run("decline", "elicited-no.txt");
+    expect(fs.existsSync(path.join(WS, "elicited-no.txt"))).toBe(false);
+  }, 40000);
+
   // --- Faz 17D: cancellation over the bidirectional stdio transport ---
   test("aborting a call sends notifications/cancelled and returns promptly", async () => {
     const { c, tr } = connect();

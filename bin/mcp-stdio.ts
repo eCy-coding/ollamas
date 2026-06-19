@@ -25,7 +25,9 @@ import type { ToolCtx, ToolDeps, ToolTier } from "../server/tool-registry";
 const autoApply = process.env.MCP_AUTO_APPLY !== "0";
 if (process.env.MCP_STDIO_NO_FS !== "1") {
   db.data.permissions.fileRead = true;
-  db.data.permissions.fileWrite = autoApply;
+  // Writes are permitted in local mode; MCP_AUTO_APPLY only governs whether a write
+  // applies directly (true) or is gated by elicitation/halt approval (false).
+  db.data.permissions.fileWrite = true;
 }
 
 const VALID_TIERS: ToolTier[] = ["safe", "host", "privileged", "host_upstream"];

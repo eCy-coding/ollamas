@@ -59,6 +59,34 @@ describe("ToolRegistry choke-point", () => {
     expect(r.halt).toBe(false);
   });
 
+  // --- Faz 18B: elicitation replaces the halt path when the client supports it ---
+  test("write_file elicits approval → accept applies (no halt)", async () => {
+    const writeFile = vi.fn();
+    const deps = mkDeps({ FilesystemManager: { readFile: () => { throw new Error("nf"); }, writeFile, generateUnifiedDiff: () => "D", getTree: async () => ({ tree: "" }) } as any });
+    const onElicit = vi.fn(async () => ({ action: "accept" as const, content: { approve: true } }));
+    const r = await ToolRegistry.execute("write_file", { path: "a.txt", content: "x" }, { isLive: true, workspaceRoot: "/ws", autoApply: false, deps, onElicit });
+    expect(onElicit).toHaveBeenCalledOnce();
+    expect(writeFile).toHaveBeenCalledOnce();
+    expect(r.applied).toBe(true);
+    expect(r.halt).toBe(false);
+  });
+
+  test("write_file elicits approval → decline does not write (no halt)", async () => {
+    const writeFile = vi.fn();
+    const deps = mkDeps({ FilesystemManager: { readFile: () => { throw new Error("nf"); }, writeFile, generateUnifiedDiff: () => "D", getTree: async () => ({ tree: "" }) } as any });
+    const onElicit = vi.fn(async () => ({ action: "decline" as const }));
+    const r = await ToolRegistry.execute("write_file", { path: "a.txt", content: "x" }, { isLive: true, workspaceRoot: "/ws", autoApply: false, deps, onElicit });
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(r.applied).toBe(false);
+    expect(r.halt).toBe(false);
+    expect(String(r.output)).toContain("declined");
+  });
+
+  test("write_file without elicitation capability falls back to halt", async () => {
+    const r = await ToolRegistry.execute("write_file", { path: "a.txt", content: "x" }, ctx({ autoApply: false }));
+    expect(r.halt).toBe(true); // unchanged legacy behavior
+  });
+
   test("onUsage fires with tool/tier/ok/latency", async () => {
     const seen: any[] = [];
     await ToolRegistry.execute("list_tree", {}, ctx({ onUsage: (e) => seen.push(e) }));
