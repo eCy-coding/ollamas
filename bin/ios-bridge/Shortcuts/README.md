@@ -50,6 +50,33 @@ POST `[Gateway]/mcp` with JSON-RPC 2.0:
 Read `result.tools[]`. For a call use `method: "tools/call"`,
 `params: { "name": "<tool>", "arguments": { … } }`. Bearer required in SaaS mode.
 
+## Recipe D — Function Router (composable, multi-step)
+> Pattern adopted from **elsheppo/ollama-shortcuts-ui** (Apache-2.0,
+> https://github.com/elsheppo/ollama-shortcuts-ui): instead of one flat
+> Shortcut, split into reusable *Blocks* dispatched by a *Function Router*.
+> This lets you chain LLM calls (summarize → translate → speak) without
+> rebuilding each Shortcut.
+
+Build three small Shortcuts that call each other via **Run Shortcut**:
+
+1. **`ollamas Block`** — the reusable worker. Input: a dictionary
+   `{ "prompt": "…", "system": "…" }`. Does Recipe A's `Get Contents of URL`
+   POST to `[Gateway]/api/generate`, returns the `text` value. One block, reused
+   everywhere.
+2. **`ollamas Router`** — the dispatcher. Input: `{ "fn": "summarize",
+   "arg": "…" }`. A **Choose from Menu** / `If fn =` maps each function name to a
+   prompt template, then **Run Shortcut → `ollamas Block`** with the built prompt.
+   Add a new capability by adding one menu branch — no HTTP plumbing repeated.
+3. **`Ask ollamas`** — the entry point (Recipe A's UI). Collects user input and
+   **Run Shortcut → `ollamas Router`** with `{ "fn": "chat", "arg": Prompt }`.
+
+Chaining example (inside Router, `fn = "brief"`):
+`ollamas Block(summarize)` → feed its `text` into `ollamas Block(translate)` →
+**Speak Text**. Each hop is the same Block; only the prompt template differs.
+
+This mirrors the CLI: each Block ≡ one `ollamas-ios generate` call, the Router ≡
+the `cmd` switch in `Sources/ollamas-ios/main.swift`.
+
 ## Secret handling
 Do **not** paste the API key into a shared Shortcut. Prefer a per-device Text
 action or, in a future native build, the iOS Keychain (tracked for ROADMAP v9).

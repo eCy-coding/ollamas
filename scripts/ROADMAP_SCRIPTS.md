@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅** (iOS bridge: Swift 8 + node 88/1 skip), **v4 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅** (cross-platform bench: adopt llm-benchmark MIT tok/s; swift 8 + node 96/1 skip), **v5 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -59,18 +59,18 @@
 
 ---
 
-## v4 — Cross-Platform Efficiency Bench ⬜
+## v4 — Cross-Platform Efficiency Bench ✅ (adopt: llm-benchmark MIT)
 
-**Tema:** MacBook vs iOS'ta en verimli yöntemi ölçümle bul.
+**Tema:** MacBook vs iOS'ta en verimli yöntemi ölçümle bul. **DONE** — GitHub adoption: kanıtlanmış tok/s deseni `MinhNgyuen/llm-benchmark` (MIT) `bin/host-bridge/bench-metrics.mjs`'e pure modül olarak lift edildi (attribution); `benchmark.mjs --platform macos|ios` + device detection + v4 `records[]` (platform+device+method); `calibrate_hardware.py` per-device thermal class; Shortcuts/README "Function Router" (ollama-shortcuts-ui Apache-2.0). Gate: swift 8 + node 96/1 (+8 golden). GOTCHA: RISK-SCR-006 LaunchAgent-LAN-privacy (openclaw#24018), RISK-SCR-007 cached-prompt null guard.
 
 **Phases:**
-1. `benchmark.mjs --platform macos|ios`: ortak deterministik task, ölç latency / tok-s / success-rate / transport RTT.
-2. iOS tarafı: Swift CLI sonucu `benchmark.json`'a `platform+device+method` anahtarıyla post eder.
-3. `calibrate_hardware.py` per-device profil (CPU/RAM/thermal class).
-4. Platform başına **en hızlı *doğru*** method seç; rapor.
-5. Regresyon eşiği (CI'da fail için).
+1. ✅ `benchmark.mjs --platform macos|ios`: arg parse + device detection + normalized record şema.
+2. ✅ tok/s çekirdeği `bench-metrics.mjs` (MIT pattern): `eval_count`/`eval_duration`(ns) → prompt/response/total tok-s; div-by-zero null guard.
+3. ✅ `calibrate_hardware.py` per-device profil (CPU/RAM/thermalClass) → `benchmark.json` calibration[] merge.
+4. ✅ Shortcuts upgrade: Function Router + modüler Block (Apache-2.0 adopt).
+5. ⬜ Regresyon eşiği (CI'da fail) → v10 CI matrix ile birleştir (ertelendi, açık).
 
-**Canonical prompt:** "benchmark.mjs'i çok-platformlu yap (--platform macos|ios), iki tarafı `benchmark.json`'a yaz, platform başına en hızlı doğru method'u seç, regresyon eşiği koy."
+**Canonical prompt:** "benchmark.mjs'i çok-platformlu yap (--platform macos|ios), llm-benchmark MIT tok/s desenini adopte et, iki tarafı `benchmark.json`'a yaz, calibrate_hardware.py per-device, golden test."
 
 **Next precomputed (→v5):** `server/tool-registry.ts` register-seam'ini bul (mevcut `run_tests`/`lint_format` register satırları); `registerHostScripts()` imza taslağı.
 

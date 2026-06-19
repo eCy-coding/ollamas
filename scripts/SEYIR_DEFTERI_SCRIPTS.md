@@ -41,6 +41,19 @@
 
 ---
 
+## v4 — Cross-Platform Bench (adopt: llm-benchmark MIT tok/s)
+
+- `[2026-06-19] kind=phase | GitHub adoption search | WebSearch+WebFetch ile macOS eşleşen tamamlanmış projeler tarandı; haritalandı: llm-benchmark(MIT)→v4, ollama-shortcuts-ui(Apache-2.0)→Shortcuts, multi-level self-heal→v7, bertvv+shellcheck→v6. Lisans disiplini: MIT/Apache kopya+attribution, SiriLLama(lisanssız) fikir-only. | plan onaylı`
+- `[2026-06-19] kind=phase | P0 metrik çekirdeği | bin/host-bridge/bench-metrics.mjs — pure tok/s çıkarımı (MIT pattern attribution): tokensPerSecond=count/(durNs/1e9), extractOllamaMetrics prompt/response split, parsePlatformArg, detectDevice, benchRecord şema | node --check OK`
+- `[2026-06-19] kind=phase | P0 wire | benchmark.mjs --platform macos|ios arg + DEVICE detection + v4 records[] (platform+device+method anahtarı) report'a eklendi; mevcut IIFE korundu | smoke: header "platform: ios device: Apple M4 Max 16c/48GB arm64" bastı`
+- `[2026-06-19] kind=phase | P2 calibrate_hardware.py | per-device profil (sysctl CPU/ncpu/mem + thermalClass heuristic) → benchmark.json calibration[] merge; stdlib-only, --dry-run | dry-run: M4 Max → workstation`
+- `[2026-06-19] kind=phase | P3 Shortcuts upgrade | Shortcuts/README.md "Recipe D — Function Router" (ollama-shortcuts-ui Apache-2.0 adopt+attribution): modüler Block + Router dispatch + chaining | -`
+- `[2026-06-19] kind=phase | P4 test | scripts/tests/benchmark.test.ts golden: tokensPerSecond (50/200 tok/s + div-by-zero null guard), extractOllamaMetrics fixture (prompt 200 / response 50 / total 48), parsePlatformArg, benchRecord şema, detectDevice shape | 8 yeni test`
+- `[2026-06-19] kind=phase | P5 gate | vitest 96 pass/1 skip (88→+8) + swift build/test 8 pass + node --check + calibrate dry-run | YEŞİL`
+- `[2026-06-19] kind=note | GOTCHA→registry | RISK-SCR-006 LaunchAgent-LAN-privacy (openclaw#24018: host-bridge LaunchAgent PPID=1 → outbound LAN sessiz blok) + RISK-SCR-007 Ollama cached-prompt prompt_eval_* atlama → null guard`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack

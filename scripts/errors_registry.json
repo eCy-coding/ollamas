@@ -51,6 +51,20 @@
       "severity": "high",
       "note": "Komşu CLI sekmesi aynı repo'da. Prevention: her commit öncesi git status; cli/ değişikliği görürsen dur, senin işin değil.",
       "applies_version": "all"
+    },
+    {
+      "id": "RISK-SCR-006",
+      "category": "portability",
+      "severity": "high",
+      "note": "macOS Local Network Privacy 'responsible process'i GUI ata üzerinden izler; host-bridge bir LaunchAgent (PPID=1, GUI atası yok) → outbound LAN sessizce bloklanır (openclaw#24018). Bench iOS yolu cihazdan Mac'e LAN üstünden vurur; bağlantı sessiz fail edebilir. Prevention: bench iOS hedefini açık LAN-IP ile test et + Privacy izni ver; egress'i 127.0.0.1'e zorlama, tunnel/reverse-proxy alternatifi belge. Kaynak: github.com/openclaw/openclaw/issues/24018.",
+      "applies_version": "v4"
+    },
+    {
+      "id": "RISK-SCR-007",
+      "category": "bench",
+      "severity": "med",
+      "note": "Ollama prompt fully-cached olduğunda prompt_eval_* alanlarını ATLAR; ham bölme NaN/Infinity üretir. Prevention: tokensPerSecond() eksik/0 süreyi null'a indirger (div-by-zero guard), asla throw etmez. Kaynak deseni: MinhNgyuen/llm-benchmark (MIT).",
+      "applies_version": "v4"
     }
   ],
   "errors": [

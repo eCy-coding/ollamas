@@ -6,9 +6,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parsePlatformArg, detectDevice, benchRecord } from "./bench-metrics.mjs";
 
 const APP = process.env.APP_URL || "http://127.0.0.1:3000";
 const STATE = path.join(os.homedir(), ".llm-mission-control");
+const PLATFORM = parsePlatformArg(process.argv); // macos | ios (default macos)
+const DEVICE = detectDevice();
 
 // Models to benchmark: [provider, model]
 const MODELS = [
@@ -62,6 +65,7 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 
 (async () => {
   console.log(`== E2E coding benchmark (${APP}) ==`);
+  console.log(`platform: ${PLATFORM}  device: ${DEVICE.device} (${DEVICE.cpuModel}, ${DEVICE.ncpu}c/${DEVICE.memGb}GB ${DEVICE.arch})`);
   console.log(`task: first 10 primes  expected: "${EXPECTED}"\n`);
 
   // Terminal axis FIRST: pick the working/fastest terminal for the code runs.
@@ -117,7 +121,23 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
   ranked.forEach((r, i) => console.log(`  ${i + 1}. ${r.model} ${r.correct ? "✓" : "✗"} total=${r.total_ms || "-"}ms tok/s=${r.tok_s || "-"}`));
   console.log(`\n>> bestModel: ${bestModel?.model}  bestTerminal: ${bestTerminal}`);
 
-  const report = { ts: new Date().toISOString(), task: "first10primes", expected: EXPECTED, results: ranked, termStats, bestModel: bestModel?.model, bestTerminal };
+  // v4 cross-platform schema: one normalized record per model, keyed by
+  // platform+device+method so macOS and iOS runs accumulate in the same file.
+  const ts = new Date().toISOString();
+  const method = PLATFORM === "ios" ? "ios-cli" : "app-generate";
+  const records = results.map((r) =>
+    benchRecord({
+      platform: PLATFORM,
+      device: DEVICE.device,
+      method,
+      model: r.model,
+      responseTps: r.tok_s ?? null,
+      latencyMs: r.total_ms ?? r.gen_ms ?? null,
+      correct: r.correct ?? null,
+      ts,
+    }),
+  );
+  const report = { ts, platform: PLATFORM, device: DEVICE, task: "first10primes", expected: EXPECTED, results: ranked, records, termStats, bestModel: bestModel?.model, bestTerminal };
   fs.mkdirSync(STATE, { recursive: true });
   fs.writeFileSync(path.join(STATE, "benchmark.json"), JSON.stringify(report, null, 2));
   console.log(`\nreport -> ${path.join(STATE, "benchmark.json")}`);
