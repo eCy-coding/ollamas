@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅** (hardening: shellcheck/shfmt/bats + DRY_RUN + ERR-SCR-003 fix; swift 8 + node 134/1 skip), **v7 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅** (self-healing: remediation map + self_heal DRY-default + plist SuccessfulExit; swift 8 + node 147/1 skip), **v8 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -114,20 +114,24 @@
 
 ---
 
-## v7 — Self-Healing ⬜
+## v7 — Self-Healing ✅
 
-**Tema:** Bridge kendini onarsın.
+**Tema:** Bridge kendini onarsın. **DONE** — pure `remediation.mjs` (planRemediation map + zero-dep backoff) + `self_heal.mjs` tool (DRY default, --apply, bridge-bağımsız direct child_process, güvenli 7345-node kill) + plist `KeepAlive{SuccessfulExit=false}`+`ThrottleInterval`. Gate: tsc ✓ · vitest **147/1** (+13) · bats 7/7 · plist lint OK · swift 8.
 
-**Phases:**
-1. `tools_doctor.mjs` extension: bridge down → auto-restart (port 7345), plist reload, key rotation.
-2. `health_probe.mjs` → remediation map (sorun → düzeltme thunk).
-3. Idempotent repair (tekrarlı çalıştırma güvenli).
-4. Repair denemeleri seyir'e loglanır.
-5. Gate: simüle arıza → otomatik recover testi.
+**Phases (gerçekleşen):**
+1. ✅ Pure `bin/host-bridge/lib/remediation.mjs`: `planRemediation(health)` → sıralı idempotent action (clean_pid/kill_7345_node/restart_bridge/plist_kickstart/port_blocked/app_report) + `retryWithBackoff` (p-retry deseni, inject-edilebilir sleep).
+2. ✅ `bin/host-bridge/tools/self_heal.mjs`: probe (bridge 7345 + pidfile kill-0 + lsof port + launchctl print) → plan → execute → backoff re-check; **güvenli kill** sadece 7345-LISTEN node (ps comm doğrula). DRY default; `--apply` ile gerçek.
+3. ✅ Idempotent: healthy→[] no-op; re-run güvenli; non-node port-holder → kill YOK, escalate.
+4. ✅ Repair planı/sonucu JSON `{healthyBefore, actions, executed, healthyAfter}`; DRY [DRY] stderr.
+5. ✅ Gate: simüle-arıza (unreachable bridge) recover testi — vitest self-heal + remediation, bats self-heal DRY. plist `SuccessfulExit=false` (crash-only restart) launchd safety-net.
 
-**Canonical prompt:** "bridge self-healing: tools_doctor auto-restart + plist reload + key rotation, health_probe remediation map, idempotent, simüle arıza recover testi."
+**Mimari karar:** bridge'i onaran tool bridge'e bağımlı OLAMAZ → bridge-client (bridgeRun) DEĞİL, doğrudan child_process. Key rotation kapsam-dışı bırakıldı (çalışan istemcileri kırar).
 
-**Next precomputed (→v8):** `logbook.mjs`'i oku; structured seyir event şeması (`latency`/`exit`/`device`/`tool`).
+**Canonical prompt:** "bridge self-healing: pure planRemediation(health)→idempotent action map + retryWithBackoff; self_heal tool DRY-default/--apply, doğrudan child_process (bridge-bağımsız), güvenli 7345-node kill, plist SuccessfulExit=false; simüle-arıza recover testi."
+
+**Adopt:** `tjluoma/launchd-keepalive` (public-domain, fikir-only), `sindresorhus/p-retry` (MIT deseni), `MathieuTurcotte/node-pid` (MIT stale-pid kill-0), `devjskit/kill-port` (MIT lsof kill).
+
+**Next precomputed (→v8 Observability):** `logbook.mjs` oku; structured seyir event şeması (`tool`/`latency`/`exit`/`device`/`ts`) → `~/.llm-mission-control/seyir-defteri-scripts.jsonl`; `pinojs/pino`+`pino-pretty` (MIT) JSONL logger + CLI dashboard (event-rate, p50/p95 latency, error-rate SLO + eşik uyarısı). self_heal sonuçları da bu event stream'e yazılsın.
 
 ---
 

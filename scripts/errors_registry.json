@@ -137,6 +137,20 @@
       "prevention_rule": "zsh oturumunda çoklu-dosya argümanını ASLA unquoted skaler değişkenle geçme; literal liste, dizi (\"${arr[@]}\") veya Makefile değişkeni kullan.",
       "test_added": "",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-008",
+      "ts": "2026-06-20",
+      "version": "v7",
+      "file": "bin/host-bridge/tools/self_heal.mjs",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "Bridge'i onaran tool bridge'e bağımlı olursa (bridgeRun), bridge ölüyken self-heal de çalışamaz (chicken-egg). Ayrıca port-kill remediation yanlış süreç öldürebilir.",
+      "evidence": "tasarım kararı — self_heal doğrudan child_process kullanır, kill yalnız 7345-LISTEN + ps comm=node",
+      "fix": "self_heal bridge-client KULLANMAZ; doğrudan lsof/ps/kill/launchctl. Kill öncesi ps -p PID -o comm= 'node' doğrula; non-node holder → port_blocked escalate, kill YOK. DRY default, --apply açık.",
+      "prevention_rule": "Recovery/self-heal aracı onardığı bileşene ASLA bağımlı olmasın (bridge'i onaran bridge'i çağırmaz). Otomatik kill yalnız doğrulanmış hedefte (port+process-adı), default DRY.",
+      "test_added": "scripts/tests/remediation.test.ts (port_blocked non-node→kill yok) + scripts/tests/self-heal.test.ts (DRY no-exec)",
+      "recurrence_count": 0
     }
   ]
 }

@@ -23,6 +23,7 @@ export const SCHEMAS = {
   tools_doctor: z.object({}).strict(),
   shell_check: z.object({ command: z.string().min(1) }).strict(),
   logbook: z.object({ action: z.enum(["add", "tail"]).optional(), text: z.string().optional(), n: z.number().int().positive().optional() }).strict(),
+  self_heal: z.object({ apply: z.boolean().optional() }).strict(),
 };
 
 // Zod schema -> JSON-schema (OpenAPI3 dialect; the shape the ReAct `tools:` param

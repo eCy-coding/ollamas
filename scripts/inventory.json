@@ -17,6 +17,7 @@
     { "name": "apply_patch",  "tier": "host",       "entry": "apply_patch.mjs",  "description": "Apply a unified diff to the host workspace." },
     { "name": "tools_doctor", "tier": "safe",       "entry": "tools_doctor.mjs", "description": "Self-test the host tool suite." },
     { "name": "shell_check",  "tier": "safe",       "entry": "shell_check.mjs",  "description": "Syntax-check a shell command on the host." },
-    { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." }
+    { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." },
+    { "name": "self_heal",    "tier": "host",       "entry": "self_heal.mjs",    "description": "Detect bridge failure and repair it (stale pid, hung 7345 node, restart/kickstart). DRY by default; pass apply=true to execute." }
   ]
 }

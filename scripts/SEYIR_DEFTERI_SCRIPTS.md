@@ -86,6 +86,20 @@
 
 ---
 
+## v7 — Self-Healing (adopt: launchd-keepalive + p-retry + node-pid)
+
+- `[2026-06-20] kind=phase | adoption search | derin web: tjluoma/launchd-keepalive (public-domain→fikir-only, KeepAlive{SuccessfulExit=false}+ThrottleInterval+modern launchctl kickstart -k gui/$UID/LABEL), sindresorhus/p-retry(1k MIT backoff deseni), MathieuTurcotte/node-pid(MIT kill-0 stale), devjskit/kill-port(MIT lsof). Karar: tam+güvenli-kill, DRY-default --apply, zero-dep backoff | plan onaylı`
+- `[2026-06-20] kind=phase | P0 pure çekirdek (TDD) | bin/host-bridge/lib/remediation.mjs — planRemediation(health)→sıralı idempotent action (clean_pid/kill_7345_node/restart_bridge/plist_kickstart/port_blocked/app_report) + retryWithBackoff (p-retry deseni, inject sleep). remediation.test.ts 10 case | önce kırmızı→yeşil`
+- `[2026-06-20] kind=phase | P1 self_heal tool | bin/host-bridge/tools/self_heal.mjs — DOĞRUDAN child_process (bridge-bağımsız, mimari karar). probe: bridge 7345/health + bridge.pid kill-0 + lsof tcp:7345 + launchctl print. Güvenli kill: ps comm "node" doğrula, sadece 7345. DRY default; --apply gerçek; retryWithBackoff re-check | DRY smoke: bridge-down→clean_pid+restart planlandı, applied=false, exit 0, kill YOK`
+- `[2026-06-20] kind=phase | P2 plist hardening | com.missioncontrol.terminalbridge.plist KeepAlive→dict{SuccessfulExit=false}+ThrottleInterval=10 (crash-only restart, launchd safety-net) | plutil -lint OK`
+- `[2026-06-20] kind=phase | P3 registry | inventory.json self_heal (tier host) + schema.mjs zod {apply?} + register BUILDERS (--apply argv); register-hooks 15→16 otomatik | -`
+- `[2026-06-20] kind=phase | P4 test | self-heal.test.ts 3 (DRY exit0/applied=false/no-exec, restart planı, JSON şekli) + sh/self-heal.bats 2 (DRY exit0); flake gözlemi: tam suite ilk koşuda 1 fail (mcp-gateway self-boot port race, v7-dışı) → 3x re-run 147/1 deterministik | -`
+- `[2026-06-20] kind=fix | self-introduced finding | self_heal.mjs:44 semgrep react-insecure-request (http://127.0.0.1:3000 loopback probe). Gizleme yok → gerekçeli nosemgrep (loopback-only, app düz HTTP konuşur, health_probe.mjs ile aynı desen; kaldırılamaz=suppression doğru disposition, IFS'ten farklı). | re-gate tsc OK + self-heal 3/3`
+- `[2026-06-20] kind=phase | P5 gate | tsc OK + vitest 147 pass/1 skip (134→+13) + bats 7/7 + shellcheck/shfmt clean + plist lint + swift 8 | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v8 Observability) | logbook.mjs oku; structured seyir event {tool,latency,exit,device,ts}→seyir-defteri-scripts.jsonl; pino+pino-pretty(MIT) JSONL logger + CLI dashboard (event-rate, p50/p95, error-rate SLO eşik uyarı); self_heal sonuçları da stream'e`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack

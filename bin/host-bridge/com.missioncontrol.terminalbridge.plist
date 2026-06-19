@@ -25,8 +25,15 @@
   </dict>
   <key>RunAtLoad</key>
   <true/>
+  <!-- Self-healing: restart only on crash (non-zero exit), throttle restart
+       storms to >=10s apart. Pattern: tjluoma/launchd-keepalive (public domain). -->
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
   <key>StandardOutPath</key>
   <string>/tmp/llm-bridge/launchd.out.log</string>
   <key>StandardErrorPath</key>

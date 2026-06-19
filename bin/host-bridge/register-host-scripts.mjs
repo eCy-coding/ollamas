@@ -42,6 +42,7 @@ const BUILDERS = {
   logbook: (a, d) => (a.action === "add"
     ? { argv: `add ${d.shArg(String(a.text || ""))}` }
     : { argv: `tail ${Number(a.n) || 20}` }),
+  self_heal: (a) => ({ argv: a.apply ? "--apply" : "", timeoutMs: 90000 }),
 };
 
 export function loadInventory(inventoryPath = DEFAULT_INVENTORY) {
