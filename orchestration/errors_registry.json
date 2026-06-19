@@ -1,0 +1,128 @@
+{
+  "_schema": {
+    "description": "Orkestrasyon lane kalıcı hata DB. ORCHESTRATION_AGENTS.md §8: bir koordinasyon hatasını asla tekrarlama; tekrar = recurrence_count++ + prevention_rule güçlendir.",
+    "fields": {
+      "id": "ERR-ORCH-NNN",
+      "ts": "ISO 8601",
+      "version": "vON (ROADMAP_ORCHESTRATION)",
+      "file": "etkilenen dosya / bağlam",
+      "category": "coordination | drift | scope | token | adoption",
+      "severity": "CRITICAL | high | med",
+      "root_cause": "semptom değil kök neden",
+      "evidence": "komut + çıktı",
+      "fix": "uygulanan düzeltme",
+      "prevention_rule": "gelecekte aynı sınıfı engelleyen tek cümle",
+      "test_added": "regresyon testi / guard yolu",
+      "recurrence_count": 0
+    }
+  },
+  "known_risks_preloaded": [
+    {
+      "id": "RISK-ORCH-001",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "note": "Branch-hijack (ERR-SCR-001 mirası): paylaşılan ~/Desktop/ollamas ağacında eşzamanlı sekme git checkout yapınca branch altından kayar; yeşil iş yanlış branch'e düşer. Prevention: orkestrasyon yalnız ~/Desktop/ollamas-orchestration-wt izole worktree'de çalışır; oturum başı branch == feat/orchestration-* doğrula.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-002",
+      "category": "drift",
+      "severity": "high",
+      "note": "Stale memory/roadmap drift: memory'de yazan branch/versiyon gerçekle uyuşmayabilir (UK-07: branch adı ≠ roadmap versiyon). Prevention: status.ts ile canlı git'ten doğrula; karar öncesi memory'ye değil git'e güven.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-003",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "note": "Scope-creep: orkestrasyon sekmesinin lane feature kodunu (src/server/cli/scripts) düzenlemesi §3 ihlali. Prevention: lane'de kod gerekiyorsa backlog+prompt üret, asla kendin edit etme; her artefakt orchestration/ altında.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-004",
+      "category": "token",
+      "severity": "med",
+      "note": "Token israfı: tüm lane dosyalarını main thread'de re-read etmek bağlamı şişirir. Prevention: status.ts matrisini ve summary-only sub-agent okumalarını tercih et; context >%80 /compact.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-005",
+      "category": "adoption",
+      "severity": "high",
+      "note": "Lisans ihlali: GPL kod (iTerm2) kopyalamak. Prevention: MIT/Apache/BSD/ISC=kod+attribution; GPL=yalnız fikir/ref; lisanssız=fikir-only. Adoption matrisinde her satır lisans-flag taşır.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-006",
+      "category": "coordination",
+      "severity": "med",
+      "note": "Lane port-probe yanlış pozitif: bir lane'in dev-server'ı başka lane'in portunu kullanabilir → yanlış 'çalışıyor' raporu. Prevention: port-probe'u branch/worktree ile eşle, yalnız sinyal say; gerçek durum için git+seyir birincil.",
+      "applies_version": "vO2"
+    },
+    {
+      "id": "RISK-ORCH-007",
+      "category": "scope",
+      "severity": "high",
+      "note": "Koordinasyon-sinyali kötüye kullanımı: §3.1 nudge ile lane sekmesine mutasyon/build/kod-üreten komut göndermek conductor'ı feature-yazıcıya dönüştürür (§3 ihlali). Prevention: signal.ts ALLOWLIST yalnız read-only teşhis (git status|log|branch|diff, echo, pwd) + injection guard (; && | ` $() >) + dry-run default; gerçek gönderim açık --nudge flag + seyir audit.",
+      "applies_version": "vO2"
+    }
+  ],
+  "errors": [
+    {
+      "id": "ERR-ORCH-001",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/status.ts (vO1 portFor/probe)",
+      "category": "coordination",
+      "severity": "high",
+      "root_cause": "vO1 dev-server tespiti portFor() heuristic'i ile branch adından port tahmin ediyordu. Keşif kanıtladı: 6 worktree de aynı porta (3000, server.ts process.env.PORT||3000) bind. Port ile lane ayırt edilemez; :3000 probe'u her backend-vari lane'i '↑' raporladı + Docker'ın 3000'i lane sanıldı (RISK-ORCH-006 gerçekleşti).",
+      "evidence": "lsof -nP -iTCP -sTCP:LISTEN → 'com.docke 3973 ... TCP *:3000 (LISTEN)'; server.ts:31 PORT = process.env.PORT || 3000 (6 worktree özdeş).",
+      "fix": "Tespit lsof→pid→process cwd→cwd-prefix eşleşen worktree'ye çevrildi (discover.ts mapServersToWorktrees). Port değil cwd ile atanır; eşleşmeyen pid (Docker) elenir. portFor/probe silindi.",
+      "prevention_rule": "Çalışan süreci ASLA yalnız porta göre lane'e atama; daima process cwd çöz (lsof -p -d cwd) ve worktree path-prefix ile eşle.",
+      "test_added": "orchestration/tests/discover.test.ts ('6×port-3000 cwd disambiguation' — aynı port farklı cwd → farklı lane, Docker elenir)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-002",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/discover.ts:8 (JSDoc)",
+      "category": "coordination",
+      "severity": "med",
+      "root_cause": "JSDoc yorumunda 'parse*/match*' ifadesindeki `*/` dizisi blok yorumu erken kapattı; sonrası kod olarak ayrıştı → esbuild 'Unexpected )'.",
+      "evidence": "vitest transform: discover.ts:8:33 ERROR Unexpected ')' (vite:esbuild).",
+      "fix": "Yorum metni 'parse / match aileleri' olarak değiştirildi; `*/` dizisi kaldırıldı.",
+      "prevention_rule": "Blok yorum içinde asla `*/` literal dizisi yazma (glob/regex örneklerinde bile); kelimeyle ifade et.",
+      "test_added": "(transform-time; vitest suite yeşil = guard)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-003",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/discover.ts (AppleScript sekme sorgusu)",
+      "category": "coordination",
+      "severity": "high",
+      "root_cause": "İKİ kombine bug: (1) `tell application \"iTerm\"/\"Terminal\"` bloğu içinde AppleScript `tab` SABİTİ uygulamanın `tab` CLASS'ı ile çakışır → ayraç olarak literal 'tab' metni basıldı. (2) AppleScript string literal \"\\t\" GERÇEK tab (0x09) DEĞİL, backslash+t'dir. Sonuç: tty/busy alanları ayrışmadı, canlı sekme keşfi bozuk (tty boş). Diğer sekmenin TAB_OSA'sı bug'ı taşıyordu; parseTabs testi JS-`\\t` fixture'ı kullandığı için yakalayamadı (test-gerçek uyuşmazlığı).",
+      "evidence": "osascript çıktısı `cat -A` → 'iterm2tab/dev/ttys008tab-zshtab0' (literal 'tab', 0x09 değil).",
+      "fix": "Ayraç tell-bloğu DIŞINDA `set D to (ASCII character 9)` ile tanımlanıp içeride değişken olarak kullanıldı; iTerm2 desteği eklendi (parseTabsTagged). Canlı doğrulama: 12 sekme tty+busy+cwd düzgün.",
+      "prevention_rule": "AppleScript'te sekme/satır ayracı için ASLA `tab` sabitine veya string-literal `\\t`'ye güvenme; `(ASCII character 9)`'u tell-bloğu DIŞINDA tanımla. AppleScript çıktı parser'larını JS-`\\t` değil GERÇEK osascript çıktısıyla test et.",
+      "test_added": "orchestration/tests/discover.test.ts ('parseTabsTagged delimiter-fix' + 'parseTmuxPanes' + 'isShellCmd')",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-004",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "worktree branch (feat/orchestration-v1 → v3)",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "root_cause": "RISK-ORCH-001 gerçekleşti: eşzamanlı sekme bu izole worktree'de `git checkout feat/orchestration-v3` çalıştırıp branch'i v1→v3 altımdan kaydırdı. HEAD base-main'de kaldığından vO2 green işi (iki sekme) HİÇ commit edilmemişti → her checkout'ta kayıp riski. memory 'vO1 DONE' diyordu ama git'te tümü untracked (RISK-ORCH-002 drift).",
+      "evidence": "git reflog → 'HEAD@{0}: checkout: moving from feat/orchestration-v1 to feat/orchestration-v3'; git status → tek '?? orchestration/' (untracked); HEAD c19a0b6 (base main).",
+      "fix": "Green iş HEMEN feat/orchestration-v3'te commit'lendi (lock-in; branch=v3/içerik=vO2 drift kabul). vO1+vO2 governance ilk kez kalıcılaştı.",
+      "prevention_rule": "İzole worktree'de bile her green parça koşusundan SONRA hemen commit et (uzun süre untracked bırakma); oturum-başı + commit-öncesi `git branch --show-current` doğrula; eşzamanlı lane'ler ayrı worktree+branch kullanmalı, asla aynı worktree'de paralel checkout.",
+      "test_added": "(süreç-kuralı; Phase 0 guard branch-doğrulaması)",
+      "recurrence_count": 1
+    }
+  ]
+}

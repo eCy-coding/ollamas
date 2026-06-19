@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ollamas cockpit</title>
+<style>
+  /* Design tokens (frontend lane src/styles/tokens.css değerleri — kopya, import değil). */
+  :root{
+    --bg:#050608; --panel:#0d0f14; --panel2:#12151c; --line:#1d212b;
+    --txt:#e8e8ea; --muted:#9aa0ab; --dim:#5b626e;
+    --indigo:#6366f1; --emerald:#10b981; --amber:#f59e0b; --rose:#f43f5e;
+    --radius:12px; --space:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+    -webkit-text-size-adjust:100%}
+  header{position:sticky;top:0;z-index:5;padding:calc(var(--space)+env(safe-area-inset-top)) var(--space) var(--space);
+    background:linear-gradient(180deg,var(--bg),rgba(5,6,8,.85));border-bottom:1px solid var(--line);
+    backdrop-filter:blur(8px)}
+  h1{margin:0;font-size:16px;font-weight:650;letter-spacing:.2px}
+  h1 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dim);margin-right:7px;vertical-align:middle;transition:background .3s}
+  h1 .dot.on{background:var(--emerald);box-shadow:0 0 8px var(--emerald)}
+  h1 .dot.off{background:var(--rose)}
+  .sub{color:var(--muted);font-size:12px;margin-top:3px}
+  .totals{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--muted)}
+  .chip b{color:var(--txt);font-weight:650}
+  .chip.live b{color:var(--emerald)} .chip.idle b{color:var(--amber)} .chip.err b{color:var(--rose)}
+  main{padding:var(--space);max-width:1100px;margin:0 auto}
+  .backend{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space);margin-bottom:var(--space)}
+  .backend.down{opacity:.55}
+  .brow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{font-size:11px;font-weight:650;padding:3px 9px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
+  .badge.live{background:rgba(16,185,129,.16);color:var(--emerald)}
+  .badge.demo{background:rgba(245,158,11,.16);color:var(--amber)}
+  .badge.degraded,.badge.down,.badge.unknown{background:rgba(244,63,94,.16);color:var(--rose)}
+  .metrics{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+  .metrics b{color:var(--txt);font-weight:600}
+  svg.spark{vertical-align:middle}
+  .grid{display:grid;gap:var(--space);grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:var(--space);display:flex;flex-direction:column;gap:8px}
+  .card.idle{border-color:rgba(245,158,11,.3)}
+  .card.dirty{border-left:3px solid var(--amber)}
+  .ctop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .lane{font-weight:650;font-size:14px}
+  .branch{color:var(--dim);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .row b{color:var(--txt);font-weight:600}
+  .pill{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--panel2);color:var(--muted)}
+  .pill.up{background:rgba(99,102,241,.16);color:var(--indigo)}
+  .pill.idle{background:rgba(245,158,11,.16);color:var(--amber)}
+  .pill.err{background:rgba(244,63,94,.16);color:var(--rose)}
+  .road{font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+  .road .nx{color:var(--indigo)}
+  footer{color:var(--dim);font-size:11px;text-align:center;padding:18px 14px calc(18px + env(safe-area-inset-bottom))}
+  @media (max-width:520px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot" id="conn"></span>ollamas cockpit</h1>
+  <div class="sub" id="sub">bağlanıyor…</div>
+  <div class="totals" id="totals"></div>
+</header>
+<main>
+  <div id="backend"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<footer id="foot">READ-ONLY conductor · vO3</footer>
+
+<script>
+(function(){
+  "use strict";
+  var es=null, cpuHist=[], MAXH=40;
+  var $=function(id){return document.getElementById(id)};
+
+  function esc(s){return String(s==null?"":s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]})}
+  function age(h){ if(!isFinite(h))return "—"; if(h<1)return Math.round(h*60)+"dk"; if(h<24)return h.toFixed(1)+"sa"; return Math.round(h/24)+"g" }
+
+  function sparkline(vals){
+    if(vals.length<2)return "";
+    var w=70,h=18,max=Math.max.apply(null,vals)||1,min=Math.min.apply(null,vals);
+    var rng=(max-min)||1, step=w/(vals.length-1);
+    var pts=vals.map(function(v,i){return (i*step).toFixed(1)+","+(h-((v-min)/rng)*h).toFixed(1)}).join(" ");
+    return '<svg class="spark" width="'+w+'" height="'+h+'"><polyline fill="none" stroke="var(--indigo)" stroke-width="1.5" points="'+pts+'"/></svg>';
+  }
+
+  function renderBackend(b){
+    var el=$("backend");
+    if(!b){ el.className="backend down"; el.innerHTML='<div class="brow"><span class="badge down">backend offline</span><span class="sub">:3000 yanıt yok — lane çalışmıyor olabilir</span></div>'; return }
+    cpuHist.push(b.cpu); if(cpuHist.length>MAXH)cpuHist.shift();
+    el.className="backend";
+    el.innerHTML='<div class="brow"><span class="badge '+esc(b.mode)+'">'+esc(b.mode)+'</span>'
+      +'<span class="badge '+(b.db==="up"?"live":"down")+'">db '+esc(b.db)+'</span>'
+      +'<span class="sub">ollama '+esc(b.ollamaVersion||"yok")+' · '+esc(b.models)+' model</span></div>'
+      +'<div class="metrics">'
+      +'<span>CPU <b>'+esc(b.cpu)+'</b> '+sparkline(cpuHist)+'</span>'
+      +'<span>RAM <b>'+esc(b.ram)+'%</b></span>'
+      +'<span>tool calls <b>'+esc(b.toolCalls)+'</b></span>'
+      +'<span>webhook kuyruk <b>'+esc(b.webhookQueue)+'</b></span>'
+      +'<span>migration <b>v'+esc(b.migrationVersion)+'</b></span></div>';
+  }
+
+  function laneCard(l){
+    var cls="card"+(l.idle?" idle":"")+(l.dirtyFiles>0?" dirty":"");
+    var dev=l.devServer?'<span class="pill up">:'+esc(l.devServer.port)+'</span>':'<span class="pill">dev —</span>';
+    var tabs=l.tabs<0?'?':l.tabs;
+    var errPill=l.errors.count>0?'<span class="pill err">'+esc(l.errors.count)+' err '+esc(l.errors.lastId||"")+'</span>':'';
+    var road=(l.roadmap.current||l.roadmap.next)
+      ? '<div class="road">'+esc(l.roadmap.current||"—")+(l.roadmap.next?' <span class="nx">→ '+esc(l.roadmap.next)+'</span>':'')+'</div>' : '';
+    return '<div class="'+cls+'">'
+      +'<div class="ctop"><span class="lane">'+esc(l.lane)+(l.idle?' 💤':'')+'</span><span class="branch">'+esc(l.head)+'</span></div>'
+      +'<div class="branch">'+esc(l.branch)+'</div>'
+      +'<div class="row"><span>yaş</span><b>'+age(l.ageHours)+'</b></div>'
+      +'<div class="row"><span>dirty / ↑↓</span><b>'+esc(l.dirtyFiles)+' · '+esc(l.ahead)+'/'+esc(l.behind)+'</b></div>'
+      +'<div class="row"><span>dev · tab</span><span>'+dev+' <span class="pill">tab '+tabs+'</span></span></div>'
+      +(errPill?'<div class="row"><span>hata</span>'+errPill+'</div>':'')
+      +road+'</div>';
+  }
+
+  function render(snap){
+    $("conn").className="dot on";
+    $("sub").textContent="canlı · "+new Date(snap.ts).toLocaleTimeString("tr-TR")+" · "+snap.lanes.length+"/"+snap.expectedLanes+" lane";
+    var t=snap.totals;
+    $("totals").innerHTML=
+      '<span class="chip live">canlı dev <b>'+t.live+'</b></span>'
+      +'<span class="chip idle">idle <b>'+t.idle+'</b></span>'
+      +'<span class="chip">dirty <b>'+t.dirty+'</b></span>'
+      +'<span class="chip err">hata <b>'+t.errors+'</b></span>';
+    renderBackend(snap.backend);
+    $("grid").innerHTML=snap.lanes.map(laneCard).join("");
+    $("foot").textContent="READ-ONLY conductor · vO3 · son güncelleme "+new Date(snap.ts).toLocaleTimeString("tr-TR");
+  }
+
+  function connect(){
+    if(es)es.close();
+    es=new EventSource("/events");
+    es.onmessage=function(e){ try{render(JSON.parse(e.data))}catch(_){}};
+    es.onerror=function(){ $("conn").className="dot off"; $("sub").textContent="bağlantı koptu — yeniden deneniyor…"; };
+  }
+  // iOS/Mac enerji: sekme gizliyken stream'i kapat, görünürde aç.
+  document.addEventListener("visibilitychange",function(){
+    if(document.hidden){ if(es){es.close();es=null} } else if(!es){ connect() }
+  });
+  connect();
+})();
+</script>
+</body>
+</html>
