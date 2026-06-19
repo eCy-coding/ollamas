@@ -1,17 +1,37 @@
 {
   "report": {
-    "ts": "2026-06-19T22:06:18.869Z",
+    "ts": "2026-06-19T22:39:53.558Z",
     "personaCoverage": {
       "backend": 1,
+      "frontend": 15,
+      "macos": 4,
+      "mcp": 2,
       "project-architect": 8,
       "prompt-engineer": 1
     },
     "byLane": {
       "backend": 2,
+      "frontend": 15,
+      "scripts": 4,
+      "integrations": 2,
       "repo": 8
     },
     "ranked": [
       "backend-backend-1",
+      "frontend-frontend-1",
+      "frontend-frontend-10",
+      "frontend-frontend-11",
+      "frontend-frontend-12",
+      "frontend-frontend-13",
+      "frontend-frontend-3",
+      "frontend-frontend-4",
+      "frontend-frontend-5",
+      "frontend-frontend-6",
+      "frontend-frontend-7",
+      "frontend-frontend-8",
+      "frontend-frontend-9",
+      "mcp-integrations-1",
+      "mcp-integrations-2",
       "project-architect-backend-orphans",
       "project-architect-repo-3",
       "project-architect-repo-4",
@@ -19,6 +39,13 @@
       "project-architect-repo-6",
       "project-architect-repo-7",
       "prompt-engineer-repo-1",
+      "frontend-frontend-14",
+      "frontend-frontend-15",
+      "frontend-frontend-2",
+      "macos-scripts-1",
+      "macos-scripts-2",
+      "macos-scripts-3",
+      "macos-scripts-4",
       "project-architect-repo-1",
       "project-architect-repo-2"
     ],
@@ -28,6 +55,23 @@
     ],
     "unresolvedDebates": [],
     "refDeficit": [
+      "frontend-frontend-3",
+      "frontend-frontend-4",
+      "frontend-frontend-5",
+      "frontend-frontend-6",
+      "frontend-frontend-7",
+      "frontend-frontend-8",
+      "frontend-frontend-9",
+      "frontend-frontend-10",
+      "frontend-frontend-11",
+      "frontend-frontend-12",
+      "frontend-frontend-13",
+      "frontend-frontend-14",
+      "frontend-frontend-15",
+      "macos-scripts-2",
+      "macos-scripts-3",
+      "macos-scripts-4",
+      "mcp-integrations-2",
       "project-architect-repo-2",
       "project-architect-repo-3",
       "project-architect-repo-4",
@@ -36,13 +80,14 @@
       "project-architect-repo-7"
     ],
     "stale": [],
+    "uncovered": [],
     "totals": {
       "bySeverity": {
         "high": 1,
-        "low": 2,
-        "med": 7
+        "med": 21,
+        "low": 9
       },
-      "open": 10,
+      "open": 31,
       "adopted": 0
     }
   },
@@ -73,7 +118,7 @@
         "verdict": ""
       },
       "source": "authored",
-      "targetHash": "7b0aa23",
+      "targetHash": "e7b8b6b",
       "solution": {
         "summary": "Prometheus scrape + Grafana dashboard JSON repo'ya ekle (deploy/). MCP tarafında trace için OpenTelemetry MCP server consume edilebilir → AI ajan distributed trace okur. Önce /metrics'i bir dashboard'a bağla, sonra logSeyir.jsonl'i de aynı panele besle.",
         "refs": [
@@ -94,6 +139,679 @@
       "consensus": [
         "backend",
         "fullstack"
+      ]
+    },
+    {
+      "id": "frontend-frontend-1",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components",
+      "severity": "med",
+      "confidence": "asserted",
+      "finding": "13 component apiClient choke-point'ini atlayıp raw fetch çağırıyor (vF6 ban ihlali)",
+      "evidence": [
+        {
+          "path": "src/App.tsx",
+          "lineHint": "-",
+          "fact": "raw fetch(/api/health) apiClient dışı"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": "GoogleDriveBrowser harici-API istisnası ayrı değerlendir"
+      },
+      "source": "authored",
+      "targetHash": "e7b8b6b",
+      "solution": {
+        "summary": "Tüm HTTP'yi src/lib/apiClient.ts üzerinden geçir (tek choke-point: auth header, retry, base-url, error). ESLint no-restricted-syntax ile raw fetch'i CI'de banla (frontend lane'de zaten kural var → kapsamı genişlet). Veri-çekme için TanStack Query merkezi client deseni.",
+        "refs": [
+          {
+            "repo": "eslint/eslint",
+            "license": "MIT",
+            "url": "https://github.com/eslint/eslint",
+            "kind": "copy"
+          },
+          {
+            "repo": "TanStack/query",
+            "license": "MIT",
+            "url": "https://github.com/TanStack/query",
+            "kind": "idea"
+          }
+        ]
+      },
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-2",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ReactAgentTab.tsx",
+      "severity": "low",
+      "confidence": "asserted",
+      "finding": "ReactAgentTab 764 + MultiAgentPipeline 533 satır — tek-sorumluluk aşımı, bakım yükü",
+      "evidence": [
+        {
+          "path": "src/components/ReactAgentTab.tsx",
+          "lineHint": "-",
+          "fact": "764 satır"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "authored",
+      "targetHash": "e7b8b6b",
+      "solution": {
+        "summary": "Alt-component + custom hook'lara böl (container/presentational ayrımı). State'i hook'a çıkar. 400 satır eşiğini size-limit gibi CI gate'e bağla.",
+        "refs": [
+          {
+            "repo": "ai/size-limit",
+            "license": "MIT",
+            "url": "https://github.com/ai/size-limit",
+            "kind": "idea"
+          },
+          {
+            "repo": "jsx-eslint/eslint-plugin-react",
+            "license": "MIT",
+            "url": "https://github.com/jsx-eslint/eslint-plugin-react",
+            "kind": "ref-only"
+          }
+        ]
+      },
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-3",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ClusterManager.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/ClusterManager.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/ClusterManager.tsx",
+          "lineHint": "24",
+          "fact": "fetch('/api/cluster/capabilities')"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-4",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/CommandLineTerminal.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/CommandLineTerminal.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/CommandLineTerminal.tsx",
+          "lineHint": "27",
+          "fact": "const res = await fetch(\"/api/terminal\", {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-5",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/GoogleDriveBrowser.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/GoogleDriveBrowser.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/GoogleDriveBrowser.tsx",
+          "lineHint": "22",
+          "fact": "const res = await fetch(\"https://www.googleapis.com/drive/v3/files?pageSize=50&f"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-6",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/KeyVault.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/KeyVault.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/KeyVault.tsx",
+          "lineHint": "26",
+          "fact": "const res = await fetch(\"/api/keys/mask\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-7",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/MultiAgentPipeline.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/MultiAgentPipeline.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/MultiAgentPipeline.tsx",
+          "lineHint": "82",
+          "fact": "const res = await fetch(`/api/models/${prov}`);"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-8",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ReactAgentTab.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/ReactAgentTab.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/ReactAgentTab.tsx",
+          "lineHint": "55",
+          "fact": "const res = await fetch(\"/api/agent/sessions\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-9",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SaaSAdmin.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SaaSAdmin.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SaaSAdmin.tsx",
+          "lineHint": "37",
+          "fact": "const r = await fetch(p, { ...init, headers: { ...thdr(), ...(init?.headers || {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-10",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SecurityPolicies.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SecurityPolicies.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SecurityPolicies.tsx",
+          "lineHint": "24",
+          "fact": "const res = await fetch(\"/api/security/log\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-11",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SelfTestGates.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SelfTestGates.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SelfTestGates.tsx",
+          "lineHint": "12",
+          "fact": "const res = await fetch(\"/api/selftest\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-12",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/VirtualController.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/VirtualController.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/VirtualController.tsx",
+          "lineHint": "10",
+          "fact": "const res = await fetch('/api/cluster/execute', {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-13",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/WorkspaceTree.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/WorkspaceTree.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/WorkspaceTree.tsx",
+          "lineHint": "24",
+          "fact": "const res = await fetch(\"/api/workspace/tree\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-14",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/MultiAgentPipeline.tsx",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "src/components/MultiAgentPipeline.tsx oversized component (533 satır > 400) — böl/refactor",
+      "evidence": [
+        {
+          "path": "src/components/MultiAgentPipeline.tsx",
+          "lineHint": "-",
+          "fact": "533 satır"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "frontend-frontend-15",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ReactAgentTab.tsx",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "src/components/ReactAgentTab.tsx oversized component (764 satır > 400) — böl/refactor",
+      "evidence": [
+        {
+          "path": "src/components/ReactAgentTab.tsx",
+          "lineHint": "-",
+          "fact": "764 satır"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "frontend"
+      ]
+    },
+    {
+      "id": "macos-scripts-1",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "*.sh",
+      "severity": "low",
+      "confidence": "asserted",
+      "finding": "4 shell script 'set -euo pipefail' eksik — sessiz hata-yutma + unset-var riski",
+      "evidence": [
+        {
+          "path": "join-cluster.sh",
+          "lineHint": "1",
+          "fact": "e=false u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "authored",
+      "targetHash": "e7b8b6b",
+      "solution": {
+        "summary": "Her script'in shebang sonrasına 'set -euo pipefail' ekle (bash strict mode). CI'de ShellCheck (SC2086 unquoted, SC2164 cd-fail) gate'i koş — frontend lhci deseni gibi. ShellCheck GPL-3.0 → BİNARİ kullan (kod kopyalama), kural-fikri serbest.",
+        "refs": [
+          {
+            "repo": "koalaman/shellcheck",
+            "license": "GPL-3.0",
+            "url": "https://github.com/koalaman/shellcheck",
+            "kind": "ref-only"
+          },
+          {
+            "repo": "sindresorhus/awesome-bash (strict-mode)",
+            "license": "CC0",
+            "url": "https://github.com/awesome-lists/awesome-bash",
+            "kind": "idea"
+          }
+        ]
+      },
+      "consensus": [
+        "macos"
+      ]
+    },
+    {
+      "id": "macos-scripts-2",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "join-cluster.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "join-cluster.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "join-cluster.sh",
+          "lineHint": "1",
+          "fact": "e=false u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "macos"
+      ]
+    },
+    {
+      "id": "macos-scripts-3",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "setup.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "setup.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "setup.sh",
+          "lineHint": "1",
+          "fact": "e=true u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "macos"
+      ]
+    },
+    {
+      "id": "macos-scripts-4",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "uninstall.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "uninstall.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "uninstall.sh",
+          "lineHint": "1",
+          "fact": "e=true u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "macos"
+      ]
+    },
+    {
+      "id": "mcp-integrations-1",
+      "persona": "mcp",
+      "targetLane": "integrations",
+      "targetPath": "server/diagnostic.ts",
+      "severity": "med",
+      "confidence": "asserted",
+      "finding": "DesktopCommander.execute doğrudan (diagnostic.ts+orchestrator.ts) — ToolRegistry choke-point dışı host-exec",
+      "evidence": [
+        {
+          "path": "server/orchestrator.ts",
+          "lineHint": "-",
+          "fact": "DesktopCommander.execute(payload) doğrudan"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": "sistem-içi meşru mu yoksa gerçek bypass mı — backend persona ile teyit"
+      },
+      "source": "authored",
+      "targetHash": "e7b8b6b",
+      "solution": {
+        "summary": "Host-komut yürütmeyi ToolRegistry.execute üzerinden geçir (tek choke-point → per-tenant allowlist + metering + redaction). Meşru sistem-içi çağrıysa AGENTS'e açık istisna + audit-log ekle. MCP server referans deseni: tüm tool dispatch tek registry'den.",
+        "refs": [
+          {
+            "repo": "modelcontextprotocol/servers",
+            "license": "MIT",
+            "url": "https://github.com/modelcontextprotocol/servers",
+            "kind": "ref-only"
+          },
+          {
+            "repo": "ollamas npm run conformance",
+            "license": "internal",
+            "url": "local",
+            "kind": "idea"
+          }
+        ]
+      },
+      "consensus": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp-integrations-2",
+      "persona": "mcp",
+      "targetLane": "integrations",
+      "targetPath": "server/orchestrator.ts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "server/orchestrator.ts choke-point bypass — ToolRegistry.execute dışı doğrudan execute/handler",
+      "evidence": [
+        {
+          "path": "server/orchestrator.ts",
+          "lineHint": "54",
+          "fact": "result = await DesktopCommander.execute(payload.command, payload.args);"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
+      "consensus": [
+        "mcp"
       ]
     },
     {
@@ -119,7 +837,7 @@
         "verdict": ""
       },
       "source": "authored",
-      "targetHash": "7b0aa23",
+      "targetHash": "e7b8b6b",
       "solution": {
         "summary": "name'i 'ollamas'a, version'ı server.json ile aynı semver'e çek. release-please zaten var → manifest'e package.json ekle ki sürüm otomatik bump'lansın, drift bitsin.",
         "refs": [
@@ -164,8 +882,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]
@@ -193,8 +911,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]
@@ -222,8 +940,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]
@@ -251,8 +969,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]
@@ -280,8 +998,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]
@@ -309,8 +1027,8 @@
         "verdict": ""
       },
       "source": "detected",
-      "targetHash": "7b0aa23",
-      "ts": "2026-06-19T22:04:33.386Z",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z",
       "consensus": [
         "project-architect"
       ]

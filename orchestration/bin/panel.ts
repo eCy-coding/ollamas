@@ -17,6 +17,7 @@ import { ANCHOR } from "./shared";
 import { parseNotes, type DiagnosticNote } from "./lib/note";
 import { dedupe, resolveDiscourse, buildReport, type PanelReport } from "./lib/rank";
 import { PERSONA_NAMES } from "./lib/personas";
+import { runAllScans } from "./scan";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -89,6 +90,11 @@ export function renderReport(rep: PanelReport, notes: DiagnosticNote[]): string 
     `- **consensusBoosted** (≥2 persona aynı bulgu): ${idList(rep.consensusBoosted)}`,
     `- **stale** (targetHash≠HEAD, drift): ${idList(rep.stale)}`,
     ``,
+    `## ⚪ UNCOVERED uzmanlar (0 detected, 0 authored)`,
+    rep.uncovered.length
+      ? rep.uncovered.map((p) => `- ⚪ \`${p}\` — bu uzman henüz hiç bulgu üretmedi (detector ekle veya not yaz)`).join("\n")
+      : `- ✅ tüm 8 uzman kapsandı`,
+    ``,
     `---`,
     `_Bu sekme (orchestration) lane kodunu yazmaz (§3). Bulgular = öneri; çözüm lane sekmesinde uygulanır._`,
   ].join("\n");
@@ -133,6 +139,11 @@ function loadAuthored(): { notes: DiagnosticNote[]; errors: string[] } {
 function main(): void {
   const head = headShort();
   const ts = new Date().toISOString();
+  // Sürdürebilir tek-komut: --refresh → önce tüm persona'ları tara, sonra raporla.
+  if (process.argv.includes("--refresh")) {
+    const n = runAllScans();
+    console.log(`[panel] --refresh: ${n} detected bulgu tarandı`);
+  }
   const detected = loadDetected();
   const { notes: authored, errors } = loadAuthored();
   for (const e of errors) console.error(`[panel] authored parse uyarısı: ${e}`);

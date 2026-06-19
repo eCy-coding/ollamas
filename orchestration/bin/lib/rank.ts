@@ -7,6 +7,7 @@
  */
 import { type DiagnosticNote, noteKey, refDeficit } from "./note";
 import type { Severity } from "./detectors";
+import { PERSONAS } from "./personas";
 
 const ORDER: Severity[] = ["info", "low", "med", "high", "blocker"];
 
@@ -75,6 +76,9 @@ export interface PanelReport {
   unresolvedDebates: string[];
   refDeficit: string[];
   stale: string[];
+  /** Hiç scan-target'ı OLMAYAN + 0 authored not'lu persona'lar — tespit yeteneği yok (completeness-critic).
+      "Taranıp temiz" (target var, 0 bulgu) ≠ uncovered. vO4.1 sonrası 8 personanın hepsinde detector var → []. */
+  uncovered: string[];
   totals: { bySeverity: Record<string, number>; open: number; adopted: number };
 }
 
@@ -111,6 +115,7 @@ export function buildReport(
     unresolvedDebates: opts.unresolvedDebates ?? [],
     refDeficit: notes.filter(refDeficit).map((n) => n.id),
     stale: opts.staleIds ?? [],
+    uncovered: PERSONAS.filter((p) => p.targets.length === 0 && (personaCoverage[p.name] || 0) === 0).map((p) => p.name),
     totals: { bySeverity, open, adopted },
   };
 }

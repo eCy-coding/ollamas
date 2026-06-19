@@ -37,3 +37,29 @@ Ben paylaşılan ROADMAP/errors/ADOPTIONS dosyalarını **clobber etmedim** (wor
   (`backend-backend-1` med→high, backend+fullstack), refDeficit 5, stale 0.
 - Tüm pure-fn suite: detectors 13 + note 11 + rank 8 + panel 6 = 38 yeni; full 108/108.
 - Typecheck: tsc --strict temiz (exit 0). Scope: scan/panel ollamas lane tree'ye 0 yazım (yalnız git-grep/read).
+
+---
+
+## vO4.1 — Panel Coverage Expansion
+
+5 boş personaya (frontend/fullstack/integrations/macos/mcp) gerçek deterministik detector + coverage-critic
++ `panel.ts --refresh` sürdürebilir tek-komut. 10 yeni saf detector (detectors.ts) + `lineCount`/`stripComments`
+util + `collectMatchingFiles` (sınırlı read-only enumerator, graph.ts import ETMEDİ → vO5-depgraph coupling yok).
+orphan-API detector DROP edildi (vO5-depgraph territory). OSS: Gitleaks(MIT regex)/ShellCheck(GPL ref-only)/
+eslint-jsx-a11y(MIT). Canlı: detected 8→29 (frontend 13 choke-point-bypass + 2 oversized, macos 4 shell-strict,
+mcp 2 DesktopCommander-direct); integrations/fullstack 0 = **taranıp temiz, FALSE-POSITIVE YOK**.
+coverage-critic: yetenek-bazlı (target'sız persona) — vO4.1 sonrası 8'in hepsinde detector → uncovered [].
+
+### ERR-ORCH-007 — choke-point detector kendi choke-point'ini bypass sandı
+- **category:** detection (FP) · **severity:** med · **applies_version:** vO4.1 · **recurrence:** 1
+- **root cause:** `chokepointBypassExec` generic `.execute(` aradı → kanonik `ToolRegistry.execute(name,args)`
+  (choke-point'in DOĞRU kullanımı) bypass olarak işaretlendi (server/mcp/server.ts false-positive).
+- **prevention_rule:** Choke-point detector kanonik çağrıyı muaf tutmalı: `.execute(`/`.handler(` ara
+  AMA `ToolRegistry.execute` içeren satırı HARİÇ tut. Genelde: bir "X-bypass" detector'ı X'in kendisini flag'lememeli.
+- **test:** `detectors2.test.ts` "kanonik ToolRegistry.execute muaf"; canlı kalibrasyonda yakalandı (commit öncesi).
+- **GOTCHA (FP #2, ders, ERR değil):** `stripComments` satıriçi `//` silerken `http://`yi bozdu → insecureHttp 0 verdi;
+  fix lookbehind `(?<!:)//` (URL'deki `://` korunur). TDD ile yakalandı.
+
+### Kanıt (P6 canlı + P8 gate)
+- `panel.ts --refresh`: 29 detected + 9 authored; severity blocker:0/high:1/med:21/low:9; uncovered [].
+- Test: detectors2 34 + rank uncovered 1 yeni; **full 163/163**. tsc --strict temiz. Scope: ollamas lane tree 0 yazım (yalnız 1 pre-existing worker değişikliği, benim değil).

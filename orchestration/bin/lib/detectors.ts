@@ -79,3 +79,169 @@ export function wiredNoConsumer(dep: string, producerHits: number, consumerHits:
     evidence: [{ path, lineHint: "-", fact: `${dep} producer=${producerHits}, consumer=0` }],
   }];
 }
+
+// ── vO4.1 Panel Coverage Expansion: util'ler + 5-persona detector'ları ─────────
+
+/** Satır sayısı (boş string → 0). */
+export function lineCount(s: string): number {
+  return s === "" ? 0 : s.split("\n").length;
+}
+
+/** Yorum-temizle: blok /*...*​/, satır-başı // ve #, satıriçi // (prose-FP azaltır). */
+export function stripComments(s: string): string {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|#)/.test(l))
+    .map((l) => l.replace(/(?<!:)\/\/.*$/, "")) // `://` (URL) koru, gerçek // yorumu sil
+    .join("\n");
+}
+
+const TEST_PATH = /\.(test|spec)\.|__mocks__|fixtures?\//i;
+
+// — frontend —
+
+/** Choke-point bypass: src/'de apiClient dışı raw fetch/axios (frontend lane choke-point yasağı). */
+export function chokepointBypass(path: string, content: string, token = "apiClient"): Finding[] {
+  if (TEST_PATH.test(path) || path.toLowerCase().includes(token.toLowerCase())) return [];
+  const lines = stripComments(content).split("\n");
+  const idx = lines.findIndex((l) => /\bfetch\(|\baxios\b/.test(l));
+  if (idx < 0) return [];
+  return [{
+    targetPath: path, severity: "med",
+    finding: `${path} choke-point bypass — raw fetch/axios (apiClient dışı çağrı)`,
+    evidence: [{ path, lineHint: String(idx + 1), fact: lines[idx].trim().slice(0, 80) }],
+  }];
+}
+
+/** Aşırı büyük component dosyası (bakım yükü). */
+export function oversizedComponent(path: string, lines: number, threshold = 400): Finding[] {
+  if (!/\.(tsx|jsx)$/.test(path) || lines <= threshold) return [];
+  return [{
+    targetPath: path, severity: "low",
+    finding: `${path} oversized component (${lines} satır > ${threshold}) — böl/refactor`,
+    evidence: [{ path, lineHint: "-", fact: `${lines} satır` }],
+  }];
+}
+
+// — fullstack —
+
+/** Seam dosyada `: any` yoğunluğu (tip-güvenliği erozyonu). Oran-tabanlı (ham sayı değil). */
+export function anyDensity(path: string, anyCount: number, lines: number, ratio = 0.05, min = 5): Finding[] {
+  if (anyCount < min || lines <= 0 || anyCount / lines <= ratio) return [];
+  return [{
+    targetPath: path, severity: "low",
+    finding: `${path} yüksek \`: any\` yoğunluğu (${anyCount}/${lines}) — tip-güvenliği erozyonu`,
+    evidence: [{ path, lineHint: "-", fact: `any=${anyCount}, ratio=${(anyCount / lines).toFixed(3)}` }],
+  }];
+}
+
+// — integrations —
+
+const PLACEHOLDER = /process\.env|\$\{|<your|<YOUR|xxxx|changeme|placeholder|example|dummy|redacted/i;
+const SECRET_GENERIC = /(api[_-]?key|token|secret|password|passwd)\s*[:=]\s*['"][A-Za-z0-9_\-]{20,}['"]/i;
+const SECRET_AWS = /\bAKIA[0-9A-Z]{16}\b/;
+const SECRET_PRIVKEY = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+
+/** Gitleaks-stili (MIT, attribution) hardcoded secret tespiti. Placeholder/example/.env.example muaf. */
+export function hardcodedSecret(path: string, content: string): Finding[] {
+  if (TEST_PATH.test(path) || /\.env\.example$/.test(path)) return [];
+  const out: Finding[] = [];
+  const lines = content.split("\n");
+  lines.forEach((l, i) => {
+    if (PLACEHOLDER.test(l)) return;
+    const hint = { path, lineHint: String(i + 1), fact: "secret-pattern eşleşti (değer redakte)" };
+    if (SECRET_AWS.test(l)) out.push({ targetPath: path, severity: "blocker", finding: `${path} hardcoded AWS access key`, evidence: [hint] });
+    else if (SECRET_PRIVKEY.test(l)) out.push({ targetPath: path, severity: "blocker", finding: `${path} hardcoded private key`, evidence: [hint] });
+    else if (SECRET_GENERIC.test(l)) out.push({ targetPath: path, severity: "high", finding: `${path} hardcoded credential (api-key/token/secret)`, evidence: [hint] });
+  });
+  return out;
+}
+
+const HTTP_SAFE = /localhost|127\.0\.0\.1|0\.0\.0\.0|w3\.org|xmlns|schemas?\.|example\.(com|org)/i;
+
+/** Şifrelenmemiş http:// URL (loopback/xmlns/schema hariç). */
+export function insecureHttp(path: string, content: string): Finding[] {
+  if (TEST_PATH.test(path)) return [];
+  const lines = stripComments(content).split("\n");
+  const idx = lines.findIndex((l) => /http:\/\/[^\s"')]+/.test(l) && !HTTP_SAFE.test(l));
+  if (idx < 0) return [];
+  return [{
+    targetPath: path, severity: "med",
+    finding: `${path} şifrelenmemiş http:// isteği (https kullan)`,
+    evidence: [{ path, lineHint: String(idx + 1), fact: lines[idx].trim().slice(0, 80) }],
+  }];
+}
+
+// — macos — (ShellCheck GPL-3.0 → yalnız kural-fikri, kod KOPYALANMADI)
+
+/** Bash/sh shebang'lı script `set -euo pipefail` (veya 3 ayrı flag) eksik → hata-yutma riski. */
+export function shellStrictMode(path: string, content: string): Finding[] {
+  const first = content.split("\n")[0] || "";
+  if (!/^#!.*\b(bash|sh)\b/.test(first)) return [];
+  const c = stripComments(content);
+  const hasE = /set\s+-\w*e\w*/.test(c);
+  const hasU = /set\s+-\w*u\w*/.test(c);
+  const hasPipefail = /pipefail/.test(c);
+  if (hasE && hasU && hasPipefail) return [];
+  return [{
+    targetPath: path, severity: "low",
+    finding: `${path} 'set -euo pipefail' eksik — sessiz hata-yutma riski`,
+    evidence: [{ path, lineHint: "1", fact: `e=${hasE} u=${hasU} pipefail=${hasPipefail}` }],
+  }];
+}
+
+/** LAN-exposure: script/launchd `0.0.0.0` bind (yorum hariç) — gizlilik riski (RISK-SCR-006). */
+export function lanExposure(path: string, content: string): Finding[] {
+  const c = stripComments(content);
+  const lines = c.split("\n");
+  const idx = lines.findIndex((l) => /\b0\.0\.0\.0\b/.test(l));
+  if (idx < 0) return [];
+  return [{
+    targetPath: path, severity: "high",
+    finding: `${path} 0.0.0.0 bind — LAN exposure (yalnız 127.0.0.1 + opt-in --lan)`,
+    evidence: [{ path, lineHint: String(idx + 1), fact: lines[idx].trim().slice(0, 80) }],
+  }];
+}
+
+/** Tehlikeli tırnaksız `rm -rf $VAR` (word-split → yanlış silme). Tırnaklı muaf. */
+export function unquotedRmVar(path: string, content: string): Finding[] {
+  const c = stripComments(content);
+  const lines = c.split("\n");
+  const idx = lines.findIndex((l) => /\brm\s+-\w*r\w*\s+\$\w+/.test(l));
+  if (idx < 0) return [];
+  return [{
+    targetPath: path, severity: "blocker",
+    finding: `${path} tırnaksız 'rm -rf $VAR' — word-split ile yanlış-silme riski`,
+    evidence: [{ path, lineHint: String(idx + 1), fact: lines[idx].trim().slice(0, 80) }],
+  }];
+}
+
+// — mcp —
+
+/** MCP tool def inputSchema var ama outputSchema yok (v1.7 conformance kuralı). */
+export function toolMissingOutputSchema(name: string, hasInput: boolean, hasOutput: boolean): Finding[] {
+  if (!hasInput || hasOutput) return [];
+  return [{
+    targetPath: `tool:${name}`, severity: "low",
+    finding: `MCP tool '${name}' outputSchema yok (inputSchema var) — conformance eksik`,
+    evidence: [{ path: name, lineHint: "-", fact: "inputSchema:true, outputSchema:false" }],
+  }];
+}
+
+/**
+ * Choke-point bypass: tool-registry dışı doğrudan `.execute(`/`.handler(` (ToolRegistry.execute atlanmış).
+ * KANONİK `ToolRegistry.execute(...)` çağrısı bypass DEĞİL → muaf (ERR-ORCH-007: detector choke-point'in
+ * kendisini bypass sandı; canlı kalibrasyonda yakalandı).
+ */
+export function chokepointBypassExec(path: string, content: string): Finding[] {
+  if (TEST_PATH.test(path) || /tool-registry/i.test(path)) return [];
+  const lines = stripComments(content).split("\n");
+  const idx = lines.findIndex((l) => /\.execute\(|\.handler\(/.test(l) && !/ToolRegistry\.execute/.test(l));
+  if (idx < 0) return [];
+  return [{
+    targetPath: path, severity: "med",
+    finding: `${path} choke-point bypass — ToolRegistry.execute dışı doğrudan execute/handler`,
+    evidence: [{ path, lineHint: String(idx + 1), fact: lines[idx].trim().slice(0, 80) }],
+  }];
+}

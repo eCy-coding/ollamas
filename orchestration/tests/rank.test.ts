@@ -74,4 +74,12 @@ describe("buildReport — aggregation", () => {
     expect(rep.totals.bySeverity.high).toBe(1);
     expect(rep.totals.open).toBe(2);
   });
+  it("uncovered: tespit-yeteneği OLMAYAN (target'sız) persona'ları listeler — taranıp-temiz değil (coverage-critic)", () => {
+    const rep = buildReport(notes, { ts: "T" });
+    // vO4.1 sonrası 8 personanın hepsinde scan target var → uncovered boş.
+    // "Taranıp temiz" (fullstack/integrations 0 bulgu) uncovered SAYILMAZ — yeteneği var.
+    expect(rep.uncovered).toEqual([]);
+    expect(rep.uncovered).not.toContain("fullstack");
+    expect(rep.uncovered).not.toContain("integrations");
+  });
 });

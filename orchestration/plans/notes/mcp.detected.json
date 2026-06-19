@@ -1,5 +1,58 @@
 {
   "persona": "mcp",
-  "count": 0,
-  "notes": []
+  "count": 2,
+  "notes": [
+    {
+      "id": "mcp-integrations-1",
+      "persona": "mcp",
+      "targetLane": "integrations",
+      "targetPath": "server/diagnostic.ts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "server/diagnostic.ts choke-point bypass — ToolRegistry.execute dışı doğrudan execute/handler",
+      "evidence": [
+        {
+          "path": "server/diagnostic.ts",
+          "lineHint": "8",
+          "fact": "const rawOutput = await DesktopCommander.execute('python3', ['calibrate_hardware"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z"
+    },
+    {
+      "id": "mcp-integrations-2",
+      "persona": "mcp",
+      "targetLane": "integrations",
+      "targetPath": "server/orchestrator.ts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "server/orchestrator.ts choke-point bypass — ToolRegistry.execute dışı doğrudan execute/handler",
+      "evidence": [
+        {
+          "path": "server/orchestrator.ts",
+          "lineHint": "54",
+          "fact": "result = await DesktopCommander.execute(payload.command, payload.args);"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-19T22:39:53.564Z"
+    }
+  ]
 }

@@ -9,13 +9,19 @@
  * Çalıştır: tsx orchestration/bin/scan.ts <persona>    (persona: project-architect|backend|...)
  *           tsx orchestration/bin/scan.ts --all
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { ANCHOR } from "./shared";
 import {
-  nameVersionMismatch, emptyFile, orphanDir, unreferencedArtifact, wiredNoConsumer, type Finding,
+  nameVersionMismatch, emptyFile, orphanDir, unreferencedArtifact, wiredNoConsumer,
+  lineCount, stripComments,
+  chokepointBypass, oversizedComponent, anyDensity,
+  hardcodedSecret, insecureHttp,
+  shellStrictMode, lanExposure, unquotedRmVar,
+  toolMissingOutputSchema, chokepointBypassExec,
+  type Finding,
 } from "./lib/detectors";
 import { PERSONAS, getPersona, PERSONA_NAMES, type Persona, type ScanTarget } from "./lib/personas";
 import type { DiagnosticNote } from "./lib/note";
@@ -55,6 +61,44 @@ function readIf(rel: string): string | null {
   try { return existsSync(full) ? readFileSync(full, "utf8") : null; } catch { return null; }
 }
 
+const SKIP_DIR = new Set(["node_modules", ".git", "dist", "build", "coverage", "test-results", ".next"]);
+
+/**
+ * Sınırlı (maxDepth/maxFiles) READ-ONLY dosya enumerator: dirRel altında globs uzantılı
+ * dosyaların {rel, content}'ini döner. graph.ts'i IMPORT ETMEZ (vO5-depgraph worker coupling yok),
+ * deseni bağımsız klonlar. node_modules/.git/dist atlanır.
+ */
+function collectMatchingFiles(dirRel: string, globs: string[] = [], maxFiles = 600, maxDepth = 7): Array<{ rel: string; content: string }> {
+  const exts = globs.map((g) => g.replace(/^\*/, "")); // "*.sh" → ".sh"
+  const out: Array<{ rel: string; content: string }> = [];
+  const root = join(ANCHOR, dirRel);
+  const walk = (abs: string, depth: number): void => {
+    if (depth > maxDepth || out.length >= maxFiles) return;
+    let entries: string[] = [];
+    try { entries = readdirSync(abs); } catch { return; }
+    for (const name of entries) {
+      if (out.length >= maxFiles) return;
+      if (SKIP_DIR.has(name) || name.startsWith(".")) continue;
+      const full = join(abs, name);
+      let s; try { s = statSync(full); } catch { continue; }
+      if (s.isDirectory()) walk(full, depth + 1);
+      else if (s.isFile() && (exts.length === 0 || exts.some((e) => name.endsWith(e)))) {
+        const rel = full.slice(ANCHOR.length + 1);
+        try { out.push({ rel, content: readFileSync(full, "utf8") }); } catch { /* atla */ }
+      }
+    }
+  };
+  if (existsSync(root)) {
+    try { statSync(root).isDirectory() ? walk(root, 0) : out.push({ rel: dirRel, content: readFileSync(root, "utf8") }); } catch { /* yok */ }
+  }
+  return out;
+}
+
+/** İçerik-tarayan kind: path dosya ise tek-dosya, dizin ise globs ile enumerate; detector'ı her dosyada koş. */
+function scanContent(t: ScanTarget, fn: (rel: string, content: string) => Finding[]): Finding[] {
+  return collectMatchingFiles(t.path, t.globs).flatMap((f) => fn(f.rel, f.content));
+}
+
 /** Bir scan target'ı canlı yürüt → Finding[]. */
 function runTarget(t: ScanTarget): Finding[] {
   switch (t.kind) {
@@ -78,6 +122,38 @@ function runTarget(t: ScanTarget): Finding[] {
       const producer = grepCount(t.producerToken || t.dep || "", ["src", "server", "bin", "*.ts", "package.json"]);
       const consumer = grepCount(t.consumerToken || "", ["src", "server", "deploy", "*.yml", "*.yaml", "*.json"]);
       return wiredNoConsumer(t.dep || "?", producer, consumer, t.path);
+    }
+    // ── vO4.1 içerik-tarayan kind'ler ──
+    case "fe-chokepoint":
+      return scanContent(t, (rel, c) => chokepointBypass(rel, c, t.chokepointToken || "apiClient"));
+    case "fe-oversized":
+      return scanContent(t, (rel, c) => oversizedComponent(rel, lineCount(c), t.threshold ?? 400));
+    case "fs-any-density":
+      return scanContent(t, (rel, c) => {
+        const code = stripComments(c);
+        const anyCount = (code.match(/:\s*any\b/g) || []).length;
+        return anyDensity(rel, anyCount, lineCount(code));
+      });
+    case "secret-scan":
+      return scanContent(t, (rel, c) => hardcodedSecret(rel, c));
+    case "insecure-http":
+      return scanContent(t, (rel, c) => insecureHttp(rel, c));
+    case "sh-strict":
+      return scanContent(t, (rel, c) => shellStrictMode(rel, c));
+    case "lan-bind":
+      return scanContent(t, (rel, c) => lanExposure(rel, c));
+    case "rm-unquoted":
+      return scanContent(t, (rel, c) => unquotedRmVar(rel, c));
+    case "mcp-exec-bypass":
+      return scanContent(t, (rel, c) => chokepointBypassExec(rel, c));
+    case "mcp-output-schema": {
+      const c = readIf(t.path);
+      if (c === null) return [];
+      const code = stripComments(c);
+      const inp = (code.match(/inputSchema/g) || []).length;
+      const outp = (code.match(/outputSchema/g) || []).length;
+      // Agregat: inputSchema'lı tool def sayısı > outputSchema → eksik conformance.
+      return toolMissingOutputSchema(`${t.path} (${outp}/${inp} outputSchema)`, inp > 0, outp >= inp);
     }
     default: return [];
   }
@@ -124,6 +200,19 @@ function writeDetected(persona: string, notes: DiagnosticNote[]): string {
   const out = join(NOTES_DIR, `${persona}.detected.json`);
   writeFileSync(out, JSON.stringify({ persona, count: notes.length, notes }, null, 2) + "\n");
   return out;
+}
+
+/** Tüm (veya verilen) persona'ları tara + detected.json yaz. panel.ts --refresh bunu çağırır. */
+export function runAllScans(personas: Persona[] = PERSONAS): number {
+  const head = headShort();
+  const ts = new Date().toISOString();
+  let total = 0;
+  for (const p of personas) {
+    const notes = scanPersona(p, head, ts);
+    writeDetected(p.name, notes);
+    total += notes.length;
+  }
+  return total;
 }
 
 function main(): void {

@@ -6,7 +6,13 @@
  * üretmiyorsa (örn. prose-kalite) target boş kalır → insan `<persona>.md` notlarını yazar.
  */
 
-export type ScanKind = "pkg-meta" | "empty-file" | "orphan-dir" | "unref-artifact" | "wired-no-consumer";
+export type ScanKind =
+  | "pkg-meta" | "empty-file" | "orphan-dir" | "unref-artifact" | "wired-no-consumer"
+  // vO4.1 içerik-tarayan kind'ler (collectMatchingFiles ister):
+  | "fe-chokepoint" | "fe-oversized" | "fs-any-density"
+  | "secret-scan" | "insecure-http"
+  | "sh-strict" | "lan-bind" | "rm-unquoted"
+  | "mcp-output-schema" | "mcp-exec-bypass";
 
 export interface ScanTarget {
   kind: ScanKind;
@@ -18,6 +24,12 @@ export interface ScanTarget {
   dep?: string;
   producerToken?: string;
   consumerToken?: string;
+  /** fe-oversized/fs-any-density: satır/oran eşiği. */
+  threshold?: number;
+  /** fe-chokepoint: choke-point dosya işaretçisi (apiClient). */
+  chokepointToken?: string;
+  /** içerik-tarayan kind'ler: path dizin ise hangi dosya uzantıları (*.sh, *.tsx). */
+  globs?: string[];
 }
 
 export interface Persona {
@@ -53,8 +65,10 @@ export const PERSONAS: Persona[] = [
   },
   {
     name: "fullstack", targetLane: "backend",
-    scope: "server.ts, src↔server kontrat seam'i",
-    targets: [],
+    scope: "server.ts, src↔server kontrat seam'i (orphan-API → vO5-depgraph)",
+    targets: [
+      { kind: "fs-any-density", path: "server.ts" },
+    ],
   },
   {
     name: "backend", targetLane: "backend",
@@ -66,22 +80,36 @@ export const PERSONAS: Persona[] = [
   {
     name: "frontend", targetLane: "frontend",
     scope: "src/{App.tsx,components,hooks}",
-    targets: [],
+    targets: [
+      { kind: "fe-chokepoint", path: "src", chokepointToken: "apiClient", globs: ["*.tsx", "*.ts", "*.jsx"] },
+      { kind: "fe-oversized", path: "src/components", threshold: 400, globs: ["*.tsx", "*.jsx"] },
+    ],
   },
   {
     name: "macos", targetLane: "scripts",
     scope: "*.sh, launchd/Terminal köprüsü, deploy/",
-    targets: [],
+    targets: [
+      { kind: "sh-strict", path: ".", globs: ["*.sh"] },
+      { kind: "lan-bind", path: ".", globs: ["*.sh", "*.plist"] },
+      { kind: "rm-unquoted", path: ".", globs: ["*.sh"] },
+    ],
   },
   {
     name: "integrations", targetLane: "integrations",
     scope: ".env.example, webhook/OAuth endpoint'leri, server.json (v2.1 cross-check)",
-    targets: [],
+    targets: [
+      { kind: "secret-scan", path: "server", globs: ["*.ts", "*.json"] },
+      { kind: "secret-scan", path: "src", globs: ["*.ts", "*.tsx"] },
+      { kind: "insecure-http", path: "src", globs: ["*.ts", "*.tsx"] },
+    ],
   },
   {
     name: "mcp", targetLane: "integrations",
     scope: "tool-registry, ToolRegistry.execute choke-point, modelcontextprotocol kullanımı",
-    targets: [],
+    targets: [
+      { kind: "mcp-output-schema", path: "server/tool-registry.ts" },
+      { kind: "mcp-exec-bypass", path: "server", globs: ["*.ts"] },
+    ],
   },
 ];
 
