@@ -1,0 +1,42 @@
+# LiteLLM proxy config for ollamas (v1.7) — runs OUT-OF-PROCESS, no Python in core.
+# ollamas consumes this proxy via the existing `custom-openai` provider path
+# (server/providers.ts), so adding/removing providers here needs ZERO core code.
+#
+# Start (separate terminal): see deploy/litellm/README.md
+#   pip install 'litellm[proxy]'
+#   litellm --config deploy/litellm/litellm.config.yaml --port 4000
+#
+# Then point ollamas at it (one-time):
+#   custom-openai-endpoint = http://localhost:4000/v1
+#   custom-openai          = <LITELLM_MASTER_KEY below>
+
+model_list:
+  # Local Ollama models — proxied so ollamas gets per-key budgets + 100+ provider reach.
+  - model_name: local-qwen
+    litellm_params:
+      model: ollama/qwen3:8b
+      api_base: http://localhost:11434
+
+  - model_name: local-llama
+    litellm_params:
+      model: ollama/llama3.1:8b
+      api_base: http://localhost:11434
+
+  # Cloud providers (optional) — uncomment + set env keys to enable fan-out.
+  # - model_name: gpt-4o-mini
+  #   litellm_params:
+  #     model: openai/gpt-4o-mini
+  #     api_key: os.environ/OPENAI_API_KEY
+  # - model_name: claude
+  #   litellm_params:
+  #     model: anthropic/claude-sonnet-4-6
+  #     api_key: os.environ/ANTHROPIC_API_KEY
+
+litellm_settings:
+  drop_params: true          # tolerate ollamas-sent params some backends reject
+  request_timeout: 600
+
+general_settings:
+  master_key: sk-ollamas-litellm-local   # CHANGE in real use; this is the custom-openai key
+  # Per-key budgets / quotas live here — LiteLLM enforces them before ollamas meters usage.
+  # max_budget: 0          # set >0 to cap spend per master key
