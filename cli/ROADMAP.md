@@ -12,8 +12,8 @@
 | **v5** | MCP client | `ollamas mcp info\|tools\|call\|upstreams\|add\|rm` — `/mcp` JSON-RPC + `/api/saas/upstreams`; guard glob + HIL gate; choke-point üzerinden çağrı | ✅ DONE |
 | **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → WFWorkflow plist (chat/status/bench/mcp-call) + recipe cards; POSIX köprü saas+mcp upstreams/add/rm; `mcp call --stream`; remote-exposure doc (tailscale) | ✅ DONE |
 | **v7** | Profiller + secrets | AES-256-GCM secrets-at-rest (`secrets.ts`/`keystore.ts`, db.ts deseni) + `*Enc` sealed config + güvenli migration; çoklu-gateway profil (`config use`/`profiles`/`--profile`); env override korunur | ✅ DONE |
-| **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | ▶ NEXT |
-| **v9** | Packaging | `npm link` global; opsiyonel Go tek-binary (v4 bench TTFB kazancı gösterirse); Homebrew tap; shell completion (bash/zsh) | |
+| **v8** | Observability/TUI | `ollamas top` — saf prom-parser (`/metrics`) + sparkline/gauge + usage timeseries + seyir tail + `--watch` (alt-screen, SIGINT-restore) | ✅ DONE |
+| **v9** | Packaging | `npm link` global; Bun `--compile` tek-binary (CI arm64 launch-smoke gate); Homebrew tap; shell completion (bash/zsh/fish) | ▶ NEXT |
 | **v10** | Self-update + plugin | `ollamas update`; manifest-tabanlı 3rd-party alt-komut sistemi; release-please; CLI CI (`.github/workflows`) | |
 | **v11+** | Ufuk (önceden-hesap) | Native Swift Shortcuts derinleştirme; WASM build; otonom agent loop; multi-gateway mesh kontrolü | |
 
@@ -74,6 +74,15 @@
 - Testler: `cli-shortcuts` (16) + `cli-shortcuts-cmd` (5) + `cli-bridge-mcp` (9, async-spawn) + `cli-mcp-stream` (6) — **full 176 pass/1 skip** (v5:140). `plutil -lint` + binary1 roundtrip + canlı build (9 dosya 0600, placeholder-only) doğrulandı.
 - Choke-point korunur (gerçek `tool-registry` import YOK; mention'lar yorum). VERSION 6.0.0.
 
+## v8 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): `yunyu/parse-prometheus-text-format` (Apache-2) parser LOGIC port; `holman/spark`(6.1k)+`sindresorhus/sparkly`(MIT) sparkline algo; `sindresorhus/ansi-escapes`+`log-update`(MIT) inline escape + full-frame repaint; `bencao/terminal-clock` loop; k9s/docker-stats 2s-repaint doğrulandı. ~100 LOC desen-port.
+- `cli/lib/metrics.ts` (saf): `parsePromText` (HELP/TYPE/labeled + histogram `_bucket/_sum/_count` konsolidasyon) + `counterTotal` + `histogramStats` (avg + **yaklaşık** p50/p90 bucket-le sınırından) + `samplesByLabel`. Malformed satır atlanır, throw yok.
+- `cli/lib/output.ts` (saf, +): `sparkline` (▁▂▃▄▅▆▇█ min/max norm; boş→"", eşit→orta düz çizgi), `bar` (█/░ gauge clamp), `compactNum` (1.2k/3.4M).
+- `cli/lib/client.ts`: `getText`+`getMetrics` (`/metrics` OPEN, auth yok) + `getUsageTimeseries` (Bearer; 401/403→OLLAMAS_API_KEY hint).
+- `cli/commands/top.ts`: saf `renderDashboard`/`buildSnapshot`/`reqRateDelta`/`cleanupSequence`. Snapshot (default) + `--json`; **`--watch`** (TTY-only) alt-screen+hide-cursor, `setInterval` repaint, req/s = Δ(request count)/Δt ring-buffer sparkline, **SIGINT/SIGTERM cleanup** cursor-restore + alt-screen-exit (yoksa terminal bozulur). Non-TTY+`--watch` → tek snapshot. seyir-defteri.jsonl tail (lokal fs, yoksa atla). `cli/OBSERVABILITY.md` (p50/p90 yaklaşık, seyir local-only, SSH alt-screen caveat).
+- Testler: `cli-metrics`(19)+`cli-output`(+13)+`cli-top`(15) → **full 243 pass/1 skip** (v7:211). Canlı stub-server probe: `--json` gerçek metrics parse, non-TTY render+degrade, `--watch` non-TTY refuse.
+- Choke-point korunur (`grep --include="*.ts"` boş); VERSION **8.0.0**.
+
 ## v7 — DONE (kanıt)
 - **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): Node.js crypto docs + kendi `server/db.ts:155-187` AES-256-GCM desen-PORT (import yok); `aws`/`gh`/`stripe` credential-at-rest modelleri (encrypted-file-from-start + opsiyonel keychain doğrulandı); `aws-cli` profil precedence (flag>env>active>default); macOS Keychain `security` CLI → **v11'e ertelendi** (SSH'de sessiz fail, temiz seam bırakıldı).
 - `cli/lib/secrets.ts` (saf): `seal`/`open` (`iv:tag:ciphertext` hex, `authTagLength:16` iki tarafta → gcm-no-tag-length yok) + `deriveKey` scrypt. **Sapma**: `open()` THROW eder (db.ts `""` döndürür — CLI'da boş Bearer key tehlikeli).
@@ -84,9 +93,10 @@
 - Testler: `cli-secrets`(14) + `cli-config-secrets`(10) + `cli-profiles`(11) → **full 211 pass/1 skip** (v6:176). Canlı (izole HOME): migration+roundtrip+tamper+env-no-persist+graceful-degrade + profil create/switch/isolation/no-plaintext doğrulandı.
 - Choke-point korunur (`grep --include="*.ts"` boş); VERSION **7.0.0**.
 
-## v8 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/lib/metrics.ts` (saf) — `/metrics` Prometheus-text parser (counter + latency histogram) + `/api/saas/usage/timeseries` şekli; ilk test = örnek `/metrics` body → typed series.
-2. `client.ts`: `getMetrics()` (`/metrics` GET, text) + `getUsageTimeseries()` (`/api/saas/usage/timeseries`, Bearer).
-3. `cli/commands/top.ts` — `ollamas top [--watch]` ince render döngüsü; terminal sparkline (output.ts reuse); TTY-only, `--json` snapshot.
-4. `seyir-defteri.jsonl` tail (`~/.llm-mission-control/seyir-defteri.jsonl`).
-5. Testler: metrics parse saf-fn; top render saf-fn; mock-fetch usage.
+## v9 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/lib/completion.ts` (saf) — statik bash/zsh/fish completion script üret (subcommand listesi + `ollamas __complete` callback); ilk test = her shell scripti subcommand'leri içerir.
+2. `ollamas completion <bash|zsh|fish>` komutu + `ollamas __complete` gizli dispatcher; `index.ts` wire.
+3. `npm link` global install smoke (TEK bash, `ollamas version`==8.x).
+4. Bun `--compile` tek-binary (`--target=bun-darwin-arm64`) — CI arm64 **launch-smoke gate** (N-006 echo-proof; Bun 1.3.12 "Killed:9" regression pin-sonrası).
+5. Homebrew tap formula taslağı.
+6. Testler: completion script saf-fn; `__complete` dispatch; binary smoke (CI).
