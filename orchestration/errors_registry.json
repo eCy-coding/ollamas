@@ -72,6 +72,13 @@
       "severity": "med",
       "note": "Lisans-gate false-allow: ADOPTIONS hücresi yanlış/belirsiz lisans etiketiyle (örn 'GPL→native API') gate'i kandırabilir veya gate dual-lisansı yanlış sınıflayabilir → copyleft kod yanlışlıkla 'code-ok' geçer. Prevention: adopt.ts classifyCell GPL içeren hücreyi STRICTEST copyleft sayar; lisans hücresi NE adopt edildiğini yansıtmalı (native scripting API → 'native', kaynak kopyası değil); --sbom ile GERÇEK runtime dep lisansı syft'ten çapraz-doğrula. NOT: RISK-ORCH-008/009 SEYIR'de cockpit (sync-freeze/test-convention) için kullanıldı; registry'de 008/009 backfill worker'a ait.",
       "applies_version": "vO4"
+    },
+    {
+      "id": "RISK-ORCH-011",
+      "category": "drift",
+      "severity": "med",
+      "note": "Version-drift false-negative/positive: drift.ts range karşılaştırması SALT-STRING ('^18.0.0' ≠ '^18.2.0' farklı sayılır, '~5.4' vs '5.4.0' farklı). Semver-aware DEĞİL → kasıtlı (pin tutarlılığı tam-eşitlik politikası, syncpack varsayılanı) ama bir lane '^18' diğeri '^18.0.0' yazarsa yanlış-pozitif drift raporlar. Prevention: drift yalnız SİNYAL (soft-warn, exit 0); gerçek uyumsuzluk için lane sekmesi `npm ls`/semver-satisfies ile doğrular; orchestration fixlemez, backlog verir (§3). Ayrıca git-worktree'ler aynı repo'nun ise root package.json paylaşır → drift=0 beklenir (ayrı paket dizinleri olmadıkça).",
+      "applies_version": "vO5"
     }
   ],
   "errors": [

@@ -10,7 +10,7 @@
 | **vO2** | ✅ DONE | Live discovery — dev-server cwd-mapping (port-3000 collision çözüldü) + tmux-first/iTerm2/Terminal.app sekme keşfi + busy/idle sinyali + **§3.1 aktif koordinasyon** (nudge/notify, allowlist+dry-run) |
 | **vO3** | ✅ DONE | **Canlı cockpit** — `serve.ts` (zero-dep node:http + SSE) + `cockpit.html` (tek dosya, iOS) backend runtime + lane matris canlı; `collect.ts` tek-kaynak (status.ts ile paylaşır) + `plan-next.ts` §4 trigger otomasyonu folded |
 | **vO4** | ✅ DONE | OSS adoption tracker + **lisans-disiplini gate** — `licenses.ts`/`adopt.ts` matris-gate (GPL+ADOPT→İHLAL, RISK-ORCH-005 kodlandı) + `sbom.ts`/`adopt-gate.ts` syft SBOM gerçek-dep audit + ADOPT_GATE.md. Gate ilk catch: ADOPTIONS mislabel düzeltildi (ERR-ORCH-005) |
-| vO5 | planned | Cross-lane bağımlılık grafiği (frontend↔backend API gap, scripts↔register-seam) |
+| **vO5** | ✅ DONE | Cross-lane bağımlılık grafiği — `graph.ts`/`depgraph.ts` API-gap (frontend↔backend route MISSING/UNUSED + scripts↔registry → mermaid) + `drift.ts` **cross-package version-drift** (aynı dep farklı lane farklı pin, syncpack deseni) → DEPGRAPH.md |
 | vO6 | planned | Benchmark agregasyon (MacBook + iOS tok/s; MLX/Rapid-MLX bench adopt) |
 | vO7 | planned | Drift-guard otomasyon (branch≡roadmap, choke-point bütünlüğü) |
 | vO8 | planned | Quality-gate roll-up (tüm lane tsc/lint/test tek matriste) |

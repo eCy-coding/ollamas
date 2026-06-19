@@ -160,3 +160,37 @@ syft kurulu değil → `--sbom` zarafetle atlar, matris-gate yine çalışır. L
 **Next precomputed (→vO5):** Cross-lane bağımlılık grafiği — `dependency-cruiser --output json` (MIT) tüket →
 lane↔lane import/API grafiği + cross-package version-drift (syncpack deseni). sbom.ts'in dep-parse'ı + adopt.ts'in
 satır-parse'ı taban. Çıktı: cockpit'e dep-graph paneli + `DEPGRAPH.md`. Oturum başı branch==feat/orchestration-v3.
+
+---
+
+## vO5 — Cross-Lane Dependency Graph + Version-Drift (2026-06-20)
+
+**Bağlam:** vO5 İKİ sekme PARALEL kodladı (yine MERGE deseni). Diğer sekme **API-gap** boyutunu yazdı
+(`bin/lib/graph.ts` extractRoutes/extractCalls/extractRegistrations/gapAnalysis/toMermaid + `bin/depgraph.ts`
+CLI: backend route ↔ frontend `/api` çağrı ↔ scripts registry → MISSING/UNUSED + mermaid → DEPGRAPH.md +
+`tests/depgraph.test.ts`). Bu sekme **ikinci core boyutu** ekledi: cross-package **version-drift** (research'te
+syncpack/manypkg üst-kategori, worker'ın graph.ts'inde YOK). Çakışma=0 (ayrı dosya + minimal additive section).
+
+**Yapıldı (bu sekme):**
+- `bin/lib/drift.ts` (NEW): `laneDepMap` (package.json deps+devDeps birleşik) + `detectVersionDrift` (dep'i
+  isimle grupla, distinct range>1 → drifted; drifted-önce sıralı, syncpack single-version-policy) + `toDriftTable`.
+- `tests/drift.test.ts` (NEW, vitest): 9 case (merge, drift tespiti, tek-lane no-drift, sıralama, tablo).
+- `bin/depgraph.ts` ENHANCE (additive, worker dosyasına minimal): drift import + lane package.json tara +
+  "## Cross-Package Version Drift" section DEPGRAPH.md'ye. shared.ts `discoverWorktrees`/`findFile` REUSE.
+
+**Kanıt (canlı):** vO5 set vitest 16/16 (drift 9 + depgraph 7). `tsx depgraph.ts` → DEPGRAPH.md: API-gap (MISSING/
+UNUSED/mermaid) + **"Version Drift (0 drifted / 8 lane)"** — git-worktree'ler aynı repo root package.json'ı
+paylaşıyor → drift=0 BEKLENEN ve doğru (RISK-ORCH-011 notu). Lane ağaçlarına 0 yazım.
+
+**Hata/Not:** Worker eşzamanlı `tests/detectors2.test.ts` (panel-v2 RED TDD, 33 fail — impl uyumsuz) yazıyor;
+BENİM commit'ime DAHİL EDİLMEDİ (worker'ın in-flight RED işi). RISK-ORCH-011 (drift salt-string, semver-aware değil →
+soft-warn sinyal).
+
+**Research (e2e GitHub, top-star permissive):** syncpack 2.1K MIT (version-drift deseni), dependency-cruiser 6.7K
+MIT (import-graph JSON, future), oasdiff 2.3K Apache (OpenAPI diff, future), mermaid 71K MIT (text DSL format).
+renovate AGPL → idea-only (bundle yasak). GPL kod YOK.
+
+**Next precomputed (→vO6):** Benchmark aggregation — bench lane (`feat/v1.8-bench`) tok/s metriklerini topla
+(MacBook + iOS); `MinhNgyuen/llm-benchmark` MIT + Rapid-MLX/mlx-lm Apple-Silicon baseline (scripts lane v4 zaten
+adopt etti — onların bench-metrics.mjs çıktısını TÜKET, yeniden hesaplama). Cockpit'e bench paneli + BENCH.md.
+collect.ts'e bench alanı. Oturum başı branch==feat/orchestration-v3.
