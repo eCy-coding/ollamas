@@ -10,7 +10,7 @@ import { runSaas } from "./commands/saas";
 import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
-import { loadConfig, saveConfig, configPath, type CliConfig } from "./lib/config";
+import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
 const VERSION = "6.0.0";
 
@@ -28,7 +28,9 @@ commands:
   bench              benchmark models (tok/s, TTFB) and pick the fastest
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
   doctor             health of gateway + ollama + bridge + ready + agent
-  config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken|profile)
+  config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
+    config use <name>  switch active gateway profile (secrets sealed per profile)
+    config profiles    list profiles
   help               this message
   version            print version
 
@@ -81,6 +83,33 @@ export function route(argv: string[]): { command: string; rest: string[] } {
 
 function runConfig(rest: string[]): number {
   const [key, value] = rest.filter((a) => !a.startsWith("-"));
+
+  // config use <name> — switch the active gateway profile (creates it if new).
+  if (key === "use") {
+    if (!value) {
+      process.stderr.write("config use: missing <name>  (try 'ollamas config profiles')\n");
+      return 2;
+    }
+    try {
+      setActiveProfile(value);
+    } catch (e: any) {
+      process.stderr.write(`config use: ${String(e?.message || e)}\n`);
+      return 2;
+    }
+    process.stdout.write(`config: active profile → ${value}  (${profilePath(value)})\n`);
+    return 0;
+  }
+
+  // config profiles — list every profile, mark the active one.
+  if (key === "profiles") {
+    for (const p of listProfiles()) {
+      process.stdout.write(`${p.active ? "*" : " "} ${p.name.padEnd(14)} ${p.gateway.padEnd(28)} key:${p.hasKey ? "set" : "unset"}\n`);
+    }
+    return 0;
+  }
+
+  const activeProfile = listProfiles().find((p) => p.active)?.name ?? "default";
+
   if (!key) {
     const cfg = loadConfig();
     const redacted = {
@@ -88,12 +117,14 @@ function runConfig(rest: string[]): number {
       apiKey: cfg.apiKey ? "***set***" : undefined,
       saasAdminToken: cfg.saasAdminToken ? "***set***" : undefined,
     };
-    process.stdout.write(JSON.stringify({ path: configPath(), ...redacted }, null, 2) + "\n");
+    process.stdout.write(
+      JSON.stringify({ path: profilePath(activeProfile), activeProfile, secretsEncryptedAtRest: true, ...redacted }, null, 2) + "\n",
+    );
     return 0;
   }
   const allowed = ["gateway", "model", "provider", "apiKey", "saasAdminToken", "mcpGuardAllow", "mcpGuardDeny", "profile"];
   if (!allowed.includes(key)) {
-    process.stderr.write(`config: unknown key '${key}' (allowed: ${allowed.join(", ")})\n`);
+    process.stderr.write(`config: unknown key '${key}' (allowed: ${allowed.join(", ")}; or 'use <name>' | 'profiles')\n`);
     return 2;
   }
   if (value === undefined) {
@@ -101,7 +132,8 @@ function runConfig(rest: string[]): number {
     return 0;
   }
   saveConfig({ [key]: value } as Partial<CliConfig>);
-  process.stdout.write(`config: ${key} updated → ${configPath()}\n`);
+  const sealed = key === "apiKey" || key === "saasAdminToken" ? " (sealed)" : "";
+  process.stdout.write(`config: ${key} updated${sealed} → [${activeProfile}] ${profilePath(activeProfile)}\n`);
   return 0;
 }
 
