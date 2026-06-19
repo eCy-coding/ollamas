@@ -2,7 +2,7 @@
 // ToolRegistry. Every tool side effect goes through the gateway's single
 // choke-point (AGENTS.md §4). This file holds no dispatch logic.
 import type { DoctorReport } from "./output";
-import type { McpTool } from "./mcp";
+import type { McpTool, McpProgress } from "./mcp";
 import { rpcEnvelope, parseRpcResponse } from "./mcp";
 
 export interface ChatMessage {
@@ -239,6 +239,36 @@ export class GatewayClient {
   // Invoke a tool via the gateway choke-point. Returns { content[], isError }.
   async mcpCallTool(name: string, args: Record<string, any>): Promise<{ content?: any[]; isError?: boolean }> {
     return this.mcpRpc("tools/call", { name, arguments: args });
+  }
+
+  // Streaming tools/call (v6): a long-running tool interleaves
+  // `notifications/progress` JSON-RPC frames on the SSE channel before the final
+  // result envelope. Forward each progress frame to onProgress as it arrives;
+  // resolve with the terminal result. Terminal-only — Shortcuts/iOS can't read
+  // SSE, so the build-time recipes stay on the non-stream path.
+  async mcpCallToolStream(
+    name: string,
+    args: Record<string, any>,
+    onProgress: (p: McpProgress) => void,
+  ): Promise<{ content?: any[]; isError?: boolean }> {
+    const r = await fetch(`${this.baseUrl}/mcp`, {
+      method: "POST",
+      headers: this.headers({ "Content-Type": "application/json", Accept: "application/json, text/event-stream" }),
+      body: JSON.stringify(rpcEnvelope(++this.rpcId, "tools/call", { name, arguments: args })),
+      signal: AbortSignal.timeout(300_000),
+    });
+    if (!r.ok || !r.body) throw new Error(mcpError(r.status));
+    let final: { result?: any; error?: any } | undefined;
+    await consumeSSE(r.body, (ev: any) => {
+      if (ev?.method === "notifications/progress") {
+        onProgress((ev.params || {}) as McpProgress);
+      } else if (ev && (ev.result !== undefined || ev.error !== undefined)) {
+        final = ev; // the JSON-RPC reply matching our request id
+      }
+    });
+    if (!final) throw new Error("MCP tools/call: stream ended with no result frame");
+    if (final.error) throw new Error(`MCP tools/call: ${final.error.message || JSON.stringify(final.error)}`);
+    return final.result;
   }
 
   // Public discovery (no auth): which tiers/tools the gateway exposes + upstreams.

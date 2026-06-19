@@ -111,6 +111,25 @@ export function argsFromPairs(pairs: string[], tool?: McpTool): Record<string, a
   return out;
 }
 
+// An MCP `notifications/progress` payload (spec shape). `total` and `message`
+// are optional; `progress` is monotonically increasing.
+export interface McpProgress {
+  progress?: number;
+  total?: number;
+  message?: string;
+  progressToken?: string | number;
+}
+
+// Render a one-line progress indicator: `⟳ 3/10 (30%) building…` — percent only
+// when total is known. Pure → unit-testable. Caller decides the stream (stderr).
+export function formatProgress(p: McpProgress, ctx: OutputCtx): string {
+  const cur = typeof p.progress === "number" ? p.progress : 0;
+  const frac = typeof p.total === "number" && p.total > 0 ? ` (${Math.round((cur / p.total) * 100)}%)` : "";
+  const tot = typeof p.total === "number" ? `/${p.total}` : "";
+  const msg = p.message ? ` ${p.message}` : "";
+  return c("dim", `⟳ ${cur}${tot}${frac}${msg}`, ctx.color);
+}
+
 // Flatten an MCP tools/call result `content[]` to plain text for the terminal.
 export function renderToolResult(result: { content?: any[]; isError?: boolean }): string {
   const parts = (result.content || []).map((p) =>

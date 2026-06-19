@@ -14,14 +14,15 @@ import { GatewayClient, type UpstreamInput } from "../lib/client";
 import { loadConfig } from "../lib/config";
 import { resolveOutputCtx, formatTable, c, type OutputCtx } from "../lib/output";
 import { confirm } from "../lib/io";
-import { filterByGuard, formatToolSignature, toolDanger, argsFromPairs, renderToolResult, type McpTool } from "../lib/mcp";
+import { filterByGuard, formatToolSignature, toolDanger, argsFromPairs, renderToolResult, formatProgress, type McpTool } from "../lib/mcp";
 
 const HELP = `ollamas mcp <action> — MCP client over the gateway choke-point
 
   info                               tiers/tools the gateway exposes (no auth)
   tools [--sig]                      list tools; --sig shows param signatures
-  call <tool> [--params '{json}'] [--arg k=v …] [--yes]
-                                     invoke a tool (host/destructive tools prompt)
+  call <tool> [--params '{json}'] [--arg k=v …] [--yes] [--stream]
+                                     invoke a tool (host/destructive tools prompt;
+                                     --stream shows progress for long tools)
   upstreams                          list registered upstream MCP servers
   add --name <n> --transport http|stdio [--url <u>|--command <c> --args a,b] [--allow t1,t2]
   rm <id> [--yes]                    remove an upstream (prompts unless --yes)
@@ -45,6 +46,7 @@ export async function runMcp(argv: string[]): Promise<number> {
       args: { type: "string" },
       allow: { type: "string" },
       sig: { type: "boolean" },
+      stream: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       json: { type: "boolean" },
       help: { type: "boolean" },
@@ -146,7 +148,12 @@ async function callTool(client: GatewayClient, name: string | undefined, v: any,
     }
   }
 
-  const result = await client.mcpCallTool(name, args);
+  // --stream consumes notifications/progress as they arrive (terminal-only;
+  // SSE can't be rendered under --json, which wants one final document).
+  const streaming = v.stream && !ctx.json;
+  const result = streaming
+    ? await client.mcpCallToolStream(name, args, (p) => process.stderr.write(formatProgress(p, ctx) + "\n"))
+    : await client.mcpCallTool(name, args);
   if (ctx.json) return json(result);
   const text = renderToolResult(result);
   if (result.isError) {
