@@ -11,6 +11,7 @@ import Ajv, { type ValidateFunction } from "ajv";
 import { runPre, runPost } from "./tool-interceptors";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
+import { ragIndex, ragSearch } from "./rag";
 
 // outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
 // (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
@@ -632,6 +633,51 @@ const TOOLS: Record<string, ToolDef> = {
         throw new Error(`promptfoo failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
       }
       return parsePromptfoo(String(text));
+    },
+  },
+
+  // v1.13: local RAG via sqlite-vec (MIT/Apache) + ollama embeddings. Dedicated
+  // vector DB (server/rag.ts), never the SaaS store. Routed through the choke-point.
+  rag_index: {
+    tier: "host",
+    schema: fn(
+      "rag_index",
+      "Embed a document (via local ollama) and store it in the local sqlite-vec vector index for later retrieval. Upserts by id.",
+      {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Stable document id (re-indexing the same id replaces it)." },
+          text: { type: "string", description: "Document text to embed and store." },
+        },
+        required: ["id", "text"],
+      },
+      { type: "object", properties: { id: { type: "string" }, dim: { type: "number" } }, required: ["id", "dim"] }
+    ),
+    invoke: async (args) => {
+      if (!args.id || args.text === undefined) throw new Error("Missing 'id' or 'text'.");
+      return await ragIndex(String(args.id), String(args.text));
+    },
+  },
+
+  rag_search: {
+    tier: "safe",
+    schema: fn(
+      "rag_search",
+      "Semantic search over the local sqlite-vec index. Returns the top-k most similar documents (id, text, distance).",
+      {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Natural-language query." },
+          k: { type: "number", description: "How many results to return. Default 5." },
+        },
+        required: ["query"],
+      },
+      { type: "object", properties: { results: { type: "array", items: { type: "object" } } } }
+    ),
+    invoke: async (args) => {
+      if (!args.query) throw new Error("Missing 'query'.");
+      const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
+      return { results: await ragSearch(String(args.query), k) };
     },
   },
 };

@@ -78,9 +78,10 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const { tools } = await c.listTools();
     await c.close();
 
-    expect(tools.length).toBe(16); // free plan = safe tier only (sample added in v1.14)
+    expect(tools.length).toBe(16); // free plan = safe tier only (+rag_search, v1.13; sample added in v1.14)
     expect(tools.some((x) => x.name === "git_commit")).toBe(false); // host tier filtered
     expect(tools.some((x) => x.name === "read_file")).toBe(true);
+    expect(tools.some((x) => x.name === "rag_search")).toBe(true); // safe-tier RAG visible to free plan
   });
 
   test("admin routes refuse a bad admin token", async () => {

@@ -23,8 +23,8 @@ function mkDeps(over: Partial<ToolDeps> = {}): ToolDeps {
 const ctx = (over: Partial<ToolCtx> = {}): ToolCtx => ({ isLive: true, workspaceRoot: "/ws", autoApply: false, deps: mkDeps(), ...over });
 
 describe("ToolRegistry choke-point", () => {
-  test("exposes all 26 built-in workspace tools", () => {
-    expect(ToolRegistry.schemas().length).toBe(26); // +bench_model (v1.8), +mac_power (v1.9), +eval_prompt (v1.12)
+  test("exposes all 28 built-in workspace tools", () => {
+    expect(ToolRegistry.schemas().length).toBe(28); // +bench_model(v1.8) +mac_power(v1.9) +eval_prompt(v1.12) +rag_index/rag_search(v1.13)
   });
 
   test("unknown tool → ok:false, not a throw", async () => {
