@@ -42,6 +42,12 @@ onu küçük ve choke-point-uyumlu ekleyip CLI'a dön.
    gateway gerektiriyorsa **boot+test+kill TEK Bash çağrısında** (harness reap gotcha).
 6. **Quality gate (pre-commit)**: `tsc --noEmit` ✓ → full `vitest run` (regression) ✓ →
    `npm run build:cli` ✓ → conventional commit (`feat(cli): …`).
+10. **Secrets-at-rest** (v7): `apiKey`/`saasAdminToken` diske **sealed** yazılır
+   (AES-256-GCM, `authTagLength:16` iki tarafta — `lib/secrets`+`lib/keystore`),
+   asla plaintext. `open()` THROW eder (boş Bearer key yollama); I/O sınırı
+   (`config load`) decrypt-hatasını **yakalayıp degrade** eder (uyar+düşür, crash
+   etme — N-013). Env-secret (`OLLAMAS_API_KEY`) asla persist edilmez (N-014).
+   Profil secret'leri izole; `--include="*.ts"` ile choke-point grep (N-012).
 
 ## §4 — Çalışma Döngüsü (her görev)
 ```

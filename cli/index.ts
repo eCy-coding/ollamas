@@ -12,7 +12,7 @@ import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
-const VERSION = "6.0.0";
+const VERSION = "7.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 

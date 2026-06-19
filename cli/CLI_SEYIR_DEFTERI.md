@@ -109,3 +109,20 @@
 - **Gözlem**: `grep -r ToolRegistry cli/` eski "= boş" konvansiyonu artık yanlış — `client.ts`/`mcp.ts`/`index.ts` yorumları (`never imports server/tool-registry`, `ToolRegistry.execute`) grep'e takılıyor. Yasanın özü = **gerçek import yok**, mention değil.
 - **Fix/Not**: gerçek gate = `grep -rn --include="*.ts" "from.*tool-registry\|require.*tool-registry" cli/` → boş olmalı (`.md` mention'ları hariç; import-grep'in kendisi bile doc'ta geçince eşleşir → `--include="*.ts"` şart). Bu phase'de doğrulandı: 0 gerçek import. CLI_AGENTS §3.1 güncellendi.
 - **ÖNLEME KURALI**: kanıt-grep'i yorum/dokümantasyon mention'larına duyarsız yaz (import statement'ı hedefle), aksi halde gate false-positive verir.
+
+## v7 — Profiller + AES-GCM secrets-at-rest (2026-06-20)
+
+### N-013 (resilience) · decrypt-failure her komutu crash ettiriyordu → degrade
+- **Semptom**: canlı probe'da kayıp/yanlış key veya bozuk `*Enc` blob → `loadConfig` `SecretError` fırlattı; `chat`/`doctor` dahil HER komut stack-trace ile çöküyor, CLI kullanılamaz hale geliyor (kullanıcı dosyayı elle silene kadar).
+- **Kök neden**: `open()` THROW eder (doğru — boş Bearer key göndermemek için, N-014). Ama bu istisna I/O sınırında yakalanmadan `loadConfig`'ten dışarı sızdı → her invocation fatal.
+- **Fix**: `unsealOrWarn` (I/O sınırı) `SecretError`'ı yakalar → tek-satır **uyarı + recovery adımları** (set OLLAMAS_API_KEY / `config apiKey` reset / `cli.json.bak` restore) yazar ve secret'i **düşürür** (absent kabul); secret-gerektirmeyen komutlar çalışmaya devam eder, auth-gerektiren komut mevcut 401-hint'e düşer. Saf `unsealDisk` hâlâ THROW eder (testler buna dayanır).
+- **ÖNLEME KURALI**: pure katman THROW etsin (doğruluk), ama I/O sınırı (config load) recoverable hatayı **yakalayıp degrade** etsin — kullanıcıya her komutta stack-trace gösterme. "fail clear, degrade gracefully" ≠ "silent-empty".
+
+### N-014 (güvenlik tasarımı) · env-secret asla diske yazılmamalı + open() THROW
+- **Gözlem**: `OLLAMAS_API_KEY` env set iken alakasız bir `config model x` → naïve `saveConfig(loadConfig())` env key'i sealed olarak diske yazardı (env-secret kalıcılaşır).
+- **Fix**: `saveConfig` persistence baseline'ı `loadDiskPlain` (env-override YOK, yalnız dosya değerleri) + patch; env'den gelen secret asla seal/persist edilmez. `open()` ise db.ts'in `""`-döndür davranışından **bilerek sapar** → THROW (CLI boş key'i Bearer olarak göndermesin).
+- **ÖNLEME KURALI**: secret persistence'ta env-kaynaklı değeri taban alma; yalnız dosya-state + explicit patch yaz. Decrypt başarısızlığında boş string döndürme (silent-empty = sahte-auth riski).
+
+### N-015 (test) · in-process probe'da bozuk dosyayı sonraki adımda yeniden kullanma
+- **Gözlem**: tek probe içinde önce `*Enc`'i kasten boz, sonra AYNI `$T` ile başka bir adım koş → ikinci adım bozuk blob'a çarpıp beklenmedik throw verdi (kod bug'ı değil, probe sıralaması).
+- **ÖNLEME KURALI**: yıkıcı (corruption/tamper) adımları probe'un EN SONUNA koy ya da her adıma taze `mktemp -d` HOME ver; durum-bozan adımdan sonra aynı fixture'ı yeniden kullanma.
