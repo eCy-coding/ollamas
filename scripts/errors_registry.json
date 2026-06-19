@@ -102,12 +102,12 @@
       "version": "v2",
       "file": "bin/host-bridge/tools/lib/bridge-client.mjs",
       "category": "portability",
-      "severity": "med",
+      "severity": "med (resolved)",
       "root_cause": "Line 9 hardcodes REPO to an absolute home path; breaks on any other machine/user/checkout. Found while surveying golden-test candidates.",
       "evidence": "bridge-client.mjs:9 export const REPO = absolute home path literal;",
-      "fix": "DEFERRED to v6 (Hardening & Portability); recorded so it is not lost.",
+      "fix": "FIXED v6: bridge-client.mjs REPO = process.env.OLLAMAS_REPO || join(dirname(fileURLToPath(import.meta.url)),'..','..','..','..'). Home literal kaldırıldı.",
       "prevention_rule": "No hardcoded absolute paths in scripts. Derive repo root from import.meta.url / env, never a literal home path.",
-      "test_added": "",
+      "test_added": "scripts/tests/repo-path.test.ts (no /Users literal + OLLAMAS_REPO override + derived path, child-process izolasyon)",
       "recurrence_count": 0
     },
     {
@@ -122,6 +122,20 @@
       "fix": "Tasarım reconciler'a çevrildi: register-if-absent / skip-if-present (registry.has) → boot'ta statik 15 tool skip, expose/ReAct kirlenmez. Schema OpenAI function şekline (fn() ayna) çevrildi. Tüm suite tekrar yeşil (108/1).",
       "prevention_rule": "Scripts ToolRegistry'ye kayıt yaparken: (a) DAİMA canonical isim + has()-reconciler kullan, choke-point expose yüzeyini dupe'la kirletme; (b) schema DAİMA OpenAI function şekli `{type:'function',function:{name,description,parameters}}` — server/tool-registry.ts fn() ayna; flat schema YASAK. Yeni kayıt eklemeden önce mcp-gateway.e2e koş.",
       "test_added": "scripts/tests/register-hooks.test.ts (12 case: reconciler skip/idempotent, OpenAI function shape, zod reject)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-005",
+      "ts": "2026-06-20",
+      "version": "v6",
+      "file": "(session shell)",
+      "category": "shell",
+      "severity": "low",
+      "root_cause": "shfmt/shellcheck'e dosya listesini unquoted $SH değişkeniyle geçtim; oturum shell'i zsh, zsh unquoted parametreyi word-split ETMEZ (bash'in aksine) → tüm liste tek arg → 'no such file'.",
+      "evidence": "lstat 'start.sh stop.sh ...': no such file or directory",
+      "fix": "Dosyaları açıkça (literal) ya da diziyle geç; Makefile $(SH_FILES) make-değişkeni (make word-split yapar) kullanıldı.",
+      "prevention_rule": "zsh oturumunda çoklu-dosya argümanını ASLA unquoted skaler değişkenle geçme; literal liste, dizi (\"${arr[@]}\") veya Makefile değişkeni kullan.",
+      "test_added": "",
       "recurrence_count": 0
     }
   ]

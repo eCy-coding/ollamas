@@ -12,7 +12,7 @@ LOG_FILE="$STATE/bridge.log"
 
 # reuse existing token or generate one
 if [ ! -s "$TOKEN_FILE" ]; then
-  openssl rand -hex 16 > "$TOKEN_FILE"
+  openssl rand -hex 16 >"$TOKEN_FILE"
 fi
 TOKEN="$(cat "$TOKEN_FILE")"
 
@@ -24,8 +24,8 @@ if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
 fi
 
 HOST_BRIDGE_TOKEN="$TOKEN" PORT="${PORT:-7345}" \
-  nohup node "$DIR/terminal-bridge.mjs" > "$LOG_FILE" 2>&1 &
-echo $! > "$PID_FILE"
+  nohup node "$DIR/terminal-bridge.mjs" >"$LOG_FILE" 2>&1 &
+echo $! >"$PID_FILE"
 sleep 1
 
 echo "[bridge] started pid $(cat "$PID_FILE") | log: $LOG_FILE"

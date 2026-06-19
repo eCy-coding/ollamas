@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "harden": "make harden"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",

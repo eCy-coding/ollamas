@@ -69,6 +69,23 @@
 
 ---
 
+## v6 — Hardening & Portability (adopt: bats-core + shfmt + shellcheck + pure-bash-bible)
+
+- `[2026-06-20] kind=phase | GitHub adoption search | derin web-search: bats-core(6.1k MIT) install+@test/run/$status, mvdan/sh shfmt(8.8k BSD-3) -i 2 -ci, koalaman/shellcheck(39.6k GPL=araç) severity+disable, pure-bash-bible+pure-sh-bible(MIT) trim/script-dir/sed-i.bak. SCRIPTS_AGENTS §5.1 doğrulandı | plan onaylı`
+- `[2026-06-20] kind=fix | ERR-SCR-003 (v2'den ertelenen) | bin/host-bridge/tools/lib/bridge-client.mjs REPO = process.env.OLLAMAS_REPO || dirname(fileURLToPath(import.meta.url)) 4-üst; home literal kaldırıldı (8 tool cd ${REPO} korunur) | node: env→/tmp/custom-repo, default→türetilmiş`
+- `[2026-06-20] kind=phase | P1 statik gate (TDD kırmızı) | scripts/tests/sh-hardening.test.ts (vitest, brew'siz daima-açık): 8 .sh shebang+set-euo, 7 destructive DRY_RUN + repo-path.test.ts (child-process izolasyon) | önce 10 fail (gaps)`
+- `[2026-06-20] kind=phase | P2 set-euo audit | install/setup/join-cluster/uninstall → set -euo pipefail + IFS=$'\n\t' + ERR-trap($LINENO); join-cluster set hiç yoktu | -`
+- `[2026-06-20] kind=phase | P3 DRY_RUN guard | install/setup/setup-keys/join-cluster → run() helper (stop.sh ayna) + destructive gate (docker build/up, npm, go build, daemon spawn, .env, read prompt); DRY modunda [DRY] yaz, exit 0 | bats: 4 script DRY exit=0 + [DRY]`
+- `[2026-06-20] kind=phase | P4 shfmt+portable | shfmt -i 2 -ci -w 8 .sh (indent normalize 4sp/2sp→2sp); setup.sh BSD-safe script_dir (pure-bash-bible MIT) | shfmt -d boş diff`
+- `[2026-06-20] kind=error | ERR-SCR-005 (low) | shfmt/shellcheck'e unquoted $SH ile dosya listesi geçtim; zsh unquoted-skaler word-split ETMEZ → tüm liste tek arg "no such file" | lstat 'start.sh stop.sh...' err`
+- `[2026-06-20] kind=fix | ERR-SCR-005 | literal dosya listesi + Makefile $(SH_FILES) (make word-split yapar). Prevention→registry: zsh'te çoklu-arg unquoted skaler YASAK | -`
+- `[2026-06-20] kind=phase | P5 shellcheck+bats+Makefile | shellcheck --severity=warning temiz (SC2034 setup-keys i→_); scripts/tests/sh/dry-run.bats 5 case (core-only); Makefile lint-sh/fmt-sh/fmt-sh-check/test-sh/harden (permissive skip-if-missing) + package.json harden | make harden CLEAN, bats 5/5`
+- `[2026-06-20] kind=fix | self-introduced finding | eklediğim safe-bash `IFS=$'\n\t'` 5 scriptte semgrep bash.ifs-tampering tetikledi (pre-commit non-blocking). Gizleme yok → IFS satırları kaldırıldı; çekirdek hardening (set -euo pipefail + ERR trap) korundu; default IFS sadece gevşetir, hiçbir splitting bozulmaz. Prevention: safe-bash header'da global IFS ekleme; set -euo pipefail yeterli | re-gate: shellcheck/shfmt/vitest 134 + bats 5/5 yeşil`
+- `[2026-06-20] kind=phase | P6 gate | tsc OK + vitest 134 pass/1 skip (108→+26) + bats 5/5 + shellcheck/shfmt clean + swift 8 | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v7 Self-Healing) | tools_doctor.mjs+health_probe.mjs oku; remediation map (port 7345 çakışma→kill+restart, stale bridge.pid temizle, plist launchctl kickstart -k); tjluoma/launchd-keepalive MIT KeepAlive/SuccessfulExit adopt; idempotent + simüle-arıza recovery testi`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack

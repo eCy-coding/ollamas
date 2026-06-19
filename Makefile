@@ -6,10 +6,13 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden
 
 # Output binary folder
 BIN_DIR = bin
+
+# In-scope shell scripts (scripts lane, v6 hardening)
+SH_FILES = start.sh stop.sh install.sh setup.sh setup-keys.sh join-cluster.sh uninstall.sh bin/host-bridge/start-bridge.sh
 
 all: help
 
@@ -84,6 +87,43 @@ up:
 ## down: Stop the stack (container + host bridge)
 down:
 	@./stop.sh
+
+## lint-sh: shellcheck all in-scope .sh (skip+warn if shellcheck absent)
+lint-sh:
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		echo "[+] shellcheck (severity=warning)..."; \
+		shellcheck --severity=warning $(SH_FILES) && echo "    -> clean"; \
+	else \
+		echo "    [!] SKIP: shellcheck not installed (brew install shellcheck)"; \
+	fi
+
+## fmt-sh: shfmt -w all in-scope .sh (2-space, skip+warn if shfmt absent)
+fmt-sh:
+	@if command -v shfmt >/dev/null 2>&1; then \
+		shfmt -i 2 -ci -w $(SH_FILES) && echo "[+] shfmt: formatted"; \
+	else \
+		echo "    [!] SKIP: shfmt not installed (brew install shfmt)"; \
+	fi
+
+## fmt-sh-check: shfmt diff gate — fail if any .sh is unformatted
+fmt-sh-check:
+	@if command -v shfmt >/dev/null 2>&1; then \
+		shfmt -i 2 -ci -d $(SH_FILES) && echo "[+] shfmt: clean"; \
+	else \
+		echo "    [!] SKIP: shfmt not installed (brew install shfmt)"; \
+	fi
+
+## test-sh: run bats shell behavior tests (skip+warn if bats absent)
+test-sh:
+	@if command -v bats >/dev/null 2>&1; then \
+		bats scripts/tests/sh/; \
+	else \
+		echo "    [!] SKIP: bats not installed (brew install bats-core)"; \
+	fi
+
+## harden: full shell hardening gate (lint + format-check + bats)
+harden: lint-sh fmt-sh-check test-sh
+	@echo "[+] shell hardening gate complete."
 
 ## clean: Remove all compiled target files and caches
 clean:

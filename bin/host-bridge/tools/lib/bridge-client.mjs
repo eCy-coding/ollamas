@@ -4,9 +4,14 @@
 // reliable exit codes).
 import { readFileSync } from "node:fs";
 import os from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-export const REPO = "/Users/emrecnyngmail.com/Desktop/ollamas";
+// Repo root the host tools cd into (docker compose / git live here). Derived from
+// this file's location (.../bin/host-bridge/tools/lib -> 4 up = root) so it is
+// portable across machines/checkouts; OLLAMAS_REPO overrides for split deploys
+// where the running stack lives elsewhere. (ERR-SCR-003: no hardcoded home path.)
+export const REPO = process.env.OLLAMAS_REPO || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const BASE = process.env.BRIDGE_URL || "http://127.0.0.1:7345";
 
 export function readToken() {

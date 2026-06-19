@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅** (registration hooks: manifest+zod reconciler; swift 8 + node 108/1 skip), **v6 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅** (hardening: shellcheck/shfmt/bats + DRY_RUN + ERR-SCR-003 fix; swift 8 + node 134/1 skip), **v7 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -95,20 +95,22 @@
 
 ---
 
-## v6 — Hardening & Portability ⬜
+## v6 — Hardening & Portability ✅
 
-**Tema:** Shell'i kırılmaz ve BSD/macOS-taşınır yap.
+**Tema:** Shell'i kırılmaz ve BSD/macOS-taşınır yap. **DONE** — 8 .sh shellcheck-temiz + shfmt-format (2-space) + set-euo audit + 4 yeni DRY_RUN guard + ERR-SCR-003 fix. Gate: tsc ✓ · vitest **134/1** (+26: sh-hardening + repo-path) · bats 5/5 · swift 8.
 
-**Phases:**
-1. Tüm `.sh` → `shellcheck` temiz.
-2. BSD vs GNU divergence pass (`sed -i`, `date`, `readlink`, `grep -P` vb.).
-3. `set -euo pipefail` audit — eksik olan scriptlere ekle.
-4. `Makefile` reproducibility (Go/Rust/C hedefleri deterministik).
-5. Gate: shellcheck CI gate'i taslağı.
+**Phases (gerçekleşen):**
+1. ✅ Tüm `.sh` `shellcheck --severity=warning` temiz (SC2034 setup-keys `i`→`_` fix).
+2. ✅ BSD/GNU: aktif `sed -i`/`readlink -f` yok; preventive BSD-safe `script_dir` (`cd "$(dirname "$0")" && pwd`, pure-bash-bible MIT) setup.sh'a; setup-keys zaten temp-file portable in-place. ERR-SCR-003 (bridge-client REPO hardcoded home) → `OLLAMAS_REPO || import.meta.url türetme`.
+3. ✅ `set -euo pipefail` + `IFS` + ERR-trap($LINENO) audit → install/setup/join-cluster/uninstall (eksikti); start/stop/setup-keys/start-bridge zaten ✓.
+4. ✅ DRY_RUN guard (v2 ertelenen) → install/setup/setup-keys/join-cluster (`run()` helper stop.sh ayna). Tüm 7 destructive script dry-runnable.
+5. ✅ Gate: `make harden` (lint-sh+fmt-sh-check+test-sh, permissive skip-if-missing) + `package.json harden` + her-zaman-açık vitest `sh-hardening.test.ts` (brew'siz statik).
 
-**Canonical prompt:** "tüm .sh'ı shellcheck-temiz + BSD/GNU taşınır yap, set -euo pipefail audit, Makefile reproducibility; shellcheck gate ekle."
+**Canonical prompt:** "tüm .sh shellcheck-temiz + shfmt(2sp) + set-euo/IFS/ERR-trap audit + DRY_RUN guard (run() ayna); ERR-SCR-003 REPO türetme; make harden gate (permissive) + vitest statik gate; bats davranış testi."
 
-**Next precomputed (→v7):** `tools_doctor.mjs` + `health_probe.mjs`'i oku; auto-repair remediation map taslağı (port 7345, plist reload).
+**Adopt:** `bats-core` (MIT), `mvdan/sh` shfmt (BSD-3), `koalaman/shellcheck` (GPL=araç), `dylanaraps/pure-bash-bible`+`pure-sh-bible` (MIT).
+
+**Next precomputed (→v7 Self-Healing):** `tools_doctor.mjs` + `health_probe.mjs` oku; auto-repair remediation map (port 7345 çakışma→kill+restart, bridge.pid stale→temizle, plist reload `launchctl kickstart -k`); idempotent; `tjluoma/launchd-keepalive` (MIT) KeepAlive/SuccessfulExit deseni adopt; simüle-arıza recovery testi (vitest mock + bats).
 
 ---
 
