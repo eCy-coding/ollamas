@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅** (cross-platform bench: adopt llm-benchmark MIT tok/s; swift 8 + node 96/1 skip), **v5 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅** (registration hooks: manifest+zod reconciler; swift 8 + node 108/1 skip), **v6 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -76,20 +76,22 @@
 
 ---
 
-## v5 — Script-tool Registration Hooks ⬜
+## v5 — Script-tool Registration Hooks ✅
 
-**Tema:** Scriptleri choke-point'e doğru tier'la, temiz seam'le bağla.
+**Tema:** Scriptleri choke-point'e doğru tier'la, temiz seam'le bağla. **DONE** — manifest `scripts/inventory.json` (15 host tool, tek doğruluk kaynağı) + `bin/host-bridge/schema.mjs` (zod + zod-to-json-schema, saf) + `bin/host-bridge/register-host-scripts.mjs` (idempotent reconciler) + `server.ts` tek-satır import (onaylı escalation). Gate: tsc ✓ · vitest **108/1** (+12 register-hooks) · swift 8.
 
-**Phases:**
-1. `registerHostScripts(deps)` — `scripts/inventory.json`'dan tier + schema okuyup `ToolRegistry.register()`.
-2. Reload'da `unregisterByPrefix("script__")` → çift kayıt yok.
-3. **Schema-from-manifest**: her tool'un input schema'sı manifest'ten gelir.
-4. Hard wrapper: server edit'i yalnız register satırı (§3 escalate guard).
-5. Gate: e2e tool çağrısı choke-point'ten geçiyor (`master_e2e_workflow.ts`).
+**Phases (gerçekleşen):**
+1. ✅ `registerHostScripts(registry, deps)` — `scripts/inventory.json`'dan tier+schema okuyup `ToolRegistry.register()`.
+2. ✅ **Reconciler** (tasarım değişti): `unregisterByPrefix` yerine `registry.has(name)` ile register-if-absent / skip-if-present → boot'ta statik 15 tool skip → expose/ReAct yüzeyi kirlenmez (ERR-SCR-004). Re-run idempotent.
+3. ✅ **Schema-from-manifest**: input schema zod'dan, registry'ye OpenAI function şekli (`{type:"function",function:{...}}`) ile.
+4. ✅ Hard wrapper: server edit'i yalnız 1 import + 1 try-guard çağrı satırı.
+5. ✅ Gate: invoke yalnız `deps.execOnHost` (bridge HTTP choke-point) üzerinden; zod invalid-arg reddi host'a ulaşmadan.
 
-**Canonical prompt:** "scriptleri ToolRegistry'e `registerHostScripts()` ile bağla: manifest'ten tier+schema, reload'da unregisterByPrefix, sadece register-seam'e dokun; e2e choke-point doğrula."
+**Canonical prompt:** "scriptleri ToolRegistry'e `registerHostScripts()` ile bağla: manifest'ten tier+schema, reconciler (has→skip) ile çift kayıt yok, OpenAI function schema şekli, sadece register-seam'e dokun; invoke choke-point'ten geçer."
 
-**Next precomputed (→v6):** tüm `.sh`'ı `shellcheck` ile tara (kuru), bulguları `errors_registry.json` kategori `portability`'e listele.
+**Adopt:** `modelcontextprotocol/typescript-sdk` (registerTool), `colinhacks/zod` + `zod-to-json-schema`.
+
+**Next precomputed (→v6):** tüm `.sh`'ı `shellcheck` ile tara (kuru) + `mvdan/sh` shfmt format + `bats-core` ekle (.sh unit test, macOS native) + `pure-bash-bible`/`pure-sh-bible` portable snippet (sed -i, trim); bulguları `errors_registry.json` kategori `portability`'e listele. ERR-SCR-003 (hardcoded home path bridge-client.mjs:9) burada düzeltilir.
 
 ---
 

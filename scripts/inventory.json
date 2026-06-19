@@ -1,0 +1,22 @@
+{
+  "$comment": "Single source of truth for host-bridge tool registration (scripts lane, v5). registerHostScripts() reads this and registers each tool into ToolRegistry under the `host_` namespace. tier mirrors server/tool-registry.ts; schema validation is generated from bin/host-bridge/schema.mjs (zod -> zod-to-json-schema). Drift guard (v10) asserts: inventory names == schema.mjs keys == bin/host-bridge/tools/*.mjs files.",
+  "version": "5.0.0",
+  "namespace": "host_",
+  "tools": [
+    { "name": "run_tests",    "tier": "safe",       "entry": "run_tests.mjs",    "description": "Run the project test suite on the host and return pass/fail." },
+    { "name": "git_ops",      "tier": "safe",       "entry": "git_ops.mjs",      "description": "Run a read-only git subcommand (status/log/diff/branch) on the host repo." },
+    { "name": "process_port", "tier": "safe",       "entry": "process_port.mjs", "description": "Report which process holds a TCP port on the host." },
+    { "name": "health_probe", "tier": "safe",       "entry": "health_probe.mjs", "description": "Check host bridge + app readiness." },
+    { "name": "lint_format",  "tier": "safe",       "entry": "lint_format.mjs",  "description": "Run typecheck/lint on the host workspace." },
+    { "name": "git_commit",   "tier": "host",       "entry": "git_commit.mjs",   "description": "Create a conventional commit on the host repo (optionally push)." },
+    { "name": "build_app",    "tier": "host",       "entry": "build_app.mjs",    "description": "Build the application on the host." },
+    { "name": "kill_process", "tier": "host",       "entry": "kill_process.mjs", "description": "Terminate a host process by pid or name (optional signal)." },
+    { "name": "log_stream",   "tier": "safe",       "entry": "log_stream.mjs",   "description": "Tail the last N lines of the host bridge log." },
+    { "name": "pkg_install",  "tier": "host",       "entry": "pkg_install.mjs",  "description": "Install a package via a host package manager." },
+    { "name": "web_search",   "tier": "safe",       "entry": "web_search.mjs",   "description": "Search the web or fetch a URL from the host." },
+    { "name": "apply_patch",  "tier": "host",       "entry": "apply_patch.mjs",  "description": "Apply a unified diff to the host workspace." },
+    { "name": "tools_doctor", "tier": "safe",       "entry": "tools_doctor.mjs", "description": "Self-test the host tool suite." },
+    { "name": "shell_check",  "tier": "safe",       "entry": "shell_check.mjs",  "description": "Syntax-check a shell command on the host." },
+    { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." }
+  ]
+}

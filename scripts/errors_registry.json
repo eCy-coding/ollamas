@@ -109,6 +109,20 @@
       "prevention_rule": "No hardcoded absolute paths in scripts. Derive repo root from import.meta.url / env, never a literal home path.",
       "test_added": "",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-004",
+      "ts": "2026-06-19",
+      "version": "v5",
+      "file": "bin/host-bridge/register-host-scripts.mjs",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "İlk v5 tasarımı host tool'larını `host_` prefix'le DYNAMIC'e ekledi + flat schema {name,description,parameters} kullandı. İki kırılma: (1) host_ dupe'ları ToolRegistry.list()/schemas() üzerinden MCP expose'a sızdı → mcp-gateway.e2e 'free-plan 15 safe-tier tools' sayısı bozuldu; (2) expose `t.schema.function.description` okuyor — ToolSchema OpenAI function şekli ({type:'function',function:{...}}), flat değil → 'Cannot read properties of undefined (reading description)'.",
+      "evidence": "vitest: tests/mcp-gateway.e2e.test.ts 3 failed (108→105); McpError -32603 reading 'description'; server/mcp/server.ts:46 t.schema.function.description",
+      "fix": "Tasarım reconciler'a çevrildi: register-if-absent / skip-if-present (registry.has) → boot'ta statik 15 tool skip, expose/ReAct kirlenmez. Schema OpenAI function şekline (fn() ayna) çevrildi. Tüm suite tekrar yeşil (108/1).",
+      "prevention_rule": "Scripts ToolRegistry'ye kayıt yaparken: (a) DAİMA canonical isim + has()-reconciler kullan, choke-point expose yüzeyini dupe'la kirletme; (b) schema DAİMA OpenAI function şekli `{type:'function',function:{name,description,parameters}}` — server/tool-registry.ts fn() ayna; flat schema YASAK. Yeni kayıt eklemeden önce mcp-gateway.e2e koş.",
+      "test_added": "scripts/tests/register-hooks.test.ts (12 case: reconciler skip/idempotent, OpenAI function shape, zod reject)",
+      "recurrence_count": 0
     }
   ]
 }

@@ -69,12 +69,26 @@ Register-seam dışında server'a derin değişiklik gerekiyorsa: **dur, escalat
 - Çalışma kuralı: **en küçük diff, en az token**. Dosyanın zaten kodladığı context'i tekrar anlatma. Yorumlar yalnız **WHY** (non-obvious); WHAT/HOW değil.
 - "Verimli yöntem" iddiası **ölçümle** desteklenir (§7 evidence). Tahminle değil.
 
+### §5.1 — Adoption Map (vibe-coding yasak: çalışan kod adopte et)
+
+Her versiyon, sıfırdan kod yazmadan önce en-yıldızlı **MIT/Apache/BSD/ISC** repodan çalışan kod/desen adopte eder. GPL (örn. shellcheck) yalnız **araç** olarak çağrılır, kod kopyalanmaz. Her adoptede kaynak + lisans attribution (yorum satırı).
+
+| Faz | Repo (lisans) | Adopte |
+|-----|---------------|--------|
+| v5 | `modelcontextprotocol/typescript-sdk` (MIT/Apache) · `colinhacks/zod`+`zod-to-json-schema` (MIT/ISC) | registerTool sözleşmesi · manifest→schema doğrulama |
+| v6 | `bats-core` (MIT) · `mvdan/sh` shfmt (BSD-3) · `koalaman/shellcheck` (GPL=araç) · `dylanaraps/pure-bash-bible`+`pure-sh-bible` (MIT) | .sh unit test · format · lint · BSD/GNU portable snippet |
+| v7 | `tjluoma/launchd-keepalive` (MIT) | KeepAlive/SuccessfulExit self-heal plist |
+| v8 | `pinojs/pino`+`pino-pretty` (MIT) | JSONL seyir event + CLI dashboard |
+| v9 | `ralfebert/PersistentURLRequestQueue` (MIT) | iOS offline queue + flush (Swift) |
+| v9/v10 | `apple/swift-crypto` (Apache) | CryptoKit HMAC Wycheproof parity |
+| v10 | `rhysd/actionlint` · `bewuethr/shellcheck-action` | macOS CI matrix + workflow/drift gate |
+
 ## §6 — Trigger Protokolü: "sıradaki versiyonu planla"
 
 Emre **"sıradaki versiyonun todo + phase list'ini planla"** (veya "sıradaki versiyonu planla") dediğinde, **kesintisiz** şu zincir koşar — ara soru yok:
 
 ```
-1. READ   errors_registry.json (tekrarlanacak hata var mı?) + ROADMAP "next precomputed" bloğu
+1. READ   errors_registry.json (tekrarlanacak hata var mı?) + ROADMAP "next precomputed" bloğu + §5.1 Adoption Map (o faz hangi repo/desen)
 2. PLAN   o versiyonun phase/todo listesini netleştir (TodoWrite)
 3. TDD    önce test (vitest / dry-run harness), sonra implementasyon
 4. CODE   en küçük diff, §3 scope içinde

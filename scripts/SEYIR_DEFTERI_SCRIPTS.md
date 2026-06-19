@@ -54,6 +54,21 @@
 
 ---
 
+## v5 — Script-tool Registration Hooks (adopt: MCP SDK + zod)
+
+- `[2026-06-19] kind=phase | GitHub adoption search | en-yıldızlı MIT/Apache repo tarandı (3 paralel Explore+web): typescript-sdk(MIT registerTool), zod(43k)+zod-to-json-schema(ISC), bats-core(6.1k v6), shfmt/shellcheck(v6), pino(v8), PersistentURLRequestQueue+swift-crypto(v9/10), actionlint(v10). Adoption Map → SCRIPTS_AGENTS §5.1 | plan onaylı`
+- `[2026-06-19] kind=phase | P0 deps+manifest | package.json zod^3.25.76 + zod-to-json-schema^3.25.2 (transitive→explicit); scripts/inventory.json 15 host tool (name/tier/entry/description, tier server/tool-registry.ts'ten aynalandı) tek doğruluk kaynağı | import smoke OK`
+- `[2026-06-19] kind=phase | P1 schema | bin/host-bridge/schema.mjs — zod SCHEMAS{15} .strict() + toJsonSchema (openApi3, $schema strip) + validateArgs; saf (fs/net yok) | -`
+- `[2026-06-19] kind=phase | P2 seam | bin/host-bridge/register-host-scripts.mjs — loadInventory(drift guard: name+schema+builder şart) + buildToolDef (OpenAI function şekli) + registerHostScripts reconciler; BUILDERS 15 tool argv server defs ayna; invoke yalnız deps.execOnHost (choke-point) | -`
+- `[2026-06-19] kind=error | ERR-SCR-004 (high) | ilk tasarım host_ prefix dupe + flat schema → mcp-gateway.e2e 3 fail (108→105): (1) host_ dupe expose'a sızdı "15 safe-tier" bozuldu, (2) expose t.schema.function.description okuyor, flat schema undefined | vitest McpError -32603`
+- `[2026-06-19] kind=fix | ERR-SCR-004 | tasarım reconciler'a çevrildi (registry.has→skip, canonical isim, host_ prefix kaldırıldı) + schema OpenAI function şekline (fn() ayna). Boot'ta statik 15 skip → expose/ReAct kirlenmez. Prevention→registry: canonical+has reconciler ZORUNLU, flat schema YASAK, kayıt öncesi mcp-gateway.e2e koş`
+- `[2026-06-19] kind=phase | P3 wire | server.ts +2 satır: import registerHostScripts + try-guard boot çağrısı (onaylı escalation, dispatch/execute'a dokunulmadı, yalnız register-seam) | -`
+- `[2026-06-19] kind=phase | P4 test | scripts/tests/register-hooks.test.ts 12 case: manifest drift, reconciler register/skip/idempotent, OpenAI function schema, invoke argv (git_commit --push, apply_patch stdin pipe, logbook tail 20), zod invalid-arg reject host'a ulaşmadan | 12 yeni`
+- `[2026-06-19] kind=phase | P5 gate | tsc --noEmit OK + vitest 108 pass/1 skip (96→+12) + swift build/test 8 pass | YEŞİL`
+- `[2026-06-19] kind=note | Next precomputed (→v6 Hardening) | shellcheck (kuru) tüm .sh + shfmt format + bats-core .sh unit test (macOS native) + pure-bash/sh-bible portable snippet (sed -i, trim, read); ERR-SCR-003 (bridge-client.mjs:9 hardcoded home) burada düzelt; RISK-SCR-003 BSD/GNU divergence test. Bulgular errors_registry kategori=portability`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack
