@@ -97,7 +97,7 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
   - **Serving/e2e:** dev server Express (SPA-only) → static lane `vite preview` ile servis. `playwright.web.config.ts` (YENİ, :3101, `serviceWorkers:'block'`); `tests/e2e-web/` landing (hero+health online/offline+axe 0 critical/serious) + embed (bubble→SSE stream yanıt + hata). `test:e2e:web` script.
   - **Bütçe:** `.size-limit.json` ayrıştırıldı: cockpit app + landing + **embed widget ≤15KB**. CI `frontend-web.yml` (YENİ).
 - **Niçin:** ollamas'ın public landing'i + 3.parti-site gömme yolu yoktu; ikisi de framework taşımadan, izole, ölçülü.
-- **Kanıt:** `npm run lint` 0 · `vitest` 105 pass/1 skip · React e2e **10 pass** · web e2e **5 pass** (landing 3 + embed 2) · `vite build` 3-entry (dist/web/* + dist/embed.js 7.2KB) · size: embed **2.4KB** brotli / landing 403B / cockpit 108KB/140. Commit: `<vF7 commit>`.
+- **Kanıt:** `npm run lint` 0 · `vitest` 105 pass/1 skip · React e2e **10 pass** · web e2e **5 pass** (landing 3 + embed 2) · `vite build` 3-entry (dist/web/* + dist/embed.js 7.2KB) · size: embed **2.4KB** brotli / landing 403B / cockpit 108KB/140. Commit: `071ac85`.
 - **Sonraki (önceden hesaplandı):** **vF8 Real-time UX Polish** — SSE/streaming hardening (apiClient.streamPost'a reconnect/abort + embed.js retry), React error boundary → `/api/logbook`, skeleton/loading state, cockpit grafik frame-budget (60fps). İlk adım: `apiClient.streamPost`'a `AbortController` + auto-reconnect/backoff + `<ErrorBoundary>` component (vF10 telemetri'ye köprü) + agent-chat skeleton.
 
 ---
