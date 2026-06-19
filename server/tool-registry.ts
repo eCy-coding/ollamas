@@ -162,6 +162,32 @@ export function parseMacPower(raw: string): { cpu_mw?: number; gpu_mw?: number; 
   return out;
 }
 
+/**
+ * Parse `promptfoo eval -o json` output into a pass/fail verdict. promptfoo nests
+ * counts under `results.stats` (older builds) or top-level `stats`; per-case rows
+ * live in `results.results` with a `success` boolean. We surface a single
+ * passRate + the failing cases so a cluster verify stage can gate on it.
+ * Throws on unparseable input so the choke-point returns ok:false.
+ * Exported for the v1.12 contract test (no promptfoo binary needed to test parsing).
+ */
+export function parsePromptfoo(raw: string): { pass: number; total: number; passRate: number; failures: { description?: string; error?: string }[] } {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) throw new Error("promptfoo: no JSON object in output");
+  const j: any = JSON.parse(raw.slice(start, end + 1));
+  const stats = j.results?.stats ?? j.stats;
+  if (!stats || (stats.successes === undefined && stats.failures === undefined)) {
+    throw new Error("promptfoo: missing results.stats");
+  }
+  const pass = Number(stats.successes) || 0;
+  const total = pass + (Number(stats.failures) || 0);
+  const rows: any[] = j.results?.results ?? j.results ?? [];
+  const failures = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && r.success === false)
+    .map((r) => ({ description: r.description ?? r.testCase?.description, error: r.error ?? r.gradingResult?.reason }));
+  return { pass, total, passRate: total ? pass / total : 0, failures };
+}
+
 const TOOLS: Record<string, ToolDef> = {
   list_tree: {
     tier: "safe",
@@ -566,6 +592,46 @@ const TOOLS: Record<string, ToolDef> = {
         throw new Error(`powermetrics failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
       }
       return parseMacPower(String(text));
+    },
+  },
+
+  // v1.12: cluster verify stage via promptfoo (MIT). Runs a promptfoo eval config
+  // on the host and returns a structured pass/fail verdict so a cluster's output
+  // can be scored before it is accepted. Routed through the choke-point.
+  eval_prompt: {
+    tier: "host",
+    schema: fn(
+      "eval_prompt",
+      "Run a promptfoo eval config on the host and return a structured pass/fail verdict (passRate + failing cases). Use as a cluster verify stage.",
+      {
+        type: "object",
+        properties: {
+          config_path: { type: "string", description: "Path to a promptfoo config (e.g. promptfooconfig.yaml)." },
+        },
+        required: ["config_path"],
+      },
+      {
+        type: "object",
+        properties: {
+          pass: { type: "number" },
+          total: { type: "number" },
+          passRate: { type: "number" },
+          failures: { type: "array", items: { type: "object" } },
+        },
+        required: ["pass", "total", "passRate"],
+      }
+    ),
+    invoke: async (args, { deps }) => {
+      if (!args.config_path) throw new Error("Missing 'config_path' (promptfoo config).");
+      const out = `/tmp/ollamas-promptfoo-${crypto.randomUUID()}.json`;
+      // promptfoo writes JSON to a file; cat it back so execOnHost captures stdout.
+      const cmd = `promptfoo eval -c ${deps.shArg(String(args.config_path))} -o ${deps.shArg(out)} --no-progress-bar && cat ${deps.shArg(out)}; rm -f ${deps.shArg(out)}`;
+      const r = await deps.execOnHost(cmd, 300000);
+      const text = typeof r === "string" ? r : r?.output ?? "";
+      if (typeof r === "object" && r && r.ok === false) {
+        throw new Error(`promptfoo failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
+      }
+      return parsePromptfoo(String(text));
     },
   },
 };
