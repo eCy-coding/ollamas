@@ -1,5 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, formatStep, formatDiff, formatTable, type DoctorReport } from "../cli/lib/output";
+import { shouldColor, resolveOutputCtx, c, formatDoctor, streamFooter, formatStep, formatDiff, formatTable, sparkline, bar, compactNum, type DoctorReport } from "../cli/lib/output";
+
+describe("sparkline", () => {
+  it("maps a ramp onto the 8 block levels", () => {
+    expect(sparkline([1, 2, 3, 4, 5, 6, 7, 8])).toBe("▁▂▃▄▅▆▇█");
+  });
+  it("empty → empty string", () => {
+    expect(sparkline([])).toBe("");
+  });
+  it("single value or all-equal → flat mid line (not all-min)", () => {
+    expect(sparkline([5])).toBe("▄");
+    expect(sparkline([5, 5, 5])).toBe("▄▄▄");
+  });
+  it("min and max anchor the ends", () => {
+    const s = sparkline([0, 100]);
+    expect(s[0]).toBe("▁");
+    expect(s[1]).toBe("█");
+  });
+});
+
+describe("bar (gauge)", () => {
+  it("renders fill proportional to fraction, clamped", () => {
+    expect(bar(0, 4)).toBe("░░░░");
+    expect(bar(0.5, 4)).toBe("██░░");
+    expect(bar(1, 4)).toBe("████");
+    expect(bar(2, 4)).toBe("████"); // clamp >1
+    expect(bar(-1, 4)).toBe("░░░░"); // clamp <0
+  });
+});
+
+describe("compactNum", () => {
+  it("compacts thousands and millions", () => {
+    expect(compactNum(999)).toBe("999");
+    expect(compactNum(1200)).toBe("1.2k");
+    expect(compactNum(12000)).toBe("12k");
+    expect(compactNum(3_400_000)).toBe("3.4M");
+  });
+});
 
 describe("shouldColor", () => {
   it("color only on a real TTY", () => {

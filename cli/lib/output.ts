@@ -97,6 +97,39 @@ export function formatTable(headers: string[], rows: unknown[][], ctx: OutputCtx
   return [head, ...rows.map((r) => pad(r))].join("\n");
 }
 
+// --- v8 observability primitives (pure) ---
+
+const SPARK_BLOCKS = "▁▂▃▄▅▆▇█";
+
+// Unicode sparkline: min/max-normalize a series onto 8 block levels. Algorithm
+// ported from holman/spark + sindresorhus/sparkly (MIT). Empty → ""; an all-equal
+// series renders at the mid block (a flat line, not all-min).
+export function sparkline(values: number[]): string {
+  if (!values.length) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const mid = SPARK_BLOCKS[Math.floor((SPARK_BLOCKS.length - 1) / 2)];
+  return values
+    .map((v) => (range === 0 ? mid : SPARK_BLOCKS[Math.round(((v - min) / range) * (SPARK_BLOCKS.length - 1))]))
+    .join("");
+}
+
+// Horizontal gauge bar: filled █ + empty ░ to `width`, fraction clamped 0..1.
+export function bar(fraction: number, width: number): string {
+  const f = Math.max(0, Math.min(1, fraction));
+  const fill = Math.round(f * width);
+  return "█".repeat(fill) + "░".repeat(Math.max(0, width - fill));
+}
+
+// Compact a count for dense dashboards: 999 → "999", 1200 → "1.2k", 3.4M → "3.4M".
+export function compactNum(n: number): string {
+  const strip = (s: string) => s.replace(/\.0$/, "");
+  if (Math.abs(n) < 1000) return String(n);
+  if (Math.abs(n) < 1e6) return strip((n / 1e3).toFixed(1)) + "k";
+  return strip((n / 1e6).toFixed(1)) + "M";
+}
+
 // Final one-line footer after a streamed answer: source + speed.
 export function streamFooter(meta: { source?: string; latencyMs?: number; tokensPerSec?: number }, ctx: OutputCtx): string {
   const parts: string[] = [];
