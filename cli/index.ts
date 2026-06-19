@@ -11,6 +11,7 @@ import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
+import { complete, completionScript } from "./lib/completion";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
 const VERSION = "8.0.0";
@@ -33,6 +34,7 @@ commands:
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
     config use <name>  switch active gateway profile (secrets sealed per profile)
     config profiles    list profiles
+  completion <shell> print a shell completion script (bash|zsh|fish)
   help               this message
   version            print version
 
@@ -139,6 +141,16 @@ function runConfig(rest: string[]): number {
   return 0;
 }
 
+function runCompletion(rest: string[]): number {
+  const shell = rest.filter((a) => !a.startsWith("-"))[0];
+  if (shell !== "bash" && shell !== "zsh" && shell !== "fish") {
+    process.stderr.write("usage: ollamas completion <bash|zsh|fish>\n");
+    return 2;
+  }
+  process.stdout.write(completionScript(shell));
+  return 0;
+}
+
 export async function main(argv: string[]): Promise<number> {
   const g = extractGlobalFlags(argv);
   if (g.gateway) process.env.OLLAMAS_GATEWAY = g.gateway; // env wins in loadConfig (G10)
@@ -159,6 +171,14 @@ export async function main(argv: string[]): Promise<number> {
       return runShortcuts(rest);
     case "top":
       return runTop(rest);
+    case "completion":
+      return runCompletion(rest);
+    case "__complete": {
+      // Hidden — emitted on every TAB. Pure tree lookup, no I/O.
+      const cands = complete(rest);
+      if (cands.length) process.stdout.write(cands.join("\n") + "\n");
+      return 0;
+    }
     case "doctor":
       return runDoctor(rest);
     case "config":

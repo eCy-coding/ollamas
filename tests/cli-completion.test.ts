@@ -1,5 +1,46 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { complete, completionScript, COMMAND_TREE } from "../cli/lib/completion";
+import { main } from "../cli/index";
+
+// Capture stdout for a single main() invocation.
+async function run(argv: string[]): Promise<{ code: number; out: string }> {
+  let out = "";
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation((c: any) => {
+    out += c;
+    return true;
+  });
+  try {
+    const code = await main(argv);
+    return { code, out };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
+describe("index wiring (completion + __complete)", () => {
+  it("completion bash → prints a bash script", async () => {
+    const { code, out } = await run(["completion", "bash"]);
+    expect(code).toBe(0);
+    expect(out).toContain("complete -F _ollamas ollamas");
+  });
+  it("completion with no/invalid shell → usage error exit 2", async () => {
+    expect((await run(["completion"])).code).toBe(2);
+    expect((await run(["completion", "tcsh"])).code).toBe(2);
+  });
+  it("__complete (no args) → all top-level commands", async () => {
+    const { out } = await run(["__complete"]);
+    expect(out.split("\n")).toEqual(expect.arrayContaining(["chat", "mcp", "top", "completion"]));
+  });
+  it("__complete mcp → mcp sub-actions", async () => {
+    const { out } = await run(["__complete", "mcp"]);
+    expect(out.split("\n")).toEqual(expect.arrayContaining(["info", "tools", "call", "upstreams", "add", "rm"]));
+  });
+  it("__complete config → use/profiles", async () => {
+    const { out } = await run(["__complete", "config"]);
+    expect(out).toContain("use");
+    expect(out).toContain("profiles");
+  });
+});
 
 describe("complete (candidate set for a position)", () => {
   it("no words / first empty word → all top-level commands", () => {
