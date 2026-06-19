@@ -119,6 +119,7 @@ iOS testi gerçek cihaz/Safari yoksa responsive emulation + not düş ("emulated
 - Her faz/versiyon → `FRONTEND_SEYIR_DEFTERI.md` (ne/nasıl/niçin/kanıt+commit).
 - Her hata → aynı dosyadaki **Hata Sicili** tablosu (root cause + önleme kuralı).
 - **Aynı hatayı tekrar yapmak = ihlal.** Koda başlamadan Hata Sicili okunur.
+- **Client hata telemetri (vF8+):** React crash `<ErrorBoundary onError>` + `window.error`/`unhandledrejection` → `logClientEvent('react_error'|'window_error'|'unhandled_rejection')` → `/api/logbook`. `apiClient` zaten `api_error/api_stream_error/api_network_error` yollar. vF10 bu sinyalleri toplar.
 
 ---
 
@@ -137,8 +138,8 @@ macOS+iOS-uyumlu, MIT/Apache repo'dan **çalışan kod** (detay: `FRONTEND_ADOPT
 | **vF5** | Design System & Tokens | ✅ DONE | style-dictionary | tokens/*.json → tokens.css → Tailwind v4 @theme |
 | **vF6** | Accessibility (WCAG AA) | ✅ DONE | axe-core, jsx-a11y | axe Playwright gate (0 critical/serious) + eslint flat-config jsx-a11y + raw-fetch ban + klavye/ARIA/nav-landmark |
 | **vF7** | Vanilla alt-lane (Landing/Embed) | ✅ DONE | shadow-dom pattern | `web/` landing (Vite multi-page, token reuse) + `public/embed.js` zero-dep Shadow-DOM streaming chat widget; vite-preview e2e |
-| **vF8** | Real-time UX Polish | NEXT | — | SSE hardening + reconnect + error boundary + skeleton + motion budget |
-| **vF9** | i18n + Theming | — | @lingui/core | TR/EN ICU + tema switch (light tokens) + tercih kalıcılığı |
+| **vF8** | Real-time UX Polish | ✅ DONE | react-error-boundary | streamPost reconnect/onError + ReactAgentTab abort-on-unmount + `<ErrorBoundary>`→logbook + global error/unhandledrejection + Skeleton + prefers-reduced-motion |
+| **vF9** | i18n + Theming | NEXT | @lingui/core | TR/EN ICU + tema switch (light tokens) + tercih kalıcılığı |
 | **vF10** | Observability & Self-Heal | — | — | client error boundary→/api/logbook + RUM + perf/görsel regresyon gate |
 | **vF11** | Tenant-aware Cockpit | — | — | tier-gated UI (safe/host/privileged görünürlük) + scope-gated butonlar |
 | **vF12** | Billing & Usage UX | — | — | usage timeseries (pure SVG) + Stripe portal/checkout + invoice preview |

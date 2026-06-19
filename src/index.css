@@ -51,3 +51,31 @@
 .animate-fade-in {
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* vF8 — loading skeleton shimmer (token colors, used by src/components/Skeleton.tsx) */
+.ollamas-skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--ollamas-color-bg-panel) 25%,
+    rgba(255, 255, 255, 0.06) 37%,
+    var(--ollamas-color-bg-panel) 63%
+  );
+  background-size: 400% 100%;
+  animation: ollamasShimmer 1.4s ease infinite;
+}
+@keyframes ollamasShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* vF8 — respect prefers-reduced-motion (WCAG 2.3.3): stop spin/pulse/ping/fade/shimmer */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ollamas-skeleton { animation: none; background: var(--ollamas-color-bg-panel); }
+}

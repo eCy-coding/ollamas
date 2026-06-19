@@ -83,6 +83,50 @@ describe('apiClient — choke-point', () => {
     expect(got.join('')).toContain('"b":2');
   });
 
+  it('streamPost retries the connect on a transient 503 then streams', async () => {
+    const enc = new TextEncoder();
+    const ok = new ReadableStream<Uint8Array>({
+      pull(ctrl) { ctrl.enqueue(enc.encode('data: {"chunk":"hi"}\n\n')); ctrl.close(); },
+    });
+    const spy = stubFetch()
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockResolvedValueOnce(new Response(ok, { status: 200 }));
+    const got: string[] = [];
+    await api.streamPost('/api/agent/chat', { m: 1 }, { onChunk: (c) => got.push(c), retries: 1, backoffMs: 0 });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(got.join('')).toContain('hi');
+  });
+
+  it('streamPost does NOT re-issue after chunks delivered (no LLM resume)', async () => {
+    const enc = new TextEncoder();
+    let n = 0;
+    const broken = new ReadableStream<Uint8Array>({
+      pull(ctrl) {
+        if (n++ === 0) ctrl.enqueue(enc.encode('data: {"chunk":"partial"}\n\n'));
+        else ctrl.error(new Error('drop'));
+      },
+    });
+    const spy = stubFetch().mockResolvedValue(new Response(broken, { status: 200 }));
+    const got: string[] = [];
+    const onError = vi.fn();
+    await expect(
+      api.streamPost('/api/agent/chat', { m: 1 }, { onChunk: (c) => got.push(c), onError, retries: 3, backoffMs: 0 }),
+    ).rejects.toBeTruthy();
+    expect(spy).toHaveBeenCalledTimes(1); // mid-stream drop is not retried
+    expect(onError).toHaveBeenCalled();
+    expect(got.join('')).toContain('partial');
+  });
+
+  it('streamPost resolves quietly when aborted', async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const spy = stubFetch();
+    await expect(
+      api.streamPost('/api/agent/chat', { m: 1 }, { onChunk: () => {}, signal: ctrl.signal }),
+    ).resolves.toBeUndefined();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('logClientEvent never throws when sendBeacon missing', () => {
     const orig = navigator.sendBeacon;
     // force fallback branch

@@ -92,7 +92,8 @@
     stream();
   }
 
-  function stream() {
+  function stream(attempt) {
+    attempt = attempt || 0;
     busy = true; send.disabled = true;
     var botNode = addMsg('bot', '');
     var acc = '';
@@ -130,6 +131,13 @@
     }).then(function () {
       finish();
     }).catch(function () {
+      // Retry the connect once (transient network) only if nothing streamed yet —
+      // an in-progress generation can't be resumed.
+      if (!acc && attempt < 1) {
+        botNode.remove();
+        setTimeout(function () { stream(attempt + 1); }, 400);
+        return;
+      }
       if (!acc) { botNode.remove(); addMsg('err', 'Could not reach the model. Is the gateway running?'); }
       reset();
     });

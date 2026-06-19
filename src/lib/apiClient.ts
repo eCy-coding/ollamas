@@ -128,31 +128,69 @@ export interface StreamOpts {
   headers?: Record<string, string>;
   signal?: AbortSignal;
   onChunk: (text: string) => void;
+  onError?: (e: unknown) => void;
+  retries?: number; // connect-retries on transient failure (default 0)
+  backoffMs?: number;
 }
 
 // SSE-over-POST: ollamas streams `data: {...}\n\n` frames on the response body
 // (agent-chat, multi-agent pipeline). EventSource can't POST, so we read the
 // ReadableStream and decode text chunks for the caller to parse.
+//
+// vF8 hardening: retries the CONNECT on transient failure (429/5xx/network) with
+// backoff, but NEVER re-issues once chunks have streamed — an LLM generation can't
+// be resumed, so a mid-stream drop surfaces as onError (honest, no duplicate text).
+// Aborts (opts.signal) are intentional and resolve quietly.
 async function streamPost(endpoint: string, body: unknown, opts: StreamOpts): Promise<void> {
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts.headers },
-    body: JSON.stringify(body),
-    signal: opts.signal,
-  });
-  if (!res.ok || !res.body) {
-    logClientEvent(`api_stream_error ${res.status} ${endpoint}`, { status: res.status });
-    throw new ApiError(res.status, endpoint, `stream ${endpoint} → ${res.status}`);
+  const retries = opts.retries ?? 0;
+  const backoffMs = opts.backoffMs ?? 300;
+  let delivered = false;
+
+  for (let attempt = 0; ; attempt++) {
+    if (opts.signal?.aborted) return;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders(), ...opts.headers },
+        body: JSON.stringify(body),
+        signal: opts.signal,
+      });
+      if (!res.ok || !res.body) {
+        if (isTransient(res.status) && attempt < retries) {
+          logClientEvent(`api_stream_reconnect ${res.status} ${endpoint}`, { attempt: attempt + 1 });
+          await sleep(backoffMs * 2 ** attempt);
+          continue;
+        }
+        logClientEvent(`api_stream_error ${res.status} ${endpoint}`, { status: res.status });
+        throw new ApiError(res.status, endpoint, `stream ${endpoint} → ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          delivered = true;
+          opts.onChunk(decoder.decode(value, { stream: true }));
+        }
+      }
+      const tail = decoder.decode();
+      if (tail) opts.onChunk(tail);
+      return;
+    } catch (e) {
+      if (opts.signal?.aborted) return; // intentional cancel
+      // Retry only the connect phase (no chunks yet); generation can't resume.
+      if (!delivered && !(e instanceof ApiError) && attempt < retries) {
+        logClientEvent(`api_stream_reconnect net ${endpoint}`, { attempt: attempt + 1 });
+        await sleep(backoffMs * 2 ** attempt);
+        continue;
+      }
+      if (!(e instanceof ApiError)) logClientEvent(`api_stream_error net ${endpoint}`, { error: String(e) });
+      const err = e instanceof ApiError ? e : new ApiError(0, endpoint, `stream network error: ${String(e)}`);
+      opts.onError?.(err);
+      throw err;
+    }
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) opts.onChunk(decoder.decode(value, { stream: true }));
-  }
-  const tail = decoder.decode();
-  if (tail) opts.onChunk(tail);
 }
 
 export const api = {

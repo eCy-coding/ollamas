@@ -4,9 +4,10 @@ import { TelemetryCockpit } from '../../src/components/TelemetryCockpit';
 import { renderUI } from './helpers';
 
 describe('TelemetryCockpit (pure)', () => {
-  it('shows init placeholder when telemetry is null', () => {
-    renderUI(<TelemetryCockpit telemetry={null} onRefresh={vi.fn()} />);
-    expect(screen.getByText(/System initializes host telemetry channels/i)).toBeInTheDocument();
+  it('shows a loading skeleton when telemetry is null', () => {
+    const { container } = renderUI(<TelemetryCockpit telemetry={null} onRefresh={vi.fn()} />);
+    expect(screen.getByLabelText(/Loading host telemetry/i)).toHaveAttribute('aria-busy', 'true');
+    expect(container.querySelectorAll('.ollamas-skeleton').length).toBeGreaterThan(0);
   });
 
   it('renders metric labels when telemetry is provided', () => {

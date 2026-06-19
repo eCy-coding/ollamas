@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { HealthTelemetry } from "../types";
 import { Cpu, HardDrive, ShieldAlert, Wifi, Zap } from "lucide-react";
+import { Skeleton } from "./Skeleton";
 
 interface CockpitProps {
   telemetry: HealthTelemetry | null;
@@ -21,8 +22,16 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
 
   if (!telemetry) {
     return (
-      <div className="p-6 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-xl animate-pulse">
-        System initializes host telemetry channels...
+      <div
+        aria-busy="true"
+        aria-label="Loading host telemetry"
+        className="p-6 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-3"
+      >
+        <Skeleton width="40%" height="0.9rem" />
+        <div className="flex gap-3">
+          <Skeleton width="100%" height="3.5rem" count={3} />
+        </div>
+        <Skeleton width="70%" height="0.8rem" />
       </div>
     );
   }

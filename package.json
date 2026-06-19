@@ -40,6 +40,7 @@
     "puppeteer": "^25.1.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-error-boundary": "^6.1.2",
     "stripe": "^22.2.1",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",

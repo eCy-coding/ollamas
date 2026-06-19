@@ -102,6 +102,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF8 — Real-time UX Polish (DONE)
+- **Ne:** Streaming dayanıklılığı + crash izolasyonu + anlamlı yükleniyor + reduced-motion. Hata gözlem boşluğu kapandı (React crash + window error/rejection → logbook).
+- **Nasıl:**
+  - **streamPost hardening** (`apiClient.ts`): `onError` + connect-faz retry (429/5xx/network, backoff) + **`delivered` guard** — chunk aktıktan sonra yeniden bağlanmaz (LLM generation resume edilemez; mid-stream drop dürüstçe `onError`). Abort sessiz çözülür. 4 yeni test.
+  - **ReactAgentTab abort**: `abortRef`+`mountedRef`+unmount cleanup; yeni-send öncesi önceki abort; catch'te `signal.aborted→return`, finally mounted+!aborted guard (state-after-unmount fix). `MultiAgentPipeline:48-73` deseni.
+  - **embed.js**: ağ hatasında connect retry-once (acc boşsa, 400ms) — mid-stream resume yok.
+  - **Error boundary** (`react-error-boundary` MIT adopt): `ErrorFallback.tsx` (role=alert+reset), `main.tsx` `<App/>` sarıldı, `onError→logClientEvent('react_error',{stack})` + `window.error`/`unhandledrejection`→logbook (gözlem boşluğu kapandı → vF10).
+  - **Skeleton** (`Skeleton.tsx` zero-dep CSS shimmer, token, aria-hidden): `TelemetryCockpit` null→skeleton kart (aria-busy). `index.css` `.ollamas-skeleton` + **`@media (prefers-reduced-motion: reduce)`** (WCAG 2.3.3).
+- **Niçin:** flaky ağ→reconnect; tab değişimi→temiz abort (leak yok); crash→izole fallback+telemetri; anlamlı loading; motion-hassas a11y.
+- **Kanıt:** `npm run lint` 0 · `vitest` **111 pass/1 skip** · React e2e **10 pass** · web e2e **5 pass** · `vite build` OK · size cockpit **109.18KB/140** (react-error-boundary +1.1KB) / embed 2.51KB. Commit: `<vF8 commit>`.
+- **Sonraki (önceden hesaplandı):** **vF9 i18n + Theming** — `@lingui/core` (2kB MIT) TR/EN ICU + tema switch (light token seti, vF5 üzerine) + tercih kalıcılığı (localStorage). İlk adım: `[data-theme]` light/dark token override + `@lingui/core` setup + `<ThemeToggle>` + TR/EN ilk string extraction.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -124,6 +138,9 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-013 | 2026-06-20 | a11y/keyboard e2e Files tab 30s timeout | `/api/workspace/tree` gerçek FS-scan paralel 4-worker yükünde takıldı (ana dizin büyük) | a11y/keyboard spec'e `**/api/workspace/**` route-stub | A11y/keyboard e2e gerçek-backend varyansından arındır; ağır endpoint'leri stub'la (deterministik tarama) |
 | FE-014 | 2026-06-20 | Multi-page sonrası size-limit cockpit bütçesi landing'i de sayacaktı | Vite multi-page input-key'e göre chunk'ı yeniden adlandırır (`index-*`→`app-*`); glob `dist/assets/*.js` landing+app karıştırır | size-limit'i entry-spesifik glob'a böl (`app-*.js`/`landing-*.js`/`embed.js`) | Multi-page'de chunk adı=input-key; bütçeyi entry başına ayır, `*.js` toptan glob conflate eder |
 | FE-015 | 2026-06-20 | Vanilla landing dev server'da (npm run dev) servis edilmiyor | Dev server Express (`tsx server.ts`) SPA-only; Vite multi-page yalnız `vite build`'i etkiler | Static alt-lane e2e `vite preview` (built dist) + `serviceWorkers:'block'` | Vanilla/static lane'i dev-server değil `vite preview` ile e2e; SPA SW'sini block'la (fetch intercept determinizmi) |
+| FE-016 | 2026-06-20 | streamPost mid-stream reconnect LLM yanıtını çoğaltır | LLM generation stateless-resume edilemez; kör retry tüm üretimi baştan yapar (duplicate text) | `delivered` guard — yalnız connect-faz (chunk öncesi) retry; sonra `onError` | Stream retry SADECE ilk chunk'tan önce; akış başladıysa drop=error, resume etme |
+| FE-017 | 2026-06-20 | ReactAgentTab stream unmount sonrası setState (leak/uyarı) | Stream component'ten uzun yaşıyordu; abort/cleanup yoktu | `abortRef`+`mountedRef`+unmount-abort + finally guard | Abortable stream consumer'ı unmount'ta abort + state-set'i mounted/aborted guard'la (Pipeline deseni) |
+| FE-018 | 2026-06-20 | "chunk-sonra-drop" testi yanlış kuruldu (chunk teslim edilmeden error) | `ReadableStream.start()` enqueue-sonra-error sıradaki chunk'ı okutmadan drop eder | Pull-based stream: 1. pull enqueue, 2. pull error | Streaming-then-drop simülasyonu `pull()` ile (start()+error chunk'ı yutar) |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

@@ -51,6 +51,12 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState<boolean>(false);
 
+  // vF8 — abort the in-flight agent stream on unmount / new run, and guard state
+  // updates after unmount (the stream out-lives the component otherwise).
+  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; abortRef.current?.abort(); }, []);
+
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
@@ -250,6 +256,11 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     const newMessages = [...messages, { role: "user", content: userText } as any];
     setMessages(newMessages);
 
+    // Cancel any prior run, start a fresh abortable one.
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     try {
       let chunkBuffer = "";
 
@@ -264,6 +275,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           sessionId: currentSessionId
         },
         {
+          signal: ctrl.signal,
           onChunk: (chunk) => {
             chunkBuffer += chunk;
             const lines = chunkBuffer.split("\n\n");
@@ -335,11 +347,15 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         },
       );
     } catch (err: any) {
+      // Aborts (unmount / new run) are intentional — don't surface them as errors.
+      if (ctrl.signal.aborted) return;
       onNotify(`Agent runtime failed: ${err.message}`, "error");
       setCurrentStepInfo("Agent pipeline disrupted.");
     } finally {
-      setIsLoading(false);
-      loadSessions();
+      if (mountedRef.current && !ctrl.signal.aborted) {
+        setIsLoading(false);
+        loadSessions();
+      }
     }
   };
 
