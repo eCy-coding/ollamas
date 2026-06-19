@@ -139,6 +139,29 @@ export function parseLlamaBench(raw: string): { tps: number; pp_tps?: number; mo
   };
 }
 
+/**
+ * Parse macOS `powermetrics --samplers cpu_power` text into per-domain power
+ * draw (milliwatts). This is the stable Apple line format ("<Domain> Power:
+ * <N> mW") that powermetrics-go / powermetrics-tui themselves parse — we adopt
+ * the technique against the native tool so no third-party binary is required.
+ * Returns whatever domains are present; throws only if none are found.
+ * Exported for the v1.9 contract test (no sudo/binary needed to test parsing).
+ */
+export function parseMacPower(raw: string): { cpu_mw?: number; gpu_mw?: number; ane_mw?: number; combined_mw?: number } {
+  const grab = (re: RegExp): number | undefined => {
+    const m = raw.match(re);
+    return m ? Number(m[1]) : undefined;
+  };
+  const out = {
+    cpu_mw: grab(/\bCPU Power:\s*([\d.]+)\s*mW/i),
+    gpu_mw: grab(/\bGPU Power:\s*([\d.]+)\s*mW/i),
+    ane_mw: grab(/\bANE Power:\s*([\d.]+)\s*mW/i),
+    combined_mw: grab(/Combined Power[^:]*:\s*([\d.]+)\s*mW/i),
+  };
+  if (Object.values(out).every((v) => v === undefined)) throw new Error("powermetrics: no power lines found");
+  return out;
+}
+
 const TOOLS: Record<string, ToolDef> = {
   list_tree: {
     tier: "safe",
@@ -507,6 +530,42 @@ const TOOLS: Record<string, ToolDef> = {
         throw new Error(`llama-bench failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
       }
       return parseLlamaBench(String(text));
+    },
+  },
+
+  // v1.9: per-node power telemetry via macOS `powermetrics` (cpu_power sampler).
+  // Adopts the powermetrics-go/tui parsing technique against the native tool —
+  // no third-party binary. Needs sudo → privileged tier. Feeds cluster telemetry.
+  mac_power: {
+    tier: "privileged",
+    schema: fn(
+      "mac_power",
+      "Sample macOS power draw (CPU/GPU/ANE milliwatts) via `powermetrics`. One sample by default. Requires sudo on the host. Returns structured per-domain power for cluster telemetry.",
+      {
+        type: "object",
+        properties: {
+          interval_ms: { type: "number", description: "Sample window in ms (powermetrics -i). Default 200." },
+        },
+        required: [],
+      },
+      {
+        type: "object",
+        properties: {
+          cpu_mw: { type: "number" },
+          gpu_mw: { type: "number" },
+          ane_mw: { type: "number" },
+          combined_mw: { type: "number" },
+        },
+      }
+    ),
+    invoke: async (args, { deps }) => {
+      const i = Number(args.interval_ms) > 0 ? Math.floor(Number(args.interval_ms)) : 200;
+      const r = await deps.execOnHost(`powermetrics --samplers cpu_power -i ${i} -n 1`, 30000);
+      const text = typeof r === "string" ? r : r?.output ?? "";
+      if (typeof r === "object" && r && r.ok === false) {
+        throw new Error(`powermetrics failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
+      }
+      return parseMacPower(String(text));
     },
   },
 };
