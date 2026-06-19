@@ -14,6 +14,13 @@
         "envOptIn": "UKP_WEBHOOK",
         "receiverTodo": "POST /api/ingest/stage-events (HMAC-verify X-Ukp-Signature) — ollamas-lane"
       }
+    },
+    {
+      "name": "fs",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/emrecnyngmail.com/Desktop/ollamas"],
+      "allowedTools": ["read_file", "list_directory", "directory_tree", "search_files", "get_file_info"]
     }
   ],
   "tools": {
