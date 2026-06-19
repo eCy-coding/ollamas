@@ -83,7 +83,7 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
   - **klavye + ARIA**: `tests/e2e/keyboard.spec.ts` (focus+Enter+Tab) + `tests/ui/a11y.test.tsx` (nav landmark + accessible-name).
   - **CI**: `.github/workflows/frontend-lint.yml` (YENİ, eslint+tsc); axe/keyboard e2e mevcut `e2e.yml`'de otomatik.
 - **Niçin:** ekran-okuyucu + klavye erişimi (WCAG AA, axe ~%57 issue); choke-point artık eslint ile mekanik denetimli (yeni raw fetch CI'da kırmızı) — KeyVault kaçağı bunu kanıtladı.
-- **Kanıt:** `npm run lint` (eslint+tsc) 0 · `vitest run` **105 pass/1 skip** · `playwright test` **10 pass** (4 axe + 2 keyboard + 4 mevcut) · `vite build` + size 107.9KB/140 gz (+0.2KB). Commit: `b42b15a`.
+- **Kanıt:** `npm run lint` (eslint+tsc) 0 · `vitest run` **105 pass/1 skip** · `playwright test` **10 pass** (4 axe + 2 keyboard + 4 mevcut) · `vite build` + size 107.9KB/140 gz (+0.2KB). Commit: `74c3a99`.
 - **⚠️ İzlenen açık (gizlenmedi):** axe `color-contrast` kapıdan çıkarıldı — dark cockpit teması çok sayıda düşük-kontrast dekoratif metin (`text-slate-500/600`, `text-[8-10px]`) içeriyor; tema-geneli kontrast düzeltmesi ayrı design pass gerektirir (öneri: vF için "contrast sweep" veya vF9 tema ile). %57 otomatik + %43 manuel (VoiceOver/uzman) kuralı.
 - **Sonraki (önceden hesaplandı):** **vF7 Vanilla alt-lane (Landing/Embed)** — saf HTML5/CSS/JS `web/` landing + embeddable widget; API'yi `fetch` ile tüketir (apiClient React-only; vanilla'da minimal fetch-wrapper), zero-dep, iOS web-clip uyumlu. İlk adım: `web/index.html` + `web/embed.js` iskelet + landing kopya + Vite multi-page VEYA ayrı statik klasör kararı; lighthouse landing perf bütçesi.
 
