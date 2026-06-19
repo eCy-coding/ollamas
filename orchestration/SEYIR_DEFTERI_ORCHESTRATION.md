@@ -128,3 +128,35 @@ işaretlendi. **Ders pekişti: cross-lane commit'te explicit `git add <path>`, b
 **Next precomputed (→vO4):** OSS adoption tracker — `bin/lib/adoption.ts` ADOPTIONS tablosunu parse + lane/versiyon
 durum + lisans-disiplini gate (GPL→ref-only uyarı) → cockpit'e adoption paneli (snapshot.adoptions[] + html sekme).
 Test: parse+gate pure fn. collect() git fan-out paralelleştir (2s→<1s). Oturum başı branch==v3 doğrula.
+
+---
+
+## vO4 — OSS Adoption Tracker + License-Discipline Gate (2026-06-20)
+
+**Bağlam:** vO4 İKİ sekme PARALEL kodladı (vO2 deseni tekrar). Diğer sekme matris-gate çekirdeğini yazdı
+(`bin/lib/licenses.ts` SPDX classify + `bin/adopt.ts` parseAdoptionRows/gate + `tests/adopt.test.ts`). Bu sekme
+**additive katman** ekledi: gerçek-bağımlılık SBOM denetimi (onların kapsamında YOK). Çakışma=0 (ayrı dosyalar,
+onların kontratını REUSE).
+
+**Yapıldı (bu sekme):**
+- `bin/lib/sbom.ts` (NEW): `parseSyftSbom` (anchore/syft Apache-2.0 `-o json` SBOM tüket, kod kopyalama yok) +
+  `auditLaneDeps` (lane package.json runtime dep lisansını licenses.ts `classifyLicense` REUSE ile sınıfla;
+  strong-copyleft runtime dep → flagged; SBOM yoksa unknown/flagged=false — pozitif kanıtsız suçlama yok).
+- `bin/adopt-gate.ts` (NEW, CLI): İKİ katman — (1) ADOPTIONS matris gate (their `parseAdoptionRows`+`gate` REUSE,
+  shared.ts `discoverWorktrees`/`findFile` REUSE) (2) `--sbom` syft per-worktree gerçek-dep audit → `ADOPT_GATE.md`
+  rapor + exit-code (matris-ihlali=hard fail 1, copyleft-runtime-dep=soft uyarı).
+- `tests/sbom.test.ts` (NEW, vitest): parseSyftSbom + auditLaneDeps 6 case.
+
+**Kanıt (canlı):** vitest tüm suite + sbom 6 yeşil. `tsx adopt-gate.ts` → mevcut 34-satır ADOPTIONS doğrulandı.
+**Gate'in ilk gerçek catch'i (ERR-ORCH-005):** ADOPTIONS satır-76 lisans hücresi 'GPL→native API' + ADOPT →
+copyleft+kod-kopyalama görünümü → İHLAL exit 1. Gerçek: iTerm2 native scripting property'si (GPL kaynak değil).
+Fix: hücre 'GPL→native API'→'native' (matrisi DÜRÜST yap, gate'i suppress etme). Yeniden: ✅ temiz exit 0.
+syft kurulu değil → `--sbom` zarafetle atlar, matris-gate yine çalışır. Lane ağaçlarına 0 yazım.
+
+**Research (e2e GitHub, top-star permissive):** anchore/syft (9.1K Apache, SBOM ADOPT), spdx/license-list-data
+(CC0, classify DATA port), davglass/license-checker (1.7K MIT, dep-lisans deseni ref), sverweij/dependency-cruiser
+(6.8K MIT, vO5 dep-graph), commitlint (18.6K MIT, vO7), reviewdog (9.4K MIT, vO8). GPL araç YOK.
+
+**Next precomputed (→vO5):** Cross-lane bağımlılık grafiği — `dependency-cruiser --output json` (MIT) tüket →
+lane↔lane import/API grafiği + cross-package version-drift (syncpack deseni). sbom.ts'in dep-parse'ı + adopt.ts'in
+satır-parse'ı taban. Çıktı: cockpit'e dep-graph paneli + `DEPGRAPH.md`. Oturum başı branch==feat/orchestration-v3.

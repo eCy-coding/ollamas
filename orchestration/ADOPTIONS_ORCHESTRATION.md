@@ -73,7 +73,7 @@ zero-dep** (no vibe-code, dep eklenmedi).
 | 9 | primeline-ai/claude-tmux-orchestration | 33 | MIT | future-ref | dosya-tabanlı çok-lane koordinasyon deseni |
 | 10 | native `tmux list-panes -a -F` + `send-keys` | 46.7K | ISC | **ADOPT** | tmux-first sekme keşfi (session/tty/cwd/cmd) + §3.1 koordinasyon dürtmesi |
 | 11 | julienXX/terminal-notifier | ~10K | MIT | **ADOPT** | §3.1 `notify` — idle/stuck lane macOS bildirimi (varsa; yoksa stdout) |
-| 12 | iTerm2 `is processing` / Terminal `busy` (AppleScript property) | 17K | GPL→**native API** | **ADOPT** | sekme busy/idle ayrımı; GPL kod DEĞİL, app'in scripting property'si (ERR-ORCH-003 delimiter-fix ile) |
+| 12 | iTerm2 `is processing` / Terminal `busy` (AppleScript property) | 17K | native | **ADOPT** | sekme busy/idle ayrımı; **app'in scripting property'si — GPL kaynak DEĞİL** (vO4 gate'in ilk catch'i: lisans hücresi "GPL→native API" idi → "native" düzeltildi; ERR-ORCH-005) |
 | 13 | OSC 133 semantic prompt marks | — | açık spec | future-ref | prompt-idle vs komut-çalışıyor kesin sinyali (vO9 heartbeat) |
 
 **Sonuç:** vO2-merge ile **6 native/açık-kaynak teknik ADOPT** (0 dep): lsof-cwd, osascript (iTerm2+Terminal),

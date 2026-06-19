@@ -65,6 +65,13 @@
       "severity": "high",
       "note": "Koordinasyon-sinyali kötüye kullanımı: §3.1 nudge ile lane sekmesine mutasyon/build/kod-üreten komut göndermek conductor'ı feature-yazıcıya dönüştürür (§3 ihlali). Prevention: signal.ts ALLOWLIST yalnız read-only teşhis (git status|log|branch|diff, echo, pwd) + injection guard (; && | ` $() >) + dry-run default; gerçek gönderim açık --nudge flag + seyir audit.",
       "applies_version": "vO2"
+    },
+    {
+      "id": "RISK-ORCH-010",
+      "category": "adoption",
+      "severity": "med",
+      "note": "Lisans-gate false-allow: ADOPTIONS hücresi yanlış/belirsiz lisans etiketiyle (örn 'GPL→native API') gate'i kandırabilir veya gate dual-lisansı yanlış sınıflayabilir → copyleft kod yanlışlıkla 'code-ok' geçer. Prevention: adopt.ts classifyCell GPL içeren hücreyi STRICTEST copyleft sayar; lisans hücresi NE adopt edildiğini yansıtmalı (native scripting API → 'native', kaynak kopyası değil); --sbom ile GERÇEK runtime dep lisansı syft'ten çapraz-doğrula. NOT: RISK-ORCH-008/009 SEYIR'de cockpit (sync-freeze/test-convention) için kullanıldı; registry'de 008/009 backfill worker'a ait.",
+      "applies_version": "vO4"
     }
   ],
   "errors": [
@@ -123,6 +130,20 @@
       "prevention_rule": "İzole worktree'de bile her green parça koşusundan SONRA hemen commit et (uzun süre untracked bırakma); oturum-başı + commit-öncesi `git branch --show-current` doğrula; eşzamanlı lane'ler ayrı worktree+branch kullanmalı, asla aynı worktree'de paralel checkout.",
       "test_added": "(süreç-kuralı; Phase 0 guard branch-doğrulaması)",
       "recurrence_count": 1
+    },
+    {
+      "id": "ERR-ORCH-005",
+      "ts": "2026-06-20",
+      "version": "vO4",
+      "file": "orchestration/ADOPTIONS_ORCHESTRATION.md:76 (iTerm2 scripting property satırı)",
+      "category": "adoption",
+      "severity": "med",
+      "root_cause": "ADOPTIONS lisans hücresi 'GPL→native API' yazıyordu + karar 'ADOPT'. vO4 adopt-gate.ts ilk canlı koşuda bunu İHLAL yakaladı: hücre metni GPL içerdiği için copyleft sınıflandı, ADOPT=kod-kopyalama ima → RISK-ORCH-005 ihlali görünümü. Gerçekte adopt edilen iTerm2'nin GPL kaynağı DEĞİL, app'in native scripting property'si (is processing) — hücre yanlış etiketliydi.",
+      "evidence": "tsx orchestration/bin/adopt-gate.ts → '❌ 1 İHLAL: iTerm2 ... GPL→native API | ADOPT | copyleft: ADOPT kod kopyalama ima eder' exit 1.",
+      "fix": "Lisans hücresi 'GPL→native API' → 'native' (NATIVE→permissive); GPL-kaynak-değil notu 'Ne' kolonuna taşındı. Gate yeniden: ✅ temiz, exit 0. (Gate'i kandırmak DEĞİL — matrisi DÜRÜST yapmak: gerçekten GPL kod kopyalanmadı.)",
+      "prevention_rule": "ADOPTIONS lisans hücresi NE adopt edildiğini yansıtmalı: native scripting API/property → 'native' (kaynak kopyası değil), 'GPL→...' gibi karışık etiket yazma. Gate-ihlali çıkarsa önce niyeti doğrula; etiket yanlışsa düzelt, gate'i suppress etme.",
+      "test_added": "orchestration/tests/adopt.test.ts (gate GPL+ADOPT→ihlal) + canlı adopt-gate.ts temiz koşu",
+      "recurrence_count": 0
     }
   ]
 }
