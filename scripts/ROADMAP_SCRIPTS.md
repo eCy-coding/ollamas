@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅** (self-healing: remediation map + self_heal DRY-default + plist SuccessfulExit; swift 8 + node 147/1 skip), **v8 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅** (observability: structured JSONL events + seyir_stats dashboard p50/p95 + SLO burn-rate; swift 8 + node 167/1 skip), **v9 NEXT**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -135,20 +135,24 @@
 
 ---
 
-## v8 — Observability ⬜
+## v8 — Observability ✅
 
-**Tema:** Her script run görünür olsun.
+**Tema:** Her script run görünür olsun. **DONE** — pure `stats.mjs` (percentile/summarize/sloCheck) + `events.mjs` (zero-dep JSONL writer, never-throw) + bridge-client emit()/main() oto-instrument + `seyir_stats.mjs` dashboard (p50/p95/p99 + SLO burn-rate). Gate: tsc ✓ · vitest **167/1** (+20) · bats 9/9 · shellcheck/shfmt clean · swift 8.
 
-**Phases:**
-1. Her script run için structured seyir event → `~/.llm-mission-control/seyir-defteri-scripts.jsonl`.
-2. Alanlar: latency, exit code, device, tool, tenant.
-3. CLI/SVG mini-dashboard (error-rate, p50/p95 latency).
-4. **Error-rate SLO** tanımı + eşik aşımında uyarı.
-5. Gate: dashboard testi.
+**Phases (gerçekleşen):**
+1. ✅ Structured event → `<DATA_DIR>/seyir-defteri-scripts.jsonl` (`events.mjs` appendFileSync, OTel alan adları `tool/duration_ms/status/exit/device/attributes`); `MISSION_CONTROL_DATA_DIR` override; `SEYIR_EVENTS=0` opt-out; best-effort never-throw.
+2. ✅ Oto-instrument: `bridge-client.mjs` emit()/main() seam → her bridge tool otomatik event (T0 import + basename tool adı); `self_heal.mjs` kendi event'i (bridge-client kullanmaz).
+3. ✅ `seyir_stats.mjs` dashboard: ndjson readline parse → summarize + sloCheck → terminal/`--json`; error-rate + p50/p95/p99 + per-tool + SLO; `--window`/`--slo`.
+4. ✅ Error-rate SLO: `%99 / 1 saat` burn-rate (google/slo-generator deseni); alert'te `seyir_stats` exit≠0 (CI/launchd gate).
+5. ✅ Gate: stats/events/seyir_stats vitest + bats; oto-instrument kanıtı (temp DATA_DIR → event satırı).
 
-**Canonical prompt:** "her script run'a structured seyir event ekle (latency/exit/device/tool), CLI/SVG dashboard, error-rate SLO + eşik uyarısı."
+**Karar (info-leak önlenimi):** `seyir_stats` tier=**host** (safe değil) — host-local operatör observability okur, tenant'a expose edilmez. ERR-SCR-004 prevention ("kayıt öncesi mcp-gateway.e2e koş") bunu yakaladı (15→16 safe sayısı → tier host'a alındı → 15).
 
-**Next precomputed (→v9):** iOS Shortcuts automation trigger envanteri + offline queue veri modeli taslağı.
+**Canonical prompt:** "structured seyir event (events.mjs zero-dep JSONL, never-throw) + bridge-client emit/main oto-instrument + pure stats.mjs (percentile/summarize/sloCheck) + seyir_stats dashboard (p50/p95 + SLO burn-rate, alert→exit1); operatör tool'ları tier=host (tenant-expose etme)."
+
+**Adopt:** `pinojs/pino-pretty` (MIT, opsiyonel render), pure-JS percentile (MIT), `google/slo-generator` (Apache burn-rate deseni), OTel semantic-conventions (Apache alan adları), node readline (builtin).
+
+**Next precomputed (→v9 iOS Deepening):** `bin/ios-bridge` Swift Package oku; offline queue veri modeli (`ralfebert/PersistentURLRequestQueue` MIT adopt — URLSession persistent retry); Shortcuts automation trigger envanteri; iOS=consumer-only (host-exec YOK); flush+replay testi (Swift XCTest + node fixture parity); HMAC parity korunur.
 
 ---
 

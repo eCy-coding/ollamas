@@ -4,8 +4,14 @@
 // reliable exit codes).
 import { readFileSync } from "node:fs";
 import os from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { recordEvent, buildEvent } from "../../lib/events.mjs";
+
+// Process start ≈ tool invocation start; every bridge tool flows through emit()/
+// main(), so recording here auto-instruments the whole toolkit (v8 observability).
+const T0 = Date.now();
+const TOOL = basename(process.argv[1] || "unknown", ".mjs");
 
 // Repo root the host tools cd into (docker compose / git live here). Derived from
 // this file's location (.../bin/host-bridge/tools/lib -> 4 up = root) so it is
@@ -62,8 +68,10 @@ export function bridgeRead(target = "terminal") {
 
 // Print a result object as pretty JSON and exit with the right code.
 export function emit(obj, okField = "ok") {
+  const failed = obj[okField] === false;
+  recordEvent(buildEvent({ tool: TOOL, durationMs: Date.now() - T0, status: failed ? "error" : "ok", exit: failed ? 1 : 0 }));
   console.log(JSON.stringify(obj, null, 2));
-  process.exit(obj[okField] === false ? 1 : 0);
+  process.exit(failed ? 1 : 0);
 }
 
 // Wrap a tool's main() so any throw becomes a clean JSON error + exit 1.
@@ -71,6 +79,7 @@ export async function main(fn) {
   try {
     await fn();
   } catch (e) {
+    recordEvent(buildEvent({ tool: TOOL, durationMs: Date.now() - T0, status: "error", exit: 1, attributes: { error: String(e?.message || e) } }));
     console.error(JSON.stringify({ ok: false, error: String(e?.message || e) }));
     process.exit(1);
   }

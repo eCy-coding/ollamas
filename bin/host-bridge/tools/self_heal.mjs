@@ -12,7 +12,9 @@ import os from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { planRemediation, retryWithBackoff } from "../lib/remediation.mjs";
+import { recordEvent, buildEvent } from "../lib/events.mjs";
 
+const T0 = Date.now();
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.BRIDGE_PORT || 7345);
 const BRIDGE_URL = process.env.BRIDGE_URL || `http://127.0.0.1:${PORT}`;
@@ -118,6 +120,7 @@ if (!APPLY) {
   for (const a of actions) if (a.sideEffect) process.stderr.write(`[DRY] would run (${a.id}): ${a.cmd}\n`);
   result.ok = true;
   result.healthyAfter = !!bridge.ok;
+  recordEvent(buildEvent({ tool: "self_heal", durationMs: Date.now() - T0, status: "ok", exit: 0, attributes: { applied: false, healthyBefore: result.healthyBefore, actions: actions.length } }));
   console.log(JSON.stringify(result, null, 2));
   process.exit(0);
 }
@@ -139,5 +142,6 @@ try {
 
 result.healthyAfter = healthyAfter;
 result.ok = healthyAfter || actions.length === 0;
+recordEvent(buildEvent({ tool: "self_heal", durationMs: Date.now() - T0, status: result.ok ? "ok" : "error", exit: result.ok ? 0 : 1, attributes: { applied: true, healthyBefore: result.healthyBefore, healthyAfter, actions: actions.length } }));
 console.log(JSON.stringify(result, null, 2));
 process.exit(result.ok ? 0 : 1);

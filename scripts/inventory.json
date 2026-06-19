@@ -18,6 +18,7 @@
     { "name": "tools_doctor", "tier": "safe",       "entry": "tools_doctor.mjs", "description": "Self-test the host tool suite." },
     { "name": "shell_check",  "tier": "safe",       "entry": "shell_check.mjs",  "description": "Syntax-check a shell command on the host." },
     { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." },
-    { "name": "self_heal",    "tier": "host",       "entry": "self_heal.mjs",    "description": "Detect bridge failure and repair it (stale pid, hung 7345 node, restart/kickstart). DRY by default; pass apply=true to execute." }
+    { "name": "self_heal",    "tier": "host",       "entry": "self_heal.mjs",    "description": "Detect bridge failure and repair it (stale pid, hung 7345 node, restart/kickstart). DRY by default; pass apply=true to execute." },
+    { "name": "seyir_stats",  "tier": "host",       "entry": "seyir_stats.mjs",  "description": "Observability dashboard over the seyir event stream: error-rate, p50/p95/p99 latency, per-tool breakdown, SLO burn-rate. Exits non-zero on SLO alert. Host-operator tool (reads host-local ~/.llm-mission-control), not tenant-exposed." }
   ]
 }

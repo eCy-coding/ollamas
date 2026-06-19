@@ -100,6 +100,20 @@
 
 ---
 
+## v8 — Observability (adopt: pino-pretty + pure-percentile + slo-generator + OTel)
+
+- `[2026-06-20] kind=phase | adoption search | derin web: pino-pretty(MIT render), pure-JS percentile(MIT linear-interp), google/slo-generator(Apache burn-rate EB=1-SLI), OTel semantic-conventions(Apache alan adları), node readline(builtin ndjson). Karar: plain JSONL appendFileSync(zero-dep) + oto-instrument emit() seam + SLO %99/1h burn-rate alert | plan onaylı`
+- `[2026-06-20] kind=phase | P0 pure stats (TDD) | bin/host-bridge/lib/stats.mjs — percentile(sortedAsc,p) linear-interp + summarize(events)→{total,errorRate,p50/p95/p99,avg,byTool} + sloCheck(window-filter+burn-rate, now injectable). stats.test.ts 11 case | kırmızı→yeşil`
+- `[2026-06-20] kind=phase | P1 event writer | bin/host-bridge/lib/events.mjs — buildEvent (OTel-ish {ts,ts_ms,tool,duration_ms,status,exit,device,attributes}, now injectable) + recordEvent appendFileSync <DATA_DIR>/seyir-defteri-scripts.jsonl, best-effort never-throw, SEYIR_EVENTS=0 opt-out. events.test.ts 5 (temp-dir izole, unwritable→no-throw) | yeşil`
+- `[2026-06-20] kind=phase | P2 oto-instrument | bridge-client.mjs T0=import + emit()/main() → recordEvent(tool=basename argv1, duration, status, exit). Tek seam → tüm bridge tool'ları enstrümante. self_heal kendi recordEvent (bridge-client kullanmaz) | kanıt: temp DATA_DIR'de logbook+self_heal event satırı (duration_ms 0/85)`
+- `[2026-06-20] kind=phase | P3 dashboard | bin/host-bridge/tools/seyir_stats.mjs — readline ndjson → summarize+sloCheck → terminal/--json, --window/--slo, SLO alert→exit1, READ-ONLY (kendi event'ini yazmaz, feedback önle) | smoke: p50 43 p95 81, sloAlert false`
+- `[2026-06-20] kind=error | near-miss (ERR-SCR-004 prevention çalıştı) | seyir_stats tier=safe eklenince mcp-gateway.e2e 'free-plan 15 safe' → 16 (reconciler yeni safe tool'u expose'a kaydetti). KÖK: seyir_stats host-operatör aracı (host FS okur), tenant-safe değil + info-leak riski | vitest: expected 16 to be 15`
+- `[2026-06-20] kind=fix | seyir_stats tier safe→host | operatör observability host'a expose edilmez; e2e 15'te kalır, server-test'e dokunulmadı (§3 korundu). Prevention: scripts manifest'e safe-tier tool eklemeden önce 'tenant'a expose edilmeli mi?' sor + mcp-gateway.e2e koş | vitest 167/1 2x deterministik`
+- `[2026-06-20] kind=phase | P4-5 gate+gov | tsc OK + vitest 167 pass/1 skip (147→+20) + bats 9/9 + shellcheck/shfmt clean + swift 8; register-hooks 16→17 oto | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v9 iOS Deepening) | bin/ios-bridge oku; offline queue (ralfebert/PersistentURLRequestQueue MIT, URLSession persistent retry) + Shortcuts automation trigger envanteri + flush/replay testi (Swift XCTest + node fixture parity); iOS=consumer-only, HMAC parity korunur`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack

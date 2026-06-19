@@ -151,6 +151,20 @@
       "prevention_rule": "Recovery/self-heal aracı onardığı bileşene ASLA bağımlı olmasın (bridge'i onaran bridge'i çağırmaz). Otomatik kill yalnız doğrulanmış hedefte (port+process-adı), default DRY.",
       "test_added": "scripts/tests/remediation.test.ts (port_blocked non-node→kill yok) + scripts/tests/self-heal.test.ts (DRY no-exec)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-009",
+      "ts": "2026-06-20",
+      "version": "v8",
+      "file": "scripts/inventory.json + bin/host-bridge/lib/events.mjs",
+      "category": "registration",
+      "severity": "med",
+      "root_cause": "(1) Manifest'e safe-tier tool eklemek onu otomatik tenant MCP expose yüzeyine sokar (reconciler register) → mcp-gateway.e2e 15→16 + host-operatör verisi info-leak. (2) Observability writer tool akışını bozabilir (disk dolu/izin).",
+      "evidence": "vitest mcp-gateway.e2e expected 16 to be 15; seyir_stats host FS ~/.llm-mission-control okur",
+      "fix": "Operatör/host-local tool'lar tier=host (safe DEĞİL) → tenant-expose edilmez. events.recordEvent best-effort try/catch never-throw + SEYIR_EVENTS=0 opt-out; testler MISSION_CONTROL_DATA_DIR=temp ile izole.",
+      "prevention_rule": "Scripts manifest'e tool eklerken: read-only ama host-local/operatör verisi okuyorsa tier=host (safe yalnız gerçekten tenant-paylaşılabilir veri). Observability/logging asla tool'u throw'la kırmasın (best-effort). Yeni tool sonrası mcp-gateway.e2e koş.",
+      "test_added": "scripts/tests/events.test.ts (never-throw) + stats/seyir_stats testleri + mcp-gateway.e2e (15 korundu)",
+      "recurrence_count": 0
     }
   ]
 }

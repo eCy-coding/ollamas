@@ -43,6 +43,7 @@ const BUILDERS = {
     ? { argv: `add ${d.shArg(String(a.text || ""))}` }
     : { argv: `tail ${Number(a.n) || 20}` }),
   self_heal: (a) => ({ argv: a.apply ? "--apply" : "", timeoutMs: 90000 }),
+  seyir_stats: (a) => ({ argv: [a.json ? "--json" : "", a.window ? `--window ${Number(a.window)}` : "", a.slo ? `--slo ${Number(a.slo)}` : ""].filter(Boolean).join(" ") }),
 };
 
 export function loadInventory(inventoryPath = DEFAULT_INVENTORY) {
