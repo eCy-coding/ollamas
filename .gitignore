@@ -11,3 +11,6 @@ coverage/
 test-results/
 playwright-report/
 .playwright/
+
+# vF3 lighthouse-ci local reports
+.lighthouseci/
