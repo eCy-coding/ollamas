@@ -139,3 +139,33 @@ Her koordinasyon hatası → `orchestration/errors_registry.json`:
 
 Aynı hata tekrar ederse → `recurrence_count++` + `prevention_rule` güçlendir. Bir hatayı
 asla iki kez yapma.
+
+---
+
+## §9. Expert Diagnostic Panel Protokolü (vO4-panel)
+
+8 uzman persona ollamas lane'lerini READ-ONLY tarar, bozuk/zayıf yerleri **teşhis notu** üretir,
+OSS-kaynaklı çözüm önerir, **rapor** eder. Sözleşme: `PANEL_SCHEMA.md`. Pattern adoption:
+`spencermarx/open-code-review` (Apache-2.0) — Tech-Lead → persona takımı → paralel inceleme →
+discourse → sentez. **CANLI LLM AGENT spawn EDİLMEZ**; discourse dosya konvansiyonudur.
+
+**Persona'lar:** project-architect, prompt-engineer, fullstack, backend, frontend, macos,
+integrations, mcp (registry: `bin/lib/personas.ts`).
+
+**Akış (deterministik, zero-dep TS):**
+```
+1. scan.ts <persona>|--all → <persona>.detected.json   (makine fact; confidence:detected)
+2. İnsan <persona>.md yazar → note JSON blok            (OSS-ref çözüm; confidence:asserted)
+3. panel.ts → merge → dedupe(consensus boost) → discourse(unresolved) → stale → rank
+   → PANEL_REPORT.md + panel-report.json
+```
+
+**Makine-vs-insan sınırı (no vibe-code):** detector yalnız kanıt+ham-finding üretir; çözüm/ref
+İNSAN yazar. Kaynak yetersizse (`refs<minRefs`) panel `refDeficit` flag'ler — araç çözüm UYDURMAZ.
+
+**Lisans disiplini:** `solution.refs[].kind` = MIT/Apache/BSD→`copy`(+attribution) ·
+GPL/bilinmeyen→`ref-only` · konsept→`idea`. (RISK-ORCH-005 ile uyumlu; vO5 adopt-gate ile çapraz.)
+
+**Scope law (§3):** detector git-grep/Read-only; panel yalnız `orchestration/plans/` altına yazar,
+lane tree'ye 0 yazım. Logbook: panel hataları `PANEL_SEYIR.md`'de (paylaşılan registry clobber
+edilmemesi için), T0 reconcile'da kanonik registry'ye merge.

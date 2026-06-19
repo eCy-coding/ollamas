@@ -1,0 +1,407 @@
+{
+  "report": {
+    "ts": "2026-06-19T22:06:18.869Z",
+    "personaCoverage": {
+      "backend": 1,
+      "project-architect": 8,
+      "prompt-engineer": 1
+    },
+    "byLane": {
+      "backend": 2,
+      "repo": 8
+    },
+    "ranked": [
+      "backend-backend-1",
+      "project-architect-backend-orphans",
+      "project-architect-repo-3",
+      "project-architect-repo-4",
+      "project-architect-repo-5",
+      "project-architect-repo-6",
+      "project-architect-repo-7",
+      "prompt-engineer-repo-1",
+      "project-architect-repo-1",
+      "project-architect-repo-2"
+    ],
+    "duplicatesMerged": 1,
+    "consensusBoosted": [
+      "backend-backend-1"
+    ],
+    "unresolvedDebates": [],
+    "refDeficit": [
+      "project-architect-repo-2",
+      "project-architect-repo-3",
+      "project-architect-repo-4",
+      "project-architect-repo-5",
+      "project-architect-repo-6",
+      "project-architect-repo-7"
+    ],
+    "stale": [],
+    "totals": {
+      "bySeverity": {
+        "high": 1,
+        "low": 2,
+        "med": 7
+      },
+      "open": 10,
+      "adopted": 0
+    }
+  },
+  "notes": [
+    {
+      "id": "backend-backend-1",
+      "persona": "backend",
+      "targetLane": "backend",
+      "targetPath": "server/metrics.ts",
+      "severity": "high",
+      "confidence": "asserted",
+      "finding": "prom-client bağlı (4 kullanım) ama tüketici/dashboard yok — observability boşluğu",
+      "evidence": [
+        {
+          "path": "server/metrics.ts",
+          "lineHint": "-",
+          "fact": "prom-client producer=4, consumer(grafana)=0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [
+          "fullstack-backend-9",
+          "backend-backend-1"
+        ],
+        "verdict": ""
+      },
+      "source": "authored",
+      "targetHash": "7b0aa23",
+      "solution": {
+        "summary": "Prometheus scrape + Grafana dashboard JSON repo'ya ekle (deploy/). MCP tarafında trace için OpenTelemetry MCP server consume edilebilir → AI ajan distributed trace okur. Önce /metrics'i bir dashboard'a bağla, sonra logSeyir.jsonl'i de aynı panele besle.",
+        "refs": [
+          {
+            "repo": "traceloop/opentelemetry-mcp-server",
+            "license": "Apache-2.0",
+            "url": "https://github.com/traceloop/opentelemetry-mcp-server",
+            "kind": "ref-only"
+          },
+          {
+            "repo": "prometheus/client_nodejs",
+            "license": "Apache-2.0",
+            "url": "https://github.com/siimon/prom-client",
+            "kind": "idea"
+          }
+        ]
+      },
+      "consensus": [
+        "backend",
+        "fullstack"
+      ]
+    },
+    {
+      "id": "project-architect-repo-1",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "package.json",
+      "severity": "low",
+      "confidence": "asserted",
+      "finding": "package.json name=\"react-example\" + version=\"0.0.0\" — release-please/server.json ile uyumsuz",
+      "evidence": [
+        {
+          "path": "package.json",
+          "lineHint": "name/version",
+          "fact": "placeholder ad + 0.0.0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "authored",
+      "targetHash": "7b0aa23",
+      "solution": {
+        "summary": "name'i 'ollamas'a, version'ı server.json ile aynı semver'e çek. release-please zaten var → manifest'e package.json ekle ki sürüm otomatik bump'lansın, drift bitsin.",
+        "refs": [
+          {
+            "repo": "googleapis/release-please",
+            "license": "Apache-2.0",
+            "url": "https://github.com/googleapis/release-please",
+            "kind": "copy"
+          },
+          {
+            "repo": "npm/node-semver",
+            "license": "ISC",
+            "url": "https://github.com/npm/node-semver",
+            "kind": "idea"
+          }
+        ]
+      },
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-2",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "package.json",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "package.json version=\"0.0.0\" — release-please ile senkron değil",
+      "evidence": [
+        {
+          "path": "package.json",
+          "lineHint": "\"version\"",
+          "fact": "version=\"0.0.0\""
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-3",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/contracts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/contracts orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/contracts",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-4",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/daemon",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/daemon orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/daemon",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-5",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/mesh",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/mesh orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/mesh",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-6",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/orchestrator",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/orchestrator orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/orchestrator",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-repo-7",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/sandbox",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/sandbox orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/sandbox",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "7b0aa23",
+      "ts": "2026-06-19T22:04:33.386Z",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "project-architect-backend-orphans",
+      "persona": "project-architect",
+      "targetLane": "backend",
+      "targetPath": "backend/",
+      "severity": "med",
+      "confidence": "asserted",
+      "finding": "backend/{contracts,daemon,mesh,orchestrator,sandbox} orphan — hiçbir import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/mesh",
+          "lineHint": "-",
+          "fact": "inbound quoted-import ref = 0 (5 dizin)"
+        }
+      ],
+      "solution": {
+        "summary": "Dead-code teyidi sonrası sil VEYA ROADMAP'e gerçek owner+plan bağla. git mv ile arşivle, knip/ts-prune ile CI'de orphan-export gate kur ki yeniden birikmesin.",
+        "refs": [
+          {
+            "repo": "webpro-nl/knip",
+            "license": "ISC",
+            "url": "https://github.com/webpro-nl/knip",
+            "kind": "ref-only"
+          },
+          {
+            "repo": "nadeesha/ts-prune",
+            "license": "MIT",
+            "url": "https://github.com/nadeesha/ts-prune",
+            "kind": "copy"
+          }
+        ]
+      },
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "authored",
+      "consensus": [
+        "project-architect"
+      ]
+    },
+    {
+      "id": "prompt-engineer-repo-1",
+      "persona": "prompt-engineer",
+      "targetLane": "repo",
+      "targetPath": "project_cortex.md",
+      "severity": "med",
+      "confidence": "asserted",
+      "finding": "Failure-sink (project_cortex.md) boş + SEYIR manuel-only → hata-öğrenme döngüsü kapalı",
+      "evidence": [
+        {
+          "path": "project_cortex.md",
+          "lineHint": "1",
+          "fact": "~465B, yalnız INITIALIZED"
+        }
+      ],
+      "solution": {
+        "summary": "logSeyir.jsonl'i prompt-context'e besleyen bir 'don't-repeat' enjeksiyonu kur (orchestration plan-next.ts errors_registry deseni). System-prompt'a son N hata + prevention_rule otomatik eklensin. Reflexion/self-refine deseni: ajan hatasını sink'e yazsın, sonraki turda okusun.",
+        "refs": [
+          {
+            "repo": "noahshinn/reflexion",
+            "license": "MIT",
+            "url": "https://github.com/noahshinn/reflexion",
+            "kind": "idea"
+          },
+          {
+            "repo": "spencermarx/open-code-review",
+            "license": "Apache-2.0",
+            "url": "https://github.com/spencermarx/open-code-review",
+            "kind": "ref-only"
+          }
+        ]
+      },
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "authored",
+      "consensus": [
+        "prompt-engineer"
+      ]
+    }
+  ]
+}
