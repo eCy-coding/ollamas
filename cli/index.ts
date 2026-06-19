@@ -40,26 +40,32 @@ global env:
   NO_COLOR           disable color
 global flags:
   --gateway <url>    override gateway for this invocation
+  --profile <name>   use a named gateway profile (config use <name> to set default)
 common flags:
   --json             machine-readable output      --timeout <ms>  stream timeout
   -m, --model        override model               -p, --provider  override provider
 run 'ollamas <command> --help' for per-command options.
 `;
 
-// Pull global flags (currently --gateway <url>) out of argv. Pure → testable.
-export function extractGlobalFlags(argv: string[]): { gateway?: string; rest: string[] } {
+// Pull global flags (--gateway <url>, --profile <name>) out of argv. Pure → testable.
+export function extractGlobalFlags(argv: string[]): { gateway?: string; profile?: string; rest: string[] } {
   const rest: string[] = [];
   let gateway: string | undefined;
+  let profile: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--gateway" && i + 1 < argv.length) {
       gateway = argv[++i];
     } else if (argv[i].startsWith("--gateway=")) {
       gateway = argv[i].slice("--gateway=".length);
+    } else if (argv[i] === "--profile" && i + 1 < argv.length) {
+      profile = argv[++i];
+    } else if (argv[i].startsWith("--profile=")) {
+      profile = argv[i].slice("--profile=".length);
     } else {
       rest.push(argv[i]);
     }
   }
-  return { gateway, rest };
+  return { gateway, profile, rest };
 }
 
 // Split argv into the command and its remaining args. Pure → unit-testable.
@@ -102,6 +108,7 @@ function runConfig(rest: string[]): number {
 export async function main(argv: string[]): Promise<number> {
   const g = extractGlobalFlags(argv);
   if (g.gateway) process.env.OLLAMAS_GATEWAY = g.gateway; // env wins in loadConfig (G10)
+  if (g.profile) process.env.OLLAMAS_PROFILE = g.profile; // --profile selects the active profile (v7)
   const { command, rest } = route(g.rest);
   switch (command) {
     case "chat":

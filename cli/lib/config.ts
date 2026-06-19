@@ -4,9 +4,9 @@
 // plaintext. Decryption happens on load so every consumer still reads the
 // plaintext `cfg.apiKey` in memory (GatewayClient callers are untouched). A
 // pre-v7 plaintext file is migrated one-way on first load (backup kept).
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { seal, open, SecretError } from "./secrets";
 import { loadMasterKey } from "./keystore";
 
@@ -32,6 +32,7 @@ interface DiskConfig {
   provider?: string;
   model?: string;
   profile?: string;
+  activeProfile?: string; // v7 global pointer — only meaningful in cli.json
   apiKey?: string; // legacy plaintext (pre-v7)
   saasAdminToken?: string; // legacy plaintext (pre-v7)
 }
@@ -45,6 +46,41 @@ const DEFAULTS: CliConfig = {
 
 export function configPath(): string {
   return join(homedir(), ".ollamas", "cli.json");
+}
+
+// --- v7 profiles: default lives in cli.json (back-compat); named profiles in
+// ~/.ollamas/profiles/<name>.json. The active-profile pointer is stored in
+// cli.json. Active selection precedence: --profile flag > OLLAMAS_PROFILE env >
+// activeProfile (cli.json) > "default". The flag is realized by index.ts setting
+// OLLAMAS_PROFILE before load (mirrors --gateway), so the config layer reads env.
+
+export function profilesDir(): string {
+  return join(homedir(), ".ollamas", "profiles");
+}
+
+function sanitizeProfile(name: string): string {
+  if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+    throw new Error(`invalid profile name '${name}' (allowed: letters, digits, . _ -)`);
+  }
+  return name;
+}
+
+export function profilePath(name: string): string {
+  return name === "default" ? configPath() : join(profilesDir(), `${sanitizeProfile(name)}.json`);
+}
+
+// PURE precedence resolver → unit-testable. flag wins, then env, then the
+// persisted active pointer, else "default".
+export function resolveProfileName(flag?: string, envVal?: string, globalActive?: string): string {
+  return (flag && flag.trim()) || (envVal && envVal.trim()) || (globalActive && globalActive.trim()) || "default";
+}
+
+function globalActiveProfile(): string | undefined {
+  return readDisk(configPath()).activeProfile;
+}
+
+function activeProfileName(env: NodeJS.ProcessEnv): string {
+  return resolveProfileName(undefined, env.OLLAMAS_PROFILE, globalActiveProfile());
 }
 
 // Env wins over file wins over defaults. Pure given its inputs → unit-testable.
@@ -97,9 +133,9 @@ export function sealDisk(fileData: Partial<CliConfig>, key: Buffer | null): Disk
   return disk;
 }
 
-function readDisk(): DiskConfig {
+function readDisk(path: string = configPath()): DiskConfig {
   try {
-    return JSON.parse(readFileSync(configPath(), "utf8"));
+    return JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return {}; // no file yet — defaults + env
   }
@@ -126,16 +162,17 @@ function unsealOrWarn(disk: DiskConfig, env: NodeJS.ProcessEnv): { fileData: Par
   }
 }
 
-// Decrypted file values WITHOUT env override — the persistence baseline so an
-// env-supplied secret (OLLAMAS_API_KEY) is never written back to disk.
+// Decrypted active-profile file values WITHOUT env override — the persistence
+// baseline so an env-supplied secret (OLLAMAS_API_KEY) is never written to disk.
 function loadDiskPlain(env: NodeJS.ProcessEnv = process.env): Partial<CliConfig> {
-  return unsealOrWarn(readDisk(), env).fileData;
+  return unsealOrWarn(readDisk(profilePath(activeProfileName(env))), env).fileData;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliConfig {
-  const disk = readDisk();
+  const path = profilePath(activeProfileName(env));
+  const disk = readDisk(path);
   const { fileData, legacy } = unsealOrWarn(disk, env);
-  if (legacy) migrateLegacy(disk, fileData, env);
+  if (legacy) migrateLegacy(path, disk, fileData, env);
   return resolveConfig(fileData, env);
 }
 
@@ -143,26 +180,76 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliConfig {
 // original first (0600) so a later keyfile loss is still recoverable, then
 // rewrites without plaintext. Non-fatal: config keeps working in-memory if the
 // rewrite fails.
-function migrateLegacy(disk: DiskConfig, fileData: Partial<CliConfig>, env: NodeJS.ProcessEnv): void {
+function migrateLegacy(path: string, disk: DiskConfig, fileData: Partial<CliConfig>, env: NodeJS.ProcessEnv): void {
   try {
-    const bak = `${configPath()}.bak.${Date.now()}`;
+    const bak = `${path}.bak.${Date.now()}`;
     writeFileSync(bak, JSON.stringify(disk, null, 2), { mode: 0o600 });
     const needKey = !!(fileData.apiKey || fileData.saasAdminToken);
     const sealed = sealDisk(fileData, needKey ? loadMasterKey(env) : null);
-    writeFileSync(configPath(), JSON.stringify(sealed, null, 2), { mode: 0o600 });
+    if (disk.activeProfile) sealed.activeProfile = disk.activeProfile; // preserve pointer
+    writeFileSync(path, JSON.stringify(sealed, null, 2), { mode: 0o600 });
     process.stderr.write(`ollamas: migrated plaintext secrets → encrypted at rest (backup: ${bak})\n`);
   } catch {
     /* migration best-effort; plaintext stays but config still works */
   }
 }
 
-export function saveConfig(patch: Partial<CliConfig>): CliConfig {
-  // Persist file-state + patch only — NOT env-supplied secrets.
-  const fileData = loadDiskPlain();
+export function saveConfig(patch: Partial<CliConfig>, env: NodeJS.ProcessEnv = process.env): CliConfig {
+  // Write the ACTIVE profile's file. Persist file-state + patch only — never
+  // env-supplied secrets. Preserve the global activeProfile pointer in cli.json.
+  const path = profilePath(activeProfileName(env));
+  const fileData = unsealOrWarn(readDisk(path), env).fileData;
   const next: Partial<CliConfig> = { ...DEFAULTS, ...fileData, ...patch };
   const needKey = !!(next.apiKey || next.saasAdminToken);
-  const dir = join(homedir(), ".ollamas");
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  writeFileSync(configPath(), JSON.stringify(sealDisk(next, needKey ? loadMasterKey() : null), null, 2), { mode: 0o600 });
-  return loadConfig();
+  const disk = sealDisk(next, needKey ? loadMasterKey() : null);
+  const prevPointer = readDisk(path).activeProfile;
+  if (prevPointer) disk.activeProfile = prevPointer;
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, JSON.stringify(disk, null, 2), { mode: 0o600 });
+  return loadConfig(env);
+}
+
+// Point the global activeProfile at <name>, creating an empty profile file if it
+// doesn't exist yet. Pointer lives in cli.json regardless of the active profile.
+export function setActiveProfile(name: string): void {
+  const target = name === "default" ? "default" : sanitizeProfile(name);
+  if (target !== "default") {
+    const p = profilePath(target);
+    if (!existsSync(p)) {
+      mkdirSync(profilesDir(), { recursive: true, mode: 0o700 });
+      writeFileSync(p, JSON.stringify({}, null, 2), { mode: 0o600 });
+    }
+  }
+  const global = readDisk(configPath());
+  global.activeProfile = target;
+  mkdirSync(join(homedir(), ".ollamas"), { recursive: true, mode: 0o700 });
+  writeFileSync(configPath(), JSON.stringify(global, null, 2), { mode: 0o600 });
+}
+
+export interface ProfileSummary {
+  name: string;
+  active: boolean;
+  gateway: string;
+  hasKey: boolean;
+}
+
+// Enumerate default + every ~/.ollamas/profiles/*.json with light metadata
+// (no decryption — only presence of a sealed/legacy secret).
+export function listProfiles(env: NodeJS.ProcessEnv = process.env): ProfileSummary[] {
+  const active = activeProfileName(env);
+  const names = new Set<string>(["default"]);
+  try {
+    for (const f of readdirSync(profilesDir())) if (f.endsWith(".json")) names.add(f.slice(0, -5));
+  } catch {
+    /* no profiles dir yet */
+  }
+  return [...names].sort().map((name) => {
+    const disk = readDisk(profilePath(name));
+    return {
+      name,
+      active: name === active,
+      gateway: disk.gateway || DEFAULTS.gateway,
+      hasKey: !!(disk.apiKeyEnc || disk.apiKey),
+    };
+  });
 }
