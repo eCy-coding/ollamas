@@ -7,8 +7,25 @@
 // injected via ToolDeps to avoid a circular import and keep host-bridge state
 // owned by one module.
 
+import Ajv, { type ValidateFunction } from "ajv";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
+
+// outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
+// (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
+// output we validate it here at the single choke-point — so HTTP expose, stdio, the
+// ReAct loop and consume side all get the same guarantee. ajv ships with the MCP SDK
+// (no new heavy dep); compiled validators are cached by schema identity.
+const ajv = new Ajv({ allErrors: true, strict: false });
+const validatorCache = new WeakMap<object, ValidateFunction | null>();
+function getValidator(schema: any): ValidateFunction | null {
+  if (!schema || typeof schema !== "object") return null;
+  if (validatorCache.has(schema)) return validatorCache.get(schema)!;
+  let v: ValidateFunction | null = null;
+  try { v = ajv.compile(schema); } catch { v = null; } // malformed schema → no-op, never fatal
+  validatorCache.set(schema, v);
+  return v;
+}
 
 /**
  * Security tier — gates which tenant plans may call a tool (AGENTS.md §5).
@@ -442,11 +459,25 @@ export const ToolRegistry = {
 
     try {
       const r = await tool.invoke(args, ctx);
-      emit(true);
-      if (r && typeof r === "object" && ("output" in r || "diff" in r || "halt" in r || "applied" in r)) {
-        return { ok: true, output: r.output, diff: r.diff || "", applied: !!r.applied, halt: !!r.halt };
+      const normalized =
+        r && typeof r === "object" && ("output" in r || "diff" in r || "halt" in r || "applied" in r)
+          ? { ok: true, output: r.output, diff: r.diff || "", applied: !!r.applied, halt: !!r.halt }
+          : { ok: true, output: r, diff: "", applied: false, halt: false };
+
+      // Enforce a declared outputSchema, but ONLY for structured (object) output —
+      // text-only tools (the common case) are never schema-checked. A violation is
+      // returned as ok:false (never thrown), preserving the choke-point contract.
+      const outSchema = tool.schema.function.outputSchema;
+      const out = normalized.output;
+      if (outSchema && out !== null && typeof out === "object") {
+        const validate = getValidator(outSchema);
+        if (validate && !validate(out)) {
+          emit(false);
+          return { ok: false, output: { error: "output_schema_violation", tool: name, details: validate.errors }, diff: "", applied: false, halt: false };
+        }
       }
-      return { ok: true, output: r, diff: "", applied: false, halt: false };
+      emit(true);
+      return normalized;
     } catch (err: any) {
       emit(false);
       return { ok: false, output: { error: err?.message || "Execution exception" }, diff: "", applied: false, halt: false };

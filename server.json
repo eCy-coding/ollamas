@@ -9,6 +9,15 @@
     "url": "https://github.com/eCy-coding/ollamas",
     "source": "github"
   },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "ollamas-mcp",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",

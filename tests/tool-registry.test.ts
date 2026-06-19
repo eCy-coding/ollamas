@@ -105,4 +105,43 @@ describe("ToolRegistry choke-point", () => {
     const r = await ToolRegistry.execute("mcp__x__ping", {}, ctx());
     expect(r.output).toBe("pong");
   });
+
+  // --- v1.7-A: outputSchema enforcement at the choke-point ---
+  const withOut = (name: string, out: any, outputSchema: any) =>
+    ToolRegistry.register(name, {
+      tier: "host",
+      schema: { type: "function", function: { name, description: "d", parameters: { type: "object", properties: {} }, outputSchema } },
+      invoke: async () => out,
+    });
+
+  test("structured output matching its outputSchema passes through", async () => {
+    withOut("mcp__os__good", { score: 9, ok: true },
+      { type: "object", properties: { score: { type: "number" }, ok: { type: "boolean" } }, required: ["score", "ok"] });
+    const r = await ToolRegistry.execute("mcp__os__good", {}, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.output).toMatchObject({ score: 9, ok: true });
+  });
+
+  test("structured output violating its outputSchema → ok:false (not a throw)", async () => {
+    withOut("mcp__os__bad", { score: "nine" },
+      { type: "object", properties: { score: { type: "number" } }, required: ["score"] });
+    const r = await ToolRegistry.execute("mcp__os__bad", {}, ctx());
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r.output)).toContain("output_schema_violation");
+  });
+
+  test("string output is never schema-checked (text-only tools unaffected)", async () => {
+    withOut("mcp__os__str", "plain text",
+      { type: "object", properties: { x: { type: "number" } }, required: ["x"] });
+    const r = await ToolRegistry.execute("mcp__os__str", {}, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.output).toBe("plain text");
+  });
+
+  test("a malformed outputSchema is ignored, not fatal", async () => {
+    withOut("mcp__os__badschema", { a: 1 }, { type: "not-a-real-type", properties: 42 });
+    const r = await ToolRegistry.execute("mcp__os__badschema", {}, ctx());
+    expect(r.ok).toBe(true);
+    expect(r.output).toMatchObject({ a: 1 });
+  });
 });

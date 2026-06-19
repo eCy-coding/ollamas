@@ -43,7 +43,7 @@ const LOG_LEVELS = ["debug", "info", "notice", "warning", "error", "critical", "
 type LogLevel = (typeof LOG_LEVELS)[number];
 const rank = (l: string) => { const i = LOG_LEVELS.indexOf(l as LogLevel); return i < 0 ? 1 : i; };
 
-function buildServer(ctx: ToolCtx): Server {
+export function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
     { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
     { capabilities: { ...MCP_CAPABILITIES } }
