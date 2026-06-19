@@ -29,6 +29,7 @@ export const COMMAND_TREE: CommandTree = {
     "config",
     "completion",
     "update",
+    "plugin",
     "help",
     "version",
   ],
@@ -40,6 +41,8 @@ export const COMMAND_TREE: CommandTree = {
     // config: profile ops + the settable keys
     config: ["use", "profiles", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
     completion: ["bash", "zsh", "fish"],
+    plugin: ["list", "install", "remove"],
+    update: ["--check"],
   },
   globalFlags: ["--gateway", "--profile", "--json", "--help"],
 };

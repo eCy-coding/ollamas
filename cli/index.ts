@@ -13,6 +13,9 @@ import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
 import { complete, completionScript } from "./lib/completion";
 import { runUpdate } from "./commands/update";
+import { runPlugin } from "./commands/plugin";
+import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from "./lib/plugins";
+import { spawnSync } from "node:child_process";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
 const VERSION = "9.0.0";
@@ -37,6 +40,7 @@ commands:
     config profiles    list profiles
   completion <shell> print a shell completion script (bash|zsh|fish)
   update [--check]   self-update from a release manifest (sha256-verified)
+  plugin <action>    manage external subcommands (list|install|remove)
   help               this message
   version            print version
 
@@ -177,6 +181,8 @@ export async function main(argv: string[]): Promise<number> {
       return runCompletion(rest);
     case "update":
       return runUpdate(rest, VERSION);
+    case "plugin":
+      return runPlugin(rest);
     case "__complete": {
       // Hidden — emitted on every TAB. Pure tree lookup, no I/O.
       const cands = complete(rest);
@@ -196,9 +202,25 @@ export async function main(argv: string[]): Promise<number> {
     case "-h":
       process.stdout.write(HELP);
       return 0;
-    default:
+    default: {
+      // Plugin fallback (v10): an unknown command may be a registered plugin.
+      // It runs ONLY if its file still matches the recorded sha256 — a tampered
+      // or unregistered command falls through to the error below. Never exec
+      // arbitrary $PATH binaries.
+      if (isValidPluginName(command)) {
+        const entry = findPlugin(loadRegistry(), command);
+        if (entry) {
+          if (!verifyPluginFile(entry.path, entry.sha256)) {
+            process.stderr.write(`ollamas: plugin '${command}' failed checksum verification — refusing to run (reinstall with 'ollamas plugin install')\n`);
+            return 1;
+          }
+          const r = spawnSync(entry.path, rest, { stdio: "inherit" });
+          return r.status ?? 1;
+        }
+      }
       process.stderr.write(`ollamas: unknown command '${command}'\nrun 'ollamas help'\n`);
       return 2;
+    }
   }
 }
 
