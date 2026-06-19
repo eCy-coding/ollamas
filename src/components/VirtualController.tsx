@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { InputEvent } from '../types';
+import { api } from '../lib/apiClient';
 
 export const VirtualController = () => {
     const [action, setAction] = useState<string>('');
@@ -7,15 +8,10 @@ export const VirtualController = () => {
     const sendAction = async (type: InputEvent['type'], payload: InputEvent['payload']) => {
         setAction(`Sending ${type} event...`);
         try {
-            const res = await fetch('/api/cluster/execute', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    toolName: 'input_bridge',
-                    payload: { type, ...payload } 
-                })
+            const data = await api.post('/api/cluster/execute', {
+                toolName: 'input_bridge',
+                payload: { type, ...payload }
             });
-            const data = await res.json();
             setAction(`Done: ${JSON.stringify(data)}`);
         } catch (e) {
             setAction('Error sending input event');

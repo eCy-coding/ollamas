@@ -5,6 +5,7 @@ import {
   FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft
 } from "lucide-react";
 import { ChatSession } from "../types";
+import { api, ApiError } from "../lib/apiClient";
 
 interface TraceStep {
   stepNum: number;
@@ -53,14 +54,14 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
-      const res = await fetch("/api/agent/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-        return data;
+      const data: any = await api.get("/api/agent/sessions");
+      setSessions(data);
+      return data;
+    } catch (e) {
+      // non-ok previously returned [] silently; only surface non-ApiError (network) failures
+      if (!(e instanceof ApiError)) {
+        onNotify("Failed to fetch past sessions config list.", "error");
       }
-    } catch {
-      onNotify("Failed to fetch past sessions config list.", "error");
     } finally {
       setLoadingSessions(false);
     }
@@ -70,25 +71,24 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const selectSession = async (id: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/agent/sessions/${id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setActiveSessionId(data.id);
-        setProvider(data.providerId || "gemini");
-        setModel(data.modelId || "gemini-3.5-flash");
-        setMessages(data.messages.length > 0 ? data.messages : [
-          {
-            role: "assistant",
-            content: "Welcome back! How can I help you proceed with this ReAct session?"
-          }
-        ]);
-        setTraceSteps([]);
-        setPendingApproval(null);
-      } else {
+      const data: any = await api.get(`/api/agent/sessions/${id}`);
+      setActiveSessionId(data.id);
+      setProvider(data.providerId || "gemini");
+      setModel(data.modelId || "gemini-3.5-flash");
+      setMessages(data.messages.length > 0 ? data.messages : [
+        {
+          role: "assistant",
+          content: "Welcome back! How can I help you proceed with this ReAct session?"
+        }
+      ]);
+      setTraceSteps([]);
+      setPendingApproval(null);
+    } catch (e) {
+      if (e instanceof ApiError) {
         onNotify("Failed to load chosen agent session context.", "error");
+      } else {
+        onNotify("Error restoring active session state.", "error");
       }
-    } catch {
-      onNotify("Error restoring active session state.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -97,30 +97,26 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const startNewSession = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/agent/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "New ReAct Session",
-          providerId: provider,
-          modelId: model
-        })
+      const newSess: any = await api.post("/api/agent/sessions", {
+        title: "New ReAct Session",
+        providerId: provider,
+        modelId: model
       });
-      if (res.ok) {
-        const newSess = await res.json();
-        setActiveSessionId(newSess.id);
-        setMessages([
-          {
-            role: "assistant",
-            content: "Session initialized successfully. Provide a software goal, and we can inspect local code files, make edits, and verify changes."
-          }
-        ]);
-        setTraceSteps([]);
-        setPendingApproval(null);
-        await loadSessions();
+      setActiveSessionId(newSess.id);
+      setMessages([
+        {
+          role: "assistant",
+          content: "Session initialized successfully. Provide a software goal, and we can inspect local code files, make edits, and verify changes."
+        }
+      ]);
+      setTraceSteps([]);
+      setPendingApproval(null);
+      await loadSessions();
+    } catch (e) {
+      // non-ok previously fell through silently; only surface non-ApiError (network) failures
+      if (!(e instanceof ApiError)) {
+        onNotify("Could not create persistent agent session.", "error");
       }
-    } catch {
-      onNotify("Could not create persistent agent session.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -130,24 +126,25 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this conversation session?")) return;
     try {
-      const res = await fetch(`/api/agent/sessions/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        onNotify("Session deleted.", "success");
-        if (activeSessionId === id) {
-          setActiveSessionId(null);
-          setMessages([
-            {
-              role: "assistant",
-              content: "Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely."
-            }
-          ]);
-          setTraceSteps([]);
-          setPendingApproval(null);
-        }
-        await loadSessions();
+      await api.del(`/api/agent/sessions/${id}`);
+      onNotify("Session deleted.", "success");
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+        setMessages([
+          {
+            role: "assistant",
+            content: "Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely."
+          }
+        ]);
+        setTraceSteps([]);
+        setPendingApproval(null);
       }
-    } catch {
-      onNotify("Failed to delete the chosen session.", "error");
+      await loadSessions();
+    } catch (e) {
+      // non-ok previously fell through silently; only surface non-ApiError (network) failures
+      if (!(e instanceof ApiError)) {
+        onNotify("Failed to delete the chosen session.", "error");
+      }
     }
   };
 
@@ -176,21 +173,20 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const fetchModels = async (prov: string) => {
     setLoadingModels(true);
     try {
-      const res = await fetch(`/api/models/${prov}`);
-      if (res.ok) {
-        const list = await res.json();
-        setModelsList(list);
-        if (list.length > 0) {
-          // Filter out error placeholder elements for initial selection
-          const validModel = list.find((m: string) => !m.includes("not set") && !m.includes("API key"));
-          setModel(validModel || list[0]);
-        }
-      } else {
-        setModelsList([]);
+      const list: any = await api.get(`/api/models/${prov}`);
+      setModelsList(list);
+      if (list.length > 0) {
+        // Filter out error placeholder elements for initial selection
+        const validModel = list.find((m: string) => !m.includes("not set") && !m.includes("API key"));
+        setModel(validModel || list[0]);
       }
-    } catch {
-      onNotify("Failed to fetch live model list. Using static presets.", "error");
-      setModelsList(["gemini-3.5-flash", "gemini-3.1-pro-preview"]);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setModelsList([]);
+      } else {
+        onNotify("Failed to fetch live model list. Using static presets.", "error");
+        setModelsList(["gemini-3.5-flash", "gemini-3.1-pro-preview"]);
+      }
     } finally {
       setLoadingModels(false);
     }
@@ -236,22 +232,18 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     let currentSessionId = activeSessionId;
     if (!currentSessionId) {
       try {
-        const res = await fetch("/api/agent/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
-            providerId: provider,
-            modelId: model
-          })
+        const newSess: any = await api.post("/api/agent/sessions", {
+          title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
+          providerId: provider,
+          modelId: model
         });
-        if (res.ok) {
-          const newSess = await res.json();
-          currentSessionId = newSess.id;
-          setActiveSessionId(newSess.id);
-        }
+        currentSessionId = newSess.id;
+        setActiveSessionId(newSess.id);
       } catch (err) {
-        console.error("Auto session generation failed", err);
+        // non-ok previously fell through silently; only log non-ApiError (network) failures
+        if (!(err instanceof ApiError)) {
+          console.error("Auto session generation failed", err);
+        }
       }
     }
 
@@ -259,100 +251,89 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     setMessages(newMessages);
 
     try {
-      const response = await fetch("/api/agent/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let chunkBuffer = "";
+
+      await api.streamPost(
+        "/api/agent/chat",
+        {
           provider,
           model,
           messages: newMessages,
           autoApply,
           maxSteps: 10,
           sessionId: currentSessionId
-        })
-      });
+        },
+        {
+          onChunk: (chunk) => {
+            chunkBuffer += chunk;
+            const lines = chunkBuffer.split("\n\n");
+            // Keep the last partial line if not completed
+            chunkBuffer = lines.pop() || "";
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
+            for (const line of lines) {
+              if (!line.trim() || !line.startsWith("data: ")) continue;
+              try {
+                const parsed = JSON.parse(line.substring(6));
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder("utf-8");
-      if (!reader) throw new Error("Null events stream reader context.");
-
-      let chunkBuffer = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        chunkBuffer += decoder.decode(value, { stream: true });
-        const lines = chunkBuffer.split("\n\n");
-        // Keep the last partial line if not completed
-        chunkBuffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith("data: ")) continue;
-          try {
-            const parsed = JSON.parse(line.substring(6));
-            
-            if (parsed.type === "thought") {
-              setCurrentStepInfo(parsed.text);
-            } 
-            else if (parsed.type === "message") {
-              setMessages((prev) => {
-                // If the last message is already assistant, append or replace
-                const last = prev[prev.length - 1];
-                if (last && last.role === "assistant") {
-                  return [...prev.slice(0, -1), { role: "assistant", content: parsed.text }];
+                if (parsed.type === "thought") {
+                  setCurrentStepInfo(parsed.text);
                 }
-                return [...prev, { role: "assistant", content: parsed.text }];
-              });
-            } 
-            else if (parsed.type === "step") {
-              setTraceSteps((prev) => {
-                // De-duplicate trace steps by stepNum and tool
-                if (prev.some(s => s.stepNum === parsed.stepNum && s.tool === parsed.tool)) {
-                  return prev;
+                else if (parsed.type === "message") {
+                  setMessages((prev) => {
+                    // If the last message is already assistant, append or replace
+                    const last = prev[prev.length - 1];
+                    if (last && last.role === "assistant") {
+                      return [...prev.slice(0, -1), { role: "assistant", content: parsed.text }];
+                    }
+                    return [...prev, { role: "assistant", content: parsed.text }];
+                  });
                 }
-                return [...prev, {
-                  stepNum: parsed.stepNum,
-                  tool: parsed.tool,
-                  args: parsed.args,
-                  ok: parsed.ok,
-                  latency: parsed.latency,
-                  result: parsed.result,
-                  diff: parsed.diff,
-                  applied: parsed.applied
-                }];
-              });
+                else if (parsed.type === "step") {
+                  setTraceSteps((prev) => {
+                    // De-duplicate trace steps by stepNum and tool
+                    if (prev.some(s => s.stepNum === parsed.stepNum && s.tool === parsed.tool)) {
+                      return prev;
+                    }
+                    return [...prev, {
+                      stepNum: parsed.stepNum,
+                      tool: parsed.tool,
+                      args: parsed.args,
+                      ok: parsed.ok,
+                      latency: parsed.latency,
+                      result: parsed.result,
+                      diff: parsed.diff,
+                      applied: parsed.applied
+                    }];
+                  });
 
-              // If a write tool is called with auto-apply turned OFF, lock the visual approval wizard
-              if (parsed.tool === "write_file" && !parsed.applied && parsed.diff) {
-                setPendingApproval({
-                  path: parsed.args.path,
-                  content: parsed.args.content,
-                  diff: parsed.diff,
-                  stepIndex: parsed.stepNum
-                });
-                onNotify("Write operation halted - awaiting manual approval.", "info");
+                  // If a write tool is called with auto-apply turned OFF, lock the visual approval wizard
+                  if (parsed.tool === "write_file" && !parsed.applied && parsed.diff) {
+                    setPendingApproval({
+                      path: parsed.args.path,
+                      content: parsed.args.content,
+                      diff: parsed.diff,
+                      stepIndex: parsed.stepNum
+                    });
+                    onNotify("Write operation halted - awaiting manual approval.", "info");
+                  }
+                }
+                else if (parsed.type === "paused") {
+                  setCurrentStepInfo("Paused. Manual file authorization requested.");
+                }
+                else if (parsed.type === "done") {
+                  setCurrentStepInfo("Reasoning loop successfully finalized.");
+                }
+                else if (parsed.type === "error") {
+                  onNotify(`Agent Reasoner: ${parsed.message}`, "error");
+                  setCurrentStepInfo("Error context occurred.");
+                }
+              } catch (e) {
+                console.warn("Could not parse SSE message", e);
               }
-            } 
-            else if (parsed.type === "paused") {
-              setCurrentStepInfo("Paused. Manual file authorization requested.");
             }
-            else if (parsed.type === "done") {
-              setCurrentStepInfo("Reasoning loop successfully finalized.");
-            }
-            else if (parsed.type === "error") {
-              onNotify(`Agent Reasoner: ${parsed.message}`, "error");
-              setCurrentStepInfo("Error context occurred.");
-            }
-          } catch (e) {
-            console.warn("Could not parse SSE message", e);
-          }
-        }
-      }
+          },
+        },
+      );
     } catch (err: any) {
       onNotify(`Agent runtime failed: ${err.message}`, "error");
       setCurrentStepInfo("Agent pipeline disrupted.");
@@ -366,37 +347,32 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     if (!pendingApproval) return;
     setApproving(true);
     try {
-      const res = await fetch("/api/agent/approve-write", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: pendingApproval.path,
-          content: pendingApproval.content
-        })
+      await api.post("/api/agent/approve-write", {
+        path: pendingApproval.path,
+        content: pendingApproval.content
       });
 
-      if (res.ok) {
-        onNotify(`Successfully applied file updates to ${pendingApproval.path}`, "success");
-        // Update trace status in the list
-        setTraceSteps((prev) => 
-          prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file" 
-            ? { ...s, applied: true, result: "File successfully written following manual validation." }
-            : s
-          )
-        );
-        setPendingApproval(null);
-        
-        // Let assistant know user approved
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Approved write for: \`${pendingApproval.path}\`. Proving files update sequence completed.` }
-        ]);
-      } else {
-        const body = await res.json();
-        throw new Error(body.error || "Failed write command.");
-      }
+      onNotify(`Successfully applied file updates to ${pendingApproval.path}`, "success");
+      // Update trace status in the list
+      setTraceSteps((prev) =>
+        prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file"
+          ? { ...s, applied: true, result: "File successfully written following manual validation." }
+          : s
+        )
+      );
+      setPendingApproval(null);
+
+      // Let assistant know user approved
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Approved write for: \`${pendingApproval.path}\`. Proving files update sequence completed.` }
+      ]);
     } catch (err: any) {
-      onNotify(`Rejected approval write: ${err.message}`, "error");
+      // non-ok responses previously parsed the JSON body for an error message
+      const msg = err instanceof ApiError
+        ? ((err.body as any)?.error || "Failed write command.")
+        : err.message;
+      onNotify(`Rejected approval write: ${msg}`, "error");
     } finally {
       setApproving(false);
     }

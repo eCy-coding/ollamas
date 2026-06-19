@@ -36,6 +36,12 @@ class EventSourceStub {
 }
 globalThis.EventSource = globalThis.EventSource || (EventSourceStub as unknown as typeof EventSource);
 
+// jsdom lacks sendBeacon; ApiClient.logClientEvent prefers it for observability.
+// Without this stub it falls back to fetch() and pollutes per-test fetch spies.
+if (typeof navigator !== 'undefined' && !navigator.sendBeacon) {
+  navigator.sendBeacon = (() => true) as unknown as typeof navigator.sendBeacon;
+}
+
 // Default fetch: empty-ok JSON. Per-test mocks override via vi.spyOn / helpers.mockFetch.
 // Prevents unmocked mount fetches from rejecting and crashing render.
 if (!globalThis.fetch || !('mockReturnValue' in (globalThis.fetch as object))) {

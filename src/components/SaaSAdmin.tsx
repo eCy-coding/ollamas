@@ -35,6 +35,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const [whUrl, setWhUrl] = useState("");
   const [whEvents, setWhEvents] = useState("key.created,usage.quota_exceeded");
 
+  // SaaSAdmin keeps a local token-scoped wrapper; consolidation tracked for a later vF.
   const hdr = () => ({ "Content-Type": "application/json", "x-admin-token": adminToken });
   const thdr = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${tenantKey}` });
   const tapi = async (p: string, init?: RequestInit) => {

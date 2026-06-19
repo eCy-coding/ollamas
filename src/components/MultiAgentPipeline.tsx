@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Play, ToggleLeft, ToggleRight, Sparkles, AlertCircle, CheckCircle2, RotateCw, Loader2, ArrowRight } from "lucide-react";
+import { api } from "../lib/apiClient";
 
 interface PipelineProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -84,15 +85,12 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
   const fetchModels = async (prov: string) => {
     if (modelsList[prov]) return;
     try {
-      const res = await fetch(`/api/models/${prov}`);
-      if (res.ok) {
-        const list = await res.json();
-        setModelsList((prev) => ({ ...prev, [prov]: list }));
-        if (list.length > 0) {
-          if (prov === architectProv) setArchitectModel(list[0]);
-          if (prov === coderProv) setCoderModel(list[0]);
-          if (prov === reviewerProv) setReviewerModel(list[0]);
-        }
+      const list: any = await api.get(`/api/models/${prov}`);
+      setModelsList((prev) => ({ ...prev, [prov]: list }));
+      if (list.length > 0) {
+        if (prov === architectProv) setArchitectModel(list[0]);
+        if (prov === coderProv) setCoderModel(list[0]);
+        if (prov === reviewerProv) setReviewerModel(list[0]);
       }
     } catch (e) {
       console.error(`Failed to load models list for provider: ${prov}`);
@@ -130,11 +128,11 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       if (abortControllerRef.current) abortControllerRef.current.abort();
       abortControllerRef.current = new AbortController();
 
-      const res = await fetch("/api/pipeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: abortControllerRef.current.signal,
-        body: JSON.stringify({
+      let buffer = "";
+
+      await api.streamPost(
+        "/api/pipeline",
+        {
           prompt,
           architectProvider: architectProv,
           architectModel,
@@ -145,67 +143,56 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           enableSelfImprove,
           maxIterations,
           writePermissions: writeFiles,
-        }),
-      });
+        },
+        {
+          signal: abortControllerRef.current.signal,
+          onChunk: (chunk) => {
+            buffer += chunk;
+            const lines = buffer.split("\n\n");
+            buffer = lines.pop() || "";
 
-      if (!res.body) {
-        onNotify("Streaming pipeline response is not supported by target server.", "error");
-        setRunning(false);
-        return;
-      }
+            for (const line of lines) {
+              if (!line.trim() || !line.startsWith("data:")) continue;
+              try {
+                const data = JSON.parse(line.substring(5).trim());
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+                if (data.stage) {
+                  setStages((prev) => ({
+                    ...prev,
+                    [data.stage]: {
+                      status: data.status,
+                      text: data.text || prev[data.stage]?.text || "",
+                      tokensPerSec: data.tokensPerSec !== undefined ? data.tokensPerSec : prev[data.stage]?.tokensPerSec,
+                      elapsed: data.elapsed !== undefined ? data.elapsed : prev[data.stage]?.elapsed,
+                      fallback: data.fallback !== undefined ? data.fallback : prev[data.stage]?.fallback,
+                    },
+                  }));
+                }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith("data:")) continue;
-          try {
-            const data = JSON.parse(line.substring(5).trim());
-            
-            if (data.stage) {
-              setStages((prev) => ({
-                ...prev,
-                [data.stage]: {
-                  status: data.status,
-                  text: data.text || prev[data.stage]?.text || "",
-                  tokensPerSec: data.tokensPerSec !== undefined ? data.tokensPerSec : prev[data.stage]?.tokensPerSec,
-                  elapsed: data.elapsed !== undefined ? data.elapsed : prev[data.stage]?.elapsed,
-                  fallback: data.fallback !== undefined ? data.fallback : prev[data.stage]?.fallback,
-                },
-              }));
-            }
-
-            if (data.done) {
-              if (data.writeCount !== undefined) {
-                setWriteCount(data.writeCount);
-              }
-            }
-
-            if (data.error) {
-              setStages((prev) => {
-                const newStages = { ...prev };
-                for (const key of Object.keys(newStages)) {
-                  if (newStages[key].status === "running") {
-                    newStages[key] = { ...newStages[key], status: "fail", text: data.error };
+                if (data.done) {
+                  if (data.writeCount !== undefined) {
+                    setWriteCount(data.writeCount);
                   }
                 }
-                return newStages;
-              });
-              onNotify(`Pipeline encountered error: ${data.error}`, "error");
-              break;
+
+                if (data.error) {
+                  setStages((prev) => {
+                    const newStages = { ...prev };
+                    for (const key of Object.keys(newStages)) {
+                      if (newStages[key].status === "running") {
+                        newStages[key] = { ...newStages[key], status: "fail", text: data.error };
+                      }
+                    }
+                    return newStages;
+                  });
+                  onNotify(`Pipeline encountered error: ${data.error}`, "error");
+                  break;
+                }
+              } catch (e) {}
             }
-          } catch (e) {}
-        }
-      }
+          },
+        },
+      );
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
         onNotify("Pipeline sequence finished successfully!", "success");
       }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Sparkles, Loader2, CheckCircle2, ShieldAlert, AlertTriangle, Play } from "lucide-react";
 import { SelfTestReport, TestGateReport } from "../types";
+import { api } from "../lib/apiClient";
 
 export const SelfTestGates: React.FC = () => {
   const [report, setReport] = useState<SelfTestReport | null>(null);
@@ -9,11 +10,8 @@ export const SelfTestGates: React.FC = () => {
   const runTests = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/selftest");
-      if (res.ok) {
-        const data = await res.json();
-        setReport(data);
-      }
+      const data = await api.get("/api/selftest");
+      setReport(data as SelfTestReport);
     } catch (e) {
       console.error("Self test routing failed.");
     } finally {

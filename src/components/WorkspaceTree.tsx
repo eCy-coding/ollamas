@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Folder, File, FilePlus, RefreshCw, Save, FolderOpen, Trash2, Edit } from "lucide-react";
 import { FileItem } from "../types";
+import { api, ApiError } from "../lib/apiClient";
 
 interface WorkspaceTreeProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -21,17 +22,14 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
   const fetchTree = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/workspace/tree");
-      if (res.ok) {
-        const data = await res.json();
-        setTree(data.tree || []);
-        if (data.mode) {
-          setTreeMode(data.mode);
-        }
-        if (data.workspaceRoot && data.workspaceRoot !== activePath) {
-          onPathChange(data.workspaceRoot);
-          setPathInput(data.workspaceRoot);
-        }
+      const data: any = await api.get("/api/workspace/tree");
+      setTree(data.tree || []);
+      if (data.mode) {
+        setTreeMode(data.mode);
+      }
+      if (data.workspaceRoot && data.workspaceRoot !== activePath) {
+        onPathChange(data.workspaceRoot);
+        setPathInput(data.workspaceRoot);
       }
     } catch (e) {
       console.error("Failed to load workspace files tree.");
@@ -47,73 +45,61 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
   const handleSelectWorkspace = async () => {
     if (!pathInput.trim()) return;
     try {
-      const res = await fetch("/api/workspace/select", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: pathInput.trim() }),
-      });
-      if (res.ok) {
-        onNotify(`Workspace path updated: ${pathInput}`, "success");
-        onPathChange(pathInput.trim());
-        setEditingFile(null);
-      } else {
-        onNotify("Failed to verify or write workspace path.", "error");
-      }
+      await api.post("/api/workspace/select", { path: pathInput.trim() });
+      onNotify(`Workspace path updated: ${pathInput}`, "success");
+      onPathChange(pathInput.trim());
+      setEditingFile(null);
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        onNotify("Failed to verify or write workspace path.", "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     }
   };
 
   const handleOpenFile = async (relativePath: string) => {
     try {
-      const res = await fetch(`/api/workspace/file?relativePath=${encodeURIComponent(relativePath)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEditingFile(relativePath);
-        setEditorContent(data.content);
-        onNotify(`Loaded: ${relativePath}`, "info");
-      } else {
-        onNotify(`Failed to read file contents: ${relativePath}`, "error");
-      }
+      const data: any = await api.get(`/api/workspace/file?relativePath=${encodeURIComponent(relativePath)}`);
+      setEditingFile(relativePath);
+      setEditorContent(data.content);
+      onNotify(`Loaded: ${relativePath}`, "info");
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        onNotify(`Failed to read file contents: ${relativePath}`, "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     }
   };
 
   const handleSaveFile = async () => {
     if (!editingFile) return;
     try {
-      const res = await fetch("/api/workspace/file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relativePath: editingFile, content: editorContent }),
-      });
-      if (res.ok) {
-        onNotify(`Saved file successfully: ${editingFile}`, "success");
-        fetchTree();
-      } else {
-        onNotify(`Fail to write file: ${editingFile}`, "error");
-      }
+      await api.post("/api/workspace/file", { relativePath: editingFile, content: editorContent });
+      onNotify(`Saved file successfully: ${editingFile}`, "success");
+      fetchTree();
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        onNotify(`Fail to write file: ${editingFile}`, "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     }
   };
 
   const handleCreateFile = async () => {
     if (!newFileName.trim()) return;
     try {
-      const res = await fetch("/api/workspace/file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relativePath: newFileName.trim(), content: "# Fresh Module" }),
-      });
-      if (res.ok) {
-        onNotify(`Created fine: ${newFileName}`, "success");
-        setNewFileName("");
-        fetchTree();
-      }
+      await api.post("/api/workspace/file", { relativePath: newFileName.trim(), content: "# Fresh Module" });
+      onNotify(`Created fine: ${newFileName}`, "success");
+      setNewFileName("");
+      fetchTree();
     } catch (e: any) {
-      onNotify(e.message, "error");
+      // non-ok previously fell through silently; only surface non-ApiError (network) failures
+      if (!(e instanceof ApiError)) {
+        onNotify(e.message, "error");
+      }
     }
   };
 
@@ -121,18 +107,17 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
     e.stopPropagation();
     if (!confirm(`Are you sure you want to delete ${relativePath}?`)) return;
     try {
-      const res = await fetch(`/api/workspace/file?relativePath=${encodeURIComponent(relativePath)}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        onNotify(`Deleted: ${relativePath}`, "info");
-        if (editingFile === relativePath) {
-          setEditingFile(null);
-        }
-        fetchTree();
+      await api.del(`/api/workspace/file?relativePath=${encodeURIComponent(relativePath)}`);
+      onNotify(`Deleted: ${relativePath}`, "info");
+      if (editingFile === relativePath) {
+        setEditingFile(null);
       }
+      fetchTree();
     } catch (err: any) {
-      onNotify(err.message, "error");
+      // non-ok previously fell through silently; only surface non-ApiError (network) failures
+      if (!(err instanceof ApiError)) {
+        onNotify(err.message, "error");
+      }
     }
   };
 

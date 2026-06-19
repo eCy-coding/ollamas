@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Terminal, ShieldCheck, Cpu } from 'lucide-react';
+import { api } from '../lib/apiClient';
 
 interface Props {
     onNotify: (msg: string, type: 'info' | 'error' | 'success') => void;
@@ -21,8 +22,7 @@ export const ClusterManager: React.FC<Props> = ({ onNotify }) => {
     };
 
     useEffect(() => {
-        fetch('/api/cluster/capabilities')
-            .then(res => res.json())
+        api.get('/api/cluster/capabilities')
             .then(data => {
                 console.log("Detected capabilities:", data);
             })

@@ -19,6 +19,7 @@ export function GoogleDriveBrowser() {
     setLoading(true);
     setError(null);
     try {
+      // external Google API — not ollamas choke-point (FRONTEND_AGENTS.md §1)
       const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=50&fields=files(id,name,mimeType)&orderBy=modifiedTime desc", {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -45,6 +46,7 @@ export function GoogleDriveBrowser() {
     if (!confirmed) return;
 
     try {
+      // external Google API — not ollamas choke-point (FRONTEND_AGENTS.md §1)
       const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }

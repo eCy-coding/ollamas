@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Download, Upload, CloudLightning, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
+import { api, ApiError } from "../lib/apiClient";
 
 interface BackupProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -19,11 +20,8 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
   const loadConfig = async () => {
     try {
-      const res = await fetch("/api/backup/config");
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-      }
+      const data: any = await api.get("/api/backup/config");
+      setConfig(data);
     } catch (e) {
       console.error("Failed to load backup configuration.");
     }
@@ -36,19 +34,15 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
   const handleSaveConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/backup/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-      if (res.ok) {
-        onNotify("Backup cloud properties updated successfully!", "success");
-        loadConfig();
-      } else {
-        onNotify("Failed to update cloud backups config.", "error");
-      }
+      await api.post("/api/backup/config", config);
+      onNotify("Backup cloud properties updated successfully!", "success");
+      loadConfig();
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        onNotify("Failed to update cloud backups config.", "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,9 +52,8 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
     setLoading(true);
     onNotify("Compressing database & executing AES-256 GCM client-side encryption...", "info");
     try {
-      const res = await fetch("/api/backup/trigger", { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data: any = await api.post("/api/backup/trigger");
+      if (data.success) {
         onNotify(`Full encrypted database uploaded: ${data.size} bytes synced.`, "success");
         if (data.url && !data.url.startsWith("local-dryrun")) {
           onNotify(`Remote endpoint response: ${data.url}`, "info");
@@ -69,7 +62,13 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
         onNotify(`Backup upload failed: ${data.error || "Server error"}`, "error");
       }
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        // non-ok responses previously parsed the JSON body for an error message
+        const body: any = e.body;
+        onNotify(`Backup upload failed: ${(body && body.error) || "Server error"}`, "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -92,19 +91,15 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
       setLoading(true);
       try {
-        const res = await fetch("/api/backup/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hexBlob: binaryHex }),
-        });
-        if (res.ok) {
-          onNotify("Database configuration successfully decrypted and restored! Sessions updated.", "success");
-          window.location.reload(); // Refresh to reload keys/masks
-        } else {
-          onNotify("Failed to restore: corrupt payload or master key mismatch.", "error");
-        }
+        await api.post("/api/backup/restore", { hexBlob: binaryHex });
+        onNotify("Database configuration successfully decrypted and restored! Sessions updated.", "success");
+        window.location.reload(); // Refresh to reload keys/masks
       } catch (err: any) {
-        onNotify(`Restore fail: ${err.message}`, "error");
+        if (err instanceof ApiError) {
+          onNotify("Failed to restore: corrupt payload or master key mismatch.", "error");
+        } else {
+          onNotify(`Restore fail: ${err.message}`, "error");
+        }
       } finally {
         setLoading(false);
       }

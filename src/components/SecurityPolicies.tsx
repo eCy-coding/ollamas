@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ShieldCheck, RefreshCw, ToggleLeft, ToggleRight, Loader2, ListFilter } from "lucide-react";
 import { SecurityEvent } from "../types";
+import { api, ApiError } from "../lib/apiClient";
 
 interface PoliciesProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -21,10 +22,7 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/security/log");
-      if (res.ok) {
-        setLogs(await res.json());
-      }
+      setLogs((await api.get("/api/security/log")) as SecurityEvent[]);
     } catch (e) {
       console.error("Failed to fetch security logs.");
     } finally {
@@ -45,18 +43,15 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
     };
 
     try {
-      const res = await fetch("/api/security/permissions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      if (res.ok) {
-        onNotify("Security permissions adjusted successfully!", "success");
-        onPermissionsChange();
-        fetchLogs();
-      }
+      await api.post("/api/security/permissions", updated);
+      onNotify("Security permissions adjusted successfully!", "success");
+      onPermissionsChange();
+      fetchLogs();
     } catch (e: any) {
-      onNotify(e.message, "error");
+      // non-ok previously fell through silently; only surface non-ApiError (network) failures
+      if (!(e instanceof ApiError)) {
+        onNotify(e.message, "error");
+      }
     }
   };
 

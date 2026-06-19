@@ -1,0 +1,12 @@
+[
+  {
+    "name": "cockpit JS (gzip, all chunks)",
+    "path": "dist/assets/*.js",
+    "limit": "140 kB"
+  },
+  {
+    "name": "cockpit CSS (gzip)",
+    "path": "dist/assets/*.css",
+    "limit": "12 kB"
+  }
+]

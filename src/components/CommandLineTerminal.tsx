@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Terminal, Play, ShieldAlert, AlertOctagon, HelpCircle } from "lucide-react";
+import { api } from "../lib/apiClient";
 
 interface TerminalProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -24,13 +25,8 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
     setLogs((prev) => [...prev, `$ ${cmdStr}`]);
 
     try {
-      const res = await fetch("/api/terminal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: cmdStr }),
-      });
-      const data = await res.json();
-      
+      const data: any = await api.post("/api/terminal", { command: cmdStr });
+
       if (data.stderr) {
         setLogs((prev) => [...prev, `[FAIL] (exit: ${data.exitCode || 1}): ${data.stderr}`]);
         onNotify(`Console alert: ${data.stderr.substring(0, 50)}`, "error");

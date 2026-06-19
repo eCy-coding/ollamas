@@ -14,6 +14,7 @@ import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
 import { VirtualController } from "./components/VirtualController";
 import { SaaSAdmin } from "./components/SaaSAdmin";
+import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
 import { 
   Cpu, Key, Sparkles, FolderOpen, Terminal, 
@@ -39,11 +40,8 @@ export default function App() {
     // Skip if page is hidden to conserve Mac energy (Performance Budget §6), unless forced initially
     if (document.hidden && !force) return;
     try {
-      const res = await fetch("/api/health");
-      if (res.ok) {
-        const data = await res.json();
-        setTelemetry(data);
-      }
+      const data = await api.get("/api/health");
+      setTelemetry(data as unknown as HealthTelemetry);
     } catch (e) {
       console.warn("Telemetry endpoint is sleeping or offline.");
     }
