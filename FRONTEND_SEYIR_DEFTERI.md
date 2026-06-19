@@ -111,7 +111,7 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
   - **Error boundary** (`react-error-boundary` MIT adopt): `ErrorFallback.tsx` (role=alert+reset), `main.tsx` `<App/>` sarıldı, `onError→logClientEvent('react_error',{stack})` + `window.error`/`unhandledrejection`→logbook (gözlem boşluğu kapandı → vF10).
   - **Skeleton** (`Skeleton.tsx` zero-dep CSS shimmer, token, aria-hidden): `TelemetryCockpit` null→skeleton kart (aria-busy). `index.css` `.ollamas-skeleton` + **`@media (prefers-reduced-motion: reduce)`** (WCAG 2.3.3).
 - **Niçin:** flaky ağ→reconnect; tab değişimi→temiz abort (leak yok); crash→izole fallback+telemetri; anlamlı loading; motion-hassas a11y.
-- **Kanıt:** `npm run lint` 0 · `vitest` **111 pass/1 skip** · React e2e **10 pass** · web e2e **5 pass** · `vite build` OK · size cockpit **109.18KB/140** (react-error-boundary +1.1KB) / embed 2.51KB. Commit: `<vF8 commit>`.
+- **Kanıt:** `npm run lint` 0 · `vitest` **111 pass/1 skip** · React e2e **10 pass** · web e2e **5 pass** · `vite build` OK · size cockpit **109.18KB/140** (react-error-boundary +1.1KB) / embed 2.51KB. Commit: `010db54`.
 - **Sonraki (önceden hesaplandı):** **vF9 i18n + Theming** — `@lingui/core` (2kB MIT) TR/EN ICU + tema switch (light token seti, vF5 üzerine) + tercih kalıcılığı (localStorage). İlk adım: `[data-theme]` light/dark token override + `@lingui/core` setup + `<ThemeToggle>` + TR/EN ilk string extraction.
 
 ---
