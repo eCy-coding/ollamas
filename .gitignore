@@ -8,3 +8,6 @@ coverage/
 !.env.example
 .ephemeral-data/
 **/.master_key
+test-results/
+playwright-report/
+.playwright/

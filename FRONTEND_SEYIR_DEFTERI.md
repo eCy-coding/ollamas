@@ -28,7 +28,22 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
   - Testler: `App.test.tsx` (13 tab nav + tab-switch etkileşim), `TelemetryCockpit` (PURE null+data), `VirtualController` (PURE + buton→POST assert), `GoogleDriveBrowser` (useAuth mock), `components.smoke.test.tsx` (9 network component `it.each` anchor + crash-yok).
 - **Niçin:** frontend regresyonu artık sessizce kaçmaz; §4 kapısı tsc + UI test içerir.
 - **Kanıt:** `npx tsc --noEmit` OK · `npx vitest run` → **108 pass / 1 skip / 0 fail** (node+jsdom+scripts); `--project jsdom` → 17/17; `--project node` → 73/1 (backend bozulmadı). Backend kodu git-diff'te YOK (selective commit).
-- **Sonraki (önceden hesaplandı):** **vF2 E2E Harness** — Playwright kurulumu (`@playwright/test`), çalışan app'e (port 3000) karşı kritik akış: agent-chat SSE + workspace tree + SaaS admin. İlk adım: `playwright.config.ts` + `tests/e2e/` + `webServer` ile `npm run dev` boot + smoke (sayfa açılır, Cockpit tab görünür). CI'da ayrı UI/e2e job (matrix redundancy'yi çöz).
+- **Sonraki (önceden hesaplandı):** vF2 E2E Harness.
+
+---
+
+## Faz vF2 — E2E Harness (Playwright) (DONE)
+- **Ne:** Playwright e2e harness; çalışan app'e (port 3100) karşı **4 spec yeşil**: smoke + workspace + saas + agent-chat (deterministik/offline). Lane-owned CI job.
+- **Nasıl:**
+  - devDep `@playwright/test@1.61` + chromium-1228 + headless-shell.
+  - `playwright.config.ts`: `testDir:tests/e2e`, `testMatch:*.spec.ts`, `webServer:'PORT=3100 npm run dev'` (reuseExistingServer !CI), `trace:on-first-retry`, `screenshot:only-on-failure`, chromium projesi.
+  - `tests/e2e/`: `smoke` (4 tab nav görünür), `workspace` (Files Explorer→"Target Directory Explorer"), `saas` (SaaS Gateway→"SaaS Gateway Control"), `agent-chat` (`page.route` ile /api/models + /api/agent/sessions [GET array / POST obj] + /api/agent/chat streamed `data:{json}\n\n` stub → greeting → EXECUTE → mock yanıt DOM'da). LLM/ollama bağımlılığı YOK.
+  - `.github/workflows/e2e.yml` (YENİ, shared ci.yml'e dokunmadan): node24 + `playwright install --with-deps` + `playwright test` + report artifact.
+  - `.gitignore` += test-results/playwright-report. `package.json` += `test:e2e`.
+- **Niçin:** gerçek tarayıcıda boot + kritik akış doğrulaması; unit/jsdom'un göremediği entegrasyon.
+- **Kanıt:** `npx playwright test` → 4 passed (3.7s) · `npx vitest run` → 90 pass/1 skip (vF1 intact, e2e specleri vitest'e sızmadı) · `npx tsc --noEmit` OK.
+- **⚠️ Ortam pivotu:** Ana dizinde sync daemon hijack (branch flip + working-tree revert) → frontend işi **izole worktree** `~/Desktop/ollamas-frontend-wt` (branch `feat/frontend-vf2`, vF1/ad07cbe tabanlı) taşındı. Daemon worktree'ye dokunmuyor.
+- **Sonraki (önceden hesaplandı):** **vF3 Perf Baseline & Budget** — Lighthouse CI + bundle analyzer; bütçe (JS<300KB hedef, baz 477KB → code-split ağır component). İlk adım: `rollup-plugin-visualizer` veya `vite build --metafile` ile bundle haritası + `@lhci/cli` config + MacBook benchmark scripti. İzole worktree'de devam.
 
 ---
 
@@ -42,6 +57,9 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-001 | 2026-06-19 | Smoke test crash: `logs.filter / .map is not a function` | Mount-fetch mock'u status-ok ama **yanlış şekil** (`{}`) döndü; component array bekliyordu | Endpoint başına array route (`/api/security/log:[]`, `/api/models/:[]`) | Fetch-on-mount component'i mock'larken yanıtın **şeklini** (array vs object) ver, sadece 200-ok yetmez |
 | FE-002 | 2026-06-19 | Anchor metni bulunamadı (ClusterManager/ReactAgentTab) | Başlık bir **gate/koşullu render** arkasındaydı (consent ekranı / conditional `<h3>`) | Anchor'ı gerçek default render state'inden seç (consent text, `Select Agent Provider`) | Assert öncesi component'in early-return/guard'larını oku; ilk görünen ekranın metnini hedefle |
 | FE-003 | 2026-06-19 | Effect throw: `scrollIntoView is not a function` | jsdom layout API'lerini implemente etmiyor | `tests/ui/setup.ts`'e `Element.prototype.scrollIntoView` stub | Browser-only API'leri (scrollIntoView/matchMedia/ResizeObserver/EventSource) setup'ta proaktif stub'la |
+| FE-004 | 2026-06-19 | Sync daemon ana dizinde branch flip + package.json/.gitignore revert | Ana repo dizini eşzamanlı daemon + diğer lane'ler tarafından sürülüyor (E-003) | Frontend işi izole worktree `~/Desktop/ollamas-frontend-wt`'ye taşındı | Multi-lane repo'da kod fazı = İZOLE WORKTREE şart (CLI/scripts lane gibi); ana dizinde çalışma |
+| FE-005 | 2026-06-19 | `playwright test` → browser executable yok / `__dirlock` | Başka proje (ecypro wt) Wed03AM'den TAKILI `playwright install` lock'u tutuyordu; ayrıca PW 1.61 chromium-1228 ister (cache 1217) | Hung PID kill + stale `__dirlock` rm + `playwright install chromium` | Browser install takılırsa `ps` ile hung install ara + stale `~/Library/Caches/ms-playwright/__dirlock` temizle |
+| FE-006 | 2026-06-19 | agent-chat: input `disabled`, fill timeout | GET `/api/agent/sessions` stub'u obje döndü, component array bekliyordu → `isLoading` takıldı → input disabled | `page.route` handler'ı `request().method()` ile GET→`[]` / POST→`{id}` ayır | Route-stub'ı HTTP method'a göre şekillendir (aynı path GET liste / POST tekil obje) |
 
 ### Devralınan gotcha (eklenen)
 - **mcp-gateway.e2e flaky:** self-boot eden server e2e cold-run'da `ECONNRESET` ile 12 fail verdi, re-run'da 73/1 yeşil. Benim değişikliğim değil — timing/port. UI testleri ayrı projede izole, etkilenmez. Backend lane'e backlog: e2e boot retry.
