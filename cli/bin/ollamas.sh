@@ -13,8 +13,26 @@ set -eu
 GATEWAY="${OLLAMAS_GATEWAY:-http://localhost:3000}"
 MODEL="${OLLAMAS_MODEL:-qwen3:8b}"
 PROVIDER="${OLLAMAS_PROVIDER:-ollama-local}"
-AUTH=""
-[ -n "${OLLAMAS_API_KEY:-}" ] && AUTH="-H Authorization:Bearer ${OLLAMAS_API_KEY}"
+
+# curl with a conditional Bearer header (E-005): the token must be passed as a
+# real argument, never via an unquoted var — `-H "Authorization: Bearer $KEY"`
+# stored in a plain var word-splits on the space in "Bearer KEY" and truncates
+# the header to "Bearer". Prepending args with set/inline call keeps it intact.
+ocurl() {
+  if [ -n "${OLLAMAS_API_KEY:-}" ]; then
+    curl -fsS -H "Authorization: Bearer ${OLLAMAS_API_KEY}" "$@"
+  else
+    curl -fsS "$@"
+  fi
+}
+# ocurl + conditional admin header, for the saas reads only.
+ocurl_admin() {
+  if [ -n "${OLLAMAS_SAAS_ADMIN:-}" ]; then
+    ocurl -H "X-Admin-Token: ${OLLAMAS_SAAS_ADMIN}" "$@"
+  else
+    ocurl "$@"
+  fi
+}
 
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift || true
@@ -24,8 +42,7 @@ esc() { printf '%s' "$1" | awk 'BEGIN{ORS=""} {gsub(/\\/,"\\\\");gsub(/"/,"\\\""
 
 case "$cmd" in
   doctor)
-    # shellcheck disable=SC2086
-    curl -fsS $AUTH "$GATEWAY/api/health" || { echo "gateway down: $GATEWAY" >&2; exit 1; }
+    ocurl "$GATEWAY/api/health" || { echo "gateway down: $GATEWAY" >&2; exit 1; }
     echo
     ;;
   chat)
@@ -33,8 +50,7 @@ case "$cmd" in
     [ -n "$prompt" ] || { echo "usage: ollamas.sh chat \"prompt\"" >&2; exit 2; }
     body=$(printf '{"provider":"%s","model":"%s","stream":false,"messages":[{"role":"user","content":"%s"}]}' \
       "$PROVIDER" "$MODEL" "$(esc "$prompt")")
-    # shellcheck disable=SC2086
-    curl -fsS $AUTH -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/generate"
+    ocurl -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/generate"
     echo
     ;;
   agent)
@@ -43,18 +59,39 @@ case "$cmd" in
     # auto-apply on the bridge path (no TTY for approval); raw SSE -> stdout.
     body=$(printf '{"provider":"%s","model":"%s","autoApply":true,"messages":[{"role":"user","content":"%s"}]}' \
       "$PROVIDER" "$MODEL" "$(esc "$task")")
-    # shellcheck disable=SC2086
-    curl -fsS -N $AUTH -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/agent/chat"
+    ocurl -N -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/agent/chat"
     echo
     ;;
   mcp)
-    # MCP over the gateway choke-point (/mcp, JSON-RPC 2.0, Streamable HTTP).
-    #   ollamas.sh mcp tools                 list tool names
-    #   ollamas.sh mcp call <tool> '{json}'  call a tool with JSON args
-    # Response is SSE-framed (`data: {…}`); strip the prefix to raw JSON.
+    # MCP over the gateway choke-point (/mcp, JSON-RPC 2.0, Streamable HTTP) for
+    # tools/call; upstream registry is plain REST (/api/saas/upstreams, Bearer).
+    #   ollamas.sh mcp tools                       list tool names
+    #   ollamas.sh mcp call <tool> '{json}'        call a tool with JSON args
+    #   ollamas.sh mcp upstreams                   list registered upstream servers
+    #   ollamas.sh mcp add <name> <http|stdio> <url> [allowCsv]
+    #   ollamas.sh mcp rm <id>
+    # tools/call response is SSE-framed (`data: {…}`); strip the prefix to raw JSON.
     sub="${1:-tools}"
     [ $# -gt 0 ] && shift || true
     case "$sub" in
+      upstreams)
+        ocurl "$GATEWAY/api/saas/upstreams" || { echo "upstreams request failed" >&2; exit 1; }
+        echo; exit 0 ;;
+      add)
+        name="${1:-}"; transport="${2:-}"; url="${3:-}"; allow="${4:-}"
+        [ -n "$name" ] && [ -n "$transport" ] || { echo "usage: ollamas.sh mcp add <name> <http|stdio> <url> [allowCsv]" >&2; exit 2; }
+        allowJson="null"
+        [ -n "$allow" ] && allowJson=$(printf '%s' "$allow" | awk -F, '{o="[";for(i=1;i<=NF;i++)o=o (i>1?",":"") "\"" $i "\"";print o"]"}')
+        body=$(printf '{"name":"%s","transport":"%s","url":"%s","allowedTools":%s}' \
+          "$(esc "$name")" "$(esc "$transport")" "$(esc "$url")" "$allowJson")
+        ocurl -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/saas/upstreams" \
+          || { echo "add request failed" >&2; exit 1; }
+        echo; exit 0 ;;
+      rm)
+        id="${1:-}"; [ -n "$id" ] || { echo "usage: ollamas.sh mcp rm <id>" >&2; exit 2; }
+        ocurl -X DELETE "$GATEWAY/api/saas/upstreams/$id" \
+          || { echo "rm request failed" >&2; exit 1; }
+        echo; exit 0 ;;
       tools)
         rpc='{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
         ;;
@@ -63,18 +100,33 @@ case "$cmd" in
         args="${2:-{}}"
         rpc=$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":%s}}' "$(esc "$tool")" "$args")
         ;;
-      *) echo "ollamas.sh mcp: unknown sub '$sub' (tools|call)" >&2; exit 2 ;;
+      *) echo "ollamas.sh mcp: unknown sub '$sub' (tools|call|upstreams|add|rm)" >&2; exit 2 ;;
     esac
-    # shellcheck disable=SC2086
-    curl -fsS $AUTH -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+    ocurl -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
       -d "$rpc" "$GATEWAY/mcp" | sed 's/^data: //;/^event:/d;/^$/d'
     echo
     ;;
+  saas)
+    # SaaS admin reads over the gateway (X-Admin-Token via OLLAMAS_SAAS_ADMIN).
+    # Read-only on the bridge — provisioning/billing stays in the Node CLI.
+    #   ollamas.sh saas plans | tenants | usage [tenantId]
+    sub="${1:-plans}"
+    [ $# -gt 0 ] && shift || true
+    case "$sub" in
+      plans)   path="/api/saas/plans" ;;
+      tenants) path="/api/saas/tenants" ;;
+      usage)   tid="${1:-}"; path="/api/saas/usage${tid:+?tenantId=$tid}" ;;
+      *) echo "ollamas.sh saas: unknown sub '$sub' (plans|tenants|usage)" >&2; exit 2 ;;
+    esac
+    ocurl_admin "$GATEWAY$path" || { echo "saas request failed (admin token? OLLAMAS_SAAS_ADMIN)" >&2; exit 1; }
+    echo
+    ;;
   help|--help|-h)
-    echo "ollamas.sh <doctor|chat|agent|mcp> — POSIX curl bridge to $GATEWAY"
+    echo "ollamas.sh <doctor|chat|agent|mcp|saas> — POSIX curl bridge to $GATEWAY"
+    echo "  mcp  tools|call|upstreams|add|rm     saas  plans|tenants|usage"
     ;;
   *)
-    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|agent|mcp|help)" >&2
+    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|agent|mcp|saas|help)" >&2
     exit 2
     ;;
 esac
