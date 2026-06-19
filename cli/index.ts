@@ -12,6 +12,7 @@ import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
 import { complete, completionScript } from "./lib/completion";
+import { runUpdate } from "./commands/update";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
 const VERSION = "9.0.0";
@@ -35,6 +36,7 @@ commands:
     config use <name>  switch active gateway profile (secrets sealed per profile)
     config profiles    list profiles
   completion <shell> print a shell completion script (bash|zsh|fish)
+  update [--check]   self-update from a release manifest (sha256-verified)
   help               this message
   version            print version
 
@@ -173,6 +175,8 @@ export async function main(argv: string[]): Promise<number> {
       return runTop(rest);
     case "completion":
       return runCompletion(rest);
+    case "update":
+      return runUpdate(rest, VERSION);
     case "__complete": {
       // Hidden — emitted on every TAB. Pure tree lookup, no I/O.
       const cands = complete(rest);

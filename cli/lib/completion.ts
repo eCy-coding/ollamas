@@ -28,6 +28,7 @@ export const COMMAND_TREE: CommandTree = {
     "doctor",
     "config",
     "completion",
+    "update",
     "help",
     "version",
   ],
