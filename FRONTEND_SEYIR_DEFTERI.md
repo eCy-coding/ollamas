@@ -47,6 +47,33 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF3 — Perf Baseline & Budget + ApiClient choke-point (DONE)
+- **Ne:** Frontend için tek I/O choke-point (`src/lib/apiClient.ts`) + perf bütçe sistemi (size-limit + lighthouse-ci) + web-vitals field telemetri kuruldu. 13 component'in 10'u `api.*`'e taşındı.
+- **Nasıl:**
+  - `src/lib/apiClient.ts`: `api.get/post/put/del` (auth header lokalStorage'dan, GET 5xx/429 retry, hata→`logClientEvent`→`/api/logbook`) + `streamPost` (SSE-over-POST `getReader` decode). `ApiError(status)`. 7 test (`tests/ui/apiClient.test.ts`).
+  - `src/lib/vitals.ts`: web-vitals (Apache-2.0) lazy import → LCP/INP/CLS/FCP/TTFB → `navigator.sendBeacon('/api/logbook')`. `main.tsx`'te wired (ayrı 2.6KB gz chunk).
+  - Migration: App/VirtualController/WorkspaceTree/SelfTestGates/CommandLineTerminal/BackupControl/ClusterManager/SecurityPolicies/MultiAgentPipeline/ReactAgentTab → `api.*`. **İstisna:** GoogleDriveBrowser (harici googleapis), SaaSAdmin (lokal token-wrapper) — yorumla işaretli.
+  - Perf gate: `.size-limit.json` (JS<140KB / CSS<12KB gz), `budget.json` + `lighthouserc.json` (LCP<2.5s, CLS<0.1), `.github/workflows/frontend-perf.yml` (build→size→lhci; shared ci.yml'e dokunmadan).
+- **Niçin:** dağınık 36 fetch çağrısı tek denetlenebilir noktaya indi (auth/retry/hata/telemetri); perf regresyonu artık CI'da kırmızı.
+- **Kanıt:** `tsc --noEmit` 0 · `vitest run` 97 pass/1 skip · `vite build` OK · `size-limit` 107.7KB/140 + 6.85KB/12 (brotli) · migration maliyeti +0.6KB gz. Commit `0fdbb94`.
+- **Sonraki (önceden hesaplandı):** vF4 PWA.
+
+## Faz vF4 — PWA / iOS web-clip (DONE)
+- **Ne:** Cockpit yüklenebilir (installable) PWA + iOS web-clip oldu; offline shell + manifest + SW.
+- **Nasıl:** `vite-plugin-pwa` (MIT) `registerType:autoUpdate` + `injectRegister:auto` → `dist/sw.js` + `workbox-*.js` + `manifest.webmanifest` üretildi. Workbox: precache (8 entry) + `/api/health` NetworkFirst (3s timeout, canlı telemetri için). `index.html` iOS meta (`apple-mobile-web-app-capable`, `status-bar-style`, `apple-touch-icon`, `viewport-fit=cover`, `theme-color`). `public/pwa-icon.svg` app mark. CSP gotcha: server.ts Helmet CSP kapalı → SW register engellenmiyor (backend dokunulmadı).
+- **Niçin:** iOS Safari "Add to Home Screen" + offline kabuk; MacBook'ta standalone pencere.
+- **Kanıt:** `vite build` → sw.js + manifest.webmanifest doğru içerik · 3 source-level guard test (`tests/ui/pwa.test.ts`) · `tsc` 0 · jsdom 27 pass. Commit `8d0a258`.
+- **Sonraki (önceden hesaplandı):** vF5 design tokens.
+
+## Faz vF5 — Design System & Tokens (DONE)
+- **Ne:** Tema değerleri JSON token single-source'a çekildi → CSS var → Tailwind v4 `@theme`.
+- **Nasıl:** `style-dictionary` (Apache-2.0) `tokens/*.json` (color/font/radius/space) → `src/styles/tokens.css` (`--ollamas-*` vars, prefix). `src/index.css` `@theme` artık hardcoded hex yerine `var(--ollamas-*)` referanslar; `@import "./styles/tokens.css"`. `npm run tokens` regen. 3 test incl. **regen-in-sync** (build no-op olmalı).
+- **Niçin:** tek doğruluk kaynağı (Figma/iOS/native paylaşımlı katman, vF9 tema için hazır); tema tutarlılığı.
+- **Kanıt:** `vite build` → built CSS'te `var(--ollamas-color-bg-base)` çözülüyor (zincir çalışıyor) · CSS 7.03KB/12 gz · `tsc` 0 · jsdom 30 pass. Commit `1b6eca1`.
+- **Sonraki (önceden hesaplandı):** **vF6 Accessibility (WCAG AA)** — `@axe-core/playwright` e2e gate + `eslint-plugin-jsx-a11y` (+ raw-`fetch` yasağı kuralı ile choke-point mekanik denetimi) + klavye nav + ARIA + focus yönetimi. İlk adım: eslint flat-config kur (mevcut yalnız `tsc`), jsx-a11y + `no-restricted-syntax` raw-fetch, sonra axe spec.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -60,8 +87,12 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-004 | 2026-06-19 | Sync daemon ana dizinde branch flip + package.json/.gitignore revert | Ana repo dizini eşzamanlı daemon + diğer lane'ler tarafından sürülüyor (E-003) | Frontend işi izole worktree `~/Desktop/ollamas-frontend-wt`'ye taşındı | Multi-lane repo'da kod fazı = İZOLE WORKTREE şart (CLI/scripts lane gibi); ana dizinde çalışma |
 | FE-005 | 2026-06-19 | `playwright test` → browser executable yok / `__dirlock` | Başka proje (ecypro wt) Wed03AM'den TAKILI `playwright install` lock'u tutuyordu; ayrıca PW 1.61 chromium-1228 ister (cache 1217) | Hung PID kill + stale `__dirlock` rm + `playwright install chromium` | Browser install takılırsa `ps` ile hung install ara + stale `~/Library/Caches/ms-playwright/__dirlock` temizle |
 | FE-006 | 2026-06-19 | agent-chat: input `disabled`, fill timeout | GET `/api/agent/sessions` stub'u obje döndü, component array bekliyordu → `isLoading` takıldı → input disabled | `page.route` handler'ı `request().method()` ile GET→`[]` / POST→`{id}` ayır | Route-stub'ı HTTP method'a göre şekillendir (aynı path GET liste / POST tekil obje) |
+| FE-007 | 2026-06-19 | apiClient testlerinde fetch call sayıları şişti + başka test'in URL'i sızdı | `setup.ts` `globalThis.fetch = vi.fn()` DOĞRUDAN atıyor; `vi.spyOn` aynı fn'i sarıp call history'i testler arası biriktiriyor | Her test `vi.stubGlobal('fetch', vi.fn())` + `afterEach vi.unstubAllGlobals()` | Paylaşılan global'i spy'lama; testte fetch izole etmek için **stubGlobal + fresh vi.fn**, spyOn değil |
+| FE-008 | 2026-06-19 | `.test.ts` (JSX'siz) jsdom test hiç çalışmadı | jsdom project glob yalnız `*.test.tsx`; node project `tests/ui/**` exclude → `.ts` hiçbir yere düşmedi | jsdom include `tests/ui/**/*.test.{ts,tsx}` | Frontend test glob'u hem `.ts` hem `.tsx` kapsamalı (lib testleri JSX içermez) |
+| FE-009 | 2026-06-19 | `logClientEvent` test fetch spy'ını kirletti + queued mock'ları tüketti | jsdom `navigator.sendBeacon` yok → fallback `fetch('/api/logbook')` aynı spy'a düştü | `setup.ts`'e `navigator.sendBeacon` no-op stub | Observability fallback'ı (sendBeacon→fetch) testte spy kirletir; sendBeacon'ı stub'la |
 
 ### Devralınan gotcha (eklenen)
+- **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.
 - **mcp-gateway.e2e flaky:** self-boot eden server e2e cold-run'da `ECONNRESET` ile 12 fail verdi, re-run'da 73/1 yeşil. Benim değişikliğim değil — timing/port. UI testleri ayrı projede izole, etkilenmez. Backend lane'e backlog: e2e boot retry.
 - **Multi-tab working tree:** repo'da eşzamanlı lane'ler (scripts/backend) var; `vitest.config.ts` + `package.json` co-owned. Commit = SADECE selective `git add` (kendi dosyaların), asla `git add -A`.
 
