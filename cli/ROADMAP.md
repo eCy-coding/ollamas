@@ -11,8 +11,8 @@
 | **v4** | Bench/calibration | `ollamas bench` dual-target (mac + remote/iOS-proxy); warmup'lı TTFB/tok/s/total; `cli-bench.json` host-etiketli; `pickBest` + `--apply`; I1-I6 | ✅ DONE |
 | **v5** | MCP client | `ollamas mcp info\|tools\|call\|upstreams\|add\|rm` — `/mcp` JSON-RPC + `/api/saas/upstreams`; guard glob + HIL gate; choke-point üzerinden çağrı | ✅ DONE |
 | **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → WFWorkflow plist (chat/status/bench/mcp-call) + recipe cards; POSIX köprü saas+mcp upstreams/add/rm; `mcp call --stream`; remote-exposure doc (tailscale) | ✅ DONE |
-| **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | ▶ NEXT |
-| **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | |
+| **v7** | Profiller + secrets | AES-256-GCM secrets-at-rest (`secrets.ts`/`keystore.ts`, db.ts deseni) + `*Enc` sealed config + güvenli migration; çoklu-gateway profil (`config use`/`profiles`/`--profile`); env override korunur | ✅ DONE |
+| **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | ▶ NEXT |
 | **v9** | Packaging | `npm link` global; opsiyonel Go tek-binary (v4 bench TTFB kazancı gösterirse); Homebrew tap; shell completion (bash/zsh) | |
 | **v10** | Self-update + plugin | `ollamas update`; manifest-tabanlı 3rd-party alt-komut sistemi; release-please; CLI CI (`.github/workflows`) | |
 | **v11+** | Ufuk (önceden-hesap) | Native Swift Shortcuts derinleştirme; WASM build; otonom agent loop; multi-gateway mesh kontrolü | |
@@ -74,8 +74,19 @@
 - Testler: `cli-shortcuts` (16) + `cli-shortcuts-cmd` (5) + `cli-bridge-mcp` (9, async-spawn) + `cli-mcp-stream` (6) — **full 176 pass/1 skip** (v5:140). `plutil -lint` + binary1 roundtrip + canlı build (9 dosya 0600, placeholder-only) doğrulandı.
 - Choke-point korunur (gerçek `tool-registry` import YOK; mention'lar yorum). VERSION 6.0.0.
 
-## v7 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/lib/secrets.ts` (saf-fn) — `server/db.ts` SecureDB AES-GCM desenini İNCELE (import etme), `seal(plaintext, key)`/`open(blob, key)` saf round-trip; ilk test = round-trip + tamper-throws (auth tag). v6 `--embed-key` plaintext-at-rest zayıf halkası bunu doğurdu.
-2. `cli/lib/config.ts` — `apiKey`/`saasAdminToken` plaintext yerine sealed blob; env override korunur; eski plaintext'i tek-yön migrate.
-3. Çoklu-gateway profil: `config use <profile>`; `~/.ollamas/profiles/<name>.json`; gateway+key+model demeti.
-4. Testler: secrets round-trip/tamper; profil seç/override zinciri; config redaksiyon.
+## v7 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): Node.js crypto docs + kendi `server/db.ts:155-187` AES-256-GCM desen-PORT (import yok); `aws`/`gh`/`stripe` credential-at-rest modelleri (encrypted-file-from-start + opsiyonel keychain doğrulandı); `aws-cli` profil precedence (flag>env>active>default); macOS Keychain `security` CLI → **v11'e ertelendi** (SSH'de sessiz fail, temiz seam bırakıldı).
+- `cli/lib/secrets.ts` (saf): `seal`/`open` (`iv:tag:ciphertext` hex, `authTagLength:16` iki tarafta → gcm-no-tag-length yok) + `deriveKey` scrypt. **Sapma**: `open()` THROW eder (db.ts `""` döndürür — CLI'da boş Bearer key tehlikeli).
+- `cli/lib/keystore.ts`: `loadMasterKey` — `OLLAMAS_PASSPHRASE` (scrypt, key disk-dışı) yoksa `~/.ollamas/.cli_master_key` (randomBytes32, 0600, lazy → keysiz kullanıcı keyfile almaz).
+- `cli/lib/config.ts`: saf `sealDisk`/`unsealDisk` (`apiKey`/`saasAdminToken`→`*Enc`, asla plaintext); load'da decrypt → **6 GatewayClient consumer'ı değişmedi**; env-secret asla persist edilmez; güvenli tek-yön migration (`cli.json.bak.<ts>` 0600 backup); bozuk/kayıp-key → uyar+düşür (her komut crash etmez).
+- Çoklu profil: `~/.ollamas/profiles/<name>.json` (default=cli.json back-compat); `resolveProfileName` precedence flag>`OLLAMAS_PROFILE`>activeProfile>default; `--profile` global flag (index.ts); `setActiveProfile`/`listProfiles`; per-profil sealed izolasyon; path-traversal guard.
+- `cli/index.ts`: `config use <name>` / `config profiles` / aktif-profil display + (sealed) işareti. `cli/SECRETS.md` (dürüst threat model + key kaynakları + recovery).
+- Testler: `cli-secrets`(14) + `cli-config-secrets`(10) + `cli-profiles`(11) → **full 211 pass/1 skip** (v6:176). Canlı (izole HOME): migration+roundtrip+tamper+env-no-persist+graceful-degrade + profil create/switch/isolation/no-plaintext doğrulandı.
+- Choke-point korunur (`grep --include="*.ts"` boş); VERSION **7.0.0**.
+
+## v8 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/lib/metrics.ts` (saf) — `/metrics` Prometheus-text parser (counter + latency histogram) + `/api/saas/usage/timeseries` şekli; ilk test = örnek `/metrics` body → typed series.
+2. `client.ts`: `getMetrics()` (`/metrics` GET, text) + `getUsageTimeseries()` (`/api/saas/usage/timeseries`, Bearer).
+3. `cli/commands/top.ts` — `ollamas top [--watch]` ince render döngüsü; terminal sparkline (output.ts reuse); TTY-only, `--json` snapshot.
+4. `seyir-defteri.jsonl` tail (`~/.llm-mission-control/seyir-defteri.jsonl`).
+5. Testler: metrics parse saf-fn; top render saf-fn; mock-fetch usage.
