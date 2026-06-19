@@ -10,8 +10,8 @@
 | **v3** | SaaS/admin + sweep | `ollamas saas plans\|tenants\|tenant new\|keys\|key new\|revoke\|audit\|usage\|billing` → `/api/saas/*`+`/api/billing/*` (X-Admin-Token); `formatTable`; secret-once key; revoke confirm; doctor saas satırı; H1-H8 | ✅ DONE |
 | **v4** | Bench/calibration | `ollamas bench` dual-target (mac + remote/iOS-proxy); warmup'lı TTFB/tok/s/total; `cli-bench.json` host-etiketli; `pickBest` + `--apply`; I1-I6 | ✅ DONE |
 | **v5** | MCP client | `ollamas mcp info\|tools\|call\|upstreams\|add\|rm` — `/mcp` JSON-RPC + `/api/saas/upstreams`; guard glob + HIL gate; choke-point üzerinden çağrı | ✅ DONE |
-| **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (saas); remote-exposure doc (tailscale/LAN + key) | ▶ NEXT |
-| **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | |
+| **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → WFWorkflow plist (chat/status/bench/mcp-call) + recipe cards; POSIX köprü saas+mcp upstreams/add/rm; `mcp call --stream`; remote-exposure doc (tailscale) | ✅ DONE |
+| **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | ▶ NEXT |
 | **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | |
 | **v9** | Packaging | `npm link` global; opsiyonel Go tek-binary (v4 bench TTFB kazancı gösterirse); Homebrew tap; shell completion (bash/zsh) | |
 | **v10** | Self-update + plugin | `ollamas update`; manifest-tabanlı 3rd-party alt-komut sistemi; release-please; CLI CI (`.github/workflows`) | |
@@ -63,9 +63,19 @@
 - **Protokol gerçeği (canlı probe)**: `/mcp` **STATELESS** — initialize GEREKMİYOR (tools/list standalone döndü), session-id YOK, yanıt `text/event-stream`. **Origin gönderme** — no-Origin always-allowed (server.ts:1293), allowlist tahmininden robust.
 - Choke-point korunur (`grep ToolRegistry cli/`=yalnız yorum; ollama'ya/registry'ye import yok); VERSION 5.0.0
 
-## v6 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/commands/shortcuts.ts` — `ollamas shortcuts build` → `.shortcut` plist üret (chat/bench/status/mcp-call reçeteleri); `~/.ollamas/shortcuts/` çıktı.
-2. POSIX köprü `ollamas.sh` → `saas` yolu tamamla (admin token curl); `mcp upstreams/add/rm` ekle (şu an yalnız tools/call).
-3. Remote-exposure doc: tailscale/LAN + `OLLAMAS_API_KEY` + TLS; iOS Shortcut'ın vuracağı `/api/generate`+`/mcp` Bearer reçetesi.
-4. `mcp call --stream` (uzun tool progress notifications/progress — server zaten gönderiyor, SSE consume).
-5. Testler: shortcuts plist saf-fn üretim; POSIX köprü mcp smoke.
+## v6 — DONE (kanıt)
+- **GitHub harvest** (eşleşen tamamlanmış projeler → zero-dep reçete PORT, binary vendor yok): drewburchfield/shortcuts-toolkit (MIT, downloadurl+header), joshfarrant/shortcuts-js (GPL, WFWorkflowActionIdentifier vocab — FİKİR-only), julian-englert/apple-shortcuts (`shortcuts sign` reçetesi — fikir-only), 0ssamaak0/SiriLLama (iCloud-link dağıtım deseni), Tailscale Serve/Funnel (resmi). Lisans disiplini uygulandı.
+- `cli/lib/shortcuts.ts` (saf-fn): `plistEscape`/`plistValue` (XML plist serializer), `wfAction`/`buildWorkflowPlist`, `recipeChat/Status/Bench/McpCall`, `allRecipes`, `recipeCard`. Key-agnostic core → `__OLLAMAS_API_KEY__` placeholder default, gerçek key core'a girmez.
+- `cli/commands/shortcuts.ts` yeni: `ollamas shortcuts build [--url] [--embed-key] [--out] [--import] [--json]`; saf `planArtifacts()` (disksiz test); I/O shell dir 0700 / dosya 0600 `~/.ollamas/shortcuts/`; `--embed-key` HIL (TTY-confirm, `--json` redddi); `--import` macOS re-sign (false-success YOK); localhost `--url` uyarısı. `index.ts` route+HELP+VERSION **6.0.0**.
+- `cli/bin/ollamas.sh`: `mcp upstreams|add|rm` (REST `/api/saas/upstreams`, Bearer) + `saas plans|tenants|usage` (read-only, X-Admin-Token). **fix E-005** auth header word-split (`Bearer KEY` boşlukta bölünüyordu → chat/agent auth'u da sessizce bozuktu) → `ocurl`/`ocurl_admin` helper.
+- `mcp call --stream`: `client.mcpCallToolStream` (notifications/progress SSE consume) + `mcp.ts` `formatProgress` saf renderer; terminal-only (`--json` altında non-stream).
+- `cli/REMOTE_EXPOSURE.md`: tailscale serve (default, private) vs funnel (public opt-in risk); Bearer=gerçek auth; iOS reçete **stream:false** (Shortcuts SSE yok); `/mcp` stateless; install via `--import`+iCloud.
+- **Apple imza gerçeği**: compiled `.shortcut` = signed (AEA); unsigned iOS'ta import EDİLEMEZ → v6 çift-tık iPhone binary göndermez; XML plist scaffold + macOS `shortcuts import` re-sign + reçete kartları.
+- Testler: `cli-shortcuts` (16) + `cli-shortcuts-cmd` (5) + `cli-bridge-mcp` (9, async-spawn) + `cli-mcp-stream` (6) — **full 176 pass/1 skip** (v5:140). `plutil -lint` + binary1 roundtrip + canlı build (9 dosya 0600, placeholder-only) doğrulandı.
+- Choke-point korunur (gerçek `tool-registry` import YOK; mention'lar yorum). VERSION 6.0.0.
+
+## v7 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/lib/secrets.ts` (saf-fn) — `server/db.ts` SecureDB AES-GCM desenini İNCELE (import etme), `seal(plaintext, key)`/`open(blob, key)` saf round-trip; ilk test = round-trip + tamper-throws (auth tag). v6 `--embed-key` plaintext-at-rest zayıf halkası bunu doğurdu.
+2. `cli/lib/config.ts` — `apiKey`/`saasAdminToken` plaintext yerine sealed blob; env override korunur; eski plaintext'i tek-yön migrate.
+3. Çoklu-gateway profil: `config use <profile>`; `~/.ollamas/profiles/<name>.json`; gateway+key+model demeti.
+4. Testler: secrets round-trip/tamper; profil seç/override zinciri; config redaksiyon.
