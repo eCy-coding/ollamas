@@ -39,18 +39,22 @@ export function buildResourceMetadata(baseUrl: string): Record<string, unknown> 
   return body;
 }
 
-/** RFC 8414 Authorization Server Metadata. ollamas does not yet run a full OAuth
- *  2.1 authorization server (token issuance → backlog); this advertises the DCR
- *  registration_endpoint so clients can register a client_id without manual setup. */
+/** RFC 8414 Authorization Server Metadata (Faz 19, v1.10). ollamas now runs a full
+ *  OAuth 2.1 AS: the SDK mcpAuthRouter serves /authorize + /token + /revoke
+ *  (authorization_code + PKCE S256); the tenant-aware DCR /register stays ours. We
+ *  serve this document ourselves (registered before the router) so it keeps
+ *  advertising registration_endpoint, which the router's own metadata omits. */
 export function buildAuthServerMetadata(baseUrl: string): Record<string, unknown> {
   const base = baseUrl.replace(/\/$/, "");
   return {
     issuer: base,
+    authorization_endpoint: `${base}/authorize`,
+    token_endpoint: `${base}/token`,
+    revocation_endpoint: `${base}/revoke`,
     registration_endpoint: `${base}${REGISTRATION_PATH}`,
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "client_credentials"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],
-    // No authorization/token endpoint yet (full AS is backlog); DCR only.
-    "x-ollamas-dcr-only": true,
   };
 }

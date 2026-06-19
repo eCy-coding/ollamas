@@ -20,8 +20,10 @@ import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./serv
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata, AUTH_SERVER_METADATA_PATH, REGISTRATION_PATH } from "./server/mcp/oauth-metadata";
 import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient } from "./server/store";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -1268,10 +1270,18 @@ content
     if (body.redirect_uris !== undefined && !Array.isArray(body.redirect_uris)) {
       return res.status(400).json({ error: "invalid_client_metadata", error_description: "redirect_uris must be an array" });
     }
+    // DCR-time tenant binding (Faz 19B): when the caller is tenant-authenticated,
+    // bind the new client to that tenant so the OAuth authorize() can auto-consent.
+    // Uses x-api-key, or the bearer token when no DCR initial-access gate is set
+    // (the gate already claims the Authorization header). Anonymous DCR → unbound.
+    let tenant_id: string | null = null;
+    const apiKey = String(req.headers["x-api-key"] || "") || (!gate ? (req.headers.authorization || "").replace(/^Bearer\s+/i, "") : "");
+    if (apiKey) { const rk = await resolveKey(apiKey); if (rk) tenant_id = rk.tenantId; }
     try {
       const r = await registerClient({
         redirect_uris: body.redirect_uris, grant_types: body.grant_types,
         token_endpoint_auth_method: body.token_endpoint_auth_method, client_name: body.client_name,
+        tenant_id,
       });
       const base = reqBase(req);
       res.status(201).json({
@@ -1289,6 +1299,19 @@ content
       res.status(500).json({ error: "server_error", error_description: err?.message || "registration failed" });
     }
   });
+
+  // OAuth 2.1 Authorization Server (Faz 19, v1.10). The SDK router serves
+  // /authorize + /token + /revoke (authorization_code + PKCE S256) backed by our
+  // OllamasOAuthProvider. Mounted AFTER our AS-metadata + DCR /register routes, so
+  // those win for their paths (the router omits registration_endpoint since our
+  // clientsStore has no registerClient — DCR stays tenant-aware in ollamas).
+  const oauthIssuer = new URL(process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`);
+  app.use(mcpAuthRouter({
+    provider: new OllamasOAuthProvider(),
+    issuerUrl: oauthIssuer,
+    resourceServerUrl: new URL("/mcp", oauthIssuer),
+    scopesSupported: ["tools:safe", "tools:host", "tools:privileged"],
+  }));
 
   // Origin allowlist for /mcp — DNS-rebinding protection (MCP Transports spec).
   // Default localhost only; override with ALLOWED_ORIGINS (CSV). A request with no

@@ -223,3 +223,41 @@ describe("rate-limit middleware (in-memory fallback, no REDIS_URL)", () => {
     expect(next).toHaveBeenCalled();
   });
 });
+
+describe("store: OAuth 2.1 AS — codes + opaque tokens (Faz 19)", () => {
+  test("DCR client binds to a tenant; getClient returns tenant_id", async () => {
+    const t = await store.createTenant("oauth-owner", "pro");
+    const c = await store.registerClient({ redirect_uris: ["https://app/cb"], tenant_id: t.id });
+    expect((await store.getClient(c.client_id))!.tenant_id).toBe(t.id);
+    const anon = await store.registerClient({ redirect_uris: ["https://app/cb"] });
+    expect((await store.getClient(anon.client_id))!.tenant_id).toBeNull();
+  });
+
+  test("auth code is single-use and expiry-gated", async () => {
+    await store.saveAuthCode({ code: "code-1", client_id: "oc_x", tenant_id: "t1", code_challenge: "chal", redirect_uri: "https://app/cb", scopes: "tools:safe", resource: null, expires_at: new Date(Date.now() + 60000).toISOString() });
+    expect((await store.getAuthCode("code-1"))!.code_challenge).toBe("chal");
+    const first = await store.consumeAuthCode("code-1");
+    expect(first!.tenant_id).toBe("t1");
+    expect(await store.consumeAuthCode("code-1")).toBeNull(); // already used
+  });
+
+  test("expired auth code does not resolve", async () => {
+    await store.saveAuthCode({ code: "code-exp", client_id: "oc_x", tenant_id: "t1", code_challenge: "c", redirect_uri: "u", scopes: "", resource: null, expires_at: new Date(Date.now() - 1000).toISOString() });
+    expect(await store.consumeAuthCode("code-exp")).toBeNull();
+  });
+
+  test("opaque token: issue → resolve → revoke", async () => {
+    const token = await store.saveOAuthToken({ client_id: "oc_x", tenant_id: "t9", scopes: "tools:safe tools:host", resource: null, ttlSecs: 3600 });
+    expect(token).toMatch(/^ot_/);
+    const r = await store.resolveOAuthToken(token);
+    expect(r!.tenantId).toBe("t9");
+    expect(r!.scopes).toEqual(["tools:safe", "tools:host"]);
+    await store.revokeOAuthToken(token);
+    expect(await store.resolveOAuthToken(token)).toBeNull();
+  });
+
+  test("expired token does not resolve", async () => {
+    const token = await store.saveOAuthToken({ client_id: "oc_x", tenant_id: "t9", scopes: "", resource: null, ttlSecs: -1 });
+    expect(await store.resolveOAuthToken(token)).toBeNull();
+  });
+});

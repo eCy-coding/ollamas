@@ -312,6 +312,9 @@ export interface DcrRequest {
   grant_types?: string[];
   token_endpoint_auth_method?: string;
   client_name?: string;
+  /** Owning tenant, bound at registration when the caller is tenant-authenticated
+   *  (Faz 19B). authorize() requires this for auto-consent; anonymous DCR = null. */
+  tenant_id?: string | null;
 }
 export interface DcrResult {
   client_id: string;
@@ -333,8 +336,8 @@ export async function registerClient(req: DcrRequest): Promise<DcrResult> {
   const secret = authMethod === "none" ? undefined : `ocs_${crypto.randomBytes(24).toString("hex")}`;
   const regToken = `rat_${crypto.randomBytes(24).toString("hex")}`;
   await d().run(
-    "INSERT INTO oauth_clients (client_id, client_secret_hash, redirect_uris, grant_types, token_endpoint_auth_method, client_name, registration_access_token_hash, created_at) VALUES (?,?,?,?,?,?,?,?)",
-    [clientId, secret ? sha256(secret) : null, JSON.stringify(redirectUris), JSON.stringify(grantTypes), authMethod, req.client_name ?? null, sha256(regToken), nowIso()]
+    "INSERT INTO oauth_clients (client_id, client_secret_hash, redirect_uris, grant_types, token_endpoint_auth_method, client_name, registration_access_token_hash, tenant_id, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+    [clientId, secret ? sha256(secret) : null, JSON.stringify(redirectUris), JSON.stringify(grantTypes), authMethod, req.client_name ?? null, sha256(regToken), req.tenant_id ?? null, nowIso()]
   );
   return {
     client_id: clientId, client_secret: secret, client_secret_hash: secret ? sha256(secret) : null,
@@ -342,10 +345,59 @@ export async function registerClient(req: DcrRequest): Promise<DcrResult> {
     registration_access_token: regToken,
   };
 }
-/** Lookup a registered client (test/introspection). Never returns secrets. */
-export async function getClient(clientId: string): Promise<{ client_id: string; redirect_uris: string[]; grant_types: string[]; token_endpoint_auth_method: string; created_at: string } | null> {
+/** Lookup a registered client (test/introspection + OAuth provider). Never returns secrets. */
+export async function getClient(clientId: string): Promise<{ client_id: string; redirect_uris: string[]; grant_types: string[]; token_endpoint_auth_method: string; tenant_id: string | null; created_at: string } | null> {
   const r = (await d().query("SELECT * FROM oauth_clients WHERE client_id = ?", [clientId])).rows[0];
-  return r ? { client_id: r.client_id, redirect_uris: JSON.parse(r.redirect_uris || "[]"), grant_types: JSON.parse(r.grant_types || "[]"), token_endpoint_auth_method: r.token_endpoint_auth_method, created_at: r.created_at } : null;
+  return r ? { client_id: r.client_id, redirect_uris: JSON.parse(r.redirect_uris || "[]"), grant_types: JSON.parse(r.grant_types || "[]"), token_endpoint_auth_method: r.token_endpoint_auth_method, tenant_id: r.tenant_id ?? null, created_at: r.created_at } : null;
+}
+
+// --- OAuth 2.1 Authorization Server: codes + opaque tokens (Faz 19, v1.10) ---
+export interface AuthCode {
+  code: string; client_id: string; tenant_id: string; code_challenge: string;
+  redirect_uri: string; scopes: string; resource: string | null; expires_at: string;
+}
+export async function saveAuthCode(c: AuthCode): Promise<void> {
+  await d().run(
+    "INSERT INTO oauth_codes (code, client_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scopes, resource, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    [c.code, c.client_id, c.tenant_id, c.code_challenge, "S256", c.redirect_uri, c.scopes, c.resource, c.expires_at, nowIso()]
+  );
+}
+export async function getAuthCode(code: string): Promise<AuthCode | null> {
+  const r = (await d().query("SELECT * FROM oauth_codes WHERE code = ?", [code])).rows[0];
+  if (!r) return null;
+  return { code: r.code, client_id: r.client_id, tenant_id: r.tenant_id, code_challenge: r.code_challenge, redirect_uri: r.redirect_uri, scopes: r.scopes || "", resource: r.resource ?? null, expires_at: r.expires_at };
+}
+/** Atomically take a code: returns it once (then deletes), null if missing/expired. */
+export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
+  const c = await getAuthCode(code);
+  await d().run("DELETE FROM oauth_codes WHERE code = ?", [code]); // one-time use
+  if (!c) return null;
+  if (c.expires_at <= nowIso()) return null;
+  return c;
+}
+/** Issue an opaque access token, stored only as a SHA-256 hash. Returns plaintext once. */
+export async function saveOAuthToken(t: { client_id: string; tenant_id: string; scopes: string; resource: string | null; ttlSecs: number }): Promise<string> {
+  const token = `ot_${crypto.randomBytes(32).toString("hex")}`;
+  const expiresAt = new Date(Date.now() + t.ttlSecs * 1000).toISOString();
+  await d().run(
+    "INSERT INTO oauth_tokens (token_hash, client_id, tenant_id, scopes, resource, expires_at, revoked, created_at) VALUES (?,?,?,?,?,?,0,?)",
+    [sha256(token), t.client_id, t.tenant_id, t.scopes, t.resource, expiresAt, nowIso()]
+  );
+  return token;
+}
+export interface ResolvedToken { clientId: string; tenantId: string; scopes: string[]; resource: string | null; expiresAt: number; }
+export async function resolveOAuthToken(plaintext: string): Promise<ResolvedToken | null> {
+  const r = (await d().query("SELECT * FROM oauth_tokens WHERE token_hash = ? AND revoked = 0", [sha256(plaintext)])).rows[0];
+  if (!r) return null;
+  if (r.expires_at <= nowIso()) return null;
+  return {
+    clientId: r.client_id, tenantId: r.tenant_id, resource: r.resource ?? null,
+    scopes: String(r.scopes || "").split(/\s+/).filter(Boolean),
+    expiresAt: Math.floor(new Date(r.expires_at).getTime() / 1000),
+  };
+}
+export async function revokeOAuthToken(plaintext: string): Promise<void> {
+  await d().run("UPDATE oauth_tokens SET revoked = 1 WHERE token_hash = ?", [sha256(plaintext)]);
 }
 
 // --- Tenant webhooks (Faz 11B) ---

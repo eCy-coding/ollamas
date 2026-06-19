@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -298,6 +299,90 @@ describe("MCP ecosystem interop + DCR (Faz 15, public pre-auth)", () => {
     });
     expect(r.status).toBe(400);
   });
+
+  // --- Faz 19: OAuth 2.1 Authorization Server (authorization_code + PKCE S256) ---
+  test("AS metadata advertises token + authorize endpoints + S256", async () => {
+    const m = await (await fetch(`${BASE}/.well-known/oauth-authorization-server`)).json() as any;
+    expect(m.authorization_endpoint).toBe(`${BASE}/authorize`);
+    expect(m.token_endpoint).toBe(`${BASE}/token`);
+    expect(m.code_challenge_methods_supported).toContain("S256");
+    expect(m.registration_endpoint).toBe(`${BASE}/register`); // tenant-aware DCR stays ours
+  });
+
+  const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  async function boundClient(plan = "enterprise") {
+    const j = (r: Response) => r.json() as any;
+    const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ name: `oauth-${plan}`, plan }),
+    }));
+    const k = await j(await fetch(`${BASE}/api/saas/keys`, {
+      method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
+      body: JSON.stringify({ tenantId: t.id }),
+    }));
+    const reg = await j(await fetch(`${BASE}/register`, {
+      method: "POST", headers: { "content-type": "application/json", "x-api-key": k.key }, // DCR-time tenant bind
+      body: JSON.stringify({ redirect_uris: [`${BASE}/cb`], token_endpoint_auth_method: "none" }),
+    }));
+    return reg.client_id as string;
+  }
+
+  async function authorize(clientId: string, challenge: string) {
+    const url = `${BASE}/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(`${BASE}/cb`)}&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`;
+    const r = await fetch(url, { redirect: "manual" });
+    return r;
+  }
+
+  test("full flow: DCR(bound) → authorize → token → ot_ token authorizes /mcp", async () => {
+    const clientId = await boundClient();
+    const verifier = b64url(crypto.randomBytes(32));
+    const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
+
+    const ar = await authorize(clientId, challenge);
+    expect([302, 303]).toContain(ar.status);
+    const loc = new URL(ar.headers.get("location")!);
+    const code = loc.searchParams.get("code");
+    expect(code).toBeTruthy();
+    expect(loc.searchParams.get("state")).toBe("xyz");
+
+    const form = new URLSearchParams({ grant_type: "authorization_code", code: code!, redirect_uri: `${BASE}/cb`, client_id: clientId, code_verifier: verifier });
+    const tr = await fetch(`${BASE}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: form });
+    expect(tr.status).toBe(200);
+    const tok = await tr.json() as any;
+    expect(tok.access_token).toMatch(/^ot_/);
+    expect(tok.token_type.toLowerCase()).toBe("bearer");
+
+    const c = new Client({ name: "oauth", version: "0" }, { capabilities: {} });
+    const t2 = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${tok.access_token}` } } });
+    await c.connect(t2);
+    const { tools } = await c.listTools();
+    await c.close();
+    expect(tools.length).toBeGreaterThan(0);
+  }, 40000);
+
+  test("PKCE mismatch is rejected at /token", async () => {
+    const clientId = await boundClient();
+    const challenge = b64url(crypto.createHash("sha256").update("the-real-verifier").digest());
+    const ar = await authorize(clientId, challenge);
+    const code = new URL(ar.headers.get("location")!).searchParams.get("code")!;
+    const form = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: `${BASE}/cb`, client_id: clientId, code_verifier: "WRONG-verifier" });
+    const tr = await fetch(`${BASE}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: form });
+    expect(tr.status).toBeGreaterThanOrEqual(400);
+  }, 40000);
+
+  test("an unbound (anonymous-DCR) client cannot get a code", async () => {
+    const reg = await (await fetch(`${BASE}/register`, {
+      method: "POST", headers: { "content-type": "application/json" }, // no tenant key → unbound
+      body: JSON.stringify({ redirect_uris: [`${BASE}/cb`], token_endpoint_auth_method: "none" }),
+    })).json() as any;
+    const challenge = b64url(crypto.createHash("sha256").update("v").digest());
+    const ar = await authorize(reg.client_id, challenge);
+    expect([302, 303]).toContain(ar.status);
+    const loc = new URL(ar.headers.get("location")!);
+    expect(loc.searchParams.get("code")).toBeNull();
+    expect(loc.searchParams.get("error")).toBe("access_denied");
+  }, 40000);
 });
 
 describe("MCP gateway CONSUME (stdio upstream)", () => {

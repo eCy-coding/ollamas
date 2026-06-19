@@ -50,6 +50,44 @@ export const MIGRATIONS: Migration[] = [
       )`);
     },
   },
+  {
+    version: 3,
+    name: "oauth_authorization_server",
+    // OAuth 2.1 Authorization Server (Faz 19, v1.10). Authorization codes + issued
+    // access tokens for the authorization_code + PKCE flow. Tokens are OPAQUE and
+    // stored as SHA-256 hashes (same one-way handling as api_keys). A client is
+    // bound to a tenant at DCR time (oauth_clients.tenant_id) so authorize() can
+    // auto-consent. Text PKs → identical DDL on both dialects.
+    up: async (db) => {
+      await db.exec(`CREATE TABLE IF NOT EXISTS oauth_codes (
+        code TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        code_challenge TEXT NOT NULL,
+        code_challenge_method TEXT NOT NULL DEFAULT 'S256',
+        redirect_uri TEXT NOT NULL,
+        scopes TEXT NOT NULL DEFAULT '',
+        resource TEXT,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`);
+      await db.exec(`CREATE TABLE IF NOT EXISTS oauth_tokens (
+        token_hash TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        scopes TEXT NOT NULL DEFAULT '',
+        resource TEXT,
+        expires_at TEXT NOT NULL,
+        revoked INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )`);
+      // Bind a DCR client to its owning tenant (nullable; anonymous DCR stays null
+      // and cannot complete authorize). Guarded: ADD COLUMN has no IF NOT EXISTS on
+      // sqlite, so a retry that finds the column already present is a no-op.
+      try { await db.exec("ALTER TABLE oauth_clients ADD COLUMN tenant_id TEXT"); }
+      catch (e: any) { if (!/duplicate column|already exists/i.test(String(e?.message))) throw e; }
+    },
+  },
 ];
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:

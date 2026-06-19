@@ -7,7 +7,7 @@
 // (req.tenant undefined) unless `required` forces 401.
 
 import type { Request, Response, NextFunction } from "express";
-import { resolveKey, getTenant, getPlan, type ResolvedKey } from "../store";
+import { resolveKey, resolveOAuthToken, getTenant, getPlan, type ResolvedKey } from "../store";
 import { resourceMetadataUrl } from "../mcp/oauth-metadata";
 
 declare global {
@@ -38,6 +38,18 @@ async function getJwks() {
     jwksFn = createRemoteJWKSet(new URL(uri));
   }
   return jwksFn;
+}
+
+/** Resolve a locally-issued opaque OAuth access token (`ot_`, Faz 19) → ResolvedKey.
+ *  Mirrors the API-key path: token → tenant → plan, scopes from the token grant. */
+async function resolveOAuth(token: string): Promise<ResolvedKey | null> {
+  const r = await resolveOAuthToken(token);
+  if (!r) return null;
+  const tenant = await getTenant(r.tenantId);
+  if (!tenant) return null;
+  const plan = await getPlan(tenant.plan_id);
+  if (!plan) return null;
+  return { tenantId: tenant.id, keyId: `oauth:${r.clientId}`, plan, scopes: r.scopes };
 }
 
 /** Verify an OAuth JWT → ResolvedKey, or null. Maps `tenantId`/`sub` claim → tenant. */
@@ -77,10 +89,13 @@ export function authMiddleware(required = false) {
 
     const key = extractKey(req);
     if (key) {
-      // Opaque API keys carry the `olm_` prefix; everything else is treated as a JWT.
+      // Opaque API keys: `olm_`. Locally-issued OAuth access tokens: `ot_` (Faz 19).
+      // Everything else is treated as an external JWT (OAUTH_ISSUER path).
       const resolved = key.startsWith("olm_")
         ? await resolveKey(key)
-        : await verifyJwt(key, `${base}/mcp`);
+        : key.startsWith("ot_")
+          ? await resolveOAuth(key)
+          : await verifyJwt(key, `${base}/mcp`);
       if (!resolved) return unauthorized("Invalid, expired, or unverifiable credential");
       req.tenant = resolved;
     } else if (required) {
