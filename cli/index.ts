@@ -10,6 +10,7 @@ import { runSaas } from "./commands/saas";
 import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
+import { runTop } from "./commands/top";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
 const VERSION = "7.0.0";
@@ -26,6 +27,7 @@ commands:
   saas <action>      manage the SaaS layer (plans|tenants|keys|audit|usage|billing)
   mcp <action>       MCP client (info|tools|call|upstreams|add|rm) via /mcp
   bench              benchmark models (tok/s, TTFB) and pick the fastest
+  top [--watch]      live metrics dashboard (requests, latency, tool calls)
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
   doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
@@ -155,6 +157,8 @@ export async function main(argv: string[]): Promise<number> {
       return runMcp(rest);
     case "shortcuts":
       return runShortcuts(rest);
+    case "top":
+      return runTop(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":
