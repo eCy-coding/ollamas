@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "tokens": "style-dictionary build --config style-dictionary.config.js",
     "build:client": "vite build",
     "size": "size-limit",
     "perf": "lhci autorun"
@@ -58,6 +59,7 @@
     "esbuild": "^0.25.0",
     "jsdom": "^26.1.0",
     "size-limit": "^12.1.0",
+    "style-dictionary": "^5.4.4",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

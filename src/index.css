@@ -1,16 +1,22 @@
 @import "tailwindcss";
+/* vF5 — design tokens generated from tokens/*.json via style-dictionary. */
+@import "./styles/tokens.css";
 
+/* @theme maps Tailwind utilities onto the generated token vars. Single source of
+   truth = tokens/*.json, NOT here. Run `npm run tokens` to regenerate. */
 @theme {
-  --color-immersive-bg: #050608;
-  --color-immersive-sidebar: #08090d;
-  --color-immersive-panel: #0a0b10;
-  --color-immersive-border: rgba(255, 255, 255, 0.05);
-  --color-immersive-text-bright: #f8fafc;
-  --color-immersive-text-muted: #94a3b8;
-  --color-immersive-text-dim: #64748b;
-  
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-immersive-bg: var(--ollamas-color-bg-base);
+  --color-immersive-sidebar: var(--ollamas-color-bg-sidebar);
+  --color-immersive-panel: var(--ollamas-color-bg-panel);
+  --color-immersive-border: var(--ollamas-color-border-subtle);
+  --color-immersive-text-bright: var(--ollamas-color-text-bright);
+  --color-immersive-text-muted: var(--ollamas-color-text-muted);
+  --color-immersive-text-dim: var(--ollamas-color-text-dim);
+  --color-accent-indigo: var(--ollamas-color-accent-indigo);
+  --color-accent-emerald: var(--ollamas-color-accent-emerald);
+
+  --font-sans: var(--ollamas-font-sans);
+  --font-mono: var(--ollamas-font-mono);
 }
 
 @layer base {

@@ -1,0 +1,21 @@
+{
+  "color": {
+    "bg": {
+      "base":    { "value": "#050608" },
+      "sidebar": { "value": "#08090d" },
+      "panel":   { "value": "#0a0b10" }
+    },
+    "border": {
+      "subtle": { "value": "rgba(255, 255, 255, 0.05)" }
+    },
+    "text": {
+      "bright": { "value": "#f8fafc" },
+      "muted":  { "value": "#94a3b8" },
+      "dim":    { "value": "#64748b" }
+    },
+    "accent": {
+      "indigo":  { "value": "#6366f1" },
+      "emerald": { "value": "#10b981" }
+    }
+  }
+}
