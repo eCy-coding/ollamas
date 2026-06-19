@@ -31,6 +31,25 @@ export const MIGRATIONS: Migration[] = [
       await db.exec("CREATE INDEX IF NOT EXISTS idx_usage_events_ts ON usage_events(ts)");
     },
   },
+  {
+    version: 2,
+    name: "oauth_clients",
+    // OAuth 2.1 Dynamic Client Registration (RFC 7591, Faz 15B). Stores DCR-issued
+    // client metadata. PK is a text client_id (no auto-increment needed), so the
+    // DDL is identical on both dialects.
+    up: async (db) => {
+      await db.exec(`CREATE TABLE IF NOT EXISTS oauth_clients (
+        client_id TEXT PRIMARY KEY,
+        client_secret_hash TEXT,
+        redirect_uris TEXT NOT NULL DEFAULT '[]',
+        grant_types TEXT NOT NULL DEFAULT '[]',
+        token_endpoint_auth_method TEXT NOT NULL DEFAULT 'client_secret_basic',
+        client_name TEXT,
+        registration_access_token_hash TEXT,
+        created_at TEXT NOT NULL
+      )`);
+    },
+  },
 ];
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:

@@ -25,6 +25,18 @@ const PAGE = 50;
 const encodeCursor = (n: number) => Buffer.from(String(n)).toString("base64");
 const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toString(), 10) || 0 : 0);
 
+// Single source of truth for the gateway's MCP identity. server.json, the
+// /.well-known/mcp.json discovery doc, and the live Server handshake all read
+// these — keeping them here prevents version/capability drift (Faz 15A).
+export const MCP_SERVER_NAME = "ollamas-gateway";
+export const MCP_SERVER_VERSION = "1.6.0";
+export const MCP_PROTOCOL_VERSION = "2025-06-18";
+// Advertise only what we implement (Faz 14A): tools/resources/prompts/
+// completions + structured logging. listChanged is false (stateless transport).
+export const MCP_CAPABILITIES = {
+  tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {},
+} as const;
+
 // RFC 5424 severities, MCP logging order (low → high). A message is sent when its
 // severity is at or above the connection's current level.
 const LOG_LEVELS = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"] as const;
@@ -33,10 +45,8 @@ const rank = (l: string) => { const i = LOG_LEVELS.indexOf(l as LogLevel); retur
 
 function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
-    { name: "ollamas-gateway", version: "1.5.0" },
-    // Advertise only what we implement (Faz 14A): tools/resources/prompts/
-    // completions + structured logging. listChanged is false (stateless transport).
-    { capabilities: { tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {} } }
+    { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
+    { capabilities: { ...MCP_CAPABILITIES } }
   );
 
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;

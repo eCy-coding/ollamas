@@ -117,12 +117,15 @@ sandbox YOK). Dış tenant'a açmak ciddi sınır.
 
 - ✅ `Faz 14` v1.5 (MCP Protocol Completeness + Observability, zero-dep) — 14A MCP logging (`logging` capability + `logging/setLevel` + choke-point `notifications/message` level-gated; dürüst capabilities, server 1.5.0); 14B tool `outputSchema` + CallTool `structuredContent` (text geriye-uyumlu); 14C observability depth (`/metrics`: `ollamas_db_pool_connections{state}`/`migration_version`/`webhook_queue_depth`/`shutdown_total`, prom-client async collect + store accessors `poolStats`/`migrationVersion`/`pendingDeliveryCount`). **Canlı kanıt: capability+setLevel e2e; tam suite 81/1 iki dialect; /metrics yeni seriler.** *(completion tool-arg + sampling/roots/elicitation/resource-subscribe → backlog: MCP `complete` yalnız prompt/resource ref; stateless transport bidirectional sınırı.)*
 
+- ✅ `Faz 15` v1.6 (MCP Ecosystem Interop + Auth Completeness, zero-dep) — proven spec/registry kodundan adopte (sıfırdan icat yok). 15A discovery+manifest: `server.json` (resmi `modelcontextprotocol/registry` formatı, schema 2025-12-11, reverse-DNS `io.github.eCy-coding/ollamas`, `remotes[streamable-http]`) + `GET /.well-known/mcp.json` (capabilities/transport/auth/primitives, `server/mcp/discovery.ts`) + tek `MCP_SERVER_VERSION`/`MCP_CAPABILITIES` const (drift-guard, `server/mcp/server.ts`); 15B OAuth 2.1 DCR (RFC 7591): public `POST /register` → `client_id`(+secret confidential) + `registration_access_token` (`registerClient`, migration v2 `oauth_clients`, rate-limited + `DCR_INITIAL_ACCESS_TOKEN` gate) + `GET /.well-known/oauth-authorization-server` (RFC 8414, `registration_endpoint`) + RFC 9728 metadata `authorization_servers` self-point. **Canlı kanıt: 5-uçlu self-boot turu (mcp.json 22 tool/3 prompt, AS metadata, DCR confidential+public); tam suite 99/1 iki dialect (sqlite+pg18); vite build.** *(DCR = yalnız client-metadata kaydı; token issuance = tam OAuth 2.1 AS → backlog. Gerçek public registry push dışa-dönük → ayrı onaylı adım, workflow disabled.)*
+
 Sonraki işler aynı sözleşmeyle: yeşil kapı (§3) + logbook (§6) + conventional commit.
 Detay: `~/.claude/plans/ollamas-projesini-a-ve-atomic-wand.md`.
 
 ### Backlog (araştırma-onaylı, henüz YAPILMADI)
 Faz 9 sonrası kalanlar (ayrı altyapı ister):
-- Tam **OAuth 2.1 authorization-server** (token issuance/refresh). *JWT validation + RFC 8707 audience Faz 9B'de yapıldı; eksik olan kendi AS'imizi çalıştırmak.*
+- **Gateway hardening (v1.7 adayı)** — proven OSS deseni: read-only tool sonuç cache (Conduit), tool-çıktısı secret-pattern redaction (docker/mcp-gateway `--block-secrets`), choke-point pre/post plugin-hook çerçevesi (IBM ContextForge).
+- Tam **OAuth 2.1 authorization-server** (token issuance/refresh). *JWT validation + RFC 8707 audience Faz 9B'de; DCR client-metadata kaydı Faz 15B'de; eksik olan authorization/token endpoint'i.*
 - Host-bridge token **HMAC + TTL + TLS/unix-socket** (şu an plaintext `X-Bridge-Token`, localhost).
 - **Per-call gerçek-zamanlı** Stripe meter (şu an nightly batch, idempotent).
 - **K8s manifest** + Redis HA + tam **OpenAPI** spec + MCP `resources`/`prompts` primitive.

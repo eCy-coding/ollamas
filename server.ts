@@ -19,9 +19,10 @@ import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { handleMcpRequest } from "./server/mcp/server";
-import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
+import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata, AUTH_SERVER_METADATA_PATH, REGISTRATION_PATH } from "./server/mcp/oauth-metadata";
+import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -1295,10 +1296,63 @@ content
     };
   };
 
+  // Externally-reachable origin. MCP_PUBLIC_URL pins it behind a proxy/LB; else
+  // derive from the request. Used by all public discovery docs (Faz 15).
+  const reqBase = (req: import("express").Request) =>
+    process.env.MCP_PUBLIC_URL || `${req.protocol}://${req.get("host") || "localhost"}`;
+
   // RFC 9728 Protected Resource Metadata (public). MCP clients fetch this after a
   // 401's WWW-Authenticate to discover how to authenticate (AGENTS.md Faz 6A).
   app.get(PROTECTED_RESOURCE_PATH, (req, res) => {
-    res.json(buildResourceMetadata(`${req.protocol}://${req.get("host") || "localhost"}`));
+    res.json(buildResourceMetadata(reqBase(req)));
+  });
+
+  // MCP HTTP discovery (Faz 15A): capabilities + transport + auth before connect.
+  app.get(MCP_DISCOVERY_PATH, (req, res) => {
+    res.json(mcpDiscovery(reqBase(req)));
+  });
+
+  // RFC 8414 Authorization Server Metadata (public) — advertises the DCR
+  // registration_endpoint so RFC 7591 clients can self-register (Faz 15B).
+  app.get(AUTH_SERVER_METADATA_PATH, (req, res) => {
+    res.json(buildAuthServerMetadata(reqBase(req)));
+  });
+
+  // RFC 7591 Dynamic Client Registration (public, pre-auth). Issues a client_id
+  // (+ secret for confidential clients) so MCP clients onboard without manual
+  // setup. Rate-limited; DCR_INITIAL_ACCESS_TOKEN (if set) gates open registration.
+  // NOTE: this records client metadata only — token issuance is a full OAuth 2.1
+  // authorization server (backlog); ollamas still authenticates via opaque API keys.
+  app.post(REGISTRATION_PATH, rateLimitMiddleware(), async (req, res) => {
+    const gate = process.env.DCR_INITIAL_ACCESS_TOKEN;
+    if (gate) {
+      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+      if (bearer !== gate) return res.status(401).json({ error: "invalid_token", error_description: "initial access token required" });
+    }
+    const body = req.body || {};
+    if (body.redirect_uris !== undefined && !Array.isArray(body.redirect_uris)) {
+      return res.status(400).json({ error: "invalid_client_metadata", error_description: "redirect_uris must be an array" });
+    }
+    try {
+      const r = await registerClient({
+        redirect_uris: body.redirect_uris, grant_types: body.grant_types,
+        token_endpoint_auth_method: body.token_endpoint_auth_method, client_name: body.client_name,
+      });
+      const base = reqBase(req);
+      res.status(201).json({
+        client_id: r.client_id,
+        ...(r.client_secret ? { client_secret: r.client_secret } : {}),
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        ...(r.client_secret ? { client_secret_expires_at: 0 } : {}),
+        redirect_uris: r.redirect_uris,
+        grant_types: r.grant_types,
+        token_endpoint_auth_method: r.token_endpoint_auth_method,
+        registration_access_token: r.registration_access_token,
+        registration_client_uri: `${base}${REGISTRATION_PATH}/${r.client_id}`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "server_error", error_description: err?.message || "registration failed" });
+    }
   });
 
   // Origin allowlist for /mcp — DNS-rebinding protection (MCP Transports spec).

@@ -306,6 +306,48 @@ export async function deleteUpstreamServer(tenantId: string, id: string): Promis
   return (await d().run("DELETE FROM upstream_servers WHERE id = ? AND tenant_id = ?", [id, tenantId])).changes > 0;
 }
 
+// --- OAuth 2.1 Dynamic Client Registration (RFC 7591, Faz 15B) ---
+export interface DcrRequest {
+  redirect_uris?: string[];
+  grant_types?: string[];
+  token_endpoint_auth_method?: string;
+  client_name?: string;
+}
+export interface DcrResult {
+  client_id: string;
+  client_secret?: string;
+  client_secret_hash: string | null;
+  redirect_uris: string[];
+  grant_types: string[];
+  token_endpoint_auth_method: string;
+  registration_access_token: string;
+}
+/** Register a DCR client. Secrets are returned in plaintext ONCE and stored only
+ *  as SHA-256 hashes (same one-way handling as api_keys). */
+export async function registerClient(req: DcrRequest): Promise<DcrResult> {
+  const clientId = `oc_${crypto.randomBytes(8).toString("hex")}`;
+  const authMethod = req.token_endpoint_auth_method || "client_secret_basic";
+  const redirectUris = req.redirect_uris ?? [];
+  const grantTypes = req.grant_types ?? ["authorization_code"];
+  // Public clients (token_endpoint_auth_method=none) get no secret (RFC 7591).
+  const secret = authMethod === "none" ? undefined : `ocs_${crypto.randomBytes(24).toString("hex")}`;
+  const regToken = `rat_${crypto.randomBytes(24).toString("hex")}`;
+  await d().run(
+    "INSERT INTO oauth_clients (client_id, client_secret_hash, redirect_uris, grant_types, token_endpoint_auth_method, client_name, registration_access_token_hash, created_at) VALUES (?,?,?,?,?,?,?,?)",
+    [clientId, secret ? sha256(secret) : null, JSON.stringify(redirectUris), JSON.stringify(grantTypes), authMethod, req.client_name ?? null, sha256(regToken), nowIso()]
+  );
+  return {
+    client_id: clientId, client_secret: secret, client_secret_hash: secret ? sha256(secret) : null,
+    redirect_uris: redirectUris, grant_types: grantTypes, token_endpoint_auth_method: authMethod,
+    registration_access_token: regToken,
+  };
+}
+/** Lookup a registered client (test/introspection). Never returns secrets. */
+export async function getClient(clientId: string): Promise<{ client_id: string; redirect_uris: string[]; grant_types: string[]; token_endpoint_auth_method: string; created_at: string } | null> {
+  const r = (await d().query("SELECT * FROM oauth_clients WHERE client_id = ?", [clientId])).rows[0];
+  return r ? { client_id: r.client_id, redirect_uris: JSON.parse(r.redirect_uris || "[]"), grant_types: JSON.parse(r.grant_types || "[]"), token_endpoint_auth_method: r.token_endpoint_auth_method, created_at: r.created_at } : null;
+}
+
 // --- Tenant webhooks (Faz 11B) ---
 export interface Webhook { id: string; tenant_id: string; url: string; events: string[]; active: number; created_at: string; }
 export async function addWebhook(tenantId: string, url: string, events: string[]): Promise<{ id: string; secret: string }> {

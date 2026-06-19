@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.eCy-coding/ollamas",
+  "description": "MCP gateway + tools-as-SaaS broker (Ollama-first). Exposes workspace tools over Streamable HTTP and consumes upstream MCP servers, with multi-tenant auth, rate-limit, usage metering, and billing.",
+  "title": "ollamas Gateway",
+  "version": "1.6.0",
+  "websiteUrl": "https://github.com/eCy-coding/ollamas",
+  "repository": {
+    "url": "https://github.com/eCy-coding/ollamas",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "http://localhost:3000/mcp"
+    }
+  ]
+}

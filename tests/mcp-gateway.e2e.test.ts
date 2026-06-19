@@ -263,6 +263,43 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
   });
 });
 
+describe("MCP ecosystem interop + DCR (Faz 15, public pre-auth)", () => {
+  test("/.well-known/mcp.json is served pre-auth with live capabilities", async () => {
+    const r = await fetch(`${BASE}/.well-known/mcp.json`);
+    expect(r.status).toBe(200);
+    const d = await r.json() as any;
+    expect(d.transport.type).toBe("streamable-http");
+    expect(d.capabilities.tools).toBeDefined();
+    expect(d.capabilities.logging).toBeDefined();
+    expect(d.auth.required).toBe(true); // this boot sets SAAS_ENFORCE=1
+  });
+
+  test("/.well-known/oauth-authorization-server advertises registration_endpoint", async () => {
+    const m = await (await fetch(`${BASE}/.well-known/oauth-authorization-server`)).json() as any;
+    expect(m.registration_endpoint).toBe(`${BASE}/register`);
+  });
+
+  test("POST /register (RFC 7591) issues a client_id + secret without an API key", async () => {
+    const r = await fetch(`${BASE}/register`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect_uris: ["https://app.example.com/cb"], client_name: "e2e" }),
+    });
+    expect(r.status).toBe(201);
+    const c = await r.json() as any;
+    expect(c.client_id).toMatch(/^oc_/);
+    expect(c.client_secret).toMatch(/^ocs_/);
+    expect(c.registration_client_uri).toContain(c.client_id);
+  });
+
+  test("POST /register rejects non-array redirect_uris (400)", async () => {
+    const r = await fetch(`${BASE}/register`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect_uris: "not-an-array" }),
+    });
+    expect(r.status).toBe(400);
+  });
+});
+
 describe("MCP gateway CONSUME (stdio upstream)", () => {
   test("connectUpstream merges a stdio MCP tool reachable via the choke-point", async () => {
     // Isolated store env for the in-process registry used here.
