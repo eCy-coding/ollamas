@@ -8,9 +8,10 @@ import { runDoctor } from "./commands/doctor";
 import { runAgent } from "./commands/agent";
 import { runSaas } from "./commands/saas";
 import { runBench } from "./commands/bench";
+import { runMcp } from "./commands/mcp";
 import { loadConfig, saveConfig, configPath, type CliConfig } from "./lib/config";
 
-const VERSION = "4.0.0";
+const VERSION = "5.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
@@ -22,6 +23,7 @@ commands:
     agent sessions   list persisted agent sessions
     agent rm <id>    delete a session
   saas <action>      manage the SaaS layer (plans|tenants|keys|audit|usage|billing)
+  mcp <action>       MCP client (info|tools|call|upstreams|add|rm) via /mcp
   bench              benchmark models (tok/s, TTFB) and pick the fastest
   doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken|profile)
@@ -81,7 +83,7 @@ function runConfig(rest: string[]): number {
     process.stdout.write(JSON.stringify({ path: configPath(), ...redacted }, null, 2) + "\n");
     return 0;
   }
-  const allowed = ["gateway", "model", "provider", "apiKey", "saasAdminToken", "profile"];
+  const allowed = ["gateway", "model", "provider", "apiKey", "saasAdminToken", "mcpGuardAllow", "mcpGuardDeny", "profile"];
   if (!allowed.includes(key)) {
     process.stderr.write(`config: unknown key '${key}' (allowed: ${allowed.join(", ")})\n`);
     return 2;
@@ -108,6 +110,8 @@ export async function main(argv: string[]): Promise<number> {
       return runSaas(rest);
     case "bench":
       return runBench(rest);
+    case "mcp":
+      return runMcp(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":

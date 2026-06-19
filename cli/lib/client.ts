@@ -2,6 +2,8 @@
 // ToolRegistry. Every tool side effect goes through the gateway's single
 // choke-point (AGENTS.md §4). This file holds no dispatch logic.
 import type { DoctorReport } from "./output";
+import type { McpTool } from "./mcp";
+import { rpcEnvelope, parseRpcResponse } from "./mcp";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -41,6 +43,7 @@ export class GatewayClient {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
   private readonly adminToken?: string;
+  private rpcId = 0;
 
   constructor(baseUrl: string, apiKey?: string, adminToken?: string) {
     // Normalize: drop trailing slashes so `${base}/api/x` never doubles up (G3).
@@ -201,6 +204,79 @@ export class GatewayClient {
     return r.json();
   }
 
+  // --- MCP client surface (v5). Tools cross the gateway's single choke-point at
+  // /mcp (ToolRegistry.execute). Stateless transport: no initialize handshake,
+  // no session id; replies are SSE-framed. No Origin header sent — the gateway
+  // always allows an absent Origin (DNS-rebinding guard), which is strictly more
+  // permissive than guessing the allowlist (server.ts:1293).
+
+  // One JSON-RPC round-trip against /mcp. Bearer apiKey when SAAS_ENFORCE=1.
+  private async mcpRpc(method: string, params: Record<string, any> = {}): Promise<any> {
+    const r = await fetch(`${this.baseUrl}/mcp`, {
+      method: "POST",
+      headers: this.headers({ "Content-Type": "application/json", Accept: "application/json, text/event-stream" }),
+      body: JSON.stringify(rpcEnvelope(++this.rpcId, method, params)),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!r.ok) throw new Error(mcpError(r.status));
+    const env = parseRpcResponse(await r.text());
+    if (env.error) throw new Error(`MCP ${method}: ${env.error.message || JSON.stringify(env.error)}`);
+    return env.result;
+  }
+
+  // List every exposed tool, following cursor pagination (server PAGE=50).
+  async mcpListTools(): Promise<McpTool[]> {
+    const tools: McpTool[] = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.mcpRpc("tools/list", cursor ? { cursor } : {});
+      tools.push(...(res?.tools ?? []));
+      cursor = res?.nextCursor;
+    } while (cursor);
+    return tools;
+  }
+
+  // Invoke a tool via the gateway choke-point. Returns { content[], isError }.
+  async mcpCallTool(name: string, args: Record<string, any>): Promise<{ content?: any[]; isError?: boolean }> {
+    return this.mcpRpc("tools/call", { name, arguments: args });
+  }
+
+  // Public discovery (no auth): which tiers/tools the gateway exposes + upstreams.
+  async mcpInfo(): Promise<{ exposeTiers: string[]; exposedTools: string[]; upstreams: any[] }> {
+    return this.getJson("/api/mcp/upstreams");
+  }
+
+  // --- Tenant upstream MCP registry (Bearer apiKey, NOT admin token) ---
+  listUpstreams(): Promise<UpstreamServer[]> {
+    return this.getJson("/api/saas/upstreams");
+  }
+  addUpstream(body: UpstreamInput): Promise<{ id: string; connect?: any }> {
+    return this.apiPost("/api/saas/upstreams", body);
+  }
+  removeUpstream(id: string): Promise<{ deleted: string; toolsRemoved: number }> {
+    return this.apiDelete(`/api/saas/upstreams/${encodeURIComponent(id)}`);
+  }
+
+  private async apiPost(path: string, body: any): Promise<any> {
+    const r = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: this.headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!r.ok) throw new Error(`gateway ${path} → ${r.status}${r.status === 401 ? "  hint: set OLLAMAS_API_KEY (tenant key)" : ""}`);
+    return r.json();
+  }
+  private async apiDelete(path: string): Promise<any> {
+    const r = await fetch(`${this.baseUrl}${path}`, {
+      method: "DELETE",
+      headers: this.headers(),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) throw new Error(`gateway ${path} → ${r.status}`);
+    return r.json();
+  }
+
   // --- SaaS / billing admin surface (v3) — all behind adminGuard (X-Admin-Token).
 
   listPlans(): Promise<Plan[]> {
@@ -264,6 +340,32 @@ function adminError(path: string, status: number): string {
     return `${base}\n  hint: admin auth — set OLLAMAS_SAAS_ADMIN or 'ollamas config saasAdminToken <token>' (gateway SAAS_ADMIN_TOKEN)`;
   }
   return base;
+}
+
+// /mcp rejects with 401/403 under SAAS_ENFORCE or a blocked Origin. Map to a hint.
+function mcpError(status: number): string {
+  const base = `gateway /mcp → ${status}`;
+  if (status === 401) return `${base}\n  hint: /mcp needs a tenant key — set OLLAMAS_API_KEY`;
+  if (status === 403) return `${base}\n  hint: Origin blocked (DNS-rebinding) — call from localhost or set ALLOWED_ORIGINS`;
+  return base;
+}
+
+export interface UpstreamServer {
+  id: string;
+  name: string;
+  transport?: "stdio" | "http";
+  url?: string | null;
+  command?: string | null;
+  args?: string[] | null;
+  allowed_tools?: string[] | null;
+}
+export interface UpstreamInput {
+  name: string;
+  transport: "stdio" | "http";
+  url?: string;
+  command?: string;
+  args?: string[];
+  allowedTools?: string[];
 }
 
 export interface Plan {
@@ -386,6 +488,8 @@ export async function buildDoctorReport(
   });
   const ready = await safeProbe(() => client.ready());
   const agent = await safeProbe(() => client.listSessions());
+  // MCP probe via the public info endpoint (no auth) — honest about exposure.
+  const mcp = await safeProbe(() => client.mcpInfo());
   // SaaS probe only when an admin token is configured; otherwise report skipped
   // (don't gate overall health on it).
   const saas = client.hasAdminToken() ? await safeProbe(() => client.listPlans()) : null;
@@ -399,6 +503,7 @@ export async function buildDoctorReport(
     ready: { ok: ready.ok, detail: ready.ok ? "ready" : ready.error },
     agent: { ok: agent.ok, detail: agent.ok ? `sessions=${countOf(agent.value)}` : agent.error },
     saas: saas ? { ok: saas.ok, detail: saas.ok ? `plans=${countOf(saas.value)}` : saas.error } : { ok: true, detail: "skipped (no admin token)" },
+    mcp: { ok: mcp.ok, detail: mcp.ok ? `tools=${countOf(mcp.value?.exposedTools)} upstreams=${countOf(mcp.value?.upstreams)}` : mcp.error },
   };
 }
 

@@ -46,6 +46,7 @@ export function formatDoctor(report: DoctorReport, ctx: OutputCtx): string {
     row("ready", report.ready),
     row("agent", report.agent),
     row("saas", report.saas),
+    row("mcp", report.mcp),
     "",
     report.healthy
       ? c("green", "healthy", ctx.color)
@@ -63,6 +64,7 @@ export interface DoctorReport {
   ready: { ok: boolean; detail: string };
   agent: { ok: boolean; detail: string };
   saas: { ok: boolean; detail: string };
+  mcp: { ok: boolean; detail: string };
 }
 
 // One line per agent tool step: tool · ok · latency · trimmed result/diff hint.

@@ -9,8 +9,8 @@
 | **v2** | Agent sürücü + sweep | `ollamas agent` ReAct loop (`/api/agent/chat` SSE); write-onay akışı (`/api/agent/approve-write`); oturum (`/api/agent/sessions`); `--yolo`/`--safe`; + 10 v1-gap (G1-G10) | ✅ DONE |
 | **v3** | SaaS/admin + sweep | `ollamas saas plans\|tenants\|tenant new\|keys\|key new\|revoke\|audit\|usage\|billing` → `/api/saas/*`+`/api/billing/*` (X-Admin-Token); `formatTable`; secret-once key; revoke confirm; doctor saas satırı; H1-H8 | ✅ DONE |
 | **v4** | Bench/calibration | `ollamas bench` dual-target (mac + remote/iOS-proxy); warmup'lı TTFB/tok/s/total; `cli-bench.json` host-etiketli; `pickBest` + `--apply`; I1-I6 | ✅ DONE |
-| **v5** | MCP client | `ollamas mcp add\|list\|call\|tools` — upstream register/consume `/api/mcp/upstreams` + `/mcp`; choke-point üzerinden çağrı | ▶ NEXT |
-| **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (agent/saas); remote-exposure doc (tailscale/LAN + key) | |
+| **v5** | MCP client | `ollamas mcp info\|tools\|call\|upstreams\|add\|rm` — `/mcp` JSON-RPC + `/api/saas/upstreams`; guard glob + HIL gate; choke-point üzerinden çağrı | ✅ DONE |
+| **v6** | iOS Shortcuts pack | `ollamas shortcuts build` → `.shortcut` (chat/bench/status); POSIX köprü tamamla (saas); remote-exposure doc (tailscale/LAN + key) | ▶ NEXT |
 | **v7** | Profiller + secrets | Çoklu-gateway profil; AES-GCM şifreli key store (`server/db.ts` SecureDB reuse) — v1 plaintext'i değiştir; `config use <profile>`; env override zinciri | |
 | **v8** | Observability/TUI | `ollamas top` canlı usage/metrics (`/metrics` prom parse + `/api/saas/usage/timeseries`); seyir-defteri.jsonl tail; terminal sparkline; `--watch` | |
 | **v9** | Packaging | `npm link` global; opsiyonel Go tek-binary (v4 bench TTFB kazancı gösterirse); Homebrew tap; shell completion (bash/zsh) | |
@@ -52,10 +52,20 @@
 - Bench ollama'ya doğrudan gitmez (yalnız `/api/generate`+`/api/models`); VERSION 4.0.0
 - **Gotcha**: N-006 echo-proof correctness (prompt'ta beklenen token olmamalı); N-007 bu gateway eval-timing yüzeye çıkarmıyor → tok/s=0 (gerçek Mac+native-ollama'da dolar)
 
-## v5 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/commands/mcp.ts` — alt-eylemler `list|add|rm|tools|call`.
-2. `cli/lib/client.ts` → `listUpstreams()`/`addUpstream(body)`/`removeUpstream(id)` → `/api/saas/upstreams` (authMiddleware tenant — apiKey gerekir, adminToken değil); `mcpTools()`/`mcpCall(tool,args)` → `/mcp` Streamable HTTP (JSON-RPC `tools/list`+`tools/call`).
-3. `/mcp` JSON-RPC istemci yardımcı (initialize→tools/list→tools/call), choke-point üzerinden.
-4. `formatTable` upstream/tool listesi; `--json` ham.
-5. auth: upstream CRUD tenant apiKey (`OLLAMAS_API_KEY`); `/mcp` Origin allowlist (DNS-rebinding guard, Faz 6) → `Origin` header doğru ver.
-6. Testler: mcp client mock-fetch (JSON-RPC envelope); `formatTable` reuse; doctor'a `mcp` opsiyonel.
+## v5 — DONE (kanıt)
+- **GitHub harvest** (eşleşen tamamlanmış MIT projeler → zero-dep TS PORT): f/mcptools (subcmd şekli, `--params`, tool-signature render, **guard** glob), jonigl/mcp-client-for-ollama (**HIL gate** destructive/open-world), MCP spec (JSON-RPC envelope). Binary vendor yok.
+- `cli/lib/mcp.ts` (saf-fn): `rpcEnvelope`/`parseRpcResponse` (SSE+JSON), `globMatch`/`filterByGuard`, `formatToolSignature`, `coerceArg`/`argsFromPairs`, `renderToolResult`, `toolDanger`.
+- `client.ts`: `mcpRpc` (stateless, Accept SSE, Bearer), `mcpListTools` (cursor pagination), `mcpCallTool`, `mcpInfo`, `listUpstreams`/`addUpstream`/`removeUpstream` (tenant apiKey); `mcpError` 401/403 hint.
+- `cli/commands/mcp.ts` yeni: `info|tools [--sig]|call [--params/--arg] [--yes]|upstreams|add|rm`; guard filtre; HIL gate; doctor `mcp` satırı.
+- config `mcpGuardAllow`/`mcpGuardDeny` (env `OLLAMAS_MCP_ALLOW`/`DENY`); POSIX köprü `mcp tools|call`.
+- Testler: `tests/cli-mcp.test.ts` (18) + output/parser ek — **full 140 pass/1 skip** (v4:122).
+- **Canlı** (kendi gateway :3009): `mcp info` tools=22; `mcp tools` ⚠ danger sütunu; `--sig` imza; `mcp call list_tree` gerçek choke-point sonucu; guard deny→3 hidden; tenant-key ile `upstreams` empty→`add` ups_…→liste 1 satır; `doctor` mcp ● up.
+- **Protokol gerçeği (canlı probe)**: `/mcp` **STATELESS** — initialize GEREKMİYOR (tools/list standalone döndü), session-id YOK, yanıt `text/event-stream`. **Origin gönderme** — no-Origin always-allowed (server.ts:1293), allowlist tahmininden robust.
+- Choke-point korunur (`grep ToolRegistry cli/`=yalnız yorum; ollama'ya/registry'ye import yok); VERSION 5.0.0
+
+## v6 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/commands/shortcuts.ts` — `ollamas shortcuts build` → `.shortcut` plist üret (chat/bench/status/mcp-call reçeteleri); `~/.ollamas/shortcuts/` çıktı.
+2. POSIX köprü `ollamas.sh` → `saas` yolu tamamla (admin token curl); `mcp upstreams/add/rm` ekle (şu an yalnız tools/call).
+3. Remote-exposure doc: tailscale/LAN + `OLLAMAS_API_KEY` + TLS; iOS Shortcut'ın vuracağı `/api/generate`+`/mcp` Bearer reçetesi.
+4. `mcp call --stream` (uzun tool progress notifications/progress — server zaten gönderiyor, SSE consume).
+5. Testler: shortcuts plist saf-fn üretim; POSIX köprü mcp smoke.

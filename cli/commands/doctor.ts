@@ -13,7 +13,7 @@ export async function runDoctor(argv: string[]): Promise<number> {
   });
 
   if (values.help) {
-    process.stdout.write("ollamas doctor — health of gateway + ollama + bridge + ready + agent\n  --json   machine-readable\n");
+    process.stdout.write("ollamas doctor — health of gateway + ollama + bridge + ready + agent + saas + mcp\n  --json   machine-readable\n");
     return 0;
   }
 

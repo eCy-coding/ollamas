@@ -71,6 +71,22 @@
 - **Not**: bench FEATURE doğru (ttfb/total/json/host-etiket/tablo + unit-test'li hesap). Gerçek tok/s yalnız **Mac+native-ollama**'da dolar (`providers.ts:250`). cli-bench.json host=`darwin/arm64` (CLI Mac host'ta koşuyor) ama inference backend container → N-002 ile birlikte: host-etiketi CLI tarafını yansıtır, gateway URL raporda ayrı.
 - **ÖNLEME/NOT**: throughput sayısı gerekiyorsa gateway'in gerçek ollama'ya bağlı olduğunu doğrula (`doctor` ollama up + gerçek model yüklü); demo/fallback'ta tok/s anlamsız.
 
+## v5 — MCP client (GitHub-harvested, 2026-06-19)
+
+### N-008 (protokol gerçeği) · `/mcp` STATELESS — initialize handshake gereksiz
+- **Gözlem**: plan, MCP spec'e göre `initialize→notifications/initialized→tools/list` handshake varsayıyordu. **Canlı probe** (boot+curl, evidence-first) gösterdi ki gateway `StreamableHTTPServerTransport({ sessionIdGenerator: undefined })` = **stateless**: `tools/list` **standalone** (önce initialize YOK) tam tool listesini döndürdü. `mcp-session-id` response header'ı YOK.
+- **Etki**: client `mcpRpc` = tek POST, handshake/session takibi YOK. Tahmin edilen 3-adımlı handshake yazılsaydı gereksiz 2 ekstra round-trip + olası "already initialized" hatası olurdu.
+- **ÖNLEME KURALI**: dış protokol entegrasyonunda spec'e körlemesine kodlama — **önce canlı probe et** (tek istek at, davranışı gör), sonra istemciyi gözleme göre yaz. Stateless transport → handshake yok varsay, kanıtla.
+
+### N-009 (güvenlik/robustluk) · `/mcp` Origin: göndermemek > tahmin etmek
+- **Gözlem**: server `originAllowed(origin)`: `if (!origin) return true` (header'sız MCP istemcisi her zaman geçer); Origin varsa ALLOWED_ORIGINS CSV veya localhost regex ister. Plan "Origin header doğru ver" diyordu.
+- **Karar**: Node `fetch` server-side **Origin eklemez** (probe: curl Origin'siz → geçti). İstemci Origin **göndermiyor** → DNS-rebinding guard'ı her config'de (ALLOWED_ORIGINS set olsa bile) geçer; Origin gönderseydik yanlış allowlist'te 403 riski.
+- **ÖNLEME KURALI**: izin-tabanlı guard'da "yanlış değer < değer-yok" ise, opsiyonel header'ı **hiç gönderme** (no-Origin always-allowed yolu). Tahmin edilen header eklemek attack-surface değil ama kırılganlık ekler.
+
+### N-010 (HIL sinyali) · tool tehlikesi = annotations.destructiveHint/openWorldHint
+- **Gözlem**: tools/list her tool'a `annotations: {readOnlyHint, destructiveHint, openWorldHint}` döndürüyor (tier alanı tools/list'te YOK). `macos_terminal`/`git_commit`/`write_host_file` → destructiveHint:true. HIL gate (ollmcp pattern) bu bayrağa anahtarlandı, ayrı tier sorgusu gerekmedi.
+- **Not**: `mcp call` tek tools/list çeker (hem isim doğrulama, hem --arg tip-coerce, hem danger tespiti) → tek round-trip ek maliyet, side-effect ÖNCESİ doğru tespit (post-hoc imkansız).
+
 ### N-004 (mimari sınır) · agent resume tam tool-history taşımıyor
 - **Gözlem**: write-onay sonrası resume, yalnız assistant history + "approved, continue" turu gönderir; tam tool-result history server session'da.
 - **Not**: server loop'u `messages` param'ından çalışır, session'ı yalnız sonda yazar → istemci-tarafı tam-history resume mümkün değil. Pragmatik resume yeterli; cap 12 round. v3+ session-load-into-loop server desteği gerekirse genişlet.

@@ -9,6 +9,8 @@ export interface CliConfig {
   gateway: string;
   apiKey?: string;
   saasAdminToken?: string; // X-Admin-Token for /api/saas/* + /api/billing/* (v3)
+  mcpGuardAllow?: string; // CSV glob whitelist for `mcp tools|call` (v5, mcptools guard)
+  mcpGuardDeny?: string; // CSV glob blacklist for `mcp tools|call` (v5)
   provider: string;
   model: string;
   profile: string;
@@ -31,6 +33,8 @@ export function resolveConfig(fileData: Partial<CliConfig>, env: NodeJS.ProcessE
     gateway: env.OLLAMAS_GATEWAY || fileData.gateway || DEFAULTS.gateway,
     apiKey: env.OLLAMAS_API_KEY || fileData.apiKey,
     saasAdminToken: env.OLLAMAS_SAAS_ADMIN || fileData.saasAdminToken,
+    mcpGuardAllow: env.OLLAMAS_MCP_ALLOW || fileData.mcpGuardAllow,
+    mcpGuardDeny: env.OLLAMAS_MCP_DENY || fileData.mcpGuardDeny,
     provider: env.OLLAMAS_PROVIDER || fileData.provider || DEFAULTS.provider,
     model: env.OLLAMAS_MODEL || fileData.model || DEFAULTS.model,
     profile: env.OLLAMAS_PROFILE || fileData.profile || DEFAULTS.profile,

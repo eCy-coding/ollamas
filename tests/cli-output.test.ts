@@ -35,6 +35,7 @@ const sample: DoctorReport = {
   ready: { ok: true, detail: "ready" },
   agent: { ok: true, detail: "sessions=2" },
   saas: { ok: true, detail: "skipped (no admin token)" },
+  mcp: { ok: true, detail: "tools=22 upstreams=0" },
 };
 
 describe("formatDoctor", () => {
@@ -46,6 +47,7 @@ describe("formatDoctor", () => {
     expect(out).toContain("gateway");
     expect(out).toContain("ready");
     expect(out).toContain("agent");
+    expect(out).toContain("mcp");
     expect(out).toContain("degraded");
     expect(out).not.toContain("\x1b["); // no color when disabled
   });

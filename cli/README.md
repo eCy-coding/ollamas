@@ -25,8 +25,9 @@ npm link               # exposes `ollamas` globally (bin field in package.json)
 | `ollamas agent sessions` | list persisted agent sessions |
 | `ollamas agent rm <id>` | delete a session |
 | `ollamas saas <action>` | admin: `plans\|tenants\|keys\|audit\|usage\|billing`, `tenant new`, `key new\|revoke` |
+| `ollamas mcp <action>` | MCP client over `/mcp`: `info\|tools\|call\|upstreams\|add\|rm` |
 | `ollamas bench` | benchmark models (tok/s, TTFB) across mac/remote targets; `--apply` picks the fastest |
-| `ollamas doctor` | health of gateway + ollama + bridge + ready + agent + saas |
+| `ollamas doctor` | health of gateway + ollama + bridge + ready + agent + saas + mcp |
 | `ollamas config [k] [v]` | show config, or set `gateway\|model\|provider\|apiKey\|saasAdminToken\|profile` |
 
 Run `ollamas <command> --help` for per-command flags. Common flags: `--json`,
@@ -42,6 +43,8 @@ OLLAMAS_API_KEY    bearer key for SAAS-enforced gateways (chat/agent need this w
 OLLAMAS_SAAS_ADMIN admin token (X-Admin-Token) for saas/billing commands
 OLLAMAS_MODEL      default model (default qwen3:8b)
 OLLAMAS_PROVIDER   default provider (default ollama-local)
+OLLAMAS_MCP_ALLOW  CSV glob whitelist for `mcp tools|call` (local guard)
+OLLAMAS_MCP_DENY   CSV glob blacklist for `mcp tools|call` (local guard)
 NO_COLOR           disable ANSI color
 ```
 
@@ -57,11 +60,37 @@ hash. `saas key revoke` prompts unless `--yes`/`--json`.
 > remote gateway only over TLS or a private tunnel (tailscale/LAN) — never plain
 > HTTP across an untrusted network.
 
+## MCP client
+
+`ollamas mcp` speaks JSON-RPC to the gateway's `/mcp` endpoint — every tool call
+still crosses the single choke-point (`ToolRegistry.execute`); the CLI never runs
+tools itself. The transport is **stateless** (no `initialize` handshake, no session
+id) and replies SSE-framed.
+
+```bash
+ollamas mcp info                       # tiers/tools the gateway exposes (no auth)
+ollamas mcp tools [--sig]              # list tools (⚠ = destructive); --sig = signatures
+ollamas mcp call read_file --arg path=cli/index.ts
+ollamas mcp call run_command --params '{"command":"git status"}'
+ollamas mcp upstreams                  # registered upstream MCP servers
+ollamas mcp add --name X --transport http --url http://host:port/mcp --allow tool_a,tool_b
+ollamas mcp rm <id>                    # prompts unless --yes
+```
+
+- **Auth:** `tools/call`, `upstreams`, `add`, `rm` need a **tenant** key
+  (`OLLAMAS_API_KEY`) — *not* the admin token. `info` is public.
+- **HIL gate:** a tool with `destructiveHint`/`openWorldHint` (e.g. `macos_terminal`,
+  `git_commit`) prompts before it runs, unless `--yes` or `--json` (ported from
+  jonigl/mcp-client-for-ollama).
+- **Local guard:** `OLLAMAS_MCP_ALLOW`/`OLLAMAS_MCP_DENY` (CSV globs) filter which
+  tools `mcp tools`/`call` will show/permit — a client-side allow/deny on top of the
+  gateway's per-tenant tier visibility (ported from f/mcptools `guard`).
+
 ## Remote / iOS
 
 The gateway is HTTP — reach it from a phone over LAN or tailscale, then either:
 
-- **SSH/iSH:** run `bin/ollamas.sh <doctor|chat|agent> …` (pure curl, no Node).
+- **SSH/iSH:** run `bin/ollamas.sh <doctor|chat|agent|mcp> …` (pure curl, no Node).
 - **Shortcuts (v6):** generated `.shortcut` files POST to `/api/generate` and `/api/agent/chat`.
 
 Set `OLLAMAS_GATEWAY` to the reachable URL and `OLLAMAS_API_KEY` when the gateway

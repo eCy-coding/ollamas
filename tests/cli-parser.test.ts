@@ -72,6 +72,12 @@ describe("main dispatch (G9)", () => {
     silence();
     expect(await main(["bench", "--help"])).toBe(0);
   });
+
+  it("routes mcp: --help exits 0, no action exits 2 (no network)", async () => {
+    silence();
+    expect(await main(["mcp", "--help"])).toBe(0);
+    expect(await main(["mcp"])).toBe(2);
+  });
 });
 
 describe("config resolution precedence", () => {

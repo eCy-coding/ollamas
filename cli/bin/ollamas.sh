@@ -47,11 +47,34 @@ case "$cmd" in
     curl -fsS -N $AUTH -H "Content-Type: application/json" -d "$body" "$GATEWAY/api/agent/chat"
     echo
     ;;
+  mcp)
+    # MCP over the gateway choke-point (/mcp, JSON-RPC 2.0, Streamable HTTP).
+    #   ollamas.sh mcp tools                 list tool names
+    #   ollamas.sh mcp call <tool> '{json}'  call a tool with JSON args
+    # Response is SSE-framed (`data: {…}`); strip the prefix to raw JSON.
+    sub="${1:-tools}"
+    [ $# -gt 0 ] && shift || true
+    case "$sub" in
+      tools)
+        rpc='{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+        ;;
+      call)
+        tool="${1:-}"; [ -n "$tool" ] || { echo "usage: ollamas.sh mcp call <tool> '{json}'" >&2; exit 2; }
+        args="${2:-{}}"
+        rpc=$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"%s","arguments":%s}}' "$(esc "$tool")" "$args")
+        ;;
+      *) echo "ollamas.sh mcp: unknown sub '$sub' (tools|call)" >&2; exit 2 ;;
+    esac
+    # shellcheck disable=SC2086
+    curl -fsS $AUTH -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+      -d "$rpc" "$GATEWAY/mcp" | sed 's/^data: //;/^event:/d;/^$/d'
+    echo
+    ;;
   help|--help|-h)
-    echo "ollamas.sh <doctor|chat|agent> — POSIX curl bridge to $GATEWAY"
+    echo "ollamas.sh <doctor|chat|agent|mcp> — POSIX curl bridge to $GATEWAY"
     ;;
   *)
-    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|agent|help)" >&2
+    echo "ollamas.sh: unknown command '$cmd' (doctor|chat|agent|mcp|help)" >&2
     exit 2
     ;;
 esac
