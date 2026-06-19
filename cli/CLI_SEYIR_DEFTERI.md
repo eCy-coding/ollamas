@@ -90,3 +90,22 @@
 ### N-004 (mimari sınır) · agent resume tam tool-history taşımıyor
 - **Gözlem**: write-onay sonrası resume, yalnız assistant history + "approved, continue" turu gönderir; tam tool-result history server session'da.
 - **Not**: server loop'u `messages` param'ından çalışır, session'ı yalnız sonda yazar → istemci-tarafı tam-history resume mümkün değil. Pragmatik resume yeterli; cap 12 round. v3+ session-load-into-loop server desteği gerekirse genişlet.
+
+## v6 — iOS Shortcuts pack (2026-06-19)
+
+### E-005 · POSIX köprü auth header word-split → `Bearer` (token kayıp), chat/agent'ı da sessizce bozdu
+- **Semptom**: bridge smoke-test `mcp upstreams` → server `Authorization: Bearer` aldı (token YOK). Beklenen `Bearer olm_test`.
+- **Kök neden**: `AUTH="-H Authorization:Bearer ${KEY}"`; sonra `curl $AUTH` (unquoted). Shell word-splitting `Bearer KEY`'i boşlukta böler → curl arg'ları `-H`, `Authorization:Bearer`, `KEY` olur; header değeri `Bearer`'a kesilir, `KEY` ayrı (yutulan) arg. **v1'den beri sessiz**: chat/agent auth'u da aynı şekilde bozuktu — yalnız enforce-açık gateway'de fark edilirdi.
+- **Fix**: AUTH/ADMIN vars silindi; `ocurl()`/`ocurl_admin()` helper'ları token'ı **gerçek curl argümanı** olarak geçer (`curl -fsS -H "Authorization: Bearer $KEY" "$@"`), word-split yok.
+- **ÖNLEME KURALI**: POSIX sh'da boşluk içeren değer (auth header) **asla** unquoted var'da curl'e verilmez (array yok). Helper fonksiyon + `"$@"` ile gerçek-arg geç. Bunu test eden bir smoke yoksa yaz (mock server header'ı assert etsin).
+
+### N-011 (test gerçeği) · `spawnSync` + in-process HTTP stub = deadlock
+- **Semptom**: bridge smoke-test'i sonsuza astı (>60s timeout), vitest header'da donup kaldı.
+- **Kök neden**: test stub server'ı vitest worker'ının **aynı event loop**'unda; `spawnSync("sh", …)` event loop'u **bloke eder** → curl isteği gelir ama server yanıt veremez (loop meşgul) → curl bekler → spawnSync bekler → kilitlenme.
+- **Fix**: `spawnSync` → async `spawn` + Promise (`child.on("close")`). Loop serbest kalır, in-process server curl'e yanıt verir.
+- **ÖNLEME KURALI**: aynı Node sürecindeki bir server'a istek atan child process'i **asla** `spawnSync`/sync I/O ile çağırma — event loop'u bloke eder. Async spawn + await kullan.
+
+### N-012 (gate düzeltme) · choke-point grep'i artık yorum-mention'larıyla eşleşiyor
+- **Gözlem**: `grep -r ToolRegistry cli/` eski "= boş" konvansiyonu artık yanlış — `client.ts`/`mcp.ts`/`index.ts` yorumları (`never imports server/tool-registry`, `ToolRegistry.execute`) grep'e takılıyor. Yasanın özü = **gerçek import yok**, mention değil.
+- **Fix/Not**: gerçek gate = `grep -rn --include="*.ts" "from.*tool-registry\|require.*tool-registry" cli/` → boş olmalı (`.md` mention'ları hariç; import-grep'in kendisi bile doc'ta geçince eşleşir → `--include="*.ts"` şart). Bu phase'de doğrulandı: 0 gerçek import. CLI_AGENTS §3.1 güncellendi.
+- **ÖNLEME KURALI**: kanıt-grep'i yorum/dokümantasyon mention'larına duyarsız yaz (import statement'ı hedefle), aksi halde gate false-positive verir.

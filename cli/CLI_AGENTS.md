@@ -28,7 +28,11 @@ onu küçük ve choke-point-uyumlu ekleyip CLI'a dön.
 ## §3 — Değişmez Yasalar (ihlal = hata)
 1. **Choke-point**: CLI `server/tool-registry`'yi **import etmez**. Tüm tool yan-etkileri
    gateway'in `/mcp` veya `/api/*` üzerinden geçer → orada `ToolRegistry.execute`'a iner.
-   CLI = ince istemci, ikinci dispatch yolu YOK. (`grep -r ToolRegistry cli/` = boş)
+   CLI = ince istemci, ikinci dispatch yolu YOK. Gate (N-012): yorum mention'ları değil
+   **gerçek import** hedefle → `grep -rn --include="*.ts" "from.*tool-registry\|require.*tool-registry" cli/` = boş (yalnız .ts; .md mention'ları hariç).
+9. **Apple-signing gerçeği** (v6): compiled `.shortcut` = signed (AEA); unsigned dosya iOS'ta
+   import EDİLEMEZ. CLI çift-tık iPhone binary üretmez → XML WFWorkflow plist scaffold + macOS
+   `shortcuts import` re-sign + saf-iOS reçete kartı. iOS reçete daima `stream:false` (SSE yok).
 2. **Zero-dep tercih**: repo ethos'u. Built-in (`node:util`, `node:readline`, `fetch`,
    `TextDecoder`) önce. Yeni runtime-dep eklemeden önce gerekçelendir + Architect onayı.
 3. **Saf çekirdek**: parse/format/SSE-split saf fonksiyon → socket'siz test edilir.
