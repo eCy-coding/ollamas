@@ -116,7 +116,8 @@ function readErrors(wtPath: string): ErrorSignal {
 async function fetchBackend(): Promise<BackendRuntime | null> {
   const base = `http://127.0.0.1:${BACKEND_PORT}`;
   try {
-    const ctrl = AbortSignal.timeout(2000);
+    // Backend kapalıyken ilk SSE frame'i bloke etmesin: hızlı düş (800ms). Açıkken sağlık <100ms.
+    const ctrl = AbortSignal.timeout(Number(process.env.ORCH_BACKEND_TIMEOUT_MS || 800));
     const [hRes, mRes] = await Promise.all([
       fetch(`${base}/api/health`, { signal: ctrl }),
       fetch(`${base}/metrics`, { signal: ctrl }).catch(() => null),
@@ -144,8 +145,29 @@ function laneName(branch: string, path: string): string {
   return m ? m[1] : branch.replace(/^feat\//, "");
 }
 
-/** Canlı READ-ONLY snapshot. Backend opsiyonel; eksik veri → "—"/null, asla throw. */
-export async function collect(): Promise<CockpitSnapshot> {
+/**
+ * Canlı sekme→lane sayım haritası (osascript; izin yok → null). PAHALI (~5s, Automation hang).
+ * Nadiren değişir → serve.ts bunu cache'ler (her poll'de ÇAĞIRMAZ), collect()'e enjekte eder.
+ */
+export function liveTabMap(): Map<string, number> | null {
+  const wts = discoverWorktrees();
+  const dwts: DWorktree[] = wts.map((w) => ({ path: w.path, branch: w.branch }));
+  const tabRes = discoverTabs();
+  if (!tabRes.available) return null;
+  const m = new Map<string, number>();
+  for (const t of tabRes.tabs) {
+    const wt = tabWorktree(t.tty, dwts);
+    if (wt) m.set(wt.path, (m.get(wt.path) || 0) + 1);
+  }
+  return m;
+}
+
+/**
+ * Canlı READ-ONLY snapshot. Backend opsiyonel; eksik veri → "—"/null, asla throw.
+ * opts.tabMap: undefined → canlı keşfet (PAHALI, status.ts/standalone); Map → enjekte (serve cache);
+ * null → sekmeyi atla (tabs=-1, hızlı SSE).
+ */
+export async function collect(opts: { tabMap?: Map<string, number> | null } = {}): Promise<CockpitSnapshot> {
   const wts = discoverWorktrees();
   const dwts: DWorktree[] = wts.map((w) => ({ path: w.path, branch: w.branch }));
 
@@ -154,15 +176,9 @@ export async function collect(): Promise<CockpitSnapshot> {
   const serverByPath = new Map<string, { port: number; up: boolean }>();
   for (const s of servers) if (!serverByPath.has(s.path)) serverByPath.set(s.path, { port: s.port, up: true });
 
-  // Terminal.app sekme keşfi (izin yoksa zarafetle atlar → tabs=-1).
-  const tabRes = discoverTabs();
-  const tabByPath = new Map<string, number>();
-  if (tabRes.available) {
-    for (const t of tabRes.tabs) {
-      const wt = tabWorktree(t.tty, dwts);
-      if (wt) tabByPath.set(wt.path, (tabByPath.get(wt.path) || 0) + 1);
-    }
-  }
+  // Sekme haritası: enjekte (serve cache) yoksa canlı keşfet. null → atla (tabs=-1).
+  const tabByPath = opts.tabMap !== undefined ? opts.tabMap : liveTabMap();
+  const tabsAvailable = tabByPath !== null;
 
   const lanes: LaneStatus[] = wts.map((wt) => {
     const dirty = git(wt.path, ["status", "--porcelain"]).split("\n").filter(Boolean).length;
@@ -178,7 +194,7 @@ export async function collect(): Promise<CockpitSnapshot> {
       ahead: parseInt(aheadStr, 10) || 0,
       behind: parseInt(behindStr, 10) || 0,
       devServer: serverByPath.get(wt.path) ?? null,
-      tabs: tabRes.available ? (tabByPath.get(wt.path) || 0) : -1,
+      tabs: tabsAvailable ? (tabByPath!.get(wt.path) || 0) : -1,
       idle: age > IDLE_HOURS,
       roadmap: readRoadmap(wt.path),
       errors: readErrors(wt.path),

@@ -88,3 +88,43 @@ commit'le kalıcılaştı (önceden tümü untracked'ti — memory "vO1 DONE" il
 **Next precomputed (→vO3):** `plan-next.ts <lane>` trigger §4 otomasyonu — verilen lane'in SEYIR+ROADMAP+errors
 oku → todo+phase+optimal-prompt taslağı emit (a3-swod template, HIL onay). vO3'e başlamadan oturum-başı
 `git branch --show-current`==`feat/orchestration-v3` doğrula (ERR-ORCH-004 prevention).
+
+---
+
+## vO3 — Canlı Cockpit (2026-06-20)
+
+**Tetik (Emre/T0):** "cockpit inşa et — ollamas'ı MacBook+iOS'tan canlı izle, soru sormadan e2e tamamla."
+Onaylı plan → cockpit = vO3 (plan-next §4 folded). Branch `feat/orchestration-v3` (oturum başı doğrulandı).
+
+**Yapıldı (bu sekme):**
+- `bin/lib/metrics.ts` + `tests/metrics.test.ts` (10/10): /api/health JSON + Prometheus /metrics saf parser.
+- `bin/lib/collect.ts` + `tests/collect.test.ts` (7/7): cockpit TEK kaynak `collect()→CockpitSnapshot`; status.ts
+  ile paylaşılabilir (refactor edilmedi — aşağı bak).
+- `bin/serve.ts` + `tests/serve.test.ts` (5/5): zero-dep node:http /cockpit.json + SSE /events + /; --lan iOS.
+- `assets/cockpit.html`: tek dosya vanilla JS + EventSource + inline CSS token kopya + SVG sparkline.
+- `plan-next.ts` (önceden vardı, untracked) + `tests/plan-next.test.ts` (24/24): §4 trigger korundu.
+
+**Kanıt (canlı, "passing'e zorla fix yok"):** vitest 50/50 + signal 28/28. Canlı serve port-probe: /cockpit.json
+200 2.2s (8 lane + backend cpu/ram/toolCalls CANLI okundu), / 200 html, /nope 404, SSE 1 data-frame teslim.
+Zero-leak: orchestration/ dışı 0 değişiklik (bu worktree) + 7 lane ağacına 0 yazım.
+
+**RISK-ORCH-008 (canlı testte bulundu, kök-neden fix):** collect() ilk ölçüm 7.5s — osascript sekme keşfi
+SENKRON execFileSync event-loop'u ~5s donduruyor (Automation izni yok→hang); cache bile server'ı dondurdu
+çünkü senkron çağrı tek-thread'i bloke ediyor. FIX: sekme keşfi serve'de default KAPALI (`ORCH_TABS=1` opt-in)
++ backend fetch timeout 800ms → collect 2.2s, SSE akıyor. **Ders: pahalı/nadir-değişen senkron subprocess
+poll-yolundan çıkar.**
+
+**RISK-ORCH-009 (test-gelenek çakışması):** `tests/*.test.ts`=vitest, `bin/lib/signal.test.ts`=standalone tsx
+(28/28, kendi ok()/process.exit). Plan'daki "vitest glob'u genişlet (P0)" YANLIŞTI — genişletmek signal.test'i
+kırardı (vitest-stili değil). **Ders: yeni vitest testleri `tests/`'e koy, glob'a dokunma.**
+
+**Karar (kural#1 kırma > DRY):** status.ts collect()'e refactor EDİLMEDİ; STATUS.md bit-aynı kalsın diye
+(roadmapStruct slice farkı çıktıyı bozardı). DRY duplikasyon kabul; status.ts stabil+tested.
+
+**ERR-ORCH-004 tekrarı (gözlem):** eşzamanlı sekme `d476a9d "vO2..."` commit'i bu oturumun cockpit dosyalarını
+da süpürdü (working tree paylaşımlı). History rewrite YAPILMADI (tab aktif); governance bu commit'le vO3 olarak
+işaretlendi. **Ders pekişti: cross-lane commit'te explicit `git add <path>`, branch doğrula.**
+
+**Next precomputed (→vO4):** OSS adoption tracker — `bin/lib/adoption.ts` ADOPTIONS tablosunu parse + lane/versiyon
+durum + lisans-disiplini gate (GPL→ref-only uyarı) → cockpit'e adoption paneli (snapshot.adoptions[] + html sekme).
+Test: parse+gate pure fn. collect() git fan-out paralelleştir (2s→<1s). Oturum başı branch==v3 doğrula.

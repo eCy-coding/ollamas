@@ -16,7 +16,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { collect, type CockpitSnapshot } from "./lib/collect";
+import { collect, liveTabMap, type CockpitSnapshot } from "./lib/collect";
 
 export type Collector = () => Promise<CockpitSnapshot>;
 
@@ -80,15 +80,31 @@ export function makeHandler(collectFn: Collector, htmlPath: string, pollMs = 500
 
 export interface ServeOpts { port?: number; lan?: boolean; pollMs?: number; }
 
-/** Sunucuyu başlat (canlı). collect canlı sarmalayıcıyı kullanır. */
+/** Sunucuyu başlat (canlı). Sekme haritası cache'lenir (osascript PAHALI → her poll'de çalışmaz). */
 export function startServer(opts: ServeOpts = {}) {
   const port = opts.port ?? Number(process.env.ORCH_COCKPIT_PORT || 7777);
   const host = opts.lan ? "0.0.0.0" : "127.0.0.1";
   const pollMs = opts.pollMs ?? Number(process.env.ORCH_POLL_SEC || 5) * 1000;
-  const server = createServer(makeHandler(collect, HTML_PATH, pollMs));
+  const tabMs = Number(process.env.ORCH_TAB_REFRESH_MS || 30000);
+
+  // Sekme cache: başta null (tabs=-1, anında ilk frame) → arka planda doldur → 30s'de tazele.
+  let tabCache: Map<string, number> | null = null;
+  const refreshTabs = () => { try { tabCache = liveTabMap(); } catch { /* izin yok → null kalır */ } };
+  const cachedCollect = () => collect({ tabMap: tabCache });
+
+  const server = createServer(makeHandler(cachedCollect, HTML_PATH, pollMs));
   server.listen(port, host, () => {
-    console.error(`[serve] cockpit → http://${host}:${port}  (poll ${pollMs}ms, ${opts.lan ? "LAN/iOS açık" : "yalnız localhost"})`);
+    console.error(`[serve] cockpit → http://${host}:${port}  (poll ${pollMs}ms, sekme tazeleme ${tabMs}ms, ${opts.lan ? "LAN/iOS açık" : "yalnız localhost"})`);
     if (opts.lan) console.error("[serve] ⚠️  --lan: LAN'daki herkes erişir. Güvenli ağda kullan (vO12 auth gelecek).");
+    // Sekme keşfi osascript SENKRON → ~5s event-loop FREEZE (Automation izni yokken hang).
+    // Default KAPALI: tabs=-1 ("?"). İzin verilip ORCH_TABS=1 ise tazele (o zaman hızlı, hang yok).
+    if (process.env.ORCH_TABS === "1") {
+      setImmediate(refreshTabs);
+      const tabTimer = setInterval(refreshTabs, tabMs);
+      server.on("close", () => clearInterval(tabTimer));
+    } else {
+      console.error("[serve] sekme keşfi kapalı (ORCH_TABS=1 + Automation izni ile aç). Şimdilik tab='?'.");
+    }
   });
   return server;
 }

@@ -27,9 +27,17 @@
 | 12 | waybarrios/vllm-mlx | — | Apache | bench/iOS | MLX OpenAI/Anthropic-uyumlu server, MCP tool-calling Apple Silicon |
 | 13 | SharpAI/SwiftLM | — | MIT | bench/iOS | Native MLX Swift LLM server, iOS entegrasyon + KV compression deseni |
 | 14 | raullenchai/Rapid-MLX | ~1K | Apache | bench | 4.2x Ollama Apple Silicon, prompt-cache deseni (261 tok/s ref) |
+| 15 | sverrirsig/claude-control | yeni | (teyit) | orchestration | **vO9 EN YÜKSEK EŞLEŞME** — macOS dashboard çoklu Claude/terminal session + tmux + worktree; process-tree ile tab→session keşfi, "focus" tab-switch. tab↔lane eşleme (fikir, lisans teyit) |
+| 16 | fboender/multi-git-status | 1.1K | GPL-3.0 | orchestration | Çoklu-repo dirty/untracked/unpushed concurrent scan (macOS). collect.ts cross-check — **ref-only** (GPL) |
+| 17 | andreygrechin/gitree | yeni | MIT | orchestration | Recursive git tree + inline status (branch+ahead/behind), concurrent scan, macOS. collect tarama deseni |
+| 18 | jhuckaby/performa | ~300 | MIT | orchestration | Multi-server web UI + canlı metrik history. cockpit.html metrik-history + dashboard layout (SVG, kütüphane yok) |
+| 19 | borisyankov/react-sparklines | 2.8K | MIT | orchestration | Sparkline algoritması → vanilla SVG'ye port (cockpit.html cpu history), React import YOK |
+| 20 | otto-de/gitactionboard | ~150 | MIT | orchestration | **vO8 quality-gate roll-up** yeşil/kırmızı CI matris dashboard UI deseni |
+| 21 | flavio87/tap-to-tmux | yeni | (teyit) | orchestration | **vO9 iOS push** — agent attention → phone notification (idle/takılı-tab uyarısı) |
 
-**Özet:** 13/14 permissive (MIT/Apache/ISC). 1 flag: iTerm2 GPL-2.0 → ref-only. Tamamı
-aktif bakımlı (2025-2026). 11/14 macOS-native.
+**Özet:** 19/21 permissive (MIT/Apache/ISC). 2 flag: iTerm2 GPL-2.0 + multi-git-status GPL-3.0 → ref-only;
+claude-control/tap-to-tmux lisans teyidi gerekli. Tamamı aktif bakımlı (2025-2026). çoğu macOS-native.
+**vO3 cockpit e2e-search:** 15-21 cockpit/dashboard/multi-repo monitoring repoları (GitHub top-star, MacOS-uyumlu).
 
 ---
 
