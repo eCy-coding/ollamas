@@ -68,6 +68,7 @@
 </header>
 <main>
   <div id="backend"></div>
+  <div id="adoption"></div>
   <div class="grid" id="grid"></div>
 </main>
 <footer id="foot">READ-ONLY conductor · vO3</footer>
@@ -122,6 +123,26 @@
       +road+'</div>';
   }
 
+  function renderAdoption(a){
+    var el=$("adoption");
+    if(!a){ el.innerHTML=""; return; }
+    var vio=a.violations||[];
+    var vioHtml=vio.length
+      ? '<div class="row" style="margin-top:8px"><span style="color:var(--rose)">⚠ lisans ihlali</span></div>'
+        +vio.map(function(v){return '<div class="road"><span class="pill err">'+esc(v.repo)+'</span> '+esc(v.reason)+'</div>'}).join("")
+      : '<div class="road" style="color:var(--emerald)">✓ lisans-disiplini temiz ('+esc(a.total)+' satır, 0 ihlal)</div>';
+    el.className="backend";
+    el.innerHTML='<div class="brow"><span class="badge live">OSS adoption</span>'
+      +'<span class="sub">'+esc(a.total)+' repo · lisans-disiplini gate (adopt.ts)</span></div>'
+      +'<div class="metrics">'
+      +'<span>permissive <b style="color:var(--emerald)">'+esc(a.permissive)+'</b></span>'
+      +'<span>weak-copyleft <b style="color:var(--amber)">'+esc(a.weakCopyleft)+'</b></span>'
+      +'<span>copyleft <b style="color:var(--amber)">'+esc(a.copyleft)+'</b></span>'
+      +'<span>unknown <b>'+esc(a.unknown)+'</b></span>'
+      +'<span>ihlal <b style="color:'+(vio.length?'var(--rose)':'var(--emerald)')+'">'+esc(vio.length)+'</b></span></div>'
+      +vioHtml;
+  }
+
   function render(snap){
     $("conn").className="dot on";
     $("sub").textContent="canlı · "+new Date(snap.ts).toLocaleTimeString("tr-TR")+" · "+snap.lanes.length+"/"+snap.expectedLanes+" lane";
@@ -132,8 +153,9 @@
       +'<span class="chip">dirty <b>'+t.dirty+'</b></span>'
       +'<span class="chip err">hata <b>'+t.errors+'</b></span>';
     renderBackend(snap.backend);
+    renderAdoption(snap.adoptions);
     $("grid").innerHTML=snap.lanes.map(laneCard).join("");
-    $("foot").textContent="READ-ONLY conductor · vO3 · son güncelleme "+new Date(snap.ts).toLocaleTimeString("tr-TR");
+    $("foot").textContent="READ-ONLY conductor · vO4 · son güncelleme "+new Date(snap.ts).toLocaleTimeString("tr-TR");
   }
 
   function connect(){

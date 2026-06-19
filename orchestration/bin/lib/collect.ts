@@ -12,7 +12,10 @@ import {
   type Worktree as DWorktree,
 } from "../discover";
 import { parseHealth, sumPromMetric, promGauge, type BackendHealth } from "./metrics";
+import { parseAdoptionRows, classifyCell, gate, type AdoptionRow, type Violation } from "../adopt";
 import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface RoadmapSignal { current: string; next: string; }
 export interface ErrorSignal { count: number; lastId: string | null; }
@@ -38,12 +41,23 @@ export interface BackendRuntime extends BackendHealth {
   migrationVersion: number; // ollamas_migration_version gauge
 }
 
+/** OSS adoption + lisans-disiplini özeti (adopt.ts/licenses.ts REUSE — cockpit görünürlüğü). */
+export interface AdoptionSummary {
+  total: number;
+  permissive: number;
+  weakCopyleft: number;
+  copyleft: number;
+  unknown: number;
+  violations: { repo: string; reason: string }[];
+}
+
 export interface CockpitSnapshot {
   ts: string;
   expectedLanes: number;
   lanes: LaneStatus[];
   backend: BackendRuntime | null;
   totals: { live: number; idle: number; dirty: number; errors: number };
+  adoptions: AdoptionSummary | null;
 }
 
 // ── Saf çekirdek ─────────────────────────────────────────────────────────────
@@ -71,12 +85,32 @@ export function errorStruct(json: string): ErrorSignal {
   }
 }
 
+/**
+ * ADOPTIONS satırlarını + gate ihlallerini cockpit özetine indir (saf; test edilebilir).
+ * Sınıflandırma adopt.ts `classifyCell` (licenses.ts SPDX DATA) REUSE — yeniden yazılmaz.
+ */
+export function summarizeAdoptions(rows: AdoptionRow[], violations: Violation[]): AdoptionSummary {
+  const s: AdoptionSummary = {
+    total: rows.length, permissive: 0, weakCopyleft: 0, copyleft: 0, unknown: 0,
+    violations: violations.map((v) => ({ repo: v.repo, reason: v.reason })),
+  };
+  for (const r of rows) {
+    const cat = classifyCell(r.license).category;
+    if (cat === "permissive") s.permissive++;
+    else if (cat === "weak-copyleft") s.weakCopyleft++;
+    else if (cat === "copyleft") s.copyleft++;
+    else s.unknown++;
+  }
+  return s;
+}
+
 /** Lane'lerden toplamları türet + snapshot'ı paketle (saf; test edilebilir). */
 export function buildSnapshot(input: {
   ts: string;
   expectedLanes: number;
   lanes: LaneStatus[];
   backend: BackendRuntime | null;
+  adoptions?: AdoptionSummary | null;
 }): CockpitSnapshot {
   const totals = { live: 0, idle: 0, dirty: 0, errors: 0 };
   for (const l of input.lanes) {
@@ -85,7 +119,10 @@ export function buildSnapshot(input: {
     totals.dirty += l.dirtyFiles;
     totals.errors += l.errors.count;
   }
-  return { ts: input.ts, expectedLanes: input.expectedLanes, lanes: input.lanes, backend: input.backend, totals };
+  return {
+    ts: input.ts, expectedLanes: input.expectedLanes, lanes: input.lanes,
+    backend: input.backend, totals, adoptions: input.adoptions ?? null,
+  };
 }
 
 // ── Canlı sarmalayıcı ────────────────────────────────────────────────────────
@@ -110,6 +147,20 @@ function readErrors(wtPath: string): ErrorSignal {
   const f = findFile(wtPath, /errors_registry\.json$/);
   if (!f) return { count: 0, lastId: null };
   try { return errorStruct(readFileSync(f, "utf8")); } catch { return { count: 0, lastId: null }; }
+}
+
+const ORCH_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", ".."); // bin/lib → orchestration/
+
+/** ADOPTIONS_ORCHESTRATION.md'yi oku → parse → gate → cockpit özeti. Yok/bozuk → null. */
+function readAdoptions(): AdoptionSummary | null {
+  const f = join(ORCH_DIR, "ADOPTIONS_ORCHESTRATION.md");
+  try {
+    const rows = parseAdoptionRows(readFileSync(f, "utf8"));
+    if (!rows.length) return null;
+    return summarizeAdoptions(rows, gate(rows, "ADOPTIONS_ORCHESTRATION.md"));
+  } catch {
+    return null;
+  }
 }
 
 /** Backend runtime'ı best-effort oku (cwd-mapped :3000). Fetch hata/timeout → null. */
@@ -202,5 +253,6 @@ export async function collect(opts: { tabMap?: Map<string, number> | null } = {}
   });
 
   const backend = await fetchBackend();
-  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend });
+  const adoptions = readAdoptions();
+  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend, adoptions });
 }
