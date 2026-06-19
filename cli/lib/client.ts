@@ -276,6 +276,32 @@ export class GatewayClient {
     return this.getJson("/api/mcp/upstreams");
   }
 
+  // --- Observability (v8) — `/metrics` is OPEN (no auth); usage needs a key. ---
+
+  private async getText(path: string, timeoutMs = 15_000): Promise<string> {
+    const r = await fetch(`${this.baseUrl}${path}`, { headers: this.headers(), signal: AbortSignal.timeout(timeoutMs) });
+    if (!r.ok) throw new Error(`gateway ${path} → ${r.status}`);
+    return r.text();
+  }
+
+  // Raw Prometheus text exposition (text/plain; version=0.0.4). Parse with lib/metrics.
+  async getMetrics(): Promise<string> {
+    return this.getText("/metrics");
+  }
+
+  // Per-day usage series (Bearer + usage:read). 401/403 → actionable hint.
+  async getUsageTimeseries(): Promise<{ tenantId: string; series: { day: string; calls: number; tokens: number }[] }> {
+    const r = await fetch(`${this.baseUrl}/api/saas/usage/timeseries`, {
+      headers: this.headers(),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) {
+      const hint = r.status === 401 || r.status === 403 ? "  hint: usage needs a tenant key — set OLLAMAS_API_KEY" : "";
+      throw new Error(`gateway /api/saas/usage/timeseries → ${r.status}${hint}`);
+    }
+    return r.json();
+  }
+
   // --- Tenant upstream MCP registry (Bearer apiKey, NOT admin token) ---
   listUpstreams(): Promise<UpstreamServer[]> {
     return this.getJson("/api/saas/upstreams");
