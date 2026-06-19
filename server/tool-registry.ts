@@ -106,11 +106,38 @@ interface ToolDef {
   invoke: (args: any, ctx: ToolCtx) => Promise<any | { output: any; diff?: string; applied?: boolean; halt?: boolean }>;
 }
 
-const fn = (name: string, description: string, parameters: any): ToolSchema => ({
+const fn = (name: string, description: string, parameters: any, outputSchema?: any): ToolSchema => ({
   type: "function",
-  function: { name, description, parameters },
+  function: { name, description, parameters, ...(outputSchema ? { outputSchema } : {}) },
 });
 const NO_ARGS = { type: "object", properties: {}, required: [] };
+
+/**
+ * Parse `llama-bench -o json` output (a JSON array of run records) into a
+ * normalized tok/s reading. llama.cpp reports throughput as `avg_ts`
+ * (tokens/sec) per run; prompt-processing (`pp`) and generation (`tg`) runs are
+ * distinct rows. We surface generation tok/s as `tps` and prompt tok/s as
+ * `pp_tps`. Throws on unparseable input so the choke-point returns ok:false.
+ * Exported for the v1.8 contract test (no real binary needed to test parsing).
+ */
+export function parseLlamaBench(raw: string): { tps: number; pp_tps?: number; model?: string; runs: number } {
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start === -1 || end === -1 || end < start) throw new Error("llama-bench: no JSON array in output");
+  const rows: any[] = JSON.parse(raw.slice(start, end + 1));
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error("llama-bench: empty result set");
+  // n_gen>0 → generation run (the tok/s users care about); n_prompt>0 only → prompt run.
+  const gen = rows.find((r) => Number(r.n_gen) > 0) ?? rows[rows.length - 1];
+  const pp = rows.find((r) => Number(r.n_prompt) > 0 && !(Number(r.n_gen) > 0));
+  const tps = Number(gen.avg_ts);
+  if (!Number.isFinite(tps)) throw new Error("llama-bench: missing avg_ts");
+  return {
+    tps,
+    pp_tps: pp && Number.isFinite(Number(pp.avg_ts)) ? Number(pp.avg_ts) : undefined,
+    model: gen.model_filename || gen.model_type || undefined,
+    runs: rows.length,
+  };
+}
 
 const TOOLS: Record<string, ToolDef> = {
   list_tree: {
@@ -442,6 +469,44 @@ const TOOLS: Record<string, ToolDef> = {
         maxTokens: Number(args.maxTokens) || 1024,
       });
       return r.text;
+    },
+  },
+  // v1.8: tok/s telemetry via llama.cpp's `llama-bench` (MIT). Wraps the native
+  // Metal binary on the host — no re-implementation. Feeds the ClusterManager
+  // tok/s panel. Routed through the choke-point so it gets metering/audit free.
+  bench_model: {
+    tier: "host",
+    schema: fn(
+      "bench_model",
+      "Benchmark a local GGUF model's generation speed (tokens/sec) with llama.cpp's llama-bench on the host. Returns structured tps for cluster telemetry.",
+      {
+        type: "object",
+        properties: {
+          model: { type: "string", description: "Absolute path to a .gguf model file (llama-bench -m)." },
+          n_tokens: { type: "number", description: "Generation tokens to time (llama-bench -n). Default 128." },
+        },
+        required: ["model"],
+      },
+      {
+        type: "object",
+        properties: {
+          tps: { type: "number", description: "Generation throughput, tokens/sec." },
+          pp_tps: { type: "number", description: "Prompt-processing throughput, tokens/sec." },
+          model: { type: "string" },
+          runs: { type: "number" },
+        },
+        required: ["tps", "runs"],
+      }
+    ),
+    invoke: async (args, { deps }) => {
+      if (!args.model) throw new Error("Missing 'model' (path to .gguf).");
+      const n = Number(args.n_tokens) > 0 ? Math.floor(Number(args.n_tokens)) : 128;
+      const r = await deps.execOnHost(`llama-bench -m ${deps.shArg(String(args.model))} -n ${n} -o json`, 180000);
+      const text = typeof r === "string" ? r : r?.output ?? "";
+      if (typeof r === "object" && r && r.ok === false) {
+        throw new Error(`llama-bench failed (exit ${r.exitCode}): ${String(text).slice(0, 300)}`);
+      }
+      return parseLlamaBench(String(text));
     },
   },
 };
