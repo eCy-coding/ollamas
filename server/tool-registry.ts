@@ -17,7 +17,9 @@ import type { TerminalManager } from "./terminal";
 // output we validate it here at the single choke-point — so HTTP expose, stdio, the
 // ReAct loop and consume side all get the same guarantee. ajv ships with the MCP SDK
 // (no new heavy dep); compiled validators are cached by schema identity.
-const ajv = new Ajv({ allErrors: true, strict: false });
+// allErrors:false (default) — first error only; avoids unbounded error allocation
+// when validating UNTRUSTED upstream tool output (DoS hardening, semgrep ajv-allerrors).
+const ajv = new Ajv({ strict: false });
 const validatorCache = new WeakMap<object, ValidateFunction | null>();
 function getValidator(schema: any): ValidateFunction | null {
   if (!schema || typeof schema !== "object") return null;
