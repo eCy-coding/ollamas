@@ -8,6 +8,7 @@
 // owned by one module.
 
 import Ajv, { type ValidateFunction } from "ajv";
+import { runPre, runPost } from "./tool-interceptors";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 
@@ -66,6 +67,9 @@ export interface ToolCtx {
   onProgress?: (progress: number, total?: number, message?: string) => void;
   /** Metering hook, invoked after every call (Faz 4). */
   onUsage?: (e: { tool: string; tier: ToolTier; ok: boolean; latencyMs: number; tenantId?: string }) => void;
+  /** Cooperative cancellation (Faz 17D). Aborted before/while a tool runs → the
+   *  call returns ok:false `cancelled` promptly (the MCP CancelledNotification path). */
+  abortSignal?: AbortSignal;
 }
 
 /** Normalized result the ReAct loop and MCP layer consume. */
@@ -457,8 +461,30 @@ export const ToolRegistry = {
       return { ok: false, output: { error: `insufficient_scope: '${name}' requires scope 'tools:${tool.tier}'.` }, diff: "", applied: false, halt: false };
     }
 
+    // Cooperative cancellation (Faz 17D): bail before doing any work if already aborted.
+    if (ctx.abortSignal?.aborted) {
+      emit(false);
+      return { ok: false, output: { error: "cancelled" }, diff: "", applied: false, halt: false };
+    }
+
+    // PRE interceptors (Faz 17A): a returned ToolResult short-circuits (e.g. cache hit).
+    const preHit = runPre(name, args, ctx, tool.tier);
+    if (preHit) {
+      emit(true);
+      return preHit;
+    }
+
     try {
-      const r = await tool.invoke(args, ctx);
+      // Race the tool against cancellation so a CancelledNotification returns promptly.
+      // The underlying host call may still run to its own timeout (documented).
+      const invokePromise = Promise.resolve(tool.invoke(args, ctx));
+      const r = ctx.abortSignal
+        ? await Promise.race([invokePromise, abortRace(ctx.abortSignal)])
+        : await invokePromise;
+      if (r === ABORTED) {
+        emit(false);
+        return { ok: false, output: { error: "cancelled" }, diff: "", applied: false, halt: false };
+      }
       const normalized =
         r && typeof r === "object" && ("output" in r || "diff" in r || "halt" in r || "applied" in r)
           ? { ok: true, output: r.output, diff: r.diff || "", applied: !!r.applied, halt: !!r.halt }
@@ -476,11 +502,22 @@ export const ToolRegistry = {
           return { ok: false, output: { error: "output_schema_violation", tool: name, details: validate.errors }, diff: "", applied: false, halt: false };
         }
       }
+      // POST interceptors (Faz 17A): redact secrets, store cache, … in registration order.
+      const finalR = runPost(name, args, ctx, tool.tier, normalized);
       emit(true);
-      return normalized;
+      return finalR;
     } catch (err: any) {
       emit(false);
       return { ok: false, output: { error: err?.message || "Execution exception" }, diff: "", applied: false, halt: false };
     }
   },
 };
+
+// Sentinel + helper for the cancellation race (Faz 17D).
+const ABORTED = Symbol("aborted");
+function abortRace(signal: AbortSignal): Promise<typeof ABORTED> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve(ABORTED);
+    signal.addEventListener("abort", () => resolve(ABORTED), { once: true });
+  });
+}

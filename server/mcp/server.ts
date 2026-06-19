@@ -94,7 +94,10 @@ export function buildServer(ctx: ToolCtx): Server {
   });
 
   // --- tools/call (progress + structured-log notifications around the call) ---
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  // `extra.signal` (Faz 17D) is the SDK-provided per-request AbortSignal: the SDK
+  // wires the MCP `notifications/cancelled` for this request to abort it. Threaded
+  // into the choke-point so an in-flight tool returns promptly as cancelled.
+  server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const { name, arguments: args } = req.params;
     const progressToken = (req.params?._meta as any)?.progressToken;
     const onProgress = progressToken
@@ -106,7 +109,7 @@ export function buildServer(ctx: ToolCtx): Server {
     // so the message is flushed on the response stream before the result.
     await emitLog(def && def.tier !== "safe" ? "notice" : "info", { msg: `tool.call ${name}`, tier: def?.tier, tenant: ctx.tenantId });
     onProgress?.(0, 1, `starting ${name}`);
-    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress });
+    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress, abortSignal: extra?.signal });
     onProgress?.(1, 1, `done ${name}`);
     await emitLog(r.ok ? "info" : "error", { msg: `tool.done ${name}`, ok: r.ok });
     const text = typeof r.output === "string" ? r.output : JSON.stringify(r.output);

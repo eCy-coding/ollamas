@@ -60,4 +60,17 @@ describe("MCP stdio EXPOSE (npx ollamas-mcp)", () => {
     expect(tools.some((t) => t.name === "git_commit")).toBe(true); // host tier now visible
     expect(tools.length).toBeGreaterThan(15);
   }, 40000);
+
+  // --- Faz 17D: cancellation over the bidirectional stdio transport ---
+  test("aborting a call sends notifications/cancelled and returns promptly", async () => {
+    const { c, tr } = connect();
+    await c.connect(tr);
+    const ac = new AbortController();
+    const started = Date.now();
+    const p = c.callTool({ name: "run_command", arguments: { command: "sleep 4" } }, undefined, { signal: ac.signal });
+    setTimeout(() => ac.abort(), 300);
+    await expect(p).rejects.toBeTruthy(); // SDK rejects the request on cancel
+    expect(Date.now() - started).toBeLessThan(3000); // returned well before the 4s sleep
+    await c.close();
+  }, 40000);
 });
