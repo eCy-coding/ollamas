@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Key, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
+import { api } from "../lib/apiClient";
 
 interface KeyVaultProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -24,11 +25,8 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
   const loadMasks = async () => {
     try {
-      const res = await fetch("/api/keys/mask");
-      if (res.ok) {
-        const data = await res.json();
-        setMasks(data);
-      }
+      const data = await api.get<Record<string, string>>("/api/keys/mask");
+      setMasks(data);
     } catch (e) {
       console.error("Failed to load credential masks", e);
     }
@@ -44,20 +42,12 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     const endpoint = provider === "custom-openai" ? inputs["custom-openai-endpoint"] : undefined;
 
     try {
-      const res = await fetch("/api/keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, key: keyVal, customEndpoint: endpoint }),
-      });
-      if (res.ok) {
-        onNotify(`Secure Key Vault updated: ${provider}`, "success");
-        setInputs((prev) => ({ ...prev, [provider]: "" }));
-        loadMasks();
-      } else {
-        onNotify(`Failed to save key for ${provider}`, "error");
-      }
-    } catch (err: any) {
-      onNotify(err.message, "error");
+      await api.post("/api/keys", { provider, key: keyVal, customEndpoint: endpoint });
+      onNotify(`Secure Key Vault updated: ${provider}`, "success");
+      setInputs((prev) => ({ ...prev, [provider]: "" }));
+      loadMasks();
+    } catch {
+      onNotify(`Failed to save key for ${provider}`, "error");
     } finally {
       setLoading(false);
     }
@@ -66,20 +56,14 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const handleClear = async (provider: string) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, key: "" }),
+      await api.post("/api/keys", { provider, key: "" });
+      onNotify(`Secured key cleared for ${provider}`, "info");
+      loadMasks();
+      setPingStatus((prev) => {
+        const next = { ...prev };
+        delete next[provider];
+        return next;
       });
-      if (res.ok) {
-        onNotify(`Secured key cleared for ${provider}`, "info");
-        loadMasks();
-        setPingStatus((prev) => {
-          const next = { ...prev };
-          delete next[provider];
-          return next;
-        });
-      }
     } catch (err: any) {
       onNotify(err.message, "error");
     } finally {
@@ -93,12 +77,10 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     const endpoint = provider === "custom-openai" ? inputs["custom-openai-endpoint"] : undefined;
 
     try {
-      const res = await fetch("/api/keys/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, key: keyVal, customEndpoint: endpoint }),
-      });
-      const data = await res.json();
+      const data = await api.post<{ success: boolean; latencyMs?: number; error?: string }>(
+        "/api/keys/test",
+        { provider, key: keyVal, customEndpoint: endpoint },
+      );
       if (data.success) {
         setPingStatus((prev) => ({
           ...prev,

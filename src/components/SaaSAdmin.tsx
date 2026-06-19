@@ -88,7 +88,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   useEffect(() => { if (adminToken !== "") localStorage.setItem("saasAdminToken", adminToken); }, [adminToken]);
   // Only auto-load when a token is already present (avoids a spurious 401 toast on
   // first mount before the operator types the admin token, Faz 9F).
-  useEffect(() => { if (adminToken) refresh(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { if (adminToken) refresh(); }, []);
 
   const loadTenant = async (t: Tenant) => {
     setSelected(t); setFreshKey(""); setUsage(null);
@@ -148,8 +148,8 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
       </div>
 
       <div className={card}>
-        <label className="text-xs font-mono text-slate-400">Admin Token (X-Admin-Token; needed when SAAS_ENFORCE=1)</label>
-        <input value={adminToken} onChange={(e) => setAdminToken(e.target.value)} type="password" placeholder="SAAS_ADMIN_TOKEN"
+        <label htmlFor="saas-admin-token" className="text-xs font-mono text-slate-400">Admin Token (X-Admin-Token; needed when SAAS_ENFORCE=1)</label>
+        <input id="saas-admin-token" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} type="password" placeholder="SAAS_ADMIN_TOKEN"
           className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono" />
       </div>
 
@@ -165,9 +165,9 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
         <div className={card}>
           <div className="flex items-center gap-2 text-sm text-slate-200 mb-3"><Building2 className="w-4 h-4 text-emerald-400" /> Tenants</div>
           <div className="flex gap-2 mb-3">
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="tenant name"
+            <input aria-label="Tenant name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="tenant name"
               className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200" />
-            <select value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-2 text-sm text-slate-200">
+            <select aria-label="Subscription plan" value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-2 text-sm text-slate-200">
               {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <button onClick={createTenant} className={`${btn} bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}><Plus className="w-3.5 h-3.5" /> Add</button>
@@ -194,14 +194,14 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
               {freshKey && (
                 <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2 mb-2">
                   <code className="flex-1 text-xs text-amber-200 break-all">{freshKey}</code>
-                  <button onClick={() => copy(freshKey)} className="text-amber-300 hover:text-amber-100"><Copy className="w-4 h-4" /></button>
+                  <button aria-label="Copy API key" onClick={() => copy(freshKey)} className="text-amber-300 hover:text-amber-100"><Copy className="w-4 h-4" /></button>
                 </div>
               )}
               <ul className="space-y-1 mb-3">
                 {keys.map((k) => (
                   <li key={k.id} className="flex items-center justify-between text-xs font-mono text-slate-400 px-2 py-1 rounded bg-black/30">
                     <span>{k.id} {k.label && `(${k.label})`} {k.revoked ? <span className="text-rose-400">· revoked</span> : <span className="text-emerald-400">· active</span>}</span>
-                    {!k.revoked && <button onClick={() => revokeKey(k.id)} className="text-rose-400 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {!k.revoked && <button aria-label="Revoke key" onClick={() => revokeKey(k.id)} className="text-rose-400 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </li>
                 ))}
                 {keys.length === 0 && <li className="text-xs text-slate-500">No keys yet.</li>}
@@ -267,15 +267,15 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
           <div>
             <div className="text-xs text-slate-300 mb-1">Webhooks</div>
             <div className="flex gap-1 mb-1">
-              <input value={whUrl} onChange={(e) => setWhUrl(e.target.value)} placeholder="https://your.app/hook" className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-200" />
-              <button onClick={addHook} className={`${btn} bg-emerald-500/15 text-emerald-300`}><Plus className="w-3 h-3" /></button>
+              <input aria-label="Webhook URL" value={whUrl} onChange={(e) => setWhUrl(e.target.value)} placeholder="https://your.app/hook" className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-200" />
+              <button aria-label="Add webhook" onClick={addHook} className={`${btn} bg-emerald-500/15 text-emerald-300`}><Plus className="w-3 h-3" /></button>
             </div>
-            <input value={whEvents} onChange={(e) => setWhEvents(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-500 mb-1" />
+            <input aria-label="Webhook events (comma-separated)" value={whEvents} onChange={(e) => setWhEvents(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-500 mb-1" />
             <ul className="space-y-0.5">
               {webhooks.map((w) => (
                 <li key={w.id} className="flex items-center gap-2 text-xs font-mono text-slate-400">
                   <span className="truncate flex-1">{w.url}</span><span className="text-slate-600">{(w.events || []).length}ev</span>
-                  <button onClick={() => delHook(w.id)} className="text-rose-400"><Trash2 className="w-3 h-3" /></button>
+                  <button aria-label="Delete webhook" onClick={() => delHook(w.id)} className="text-rose-400"><Trash2 className="w-3 h-3" /></button>
                 </li>
               ))}
               {webhooks.length === 0 && <li className="text-xs text-slate-600">none</li>}

@@ -119,7 +119,7 @@ export default function App() {
               <span className="font-bold">[{n.type.toUpperCase()}]</span>
               <span>{n.msg}</span>
             </div>
-            <button onClick={() => setNotifications((prev) => prev.filter((p) => p.id !== n.id))} className="ml-3 hover:text-white shrink-0">
+            <button aria-label="Dismiss notification" onClick={() => setNotifications((prev) => prev.filter((p) => p.id !== n.id))} className="ml-3 hover:text-white shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -163,14 +163,15 @@ export default function App() {
             themeMode === "dark" ? "bg-[#08090d] border-white/5" : "bg-white border-slate-200"
           }`}>
             <span className="text-[10px] text-slate-500 font-mono uppercase block mb-3.5 tracking-widest font-bold">Project Explorer</span>
-            <div className="flex flex-col gap-1.5">
+            <nav aria-label="Primary" className="flex flex-col gap-1.5">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
                   className={`flex items-center gap-3 px-3 py-2 rounded text-xs font-medium font-mono transition-all text-left ${
-                    activeTab === tab.id 
-                      ? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20" 
+                    activeTab === tab.id
+                      ? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
                       : "text-slate-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
@@ -178,7 +179,7 @@ export default function App() {
                   <span>{tab.label}</span>
                 </button>
               ))}
-            </div>
+            </nav>
           </div>
 
           {/* Setup Guide / Demowizard (M10, AC-32) */}

@@ -83,11 +83,12 @@ AGENTS.md §2 (1-8) miras alınır + frontend ekleri:
 Commit öncesi sırayla, her biri taze koşu:
 
 ```
-tsc --noEmit (type)                       ✓
-lint (eslint / lint_format)               ✓
-frontend test suite (fresh, vitest/play)  ✓
-perf bütçe (Lighthouse/bundle, vF3+)      ✓
-→ sonra conventional commit: feat|fix|refactor|chore|docs|test(ui|web|pwa): msg + (vFn)
+eslint (a11y + hooks + choke-point ban, vF6+)  ✓   # npm run lint = eslint && tsc
+tsc --noEmit (type)                            ✓
+frontend test suite (fresh, vitest/play)       ✓
+a11y gate (axe-core WCAG AA e2e, vF6+)         ✓   # 0 critical/serious
+perf bütçe (Lighthouse/bundle, vF3+)           ✓
+→ sonra conventional commit: feat|fix|refactor|chore|docs|test(ui|web|pwa|a11y): msg + (vFn)
 ```
 
 Biri kırmızıysa commit YOK. Atlanan adım açıkça söylenir.
@@ -128,8 +129,8 @@ macOS+iOS-uyumlu, MIT/Apache repo'dan **çalışan kod** (detay: `FRONTEND_ADOPT
 | **vF3** | Perf Baseline & Budget | ✅ DONE | web-vitals, lighthouse-ci, size-limit | `apiClient` choke-point + budget.json + size-limit + frontend-perf CI + web-vitals→logbook |
 | **vF4** | PWA / iOS web-clip | ✅ DONE | vite-plugin-pwa | manifest + SW + offline shell + iOS meta + apple-touch-icon |
 | **vF5** | Design System & Tokens | ✅ DONE | style-dictionary | tokens/*.json → tokens.css → Tailwind v4 @theme |
-| **vF6** | Accessibility (WCAG AA) | NEXT | axe-core, jsx-a11y | axe Playwright gate + eslint-jsx-a11y (raw-fetch ban) + klavye/ARIA/focus |
-| **vF7** | Vanilla alt-lane (Landing/Embed) | — | — | saf HTML5/CSS/JS `web/` landing + embed widget; zero-dep |
+| **vF6** | Accessibility (WCAG AA) | ✅ DONE | axe-core, jsx-a11y | axe Playwright gate (0 critical/serious) + eslint flat-config jsx-a11y + raw-fetch ban + klavye/ARIA/nav-landmark |
+| **vF7** | Vanilla alt-lane (Landing/Embed) | NEXT | — | saf HTML5/CSS/JS `web/` landing + embed widget; zero-dep |
 | **vF8** | Real-time UX Polish | — | — | SSE hardening + reconnect + error boundary + skeleton + motion budget |
 | **vF9** | i18n + Theming | — | @lingui/core | TR/EN ICU + tema switch (light tokens) + tercih kalıcılığı |
 | **vF10** | Observability & Self-Heal | — | — | client error boundary→/api/logbook + RUM + perf/görsel regresyon gate |

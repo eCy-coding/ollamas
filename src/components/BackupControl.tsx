@@ -169,8 +169,9 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
           <h3 className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Locker Destination Settings</h3>
           
           <div>
-            <label className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Backup Target Type</label>
+            <label htmlFor="backup-target-type" className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Backup Target Type</label>
             <select
+              id="backup-target-type"
               value={config.type}
               onChange={(e) => setConfig((p) => ({ ...p, type: e.target.value }))}
               className="w-full bg-[#050608] border border-white/5 text-xs rounded p-1.5 text-slate-200 focus:outline-none focus:border-indigo-500/40 font-mono"
@@ -184,8 +185,9 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
           {config.type !== "none" && (
             <div className="space-y-2.5 font-mono text-xs">
               <div>
-                <label className="text-[10px] text-slate-550 block mb-0.5">Endpoint Host URL</label>
+                <label htmlFor="backup-endpoint" className="text-[10px] text-slate-550 block mb-0.5">Endpoint Host URL</label>
                 <input
+                  id="backup-endpoint"
                   type="text"
                   placeholder="https://s3.us-east-1.amazonaws.com"
                   value={config.endpoint}
@@ -196,8 +198,9 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
               {config.type === "s3" && (
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Bucket Identifier</label>
+                  <label htmlFor="backup-bucket" className="text-[10px] text-slate-550 block mb-0.5">Bucket Identifier</label>
                   <input
+                    id="backup-bucket"
                     type="text"
                     placeholder="mission-control-backups"
                     value={config.bucket}
@@ -209,8 +212,9 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Access ID / Username</label>
+                  <label htmlFor="backup-access-key" className="text-[10px] text-slate-550 block mb-0.5">Access ID / Username</label>
                   <input
+                    id="backup-access-key"
                     type="text"
                     placeholder="AWS_KEY_ID"
                     value={config.accessKey}
@@ -219,8 +223,9 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Secret Key / Password</label>
+                  <label htmlFor="backup-secret-key" className="text-[10px] text-slate-550 block mb-0.5">Secret Key / Password</label>
                   <input
+                    id="backup-secret-key"
                     type="password"
                     placeholder="Masked"
                     value={config.secretKey}

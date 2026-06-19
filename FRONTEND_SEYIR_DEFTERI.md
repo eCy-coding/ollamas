@@ -74,6 +74,21 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF6 — Accessibility (WCAG AA) + ESLint a11y gate + choke-point ban (DONE)
+- **Ne:** Frontend'e otomatik WCAG AA kapısı kuruldu: statik a11y lint (eslint-jsx-a11y) + çalışma-zamanı axe taraması (4 tab, 0 critical/serious) + klavye nav + choke-point eslint-ban. **KeyVault'un vF3'te kaçan 4 raw fetch'i** ban ile yakalandı → migrate.
+- **Nasıl:**
+  - **ESLint flat-config** (`eslint.config.js`, YENİ): `jsxA11y.flatConfigs.recommended` + `react-hooks/rules-of-hooks` + `no-restricted-globals` (raw `fetch`/`EventSource` yasağı, components+App; override: apiClient/GoogleDriveBrowser/SaaSAdmin). Bilinçli dar kapsam: tsc tipleri tutar, eslint yalnız a11y+hooks+ban. `lint`=`eslint . && tsc --noEmit`. Adoption: eslint-plugin-jsx-a11y (MIT), react-hooks (MIT), typescript-eslint parser (MIT).
+  - **a11y fix** (pattern, ~7 dosya): icon-only buton → `aria-label` (SaaSAdmin Copy/Trash2/Plus, WorkspaceTree refresh/create, App notification-dismiss); unlabeled input/select → `aria-label` (SaaSAdmin tenant/plan/webhook); `<label>`→input `htmlFor`/`id` (BackupControl×5, ReactAgentTab, MultiAgentPipeline); onClick-`<div>` → `role=button`+`tabIndex`+`onKeyDown` (WorkspaceTree row, ReactAgentTab session); tab-bar `<nav aria-label="Primary">` landmark + `aria-current`.
+  - **axe gate** (`tests/e2e/a11y.spec.ts`, YENİ): `@axe-core/playwright` (MPL-2.0) 4 tab `withTags(wcag2a/2aa/21aa)` → 0 critical/serious. `color-contrast` devre dışı (dark-theme dekoratif düşük-kontrast = ayrı design pass, GİZLENMEDİ, aşağıda izlendi). Files tab `/api/workspace/**` stub (gerçek FS-scan paralelde takılıyor).
+  - **klavye + ARIA**: `tests/e2e/keyboard.spec.ts` (focus+Enter+Tab) + `tests/ui/a11y.test.tsx` (nav landmark + accessible-name).
+  - **CI**: `.github/workflows/frontend-lint.yml` (YENİ, eslint+tsc); axe/keyboard e2e mevcut `e2e.yml`'de otomatik.
+- **Niçin:** ekran-okuyucu + klavye erişimi (WCAG AA, axe ~%57 issue); choke-point artık eslint ile mekanik denetimli (yeni raw fetch CI'da kırmızı) — KeyVault kaçağı bunu kanıtladı.
+- **Kanıt:** `npm run lint` (eslint+tsc) 0 · `vitest run` **105 pass/1 skip** · `playwright test` **10 pass** (4 axe + 2 keyboard + 4 mevcut) · `vite build` + size 107.9KB/140 gz (+0.2KB). Commit: `b42b15a`.
+- **⚠️ İzlenen açık (gizlenmedi):** axe `color-contrast` kapıdan çıkarıldı — dark cockpit teması çok sayıda düşük-kontrast dekoratif metin (`text-slate-500/600`, `text-[8-10px]`) içeriyor; tema-geneli kontrast düzeltmesi ayrı design pass gerektirir (öneri: vF için "contrast sweep" veya vF9 tema ile). %57 otomatik + %43 manuel (VoiceOver/uzman) kuralı.
+- **Sonraki (önceden hesaplandı):** **vF7 Vanilla alt-lane (Landing/Embed)** — saf HTML5/CSS/JS `web/` landing + embeddable widget; API'yi `fetch` ile tüketir (apiClient React-only; vanilla'da minimal fetch-wrapper), zero-dep, iOS web-clip uyumlu. İlk adım: `web/index.html` + `web/embed.js` iskelet + landing kopya + Vite multi-page VEYA ayrı statik klasör kararı; lighthouse landing perf bütçesi.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -90,6 +105,10 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-007 | 2026-06-19 | apiClient testlerinde fetch call sayıları şişti + başka test'in URL'i sızdı | `setup.ts` `globalThis.fetch = vi.fn()` DOĞRUDAN atıyor; `vi.spyOn` aynı fn'i sarıp call history'i testler arası biriktiriyor | Her test `vi.stubGlobal('fetch', vi.fn())` + `afterEach vi.unstubAllGlobals()` | Paylaşılan global'i spy'lama; testte fetch izole etmek için **stubGlobal + fresh vi.fn**, spyOn değil |
 | FE-008 | 2026-06-19 | `.test.ts` (JSX'siz) jsdom test hiç çalışmadı | jsdom project glob yalnız `*.test.tsx`; node project `tests/ui/**` exclude → `.ts` hiçbir yere düşmedi | jsdom include `tests/ui/**/*.test.{ts,tsx}` | Frontend test glob'u hem `.ts` hem `.tsx` kapsamalı (lib testleri JSX içermez) |
 | FE-009 | 2026-06-19 | `logClientEvent` test fetch spy'ını kirletti + queued mock'ları tüketti | jsdom `navigator.sendBeacon` yok → fallback `fetch('/api/logbook')` aynı spy'a düştü | `setup.ts`'e `navigator.sendBeacon` no-op stub | Observability fallback'ı (sendBeacon→fetch) testte spy kirletir; sendBeacon'ı stub'la |
+| FE-010 | 2026-06-20 | KeyVault'ta 4 raw `fetch` vF3 choke-point migration'ından kaçtı | vF3 migration manuel 10-dosya listeyle yapıldı; KeyVault listede yoktu (sessiz eksik) | eslint `no-restricted-globals` ban KeyVault'u yakaladı → `api.*`'e migrate | Toplu migration'ı **manuel liste** ile değil **mekanik kural** (eslint ban) ile bitir; ban = kaçak kanıtı |
+| FE-011 | 2026-06-20 | `@axe-core/playwright` install ERESOLVE ile patladı | `@eslint/js@10` (kullanılmıyordu) peer eslint@10 ister, kurulu eslint@9 ile çakıştı | Kullanılmayan `@eslint/js` kaldırıldı | eslint flat-config'de import EDİLMEYEN paketi (`@eslint/js`) kurma; sürüm-pin uyumu (eslint↔@eslint/js major eşit) |
+| FE-012 | 2026-06-20 | axe runtime'da button-name/select-name/label buldu; eslint-jsx-a11y bulmadı | Statik jsx-a11y icon-only buton (text yok) + placeholder-only input'u flag'lemez; axe runtime DOM'da yakalar | Icon buton+input'lara `aria-label`; her ikisi koş | Statik a11y lint ≠ runtime axe; **ikisi de** gerek (lint=hızlı/yapısal, axe=hesaplı isim/kontrast) |
+| FE-013 | 2026-06-20 | a11y/keyboard e2e Files tab 30s timeout | `/api/workspace/tree` gerçek FS-scan paralel 4-worker yükünde takıldı (ana dizin büyük) | a11y/keyboard spec'e `**/api/workspace/**` route-stub | A11y/keyboard e2e gerçek-backend varyansından arındır; ağır endpoint'leri stub'la (deterministik tarama) |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

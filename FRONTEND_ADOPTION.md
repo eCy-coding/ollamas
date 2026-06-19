@@ -14,13 +14,14 @@
 | `ai/size-limit` (+`@size-limit/file`) | MIT | vF3 | Bundle bütçesi (gzip/brotli), CI fail-on-regress | ✅ `.size-limit.json` |
 | `vite-pwa/vite-plugin-pwa` (+Workbox 7) | MIT | vF4 | Zero-config PWA, SW, offline shell, iOS web-clip | ✅ `vite.config.ts` |
 | `amzn/style-dictionary` | Apache-2.0 | vF5 | JSON token → CSS var → Tailwind v4 `@theme` | ✅ `tokens/` + config |
+| `dequelabs/axe-core` (`@axe-core/playwright`) | MPL-2.0 | vF6 | WCAG AA otomatik tarama (4 tab, 0 critical/serious) | ✅ `tests/e2e/a11y.spec.ts` |
+| `jsx-eslint/eslint-plugin-jsx-a11y` | MIT | vF6 | Statik JSX a11y lint (flat-config) | ✅ `eslint.config.js` |
+| `jsx-eslint/eslint-plugin-react-hooks` + `typescript-eslint` | MIT | vF6 | Flat-config temel (rules-of-hooks + TSX parser) | ✅ `eslint.config.js` |
 
 ## Sıradaki adopsiyonlar (planlı)
 
 | Repo | Lisans | vF | Ne için |
 |------|--------|----|---------|
-| `dequelabs/axe-core` (`@axe-core/playwright`) | MPL-2.0 | vF6 | WCAG AA otomatik tarama (e2e gate) |
-| `jsx-eslint/eslint-plugin-jsx-a11y` | MIT | vF6 | Statik JSX a11y lint + raw-`fetch` yasağı (choke-point denetimi) |
 | `lingui/js-lingui` (`@lingui/core`) | MIT | vF9 | 2kB compile-time i18n (TR/EN), dead-code elim |
 
 ## Notlar

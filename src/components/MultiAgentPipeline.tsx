@@ -240,8 +240,9 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
 
       {/* Input Prompter */}
       <div className="mb-5">
-        <label className="text-[10px] text-slate-500 font-mono tracking-widest block mb-1.5 uppercase">Prompt Requirements</label>
+        <label htmlFor="pipeline-prompt" className="text-[10px] text-slate-500 font-mono tracking-widest block mb-1.5 uppercase">Prompt Requirements</label>
         <textarea
+          id="pipeline-prompt"
           rows={3}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}

@@ -398,9 +398,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         
         {/* Provider Choice */}
         <div className="space-y-1.5Col">
-          <label className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">Select Agent Provider</label>
+          <label htmlFor="react-agent-provider" className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">Select Agent Provider</label>
           <div className="relative">
-            <select 
+            <select
+              id="react-agent-provider"
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
               className="w-full bg-slate-900 border border-white/10 rounded px-3 py-2 text-xs font-mono text-slate-200 outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
@@ -416,9 +417,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
         {/* Dynamic Model Dropdown */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">Active LLM Model</label>
+          <label htmlFor="react-agent-model" className="text-[10px] font-mono text-slate-500 uppercase tracking-wider font-bold">Active LLM Model</label>
           <div className="relative">
-            <select 
+            <select
+              id="react-agent-model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               disabled={loadingModels || modelsList.length === 0}
@@ -470,7 +472,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           <div className="flex items-center justify-between pb-2 border-b border-white/5">
             <div className="flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-slate-400" />
-              <label className="text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">ReAct Sessions</label>
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">ReAct Sessions</span>
             </div>
             <button
               onClick={startNewSession}
@@ -493,7 +495,15 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 return (
                   <div
                     key={sess.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => !isLoading && selectSession(sess.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        if (!isLoading) selectSession(sess.id);
+                      }
+                    }}
                     className={`group w-full text-left p-2 rounded cursor-pointer transition flex items-center justify-between border ${
                       isActive 
                         ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"

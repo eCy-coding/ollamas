@@ -1,0 +1,23 @@
+name: Frontend Lint + A11y (vF6)
+
+# Frontend lane (vF6) — separate from ci.yml (backend-owned). Gates accessibility
+# (eslint-plugin-jsx-a11y) + React hooks + the apiClient choke-point ban, then
+# tsc. The axe-core WCAG AA e2e gate runs in e2e.yml (a11y.spec.ts / keyboard.spec.ts).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: ESLint (a11y + hooks + choke-point ban) and tsc
+        run: npm run lint

@@ -133,8 +133,16 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
   const renderItem = (item: FileItem) => {
     return (
       <div key={item.relativePath} className="space-y-1 select-none text-xs">
-        <div 
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => !item.isDirectory && handleOpenFile(item.relativePath)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (!item.isDirectory) handleOpenFile(item.relativePath);
+            }
+          }}
           className={`group flex items-center justify-between px-2 py-1 rounded cursor-pointer hover:bg-white/5 transition ${
             editingFile === item.relativePath ? "bg-white/5 border-l border-indigo-400" : ""
           }`}
@@ -179,7 +187,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
           <FolderOpen className="w-4 h-4 text-indigo-400" />
           <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Target Directory Explorer</h2>
         </div>
-        <button onClick={fetchTree} disabled={loading} className="text-slate-400 hover:text-white cursor-pointer">
+        <button aria-label="Refresh file tree" onClick={fetchTree} disabled={loading} className="text-slate-400 hover:text-white cursor-pointer">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
@@ -212,7 +220,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
               onChange={(e) => setNewFileName(e.target.value)}
               className="flex-1 bg-[#050608] border border-white/5 rounded text-xs px-2 py-1 text-slate-300 font-mono focus:outline-none placeholder-slate-700"
             />
-            <button onClick={handleCreateFile} className="bg-white/5 text-indigo-400 border border-white/10 rounded px-2 hover:bg-white/10 cursor-pointer">
+            <button aria-label="Create file" onClick={handleCreateFile} className="bg-white/5 text-indigo-400 border border-white/10 rounded px-2 hover:bg-white/10 cursor-pointer">
               <FilePlus className="w-3.5 h-3.5" />
             </button>
           </div>
