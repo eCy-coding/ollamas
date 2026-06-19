@@ -12,7 +12,7 @@
 | Versiyon | Durum | Kapsam |
 |----------|-------|--------|
 | **vO1** | ✅ DONE | Bootstrap: master prompt + roadmap + errors_registry + seyir + adoption matris + read-only status.ts |
-| **vO2** | ✅ DONE | Live discovery — dev-server cwd-mapping (port-3000 collision çözüldü) + Terminal.app sekme keşfi + idle-lane sinyali |
+| **vO2** | ✅ DONE | Live discovery — dev-server cwd-mapping (port-3000 collision çözüldü) + tmux-first/iTerm2/Terminal.app sekme keşfi + busy/idle sinyali + **§3.1 aktif koordinasyon** (nudge/notify, allowlist+dry-run) |
 | vO3 | planned | Per-lane sıradaki-versiyon planner otomasyonu (trigger protokolü §4 kodlanır) |
 | vO4 | planned | OSS adoption tracker + lisans-disiplini gate |
 | vO5 | planned | Cross-lane bağımlılık grafiği (frontend↔backend API gap, scripts↔register-seam) |
@@ -30,6 +30,8 @@
 ## Don't-repeat (errors_registry)
 - ERR-ORCH-001: Çalışan süreci ASLA yalnız porta göre lane'e atama; daima process cwd çöz (lsof -p -d cwd) ve worktree path-prefix ile eşle.
 - ERR-ORCH-002: Blok yorum içinde asla `*/` literal dizisi yazma (glob/regex örneklerinde bile); kelimeyle ifade et.
+- ERR-ORCH-003: AppleScript'te sekme/satır ayracı için ASLA `tab` sabitine veya string-literal `\t`'ye güvenme; `(ASCII character 9)`'u tell-bloğu DIŞINDA tanımla. AppleScript çıktı parser'larını JS-`\t` değil GERÇEK osascript çıktısıyla test et.
+- ERR-ORCH-004: İzole worktree'de bile her green parça koşusundan SONRA hemen commit et (uzun süre untracked bırakma); oturum-başı + commit-öncesi `git branch --show-current` doğrula; eşzamanlı lane'ler ayrı worktree+branch kullanmalı, asla aynı worktree'de paralel checkout.
 
 ## Optimal Prompt (lane sekmesine yapıştır)
 ```
@@ -44,7 +46,7 @@ Sen orchestration lane sekmesisin (branch feat/orchestration-v3).
   > | Versiyon | Durum | Kapsam |
   > |----------|-------|--------|
   > | **vO1** | ✅ DONE | Bootstrap: master prompt + roadmap + errors_registry + seyir + adoption matris + read-only status.ts |
-  > | **vO2** | ✅ DONE | Live discovery — dev-server cwd-mapping (port-3000 collision çözüldü) + Terminal.app sekme keşfi + idle-lane sinyali |
+  > | **vO2** | ✅ DONE | Live discovery — dev-server cwd-mapping (port-3000 collision çözüldü) + tmux-first/iTerm2/Terminal.app sekme keşfi + busy/idle sinyali + **§3.1 aktif koordinasyon** (nudge/notify, allowlist+dry-run) |
   > | vO3 | planned | Per-lane sıradaki-versiyon planner otomasyonu (trigger protokolü §4 kodlanır) |
   > | vO4 | planned | OSS adoption tracker + lisans-disiplini gate |
   > | vO5 | planned | Cross-lane bağımlılık grafiği (frontend↔backend API gap, scripts↔register-seam) |
@@ -58,6 +60,8 @@ Sen orchestration lane sekmesisin (branch feat/orchestration-v3).
 **[Constraints]** Scope law'una uy (lane dışına çıkma). TDD: test önce. Zero-dep tercih. Kalite kapısı: typecheck+lint+test taze koşu → conventional commit. No vibe-code: OSS adopt = MIT/Apache kopya+attribution. Şu hataları TEKRARLAMA:
   - ERR-ORCH-001: Çalışan süreci ASLA yalnız porta göre lane'e atama; daima process cwd çöz (lsof -p -d cwd) ve worktree path-prefix ile eşle.
   - ERR-ORCH-002: Blok yorum içinde asla `*/` literal dizisi yazma (glob/regex örneklerinde bile); kelimeyle ifade et.
+  - ERR-ORCH-003: AppleScript'te sekme/satır ayracı için ASLA `tab` sabitine veya string-literal `\t`'ye güvenme; `(ASCII character 9)`'u tell-bloğu DIŞINDA tanımla. AppleScript çıktı parser'larını JS-`\t` değil GERÇEK osascript çıktısıyla test et.
+  - ERR-ORCH-004: İzole worktree'de bile her green parça koşusundan SONRA hemen commit et (uzun süre untracked bırakma); oturum-başı + commit-öncesi `git branch --show-current` doğrula; eşzamanlı lane'ler ayrı worktree+branch kullanmalı, asla aynı worktree'de paralel checkout.
 **[Format]** Sıra: READ → PLAN(todo+phase) → TDD → CODE → GATE → LOG(SEYIR+errors) → COMMIT(istenirse).
 **[Examples]** Önceki versiyon vO2 (Live discovery dev server cwd mapping (port 3000 collision ç) kanıt deseni: testler yeşil + SEYIR girdisi + errors_registry güncel.
 ```
