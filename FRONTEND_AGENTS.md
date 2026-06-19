@@ -41,7 +41,13 @@ backlog notu düşülür (`FRONTEND_SEYIR_DEFTERI.md`).
 DOĞRUDAN çağırmaz; tüm backend I/O `api.get/post/put/del/streamPost` üzerinden geçer
 (tek yerde auth header + retry + hata→`/api/logbook` + stream decode). İstisnalar
 dosyada yorumla işaretlenir: harici API (Google Drive) + `SaaSAdmin` lokal token-wrapper.
-vF6'da eslint kuralı raw `fetch`'i yasaklar (mekanik denetim).
+vF6'da eslint kuralı raw `fetch`'i yasaklar (mekanik denetim — `src/**` kapsamı).
+
+**Vanilla alt-lane istisnası (vF7+):** `web/**` (landing) + `public/embed.js` (gömülebilir
+widget) React component DEĞİL, **zero-dep ayrı dağıtılabilir** — apiClient import etmez,
+minimal kendi `fetch`'ini kullanır (embed.js herhangi siteye gömülür, bundler yok). eslint
+`src/**` kapsamında olduğu için bu lane kuralın dışında; choke-point yalnız mantıksal
+(yine sadece mevcut public endpoint'leri tüketir, backend dokunulmaz).
 
 Şüphede default = REDDET + sor.
 
@@ -130,8 +136,8 @@ macOS+iOS-uyumlu, MIT/Apache repo'dan **çalışan kod** (detay: `FRONTEND_ADOPT
 | **vF4** | PWA / iOS web-clip | ✅ DONE | vite-plugin-pwa | manifest + SW + offline shell + iOS meta + apple-touch-icon |
 | **vF5** | Design System & Tokens | ✅ DONE | style-dictionary | tokens/*.json → tokens.css → Tailwind v4 @theme |
 | **vF6** | Accessibility (WCAG AA) | ✅ DONE | axe-core, jsx-a11y | axe Playwright gate (0 critical/serious) + eslint flat-config jsx-a11y + raw-fetch ban + klavye/ARIA/nav-landmark |
-| **vF7** | Vanilla alt-lane (Landing/Embed) | NEXT | — | saf HTML5/CSS/JS `web/` landing + embed widget; zero-dep |
-| **vF8** | Real-time UX Polish | — | — | SSE hardening + reconnect + error boundary + skeleton + motion budget |
+| **vF7** | Vanilla alt-lane (Landing/Embed) | ✅ DONE | shadow-dom pattern | `web/` landing (Vite multi-page, token reuse) + `public/embed.js` zero-dep Shadow-DOM streaming chat widget; vite-preview e2e |
+| **vF8** | Real-time UX Polish | NEXT | — | SSE hardening + reconnect + error boundary + skeleton + motion budget |
 | **vF9** | i18n + Theming | — | @lingui/core | TR/EN ICU + tema switch (light tokens) + tercih kalıcılığı |
 | **vF10** | Observability & Self-Heal | — | — | client error boundary→/api/logbook + RUM + perf/görsel regresyon gate |
 | **vF11** | Tenant-aware Cockpit | — | — | tier-gated UI (safe/host/privileged görünürlük) + scope-gated butonlar |

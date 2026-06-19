@@ -89,6 +89,19 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF7 — Vanilla alt-lane: Landing + embeddable chat widget (DONE)
+- **Ne:** İki zero-dep vanilla yüz eklendi: (1) `web/` landing (public yüz, canlı health rozeti), (2) `public/embed.js` — herhangi siteye `<script>` ile gömülen Shadow-DOM streaming chat widget. React bundle taşınmaz; backend dokunulmaz.
+- **Nasıl:**
+  - **Vite multi-page** (`vite.config.ts` `build.rollupOptions.input` = app/landing/embedDemo). `web/index.html`+`landing.css`+`landing.js` semantik HTML5 (vF6 a11y: nav landmark/alt/aria-live), `@import "../src/styles/tokens.css"` → --ollamas-* token reuse (tek-kaynak). `landing.js` vanilla `fetch('/api/health')` → online/offline rozet (defensif shape).
+  - **`public/embed.js`** (verbatim, zero-build): IIFE + `attachShadow` (host-CSS izolasyon) + floating bubble/panel; config `data-api-base/model/provider/title`; `POST /api/generate` SSE `getReader()` decode (apiClient.streamPost deseni reimplement — standalone kısıt). a11y: aria-label/role/log. **Adoption:** Shadow-DOM + SSE-read deseni (`chatui`/`quikchat` zero-dep widget'lar) — fikir-level reimplement, kod kopyalanmadı.
+  - **Serving/e2e:** dev server Express (SPA-only) → static lane `vite preview` ile servis. `playwright.web.config.ts` (YENİ, :3101, `serviceWorkers:'block'`); `tests/e2e-web/` landing (hero+health online/offline+axe 0 critical/serious) + embed (bubble→SSE stream yanıt + hata). `test:e2e:web` script.
+  - **Bütçe:** `.size-limit.json` ayrıştırıldı: cockpit app + landing + **embed widget ≤15KB**. CI `frontend-web.yml` (YENİ).
+- **Niçin:** ollamas'ın public landing'i + 3.parti-site gömme yolu yoktu; ikisi de framework taşımadan, izole, ölçülü.
+- **Kanıt:** `npm run lint` 0 · `vitest` 105 pass/1 skip · React e2e **10 pass** · web e2e **5 pass** (landing 3 + embed 2) · `vite build` 3-entry (dist/web/* + dist/embed.js 7.2KB) · size: embed **2.4KB** brotli / landing 403B / cockpit 108KB/140. Commit: `<vF7 commit>`.
+- **Sonraki (önceden hesaplandı):** **vF8 Real-time UX Polish** — SSE/streaming hardening (apiClient.streamPost'a reconnect/abort + embed.js retry), React error boundary → `/api/logbook`, skeleton/loading state, cockpit grafik frame-budget (60fps). İlk adım: `apiClient.streamPost`'a `AbortController` + auto-reconnect/backoff + `<ErrorBoundary>` component (vF10 telemetri'ye köprü) + agent-chat skeleton.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -109,6 +122,8 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-011 | 2026-06-20 | `@axe-core/playwright` install ERESOLVE ile patladı | `@eslint/js@10` (kullanılmıyordu) peer eslint@10 ister, kurulu eslint@9 ile çakıştı | Kullanılmayan `@eslint/js` kaldırıldı | eslint flat-config'de import EDİLMEYEN paketi (`@eslint/js`) kurma; sürüm-pin uyumu (eslint↔@eslint/js major eşit) |
 | FE-012 | 2026-06-20 | axe runtime'da button-name/select-name/label buldu; eslint-jsx-a11y bulmadı | Statik jsx-a11y icon-only buton (text yok) + placeholder-only input'u flag'lemez; axe runtime DOM'da yakalar | Icon buton+input'lara `aria-label`; her ikisi koş | Statik a11y lint ≠ runtime axe; **ikisi de** gerek (lint=hızlı/yapısal, axe=hesaplı isim/kontrast) |
 | FE-013 | 2026-06-20 | a11y/keyboard e2e Files tab 30s timeout | `/api/workspace/tree` gerçek FS-scan paralel 4-worker yükünde takıldı (ana dizin büyük) | a11y/keyboard spec'e `**/api/workspace/**` route-stub | A11y/keyboard e2e gerçek-backend varyansından arındır; ağır endpoint'leri stub'la (deterministik tarama) |
+| FE-014 | 2026-06-20 | Multi-page sonrası size-limit cockpit bütçesi landing'i de sayacaktı | Vite multi-page input-key'e göre chunk'ı yeniden adlandırır (`index-*`→`app-*`); glob `dist/assets/*.js` landing+app karıştırır | size-limit'i entry-spesifik glob'a böl (`app-*.js`/`landing-*.js`/`embed.js`) | Multi-page'de chunk adı=input-key; bütçeyi entry başına ayır, `*.js` toptan glob conflate eder |
+| FE-015 | 2026-06-20 | Vanilla landing dev server'da (npm run dev) servis edilmiyor | Dev server Express (`tsx server.ts`) SPA-only; Vite multi-page yalnız `vite build`'i etkiler | Static alt-lane e2e `vite preview` (built dist) + `serviceWorkers:'block'` | Vanilla/static lane'i dev-server değil `vite preview` ile e2e; SPA SW'sini block'la (fetch intercept determinizmi) |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d12" />
+    <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
+    <title>ollamas embed widget — demo</title>
+    <link rel="stylesheet" href="./landing.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/web/"><img src="/pwa-icon.svg" alt="" width="28" height="28" /><span>ollamas</span></a>
+      <nav aria-label="Primary" class="site-nav">
+        <a href="/web/">Home</a>
+        <a href="/">Cockpit</a>
+        <a href="/api/docs">API</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Embeddable chat widget</h1>
+        <p class="tagline">
+          This page is a plain host site. The streaming chat in the corner is the entire
+          ollamas widget — one zero-dependency script, isolated in a Shadow DOM.
+        </p>
+      </section>
+
+      <section class="features" aria-label="Usage">
+        <article class="card">
+          <h2>One tag</h2>
+          <p>Add the widget to any website:</p>
+          <pre style="overflow:auto"><code>&lt;script src="/embed.js"
+  data-api-base="https://your-ollamas"
+  data-provider="ollama-local"
+  data-model="llama3"
+  data-title="ollamas"&gt;&lt;/script&gt;</code></pre>
+        </article>
+        <article class="card">
+          <h2>What it does</h2>
+          <p>Streams replies from <code>POST /api/generate</code> over SSE. No build step, no framework, no host-CSS conflicts.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer"><p>ollamas · embed demo</p></footer>
+
+    <!-- The widget itself. Same-origin api-base (empty) so the demo talks to this gateway. -->
+    <script src="/embed.js" data-provider="ollama-local" data-title="ollamas"></script>
+  </body>
+</html>

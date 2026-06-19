@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:web": "playwright test -c playwright.web.config.ts",
     "tokens": "style-dictionary build --config style-dictionary.config.js",
     "build:client": "vite build",
     "size": "size-limit",

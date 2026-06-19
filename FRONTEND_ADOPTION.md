@@ -17,6 +17,7 @@
 | `dequelabs/axe-core` (`@axe-core/playwright`) | MPL-2.0 | vF6 | WCAG AA otomatik tarama (4 tab, 0 critical/serious) | ✅ `tests/e2e/a11y.spec.ts` |
 | `jsx-eslint/eslint-plugin-jsx-a11y` | MIT | vF6 | Statik JSX a11y lint (flat-config) | ✅ `eslint.config.js` |
 | `jsx-eslint/eslint-plugin-react-hooks` + `typescript-eslint` | MIT | vF6 | Flat-config temel (rules-of-hooks + TSX parser) | ✅ `eslint.config.js` |
+| `lesichkovm/chatui` + `deftio/quikchat` (desen) | fikir-level | vF7 | Zero-dep **Shadow-DOM** kapsülleme + `getReader()` SSE okuma deseni — kod kopyalanmadı, reimplement | ✅ `public/embed.js` |
 
 ## Sıradaki adopsiyonlar (planlı)
 

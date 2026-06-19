@@ -54,6 +54,17 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // vF7 — multi-page: the React SPA (app) + the vanilla alt-lane landing/embed
+    // demo. public/embed.js is copied verbatim (zero-build, embeddable anywhere).
+    build: {
+      rollupOptions: {
+        input: {
+          app: path.resolve(__dirname, 'index.html'),
+          landing: path.resolve(__dirname, 'web/index.html'),
+          embedDemo: path.resolve(__dirname, 'web/embed-demo.html'),
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d12" />
+    <meta name="description" content="ollamas — regional MCP gateway + tools-as-SaaS cockpit for local & cloud LLMs." />
+    <link rel="icon" type="image/svg+xml" href="/pwa-icon.svg" />
+    <link rel="apple-touch-icon" href="/pwa-icon.svg" />
+    <title>ollamas — LLM Mission Control</title>
+    <!-- vF7 vanilla alt-lane: zero-framework landing, design tokens reused from the SPA -->
+    <link rel="stylesheet" href="./landing.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/web/">
+        <img src="/pwa-icon.svg" alt="" width="28" height="28" />
+        <span>ollamas</span>
+      </a>
+      <nav aria-label="Primary" class="site-nav">
+        <a href="/">Cockpit</a>
+        <a href="/web/embed-demo.html">Embed</a>
+        <a href="/api/docs">API</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow" data-health-badge aria-live="polite">checking status…</p>
+        <h1>LLM Mission Control</h1>
+        <p class="tagline">
+          A regional <strong>MCP gateway</strong> + tools-as-SaaS broker for your local and cloud
+          models — one choke-point, metered, multi-tenant, on your hardware.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="/">Open the cockpit</a>
+          <a class="btn btn-ghost" href="/web/embed-demo.html">Try the embed widget</a>
+        </div>
+      </section>
+
+      <section class="features" aria-label="Features">
+        <article class="card">
+          <h2>MCP Gateway</h2>
+          <p>Expose 22 workspace tools to any MCP client (Claude Code) and consume upstream servers — all through one registry.</p>
+        </article>
+        <article class="card">
+          <h2>Tools-as-SaaS</h2>
+          <p>Per-tenant API keys, rate limits, usage metering and Stripe billing. Tier-gated tool allowlists.</p>
+        </article>
+        <article class="card">
+          <h2>Local-first</h2>
+          <p>Runs on your Mac with Ollama. Keys stay server-side, AES-256-GCM encrypted. iOS web-clip + offline cockpit.</p>
+        </article>
+        <article class="card">
+          <h2>Embeddable</h2>
+          <p>Drop a single <code>&lt;script&gt;</code> tag to add a streaming chat widget to any site. Zero dependencies, Shadow-DOM isolated.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>ollamas · LLM Mission Control · <a href="/api/docs">OpenAPI</a></p>
+    </footer>
+
+    <script type="module" src="./landing.js"></script>
+  </body>
+</html>
