@@ -126,3 +126,19 @@
 ### N-015 (test) · in-process probe'da bozuk dosyayı sonraki adımda yeniden kullanma
 - **Gözlem**: tek probe içinde önce `*Enc`'i kasten boz, sonra AYNI `$T` ile başka bir adım koş → ikinci adım bozuk blob'a çarpıp beklenmedik throw verdi (kod bug'ı değil, probe sıralaması).
 - **ÖNLEME KURALI**: yıkıcı (corruption/tamper) adımları probe'un EN SONUNA koy ya da her adıma taze `mktemp -d` HOME ver; durum-bozan adımdan sonra aynı fixture'ı yeniden kullanma.
+
+## v8 — Observability/TUI `ollamas top` (2026-06-20)
+
+### N-016 (TUI yasası) · `--watch` SIGINT'te terminali geri yükle, yoksa bozulur
+- **Risk**: alt-screen (`\x1b[?1049h`) + hidden-cursor (`\x1b[?25l`) ile girip cleanup'sız çıkılırsa kullanıcının terminali imleçsiz + alt-ekranda kalır (bozuk).
+- **Fix**: `cleanupSequence()` saf fn = `CURSOR_SHOW + ALT_OFF`; SIGINT **ve** SIGTERM handler'ı bunu yazıp `exit(0)`; `tearingDown` guard çift-cleanup'ı önler. Saf fn unit-test (show-cursor + alt-off içerir).
+- **ÖNLEME KURALI**: alt-screen/cursor-hide kullanan her live komut, signal handler'da terminali **mutlaka** geri yükler; restore dizisini saf fn yapıp test et. Non-TTY → loop'a hiç girme (tek snapshot).
+
+### N-017 (consume gerçeği) · `/metrics` auth'suz, usage Bearer ister → panel-bazlı degrade
+- **Gözlem**: server `/metrics` OPEN (prom-client, auth yok); `/api/saas/usage/timeseries` Bearer+scope ister. Tek "her şey ya da hiç" hata = kötü UX.
+- **Fix**: metrics panel daima render (key gerekmez); usage panel best-effort `try/catch` → 401'de hint göster, gerisi çalışır. seyir-defteri.jsonl yoksa o panel atlanır.
+- **ÖNLEME KURALI**: çok-kaynaklı dashboard'da her paneli **bağımsız degrade** et; bir kaynağın auth/eksikliği tüm view'i düşürmesin.
+
+### N-018 (yaklaşıklık dürüstlüğü) · histogram p50/p90 bucket-le sınırı = yaklaşık
+- **Gözlem**: prom histogram yalnız cumulative bucket sayıları verir; gerçek quantile yok. p50/p90 = percentile'ı geçen ilk bucket'ın `le` üst sınırı.
+- **ÖNLEME KURALI**: türetilmiş metriği **yaklaşık** olarak işaretle (`~p90`) + doc'ta belirt; kesinmiş gibi sunma (over-claim yok). `+Inf` bucket'ı sonsuz, son sonlu le'ye düş.
