@@ -142,3 +142,20 @@
 ### N-018 (yaklaşıklık dürüstlüğü) · histogram p50/p90 bucket-le sınırı = yaklaşık
 - **Gözlem**: prom histogram yalnız cumulative bucket sayıları verir; gerçek quantile yok. p50/p90 = percentile'ı geçen ilk bucket'ın `le` üst sınırı.
 - **ÖNLEME KURALI**: türetilmiş metriği **yaklaşık** olarak işaretle (`~p90`) + doc'ta belirt; kesinmiş gibi sunma (over-claim yok). `+Inf` bucket'ı sonsuz, son sonlu le'ye düş.
+
+## v9 — Packaging (2026-06-20)
+
+### E-006 · Compiled binary adı `invokedDirectly` guard'ına uymuyordu → binary no-op
+- **Semptom**: `bun --compile` çıktısı `dist/ollamas-darwin-arm64` çalıştırıldığında HİÇBİR ŞEY yapmadı (main() koşmadı), sessizce çıktı.
+- **Kök neden**: entry-guard `process.argv[1]` regex'i yalnız `…/ollamas$` veya `index.(ts|cjs|js)$` eşliyordu. Compiled binary `ollamas-darwin-arm64` ile bitiyor → `ollamas$` eşleşmiyor → `invokedDirectly=false` → main atlanır. (E-001 dual-shebang ile aynı sınıf: paketleme-anı ile çalışma-anı isim uyuşmazlığı.)
+- **Fix**: regex `ollamas[\w.\-]*$` → her `ollamas*` binary adını eşler; test-import (argv[1]=vitest) hâlâ eşleşmez.
+- **ÖNLEME KURALI**: "doğrudan mı çalıştırıldı" guard'ı, üretilecek TÜM dağıtım adlarını (suffix'li binary, symlink) hesaba katsın; yalnız kaynak dosya adına bağlama. Yeni paketleme hedefi eklerken guard'ı doğrula (binary'yi gerçekten çalıştır).
+
+### N-019 (completion) · shell prefix-filtreler, biz değil
+- **Gözlem**: `__complete` candidate'leri kullanıcı girdisine göre filtrelemeye kalkmak zsh/fish eşleşmesini bozar — bash `compgen -W`, zsh `compadd`, fish kendi prefix-match'ini yapar.
+- **ÖNLEME KURALI**: completion callback'i pozisyonun **TAM candidate set**'ini döndürür; prefix-filtreleme shell'in işi. `__complete` ayrıca **gizli + saf + I/O'suz** (her TAB'da koşar — config/network yükleme YASAK).
+
+### N-020 (macOS dağıtım) · unsigned binary Gatekeeper'a takılır
+- **Gözlem**: ad-hoc/imzasız compiled binary indirilince macOS "cannot be opened" (quarantine xattr) verir.
+- **Fix/Not**: build script lokal binary'yi `codesign -s -` ad-hoc imzalar (lokal çalışır). İNDİRİLEN binary için `xattr -d com.apple.quarantine ./ollamas` (doc'ta). Gerçek dağıtım için notarize → v18.
+- **ÖNLEME KURALI**: macOS native binary ship'lerken Gatekeeper'ı baştan planla (ad-hoc lokal, notarize dağıtım); kullanıcıya quarantine-temizleme adımını ver.

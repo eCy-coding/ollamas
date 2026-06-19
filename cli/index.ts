@@ -14,7 +14,7 @@ import { runTop } from "./commands/top";
 import { complete, completionScript } from "./lib/completion";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
-const VERSION = "8.0.0";
+const VERSION = "9.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
