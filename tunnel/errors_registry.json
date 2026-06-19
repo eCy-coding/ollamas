@@ -1,0 +1,79 @@
+{
+  "_schema": {
+    "description": "Tunnel lane kalıcı hata DB. TUNNEL_AGENTS.md §3.9 + §9: her hata kök-nedeniyle kaydedilir, prevention_rule aynı sınıfı engeller. recurrence_count artarsa kural yetersiz demektir.",
+    "fields": {
+      "id": "ERR-TUNNEL-NNN | RISK-TUNNEL-NNN",
+      "ts": "ISO 8601",
+      "version": "vTN (TUNNEL_ROADMAP)",
+      "file": "etkilenen dosya yolu",
+      "category": "scope | branch | routing | auth | isolation | keys | license | network | tooling",
+      "severity": "CRITICAL | high | med | low",
+      "root_cause": "semptom değil kök neden",
+      "evidence": "komut + çıktı",
+      "fix": "uygulanan düzeltme",
+      "prevention_rule": "gelecekte aynı sınıfı engelleyen tek cümle",
+      "test_added": "regresyon testi yolu",
+      "recurrence_count": 0
+    }
+  },
+  "known_risks_preloaded": [
+    {
+      "id": "RISK-TUNNEL-001",
+      "category": "branch",
+      "severity": "high",
+      "note": "Eşzamanlı sekmeler aynı repo'da checkout ile branch çalabilir (ref ERR-SCR-001, ERR-ORCH-004). Oturum başı `git branch --show-current` == feat/tunnel-v1 doğrula.",
+      "applies_version": "vT0"
+    },
+    {
+      "id": "RISK-TUNNEL-002",
+      "category": "scope",
+      "severity": "high",
+      "note": "Erişilebilirlik için server.ts (origin/TLS) edit etmek YASAK. env/config + reverse-proxy üret, integrations lane'e doküman devret.",
+      "applies_version": "vT0"
+    },
+    {
+      "id": "RISK-TUNNEL-003",
+      "category": "network",
+      "severity": "CRITICAL",
+      "note": "Güvensiz WiFi'de ham 0.0.0.0:3000 ifşası (ref RISK-SCR-006 openclaw#24018). Off-LAN yalnız WG-şifreli arayüz üzerinden eriş.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-004",
+      "category": "keys",
+      "severity": "CRITICAL",
+      "note": "WireGuard private key repo'ya/log'a sızabilir. Anahtarlar worktree dışı, .gitignore (*.conf/*.key), çıktı redaction.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-005",
+      "category": "license",
+      "severity": "high",
+      "note": "wireguard-tools GPL-2.0; kaynak kopyalamak bulaşma yaratır. Yalnız spawn('wg',...) binary çağrısı.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-006",
+      "category": "tooling",
+      "severity": "med",
+      "note": "İzole worktree'de node_modules yok (gitignored). Zero-dep: Node 24 native TS strip + node:test kullan; typescript/tsx kurulumu opsiyonel gate.",
+      "applies_version": "vT1"
+    }
+  ],
+  "errors": [
+    {
+      "id": "ERR-TUNNEL-001",
+      "ts": "2026-06-20",
+      "version": "vT1",
+      "file": "src/transports/wireguard.ts",
+      "category": "tooling",
+      "severity": "med",
+      "root_cause": "Node 24 strip-only TS execution does not support TS parameter properties (constructor(private x)). class field shorthand needs full transpiler, not type-strip.",
+      "evidence": "SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript parameter property is not supported in strip-only mode (node --test src/transports/wireguard.test.ts)",
+      "fix": "Declare fields explicitly + assign in constructor body (no access-modifier params).",
+      "prevention_rule": "Bu lane zero-dep Node-strip kullanır: ASLA `constructor(private/public/readonly x)` yazma; alanları açıkça tanımla + gövdede ata. Ayrıca enum/namespace/decorator da yok.",
+      "test_added": "src/transports/wireguard.test.ts (transport metadata)",
+      "recurrence_count": 0
+    }
+  ]
+}

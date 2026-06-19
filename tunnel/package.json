@@ -1,0 +1,15 @@
+{
+  "name": "ollamas-tunnel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ollamas tunnel/switch lane — sovereign zero-account MacBook<->iOS e2e reachability",
+  "scripts": {
+    "test": "node --test src/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "tunnel": "node src/cli.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
