@@ -18,7 +18,7 @@ import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from ".
 import { spawnSync } from "node:child_process";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 
-const VERSION = "9.0.0";
+const VERSION = "10.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 

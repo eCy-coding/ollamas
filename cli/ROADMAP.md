@@ -14,7 +14,8 @@
 | **v7** | Profiller + secrets | AES-256-GCM secrets-at-rest (`secrets.ts`/`keystore.ts`, db.ts deseni) + `*Enc` sealed config + güvenli migration; çoklu-gateway profil (`config use`/`profiles`/`--profile`); env override korunur | ✅ DONE |
 | **v8** | Observability/TUI | `ollamas top` — saf prom-parser (`/metrics`) + sparkline/gauge + usage timeseries + seyir tail + `--watch` (alt-screen, SIGINT-restore) | ✅ DONE |
 | **v9** | Packaging | shell completion (bash/zsh/fish) + hidden `__complete`; Bun `--compile` tek-binary (1.3.13 arm64 pin + ad-hoc codesign); Homebrew formula draft + PACKAGING.md; npm link | ✅ DONE |
-| **v10** | Self-update + plugin | `ollamas update` (manifest+sha256); manifest-tabanlı 3rd-party alt-komut sistemi; binary release wire (release-please mevcut) | ▶ NEXT |
+| **v10** | Self-update + plugin | `ollamas update` (manifest+sha256-verify+atomic-replace); checksum-gated plugin alt-komut sistemi; release-binary CI draft; UPDATE.md | ✅ DONE |
+| **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `--insecure-storage` opt-out | ▶ NEXT |
 | **v11+** | Ufuk (önceden-hesap) | Native Swift Shortcuts derinleştirme; WASM build; otonom agent loop; multi-gateway mesh kontrolü | |
 
 ## v1 — DONE (kanıt)
@@ -74,6 +75,15 @@
 - Testler: `cli-shortcuts` (16) + `cli-shortcuts-cmd` (5) + `cli-bridge-mcp` (9, async-spawn) + `cli-mcp-stream` (6) — **full 176 pass/1 skip** (v5:140). `plutil -lint` + binary1 roundtrip + canlı build (9 dosya 0600, placeholder-only) doğrulandı.
 - Choke-point korunur (gerçek `tool-registry` import YOK; mention'lar yorum). VERSION 6.0.0.
 
+## v10 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): deno upgrade + tj/go-update (MIT) atomic-replace+sha256; GitHub Releases API / `latest.json` manifest; jedisct1/minisign (Tier-2 sig→v18); git/gh-extension/krew plugin → **checksum-gated** (blind-exec değil) güvenli varyant.
+- `cli/lib/manifest.ts` (saf): `parseManifest`/`compareSemver`/`isNewer`/`currentTarget`/`selectAsset`/`sha256Hex`. `cli/lib/plugins.ts` (saf): `parsePluginRegistry`/`findPlugin`/`isValidPluginName`(traversal-guard)+load/save/`verifyPluginFile`.
+- `cli/commands/update.ts`: saf `planUpdate` + `ollamas update [--check][--manifest]`; manifest URL **explicit** (flag/env, hardcode yok, startup-network yok); standalone fetch (non-gateway, N-023); download→**sha256-verify**(mismatch→abort, canlı binary'ye dokunmaz, N-021)→temp aynı-dizin→chmod+x→macOS quarantine drop→atomic `renameSync(process.argv[1])`; node-run `.cjs`→pkg-manager uyarısı.
+- `cli/commands/plugin.ts` + index fallback: `plugin list|install|remove`; bilinmeyen komut = kayıtlı plugin İSE sha256-eşleşirse exec (tampered→red, kayıtsız→unknown, N-022); TOFU install, `$PATH` taranmaz.
+- `.github/workflows/release-binary.yml` draft (tag-triggered matrix→binary+sha+latest.json+gh upload); `cli/UPDATE.md`.
+- Testler: `cli-manifest`(9)+`cli-plugins`(7)+`cli-update`(3) → **full 280 pass/1 skip** (v9:261). Canlı: update --check/replace/**mismatch-abort** (temp hedef, gerçek binary asla); plugin install→exec(args+stdio)→**tamper-refuse**→remove→unknown.
+- Choke-point korunur (`grep --include="*.ts"` boş; release-fetch tool-call değil N-023); VERSION **10.0.0**. **Outward-facing**: binary release / manifest hosting kullanıcı kararı (CI draft+doc ship, publish YOK).
+
 ## v9 — DONE (kanıt)
 - **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): gh CLI(38k)+npm completion+pnpm/tabtab desen → static-script+`__complete`-callback hand-roll; Bun `--compile`(oven-sh/bun, 1.3.12 arm64 "Killed:9" → **1.3.13 fix**, host'ta var); Node `--build-sea` 25.5+ ister (host 24.16 → v12'ye not); Homebrew prebuilt-binary formula deseni (deno/gh).
 - `cli/lib/completion.ts` (saf): `COMMAND_TREE` tek-kaynak + `complete(words)` (pozisyon candidate-set; shell prefix-filtreler, biz değil — N-019) + `completionScript(bash|zsh|fish)`.
@@ -101,9 +111,8 @@
 - Testler: `cli-secrets`(14) + `cli-config-secrets`(10) + `cli-profiles`(11) → **full 211 pass/1 skip** (v6:176). Canlı (izole HOME): migration+roundtrip+tamper+env-no-persist+graceful-degrade + profil create/switch/isolation/no-plaintext doğrulandı.
 - Choke-point korunur (`grep --include="*.ts"` boş); VERSION **7.0.0**.
 
-## v10 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/lib/manifest.ts` (saf) — release manifest `{version, assets:[{target,url,sha256}]}` parse + semver-compare; ilk test = `isNewer("9.0.0","9.1.0")` + `process.platform/arch`'a göre asset-select.
-2. `ollamas update` komutu — manifest fetch + uygun asset indir + **sha256-verify** + atomic replace (opt-in, `--check` dry-run); kayıp/yanlış-hash → red.
-3. Manifest-tabanlı plugin alt-komut loader (`~/.ollamas/plugins/<name>` allowlist + checksum); choke-point korunur.
-4. Binary release wire (release-please mevcut → tag'de per-arch binary attach).
-5. Testler: manifest parse/semver/asset-select saf-fn; update dry-run mock-fetch; plugin discovery saf-fn.
+## v11 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `cli/lib/keychain.ts` (seam) — `keychainAvailable()` (macOS + GUI), `keychainGet/Set/Delete(account, service)` `/usr/bin/security` `execFileSync`; ilk test = komut-arg kurulumu (secret argv'de loglanmaz) + non-macOS → null (v7 keyfile fallback).
+2. `keystore.ts` entegrasyon: opsiyonel key-source = Keychain (v7 seam arkasında); `--insecure-storage` opt-out file-key'e döner.
+3. SSH/headless'te Keychain sessiz-fail → graceful fallback (v7 keyfile/PASSPHRASE).
+4. Testler: keychain arg-construction; fallback-to-keyfile; round-trip (macOS-guard live).

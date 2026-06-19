@@ -159,3 +159,18 @@
 - **Gözlem**: ad-hoc/imzasız compiled binary indirilince macOS "cannot be opened" (quarantine xattr) verir.
 - **Fix/Not**: build script lokal binary'yi `codesign -s -` ad-hoc imzalar (lokal çalışır). İNDİRİLEN binary için `xattr -d com.apple.quarantine ./ollamas` (doc'ta). Gerçek dağıtım için notarize → v18.
 - **ÖNLEME KURALI**: macOS native binary ship'lerken Gatekeeper'ı baştan planla (ad-hoc lokal, notarize dağıtım); kullanıcıya quarantine-temizleme adımını ver.
+
+## v10 — Self-update + Plugin (2026-06-20)
+
+### N-021 (güvenlik) · self-replace ÖNCE sha256 doğrula, sonra atomic rename
+- **Tasarım**: `ollamas update` indirilen asset'i manifest sha256'sına karşı doğrular; **mismatch → abort + temp sil**, canlı binary'ye DOKUNMAZ. Doğrulama geçerse: temp **hedefin dizininde** (aynı fs — cross-device rename başarısız), `chmod +x`, macOS quarantine drop, `renameSync` ile hedefin üzerine (açık inode rename'i atlatır → çalışan binary güvenle değişir).
+- **Kanıt**: canlı probe SADECE temp hedefte (gerçek binary asla); mismatch case target'ı değiştirmedi (exit 1).
+- **ÖNLEME KURALI**: indirip-çalıştıran her akışta **doğrula-sonra-değiştir**; asla hedefi kısmi-yaz. Temp aynı filesystem'de (atomic rename şartı). Self-update'i gerçek binary üzerinde test ETME — temp hedef enjekte et.
+
+### N-022 (güvenlik) · plugin = keyfi kod → checksum-gate, blind-exec YOK
+- **Tasarım**: bilinmeyen komut = kayıtlı plugin ise YALNIZ dosya sha256'sı kayıtla eşleşirse exec edilir (tampered→red exit 1, kayıtsız→unknown exit 2). `$PATH` taranmaz, otomatik kurulum yok; `plugin install` = açık güven kapısı (TOFU). İsim path-traversal guard'lı (`a-z0-9-`).
+- **ÖNLEME KURALI**: dış kod exec eden CLI özelliği, git'in blind `git-foo` modelini KOPYALAMA — checksum-manifest ile gate'le; tampered'ı reddet; trust'ı explicit install'a bağla.
+
+### N-023 (choke-point ayrımı) · release download tool-call DEĞİL
+- **Gözlem**: `update` manifest+asset'i standalone `fetch` ile çeker, `GatewayClient` üzerinden değil. Bu choke-point ihlali DEĞİL — release indirme bir tool çağrısı değil (gateway `/mcp` rate-limit/registry ile ilgisiz).
+- **ÖNLEME KURALI**: choke-point yasası **tool yan-etkileri** içindir (`/mcp`→ToolRegistry.execute). Sürüm/asset indirme gibi non-tool ağ erişimi serbest; ama bunu kodda+doc'ta açıkça ayır ki ihlal sanılmasın.
