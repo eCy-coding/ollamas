@@ -11,6 +11,8 @@
     "cli": "tsx cli/index.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && npm run build:cli",
     "build:cli": "esbuild cli/index.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/cli/index.cjs",
+    "postbuild:cli": "chmod +x dist/cli/index.cjs",
+    "build:binary": "bash cli/build-binary.sh",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

@@ -199,7 +199,10 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 // Only run when invoked directly (not when imported by tests).
-const invokedDirectly = process.argv[1] && /(?:^|[\\/])(?:index\.(?:ts|cjs|js)|ollamas)$/.test(process.argv[1]);
+// Run when launched directly (node/tsx) OR as a compiled binary named ollamas*
+// (Bun --compile output is ollamas-darwin-arm64 etc.). Importing in tests does
+// not match (argv[1] is the test runner).
+const invokedDirectly = process.argv[1] && /(?:^|[\\/])(?:index\.(?:ts|cjs|js)|ollamas[\w.\-]*)$/.test(process.argv[1]);
 if (invokedDirectly) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))
