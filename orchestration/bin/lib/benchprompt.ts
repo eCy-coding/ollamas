@@ -20,6 +20,12 @@ export interface BenchRegression { model: string; device: string; baseTokS: numb
 
 export interface RoutingPolicy { planner: string; coder: string; cheap: string; }
 
+/** Donanım-duyarlı yerel seçim (optimize.ts selectBest+optimalConfig sonucu; tip lokal = commit-izole). */
+export interface LocalSelection {
+  model: string; score: number; tokS: number; reason: string;
+  config: { num_ctx: number; num_gpu: number; num_thread: number; keep_alive: string; quant: string };
+}
+
 /** Tier-A Claude routing (plan.md §1) — local-bench DEĞİL, public 2026 leaderboard ile. */
 export const DEFAULT_ROUTING: RoutingPolicy = {
   planner: "Opus 4.8 (claude-opus-4-8)",
@@ -37,6 +43,31 @@ export interface BenchPromptInput {
   regressions: BenchRegression[];
   routing: RoutingPolicy;
   ts: string;                  // ölçüm/üretim zamanı (deterministik test için param)
+  localSelection?: LocalSelection;  // VARSA donanım-duyarlı pick (selectBest); YOKSA champion fallback
+  stale?: boolean;             // bench verisi bayat mı (uyarı satırı)
+}
+
+/** selection_rule gövdesi: donanım-duyarlı localSelection varsa onu, yoksa champion+hardcoded M4. */
+function selectionLines(input: BenchPromptInput): string[] {
+  const ls = input.localSelection;
+  if (ls) {
+    const c = ls.config;
+    return [
+      `- **🏆 Seçili (donanım-optimal, 0-manuel): \`${ls.model}\`** — ${ls.tokS} tok/s, skor ${ls.score} ` +
+        `(correctness-gate ✓ + VRAM-fit ✓; bu RAM'e sığan en-verimli DOĞRU model).`,
+      `- Gerekçe: ${ls.reason}.`,
+      `- Optimal config (RAM-tier-duyarlı): \`num_ctx=${c.num_ctx}\` \`num_gpu=${c.num_gpu}\` \`num_thread=${c.num_thread}\` \`keep_alive=${c.keep_alive}\` \`quant=${c.quant}\`.`,
+      `- **Yanlış cevap veren hızlı model elenir** (correct=0 → daha hızlı olsa bile diskalifiye).`,
+      `- Apple Silicon: Ollama ≥0.19 **MLX backend** (~2× decode, ≥32GB unified RAM) tercih et.`,
+    ];
+  }
+  return [
+    champLine(input.best),
+    `- **Yanlış cevap veren hızlı model elenir** (örn correct=0 olan model, daha yüksek tok/s olsa bile).`,
+    `- M4 tuning: \`num_thread=12\`, \`num_gpu=999\`, \`num_ctx=8192\`, \`keep_alive=30m\` (sıcak tut, reload yok).`,
+    `  Bench yoksa warm fallback \`${WARM_DEFAULT}\`.`,
+    `- Apple Silicon: Ollama ≥0.19 **MLX backend** (~2× decode, ≥32GB unified RAM) tercih et.`,
+  ];
 }
 
 function evidenceTable(aggs: BenchAgg[], best: Record<string, BenchAgg>): string {
@@ -71,6 +102,9 @@ export function buildModelSelectionPrompt(input: BenchPromptInput): string {
     ? regressions.map((r) => `\`${r.model}\`@${r.device}: ${r.medianTokS} vs baseline ${r.baseTokS} → **-%${r.dropPct}**`).join(" · ")
     : "none";
 
+  const staleWarn = input.stale
+    ? `> ⚠️ **Bench verisi bayat** (${ts}). Seçim en-iyi-bilinen veriye dayanır; tazelemek için \`tsx orchestration/bin/benchprompt.ts --refresh\` (server :3000 açıkken).`
+    : `> ✓ Bench verisi taze (${ts}).`;
   return [
     `# OLLAMAS — OPTIMAL MODEL & WORKING-PRINCIPLE PROMPT`,
     `<!-- AUTO benchprompt.ts · ${ts} · chip ${chip} · regenerate: \`tsx orchestration/bin/benchprompt.ts\` · elle düzenleme -->`,
@@ -78,6 +112,7 @@ export function buildModelSelectionPrompt(input: BenchPromptInput): string {
     `> Taşınabilir + self-contained. Nereye yapıştırırsan yapıştır: aşağıdaki en-verimli seçimleri al ve`,
     `> **çalışmaya başla** — hangi modeli kullanacağını sorma. Seçimler runtime-kanıtlı (tok/s) +`,
     `> matematik-sağlam (median/MAD/p95) + kod-bütünlüğü (correctness-gate + gate-before-commit).`,
+    staleWarn,
     ``,
     `<role>`,
     `Apple M4 (macOS) üzerinde **ollamas** projesinde otonom kıdemli mühendissin. Tek alanına odaklan,`,
@@ -103,11 +138,7 @@ export function buildModelSelectionPrompt(input: BenchPromptInput): string {
     `</runtime_evidence>`,
     ``,
     `<selection_rule>`,
-    champLine(best),
-    `- **Yanlış cevap veren hızlı model elenir** (örn correct=0 olan model, daha yüksek tok/s olsa bile).`,
-    `- M4 tuning: \`num_thread=12\`, \`num_gpu=999\`, \`num_ctx=8192\`, \`keep_alive=30m\` (sıcak tut, reload yok).`,
-    `  Bench yoksa warm fallback \`${WARM_DEFAULT}\`.`,
-    `- Apple Silicon: Ollama ≥0.19 **MLX backend** (~2× decode, ≥32GB unified RAM) tercih et.`,
+    ...selectionLines(input),
     `- Regresyon: ${regList}.`,
     `</selection_rule>`,
     ``,

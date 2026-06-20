@@ -29,6 +29,7 @@ export interface RoleInputs {
   ollamasBranch: string;
   lanes: { branch: string; done?: string; next?: string; dirty?: number }[];
   tools: { name: string; gist: string }[];
+  optimal?: { model: string; tokS: number; chip: string } | null; // vO6 0-manuel optimal runtime (MODEL_SELECTION.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -83,6 +84,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     `## Mevcut aşama`,
     `- Orchestration: **${cur} DONE** → sıradaki **${nxt}**`,
     `- İzlenen lane'ler (${i.lanes.length}): ${laneList}`,
+    i.optimal ? `- 🏆 **Optimal runtime (0-manuel):** \`${i.optimal.model}\` @ ${i.optimal.chip} (${i.optimal.tokS} tok/s) — \`MODEL_PROMPT.md\`` : `- Optimal runtime: \`tsx bin/benchprompt.ts\` koş (henüz MODEL_SELECTION.json yok)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -161,6 +163,16 @@ async function main(): Promise<void> {
     branch: l.branch, done: l.roadmap.current, next: l.roadmap.next, dirty: l.dirtyFiles,
   }));
 
+  // vO6 0-manuel optimal runtime (MODEL_SELECTION.json varsa; graceful absent).
+  let optimal: RoleInputs["optimal"] = null;
+  try {
+    const msF = join(ORCH_DIR, "MODEL_SELECTION.json");
+    if (existsSync(msF)) {
+      const ms = JSON.parse(readFileSync(msF, "utf8"));
+      if (ms?.selection?.model) optimal = { model: ms.selection.model, tokS: ms.selection.tokS, chip: ms.chip };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -168,6 +180,7 @@ async function main(): Promise<void> {
     ollamasBranch: git(ANCHOR, ["branch", "--show-current"]) || "?",
     lanes,
     tools: readTools(),
+    optimal,
   });
 
   console.log(answer);

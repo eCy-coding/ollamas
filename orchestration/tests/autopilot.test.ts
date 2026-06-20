@@ -1,0 +1,35 @@
+import { describe, it, expect } from "vitest";
+import { summarizeAutopilot, type StepResult } from "../bin/lib/autopilot";
+
+const RESULTS: StepResult[] = [
+  { step: "benchprompt", ok: true, ms: 120, detail: "pick qwen3-coder:30b · 119.7 tok/s" },
+  { step: "conduct", ok: true, ms: 80, detail: "next: vO8 drift-guard (ROADMAP)" },
+  { step: "status", ok: false, ms: 40, detail: "timeout" },
+];
+
+describe("summarizeAutopilot — otopilot özeti (PURE, deterministik)", () => {
+  const md = summarizeAutopilot(RESULTS, "2026-06-20T10:00:00Z");
+
+  it("her adımı ok/fail işaretiyle listeler", () => {
+    expect(md).toContain("benchprompt");
+    expect(md).toContain("conduct");
+    expect(md).toContain("status");
+    expect(md).toMatch(/✓.*benchprompt|benchprompt.*✓/);
+    expect(md).toMatch(/✗.*status|status.*✗/);
+  });
+  it("ok/fail sayımı doğru (2 ok / 1 fail)", () => {
+    expect(md).toMatch(/2\/3|2 ok|2 başarılı/);
+  });
+  it("model-pick + conductor next-action öne çıkar (0-manuel özeti)", () => {
+    expect(md).toContain("qwen3-coder:30b");
+    expect(md).toMatch(/vO8 drift-guard/);
+  });
+  it("deterministik — aynı girdi aynı çıktı (Date.now yok)", () => {
+    expect(summarizeAutopilot(RESULTS, "2026-06-20T10:00:00Z")).toBe(md);
+  });
+  it("boş sonuç → graceful (kırılmaz)", () => {
+    const empty = summarizeAutopilot([], "t");
+    expect(empty).toMatch(/autopilot/i);
+    expect(empty).toMatch(/0\/0|adım yok|no step/i);
+  });
+});

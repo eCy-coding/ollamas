@@ -86,6 +86,13 @@
       "severity": "med",
       "note": "Tek 'self-answer' isteğine 3 paralel sekme aynı anda 3 ayrı impl yazdı (whoami/rolecard collect-tabanlı + identity/laneinfo duplikat + role/role-hook hook-tabanlı), hepsi untracked, suite RED (identity.test 1 fail). Çözüm T0-onaylı SENTEZ: oto-tetik hook (role-hook.ts) KORU + tek jeneratörü canonical collect.ts'e bağla (per-lane shipped→next fold) + plan-next doğru versiyon parser; duplikat sil (identity/laneinfo/whoami/rolecard+testleri). Prevention: aynı isteğe çok untracked impl → TEK sentezde birleştir (clobber etme, fikri fold et), kararı T0'a sun (deliverable şekli = kullanıcı kararı), commit-öncesi suite YEŞİL (kırık worker-test karantina/sil). LİMİT: per-lane tablo roadmapStruct (collect) gürültülü/truncated string verir (cockpit ile aynı) — bug değil, dürüst-canlı sinyal; lane ROADMAP body güncellenince düzelir; orchestration KENDİ current/next'i plan-next ile DOĞRU.",
       "applies_version": "vO-ID"
+    },
+    {
+      "id": "RISK-ORCH-013",
+      "category": "multi-worker-collision",
+      "severity": "med",
+      "note": "vO6 '0-manuel optimal seçim'e 4 paralel sekme yazdı: bench.ts(istatistik) + optimize.ts(selectBest+buildWorkingPrompt→OPTIMAL_PROMPT.md) + benchprompt.ts(Tier-A routing→MODEL_PROMPT.md) + conduct.ts(vO8 zero-touch). İKİ portable-prompt artefaktı + cross-dep (conduct→optimize.buildWorkingPrompt+OPTIMAL.json). T0-onaylı FÜZYON: benchprompt.buildModelSelectionPrompt'a localSelection eklendi → optimize.selectBest(donanım-duyarlı)+optimalConfig(RAM-tier) Tier-A routing'le tek MODEL_PROMPT.md'de birleşti; bin/optimize.ts CLI + OPTIMAL_PROMPT.md + OPTIMAL.json silindi; machine-çıktı MODEL_SELECTION.json'a taşındı. optimize.ts LIB KORUNDU (conduct hâlâ buildWorkingPrompt kullanıyor — unused değil). conduct.ts ref-onarımı (OPTIMAL.json→MODEL_SELECTION.json, optimize.ts→benchprompt.ts) — silmemin yarattığı dangling-ref'i tamir, conduct vO8 commit-DIŞI. Prevention: silmeden önce cross-dep tara (grep import+JSON-read); başka feature'ın kullandığı export'u 'unused' sanıp silme; sildiğin dosyaya işaret eden sibling-ref'leri tamir et; deliverable-fork T0'a sun. LİMİT: bench verisi STALE (benchmark.json 6 gün) → isStale uyarır, --refresh opt-in (ağır bench bench-lane işi, conductor read-only §3); 0-manuel-SEÇİM tam (selectBest insan-girdisiz) ama sürekli-tazelik bench-lane/cron sorumluluğu. Versiyon-etiket drift: workers vO6/vO6.1/vO7/vO8 paralel etiketledi (optimize.ts header 'vO7' ≠ ROADMAP) — UK-07 ailesi, branch≡roadmap hedefi vO8 drift-guard'a kaldı.",
+      "applies_version": "vO6"
     }
   ],
   "errors": [

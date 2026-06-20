@@ -70,6 +70,18 @@ describe("buildRoleAnswer — per-lane canlı aşama tablosu (folded collect sin
   });
 });
 
+describe("buildRoleAnswer — vO6 optimal runtime surface", () => {
+  it("optimal VARSA 🏆 0-manuel runtime satırı (model+chip+tok/s)", () => {
+    const out = buildRoleAnswer({ ...BASE, optimal: { model: "qwen3-coder:30b", tokS: 119.7, chip: "Apple M4 Max" } });
+    expect(out).toMatch(/🏆.*Optimal runtime.*0-manuel/i);
+    expect(out).toContain("qwen3-coder:30b");
+    expect(out).toContain("119.7");
+  });
+  it("optimal YOKSA benchprompt-koş fallback (graceful)", () => {
+    expect(buildRoleAnswer(BASE)).toMatch(/benchprompt\.ts/);
+  });
+});
+
 describe("isRoleQuestion — hook matcher", () => {
   it("kimlik/görev sorularını yakalar", () => {
     expect(isRoleQuestion("Bu terminal sekmesinde görevin nedir? Ne yaparsın?")).toBe(true);

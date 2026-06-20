@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildModelSelectionPrompt, DEFAULT_ROUTING, WARM_DEFAULT, type BenchPromptInput, type BenchAgg } from "../bin/lib/benchprompt";
+import { buildModelSelectionPrompt, DEFAULT_ROUTING, WARM_DEFAULT, type BenchPromptInput, type BenchAgg, type LocalSelection } from "../bin/lib/benchprompt";
 
 const AGGS: BenchAgg[] = [
   { model: "qwen3-coder:30b", device: "mac", n: 1, medianTokS: 119.7, p95: 119.7, mad: 0, min: 119.7, max: 119.7, correctRatio: 1 },
@@ -41,6 +41,32 @@ describe("buildModelSelectionPrompt — taşınabilir çalışma-prensibi prompt
     expect(p).toMatch(/<working_principles>/);
     expect(p).toMatch(/<runtime_evidence/);
     expect(p).toMatch(/<selection_rule>/);
+  });
+});
+
+describe("buildModelSelectionPrompt — FÜZYON: donanım-duyarlı localSelection (selectBest)", () => {
+  const ls: LocalSelection = {
+    model: "qwen3-coder:30b", score: 0.906, tokS: 119.7,
+    reason: "correct 1 + tok 119.7/119.7 + vram-fit 0.53",
+    config: { num_ctx: 8192, num_gpu: 999, num_thread: 12, keep_alive: "30m", quant: "Q4_K_M" },
+  };
+  const fused = buildModelSelectionPrompt({ ...full, localSelection: ls });
+
+  it("donanım-optimal pick + RAM-tier config + Tier-A routing HEPSİ tek prompt'ta", () => {
+    expect(fused).toContain("qwen3-coder:30b");       // yerel selectBest pick
+    expect(fused).toContain("num_ctx=8192");          // RAM-tier config (hardcoded değil)
+    expect(fused).toContain("num_gpu=999");
+    expect(fused).toMatch(/donanım-optimal|0-manuel/i);
+    expect(fused).toMatch(/Opus/);                     // Tier-A routing korunur
+    expect(fused).toMatch(/Sonnet/);
+    expect(fused).toMatch(/skor 0\.906/);             // selectBest skoru görünür
+  });
+  it("localSelection YOKSA champion fallback (geriye-uyum)", () => {
+    expect(buildModelSelectionPrompt(full)).toMatch(/🏆.*qwen3-coder:30b|use/);
+  });
+  it("stale=true → bayat uyarısı; stale=false → taze", () => {
+    expect(buildModelSelectionPrompt({ ...full, stale: true })).toMatch(/bayat/i);
+    expect(buildModelSelectionPrompt({ ...full, stale: false })).toMatch(/taze/i);
   });
 });
 

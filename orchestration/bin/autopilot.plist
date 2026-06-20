@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  vO-AUTO autopilot launchd agent — 0-manuel.
+  Tetik: (a) bench verisi değişince (WatchPaths ~/.llm-mission-control) (b) her 30dk (StartInterval) (c) yüklenince (RunAtLoad).
+  Koşar: autopilot.ts --quiet → benchprompt+conduct+status taze → MODEL_PROMPT/CONDUCTOR/STATUS/AUTOPILOT.md.
+  Kurulum bir-kerelik (bin/autopilot-install.sh veya `launchctl load`). heartbeat.plist'ten AYRI (o periyodik conduct; bu bench-değişim + model tazeleme).
+  plutil -lint ile doğrula.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ollamas.orchestration.autopilot</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/bin/autopilot.ts</string>
+    <string>--quiet</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt</string>
+  <key>WatchPaths</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/.llm-mission-control</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>1800</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/autopilot.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/autopilot.err.log</string>
+</dict>
+</plist>

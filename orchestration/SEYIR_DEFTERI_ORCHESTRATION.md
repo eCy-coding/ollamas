@@ -223,3 +223,60 @@ yanılttı (ilk impl'imde); fix prose'dan literal marker çıkar. Per-lane strin
 
 **Next precomputed (→vO6):** değişmedi — Benchmark aggregation (yukarı). role.ts genişletilebilir: bench tok/s
 özeti, son commit, test sayısı gibi canlı sinyaller (§12 daima-geliştirilebilir).
+
+## vO6.1 — Benchmark → Taşınabilir Model-Seçim PROMPT'u (2026-06-20)
+
+**Ne:** Emre "benchmark sonucunu nereye yapıştırılırsa en-verimli seçimle çalışmaya başlayan kusursuz
+global-standart prompt'a dönüştür" istedi. Worker vO6 bench-CORE'u (lib/bench.ts median/p95/MAD/regression +
+bench.ts→BENCH.json) zaten kurmuş (UNTRACKED, GREEN); o **DATA** üretir, **prompt** üretmez → boşluk.
+
+**Yapıldı:** `bin/lib/benchprompt.ts` (PURE `buildModelSelectionPrompt` — role/working_principles/runtime_evidence/
+selection_rule/output sectioned, deterministik) + `bin/benchprompt.ts` (BENCH.json read-only CONSUME → MODEL_PROMPT.md
++ stdout, ts=mtime churn-free) + `tests/benchprompt.test.ts` (9 case). Tier-A routing plan.md §1 (Opus-plan/Sonnet-code/
+Haiku-search) + Tier-B correctness-gate→tok/s füzyonu.
+
+**Kanıt:** vitest 248/248 (benchprompt 9 dahil), signal 28/28. Canlı: champ `qwen3-coder:30b` 119.7 tok/s,
+`qwen3:4b` 111 tok/s ama correct=0 → ✗ disqualified (correctness-gate çalışıyor). **Self-update kanıtı:**
+BENCH.json champ→gpt-oss değiştir→prompt champ gpt-oss oldu→geri yüklendi. Zero-leak: 8 lane ağacına 0 yazım.
+
+**Karar (commit-izolasyon):** benchprompt lib/bench.ts'e tip-import EDİYORDU → worker'ın untracked dosyası;
+ben commit edip o commit'lenmezse temiz checkout kırılır → Agg/Regression tiplerini **lokal tanımladım**
+(runtime'da BENCH.json düz-JSON, tip-only). Böylece commit'im self-contained, worker bench.ts'ten bağımsız.
+
+**Adopt (vibe-yok):** f/prompts.chat (role→constraints→evidence→output yapısı, permissive) + gszhangwei/
+structured-prompts (XML-section paste-anywhere, MIT) — desen-kopya. RouteLLM (Apache, ML-classifier) idea-only,
+kod kopyası YOK. tok/s metodolojisi (LarHope/aidatatools MIT) zaten worker bench-core'da.
+
+**Next precomputed (→vO7):** Drift-guard otomasyon (branch≡roadmap, choke-point bütünlüğü). benchprompt
+genişletilebilir: per-task model (coding↔reasoning↔vision ayrı champ), iOS device kolonu (cli-bench.json target).
+
+---
+
+## vO6 — Benchmark Aggregation + 0-Manuel Optimal Seçim FÜZYON (2026-06-20)
+
+**Tetik (Emre/T0):** "sıradaki versiyonu planla" + **0 manuel seçim/işlem** — bench verisinden M4+ollamas için
+OTOMATİK en-iyi model+config (test-geçen, runtime+matematik+kod-bütünlüğü) → nereye yapıştırılırsa en-verimli
+seçimle çalışan TEK portable prompt.
+
+**Bağlam (4-worker proliferation):** bench.ts(istatistik) + optimize.ts(donanım-duyarlı selectBest+buildWorkingPrompt
+→OPTIMAL_PROMPT.md) + benchprompt.ts(Tier-A routing→MODEL_PROMPT.md) + conduct.ts(vO8 zero-touch) — hepsi untracked,
+İKİ portable-prompt artefaktı. optimize.test Explore-RED'i ELLE-DOĞRULANDI yeşildi (worker scoreAll fix sonrası).
+
+**Yapıldı (T0-onaylı FÜZYON):**
+- `bin/lib/bench.ts` +`isStale(ts,maxDays)` (tazelik; geçersiz→güvenli-stale). tests +4.
+- `bin/lib/benchprompt.ts` +`LocalSelection` + `selectionLines` + `stale` uyarı: localSelection VARSA donanım-duyarlı
+  selectBest pick + RAM-tier config (HARDCODED M4 yerine), YOKSA champion fallback. tests +3.
+- `bin/benchprompt.ts` = TEK KANONİK CLI yeniden-yazıldı: canlı sysctl(M4) → bench.aggregate → **optimize.selectBest**
+  + optimalConfig → buildModelSelectionPrompt(localSelection) → **MODEL_PROMPT.md** + **MODEL_SELECTION.json**; stale + `--refresh` opt-in.
+- SİL: `bin/optimize.ts`(CLI) + OPTIMAL_PROMPT.md + OPTIMAL.json (optimize LIB KORUNDU — conduct kullanıyor).
+- `bin/role.ts` +🏆 optimal-runtime satırı (MODEL_SELECTION.json). tests +2.
+- `bin/conduct.ts` ref-onarımı (OPTIMAL.json→MODEL_SELECTION.json, optimize.ts→benchprompt.ts) — silmemin dangling-ref'i; conduct vO8 commit-DIŞI.
+
+**Kanıt (canlı):** vitest **286/24** yeşil. `tsx bin/benchprompt.ts` → M4 Max 52GB algıla → **0-manuel selectBest
+`qwen3-coder:30b`** (119.7 tok/s, skor 0.913, correctness-gate✓+VRAM-fit✓) → RAM-tier num_ctx=8192 → MODEL_PROMPT.md
+(Tier-A routing + donanım-optimal pick FÜZYON) + MODEL_SELECTION.json; **⚠️ STALE uyarısı** (benchmark.json 6 gün). role.ts
+→ 🏆 optimal satırı. Scope: orchestration/** + ~/.llm-mission-control(refresh opt-in); 8 lane 0 yazım.
+
+**RISK-ORCH-013:** 4-worker prompt-proliferation→füzyon; cross-dep silme (conduct→optimize) ref-tara; stale-bench (isStale+opt-in-refresh, sürekli-tazelik bench-lane işi); versiyon-etiket drift (optimize 'vO7'≠ROADMAP).
+
+**Next precomputed (→vO7):** drift-guard (branch≡roadmap; optimize.ts header vO7→vO6 düzelt). benchprompt: per-task champ + iOS device kolonu.

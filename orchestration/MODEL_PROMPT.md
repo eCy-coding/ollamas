@@ -1,9 +1,10 @@
 # OLLAMAS — OPTIMAL MODEL & WORKING-PRINCIPLE PROMPT
-<!-- AUTO benchprompt.ts · 2026-06-20T10:52:02.489Z · chip Apple M4 Max · regenerate: `tsx orchestration/bin/benchprompt.ts` · elle düzenleme -->
+<!-- AUTO benchprompt.ts · 2026-06-14T16:04:46.189Z · chip Apple M4 Max · regenerate: `tsx orchestration/bin/benchprompt.ts` · elle düzenleme -->
 
 > Taşınabilir + self-contained. Nereye yapıştırırsan yapıştır: aşağıdaki en-verimli seçimleri al ve
 > **çalışmaya başla** — hangi modeli kullanacağını sorma. Seçimler runtime-kanıtlı (tok/s) +
 > matematik-sağlam (median/MAD/p95) + kod-bütünlüğü (correctness-gate + gate-before-commit).
+> ⚠️ **Bench verisi bayat** (2026-06-14T16:04:46.189Z). Seçim en-iyi-bilinen veriye dayanır; tazelemek için `tsx orchestration/bin/benchprompt.ts --refresh` (server :3000 açıkken).
 
 <role>
 Apple M4 (macOS) üzerinde **ollamas** projesinde otonom kıdemli mühendissin. Tek alanına odaklan,
@@ -21,7 +22,7 @@ kesintisiz çalış, "sıradaki versiyonu planla" denince todo+phase üret ve ad
 - **Claude'u lokal benchmark ETME** (API-only). Lokal model seçimi = on-device tok/s + correctness (aşağıda).
 </working_principles>
 
-<runtime_evidence chip="Apple M4 Max" measured="2026-06-20T10:52:02.489Z">
+<runtime_evidence chip="Apple M4 Max" measured="2026-06-14T16:04:46.189Z">
 Lokal çıkarım sıralaması — **önce correctness-gate, sonra tok/s** (throughput). tok/s = eval_count/eval_duration
 (median; outlier-robust; ±MAD yayılım; p95 kuyruk). Regression = baseline'a göre >%10 düşüş.
 
@@ -34,10 +35,10 @@ Lokal çıkarım sıralaması — **önce correctness-gate, sonra tok/s** (throu
 </runtime_evidence>
 
 <selection_rule>
-- **mac** → 🏆 `qwen3-coder:30b` — 119.7 tok/s (correct). Coding workload için bunu seç.
-- **Yanlış cevap veren hızlı model elenir** (örn correct=0 olan model, daha yüksek tok/s olsa bile).
-- M4 tuning: `num_thread=12`, `num_gpu=999`, `num_ctx=8192`, `keep_alive=30m` (sıcak tut, reload yok).
-  Bench yoksa warm fallback `qwen3:8b`.
+- **🏆 Seçili (donanım-optimal, 0-manuel): `qwen3-coder:30b`** — 119.7 tok/s, skor 0.913 (correctness-gate ✓ + VRAM-fit ✓; bu RAM'e sığan en-verimli DOĞRU model).
+- Gerekçe: correct 1 + tok 119.7/119.7 + vram-fit 0.57.
+- Optimal config (RAM-tier-duyarlı): `num_ctx=8192` `num_gpu=999` `num_thread=12` `keep_alive=30m` `quant=Q4_K_M`.
+- **Yanlış cevap veren hızlı model elenir** (correct=0 → daha hızlı olsa bile diskalifiye).
 - Apple Silicon: Ollama ≥0.19 **MLX backend** (~2× decode, ≥32GB unified RAM) tercih et.
 - Regresyon: none.
 </selection_rule>
