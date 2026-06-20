@@ -77,6 +77,30 @@ describe("renderDashboard (pure)", () => {
   it("NO_COLOR output has no ANSI escapes", () => {
     expect(renderDashboard(base, noColor)).not.toContain("\x1b[");
   });
+
+  // v16 — width drives layout. 0 (default) → vertical (above tests); ≥100 → panes.
+  it("wide width → side-by-side panes (boxed)", () => {
+    const out = renderDashboard(base, noColor, 120);
+    expect(out).toContain("requests");
+    expect(out).toContain("latency");
+    expect(out).toContain("tool calls");
+    expect(out).toContain("┌"); // box-drawing → multi-pane active
+    // a content row should carry multiple box borders (side-by-side)
+    const row = out.split("\n").find((l) => l.includes("5 total"))!;
+    expect((row.match(/│/g) || []).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("wide width renders a sessions pane when sessions present", () => {
+    const out = renderDashboard({ ...base, sessions: [{ id: "sess1234", title: "build CLI" } as any] }, noColor, 140);
+    expect(out).toContain("sessions");
+    expect(out).toContain("sess1234".slice(0, 8));
+  });
+
+  it("narrow width keeps the vertical layout (no boxes)", () => {
+    const out = renderDashboard(base, noColor, 80);
+    expect(out).not.toContain("┌");
+    expect(out).toContain("5 total");
+  });
 });
 
 describe("cleanupSequence (terminal restore contract)", () => {
