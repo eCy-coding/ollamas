@@ -576,14 +576,24 @@ async function initializeServer() {
   app.post("/api/agent/chat", async (req, res) => {
     const { provider, model, messages, autoApply, maxSteps = 8, sessionId } = req.body;
 
+    // Validate BEFORE switching to SSE: once event-stream headers are sent we can no
+    // longer return a clean status. A missing/empty messages[] would otherwise throw
+    // an unhandled "messages is not iterable" and abort the stream (mirrors /api/generate).
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages (non-empty array) required; use POST /api/ai/generate for a single prompt string" });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    // Abort the ReAct loop when the HTTP client disconnects.
+    // Abort the ReAct loop only on a real client disconnect. `req` "close" fires as
+    // soon as the (already express.json-parsed) request body is consumed — wiring it
+    // to abort() cancelled the very first LLM fetch ("operation was aborted") and
+    // silently dropped the agent to demo fallback. `res` "close" is the correct
+    // disconnect signal for a streaming response; guard so a normal end never aborts.
     const ac = new AbortController();
-    req.on("close", () => ac.abort());
-    res.on("close", () => ac.abort());
+    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
 
     const sendEvent = (type: string, payload: any) => {
       res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
