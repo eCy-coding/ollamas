@@ -11,7 +11,9 @@ import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
-import { complete, completionScript } from "./lib/completion";
+import { complete, completionScript, type DynamicValues } from "./lib/completion";
+import { PROVIDERS } from "./lib/providers";
+import { cachedModels } from "./lib/modelcache";
 import { runUpdate } from "./commands/update";
 import { runPlugin } from "./commands/plugin";
 import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from "./lib/plugins";
@@ -214,8 +216,19 @@ export async function main(argv: string[]): Promise<number> {
     case "plugin":
       return runPlugin(rest);
     case "__complete": {
-      // Hidden — emitted on every TAB. Pure tree lookup, no I/O.
-      const cands = complete(rest);
+      // Hidden — emitted on every TAB. Gathers dynamic VALUE candidates from LOCAL
+      // disk only: NEVER a network call or a keychain read here (a keychain read has
+      // a 5 s timeout and could prompt — N-019/N-032). provider comes from env (no
+      // config unseal); profiles are a plain disk read; models come from the cache
+      // doctor/bench write.
+      const dyn: DynamicValues = { providers: [...PROVIDERS] };
+      try {
+        dyn.profiles = listProfiles().map((p) => p.name);
+        dyn.models = cachedModels(process.env.OLLAMAS_PROVIDER || "ollama-local");
+      } catch {
+        /* best-effort — completion still returns static candidates */
+      }
+      const cands = complete(rest, dyn);
       if (cands.length) process.stdout.write(cands.join("\n") + "\n");
       return 0;
     }

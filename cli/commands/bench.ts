@@ -10,6 +10,7 @@ import { GatewayClient, type ChatMessage } from "../lib/client";
 import { loadConfig, saveConfig } from "../lib/config";
 import { resolveOutputCtx, formatTable, c, type OutputCtx } from "../lib/output";
 import { aggregate, pickBest, type RunSample, type ModelResult } from "../lib/bench";
+import { writeModelCache } from "../lib/modelcache";
 
 const HELP = `ollamas bench — benchmark models through the gateway
 
@@ -79,6 +80,7 @@ export async function runBench(argv: string[]): Promise<number> {
     if (!models.length) {
       try {
         models = await client.listModels(cfg.provider);
+        writeModelCache(cfg.provider, models); // populate `-m <TAB>` completion (best-effort)
       } catch {
         models = [cfg.model];
       }
