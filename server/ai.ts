@@ -45,6 +45,13 @@ export async function listModels(): Promise<string[]> {
   return (data.models || []).map((m: any) => m.name);
 }
 
+/** Prefer a coder-tuned local model (qwen3-coder per orchestration vO6 M4 benchmark). */
+export async function resolveLocalCoder(): Promise<string> {
+  const models = await listModels();
+  if (!models.length) throw new Error("no local ollama model available");
+  return models.find((m) => m.includes(LOCAL_CODER_HINT)) ?? models[0];
+}
+
 /** Auto-pick the first local ollama model. Throws if none are installed. */
 export async function resolveDefaultModel(): Promise<string> {
   if (defaultModelCache && Date.now() - defaultModelCache.at < DEFAULT_MODEL_TTL_MS) {

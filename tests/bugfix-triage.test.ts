@@ -1,6 +1,6 @@
 // vC1 P3 — triage pipeline. Hermetic: GenFn is injected (no live Gemini).
 
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
 import {
   extractJson,
   parseVerdict,
@@ -69,6 +69,37 @@ describe("triageFinding — implementer ≠ verifier", () => {
     const t = await triageFinding(process.cwd(), F, gen);
     expect(t.kept).toBe(false);
     expect(t.refutation.reason).toMatch(/not-real/);
+  });
+});
+
+describe("triageFinding — hybrid (local first-pass + Gemini verify)", () => {
+  test("real finding escalates to colabGen; verifierEngine = colab/<model>", async () => {
+    const localGen = scriptedGen('{"isReal":true,"severity":"high","rootCause":"rc","proposedFix":"pf"}');
+    const colabCalls: string[] = [];
+    const colabGen: GenFn = async (p) => { colabCalls.push(p); return { text: '{"refuted":false,"reason":"confirmed by gemini"}' }; };
+    const t = await triageFinding(process.cwd(), F, localGen, colabGen, { provider: "ollama-local", model: "qwen3-coder:30b" }, "google/gemini-3.5-flash");
+    expect(t.kept).toBe(true);
+    expect(t.verifierEngine).toBe("colab/google/gemini-3.5-flash");
+    expect(colabCalls).toHaveLength(1); // Gemini ran the verify pass
+  });
+
+  test("not-real finding does NOT call colabGen (no egress for noise)", async () => {
+    const localGen = scriptedGen('{"isReal":false}');
+    const colabGen = vi.fn();
+    const t = await triageFinding(process.cwd(), F, localGen, colabGen as unknown as GenFn);
+    expect(t.kept).toBe(false);
+    expect(t.verifierEngine).toBe("local(first-pass)");
+    expect(colabGen).not.toHaveBeenCalled();
+  });
+
+  test("no colabGen → local verify (graceful, 0-manual)", async () => {
+    const localGen = scriptedGen(
+      '{"isReal":true,"severity":"medium","rootCause":"rc","proposedFix":"pf"}',
+      '{"refuted":false,"reason":"local confirms"}'
+    );
+    const t = await triageFinding(process.cwd(), F, localGen);
+    expect(t.kept).toBe(true);
+    expect(t.verifierEngine).toBe("local");
   });
 });
 
