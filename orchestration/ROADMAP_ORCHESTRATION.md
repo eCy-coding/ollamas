@@ -26,7 +26,7 @@
 | **vO10** | ✅ DONE | **Heartbeat daemon** — `bin/heartbeat.ts`+lib: periyodik tick → conduct kararı + collision-safe + stuck-lane + delta-notify (alert-fatigue guard, state-hash idempotent). launchd/--watch. Adopt watchexec/chokidar idea. heartbeat.test |
 | **vO11** | ✅ DONE | **Self-review critic + safe auto-fix** — `critic.ts` (roadmap-sync/orphan/coverage/duplication audit → CRITIC.json) + `autofix.ts` (CRITIC→ROADMAP planned→DONE flip, **scope-locked governance-only ASLA kod/lane**, dry-run default + atomic .bak). Adopt danger.js/release-please idea. critic.test+autofix.test |
 | **vO12** | ✅ DONE | **Definition-of-Done gate + conduct ÖZ-DENETİM WIRING (0-touch self-policing)** — `dod.ts` 6-kural yarım-iş tespiti (code-without-test/uncommitted-green/orphan-marker/concurrent-task-gap/governance-drift/roadmap-incoherence → DOD.json). **KRİTİK WIRING:** TIERS+`COMPLETENESS` (RED-sonrası/STALE-öncesi); conduct.ts CRITIC.json+DOD.json findings'i TÜKETİR (merge → 31 COMPLETENESS finding, orphan-değil); autopilot chain benchprompt→**critic→dod**→conduct→status→doctor; `role.ts`→🧭 öz-denetim satırı. = Emre'nin "YARIM YOK" kuralı loop'ta OTOMATİK. RISK-ORCH-015. Adopt dod-checklist idea |
-| vO13 | planned | Horizon auto-roadmap (10-versiyon lookahead) — lib hazır, **conduct-merge + ROADMAP_HORIZON reconcile tasarımı gerekir (DEFER, yarım-commit-etme)** |
+| vO13 | ✅ DONE | Horizon auto-roadmap (10-versiyon lookahead) — lib hazır, **conduct-merge + ROADMAP_HORIZON reconcile tasarımı gerekir (DEFER, yarım-commit-etme)** |
 
 ---
 
