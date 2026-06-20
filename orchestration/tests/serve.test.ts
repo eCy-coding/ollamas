@@ -8,6 +8,7 @@ const SNAP: CockpitSnapshot = {
   lanes: [],
   backend: null,
   totals: { live: 0, idle: 0, dirty: 0, errors: 0 },
+  adoptions: null,
 };
 
 const collector: Collector = async () => SNAP;

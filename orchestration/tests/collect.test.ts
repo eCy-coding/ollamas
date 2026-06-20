@@ -56,7 +56,7 @@ describe("buildSnapshot — toplamlar", () => {
   it("ts ve backend pass-through", () => {
     const snap = buildSnapshot({
       ts: "T", expectedLanes: 1, lanes: [],
-      backend: { cpu: 1, ram: 2, ollamaVersion: "0.5", mode: "live", db: "up", models: 1, toolCalls: 9, webhookQueue: 0, migrationVersion: 13 },
+      backend: { cpu: 1, ram: 2, ollamaVersion: "0.5", mode: "live", db: "up", models: 1, toolCalls: 9, webhookQueue: 0, migrationVersion: 13, loaded: [] },
     });
     expect(snap.ts).toBe("T");
     expect(snap.backend?.toolCalls).toBe(9);

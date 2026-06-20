@@ -59,7 +59,7 @@ describe("planRoadmapFlips", () => {
 });
 
 describe("isSafe — GÜVENLİK guardrail", () => {
-  const flip: FixOp = { kind: "roadmap-drift", target: "vO9", file: "ROADMAP_ORCHESTRATION.md", before: "x", after: "y", safe: true };
+  const flip: FixOp = { kind: "roadmap-drift", target: "vO9", file: "ROADMAP_ORCHESTRATION.md", before: "x", after: "y", safe: true, reason: "roadmap version drift" };
   it("roadmap md flip → safe", () => {
     expect(isSafe(flip)).toBe(true);
   });
