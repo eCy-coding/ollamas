@@ -4,7 +4,7 @@
 // findings that survive both are kept. Pure parsers/renderers are unit-tested;
 // the model call is dependency-injected (GenFn) so tests stay hermetic.
 
-import { generate, pickEngine, type AiProvider } from "../server/ai";
+import { generate, resolveLocalCoder, type AiProvider } from "../server/ai";
 import { detectAll, type Finding } from "./detect";
 export type { Finding } from "./detect";
 import { colabGen, colabRuntimeAvailable, COLAB_DEFAULT_MODEL } from "./colab-bridge";
@@ -26,6 +26,8 @@ export interface TriagedFinding extends Finding {
   verdict: Verdict;
   refutation: Refutation;
   kept: boolean;
+  /** Which engine ran the verify pass: "local", "colab/<model>", or "local(first-pass)". */
+  verifierEngine?: string;
 }
 
 export interface EngineSel {
@@ -111,23 +113,48 @@ function refutePrompt(f: Finding, ctx: string, v: Verdict): string {
 
 // ── Triage pipeline ──────────────────────────────────────────────────────────
 
+/**
+ * Hybrid triage: local first-pass verdict (0-manual, qwen3-coder), then — for
+ * findings judged real — an INDEPENDENT verify pass on Gemini when a Colab
+ * runtime is supplied (implementer ≠ verifier), else a local verify. Only real
+ * findings' code context reaches Gemini (egress is bounded to escalations).
+ * Backward-compatible: called with a single `localGen` (no colabGen) it behaves
+ * as the original local-only triage.
+ */
 export async function triageFinding(
   cwd: string,
   f: Finding,
-  gen: GenFn,
-  eng: EngineSel = { provider: "gemini", model: "gemini-3.5-flash" }
+  localGen: GenFn,
+  colabGen?: GenFn,
+  localEng: EngineSel = { provider: "ollama-local", model: "" },
+  colabModel: string = COLAB_DEFAULT_MODEL
 ): Promise<TriagedFinding> {
   const ctx = readContext(cwd, f.file, f.line);
-  const verdict = parseVerdict((await gen(triagePrompt(f, ctx), { ...eng, system: TRIAGE_SYSTEM, temperature: 0 })).text);
-  const refutation = verdict.isReal
-    ? parseRefutation((await gen(refutePrompt(f, ctx, verdict), { ...eng, system: REFUTE_SYSTEM, temperature: 0 })).text)
-    : { refuted: true, reason: "triage marked finding not-real" };
-  return { ...f, verdict, refutation, kept: verdict.isReal && !refutation.refuted };
+  const verdict = parseVerdict(
+    (await localGen(triagePrompt(f, ctx), { ...localEng, system: TRIAGE_SYSTEM, temperature: 0 })).text
+  );
+  if (!verdict.isReal) {
+    return { ...f, verdict, refutation: { refuted: true, reason: "triage marked finding not-real" }, kept: false, verifierEngine: "local(first-pass)" };
+  }
+  // Escalate real findings to a stronger, independent verifier (Gemini if present).
+  const useColab = !!colabGen;
+  const verifier = colabGen ?? localGen;
+  const opts = useColab
+    ? { model: colabModel, system: REFUTE_SYSTEM, temperature: 0 }
+    : { ...localEng, system: REFUTE_SYSTEM, temperature: 0 };
+  const refutation = parseRefutation((await verifier(refutePrompt(f, ctx, verdict), opts)).text);
+  return { ...f, verdict, refutation, kept: !refutation.refuted, verifierEngine: useColab ? `colab/${colabModel}` : "local" };
 }
 
-export async function triageAll(cwd: string, findings: Finding[], gen: GenFn, eng: EngineSel): Promise<TriagedFinding[]> {
+export async function triageAll(
+  cwd: string,
+  findings: Finding[],
+  localGen: GenFn,
+  colabGen?: GenFn,
+  localEng?: EngineSel
+): Promise<TriagedFinding[]> {
   const out: TriagedFinding[] = [];
-  for (const f of findings) out.push(await triageFinding(cwd, f, gen, eng)); // sequential: avoid rate-limit bursts
+  for (const f of findings) out.push(await triageFinding(cwd, f, localGen, colabGen, localEng)); // sequential: avoid rate-limit bursts
   return out;
 }
 
@@ -137,14 +164,15 @@ export function renderReport(triaged: TriagedFinding[], engine?: { provider: str
   const kept = triaged.filter((t) => t.kept).sort((a, b) => SEV_RANK[a.verdict.severity] - SEV_RANK[b.verdict.severity]);
   const dropped = triaged.filter((t) => !t.kept);
   const L: string[] = [];
-  L.push("# BUGFIX_REPORT — ollamas Colab Koordinatör (vC1)", "");
-  if (engine) L.push(`Triage engine: **${engine.provider}** (${engine.model})`, "");
+  L.push("# BUGFIX_REPORT — ollamas Colab Koordinatör (vC1.6 hibrit)", "");
+  if (engine) L.push(`Engine: **${engine.provider}** (${engine.model})`, "");
   L.push(`Toplam: ${triaged.length} · doğrulanmış: ${kept.length} · elenen: ${dropped.length}`, "");
   L.push("## Doğrulanmış buglar (öncelik sırası)", "");
   if (!kept.length) L.push("_(yok)_", "");
   for (const t of kept) {
     L.push(`### [${t.verdict.severity.toUpperCase()}] ${t.file}:${t.line} — ${t.rule}`);
     L.push(`- **Kaynak:** ${t.source} — ${t.message}`);
+    L.push(`- **Doğrulayan:** ${t.verifierEngine ?? "?"}`);
     L.push(`- **Root cause:** ${t.verdict.rootCause}`);
     L.push(`- **Önerilen fix:** ${t.verdict.proposedFix}`, "");
   }
@@ -160,18 +188,22 @@ async function main() {
   const cwd = process.cwd();
   const arg = process.argv[2];
   const findings: Finding[] = arg && existsSync(arg) ? JSON.parse(readFileSync(arg, "utf8")) : detectAll(cwd);
-  // Prefer the connected Colab runtime (key-less Gemini); else local/gemini-key engine.
-  const useColab = colabRuntimeAvailable();
-  const eng: EngineSel = useColab
-    ? { provider: "gemini", model: COLAB_DEFAULT_MODEL } // colabGen ignores provider, uses model
-    : await pickEngine("code");
-  const gen: GenFn = useColab ? colabGen : (p, o) => generate(p, o);
-  const label = { provider: useColab ? "colab" : eng.provider, model: eng.model };
-  console.error("[triage] engine:", label.provider, label.model, "| findings:", findings.length);
-  const triaged = await triageAll(cwd, findings, gen, eng);
+  // Hybrid: local first-pass (0-manual) + Gemini verify on real findings when a
+  // Colab runtime is reachable; degrades to local verify otherwise.
+  const localEng: EngineSel = { provider: "ollama-local", model: await resolveLocalCoder() };
+  const localGen: GenFn = (p, o) => generate(p, o);
+  const colab = colabRuntimeAvailable() ? colabGen : undefined;
+  const label = { provider: "hibrit", model: `local:${localEng.model}${colab ? ` + colab/${COLAB_DEFAULT_MODEL}` : ""}` };
+  console.error("[triage] hybrid | local:", localEng.model, "| gemini-verify:", !!colab, "| findings:", findings.length);
+  const triaged = await triageAll(cwd, findings, localGen, colab, localEng);
   writeFileSync(join(cwd, "bugfix", "bugfix-findings.json"), JSON.stringify(triaged, null, 2) + "\n");
   writeFileSync(join(cwd, "bugfix", "BUGFIX_REPORT.md"), renderReport(triaged, label) + "\n");
-  console.error("[triage] kept:", triaged.filter((t) => t.kept).length, "→ bugfix/BUGFIX_REPORT.md");
+  // Track every operation: one JSONL line per finding (engine used + verdict).
+  const log = triaged
+    .map((t) => JSON.stringify({ ts: new Date().toISOString(), file: t.file, line: t.line, verifier: t.verifierEngine, kept: t.kept }))
+    .join("\n");
+  writeFileSync(join(cwd, "bugfix", "triage.log"), log + "\n");
+  console.error("[triage] kept:", triaged.filter((t) => t.kept).length, "→ bugfix/BUGFIX_REPORT.md + triage.log");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
