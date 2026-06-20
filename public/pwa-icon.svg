@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ollamas">
+  <rect width="512" height="512" rx="96" fill="#0b0d12"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#6366f1" stroke-width="28"/>
+  <circle cx="256" cy="256" r="64" fill="#10b981"/>
+  <path d="M256 36v60M256 416v60M36 256h60M416 256h60" stroke="#6366f1" stroke-width="24" stroke-linecap="round"/>
+</svg>

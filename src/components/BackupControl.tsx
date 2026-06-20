@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Download, Upload, CloudLightning, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
+import { api, ApiError } from "../lib/apiClient";
 
 interface BackupProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -19,11 +20,8 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
   const loadConfig = async () => {
     try {
-      const res = await fetch("/api/backup/config");
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-      }
+      const data: any = await api.get("/api/backup/config");
+      setConfig(data);
     } catch (e) {
       console.error("Failed to load backup configuration.");
     }
@@ -36,19 +34,15 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
   const handleSaveConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/backup/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-      if (res.ok) {
-        onNotify("Backup cloud properties updated successfully!", "success");
-        loadConfig();
-      } else {
-        onNotify("Failed to update cloud backups config.", "error");
-      }
+      await api.post("/api/backup/config", config);
+      onNotify("Backup cloud properties updated successfully!", "success");
+      loadConfig();
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        onNotify("Failed to update cloud backups config.", "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,9 +52,8 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
     setLoading(true);
     onNotify("Compressing database & executing AES-256 GCM client-side encryption...", "info");
     try {
-      const res = await fetch("/api/backup/trigger", { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data: any = await api.post("/api/backup/trigger");
+      if (data.success) {
         onNotify(`Full encrypted database uploaded: ${data.size} bytes synced.`, "success");
         if (data.url && !data.url.startsWith("local-dryrun")) {
           onNotify(`Remote endpoint response: ${data.url}`, "info");
@@ -69,7 +62,13 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
         onNotify(`Backup upload failed: ${data.error || "Server error"}`, "error");
       }
     } catch (e: any) {
-      onNotify(e.message, "error");
+      if (e instanceof ApiError) {
+        // non-ok responses previously parsed the JSON body for an error message
+        const body: any = e.body;
+        onNotify(`Backup upload failed: ${(body && body.error) || "Server error"}`, "error");
+      } else {
+        onNotify(e.message, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -92,19 +91,15 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
       setLoading(true);
       try {
-        const res = await fetch("/api/backup/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hexBlob: binaryHex }),
-        });
-        if (res.ok) {
-          onNotify("Database configuration successfully decrypted and restored! Sessions updated.", "success");
-          window.location.reload(); // Refresh to reload keys/masks
-        } else {
-          onNotify("Failed to restore: corrupt payload or master key mismatch.", "error");
-        }
+        await api.post("/api/backup/restore", { hexBlob: binaryHex });
+        onNotify("Database configuration successfully decrypted and restored! Sessions updated.", "success");
+        window.location.reload(); // Refresh to reload keys/masks
       } catch (err: any) {
-        onNotify(`Restore fail: ${err.message}`, "error");
+        if (err instanceof ApiError) {
+          onNotify("Failed to restore: corrupt payload or master key mismatch.", "error");
+        } else {
+          onNotify(`Restore fail: ${err.message}`, "error");
+        }
       } finally {
         setLoading(false);
       }
@@ -113,17 +108,17 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
   };
 
   return (
-    <div className="bg-[#08090d] border border-white/5 rounded p-5 shadow-lg">
+    <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center gap-2.5 mb-4">
-        <CloudLightning className="w-4 h-4 text-indigo-400" />
-        <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Client-Side Encrypted Backups</h2>
+        <CloudLightning className="w-4 h-4 text-status-accent" />
+        <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Client-Side Encrypted Backups</h2>
       </div>
 
-      <div className="flex gap-2.5 bg-black/30 border border-white/5 p-4 rounded mb-6 text-xs text-slate-400 font-mono">
-        <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+      <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-4 rounded mb-6 text-xs text-immersive-text-muted font-mono">
+        <ShieldCheck className="w-4 h-4 text-status-accent shrink-0" />
         <div>
-          <strong className="text-slate-200">Zero-Knowledge Protocol:</strong>
-          <p className="mt-0.5 leading-relaxed text-slate-450">
+          <strong className="text-immersive-text-bright">Zero-Knowledge Protocol:</strong>
+          <p className="mt-0.5 leading-relaxed text-immersive-text-muted">
             Plaintext configuration secrets are never transmitted off your device. The backup module compresses details with native Gzip, 
             encrypts them completely using AES-256-GCM (on-device hardware), and only then posts the secure payload to S3 or WebDAV buckets.
           </p>
@@ -132,36 +127,36 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Local export triggers column */}
-        <div className="bg-black/30 border border-white/5 p-4 rounded space-y-4">
-          <h3 className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Local Database Control</h3>
+        <div className="bg-immersive-inset border border-immersive-border p-4 rounded space-y-4">
+          <h3 className="text-[10px] text-immersive-text-dim font-mono tracking-widest uppercase">Local Database Control</h3>
           
           <div className="flex flex-col gap-2.5">
             <a
               href="/api/backup/download"
-              className="bg-[#050608] hover:bg-white/5 border border-white/5 rounded p-3 text-xs text-slate-300 flex items-center justify-between transition cursor-pointer"
+              className="bg-immersive-bg hover:bg-white/5 border border-immersive-border rounded p-3 text-xs text-immersive-text-muted flex items-center justify-between transition cursor-pointer"
             >
               <div className="text-left font-mono">
-                <span className="font-semibold text-slate-200 block">Export AES Blob</span>
-                <span className="text-[10px] text-slate-500">Download current hardware config as single .enc file</span>
+                <span className="font-semibold text-immersive-text-bright block">Export AES Blob</span>
+                <span className="text-[10px] text-immersive-text-dim">Download current hardware config as single .enc file</span>
               </div>
-              <Download className="w-4 h-4 text-indigo-400" />
+              <Download className="w-4 h-4 text-status-accent" />
             </a>
 
-            <label className="border border-white/5 border-dashed rounded p-3 text-xs text-slate-300 flex items-center justify-between cursor-pointer hover:bg-white/5 transition">
+            <label className="border border-immersive-border border-dashed rounded p-3 text-xs text-immersive-text-muted flex items-center justify-between cursor-pointer hover:bg-white/5 transition">
               <div className="text-left font-mono">
-                <span className="font-semibold text-slate-200 block">Restore Local Backup</span>
-                <span className="text-[10px] text-slate-500">Upload encrypted .enc file to restore settings</span>
+                <span className="font-semibold text-immersive-text-bright block">Restore Local Backup</span>
+                <span className="text-[10px] text-immersive-text-dim">Upload encrypted .enc file to restore settings</span>
               </div>
-              <Upload className="w-4 h-4 text-emerald-400" />
+              <Upload className="w-4 h-4 text-status-ok" />
               <input type="file" accept=".enc" className="hidden" onChange={handleFileRestore} disabled={loading} />
             </label>
           </div>
 
-          <div className="pt-2 border-t border-white/5">
+          <div className="pt-2 border-t border-immersive-border">
             <button
               onClick={handleTriggerSync}
               disabled={loading}
-              className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs rounded py-2 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-xs rounded py-2 transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudLightning className="w-3.5 h-3.5" />}
               Sync Encrypted Cloud Remote Backup Now
@@ -170,15 +165,16 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
         </div>
 
         {/* Cloud Configurations column */}
-        <div className="bg-black/30 border border-white/5 p-4 rounded space-y-3.5">
-          <h3 className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Locker Destination Settings</h3>
+        <div className="bg-immersive-inset border border-immersive-border p-4 rounded space-y-3.5">
+          <h3 className="text-[10px] text-immersive-text-dim font-mono tracking-widest uppercase">Locker Destination Settings</h3>
           
           <div>
-            <label className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Backup Target Type</label>
+            <label htmlFor="backup-target-type" className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-1">Backup Target Type</label>
             <select
+              id="backup-target-type"
               value={config.type}
               onChange={(e) => setConfig((p) => ({ ...p, type: e.target.value }))}
-              className="w-full bg-[#050608] border border-white/5 text-xs rounded p-1.5 text-slate-200 focus:outline-none focus:border-indigo-500/40 font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-xs rounded p-1.5 text-immersive-text-bright focus:outline-none focus:border-indigo-500/40 font-mono"
             >
               <option value="none">Disabled (Local Space Only)</option>
               <option value="s3">S3-Compatible (MinIO, AWS S3, Cloudflare R2)</option>
@@ -189,48 +185,52 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
           {config.type !== "none" && (
             <div className="space-y-2.5 font-mono text-xs">
               <div>
-                <label className="text-[10px] text-slate-550 block mb-0.5">Endpoint Host URL</label>
+                <label htmlFor="backup-endpoint" className="text-[10px] text-immersive-text-dim block mb-0.5">Endpoint Host URL</label>
                 <input
+                  id="backup-endpoint"
                   type="text"
                   placeholder="https://s3.us-east-1.amazonaws.com"
                   value={config.endpoint}
                   onChange={(e) => setConfig((p) => ({ ...p, endpoint: e.target.value }))}
-                  className="w-full bg-[#050608] border border-white/5 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-indigo-500/40"
+                  className="w-full bg-immersive-bg border border-immersive-border rounded px-2.5 py-1.5 text-immersive-text-muted focus:outline-none focus:border-indigo-500/40"
                 />
               </div>
 
               {config.type === "s3" && (
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Bucket Identifier</label>
+                  <label htmlFor="backup-bucket" className="text-[10px] text-immersive-text-dim block mb-0.5">Bucket Identifier</label>
                   <input
+                    id="backup-bucket"
                     type="text"
                     placeholder="mission-control-backups"
                     value={config.bucket}
                     onChange={(e) => setConfig((p) => ({ ...p, bucket: e.target.value }))}
-                    className="w-full bg-[#050608] border border-white/5 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-indigo-500/40"
+                    className="w-full bg-immersive-bg border border-immersive-border rounded px-2.5 py-1.5 text-immersive-text-muted focus:outline-none focus:border-indigo-500/40"
                   />
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Access ID / Username</label>
+                  <label htmlFor="backup-access-key" className="text-[10px] text-immersive-text-dim block mb-0.5">Access ID / Username</label>
                   <input
+                    id="backup-access-key"
                     type="text"
                     placeholder="AWS_KEY_ID"
                     value={config.accessKey}
                     onChange={(e) => setConfig((p) => ({ ...p, accessKey: e.target.value }))}
-                    className="w-full bg-[#050608] border border-white/5 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-indigo-500/40"
+                    className="w-full bg-immersive-bg border border-immersive-border rounded px-2.5 py-1.5 text-immersive-text-muted focus:outline-none focus:border-indigo-500/40"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-550 block mb-0.5">Secret Key / Password</label>
+                  <label htmlFor="backup-secret-key" className="text-[10px] text-immersive-text-dim block mb-0.5">Secret Key / Password</label>
                   <input
+                    id="backup-secret-key"
                     type="password"
                     placeholder="Masked"
                     value={config.secretKey}
                     onChange={(e) => setConfig((p) => ({ ...p, secretKey: e.target.value }))}
-                    className="w-full bg-[#050608] border border-white/5 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-indigo-500/40"
+                    className="w-full bg-immersive-bg border border-immersive-border rounded px-2.5 py-1.5 text-immersive-text-muted focus:outline-none focus:border-indigo-500/40"
                   />
                 </div>
               </div>
@@ -240,7 +240,7 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
           <div className="flex gap-2 items-center pt-2">
             <button
               onClick={handleSaveConfig}
-              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs rounded px-4 py-1.5 transition cursor-pointer"
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-xs rounded px-4 py-1.5 transition cursor-pointer"
             >
               Save Cloud Parameters
             </button>

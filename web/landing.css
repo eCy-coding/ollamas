@@ -1,0 +1,61 @@
+/* vF7 — vanilla landing styles. Reuses the SPA design tokens (single source of
+   truth: tokens/*.json → src/styles/tokens.css via style-dictionary). */
+@import "../src/styles/tokens.css";
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--ollamas-font-sans);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(99, 102, 241, 0.12), transparent),
+    var(--ollamas-color-bg-base);
+  color: var(--ollamas-color-text-muted);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+a { color: var(--ollamas-color-accent-indigo); text-decoration: none; }
+a:hover { color: var(--ollamas-color-text-bright); }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--ollamas-color-accent-indigo); outline-offset: 2px; }
+
+.site-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--ollamas-space-3) var(--ollamas-space-4);
+  border-bottom: 1px solid var(--ollamas-color-border-subtle);
+  background: var(--ollamas-color-bg-sidebar);
+}
+.brand { display: flex; align-items: center; gap: var(--ollamas-space-2); font-weight: 700; color: var(--ollamas-color-text-bright); }
+.site-nav { display: flex; gap: var(--ollamas-space-4); font-family: var(--ollamas-font-mono); font-size: 0.85rem; }
+
+main { max-width: 960px; margin: 0 auto; padding: var(--ollamas-space-4); }
+
+.hero { text-align: center; padding: clamp(2rem, 8vw, 5rem) 0; }
+.eyebrow {
+  display: inline-block; font-family: var(--ollamas-font-mono); font-size: 0.75rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.25rem 0.75rem; border-radius: 999px;
+  border: 1px solid var(--ollamas-color-border-subtle); color: var(--ollamas-color-text-dim);
+}
+.eyebrow[data-status="online"] { color: var(--ollamas-color-accent-emerald); border-color: color-mix(in srgb, var(--ollamas-color-accent-emerald) 40%, transparent); }
+.eyebrow[data-status="offline"] { color: #f43f5e; border-color: rgba(244, 63, 94, 0.4); }
+.hero h1 { font-size: clamp(2rem, 7vw, 3.5rem); color: var(--ollamas-color-text-bright); margin: var(--ollamas-space-3) 0; }
+.tagline { max-width: 38rem; margin: 0 auto var(--ollamas-space-4); font-size: 1.1rem; }
+
+.cta-row { display: flex; gap: var(--ollamas-space-3); justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block; padding: 0.7rem 1.4rem; border-radius: var(--ollamas-radius-md);
+  font-family: var(--ollamas-font-mono); font-weight: 700; font-size: 0.85rem;
+  border: 1px solid transparent; transition: background 0.15s, border-color 0.15s;
+}
+.btn-primary { background: color-mix(in srgb, var(--ollamas-color-accent-indigo) 18%, transparent); color: var(--ollamas-color-accent-indigo); border-color: color-mix(in srgb, var(--ollamas-color-accent-indigo) 30%, transparent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--ollamas-color-accent-indigo) 28%, transparent); }
+.btn-ghost { background: rgba(255, 255, 255, 0.04); color: var(--ollamas-color-text-bright); border-color: var(--ollamas-color-border-subtle); }
+
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--ollamas-space-3); padding: var(--ollamas-space-4) 0; }
+.card { padding: var(--ollamas-space-4); border: 1px solid var(--ollamas-color-border-subtle); border-radius: var(--ollamas-radius-lg); background: var(--ollamas-color-bg-panel); }
+.card h2 { font-size: 1rem; color: var(--ollamas-color-text-bright); margin: 0 0 var(--ollamas-space-2); }
+.card p { margin: 0; font-size: 0.92rem; }
+.card code { font-family: var(--ollamas-font-mono); color: var(--ollamas-color-accent-emerald); }
+
+.site-footer { text-align: center; padding: var(--ollamas-space-4); border-top: 1px solid var(--ollamas-color-border-subtle); font-family: var(--ollamas-font-mono); font-size: 0.8rem; color: var(--ollamas-color-text-dim); }

@@ -9,3 +9,9 @@ coverage/
 .ephemeral-data/
 .colab-data/
 **/.master_key
+test-results/
+playwright-report/
+.playwright/
+
+# vF3 lighthouse-ci local reports
+.lighthouseci/

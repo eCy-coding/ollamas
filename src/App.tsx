@@ -14,18 +14,48 @@ import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
 import { VirtualController } from "./components/VirtualController";
 import { SaaSAdmin } from "./components/SaaSAdmin";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { LanguageToggle } from "./components/LanguageToggle";
+import { ObservabilityPanel } from "./components/ObservabilityPanel";
+import { UsagePanel } from "./components/UsagePanel";
+import { OfflineBadge } from "./components/OfflineBadge";
+import { CapabilityProvider, CapabilityGate } from "./components/CapabilityGate";
+import { isTabEnabled } from "./lib/capabilities";
+import { useLingui } from "@lingui/react";
+import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
-import { 
-  Cpu, Key, Sparkles, FolderOpen, Terminal, 
+import {
+  Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2
+  MousePointer2, Building2, Lock
 } from "lucide-react";
+
+// vF11 — shown in a gated tab's body when the backend has not granted the
+// required permission (defense-in-depth; the tab button is also disabled).
+function CapabilityDenied({ capKey, onOpen }: { capKey: string; onOpen: () => void }) {
+  const { _ } = useLingui();
+  return (
+    <div className="bg-immersive-panel border border-immersive-border rounded p-6 text-center space-y-3 animate-fade-in">
+      <Lock className="w-6 h-6 mx-auto text-status-warn" />
+      <h3 className="text-sm font-bold font-mono text-immersive-text-bright">{_('app.cap.deniedTitle')}</h3>
+      <p className="text-xs text-immersive-text-muted">{_('app.cap.deniedBody')} ({_(capKey)})</p>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="text-xs border border-immersive-border rounded px-3 py-1.5 text-immersive-text-muted hover:text-immersive-text-bright transition-colors"
+      >
+        {_('app.cap.openSecurity')}
+      </button>
+    </div>
+  );
+}
 
 export default function App() {
   const [telemetry, setTelemetry] = useState<HealthTelemetry | null>(null);
   const [activeTab, setActiveTab] = useState<string>("telemetry");
   const [notifications, setNotifications] = useState<{ id: string; msg: string; type: "success" | "error" | "info" }[]>([]);
-  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
+  const { _ } = useLingui();
+  const perms = telemetry?.permissions ?? null; // vF11 — backend-granted capabilities (deny-by-default until known)
 
   const notify = (msg: string, type: "success" | "error" | "info" = "info") => {
     const id = Math.random().toString(36).slice(2, 9);
@@ -39,11 +69,8 @@ export default function App() {
     // Skip if page is hidden to conserve Mac energy (Performance Budget §6), unless forced initially
     if (document.hidden && !force) return;
     try {
-      const res = await fetch("/api/health");
-      if (res.ok) {
-        const data = await res.json();
-        setTelemetry(data);
-      }
+      const data = await api.get("/api/health");
+      setTelemetry(data as unknown as HealthTelemetry);
     } catch (e) {
       console.warn("Telemetry endpoint is sleeping or offline.");
     }
@@ -55,29 +82,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Tab labels resolve via i18n at render: `_(`app.tab.${id}`)` (vF9).
   const tabs = [
-    { id: "telemetry", label: "Cockpit Dashboard", icon: <Cpu className="w-4 h-4" /> },
-    { id: "swarm", label: "P2P Computing Swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
-    { id: "saas", label: "SaaS Gateway", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
-    { id: "pipeline", label: "Pipeline Agent", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
-    { id: "react-agent", label: "ReAct Specialist", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
-    { id: "files", label: "Files Explorer", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
-    { id: "drive", label: "Google Drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
-    { id: "terminal", label: "Interactive CLI", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
-    { id: "keys", label: "Hardware Vault", icon: <Key className="w-4 h-4 text-indigo-400" /> },
-    { id: "security", label: "Guard Policies", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
-    { id: "backup", label: "AES Cloud Backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
-    { id: "automation", label: "Virtual Controller", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
-    { id: "selftest", label: "Verify Gates", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
+    { id: "telemetry", icon: <Cpu className="w-4 h-4" /> },
+    { id: "swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
+    { id: "saas", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
+    { id: "pipeline", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
+    { id: "react-agent", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
+    { id: "files", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
+    { id: "drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
+    { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
+    { id: "keys", icon: <Key className="w-4 h-4 text-indigo-400" /> },
+    { id: "security", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
+    { id: "backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
+    { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
+    { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
   ];
 
   // Map header status badge
   const getHeaderBadge = () => {
-    if (!telemetry) return <span className="text-slate-500 animate-pulse text-xs font-mono">CONNECTING...</span>;
+    if (!telemetry) return <span className="text-immersive-text-dim animate-pulse text-xs font-mono">CONNECTING...</span>;
     if (telemetry.mode === "live") {
       const activeCount = telemetry.metrics?.loadedModels?.length || 0;
       return (
-        <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full font-mono font-medium">
+        <span className="flex items-center gap-1.5 text-xs text-status-ok bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full font-mono font-medium">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           LIVE · {activeCount > 0 ? `${activeCount} models active` : "Ollama online"}
         </span>
@@ -85,14 +113,14 @@ export default function App() {
     }
     if (telemetry.mode === "degraded-live") {
       return (
-        <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/15 border border-amber-500/20 px-3 py-1 rounded-full font-mono font-medium">
+        <span className="flex items-center gap-1.5 text-xs text-status-warn bg-amber-500/15 border border-amber-500/20 px-3 py-1 rounded-full font-mono font-medium">
           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
           DEGRADED · Ollama offline
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-full font-mono font-medium">
+      <span className="flex items-center gap-1.5 text-xs text-immersive-text-muted bg-immersive-panel border border-immersive-border px-3 py-1 rounded-full font-mono font-medium">
         <span className="w-2 h-2 rounded-full bg-slate-500 animate-ping"></span>
         DEMO · Cloud Sandbox (Emulated)
       </span>
@@ -100,11 +128,8 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
-      themeMode === "dark" 
-        ? "bg-[#050608] text-slate-300" 
-        : "bg-slate-50 text-slate-900"
-    }`}>
+    <CapabilityProvider permissions={perms}>
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-immersive-bg text-immersive-text-muted">
       
       {/* Dynamic Toast Notifications (Corner Overlay) */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
@@ -112,16 +137,16 @@ export default function App() {
           <div 
             key={n.id} 
             className={`p-3.5 rounded border flex items-center justify-between shadow-2xl transition duration-300 text-xs font-mono ${
-              n.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" :
-              n.type === "error" ? "bg-red-500/10 border-red-500/20 text-red-300" :
-              "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
+              n.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-status-ok" :
+              n.type === "error" ? "bg-red-500/10 border-red-500/20 text-status-err" :
+              "bg-indigo-500/10 border-indigo-500/20 text-status-accent"
             }`}
           >
             <div className="flex gap-2">
               <span className="font-bold">[{n.type.toUpperCase()}]</span>
               <span>{n.msg}</span>
             </div>
-            <button onClick={() => setNotifications((prev) => prev.filter((p) => p.id !== n.id))} className="ml-3 hover:text-white shrink-0">
+            <button aria-label="Dismiss notification" onClick={() => setNotifications((prev) => prev.filter((p) => p.id !== n.id))} className="ml-3 hover:text-immersive-text-bright shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -129,30 +154,25 @@ export default function App() {
       </div>
 
       {/* Global Header */}
-      <header className={`border-b h-14 px-6 flex items-center justify-between gap-4 ${
-        themeMode === "dark" ? "border-white/5 bg-[#08090d]" : "border-slate-200 bg-white"
-      }`}>
+      <header className="border-b h-14 px-6 flex items-center justify-between gap-4 border-immersive-border bg-immersive-sidebar">
         <div className="flex items-center gap-4">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-lg">
+          <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-immersive-text-bright shadow-lg">
             <div className="w-4 h-4 border-2 border-white/90 rotate-45"></div>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-xs font-bold tracking-widest text-indigo-400 uppercase leading-none flex items-center gap-2">
+            <h1 className="text-xs font-bold tracking-widest text-status-accent uppercase leading-none flex items-center gap-2">
               LLM Mission Control
-              <span className="text-[9px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-1 py-0.5 rounded">V1.0</span>
+              <span className="text-[9px] font-mono text-status-info bg-cyan-500/10 border border-cyan-500/20 px-1 py-0.5 rounded">V1.0</span>
             </h1>
-            <span className="text-xs text-slate-400 font-semibold mt-0.5">E2E_ORCHESTRATOR_V3</span>
+            <span className="text-xs text-immersive-text-muted font-semibold mt-0.5">E2E_ORCHESTRATOR_V3</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3.5">
+          <OfflineBadge />
           {getHeaderBadge()}
-          <button 
-            onClick={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
-            className="text-slate-400 hover:text-white text-xs border border-white/10 rounded px-2.5 py-1 whitespace-nowrap"
-          >
-            {themeMode === "dark" ? "Light theme" : "Dark theme"}
-          </button>
+          <LanguageToggle />
+          <ThemeToggle />
         </div>
       </header>
 
@@ -161,45 +181,50 @@ export default function App() {
         
         {/* Left Side Sidebar / Tab Controls */}
         <div className="lg:col-span-1 space-y-4">
-          <div className={`p-4 rounded border ${
-            themeMode === "dark" ? "bg-[#08090d] border-white/5" : "bg-white border-slate-200"
-          }`}>
-            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-3.5 tracking-widest font-bold">Project Explorer</span>
-            <div className="flex flex-col gap-1.5">
-              {tabs.map((tab) => (
+          <div className="p-4 rounded border bg-immersive-sidebar border-immersive-border">
+            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-3.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
+            <nav aria-label="Primary" className="flex flex-col gap-1.5">
+              {tabs.map((tab) => {
+                const enabled = isTabEnabled(tab.id, perms);
+                return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { if (enabled) setActiveTab(tab.id); }}
+                  disabled={!enabled}
+                  aria-disabled={!enabled}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
+                  title={enabled ? undefined : _('app.cap.locked')}
                   className={`flex items-center gap-3 px-3 py-2 rounded text-xs font-medium font-mono transition-all text-left ${
-                    activeTab === tab.id 
-                      ? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20" 
-                      : "text-slate-400 hover:text-white hover:bg-white/5"
-                  }`}
+                    activeTab === tab.id
+                      ? "bg-indigo-500/10 text-status-accent border border-indigo-500/20"
+                      : "text-immersive-text-muted hover:text-immersive-text-bright hover:bg-white/5"
+                  } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
                 >
-                  {tab.icon}
-                  <span>{tab.label}</span>
+                  {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
+                  <span>{_(`app.tab.${tab.id}`)}</span>
                 </button>
-              ))}
-            </div>
+                );
+              })}
+            </nav>
           </div>
 
           {/* Setup Guide / Demowizard (M10, AC-32) */}
           {telemetry?.mode === "demo" && (
-            <div className="bg-[#08090d] border border-white/5 rounded p-4 space-y-3">
-              <div className="flex items-center gap-2 text-indigo-400">
+            <div className="bg-immersive-sidebar border border-immersive-border rounded p-4 space-y-3">
+              <div className="flex items-center gap-2 text-status-accent">
                 <Info className="w-4 h-4 shrink-0" />
                 <h3 className="text-[10px] block font-bold font-mono tracking-widest uppercase">SETUP WORKSPACE WIZARD</h3>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-400">
+              <p className="text-[11px] leading-relaxed text-immersive-text-muted">
                 You are executing in our cloud playground container context. Local MacBook system access is restricted.
               </p>
-              <div className="space-y-2 text-[10px] bg-black/40 border border-white/5 p-3 rounded font-mono">
-                <span className="text-slate-300 font-bold block">Deploy on macOS Workstation:</span>
-                <ol className="list-decimal pl-4 text-slate-400 space-y-1">
+              <div className="space-y-2 text-[10px] bg-immersive-inset border border-immersive-border p-3 rounded font-mono">
+                <span className="text-immersive-text-muted font-bold block">Deploy on macOS Workstation:</span>
+                <ol className="list-decimal pl-4 text-immersive-text-muted space-y-1">
                   <li>Download repository Zip using **Export** menu in AI Studio.</li>
                   <li>Extract download folder.</li>
-                  <li>In terminal, execute: <code className="text-indigo-400 font-bold font-mono">./install.sh</code></li>
-                  <li>Open browser directly at <code className="text-white">http://localhost:3000</code></li>
+                  <li>In terminal, execute: <code className="text-status-accent font-bold font-mono">./install.sh</code></li>
+                  <li>Open browser directly at <code className="text-immersive-text-bright">http://localhost:3000</code></li>
                 </ol>
               </div>
             </div>
@@ -210,15 +235,15 @@ export default function App() {
         <div className="lg:col-span-3 space-y-6">
           
           {/* Top Status Indicators bar */}
-          <div className="bg-[#08090d] border border-white/5 rounded px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 text-xs font-mono">
+          <div className="bg-immersive-sidebar border border-immersive-border rounded px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 text-xs font-mono">
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-slate-500">Active Host:</span>
-              <span className="text-slate-300 font-semibold">{telemetry ? telemetry.os.platform : "Loading..."}</span>
+              <span className="text-immersive-text-dim">{_('app.status.activeHost')}</span>
+              <span className="text-immersive-text-muted font-semibold">{telemetry ? telemetry.os.platform : "Loading..."}</span>
             </div>
-            <div className="hidden md:block text-slate-800">|</div>
+            <div className="hidden md:block text-immersive-text-dim">|</div>
             <div className="flex items-center gap-1.5 truncate">
-              <span className="text-slate-500">Workspace:</span>
-              <span className="text-slate-300 truncate font-semibold" title={telemetry?.workspacePath}>{telemetry ? telemetry.workspacePath : "Connecting..."}</span>
+              <span className="text-immersive-text-dim">{_('app.status.workspace')}</span>
+              <span className="text-immersive-text-muted truncate font-semibold" title={telemetry?.workspacePath}>{telemetry ? telemetry.workspacePath : "Connecting..."}</span>
             </div>
           </div>
 
@@ -226,6 +251,7 @@ export default function App() {
           {activeTab === "telemetry" && (
             <div className="space-y-6 animate-fade-in">
               <TelemetryCockpit telemetry={telemetry} onRefresh={fetchTelemetry} />
+              <ObservabilityPanel />
               <SelfTestGates />
             </div>
           )}
@@ -247,12 +273,14 @@ export default function App() {
 
           {activeTab === "files" && (
             <div className="animate-fade-in">
-              <WorkspaceTree 
-                onNotify={notify} 
-                activePath={telemetry ? telemetry.workspacePath : ""}
-                onPathChange={(newPath) => setTelemetry((p) => p ? { ...p, workspacePath: newPath } : null)}
-                isLive={telemetry ? telemetry.mode !== "demo" : false}
-              />
+              <CapabilityGate need="fileRead" fallback={<CapabilityDenied capKey="app.cap.fileRead" onOpen={() => setActiveTab("security")} />}>
+                <WorkspaceTree
+                  onNotify={notify}
+                  activePath={telemetry ? telemetry.workspacePath : ""}
+                  onPathChange={(newPath) => setTelemetry((p) => p ? { ...p, workspacePath: newPath } : null)}
+                  isLive={telemetry ? telemetry.mode !== "demo" : false}
+                />
+              </CapabilityGate>
             </div>
           )}
 
@@ -264,10 +292,12 @@ export default function App() {
 
           {activeTab === "terminal" && (
             <div className="animate-fade-in">
-              <CommandLineTerminal 
-                onNotify={notify} 
-                isLive={telemetry ? telemetry.mode !== "demo" : false}
-              />
+              <CapabilityGate need="commandExec" fallback={<CapabilityDenied capKey="app.cap.commandExec" onOpen={() => setActiveTab("security")} />}>
+                <CommandLineTerminal
+                  onNotify={notify}
+                  isLive={telemetry ? telemetry.mode !== "demo" : false}
+                />
+              </CapabilityGate>
             </div>
           )}
 
@@ -289,13 +319,17 @@ export default function App() {
 
           {activeTab === "backup" && (
             <div className="animate-fade-in">
-              <BackupControl onNotify={notify} />
+              <CapabilityGate need="fileWrite" fallback={<CapabilityDenied capKey="app.cap.fileWrite" onOpen={() => setActiveTab("security")} />}>
+                <BackupControl onNotify={notify} />
+              </CapabilityGate>
             </div>
           )}
 
           {activeTab === "automation" && (
             <div className="animate-fade-in">
-              <VirtualController />
+              <CapabilityGate need="commandExec" fallback={<CapabilityDenied capKey="app.cap.commandExec" onOpen={() => setActiveTab("security")} />}>
+                <VirtualController />
+              </CapabilityGate>
             </div>
           )}
 
@@ -306,7 +340,8 @@ export default function App() {
           )}
 
           {activeTab === "saas" && (
-            <div className="animate-fade-in">
+            <div className="animate-fade-in space-y-6">
+              <UsagePanel />
               <SaaSAdmin onNotify={notify} />
             </div>
           )}
@@ -320,11 +355,10 @@ export default function App() {
       </main>
 
       {/* Global Footer */}
-      <footer className={`border-t px-6 py-4 text-center text-xs font-mono tracking-wider ${
-        themeMode === "dark" ? "border-white/5 bg-[#050608] text-slate-500" : "border-slate-200 bg-white text-slate-600"
-      }`}>
-        <p>© 2026 LLM Mission Control. Offline-First Privacy Secured Machine Cockpit.</p>
+      <footer className="border-t px-6 py-4 text-center text-xs font-mono tracking-wider border-immersive-border bg-immersive-bg text-immersive-text-dim">
+        <p>{_('app.footer.copyright')}</p>
       </footer>
     </div>
+    </CapabilityProvider>
   );
 }

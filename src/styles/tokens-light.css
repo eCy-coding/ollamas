@@ -1,0 +1,22 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+[data-theme="light"] {
+  --ollamas-color-bg-base: #ffffff;
+  --ollamas-color-bg-sidebar: #f8fafc;
+  --ollamas-color-bg-panel: #f1f5f9;
+  --ollamas-color-bg-inset: #e2e8f0;
+  --ollamas-color-border-subtle: rgba(15, 23, 42, 0.08);
+  --ollamas-color-border-strong: rgba(15, 23, 42, 0.14);
+  --ollamas-color-text-bright: #0f172a;
+  --ollamas-color-text-muted: #475569;
+  --ollamas-color-text-dim: #586477;
+  --ollamas-color-accent-indigo: #4f46e5;
+  --ollamas-color-accent-emerald: #059669;
+  --ollamas-color-status-accent: #4f46e5;
+  --ollamas-color-status-ok: #047857;
+  --ollamas-color-status-warn: #92400e;
+  --ollamas-color-status-err: #be123c;
+  --ollamas-color-status-info: #155e75;
+}
