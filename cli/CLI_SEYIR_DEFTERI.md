@@ -5,6 +5,25 @@
 
 ---
 
+## v12 — Node-SEA canonical binary (2026-06-20)
+
+### N-029 · Node SEA'da `argv[1]` script DEĞİL → isim-guard tek başına binary'yi no-op eder
+- **Semptom (öngörülen+kapatılan)**: `invokedDirectly` guard'ı `process.argv[1]`'i `ollamas*`/`index.*`'e karşı test ediyordu. Bun binary'de argv[1]=binary-yolu (eşleşir), ama **Node SEA'da gömülü script var → argv[1] İLK USER ARG** (`version` vb.) → regex eşleşmez → `main()` çağrılmaz → binary sessizce hiçbir şey yapmaz (E-006 ailesi).
+- **Fix**: `import { isSea } from "node:sea"` + `runningAsSea = try{isSea()}catch{false}`; `invokedDirectly = runningAsSea || (argv[1] regex)`. Canlı SEA binary `version`/`__complete`/`help` doğrulandı.
+- **ÖNLEME KURALI**: tek-binary paketleyici eklerken launch-guard'ı o runtime'ın argv şekline göre doğrula; SEA = `isSea()`, isim-regex yetmez.
+
+### N-030 · macOS imzalı binary'ye postject inject ÖNCE remove-sign, SONRA re-sign
+- **Gözlem**: `cp $(command -v node)` kopyası imzalı; postject Mach-O segment (`NODE_SEA`) ekler → imza bozulur → çalışmaz/Gatekeeper reddeder.
+- **Fix**: build-sea.sh macOS dalı `codesign --remove-signature` → `postject … --macho-segment-name NODE_SEA` → `codesign -s - --force`. Linux ikisini de atlar.
+- **ÖNLEME KURALI**: macOS'ta imzalı binary'yi düzenleyen her adım (inject/patch) öncesi imzayı sök, sonra ad-hoc re-sign.
+
+### N-031 · postject = build-time devDep → runtime zero-dep KORUNUR
+- **Gözlem**: SEA inject için postject gerekti; lane yasası zero-dep.
+- **Karar**: zero-dep = zero-**RUNTIME**-dep. postject (esbuild/vite/vitest/tsx/bun gibi) build-time devDep → `node dist/cli/index.cjs` hâlâ saf built-in. Doğrulandı.
+- **ÖNLEME KURALI**: "zero-dep" = runtime; build tooling devDep olarak serbest. Runtime importu node:* dışına çıkarsa ihlal.
+
+---
+
 ## CLI-ID — Sekme kimliği otomasyonu (2026-06-20)
 
 ### N-027 · UserPromptSubmit hook self-registration güvenlik-kapısına takılır
