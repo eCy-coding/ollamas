@@ -3,7 +3,8 @@
 //   up       wg-quick up wg0
 //   down     wg-quick down wg0
 //   tls      mkcert local CA + cert + Caddyfile + iOS .mobileconfig for LAN-TLS (vT2)
-//   select   probe registered transports (LAN-TLS preferred, WireGuard fallback), print endpoint
+//   mesh     self-hosted Headscale config + zero-account preauth steps for sovereign mesh (vT3)
+//   select   probe registered transports (LAN-TLS > WireGuard > mesh), print endpoint
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -30,6 +31,16 @@ import {
   CaddyTlsTransport,
   type CaddyTlsPlan,
 } from "./transports/caddy-tls.ts";
+import {
+  DEFAULT_MESH_PLAN,
+  HeadscaleTransport,
+  clientUpCommand,
+  createUserCommand,
+  preAuthKeyCommand,
+  renderHeadscaleConfig,
+  serviceUrl as meshServiceUrl,
+  type HeadscalePlan,
+} from "./transports/headscale.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
 
 const KEYS_DIR = join(import.meta.dirname, "..", "keys");
@@ -134,6 +145,31 @@ async function cmdTls(): Promise<void> {
   console.log(`  4) iPhone Safari: ${tlsServiceUrl(plan)}/healthz → 200`);
 }
 
+async function cmdMesh(): Promise<void> {
+  // Sovereign mesh: self-hosted Headscale control plane over the WireGuard data plane (vT3).
+  // Coordination URL defaults to this Mac's Bonjour name so an iPhone on/off WiFi can reach it.
+  const host = detectLocalHostname();
+  const plan: HeadscalePlan = { ...DEFAULT_MESH_PLAN, serverUrl: `http://${host}:8080` };
+  const configPath = join(KEYS_DIR, "headscale.yaml");
+
+  await mkdir(KEYS_DIR, { recursive: true });
+  await chmod(KEYS_DIR, 0o700);
+  await writeFile(configPath, renderHeadscaleConfig(plan), { mode: 0o600 });
+
+  console.log(`Headscale config → ${configPath}`);
+  console.log(`Coordination URL = ${plan.serverUrl}`);
+  console.log(`ollamas over mesh= ${meshServiceUrl(plan)}`);
+  console.log("");
+  console.log("Next (binary-invoke; brew install headscale, iPhone: Tailscale app):");
+  console.log(`  1) headscale serve --config ${configPath}`);
+  console.log(`  2) ${createUserCommand(plan)}`);
+  console.log(`  3) ${preAuthKeyCommand(plan)}   # reusable, zero Tailscale account`);
+  console.log(`  4) iPhone Tailscale app → Settings → ALTERNATE COORDINATION SERVER URL = ${plan.serverUrl}`);
+  console.log(`     → log in → approve:  headscale nodes register --user ${plan.user} --key <mkey>`);
+  console.log(`  5) CLI peer (optional): ${clientUpCommand(plan)}`);
+  console.log(`  6) iPhone: ${meshServiceUrl(plan)}/healthz → 200`);
+}
+
 function wgQuick(action: "up" | "down"): Promise<number> {
   return new Promise((resolve) => {
     const p = spawn("wg-quick", [action, "wg0"], { stdio: "inherit" });
@@ -143,12 +179,16 @@ function wgQuick(action: "up" | "down"): Promise<number> {
 }
 
 async function cmdSelect(): Promise<void> {
+  const host = detectLocalHostname();
   const wgPlan: WgPlan = { ...DEFAULT_PLAN, endpointHost: detectLanIp() };
-  const tlsPlan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host: detectLocalHostname() };
-  // LAN-TLS (pri 10) preferred when on home WiFi; WireGuard (pri 20) fallback off-LAN.
+  const tlsPlan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host };
+  const meshPlan: HeadscalePlan = { ...DEFAULT_MESH_PLAN, serverUrl: `http://${host}:8080` };
+  // Priority order: LAN-TLS (10) on home WiFi → mesh band (20): WireGuard p2p (same-LAN direct),
+  // then Headscale mesh (multi-device / remote overlay). First healthy in order wins.
   const sw = new TunnelSwitch()
     .register(new CaddyTlsTransport(tlsPlan))
-    .register(new WireGuardTransport(wgPlan));
+    .register(new WireGuardTransport(wgPlan))
+    .register(new HeadscaleTransport(meshPlan));
   const ep = await sw.select();
   console.log(ep ? JSON.stringify(ep) : "no healthy transport (is ollamas + a tunnel up?)");
   process.exitCode = ep ? 0 : 1;
@@ -167,10 +207,12 @@ async function main(): Promise<void> {
       return;
     case "tls":
       return cmdTls();
+    case "mesh":
+      return cmdMesh();
     case "select":
       return cmdSelect();
     default:
-      console.log("usage: tunnel <config|up|down|tls|select>");
+      console.log("usage: tunnel <config|up|down|tls|mesh|select>");
   }
 }
 

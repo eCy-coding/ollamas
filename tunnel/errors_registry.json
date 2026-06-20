@@ -65,6 +65,27 @@
       "severity": "high",
       "note": "HTTPS probe'da rejectUnauthorized:false TLS doğrulamasını kapatır → LAN MITM. mkcert -install sonrası CA sistem trust store'da, varsayılan DOĞRULA (insecure opt-in yalnız debug). semgrep bypass-tls-verification.",
       "applies_version": "vT2"
+    },
+    {
+      "id": "RISK-TUNNEL-008",
+      "category": "network",
+      "severity": "med",
+      "note": "Headscale mesh'te iki uç da simetrik-NAT arkasındaysa doğrudan UDP delik açılamaz → relay gerekir. Çözüm: headscale config'de GÖMÜLÜ DERP (derp.server.enabled:true + STUN 3478) → kendi relay'imiz, Tailscale SaaS DERP'e bağımlılık YOK (egemenlik korunur).",
+      "applies_version": "vT3"
+    },
+    {
+      "id": "RISK-TUNNEL-009",
+      "category": "license",
+      "severity": "med",
+      "note": "iOS tarafı resmi Tailscale App Store client'ı kullanır (kendi mesh client'ımız yok). Egemenlik tanımı = CONTROL-PLANE self-host (Headscale) + zero-account (preauth); client binary'si üçüncü-taraf ama ücretsiz/hesapsız çalışır. Tam-client-egemenliği istenirse Nebula (kendi Mobile Nebula app'i) alternatifi notlandı — ama WireGuard data-plane'den sapar (kod-bütünlüğü). Karar: Headscale (vT3 ADOPTION matris).",
+      "applies_version": "vT3"
+    },
+    {
+      "id": "RISK-TUNNEL-010",
+      "category": "keys",
+      "severity": "high",
+      "note": "Headscale preauth key (zero-account kimlik) loglanır/commit'lenirse mesh'e izinsiz katılım. keys/ 0600 gitignored; cli.ts mesh çıktısı GERÇEK key basmaz (clientUpCommand default <PREAUTH_KEY> placeholder); gerçek key yalnız `headscale preauthkeys create` ile elde edilir, redaction.",
+      "applies_version": "vT3"
     }
   ],
   "errors": [
@@ -80,6 +101,20 @@
       "fix": "Declare fields explicitly + assign in constructor body (no access-modifier params).",
       "prevention_rule": "Bu lane zero-dep Node-strip kullanır: ASLA `constructor(private/public/readonly x)` yazma; alanları açıkça tanımla + gövdede ata. Ayrıca enum/namespace/decorator da yok.",
       "test_added": "src/transports/wireguard.test.ts (transport metadata)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-002",
+      "ts": "2026-06-20",
+      "version": "vT3",
+      "file": "package.json",
+      "category": "tooling",
+      "severity": "med",
+      "root_cause": "test script glob 'node --test src/**/*.test.ts' npm tarafından /bin/sh ile çalıştırılır; sh globstar (**) desteklemez → yalnız bir-seviye (src/transports/*.test.ts) eşleşir, top-level src/*.test.ts (health/switch/mobileconfig) SESSIZCE atlanır → kalite kapısı testlerin yarısını koşmaz (21 vs gerçek 48).",
+      "evidence": "npm test → tests 21; node --test (recursive auto-discovery) → tests 48",
+      "fix": "package.json test script → 'node --test' (built-in recursive auto-discovery, glob yok).",
+      "prevention_rule": "Test koşumu için shell glob kullanma; 'node --test' auto-discovery'ye bırak. Kalite kapısı sayısı node --test çıktısıyla doğrulanır, npm glob'a güvenilmez.",
+      "test_added": "doğrulama: npm test == node --test == 48",
       "recurrence_count": 0
     }
   ]

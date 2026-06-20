@@ -14,7 +14,9 @@
 | `caddyserver/caddy` | 73k | Apache-2.0 | vT2 | reverse_proxy localhost:3000 + TLS serve | ✅ `transports/caddy-tls.ts` (spawn) |
 | `FiloSottile/mkcert` | 59k | BSD-3 | vT2 | local CA + `<host>.local` cert | ✅ `cli.ts tls` (spawn) |
 | `mullvad/encrypted-dns-profiles` | ~0.7k | (reference) | vT2 | `.mobileconfig` plist şekli — fikir, kod-kopya YOK | ✅ `mobileconfig.ts` (kendi render) |
-| `juanfont/headscale` | 38k | BSD-3 | vT3 | sovereign mesh control-plane | planned |
+| `juanfont/headscale` | 38k | BSD-3 | vT3 | sovereign mesh control-plane (self-host); **binary-invoke** | ✅ `transports/headscale.ts` + reçete `recipes/headscale-ios.md` |
+| ~~`slackhq/nebula`~~ | 15k | MIT | vT3 | **ELENDİ**: kendi protokolü → vT1 WireGuard data-plane'den sapma (kod-bütünlüğü); en egemen (kendi Mobile Nebula app'i) ama tutarsız | reddedildi (karar-log) |
+| ~~`netbirdio/netbird`~~ | ~13k | Apache-2.0 | vT3 | **ELENDİ**: ağır (mgmt+signal+dashboard) M4 tek-binary hedefine aykırı; WG-tabanlı ama fazla parça | reddedildi (karar-log) |
 | `fatedier/frp` | 107k | Apache-2.0 | vT4 | reverse TCP tunnel (kendi VPS) | planned |
 | `ekzhang/bore` | 11k | MIT | vT4 | minimal Rust tunnel (alt) | planned |
 

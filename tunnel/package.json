@@ -5,9 +5,10 @@
   "type": "module",
   "description": "ollamas tunnel/switch lane — sovereign zero-account MacBook<->iOS e2e reachability",
   "scripts": {
-    "test": "node --test src/**/*.test.ts",
+    "test": "node --test",
     "typecheck": "tsc --noEmit",
-    "tunnel": "node src/cli.ts"
+    "tunnel": "node src/cli.ts",
+    "whoami": "bash scripts/whoami.sh"
   },
   "engines": {
     "node": ">=24"

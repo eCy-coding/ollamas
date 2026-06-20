@@ -58,8 +58,30 @@
   `tsc -p` → 0; `cli select` exit 1 + temiz mesaj (transport yokken); `cli tls` mkcert yokken temiz
   "brew install mkcert". iOS cihaz-kanıtı (https://<host>.local 200) Emre'de (reçete hazır).
 
+## Faz 5 — Sovereign mesh transport (vT3)
+
+- **Karar (research-driven):** mesh motoru = **Headscale** (juanfont/headscale, BSD-3). Karar matrisi
+  M4+iOS+egemen+kod-bütünlüğü → vT1 WireGuard data-plane reuse + tek hafif Go binary + iOS resmi Tailscale
+  app "ALTERNATE COORDINATION SERVER URL" (no-MDM, v1.38.1+) + BSD-3 binary-invoke. Nebula (kendi protokol →
+  WG'den sapma) ve NetBird (ağır mgmt+signal+dashboard) elendi. Kaynaklar: headscale apple docs + 2026
+  karşılaştırmaları (pinggy/dev.to/lilting).
+- **Ne:** `transports/headscale.ts` — PURE renderHeadscaleConfig (sqlite + gömülü DERP = egemen NAT traversal,
+  Tailscale SaaS relay YOK) + clientUpCommand (login-server; default `<PREAUTH_KEY>` placeholder) +
+  preAuthKeyCommand + createUserCommand + serviceUrl; `HeadscaleTransport` (name=headscale, pri=PRIORITY.MESH,
+  explicit field'lar, probe=probeHttp(meshIp/healthz), spawn `headscale serve`). `cli.ts mesh` (config.yaml +
+  preauth adımları, keys/ 0600) + `select` LAN-TLS>WireGuard>Headscale. `recipes/headscale-ios.md`.
+- **Nasıl:** Headscale **binary-invoke only** (BSD-3). Zero-account = preauth key. iOS resmi client =
+  egemenlik control-plane self-host'ta (RISK-TUNNEL-009). Gömülü DERP = kendi relay (RISK-TUNNEL-008).
+- **Bonus root-fix (ERR-TUNNEL-002):** `npm test` glob `src/**/*.test.ts` /bin/sh'de `**` desteklemiyordu →
+  yalnız 21 test (top-level src/*.test.ts atlanıyordu). Düzeltme: script → `node --test` (recursive). 48/48.
+- **Niçin:** vT1/vT2 tek-cihaz/aynı-LAN'ı çözdü; vT3 = çok-cihaz + remote tek overlay, kendi-barındırılan.
+- **Kanıt:** `node --test` → **48/48 green** (headscale 10 yeni); `npm run typecheck` → 0;
+  `node src/cli.ts mesh` → keys/headscale.yaml + Coordination URL `http://Emre-MacBook-Pro.local:8080` (canlı);
+  keys/ gitignored. iOS cihaz-kanıtı (mesh `100.64.0.1:3000/healthz` 200) Emre'de. **Taşınabilir master prompt**
+  `prompts/ollamas-tunnel-portable.md` üretildi.
+
 ---
-**Toplam (vT1+vT2 kod):** 5 governance + 7 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/cli) + 6 test dosya (37 test) + 2 iOS reçete. Zero-dep (Node 24 strip + node:test),
-zero-account. tsc 0 + test 37/37. Gotcha ERR-TUNNEL-001 (strip param-property yasak).
-vT1 (WireGuard 200) + vT2 (LAN-TLS 200) cihaz-kanıtları Emre'de.
+**Toplam (vT1+vT2+vT3 kod):** 5 governance + 8 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/headscale/cli) + 7 test dosya (48 test) + 3 iOS reçete + 1 taşınabilir prompt. Zero-dep
+(Node 24 strip + node:test), zero-account. tsc 0 + test 48/48. Gotcha ERR-TUNNEL-001 (strip param-property),
+ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de.

@@ -128,4 +128,18 @@ branch == feat/tunnel-v1           ✓
 
 ---
 
+## §12. Self-Report Contract (kalıcı kimlik)
+
+- **Tetik:** "Bu sekmede görevin nedir? / Ne yaparsın? / kimsin?" (eş anlamlıları) gelince →
+  `TUNNEL_IDENTITY.md` prosedürünü uygula: önce `npm run whoami` (read-only canlı state), sonra
+  §3 şablonunu canlı veriyle doldurup cevapla. **Asla ezberden/stale cevap verme** (evidence-first).
+- **Kaynak doğruluğu:** shipped versiyon = ROADMAP `✅ DONE` + `git log`; `VERSION` dosyası stale olabilir
+  (whoami drift'i uyarır).
+- **Geliştirilebilirlik:** veri otomatik (whoami) — yeni versiyon ship edince ROADMAP işaretle, cevap
+  kendiliğinden tazelenir; yapı manuel — yeni sürekli-yetenek doğunca `TUNNEL_IDENTITY.md` §3+§6 güncelle.
+- **vT7 birleşmesi:** observability geldiğinde `scripts/whoami.sh` mantığı `tunnel status` endpoint'ine
+  taşınır; IDENTITY o zaman endpoint'i çağırır (§8 ile hizalı).
+
+---
+
 **Lang:** Türkçe | kod/commit/id: İngilizce. **Min token, max performans.**
