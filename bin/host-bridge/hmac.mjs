@@ -14,12 +14,18 @@ export function canonicalMessage(method, path, body, timestamp, nonce) {
   return `${method.toUpperCase()}\n${path}\n${body}\n${timestamp}\n${nonce}`;
 }
 
+/**
+ * Raw HMAC-SHA256 hex over arbitrary key/data. The single primitive every signer
+ * here is built on, so a known-answer test (RFC 4231) over THIS function proves
+ * the exact code path the bridge uses. `key`/`data` accept string or Buffer.
+ */
+export function hmacSha256Hex(key, data) {
+  return crypto.createHmac("sha256", key).update(data).digest("hex");
+}
+
 /** HMAC-SHA256 hex signature over the canonical message. */
 export function computeSignature(secret, method, path, body, timestamp, nonce) {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(canonicalMessage(method, path, body, timestamp, nonce))
-    .digest("hex");
+  return hmacSha256Hex(secret, canonicalMessage(method, path, body, timestamp, nonce));
 }
 
 /**

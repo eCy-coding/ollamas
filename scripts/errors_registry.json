@@ -179,6 +179,34 @@
       "prevention_rule": "iOS bridge: yalnız Foundation/CryptoKit/Network builtin (external SPM dep ekleme); consumer-only (host-exec asla); kuyruk persist DAİMA atomic + başarısız item asla drain etme (retry). Test edilemeyen glue (reachability/App Intents) yerine inject-edilebilir/CLI-test-edilebilir desen seç.",
       "test_added": "bin/ios-bridge/Tests/OllamasKitTests/OfflineQueueTests.swift (6 case: persist/drain/keep+attempts/partial-retry/across-instances/env)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-011",
+      "ts": "2026-06-20",
+      "version": "v10",
+      "file": "bin/host-bridge/drift-check.mjs",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "Drift detector yalnız inventory→{schema,builders} yönünü kontrol ederse ORPHAN'ları (manifest'siz schema/tool/builder) kaçırır → false-negative. register-host-scripts.mjs boot-throw'u da tek-yön + server-boot gerektirir (CI'da koşmaz).",
+      "evidence": "node bin/host-bridge/drift-check.mjs → 'OK 17 aligned' exit0; testte schema/file/builder eksilt veya orphan ekle → exit1 + symmetric-diff raporu",
+      "fix": "4-kaynak ÇİFT-YÖNLÜ symmetric difference (inventory↔schema, ↔builders, ↔files) + entry-file existsSync; pure detectDrift, CI server-boot'suz koşar (scripts-ci.yml).",
+      "prevention_rule": "Drift kontrolü DAİMA çift-yönlü (her iki only_in_*) + dosya-varlığı; tek-yön subset kontrolü orphan kaçırır. Yeni kaynak eklenince detectDrift'e çift-yön pair ekle.",
+      "test_added": "scripts/tests/drift-check.test.ts (6 case: aligned + missing-schema/orphan-file/missing-builder/missing-entry-file)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-012",
+      "ts": "2026-06-20",
+      "version": "v10",
+      "file": "bin/ios-bridge/gen-vectors.mjs",
+      "category": "hmac",
+      "severity": "high",
+      "root_cause": "HMAC parity yalnız self==generated kontrol ederse hatalı-ama-tutarlı bir implementasyon iki tarafta aynı yanlışı üretip yeşil kalır (self-consistency != correctness). KAT beklenen değeri yanlış kopyalanırsa sahte güven.",
+      "evidence": "gen-vectors buildKats() her mac'i RFC 4231 expected ile karşılaştırır, mismatch→throw; node test mac==RFC published; swift CryptoKit KAT==fixture (15 swift / 174 node yeşil)",
+      "fix": "RFC 4231 known-answer vektörleri (C2SP/wycheproof Apache) eklendi; gen-vectors self-check (mac!=expected→throw, yanlış değer commit edilemez); node + Swift testleri RFC sabitlerine bağlandı.",
+      "prevention_rule": "Kripto paritesi DAİMA harici referansa (RFC/wycheproof) bağlanır, yalnız self-consistency'e değil; KAT üreteci beklenen sabite karşı self-check yapar.",
+      "test_added": "scripts/tests/ios-hmac-vectors.test.ts (RFC4231 KAT) + HMACParityTests.swift testRFC4231KATsMatch",
+      "recurrence_count": 0
     }
   ]
 }

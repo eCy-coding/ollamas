@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅** (iOS deepening: offline queue Codable persist + flush/retry + queue CLI + Shortcuts automation; swift 14 + node 167/1 skip), **v10 NEXT (final)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA** (drift detector + RFC4231 HMAC KAT parity + macOS CI + actionlint + portable operating prompt; node 174/1 + swift 15 + drift exit0 + harden 9), **v11 NEXT (Scripts-as-SaaS metering)**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -177,20 +177,25 @@
 
 ---
 
-## v10 — GA & Drift Guard ⬜
+## v10 — GA & Drift Guard ✅
 
-**Tema:** Üretim olgunluğu + kayma koruması.
+**Tema:** Üretim olgunluğu + kayma koruması. **DONE** — kayma + kripto + shell regresyonu CI'da (macOS runner) yakalanır; lane paste-anywhere portable prompt'la taşınabilir.
 
-**Phases:**
-1. CI matrix: macOS + iOS-sim.
-2. **HMAC-parity gate** (server ↔ bridge ↔ Swift byte-identical CI'da fail-safe).
-3. **shellcheck gate** zorunlu.
-4. **Drift detector**: inventory.json ↔ gerçek dosya seti tutarsızlığı → fail.
-5. GA tag + release notes.
+**Phases (gerçekleşen):**
+1. ✅ **Drift detector** (pure, zero-dep): `bin/host-bridge/drift-check.mjs` — 4 kaynak ÇİFT-YÖNLÜ symmetric difference (inventory ↔ schema.mjs keys ↔ register BUILDERS ↔ tools/*.mjs) + entry-file existsSync → drift→exit1. `register-host-scripts.mjs` BUILDERS export edildi. Canlı: 17 tool hizalı, exit0. (RISK-SCR-011: tek-yön orphan kaçırır → çift-yön zorunlu.)
+2. ✅ **HMAC extended parity (matematiksel KAT)**: `hmac.mjs` `hmacSha256Hex` primitifi ayrıldı (DRY); `gen-vectors.mjs` RFC 4231 #1-#4 known-answer bloğu (`kats[]`) + self-check (mac≠expected→throw). node test mac==RFC published; Swift `testRFC4231KATsMatch` CryptoKit==fixture. Self-consistency→correctness. (RISK-SCR-012.)
+3. ✅ **shellcheck/drift gate**: macOS CI `make harden` (shellcheck+shfmt+bats 9) + `drift-check.mjs` zorunlu adım.
+4. ✅ **macOS CI** (collision-safe, yeni): `.github/workflows/scripts-ci.yml` — `macos-latest`: npm ci→tsc→vitest→brew(shellcheck/shfmt/bats)→make harden→drift-check→swift build/test; + `actionlint` job (ubuntu, docker rhysd/actionlint:1.7.7). Paylaşılan `ci.yml` DEĞİŞMEDİ.
+5. ✅ **GA**: `RELEASE_NOTES_SCRIPTS.md` (v1-v10 + gate matrisi + adoption ledger) + `inventory.json` version→10.0.0 (GA marker). Gerçek `git tag` push YOK (ürün release-please akışını ezmemek için; operatör kararı).
+6. ✅ **Portable operating prompt**: `SCRIPTS_PORTABLE_PROMPT.md` — tek-dosya self-contained (kimlik+scope+choke-point+verimli-seçim kuralları+gate+7-adım trigger+adoption); nereye yapıştırılırsa lane'i en verimli seçimlerle yürütür.
 
-**Canonical prompt:** "scripts domain GA: CI matrix (macOS+iOS-sim), HMAC-parity gate, shellcheck gate, drift detector (inventory↔gerçek), GA tag."
+**Adopt:** `C2SP/wycheproof`+RFC 4231 (Apache, HMAC KAT data), `rhysd/actionlint` (MIT tool, pinned 1.7.7), `koalaman/shellcheck`+`mvdan/sh`+`bats-core` (GPL/BSD/MIT tool), GitHub `macos-latest` runner; syncpack/knip drift-deseni (idea-only, pure zero-dep yazıldı).
 
-**Next precomputed (→v11):** GA sonrası — per-call realtime metering hook'u scriptlere yay (canonical AGENTS.md backlog ile hizala); v11 teması "Scripts-as-SaaS metering".
+**Canonical prompt:** "scripts GA: standalone bidirectional drift detector (inventory↔schema↔builders↔files + entry exists) + RFC4231 HMAC KAT parity (gen-vectors self-check, node+Swift) + macOS CI (tsc/vitest/harden/drift/swift) + actionlint + portable single-file operating prompt + GA release notes; paylaşılan ci.yml'e dokunma, git tag push yok."
+
+**Gate (kanıt):** `tsc 0 · vitest 174/1 · make harden 9 bats · drift-check exit0 (17 aligned) · swift build+test 15/0 · scripts-ci.yml YAML valid`.
+
+**Next precomputed (→v11 Scripts-as-SaaS metering):** `server/tool-registry.ts` execute()'taki metering noktasını oku (dokunma) → host tool invoke'larına per-call realtime usage event'i (tenant+tool+latency+exit) `recordEvent`/billing seam'ine yay; canonical AGENTS.md SaaS metering backlog'u ile hizala; ilk hamle = mevcut metering interceptor'ı + bridge-client emit() seam'ini eşle, çift-sayım önle (execute zaten sayıyorsa script-side sayma).
 
 ---
 

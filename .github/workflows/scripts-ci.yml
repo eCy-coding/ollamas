@@ -1,0 +1,64 @@
+# Scripts lane GA gate (v10). Runs the scripts-domain quality gate on a real
+# macOS runner — the platform the host bridge + iOS bridge actually target — and
+# lints the workflows themselves. Separate from the shared ci.yml (Ubuntu, app
+# build) so the two lanes never collide. Triggered only when scripts surface changes.
+name: scripts-ci
+
+on:
+  push:
+    paths:
+      - "scripts/**"
+      - "bin/host-bridge/**"
+      - "bin/ios-bridge/**"
+      - "bin/scripts/**"
+      - "Makefile"
+      - "*.sh"
+      - ".github/workflows/scripts-ci.yml"
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "bin/host-bridge/**"
+      - "bin/ios-bridge/**"
+      - "bin/scripts/**"
+      - "Makefile"
+      - "*.sh"
+      - ".github/workflows/scripts-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests (vitest)
+        run: npx vitest run
+      - name: Shell hardening tools
+        run: brew install shellcheck shfmt bats-core
+      - name: Shell gate (shellcheck + shfmt + bats)
+        run: make harden
+      - name: Drift guard (inventory == schema == builders == files)
+        run: node bin/host-bridge/drift-check.mjs
+      - name: Swift build + test (iOS bridge, HMAC RFC 4231 parity)
+        run: |
+          cd bin/ios-bridge
+          swift build
+          swift test
+
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color

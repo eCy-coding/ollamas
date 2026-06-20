@@ -123,6 +123,16 @@
 - `[2026-06-20] kind=phase | P3 gate+gov | swift build+test 14 (regresyon yok) + node tsc OK + vitest 167/1 (ios-hmac-vectors parity korundu) + make harden clean | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v10 GA & Drift Guard, FINAL) | .github/workflows CI matrix (macOS: node tsc+vitest+harden + swift build/test) + actionlint(rhysd) + shellcheck-action(bewuethr) + inventory↔dosya drift detector (inventory tool adları==schema.mjs keys==tools/*.mjs) + HMAC Wycheproof-genişletilmiş parity + GA tag/release notları`
 
+## v10 — GA & Drift Guard ✅ (GA)
+
+- `[2026-06-20] kind=phase | P1 drift detector | bin/host-bridge/drift-check.mjs pure zero-dep: 4-kaynak çift-yönlü symmetric-diff (inventory↔schema↔BUILDERS↔tools/*.mjs) + entry existsSync; register-host-scripts BUILDERS export | node drift-check → 'OK 17 aligned' exit0; drift-check.test.ts 6 case (missing-schema/orphan-file/missing-builder/missing-entry yakalar) | YEŞİL`
+- `[2026-06-20] kind=phase | P2 HMAC RFC4231 KAT | hmac.mjs hmacSha256Hex primitif ayrıldı (DRY); gen-vectors.mjs kats[] RFC4231 #1-#4 + self-check (mac≠expected→throw); node test mac==RFC published; Swift testRFC4231KATsMatch CryptoKit==fixture | self-consistency→correctness; fixture regenerate edildi (5 vector + 4 kat) | YEŞİL`
+- `[2026-06-20] kind=phase | P3-4 macOS CI + gate | .github/workflows/scripts-ci.yml (macos-latest: npm ci→tsc→vitest→brew shellcheck/shfmt/bats→make harden→drift-check→swift build/test) + actionlint job (ubuntu docker rhysd/actionlint:1.7.7); paylaşılan ci.yml DOKUNULMADI | YAML safe_load OK (2 job, 9+2 step) | YEŞİL`
+- `[2026-06-20] kind=phase | P5 GA | RELEASE_NOTES_SCRIPTS.md (v1-v10 + gate matrisi + adoption ledger) + inventory.json version 5.0.0→10.0.0 GA marker; git tag push YOK (release-please ezme, operatör kararı) | — | YEŞİL`
+- `[2026-06-20] kind=phase | P6 portable prompt | SCRIPTS_PORTABLE_PROMPT.md tek-dosya self-contained (kimlik+scope+choke-point+verimli-seçim+gate+7-adım trigger+adoption); nereye yapıştırılırsa lane'i en verimli seçimlerle yürütür, harici dosya okumadan | dış-referans yok ({TASK} hariç) | YEŞİL`
+- `[2026-06-20] kind=phase | P7 gate (taze) | tsc 0 + vitest 174/1 skip (+7: drift 6 + RFC KAT 1, regresyon yok) + make harden 9 bats + drift-check exit0 (17 aligned) + swift build+test 15/0 (was 14, +1 KAT) | YEŞİL — GA`
+- `[2026-06-20] kind=note | Next precomputed (→v11 Scripts-as-SaaS metering) | tool-registry.execute() metering noktasını oku (dokunma) → host tool invoke'larına per-call usage event (tenant+tool+latency+exit) billing/recordEvent seam'ine yay; çift-sayım önle (execute zaten sayıyorsa script-side sayma); canonical AGENTS.md SaaS metering backlog ile hizala`
+
 ---
 
 ## Hata Anlatıları

@@ -98,4 +98,4 @@ export function registerHostScripts(registry, deps, inventoryPath = DEFAULT_INVE
   return { registered: names.length, skipped: skipped.length, names, skipped_names: skipped };
 }
 
-export { DEFAULT_INVENTORY };
+export { DEFAULT_INVENTORY, BUILDERS };

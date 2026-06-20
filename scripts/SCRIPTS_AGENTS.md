@@ -15,6 +15,11 @@
 
 Bu üçünden hiçbirini yapmıyorsa, iş değildir — yapma.
 
+## §0.1 — Kimlik Öz-Raporu (Identity Self-Report)
+
+Trigger cümlesi: **"Bu terminal sekmesinde görevin nedir?" / "Ne yaparsın?"** (veya eşdeğeri).
+Geldiğinde: hardcoded cevaplama → `TAB_IDENTITY_SCRIPTS.md` **§2 SELF-REFRESH PROTOCOL**'ünü koş (read-only: `git log -1` + ROADMAP grep + errors recurrence) → **§5 RENDER TEMPLATE**'i güncel değerlerle doldurup yanıtla. Durum versiyonla değişir; cevap daima canlı kaynaktan türetilir. Bu bir self-report'tur — kod değişikliği değil.
+
 ## §1 — Subordination (Tabiiyet)
 
 - `AGENTS.md` §0-§8 **aynen** miras alınır. Bu dosya onları tekrar yazmaz; bağlar.
@@ -93,7 +98,7 @@ Emre **"sıradaki versiyonun todo + phase list'ini planla"** (veya "sıradaki ve
 3. TDD    önce test (vitest / dry-run harness), sonra implementasyon
 4. CODE   en küçük diff, §3 scope içinde
 5. GATE   tsc --noEmit → lint/shellcheck → vitest run (fresh) → yeşil
-6. LOG    SEYIR_DEFTERI_SCRIPTS.md + errors_registry.json güncelle; bir sonraki versiyonu precompute et
+6. LOG    SEYIR_DEFTERI_SCRIPTS.md + errors_registry.json güncelle; bir sonraki versiyonu precompute et; TAB_IDENTITY_SCRIPTS.md §3 STATUS SNAPSHOT'ı yeni shipped/next/horizon ile tazele (kimlik self-updating)
 7. COMMIT conventional commit (feat|fix|refactor|chore|docs|test(scripts): ...)
 ```
 
