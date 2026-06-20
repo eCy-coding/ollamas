@@ -71,6 +71,13 @@ interface LatencyEntry {
 }
 const latencyCache: Record<string, LatencyEntry> = {};
 
+// Compose caller-supplied cancellation with the 300s provider timeout.
+// When no caller signal is given the plain timeout is preserved unchanged.
+function buildSignal(callerSignal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(300000);
+  return callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+}
+
 export class ProviderRouter {
   /**
    * Main route function with fallback and latency awareness
@@ -78,7 +85,8 @@ export class ProviderRouter {
   public static async generate(
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void,
-    onFallback?: (from: string, to: string, error: string) => void
+    onFallback?: (from: string, to: string, error: string) => void,
+    signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
     const providersToTry = this.getFallbackChain(config.provider);
@@ -92,7 +100,7 @@ export class ProviderRouter {
           continue;
         }
 
-        const result = await this.executeProvider(resolvedConfig, onStreamChunk);
+        const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
         
         // Track successfully executed provider's latency
         const elapsed = Date.now() - start;
@@ -182,7 +190,8 @@ export class ProviderRouter {
    */
   private static async executeProvider(
     config: GenerateConfig,
-    onStreamChunk?: (text: string) => void
+    onStreamChunk?: (text: string) => void,
+    signal?: AbortSignal
   ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; toolCalls?: ToolCall[] }> {
     const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
     const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
@@ -214,7 +223,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
-          signal: AbortSignal.timeout(300000), // Massive timeout for slow-loading local models (L12)
+          signal: buildSignal(signal), // Compose caller cancellation with 300s timeout (L12)
         });
 
         if (!response.ok) {
@@ -306,7 +315,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
-          signal: AbortSignal.timeout(300000),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -470,6 +479,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -546,6 +556,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -623,6 +634,7 @@ export class ProviderRouter {
               input_schema: t.function.parameters
             })) : undefined,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {

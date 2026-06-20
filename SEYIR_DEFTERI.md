@@ -155,6 +155,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tam suite **150 passed/2 skipped** (+6: 2 consume-roots + 3 abort-forward spy + 1 combineSignal); tsc temiz; vite+server+stdio bundle; `conformance:stdio` tools/list OK.
 - **Sonraki (önceden hesaplandı):** v1.12 — OAuth refresh + RFC 9700 rotation (migration v4) · client_credentials grant · expose-side roots (client root'larını okuyup FS-tool scope) · resource subscriptions.
 
+## Faz 21 — v1.12 (Abort Propagation E2E + Federated Roots Aggregation, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** v1.11'in iki desenini uçtan uca tamamladı. **0 yeni dep** (SDK `ListRootsResultSchema` + Node stdlib `AbortSignal.any`). Çoklu-worker: kod paralel sekme tarafından yazılmıştı; tutarlı + gate-yeşil olduğu için **additive tamamlandı** (test + docs eklendi, 4 dosya rewrite edilmedi) — clobber yok.
+- **Nasıl:** 21A **abort propagation** — `server.ts` ReAct SSE loop `AbortController` + client-disconnect (`req/res.on("close")→abort`) → `ProviderRouter.generate(...,signal)` + `buildSignal=AbortSignal.any([caller,timeout300s])` 5 provider'a + tool `ctx.abortSignal`; `AbortError`→graceful `res.end()`. 21B **federated roots** — `client.ts` connect-sonrası upstream `roots/list` çeker → `upstreamRoots` (never-throw) + `getFederatedRoots()` `<server>:<name>`; `mcp/server.ts` `roots:{}` capability + `roots/list`=workspace+federated.
+- **Niçin:** İptal artık client'tan LLM+tool+loop'a kadar gerçekten propage olur (kaynak israfı yok); federation görünürlüğü için upstream root'ları expose'da agrege edilir (sandbox sinyali zinciri).
+- **Kanıt:** tam suite **163 passed/2 skipped** (+2 federated-roots: agrege + graceful-boş; ilk full-run'da conformance inspector "fetch failed" **flaky**→izole 3/3 + re-run temiz, env-level port, regresyon değil); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle. Abort yolu = v1.11 birim testleri + e2e kod-yolu (providers `buildSignal` modül-private, sessiz-skip yok — dürüst not).
+- **Sonraki (önceden hesaplandı):** v1.13 — OAuth refresh + RFC 9700 rotation (migration v4) · client_credentials grant · resource subscriptions · expose-side sampling-to-tool.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

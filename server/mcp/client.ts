@@ -16,7 +16,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { CreateMessageRequestSchema, ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CreateMessageRequestSchema, ListRootsRequestSchema, ListRootsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -122,6 +122,20 @@ export interface UpstreamResult {
 const clients = new Map<string, Client>();
 // Pinned manifest hash per upstream — detects tool-set tampering across reconnects.
 const manifestHashes = new Map<string, string>();
+// Per-upstream roots fetched after connect (v1.11 Phase A expose-side aggregation).
+const upstreamRoots = new Map<string, { uri: string; name: string }[]>();
+
+/** Flatten all stored upstream roots, namespacing name as "<server>:<name>".
+ *  Best-effort: never throws. An upstream that does not support roots is stored as []. */
+export function getFederatedRoots(): { uri: string; name: string }[] {
+  const result: { uri: string; name: string }[] = [];
+  for (const [server, roots] of upstreamRoots) {
+    for (const r of roots) {
+      result.push({ uri: r.uri, name: `${server}:${r.name}` });
+    }
+  }
+  return result;
+}
 
 /** Strip prompt-injection markers from untrusted upstream text before it reaches
  *  the agent's conversation (defense against tool-output prompt injection). */
@@ -209,6 +223,16 @@ export async function connectUpstream(cfg: UpstreamConfig): Promise<UpstreamResu
     }
 
     clients.set(cfg.name, client);
+
+    // v1.11 Phase A: fetch upstream roots for expose-side aggregation. Best-effort —
+    // an upstream that does not implement roots/list will reject → store [].
+    try {
+      const { roots: fetchedRoots } = await client.request({ method: "roots/list" }, ListRootsResultSchema);
+      upstreamRoots.set(cfg.name, (fetchedRoots || []).map((r) => ({ uri: r.uri, name: r.name || r.uri })));
+    } catch {
+      upstreamRoots.set(cfg.name, []);
+    }
+
     return {
       name: cfg.name, ok: true, tools: registered,
       skipped: skipped.length ? skipped : undefined, manifestChanged,

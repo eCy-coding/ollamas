@@ -12,11 +12,13 @@ import {
   CallToolRequestSchema, ListToolsRequestSchema,
   ListResourcesRequestSchema, ReadResourceRequestSchema,
   ListPromptsRequestSchema, GetPromptRequestSchema, CompleteRequestSchema,
-  SetLevelRequestSchema,
+  SetLevelRequestSchema, ListRootsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
+import { getFederatedRoots } from "./client";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
@@ -34,7 +36,7 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 // Advertise only what we implement (Faz 14A): tools/resources/prompts/
 // completions + structured logging. listChanged is false (stateless transport).
 export const MCP_CAPABILITIES = {
-  tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {},
+  tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {}, roots: {},
 } as const;
 
 // RFC 5424 severities, MCP logging order (low → high). A message is sent when its
@@ -64,6 +66,16 @@ export function buildServer(ctx: ToolCtx): Server {
     const lvl = String(req.params?.level || "");
     if (LOG_LEVELS.includes(lvl as LogLevel)) logLevel = lvl as LogLevel;
     return {};
+  });
+
+  // --- roots/list (v1.11 Phase A): workspace root + federated upstream roots ---
+  server.setRequestHandler(ListRootsRequestSchema, async () => {
+    const workspacePath = (await import("../db")).db.data.workspacePath;
+    const workspace = workspacePath
+      ? [{ uri: pathToFileURL(workspacePath).href, name: "workspace" }]
+      : [];
+    const federated = getFederatedRoots();
+    return { roots: [...workspace, ...federated] };
   });
 
   // --- tools/list (per-tenant visibility + cursor pagination) ---

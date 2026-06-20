@@ -514,6 +514,11 @@ async function initializeServer() {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
+    // Abort the ReAct loop when the HTTP client disconnects.
+    const ac = new AbortController();
+    req.on("close", () => ac.abort());
+    res.on("close", () => ac.abort());
+
     const sendEvent = (type: string, payload: any) => {
       res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
     };
@@ -566,7 +571,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           messages: activeHistory,
           tools: AGENT_TOOLS,
           stream: false,
-        });
+        }, undefined, undefined, ac.signal);
 
         // Meter LLM output tokens (Faz 6D) — a billing dimension distinct from
         // per-tool-call usage, under the single-user "local" tenant.
@@ -599,6 +604,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
             const r = await ToolRegistry.execute(toolName, args, {
               isLive, workspaceRoot, autoApply, deps: TOOL_DEPS,
               tenantId: "local",
+              abortSignal: ac.signal,
               onUsage: (e) => {
                 recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
                 recordToolMetric(e.tool, e.tier, e.ok);
@@ -683,6 +689,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
       res.end();
     } catch (err: any) {
+      // Client disconnected — abort is expected, not an error.
+      if (err?.name === "AbortError" || ac.signal.aborted) {
+        res.end();
+        return;
+      }
       sendEvent("error", { message: err?.message || "Execution loop failure." });
       res.end();
     }
