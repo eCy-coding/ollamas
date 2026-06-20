@@ -15,6 +15,7 @@
   <array>
     <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
     <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/bin/autopilot.ts</string>
+    <string>--heal</string>
     <string>--quiet</string>
   </array>
   <key>WorkingDirectory</key>

@@ -39,4 +39,11 @@ describe("summarizeAutopilot — otopilot özeti (PURE, deterministik)", () => {
     const go = summarizeAutopilot([...RESULTS, { step: "doctor", ok: true, ms: 30, detail: "GO — tam canlı" }], "t");
     expect(go).toMatch(/✅ GO/);
   });
+  it("heal adımı → staleness self-heal satırı (0-manuel taze)", () => {
+    const healed = summarizeAutopilot([{ step: "heal", ok: true, ms: 5000, detail: "🔄 auto-refresh tetiklendi" }, ...RESULTS], "t");
+    expect(healed).toMatch(/Staleness self-heal/);
+    expect(healed).toMatch(/auto-refresh/);
+    // heal adımı yoksa satır görünmez (SessionStart hızlı yol)
+    expect(summarizeAutopilot(RESULTS, "t")).not.toMatch(/Staleness self-heal/);
+  });
 });

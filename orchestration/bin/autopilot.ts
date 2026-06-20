@@ -15,11 +15,13 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ANCHOR } from "./shared";
 import { summarizeAutopilot, type StepResult } from "./lib/autopilot";
+import { shouldAutoRefresh, COOLDOWN_H } from "./lib/refresh";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const TSX = join(ANCHOR, "node_modules", ".bin", "tsx");
 const QUIET = process.argv.includes("--quiet");
+const HEAL = process.argv.includes("--heal"); // vO-AUTO.2: bayatsa otonom tazele (launchd; SessionStart'ta KAPALI=hızlı)
 
 /** Bir adımı read-only spawn et; never-throw → StepResult. Süreyi process.hrtime ile ölç (Date.now yok). */
 function runStep(step: string, script: string, args: string[]): StepResult {
@@ -54,6 +56,14 @@ function detailFor(step: string): string {
     }
     return "karar tazelendi";
   }
+  if (step === "critic") {
+    const c = readJson(join(ORCH_DIR, "CRITIC.json"));
+    return c ? `completeness skor ${c.score ?? "?"} · ${(c.findings ?? []).length} açık` : "öz-denetim tazelendi";
+  }
+  if (step === "dod") {
+    const d = readJson(join(ORCH_DIR, "DOD.json"));
+    return d ? `DoD skor ${d.score ?? "?"} · ${(d.findings ?? []).length} yarım-iş` : "DoD tazelendi";
+  }
   if (step === "status") return "lane matrisi tazelendi";
   return "ok";
 }
@@ -80,12 +90,41 @@ function runDoctor(): StepResult {
   return { step: "doctor", ok: go, ms, detail };
 }
 
+/** server :3000 read-only probe (refresh path şart). */
+function serverUp(): boolean {
+  try { execFileSync("curl", ["-s", "-m", "2", "-o", "/dev/null", "http://localhost:3000/api/health"], { stdio: ["ignore", "ignore", "ignore"] }); return true; }
+  catch { return false; }
+}
+
+/** vO-AUTO.2 otonom staleness self-heal: bayat + up + cooldown geçti ise benchprompt --refresh (debounced). */
+function runHeal(): StepResult {
+  const t0 = process.hrtime.bigint();
+  const sel = readJson(join(ORCH_DIR, "MODEL_SELECTION.json")) || {};
+  const stampF = join(ORCH_DIR, ".autopilot-refresh.json");
+  const lastAttemptMs = readJson(stampF)?.lastAttemptMs || 0;
+  const nowMs = Date.now();
+  const d = shouldAutoRefresh({ stale: sel.stale === true, serverUp: serverUp(), lastAttemptMs, nowMs, cooldownHours: COOLDOWN_H });
+  let ok = true, detail = d.reason;
+  if (d.go) {
+    writeFileSync(stampF, JSON.stringify({ lastAttemptMs: nowMs }) + "\n"); // stamp ÖNCE → fail'de bile thrash-guard (cooldown)
+    try {
+      execFileSync(TSX, [join(HERE, "benchprompt.ts"), "--refresh"], { stdio: ["ignore", "ignore", "ignore"], timeout: 620_000, cwd: ORCH_DIR });
+      detail = `🔄 auto-refresh tetiklendi — ${d.reason}`;
+    } catch (e: any) { ok = false; detail = `auto-refresh hata: ${(e?.message ?? "").slice(0, 50)}`; }
+  }
+  const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+  return { step: "heal", ok, ms, detail };
+}
+
 function main(): void {
   // ISO ts: dosya mtime tabanlı değil — autopilot her koşuda taze tetik; deterministik test PURE fn'de.
   const ts = new Date().toISOString();
   const results: StepResult[] = [
+    ...(HEAL ? [runHeal()] : []),  // launchd --heal: bayatsa önce tazele; SessionStart'ta atlanır (hızlı)
     runStep("benchprompt", "benchprompt.ts", []),
-    runStep("conduct", "conduct.ts", ["--json"]),
+    runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
+    runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
+    runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
     runStep("status", "status.ts", []),
     runDoctor(),
   ];

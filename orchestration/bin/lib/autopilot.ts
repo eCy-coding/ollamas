@@ -23,6 +23,8 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
   // readiness (doctor): 0-manuel canlı + taze mi (GO/NO-GO).
   const readyR = results.find((r) => r.step === "doctor");
   const readiness = readyR ? `${readyR.ok ? "✅ GO" : "🛑 NO-GO"} — ${readyR.detail}` : "—";
+  // heal (vO-AUTO.2 staleness self-heal): tazeleme kararı/sonucu.
+  const healR = results.find((r) => r.step === "heal");
 
   const rows = results.length
     ? results.map((r) => `| ${r.ok ? "✓" : "✗"} | \`${r.step}\` | ${r.ms}ms | ${r.detail} |`)
@@ -39,6 +41,7 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
     `**Model seçimi (0-manuel-seçim):** ${pick}`,
     `**Conductor sonraki-aksiyon:** ${next}`,
     `**Readiness (0-manuel aktif mi):** ${readiness}`,
+    ...(healR ? [`**Staleness self-heal (0-manuel taze):** ${healR.detail}`] : []),
     ``,
     `| | Adım | Süre | Detay |`,
     `|---|---|--:|---|`,
