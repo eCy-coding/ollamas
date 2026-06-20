@@ -128,3 +128,15 @@ OLLAMAS_WORKSPACE=/path/to/my/checkout ./scripts/colab-local-runtime.sh up
 ```
 
 Useful when running the script from outside the git tree.
+
+## Apple Silicon (M4) note
+
+The Colab runtime image `us-docker.pkg.dev/colab-images/public/runtime` is **amd64-only** — on
+Apple Silicon it runs under emulation. The script passes `--platform linux/amd64` so Docker does
+not print a platform-mismatch warning; the first kernel call is slightly slower (expected, inherent
+— there is no arm64 image).
+
+## Port note
+
+Do NOT hardcode `--port 3100` if a jupyter/server already holds it (the bare `jupyter server` command
+binds 3100). The script auto-picks the first free port (3100 → 9000 → 8888 …); use `up` / `url`.

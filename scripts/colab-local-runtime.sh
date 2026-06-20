@@ -157,7 +157,11 @@ cmd_up_docker() {
     docker start "${CONTAINER_NAME}" >/dev/null
   else
     log "Starting new container '${CONTAINER_NAME}'..."
+    # The Colab runtime image is amd64-only; declare the platform explicitly so
+    # Apple Silicon runs it under emulation without the noisy mismatch warning
+    # (no arm64 variant exists — first kernel call is slower, expected).
     docker run -d \
+      --platform linux/amd64 \
       --name "${CONTAINER_NAME}" \
       -p "127.0.0.1:${port}:8080" \
       -v "${workspace}:/content/ollamas" \
