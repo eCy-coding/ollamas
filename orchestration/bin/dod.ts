@@ -17,6 +17,7 @@ import {
   type Lapse,
 } from "./lib/dod";
 import { parseVersions } from "./plan-next";
+import { loadSuppress, applySuppress, suppressedBlock } from "./lib/suppress";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -65,7 +66,14 @@ function main(): void {
   const lapsesR4 = auditGovernance(doneVersions, seyirText);
   const lapsesR6 = auditConcurrent(toolStems, testStems, roadmapText, seyirText);
 
-  const lapses: Lapse[] = [...lapsesR1, ...lapsesR3, ...lapsesR4, ...lapsesR6, ...lapsesR2, ...lapsesR5];
+  const allLapses: Lapse[] = [...lapsesR1, ...lapsesR3, ...lapsesR4, ...lapsesR6, ...lapsesR2, ...lapsesR5];
+
+  // vO14 detector precision: gerekçeli-istisna (IO-wrapper/data-only) suppress (silent-değil).
+  const lapseKind = (l: Lapse) => `dod:${l.rule}:${l.target}`;
+  const rules = loadSuppress(join(ORCH_DIR, ".policy-suppress.json"));
+  const { suppressed } = applySuppress(allLapses.map((l) => ({ kind: lapseKind(l) })), rules, "dod");
+  const suppressedKinds = new Set(suppressed.map((s) => s.kind));
+  const lapses = allLapses.filter((l) => !suppressedKinds.has(lapseKind(l))); // GERÇEK lapse'ler
   const score = scoreDoD(lapses);
 
   const cat = (title: string, rules: string[]) => {
@@ -85,6 +93,7 @@ function main(): void {
     ...cat("📋 DONE ama governance eksik", ["done-without-governance"]),
     ...cat("🗺️ Roadmap izlenebilirlik", ["roadmap-coherence"]),
     ...cat("🚧 Marker (TODO/FIXME)", ["marker"]),
+    suppressedBlock(suppressed),
     `---`,
     `_dod bulur+raporlar; commit/fix insan/conduct (§3). DOD.json → conduct COMPLETENESS._`,
   ].join("\n");

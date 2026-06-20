@@ -107,6 +107,18 @@ describe("buildRoleAnswer — vO10-12 öz-denetim surface", () => {
   });
 });
 
+describe("buildRoleAnswer — vO14 kritik-gereksinim füzyon surface", () => {
+  it("topReq VARSA 🎯 kritik-gereksinim + hazırlık satırı", () => {
+    const out = buildRoleAnswer({ ...BASE, topReq: { criticality: "CRITICAL", target: "backend", readiness: 72 } });
+    expect(out).toMatch(/🎯.*Kritik gereksinim/i);
+    expect(out).toContain("CRITICAL:backend");
+    expect(out).toMatch(/72\/100/);
+  });
+  it("topReq YOKSA fuse-koş fallback (graceful)", () => {
+    expect(buildRoleAnswer(BASE)).toMatch(/fuse\.ts/);
+  });
+});
+
 describe("isRoleQuestion — hook matcher", () => {
   it("kimlik/görev sorularını yakalar", () => {
     expect(isRoleQuestion("Bu terminal sekmesinde görevin nedir? Ne yaparsın?")).toBe(true);

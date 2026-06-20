@@ -1,11 +1,10 @@
 # CRITIC — Orchestration Öz-Denetim (completeness)
 
 > READ-ONLY `critic.ts` üretti. Sistem kendi açığını bulur (deterministik, self-improving).
-> **Kapsamlılık skoru: 60/100** · 7 gap (26 araç, 31 artefakt).
+> **Kapsamlılık skoru: 98/100** · 1 gap (26 araç, 32 artefakt).
 
-### 🔴 Roadmap-vs-Gerçek Drift (1)
-- **[high]** vO13: vO13 (Horizon auto roadmap (10 versiyon lookahead) lib hazır, cond) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)
-  → vO13 durumunu DONE'a güncelle (roadmap-gerçek reconcile)
+### 🔴 Roadmap-vs-Gerçek Drift (0)
+- _temiz_
 
 ### DONE ama kanıt-yok (0)
 - _temiz_
@@ -13,21 +12,19 @@
 ### Orphan artefakt (0)
 - _temiz_
 
-### Duplicate araç (4)
-- **[med]** autopilot.ts↔horizon.ts: autopilot.ts ve horizon.ts amaç-örtüşmesi yüksek (2 ortak kelime) — olası duplicate
-  → autopilot.ts/horizon.ts dedup ya da rol ayrımını netleştir
-- **[med]** conduct.ts↔serve.ts: conduct.ts ve serve.ts amaç-örtüşmesi yüksek (2 ortak kelime) — olası duplicate
-  → conduct.ts/serve.ts dedup ya da rol ayrımını netleştir
-- **[med]** doctor.ts↔model-hook.ts: doctor.ts ve model-hook.ts amaç-örtüşmesi yüksek (3 ortak kelime) — olası duplicate
-  → doctor.ts/model-hook.ts dedup ya da rol ayrımını netleştir
-- **[med]** model-hook.ts↔role-hook.ts: model-hook.ts ve role-hook.ts amaç-örtüşmesi yüksek (5 ortak kelime) — olası duplicate
-  → model-hook.ts/role-hook.ts dedup ya da rol ayrımını netleştir
+### Duplicate araç (0)
+- _temiz_
 
-### Test-coverage gap (2)
-- **[low]** lib/collect.ts: lib/collect.ts: test'siz export → liveTabMap
-  → lib/collect.ts için test ekle (liveTabMap)
-- **[low]** lib/signal.ts: lib/signal.ts: test'siz export → notify
-  → lib/signal.ts için test ekle (notify)
+### Test-coverage gap (1)
+- **[low]** lib/suppress.ts: lib/suppress.ts: test'siz export → loadSuppress
+  → lib/suppress.ts için test ekle (loadSuppress)
+
+## ⏭️ Gerekçeli-istisna (suppressed: 5) — gizlenmedi, kabul-edildi
+- `crit:coverage-gap:lib/signal.ts` — notify = terminal-notifier IO-wrapper; signal.test 28-case zaten isAllowedCmd+mocked-nudge/notify kapsar
+- `crit:duplication:autopilot.ts↔horizon.ts` — false-positive: autopilot adımları KOŞAR, horizon roadmap ÜRETİR — farklı girdi/çıktı/amaç (shared-import heuristic gürültüsü)
+- `crit:duplication:conduct.ts↔serve.ts` — false-positive: conduct lane-durumu ANALİZ eder, serve HTTP/SSE ile GÖSTERİR — farklı katman (analyzer vs UI)
+- `crit:duplication:doctor.ts↔model-hook.ts` — false-positive: doctor readiness DENETLER, model-hook Claude-prompt'u YAKALAR — farklı scope
+- `crit:duplication:model-hook.ts↔role-hook.ts` — false-positive: model-hook model-sorusuna MODEL_PROMPT enjekte, role-hook kimlik-sorusuna role-cevap — farklı tetik/payload, ikisi de UserPromptSubmit ama amaç-ayrı
 
 ---
 _Critic bulur+raporlar; fix conduct/insan (§3). CRITIC.json → conduct COMPLETENESS beslemesi._

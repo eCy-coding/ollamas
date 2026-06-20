@@ -64,6 +64,10 @@ function detailFor(step: string): string {
     const d = readJson(join(ORCH_DIR, "DOD.json"));
     return d ? `DoD skor ${d.score ?? "?"} · ${(d.findings ?? []).length} yarım-iş` : "DoD tazelendi";
   }
+  if (step === "fuse") {
+    const r = readJson(join(ORCH_DIR, "REQUIREMENTS.json"));
+    return r ? `hazırlık ${r.readiness ?? "?"}/100 · top ${r.top ? r.top.criticality + ":" + r.top.target : "yok"}` : "gereksinim füzyonu tazelendi";
+  }
   if (step === "status") return "lane matrisi tazelendi";
   return "ok";
 }
@@ -125,6 +129,7 @@ function main(): void {
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
+    runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("status", "status.ts", []),
     runDoctor(),
   ];

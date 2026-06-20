@@ -418,3 +418,82 @@ otomatik bildiriyor — lane sekmesi düzeltmeli (§3 prompt/backlog).
 
 **Next precomputed (→vO15):** heartbeat plist fuse-source güncelle (zaten --once default fuse); conduct.ts
 stabilde REQUIREMENTS.json tüket (worker churn bitince); backend test-fix lane prompt önceliklendir.
+
+---
+
+## vO15 — Staleness-Guard / Phantom-Critical Fix (evidence-first, 2026-06-20)
+
+**Bağlam:** Kullanıcı "gereksiz iş yapma + CRITICAL tespit et". fuse readiness 0/100 "backend test FAILED" diyordu;
+kullanıcı backend-prompt seçti. EVIDENCE-FIRST doğrulama: `npm test` backend = **179 PASS**. Premise YANLIŞ →
+backend-prompt = gereksiz iş → iptal. Kök neden: fuse bayat-audit füzyonluyor → phantom-CRITICAL.
+
+**3 phantom kaynağı bulundu+fixlendi (hepsi qualityToReqs):**
+1. QUALITY testLast=failed ama per-lane `testTs` 2 gün bayat → CRITICAL. Fix: per-lane testTs tazelik (sourceFresh) → bayatsa COMPLETENESS-stale uyarı.
+2. `tsc:"skip"` kırık sayılıyordu (skip≠fail) → orchestration/tunnel phantom. Fix: tscBroken = tsc==="fail"||errors>0.
+3. `redLanes` tazelik-kanıtsız CRITICAL → Fix: lanes[]'te yoksa COMPLETENESS-unverified.
+
+**Yapıldı:** `lib/fuse.ts` +sourceFresh/staleWarning/normalizeFresh + qualityToReqs per-lane testTs + tsc-fix + redLanes-downgrade. `fuse.ts` per-kaynak tazelik (FUSE_STALE_MIN env, default 60dk) + REQUIREMENTS "Kaynak tazelik" tablosu. `fuse.test` +staleness/phantom regresyon.
+
+**Kanıt:** fuse 20/20; full suite green. Canlı: **CRITICAL 3→0**, readiness 0→**43/100** (gerçek), top artık
+gerçek COMPLETENESS (roadmap-drift vO13). backend phantom düştü (stale-test:backend uyarısı). Adopt: bench.isStale
+reuse + Prometheus/k8s staleness mental-model (0 dep). GPL yok. Yeni araç YOK (fuse integrity-fix).
+
+**Kritik ders (errors_registry):** bayat-veri füzyonu = phantom-critical = en büyük gereksiz-iş kaynağı.
+Prevention: füzyondan önce her kaynağın VERİ tazeliğini (dosya-ts DEĞİL, içerik testTs) kontrol et.
+
+**Bilinen kalan:** conduct.ts (worker) hâlâ bayat-QUALITY'den RED türetebilir (conduct staleness-guard yok) →
+worker-path backlog. Benim fuse-path temiz. Next: conduct'a da staleness (worker churn bitince) veya fuse
+conduct-RED'i de testTs-doğrula.
+
+---
+
+## vO16 — Fuse Conduct-Ingestion Integrity (vO15 residual kapat, 2026-06-20)
+
+**Bağlam:** vO15 fuse phantom'larını temizledi ama bilerek conduct-path residual bıraktım. Doğruladım: GERÇEK
++ iki yönlü bozuk.
+
+**Kanıt:** (1) fuse source dağılımı `{critic,dod,quality}` — **conduct YOK**: conduct RED'de exit-1 → fuse
+conductFindings execFileSync throw → catch[] → conductor TÜM sinyali kayıp (kör-nokta). (2) conduct RED:backend
+phantom (bayat QUALITY testTs 2-gün; backend 179 pass).
+
+**Yapıldı:** `fuse.ts` conductFindings non-zero-exit'te stdout yakala (heartbeat execJson deseni) → conduct
+sinyali kaybolmaz. `lib/fuse.ts` +staleFailLanes (testLast=failed+bayat-testTs lane'leri) +guardStaleConduct
+(conduct CRITICAL+stale-lane → COMPLETENESS downgrade). main: conduct reqs guard'landı. `fuse.test` +4.
+
+**Kanıt (sonuç):** fuse 24/24; full suite green. Canlı: **conduct ARTIK VAR** (source: conduct+dod+critic
+birleşik); **backend COMPLETENESS:red+stale-test (CRITICAL DEĞİL)**, dedupe birleşti; **CRITICAL 0**, readiness 42
+gerçek. backend npm test=179 pass ile hizalı. Adopt: execJson + sourceFresh reuse (0 dep). GPL yok. Yeni araç YOK.
+
+**Kritik ders:** gate exit-code (child process.exit(1)) parent'ta execFileSync throw → child'ın GEÇERLİ stdout'u
+yutulur. Prevention: child JSON tüketiminde non-zero-exit'te e.stdout yakala. + türev-CRITICAL'i kaynak-tazeliğiyle guard.
+
+**Next:** sistem doygun + phantom-free. Kalan = worker-backlog (conduct.ts kendi staleness-guard'ı; autopilot↔
+horizon dup; backend lane test-fix LANE işi). fuse-path TAM temiz.
+
+---
+
+## vO14 — Critical-Requirements Fusion + Detector Precision + Self-Remediation (2026-06-20)
+
+**Tetik (Emre/T0):** "gereksiz işle uğraşma, CRITICAL+TÜM gereksinimleri tespit et, kapsayıcı, YARIM YOK, eş zamanlı."
+
+**KAPSAMLI TESPİT:** self-policing loop KENDİ bulgularını verdi (dod 12 + critic 7). Explore ile GERÇEK-vs-GÜRÜLTÜ ayrıldı:
+GERÇEK yarım-iş = shared.ts 4-export test-siz (worker tests/shared.test 11/11 yaptı). GÜRÜLTÜ = liveTabMap/notify
+(IO-wrapper) + 4 duplication (FALSE-POS, shared-import heuristic). Kök-boşluk: dod/critic SUPPRESS mekanizması yoktu →
+gürültü-flag autonomous-verdict-bozar (0-manuel conduct kararı güvenilmez).
+
+**Yapıldı (CERRAHİ — gürültü-kovalamaca elendi):**
+- **DETECTOR PRECISION (core):** `bin/lib/suppress.ts` (saf applySuppress, detector-scoped, kind-substring) +
+  `.policy-suppress.json` (6 gerekçeli-istisna: 2 IO-wrapper + 4 false-pos-dup, her kural reason-ZORUNLU). dod/critic main
+  suppress uygular → **critic 60→98/100** verdict precise. **SİLENT-DEĞİL** (suppressedBlock: 6 suppressed sayı+reason
+  raporda, "gizlenmedi-kabul-edildi"). Propagasyon: dod/critic temiz→fuse/conduct OTOMATİK temiz (eş-zamanlı).
+- **fuse wire:** `fuse.ts` (conduct/critic/dod/quality→REQUIREMENTS.md kritik-öncelikli birleşik + readiness) autopilot
+  chain'e eklendi (benchprompt→critic→dod→conduct→**fuse**→status→doctor). orphan→non-orphan.
+- `role.ts`→🎯 kritik-gereksinim satırı. `tests/shared.test.ts` (worker-green) bundle.
+
+**Kanıt:** vitest **441 yeşil**. critic 60→98 (6 false-pos suppress şeffaf). `tsx fuse.ts`→REQUIREMENTS hazırlık 42/100,
+18 gereksinim, top=SECURITY:lic. autopilot fuse-step ✓ (hazırlık 42/100). role 🎯. suppress.test 6/6.
+**RISK-ORCH-016:** detector-precision (gürültü-flag verdict-bozar→suppress AMA gerekçeli-şeffaf; IO-wrapper/false-pos≠yarım-iş;
+gerçek-gap ASLA suppress; propagasyon dod/critic→fuse/conduct).
+
+**Next precomputed (→vO15):** suppress-expiry/audit (kabul-edilen-istisna sonradan-gerçek-gap-olursa stale-uyarı) +
+REQUIREMENTS→GitHub-issue export. Aktivasyon (hook+launchd) hâlâ PRIVILEGED tek-manuel-artık.

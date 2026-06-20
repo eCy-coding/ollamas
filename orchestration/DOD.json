@@ -1,21 +1,12 @@
 {
-  "ts": "2026-06-20T12:11:26.021Z",
-  "score": 39,
+  "ts": "2026-06-20T12:37:01.237Z",
+  "score": 60,
   "findings": [
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
-      "kind": "dod:code-without-test:shared.ts",
-      "detail": "shared.ts (4 export) test'te geçmiyor — yarım iş",
-      "action": "shared.ts için tests/shared.test.ts ekle",
-      "severity": 65,
-      "concurrent": false
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:uncommitted-green:44 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, CONDUCTOR.md, DOCTOR.md, DRIFT.md, MODEL_PROMPT.md…",
+      "kind": "dod:uncommitted-green:34 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, CONDUCTOR.md, CRITIC.json, CRITIC.md, DOCTOR.md…",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "severity": 40,
       "concurrent": false
@@ -68,27 +59,9 @@
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
-      "kind": "dod:concurrent-task:fuse",
-      "detail": "fuse kısmen tamam — eksik eş-zamanlı: roadmap-row",
-      "action": "fuse için roadmap-row aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
       "kind": "dod:concurrent-task:scan",
       "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
       "action": "scan için test aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:shared",
-      "detail": "shared kısmen tamam — eksik eş-zamanlı: test",
-      "action": "shared için test aynı anda tamamla",
       "severity": 40,
       "concurrent": true
     },
@@ -100,15 +73,6 @@
       "action": "status için test aynı anda tamamla",
       "severity": 40,
       "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:roadmap-coherence:fuse",
-      "detail": "fuse aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
-      "action": "fuse'yi ilgili vO satırına ekle",
-      "severity": 15,
-      "concurrent": false
     }
   ]
 }

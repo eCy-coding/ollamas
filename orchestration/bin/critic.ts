@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditAll, scoreCompleteness, type Gap } from "./lib/critic";
+import { loadSuppress, applySuppress, suppressedBlock } from "./lib/suppress";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -67,7 +68,14 @@ function main(): void {
 
   const roadmapMd = read(join(ORCH_DIR, "ROADMAP_ORCHESTRATION.md"));
 
-  const gaps: Gap[] = auditAll({ roadmapMd, toolNames, artifactNames, allSourceText, exportsByFile, testText, tools });
+  const allGaps: Gap[] = auditAll({ roadmapMd, toolNames, artifactNames, allSourceText, exportsByFile, testText, tools });
+
+  // vO14 detector precision: IO-wrapper + false-pos duplication suppress (gerekçeli, silent-değil).
+  const findingKind = (g: Gap) => `crit:${g.kind}:${g.target}`;
+  const rules = loadSuppress(join(ORCH_DIR, ".policy-suppress.json"));
+  const { suppressed } = applySuppress(allGaps.map((g) => ({ kind: findingKind(g) })), rules, "critic");
+  const suppressedKinds = new Set(suppressed.map((s) => s.kind));
+  const gaps = allGaps.filter((g) => !suppressedKinds.has(findingKind(g))); // GERÇEK gap'ler (skor bunun üzerinden)
   const score = scoreCompleteness(gaps);
 
   const byKind = (k: string) => gaps.filter((g) => g.kind === k);
@@ -87,6 +95,7 @@ function main(): void {
     ...section("Orphan artefakt", "orphan-artifact"),
     ...section("Duplicate araç", "duplication"),
     ...section("Test-coverage gap", "coverage-gap"),
+    suppressedBlock(suppressed),
     `---`,
     `_Critic bulur+raporlar; fix conduct/insan (§3). CRITIC.json → conduct COMPLETENESS beslemesi._`,
   ].join("\n");

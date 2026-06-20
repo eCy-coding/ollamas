@@ -32,6 +32,7 @@ export interface RoleInputs {
   optimal?: { model: string; tokS: number; chip: string } | null; // vO6 0-manuel optimal runtime (MODEL_SELECTION.json)
   health?: { green: number; red: number; unknown: number } | null;  // vO9 lane sağlık roll-up (QUALITY.json)
   selfPolice?: { completeness: number; dod: number } | null;        // vO10-12 öz-denetim açık-iş (CRITIC/DOD.json)
+  topReq?: { criticality: string; target: string; readiness: number } | null; // vO14 fuse birleşik kritik gereksinim (REQUIREMENTS.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -89,6 +90,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     i.optimal ? `- 🏆 **Optimal runtime (0-manuel):** \`${i.optimal.model}\` @ ${i.optimal.chip} (${i.optimal.tokS} tok/s) — \`MODEL_PROMPT.md\`` : `- Optimal runtime: \`tsx bin/benchprompt.ts\` koş (henüz MODEL_SELECTION.json yok)`,
     i.health ? `- 🩺 **Lane health (vO9):** ${i.health.green}🟢 / ${i.health.red}🔴 / ${i.health.unknown}⚪ — \`QUALITY.md\` (tsc canlı + vitest cache)` : `- Lane health: \`tsx bin/quality.ts\` koş (henüz QUALITY.json yok)`,
     i.selfPolice ? `- 🧭 **Öz-denetim (vO10-12):** completeness ${i.selfPolice.completeness} açık · DoD ${i.selfPolice.dod} yarım-iş — \`CRITIC.md\`/\`DOD.md\` (autopilot→conduct tüketir)` : `- Öz-denetim: \`tsx bin/critic.ts\` + \`tsx bin/dod.ts\` koş`,
+    i.topReq ? `- 🎯 **Kritik gereksinim (vO14 füzyon):** ${i.topReq.criticality}:${i.topReq.target} · proje hazırlık ${i.topReq.readiness}/100 — \`REQUIREMENTS.md\` (tüm-gate birleşik)` : `- Kritik gereksinim: \`tsx bin/fuse.ts\` koş (REQUIREMENTS füzyonu)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -195,6 +197,17 @@ async function main(): Promise<void> {
     if (c || d) selfPolice = { completeness: (c?.findings ?? []).length, dod: (d?.findings ?? []).length };
   } catch { /* graceful */ }
 
+  // vO14 fuse birleşik kritik gereksinim (REQUIREMENTS.json varsa; graceful absent).
+  let topReq: RoleInputs["topReq"] = null;
+  try {
+    const rF = join(ORCH_DIR, "REQUIREMENTS.json");
+    if (existsSync(rF)) {
+      const r = JSON.parse(readFileSync(rF, "utf8"));
+      if (r?.top) topReq = { criticality: r.top.criticality, target: r.top.target, readiness: r.readiness ?? 0 };
+      else if (typeof r?.readiness === "number") topReq = { criticality: "—", target: "tümü karşılandı", readiness: r.readiness };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -205,6 +218,7 @@ async function main(): Promise<void> {
     optimal,
     health,
     selfPolice,
+    topReq,
   });
 
   console.log(answer);

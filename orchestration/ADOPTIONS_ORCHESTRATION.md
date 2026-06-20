@@ -119,3 +119,15 @@ coverage% (vitest cache), gh-api CI-status (workflow conclusion), turbo-style af
 **Karar (vO10-12):** heartbeat/critic/dod/autofix tamamen **kendi zero-dep impl**'i. watchexec/danger/release-please
 yalnız **kavram** (idea-only) — kod vendor YOK. **Ekleyebilecekler:** horizon conduct-merge (vO13), loop-closure
 (conduct→lane-exec — §3 read-only gereği DEFER, lane sekmesi koşar), gh-api PR-status critic'e.
+
+## vO14 — Detector Precision + Fusion (research)
+
+| # | Repo | ⭐ | Lisans | Karar | Ne |
+|---|------|-----|--------|-------|-----|
+| 20 | eslint/eslint (baseline/disable) | 25k | MIT | idea-only | gerekçeli-istisna deseni (suppress reason-zorunlu); zero-dep .policy-suppress.json kendi impl |
+| 21 | SonarSource/sonarqube (issue-suppress) | 9k | LGPL | idea-only | false-positive mark + audit deseni; LGPL→kod-YOK, kavram |
+| 22 | sonarqube issue-aggregation / codeclimate | — | — | idea-only | çok-analizör→tek-rapor füzyon (fuse); kendi rankCritical |
+
+**Karar (vO14):** suppress + fuse tamamen **kendi zero-dep impl**'i. eslint-baseline/sonarqube yalnız **kavram**
+(gerekçeli-istisna + issue-aggregation, idea-only) — kod vendor YOK. SİLENT-değil ilkesi (suppressedBlock şeffaf).
+**Ekleyebilecekler:** suppress-expiry (stale-istisna→gerçek-gap-olursa uyarı), REQUIREMENTS→GitHub-issue, suppress-audit-log.

@@ -19,34 +19,36 @@
 - İzole worktree, branch git ile doğrulanır (RISK-ORCH-001 branch-hijack)
 
 ## Mevcut aşama
-- Orchestration: **vO11 (Self review + completeness critic (eksik koordinasyon ne?)) DONE** → sıradaki **(ROADMAP'e planlı versiyon ekle)**
+- Orchestration: **vO13 (Horizon auto roadmap (10 versiyon lookahead) lib hazır, cond) DONE** → sıradaki **(ROADMAP'e planlı versiyon ekle)**
 - İzlenen lane'ler (10): `feat/v1.11-roots-abort` · `feat/cli-v2-clean` · `feat/frontend-vf3` · `feat/general-oauth-grants` · `feat/ukp-ingest-receiver` · `feat/gateway-v2` · `feat/orchestration-v3` · `feat/scripts-v1` · `feat/tunnel-v1` · `feat/v1.8-bench`
 - Optimal runtime: `tsx bin/benchprompt.ts` koş (henüz MODEL_SELECTION.json yok)
 - 🩺 **Lane health (vO9):** 1🟢 / 1🔴 / 7⚪ — `QUALITY.md` (tsc canlı + vitest cache)
-- 🧭 **Öz-denetim (vO10-12):** completeness 12 açık · DoD 19 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
+- 🧭 **Öz-denetim (vO10-12):** completeness 1 açık · DoD 10 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
+- 🎯 **Kritik gereksinim (vO14 füzyon):** SECURITY:lic:f/prompts.chat · proje hazırlık 42/100 — `REQUIREMENTS.md` (tüm-gate birleşik)
 
 ## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)
 | Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |
 |------|-----------------|----------------------------|-------|
-| `v1.11-roots-abort` | ✅ ~~Per tenant upstream tool visibili… | → ✅ Faz 22 v1.13 (OAuth Refresh Token R… | 8△ |
-| `cli-v2-clean` | v13 — DONE (kanıt) | → v14 TUI v2 / agent watch top multi pa… | 2△ |
-| `frontend-vf3` | ✅ Faz 13 v1.4 (Production Operations … | → — | 21△ |
+| `v1.11-roots-abort` | ✅ ~~RFC 8707 resource binding enforce… | → ✅ Faz 22 v1.13 (OAuth Refresh Token R… | 3△ |
+| `cli-v2-clean` | v14 — DONE (kanıt) | → v15 TUI v2 / agent watch top multi pa… | 0△ |
+| `frontend-vf3` | ✅ Faz 13 v1.4 (Production Operations … | → — | 0△ |
 | `general-oauth-grants` | ✅ ~~roots/list upstream agregasyonu +… | → — | 0△ |
 | `ukp-ingest-receiver` | ✅ ~~roots/list upstream agregasyonu +… | → ✅ Faz 22 v1.13 (OAuth Refresh Token R… | 0△ |
-| `gateway-v2` | ✅ Per tenant upstream tool visibility… | → — | 1△ |
-| `orchestration-v3` | — | → — | 50△ |
-| `scripts-v1` | v14 — Host Bridge Security Hardening … | → Durum işaretleri: ⬜ planlı · 🔵 devam… | 3△ |
-| `tunnel-v1` | — | → — | 12△ |
-| `v1.8-bench` | ✅ Faz 15 v1.6 (MCP Ecosystem Interop … | → — | 4△ |
+| `gateway-v2` | ✅ Per tenant upstream tool visibility… | → — | 0△ |
+| `orchestration-v3` | — | → — | 41△ |
+| `scripts-v1` | v16 — LaunchAgent Auto Load ✅ (reboot… | → Durum işaretleri: ⬜ planlı · 🔵 devam… | 4△ |
+| `tunnel-v1` | — | → vT9 Connectivity aware routing transp… | 3△ |
+| `v1.8-bench` | ✅ Faz 15 v1.6 (MCP Ecosystem Interop … | → — | 1△ |
 
 ## Geliştirilebilir aşamalar (ROADMAP planned)
 - (ROADMAP'te planned vO yok)
 
 ### Lane bazında geliştirilebilir sonraki (canlı NEXT sinyalleri)
 - **v1.11-roots-abort** → ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
-- **cli-v2-clean** → v14 TUI v2 / agent watch top multi pane (request
+- **cli-v2-clean** → v15 TUI v2 / agent watch top multi pane (request
 - **ukp-ingest-receiver** → ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
 - **scripts-v1** → Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. 
+- **tunnel-v1** → vT9 Connectivity aware routing transport reachVi
 
 ## Araç envanteri (24 bin/)
 - `adopt-gate.ts` — adopt-gate.ts — vO4 OSS Adoption License-Discipline Gate
