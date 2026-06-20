@@ -58,6 +58,28 @@ function detailFor(step: string): string {
   return "ok";
 }
 
+/** doctor adımı: NO-GO'da exit 1 atar (gate) → execFileSync throw; tolere et, DOCTOR.md verdict'ini oku. */
+function runDoctor(): StepResult {
+  const t0 = process.hrtime.bigint();
+  let threw = false;
+  try {
+    execFileSync(TSX, [join(HERE, "doctor.ts"), "--quiet"], { stdio: ["ignore", "ignore", "ignore"], timeout: 30_000, cwd: ORCH_DIR });
+  } catch { threw = true; } // NO-GO exit 1 = beklenen, hata değil
+  const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+  // verdict DOCTOR.md'den (read-only): "## ✅ GO ..." veya "## 🛑 NO-GO ...".
+  let detail = "readiness bilinmiyor", go = !threw;
+  try {
+    const line = readFileSync(join(ORCH_DIR, "DOCTOR.md"), "utf8").split("\n").find((l) => /^##\s/.test(l));
+    if (line) {
+      go = !/NO-GO/.test(line); // NO-GO yoksa GO
+      // "## 🛑 NO-GO — sebep" → yalnız "sebep" (lib/autopilot GO/NO-GO ön-ekini kendi ekler).
+      detail = line.replace(/^#+\s*/, "").replace(/^[✀-➿☀-⛿✅🛑\s]+/u, "")
+        .replace(/^(NO-GO|GO)\s*[—-]\s*/, "").trim().slice(0, 90);
+    }
+  } catch { /* DOCTOR.md yok */ }
+  return { step: "doctor", ok: go, ms, detail };
+}
+
 function main(): void {
   // ISO ts: dosya mtime tabanlı değil — autopilot her koşuda taze tetik; deterministik test PURE fn'de.
   const ts = new Date().toISOString();
@@ -65,6 +87,7 @@ function main(): void {
     runStep("benchprompt", "benchprompt.ts", []),
     runStep("conduct", "conduct.ts", ["--json"]),
     runStep("status", "status.ts", []),
+    runDoctor(),
   ];
   const md = summarizeAutopilot(results, ts);
   writeFileSync(join(ORCH_DIR, "AUTOPILOT.md"), md.endsWith("\n") ? md : md + "\n");

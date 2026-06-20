@@ -32,4 +32,11 @@ describe("summarizeAutopilot — otopilot özeti (PURE, deterministik)", () => {
     expect(empty).toMatch(/autopilot/i);
     expect(empty).toMatch(/0\/0|adım yok|no step/i);
   });
+  it("doctor adımı → readiness satırı (GO/NO-GO) öne çıkar", () => {
+    const noGo = summarizeAutopilot([...RESULTS, { step: "doctor", ok: false, ms: 30, detail: "NO-GO — hook-wiring aktif değil" }], "t");
+    expect(noGo).toMatch(/Readiness/);
+    expect(noGo).toMatch(/NO-GO/);
+    const go = summarizeAutopilot([...RESULTS, { step: "doctor", ok: true, ms: 30, detail: "GO — tam canlı" }], "t");
+    expect(go).toMatch(/✅ GO/);
+  });
 });

@@ -20,6 +20,9 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
   // pick (benchprompt) + next-action (conduct) öne çıkar.
   const pick = results.find((r) => r.step === "benchprompt" && r.ok)?.detail || "—";
   const next = results.find((r) => r.step === "conduct" && r.ok)?.detail || "—";
+  // readiness (doctor): 0-manuel canlı + taze mi (GO/NO-GO).
+  const readyR = results.find((r) => r.step === "doctor");
+  const readiness = readyR ? `${readyR.ok ? "✅ GO" : "🛑 NO-GO"} — ${readyR.detail}` : "—";
 
   const rows = results.length
     ? results.map((r) => `| ${r.ok ? "✓" : "✗"} | \`${r.step}\` | ${r.ms}ms | ${r.detail} |`)
@@ -35,6 +38,7 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
     `**Durum:** ${okN}/${total} adım başarılı · ${ts}`,
     `**Model seçimi (0-manuel-seçim):** ${pick}`,
     `**Conductor sonraki-aksiyon:** ${next}`,
+    `**Readiness (0-manuel aktif mi):** ${readiness}`,
     ``,
     `| | Adım | Süre | Detay |`,
     `|---|---|--:|---|`,
