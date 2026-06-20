@@ -75,6 +75,13 @@ public struct OllamasClient: Sendable {
         return try await send(buildRequest(path: "/api/generate", method: "POST", jsonBody: body))
     }
 
+    /// Deliver a queued envelope (path + method + raw JSON body). Used by the
+    /// offline-queue flush; throws on transport/HTTP error so the item is retried.
+    @discardableResult
+    public func sendEnvelope(path: String, method: String, body: Data?) async throws -> Data {
+        try await send(buildRequest(path: path, method: method, jsonBody: body))
+    }
+
     public func mcpToolsList() async throws -> Data {
         let body = Self.mcpEnvelope(id: 1, method: "tools/list", params: [:])
         return try await send(buildRequest(path: "/mcp", method: "POST", jsonBody: body))

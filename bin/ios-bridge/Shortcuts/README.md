@@ -85,3 +85,36 @@ action or, in a future native build, the iOS Keychain (tracked for ROADMAP v9).
 The body shapes above are exactly what `OllamasClient.generateBody` /
 `OllamasClient.mcpEnvelope` produce (`Sources/OllamasKit/Client.swift`), so
 `swift run ollamas-ios generate "hi"` is a faithful dry-run of Recipe A.
+
+## Recipe E — Automation Triggers (v9)
+
+Shortcuts **Automations** run a recipe on an event instead of a tap. iOS =
+consumer-only: every trigger ends in an HTTP POST to the app gateway (Bearer),
+never a host command.
+
+| Trigger | Set up (Automation tab) | Action |
+|---------|-------------------------|--------|
+| **Time of Day** | "Every day at 08:00" | Run Recipe A with prompt = "Sabah brief: bugünün özeti" → Speak/Notify |
+| **Arrive home** | "When I arrive" → Home | POST `[Gateway]/api/generate` "Eve geldim, bekleyen işleri özetle" |
+| **App Open** | "When [App] is opened" | GET `[Gateway]/api/health` → if down, queue locally (below) |
+
+### Offline behavior (pairs with the CLI queue)
+A phone Automation can't reach the Mac when you're away from the LAN. Two options:
+
+1. **On-device only:** keep the Automation simple (fire-and-forget POST); iOS
+   Shortcuts has no built-in retry, so a missed call is just skipped.
+2. **Durable (Mac-side):** when the Mac is offline/asleep, enqueue with the CLI
+   and flush on reconnect — the same outbox the Automation would target:
+   ```sh
+   ollamas-ios queue add "Sabah brief"   # enqueue (survives restart)
+   ollamas-ios queue list                # inspect pending
+   ollamas-ios queue flush               # deliver; failures stay + retry next
+   ```
+   Store path: `OLLAMAS_QUEUE_FILE` or `~/.llm-mission-control/ios-outbox.json`.
+   Wire `queue flush` to a login item / `launchctl` time trigger so the outbox
+   drains automatically when connectivity returns.
+
+### Sharing
+Automations are per-device (binary, can't be exported as text). This card is the
+build recipe; the CLI (`ollamas-ios queue …`) is the testable reference
+implementation of the same enqueue → flush → retry contract.

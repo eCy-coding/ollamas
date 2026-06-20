@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅** (observability: structured JSONL events + seyir_stats dashboard p50/p95 + SLO burn-rate; swift 8 + node 167/1 skip), **v9 NEXT**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅** (iOS deepening: offline queue Codable persist + flush/retry + queue CLI + Shortcuts automation; swift 14 + node 167/1 skip), **v10 NEXT (final)**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -156,20 +156,24 @@
 
 ---
 
-## v9 — iOS Deepening ⬜
+## v9 — iOS Deepening ✅
 
-**Tema:** iOS'u pasif tüketiciden proaktif istemciye taşı.
+**Tema:** iOS'u pasif tüketiciden proaktif istemciye taşı. **DONE** — zero-dep `OfflineQueue` actor (Codable persist + flush/retry) + `queue add|list|flush` CLI + Shortcuts Recipe E (automation triggers). Gate: swift **14** (8→+6) · node 167/1 regresyon-yok · tsc · make harden clean · CLI smoke.
 
-**Phases:**
-1. Shortcuts automation trigger (konum/saat/olay → MacBook job).
-2. Background sync (iOS → MacBook periyodik).
-3. **Offline queue**: bağlantı yokken job kuyruğa, dönünce flush.
-4. iOS = **consumer-only** (asla host-exec target — sandbox sınırı).
-5. Gate: offline→online flush testi.
+**Phases (gerçekleşen):**
+1. ✅ Shortcuts automation trigger → `Shortcuts/README.md` Recipe E (saat/konum-varış/app-open → gateway POST Bearer; iOS consumer-only).
+2. ✅ Offline queue: `OfflineQueue.swift` actor — `RequestEnvelope` Codable → JSON dosya (atomic write), `enqueue`/`list`/`count`/`flush(sender)`; başarı→drain, hata→item kalır+`attempts++` (retry); kısmi flush yalnız başarısızları tutar.
+3. ✅ CLI: `queue add "<prompt>"` (/api/generate envelope) / `queue list` (JSON) / `queue flush` (Client.sendEnvelope; başarı→drain, hata→kal). `OLLAMAS_QUEUE_FILE` env.
+4. ✅ iOS **consumer-only**: envelope = app-gateway HTTP (path+body), host-exec YOK; HMAC parity değişmedi.
+5. ✅ Gate: offline→flush testi (`OfflineQueueTests` 6 case: enqueue/persist, success-drain, fail-keep+attempts, partial-retry, persistence-across-instances, env). CLI smoke kanıt: flush(offline)→delivered:0 remaining:2 attempts↑.
 
-**Canonical prompt:** "iOS deepening: Shortcuts automation trigger, background sync, offline queue+flush; iOS consumer-only kalır; flush testi."
+**Karar:** persistence zero-dep Codable+FileManager actor (ralfebert/PersistentURLRequestQueue dep eklenmedi, desen-only); flush manual/CLI (NWPathMonitor untested-glue eklenmedi); Shortcuts HTTP-reçete (App Intents app-target gerektirir, eklenmedi). Hepsi tam test edilebilir + consumer-only sınır korundu.
 
-**Next precomputed (→v10):** CI matrix taslağı (`.github/workflows`) — macOS runner + iOS-sim job iskeleti.
+**Canonical prompt:** "iOS offline queue: zero-dep Codable+FileManager actor (enqueue/flush/retry, atomic persist) + queue CLI (add/list/flush, OLLAMAS_QUEUE_FILE) + Shortcuts automation reçetesi; iOS consumer-only, HMAC parity değişmez; flush(success-drain/fail-keep+attempts) testi."
+
+**Adopt:** `ralfebert/PersistentURLRequestQueue` (MIT, desen-only), Codable+FileManager actor (Foundation builtin), `elsheppo/ollama-shortcuts-ui` (Apache, automation reçete).
+
+**Next precomputed (→v10 GA & Drift Guard):** `.github/workflows` CI matrix (macOS runner: node tsc+vitest+make harden + swift build/test) + `rhysd/actionlint` workflow-lint + inventory↔dosya drift detector (inventory.json tool adları == schema.mjs keys == bin/host-bridge/tools/*.mjs) + HMAC Wycheproof-tarzı genişletilmiş parity vektörleri + GA tag/release notları. `bewuethr/shellcheck-action` CI gate.
 
 ---
 

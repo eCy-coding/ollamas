@@ -165,6 +165,20 @@
       "prevention_rule": "Scripts manifest'e tool eklerken: read-only ama host-local/operatör verisi okuyorsa tier=host (safe yalnız gerçekten tenant-paylaşılabilir veri). Observability/logging asla tool'u throw'la kırmasın (best-effort). Yeni tool sonrası mcp-gateway.e2e koş.",
       "test_added": "scripts/tests/events.test.ts (never-throw) + stats/seyir_stats testleri + mcp-gateway.e2e (15 korundu)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-010",
+      "ts": "2026-06-20",
+      "version": "v9",
+      "file": "bin/ios-bridge/Sources/OllamasKit/OfflineQueue.swift",
+      "category": "ios",
+      "severity": "med",
+      "root_cause": "(1) Offline queue persist'i non-atomic olursa süreç ortası crash kuyruğu bozar. (2) iOS bridge'e host-exec/dep eklemek consumer-only sınırını + zero-dep felsefesini kırar. (3) flush'ta başarısız item drain edilirse veri kaybı.",
+      "evidence": "tasarım: data.write(.atomic); flush başarısızda item kalır+attempts++; Package.swift dep eklenmedi",
+      "fix": "Codable+FileManager actor, atomic write (.atomic), flush başarı→drain/hata→keep+attempts. ralfebert/PersistentURLRequestQueue desen-only (dep yok). NWPathMonitor/App Intents eklenmedi (untested-glue/app-target).",
+      "prevention_rule": "iOS bridge: yalnız Foundation/CryptoKit/Network builtin (external SPM dep ekleme); consumer-only (host-exec asla); kuyruk persist DAİMA atomic + başarısız item asla drain etme (retry). Test edilemeyen glue (reachability/App Intents) yerine inject-edilebilir/CLI-test-edilebilir desen seç.",
+      "test_added": "bin/ios-bridge/Tests/OllamasKitTests/OfflineQueueTests.swift (6 case: persist/drain/keep+attempts/partial-retry/across-instances/env)",
+      "recurrence_count": 0
     }
   ]
 }

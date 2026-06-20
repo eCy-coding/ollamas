@@ -114,6 +114,17 @@
 
 ---
 
+## v9 — iOS Deepening (adopt: PersistentURLRequestQueue desen + Codable actor)
+
+- `[2026-06-20] kind=phase | adoption search | derin web: ralfebert/PersistentURLRequestQueue(MIT enqueue/flush/retry şekli), Codable+FileManager actor(Foundation builtin), NWPathMonitor(Network builtin), App Intents(app-target gerektirir-dürüst sınır), ollama-shortcuts-ui(Apache automation). Karar: zero-dep Codable actor + manual/CLI flush + HTTP-reçete (dep/glue/app-target eklenmez) | plan onaylı`
+- `[2026-06-20] kind=phase | P0 OfflineQueue (TDD) | Sources/OllamasKit/OfflineQueue.swift — RequestEnvelope Codable {id,createdAt,path,method,bodyJSON,attempts} + actor enqueue/list/count/flush(sender); başarı→drain, throw→kal+attempts++; atomic persist (JSONEncoder iso8601, .atomic write); defaultFileURL OLLAMAS_QUEUE_FILE||~/.llm-mission-control/ios-outbox.json. OfflineQueueTests 6 case | swift 8→14`
+- `[2026-06-20] kind=phase | P1 CLI | main.swift queue add/list/flush (runQueue async) + Client.sendEnvelope(path,method,body) generic gönderici; OLLAMAS_QUEUE_FILE onurlandır | smoke: add×2→pending2, flush(gateway kapalı)→delivered0/remaining2/attempts↑1, persistence-across-process (her komut ayrı süreç)`
+- `[2026-06-20] kind=phase | P2 Shortcuts | Shortcuts/README.md Recipe E — automation triggers (saat/konum-varış/app-open→gateway POST Bearer) + offline davranış (CLI queue ile eşleş) + sharing (binary per-device, CLI=test edilebilir referans); iOS consumer-only | -`
+- `[2026-06-20] kind=phase | P3 gate+gov | swift build+test 14 (regresyon yok) + node tsc OK + vitest 167/1 (ios-hmac-vectors parity korundu) + make harden clean | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v10 GA & Drift Guard, FINAL) | .github/workflows CI matrix (macOS: node tsc+vitest+harden + swift build/test) + actionlint(rhysd) + shellcheck-action(bewuethr) + inventory↔dosya drift detector (inventory tool adları==schema.mjs keys==tools/*.mjs) + HMAC Wycheproof-genişletilmiş parity + GA tag/release notları`
+
+---
+
 ## Hata Anlatıları
 
 ### ERR-SCR-001 (CRITICAL) — Paylaşılan working tree branch hijack
