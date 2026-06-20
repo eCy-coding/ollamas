@@ -18,8 +18,9 @@
 | **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `resolveKeySource` precedence + `config keystore` migrate (aynı key bytes) + `--insecure-storage` opt-out | ✅ DONE |
 | **v12** | Node-SEA binary | **classic** `node --experimental-sea-config` (host Node 24.16, `--build-sea`/25.5 gerekmez) + postject inject + macOS remove-sign→inject→re-sign; `sea.ts` saf + `build:sea`; Bun alternate kalır, SEA canonical runtime-integrity | ✅ DONE |
 | **v13** | Completions v2 + man | `__complete` dinamik VALUES (`config use`→profil, `-m`→model-cache, `-p`→provider; **TAB'da network/keychain YOK** N-032) + `man ollamas` saf troff (`mandoc -Tlint` temiz) | ✅ DONE |
-| **v14** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
-| **v14+** | Ufuk (önceden-hesap) | v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
+| **v14** | MCP client completeness | `mcp resources\|read\|prompts\|prompt` — gateway'in resources/prompts/completion yüzeyine erişim (v5'te eksikti); aynı stateless JSON-RPC + cursor; canlı architect/coder/reviewer prompt render | ✅ DONE |
+| **v15** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
+| **v15+** | Ufuk (önceden-hesap) | v16 profile-sync · v17 plugin-SDK · v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
@@ -138,7 +139,14 @@
 - Testler: `cli-completion-dynamic`+`cli-modelcache`+`cli-man` → **full pass** (v12-set:324→+). Canlı: `__complete config use`→default, `-p`→6 provider, `-m`→boş(cache yok), `ollamas man | mandoc -Tlint` temiz, TAB'da network/keychain yok (5s timeout altında).
 - VERSION 12.0.0→**13.0.0**; choke-point korunur; zero-RUNTIME-dep. **Gotcha**: N-032 `__complete` keychain/network-tetikleme-YASAK→env+cache+plain-disk; N-033 troff `.PP`-after-`.SH`-redundant→ilk-paragraf-bare; N-034 model-completion-cache-populate-via-bench (manuel değil ama bench-bir-kez-koş).
 
-## v14 — NEXT (önceden-hesaplanmış ilk todo'lar)
+## v14 — DONE (kanıt)
+- **Kritik-gap tespiti** (precompute TUI-v2 idi → "gereksiz işle uğraşma, critical tespit et"): gateway `server/mcp/server.ts` resources/list+read, prompts/list+get, completion/complete sunuyor (capabilities tools+resources+prompts+completions) ama CLI v5 yalnız tools/upstreams destekliyordu → **MCP yüzeyinin yarısı erişilemezdi**. v14 bu gerçek boşluğu kapatır (polish değil). TUI-v2 → v15.
+- **Adoption** (lisans disiplinli, zero-dep): MCP spec JSON-RPC (resources/prompts metod-string'leri) + mevcut in-repo v5 `mcpListTools`/`mcpRpc` plumbing reuse (cursor pagination, stateless, SSE+JSON). Yeni dep yok.
+- `cli/lib/mcp.ts` (+saf): `McpResource`/`McpPrompt` tip + `renderResourceContents`(text raw/blob özet) + `renderPromptMessages`(role:text chain) + `formatPromptSignature`(req/opt) + `promptArgsFromPairs`(string-map, coercion-yok). `client.ts`: `mcpListResources`/`mcpReadResource`/`mcpListPrompts`/`mcpGetPrompt` (tools ile aynı stateless+cursor). `commands/mcp.ts`: `resources|read|prompts [--sig]|prompt` + HELP; completion mcp sub-actions.
+- Testler: `cli-mcp-resources`(saf render + mock-fetch round-trip/pagination) → **full 363 pass/4 skip** (v13:350). **Canlı** (gateway :3399 boot): `mcp prompts`→3 gerçek (architect/coder/reviewer+args), `--sig` imza, `mcp prompt architect --arg task=…`→**gerçek message-chain render** (task interpole), `resources`→0 (workspace boş=beklenen, zarif). VERSION 13.0.0→**14.0.0**.
+- Choke-point korunur (registry import YOK, /mcp choke-point üstünden); zero-RUNTIME-dep. **Gotcha**: N-035 resources-boş≠hata (workspace-bağlı, zarif-0-satır); N-036 prompt-args-string-spec-coercion-yok (tool-args'tan farklı).
+
+## v15 — NEXT (önceden-hesaplanmış ilk todo'lar)
 1. `top` multi-pane: `cli/commands/top.ts` `renderDashboard` → çoklu panel (requests | latency | tool-calls ayrı kutu); v8 saf-renderer + sparkline reuse.
 2. `agent --watch`: canlı ReAct akış görünümü (alt-screen, v8 SIGINT-restore N-016 deseni); non-TTY→tek-snapshot degrade.
 3. İlk check = multi-pane render saf-test (fixture metrics) + non-TTY degrade; agent-watch SIGINT cursor-restore.

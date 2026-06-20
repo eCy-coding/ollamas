@@ -5,6 +5,20 @@
 
 ---
 
+## v14 — MCP client completeness (resources + prompts) (2026-06-20)
+
+### N-035 · `mcp resources` boş ≠ hata (workspace-bağlı)
+- **Gözlem**: Canlı gateway `resources/list`→0 döndü (default `~/ai-workspace` boş). İlk bakışta "bug?" gibi.
+- **Karar**: Resources = workspace dosyaları → boş workspace=0 resource=BEKLENEN. CLI zarif "0 resource(s)" basar, hata değil. Prompts dolu (3 pipeline) → plumbing doğru.
+- **ÖNLEME KURALI**: capability-list boş dönüşünü hata sanma; veri-kaynağına bağlı (workspace/tenant). Zarif-boş-render + sayaç; canlı-doğrulamada dolu olan başka method (prompts) ile plumbing'i kanıtla.
+
+### N-036 · prompt-args string (spec), tool-args schema-coerce — KARIŞTIRMA
+- **Gözlem**: MCP spec'te tool-args `inputSchema`'ya göre tiplenir (number/bool coerce); prompt-args **düz string**. Aynı `argsFromPairs`'i kullanmak yanlış olurdu.
+- **Fix**: ayrı `promptArgsFromPairs` (coercion yok, `prompts/get arguments` string-map). `mcpGetPrompt(name, Record<string,string>)`.
+- **ÖNLEME KURALI**: MCP'de tool-call args ≠ prompt-get args; tip-coercion yalnız tool tarafında. Spec ayrımına sadık kal.
+
+---
+
 ## v13 — Completions v2 + man (2026-06-20)
 
 ### N-032 · `__complete` her TAB'da koşar → keychain/network TETİKLEME YASAK
