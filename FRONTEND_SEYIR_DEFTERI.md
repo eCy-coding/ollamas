@@ -159,6 +159,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF12 — Billing & Usage UX (tenant self-service) (DONE) · 🏁 12-VERSİYON ROADMAP TAMAMLANDI
+- **Ne:** Backend tenant usage/quota + Stripe billing endpoint'lerinin cockpit yüzeyi yoktu. vF12 tenant-facing panel: kota-metre (WAI-ARIA `meter`) + aylık çağrı trendi (Sparkline) + Stripe portal/checkout (redirect). 401 (key yok) ve 501 (Stripe yok) zarif state.
+- **Nasıl:**
+  - **Saf logic** (`src/lib/usage.ts`, DOM'suz→testli): `usageRatio` (quota≤0→0 sınırsız, clamp01, NaN-guard) + `usageStatus` (<0.75 ok/<1 warn/≥1 over) + `usagePercent` + `seriesToCalls` (defansif non-array→[]).
+  - **Hook** (`useUsage.ts`): `api.get /api/saas/self/usage` (Bearer apiKey) + best-effort `/api/saas/usage/timeseries`; durum `loading|ok|unauthorized(401/403)|error`; 401=first-class state (hata değil); unmount-guard.
+  - **UsageMeter** (`role="meter"` + `aria-valuenow/min/max/valuetext`, adopt WAI-ARIA meter deseni zero-dep; quota=quantity→meter, progressbar değil) status-renk (emerald/amber/rose).
+  - **UsagePanel** (theme-aware): loading→Skeleton, 401→connect-key kartı, ok→plan/period + UsageMeter + used/quota + Sparkline(series.calls). **Billing**: Manage billing/Upgrade → `api.post /api/billing/{portal,checkout}` → `{url}`→`window.location.assign` / no-url|501→notConfigured notu (graceful, Stripe SDK YOK). i18n en/tr ~15 key. App `saas` tab'ında SaaSAdmin ÜSTÜNE (tenant-Bearer vs admin-token bağımsız).
+- **Niçin:** Tenant kotasını/faturasını cockpit'ten görür+yönetir; sovereign (redirect-url, SDK yok); 401/501 dürüst state (kör hata değil).
+- **Kanıt:** `npm run lint` 0 · `vitest` **139 pass/1 skip** (+7: 4 logic + 3 render) · React e2e **10 pass** (a11y SaaS UsagePanel WCAG AA temiz, 2 koşu flake-yok) · web e2e **5 pass** · `vite build` OK · size cockpit **116.32KB/140** (+1.29KB zero-dep).
+- **Açık iz (tracked):** Billing redirect gerçek Stripe gerektirir (yoksa notConfigured dry-run). `/api/billing/preview` adminGuard→tenant panelinde yok. **vF13 (derin component theme-sweep) en yüksek-değer açık-iz**: 13 component hardcoded `bg-[#08090d]`/`text-slate-*` → vF9 theming'i dürüstçe tamamlar.
+- **Sonraki (önceden hesaplandı):** **vF13 Derin Component Theme-Sweep** — 13 component'in (TelemetryCockpit, SelfTestGates, demo wizard, status bar, badge'ler) hardcoded renklerini token-utility'ye (`bg-immersive-*`, `text-immersive-*`) migrate; axe `color-contrast` kuralını gate'e geri al (vF6'da çıkarılmıştı). İlk adım: en çok hardcoded-renk içeren TelemetryCockpit.tsx'i token'a çevir + `color-contrast`-only axe spot-test; sonra component-component sweep + kapıya `color-contrast` ekle.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).

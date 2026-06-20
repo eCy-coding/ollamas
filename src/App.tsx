@@ -17,6 +17,7 @@ import { SaaSAdmin } from "./components/SaaSAdmin";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { ObservabilityPanel } from "./components/ObservabilityPanel";
+import { UsagePanel } from "./components/UsagePanel";
 import { CapabilityProvider, CapabilityGate } from "./components/CapabilityGate";
 import { isTabEnabled } from "./lib/capabilities";
 import { useLingui } from "@lingui/react";
@@ -337,7 +338,8 @@ export default function App() {
           )}
 
           {activeTab === "saas" && (
-            <div className="animate-fade-in">
+            <div className="animate-fade-in space-y-6">
+              <UsagePanel />
               <SaaSAdmin onNotify={notify} />
             </div>
           )}

@@ -23,6 +23,7 @@
 | `[data-theme]` + CSS-var + no-flash (standart desen) | — (pattern) | vF9 | Tailwind v4 token-flip; `<head>` inline FOUC-guard script; component'ler theme-agnostik (`dark:` prefix yok) | ✅ `src/lib/theme.tsx` + `tokens-light/` + `index.html` + `ThemeToggle.tsx` |
 | `fnando/sparkline` (desen) | MIT | vF10 | Zero-dep SVG `<polyline>` sparkline deseni (normalize→points) — kod kopyalanmadı, reimplement; `stroke=currentColor`→theme-aware; 0 bundle. RUM lib'leri (baselime/react-rum, aws-rum-web) REDDEDİLDİ (ağır+harici, sovereign ihlali) | ✅ `src/components/Sparkline.tsx` |
 | `rbac-ui` **AccessGate deseni** | desen (zero-dep) | vF11 | Declarative capability gate (`<CapabilityGate need fallback>` + `useCapability`, deny-by-default/pessimistic) — kod kopyalanmadı, reimplement. `@rbac-ui/react`/`@casl/react`/`ra-rbac` REDDEDİLDİ (dep + role/claim modeli yok, bizde boolean permission map) | ✅ `src/components/CapabilityGate.tsx` + `src/lib/capabilities.ts` |
+| WAI-ARIA **`meter` rolü** deseni (react-aria `useMeter` fikri) | desen (zero-dep) | vF12 | Erişilebilir kota-metre (`role="meter"`+`aria-valuenow/min/max/valuetext`) — quota=quantity→meter (progressbar değil). `react-circular-progressbar`/`@react-aria/meter`/Stripe-SDK REDDEDİLDİ (dep; billing `{url}` redirect→`window.location` yeter) | ✅ `src/components/UsageMeter.tsx` + `UsagePanel.tsx` |
 
 ## Backend backlog (bu lane çözemez — Scope Law)
 - **Tenant tier expose**: `/api/health` veya yeni `/api/session/me` per-session `tier`/`plan.allowed_tiers` döndürmeli → frontend tier-gating (host/privileged görünürlük) ancak o zaman eklenir. vF11 yalnız `permissions{}` üzerinden gate eder.
@@ -31,7 +32,7 @@
 
 | Repo | Lisans | vF | Ne için |
 |------|--------|----|---------|
-| (vF12) pure-SVG usage-bar (yeni dep yok) | — | vF12 | Billing & Usage UX — `/api/saas/self/usage` quota/used + Stripe portal/checkout linki |
+| (vF13) `dequelabs/axe-core` `color-contrast` (mevcut, MPL-2.0) | MPL-2.0 | vF13 | Derin component theme-sweep — 13 component hardcoded renk→token; `color-contrast` kuralını axe gate'ine geri al (vF6'da çıkarılmıştı) |
 
 ## Notlar
 - **iOS uyumluluğu** her adopsiyonun ön-koşulu: Safari/web-clip'te çalışmayan kütüphane alınmaz.
