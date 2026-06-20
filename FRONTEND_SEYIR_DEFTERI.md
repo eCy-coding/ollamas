@@ -145,6 +145,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF11 — Tenant/Capability-aware Cockpit (DONE)
+- **Ne:** Cockpit tab'ları + aksiyonları yetki-bilinçsizdi (`commandExec` kapalıyken Interactive CLI yine tıklanır → backend reddini ancak çağrıdan sonra görürdü). vF11 UI'yi `telemetry.permissions{}` üzerinden **deny-by-default** gate eder; backend otoritesini **yansıtır** (güvenlik sınırı değil — sınır backend `ToolRegistry` tier-allowlist'tir, zaten enforce).
+- **Scope-Law kararı (kritik):** tenant **tier** (`plan.allowed_tiers`) frontend'e expose EDİLMİYOR; expose `server.ts`/`/api/health` değişikliği = YASAK → **tier-gating bu lane'de DEĞİL, backend lane backlog**. Mevcut, gerçek yüzey = `telemetry.permissions{fileRead,fileWrite,commandExec,git}` (her 5sn `/api/health`'ten) → gate bunun üzerine.
+- **Nasıl:**
+  - **Saf logic** (`src/lib/capabilities.ts`, DOM'suz→testli): `TAB_CAPABILITY` haritası (`terminal/automation→commandExec`, `backup→fileWrite`, `files→fileRead`, diğer 9→`null`) + `hasCapability` (**deny-by-default**: `perms==null`→false) + `isTabEnabled`.
+  - **AccessGate deseni** (`src/components/CapabilityGate.tsx`, adopt rbac-ui pattern zero-dep reimplement): `CapabilityProvider` (context=permissions|null) + `useCapability` + `<CapabilityGate need fallback>` (pessimistic; loading=deny).
+  - **App** (`App.tsx`): içerik `<CapabilityProvider permissions={telemetry?.permissions??null}>` ile sarıldı; **tab butonları** `isTabEnabled` false→`disabled`+`aria-disabled`+Lock-ikon+title; **gated gövdeler** (terminal/automation/backup/files) `<CapabilityGate>` + `CapabilityDenied` fallback (token-aware kart + Guard Policies'e geçiş butonu, i18n). en+tr ~11 key.
+- **Niçin:** Kullanıcı yetkisiz aksiyonu deneyip backend-reddi beklemez; kilitli alanı görür + nasıl açacağını öğrenir (Guard Policies). Deny-by-default = güvenlik-bilinçli (pessimistic loading).
+- **Kanıt:** `npm run lint` 0 · `vitest` **132 pass/1 skip** (+8: 4 logic + 4 gate/App) · React e2e **10 pass** (a11y deterministik FE-019 fix sonrası) · web e2e **5 pass** · `vite build` OK · size cockpit **115.03KB/140** (+0.65KB zero-dep).
+- **Açık iz (tracked):** **Backend backlog** — `/api/health` veya yeni `/api/session/me`'ye tenant `tier`/`plan.allowed_tiers` ekle → o zaman tier-gating (host/privileged) eklenir. `keys` (host-vault) gate'siz (permissions{} alanı yok). Derin component renk-sweep hâlâ açık.
+- **Sonraki (önceden hesaplandı):** **vF12 Billing & Usage UX** — `/api/saas/self/usage` (tenant scope) + `/api/billing/{portal,checkout,preview}` tüketen usage/fatura paneli. İlk adım: `useUsage` hook (`api.get /api/saas/self/usage` → quota/used/period) + `UsagePanel` (pure-SVG usage-bar + quota %), SaaS tab altına; Stripe portal/checkout linki (yeni dep yok).
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -170,6 +184,7 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-016 | 2026-06-20 | streamPost mid-stream reconnect LLM yanıtını çoğaltır | LLM generation stateless-resume edilemez; kör retry tüm üretimi baştan yapar (duplicate text) | `delivered` guard — yalnız connect-faz (chunk öncesi) retry; sonra `onError` | Stream retry SADECE ilk chunk'tan önce; akış başladıysa drop=error, resume etme |
 | FE-017 | 2026-06-20 | ReactAgentTab stream unmount sonrası setState (leak/uyarı) | Stream component'ten uzun yaşıyordu; abort/cleanup yoktu | `abortRef`+`mountedRef`+unmount-abort + finally guard | Abortable stream consumer'ı unmount'ta abort + state-set'i mounted/aborted guard'la (Pipeline deseni) |
 | FE-018 | 2026-06-20 | "chunk-sonra-drop" testi yanlış kuruldu (chunk teslim edilmeden error) | `ReadableStream.start()` enqueue-sonra-error sıradaki chunk'ı okutmadan drop eder | Pull-based stream: 1. pull enqueue, 2. pull error | Streaming-then-drop simülasyonu `pull()` ile (start()+error chunk'ı yutar) |
+| FE-019 | 2026-06-20 | a11y "Cockpit Dashboard" e2e flaky (1. koşu fail, re-run pass) | vF10 ObservabilityPanel canlı `/api/logbook` fetch'i 8-worker paralel yükte yarı-render; axe async-region'ı tarıyor | a11y spec beforeEach'e `**/api/logbook**` route-stub (boş entries) | Yeni async-fetch'li panel a11y/gate testine girdiğinde endpoint'ini STUB'la (FE-013 ailesi); axe yarı-yüklü DOM taramasın, retry-ile-geçme yasak |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

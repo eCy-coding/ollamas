@@ -36,9 +36,9 @@ Her commit bu hedefe yaklaştırmalı. Backend'e dokunan iş bu lane'in işi DE�
 
 ### Tek-kaynak durum alanları (ÖZ-GÜNCELLEME NOKTASI — §7 ile senkron)
 ```yaml
-SU_AN:    "vF10 — Observability & Self-Heal (in-cockpit RUM: p75 vitals + error-rate + sparkline + health verdict)"   # son shipped
-SIRADAKI: "vF11 — Tenant-aware Cockpit (tier-gated UI görünürlük, deny-by-default)"   # NEXT
-UFUK:     "vF12 Billing & Usage UX → (vF13+ açık-uçlu: derin theme-sweep, design-system v2, offline-first, RUM-trend-persist)"   # append-only
+SU_AN:    "vF11 — Capability-aware Cockpit (deny-by-default tab/aksiyon gating, permissions{} üzerinden)"   # son shipped
+SIRADAKI: "vF12 — Billing & Usage UX (/api/saas/self/usage quota + Stripe portal/checkout)"   # NEXT
+UFUK:     "(vF13+ açık-uçlu: tenant-tier gating [backend tier-expose sonrası], derin theme-sweep, design-system v2, offline-first, RUM-trend-persist)"   # append-only
 ```
 
 ### GÜNCELLEME PROTOKOLÜ (kart kendini nasıl güncel tutar)
@@ -173,7 +173,8 @@ macOS+iOS-uyumlu, MIT/Apache repo'dan **çalışan kod** (detay: `FRONTEND_ADOPT
 | **vF8** | Real-time UX Polish | ✅ DONE | react-error-boundary | streamPost reconnect/onError + ReactAgentTab abort-on-unmount + `<ErrorBoundary>`→logbook + global error/unhandledrejection + Skeleton + prefers-reduced-motion |
 | **vF9** | i18n + Theming | ✅ DONE | @lingui/core+react (runtime) | TR/EN runtime i18n + light/dark `[data-theme]` token-flip + no-flash + ThemeToggle/LanguageToggle; shell migrate (derin component sweep ayrı) |
 | **vF10** | Observability & Self-Heal | ✅ DONE | fnando/sparkline (pattern) | in-cockpit RUM: p75 web-vitals + client-error oranı + zaman-serisi sparkline (zero-dep SVG) + sağlık-verdict (self-heal-lite); `observability.ts` saf logic + `useLogbook` + theme-aware panel |
-| **vF11** | Tenant-aware Cockpit | NEXT | — | tier-gated UI (safe/host/privileged görünürlük) + scope-gated butonlar (backend yetkisini yansıtır, deny-by-default) |
+| **vF11** | Tenant-aware Cockpit | ✅ DONE | rbac-ui AccessGate (pattern) | capability-gating `telemetry.permissions{}` üzerinden (deny-by-default): tab disabled+Lock + gated gövde `<CapabilityGate>`+CapabilityDenied; tenant-tier expose = backend backlog |
+| **vF12** | Billing & Usage UX | NEXT | — | `/api/saas/self/usage` quota/used + Stripe portal/checkout/preview; usage timeseries (pure SVG) |
 | **vF11** | Tenant-aware Cockpit | — | — | tier-gated UI (safe/host/privileged görünürlük) + scope-gated butonlar |
 | **vF12** | Billing & Usage UX | — | — | usage timeseries (pure SVG) + Stripe portal/checkout + invoice preview |
 

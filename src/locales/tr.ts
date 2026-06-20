@@ -40,4 +40,12 @@ export const messages: Record<string, string> = {
   'app.obs.err.window': 'Pencere',
   'app.obs.err.unhandled': 'Promise',
   'app.obs.err.api': 'API',
+  'app.cap.locked': 'Kilitli — izin gerekli',
+  'app.cap.deniedTitle': 'Yetki gerekli',
+  'app.cap.deniedBody': 'Bu alan şu an kapalı olan bir izin gerektiriyor.',
+  'app.cap.openSecurity': "Koruma Politikaları'nı aç",
+  'app.cap.fileRead': 'Dosya okuma',
+  'app.cap.fileWrite': 'Dosya yazma',
+  'app.cap.commandExec': 'Komut çalıştırma',
+  'app.cap.git': 'Git',
 };

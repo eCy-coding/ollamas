@@ -17,20 +17,43 @@ import { SaaSAdmin } from "./components/SaaSAdmin";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { ObservabilityPanel } from "./components/ObservabilityPanel";
+import { CapabilityProvider, CapabilityGate } from "./components/CapabilityGate";
+import { isTabEnabled } from "./lib/capabilities";
 import { useLingui } from "@lingui/react";
 import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
-import { 
-  Cpu, Key, Sparkles, FolderOpen, Terminal, 
+import {
+  Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2
+  MousePointer2, Building2, Lock
 } from "lucide-react";
+
+// vF11 — shown in a gated tab's body when the backend has not granted the
+// required permission (defense-in-depth; the tab button is also disabled).
+function CapabilityDenied({ capKey, onOpen }: { capKey: string; onOpen: () => void }) {
+  const { _ } = useLingui();
+  return (
+    <div className="bg-immersive-panel border border-immersive-border rounded p-6 text-center space-y-3 animate-fade-in">
+      <Lock className="w-6 h-6 mx-auto text-amber-400" />
+      <h3 className="text-sm font-bold font-mono text-immersive-text-bright">{_('app.cap.deniedTitle')}</h3>
+      <p className="text-xs text-immersive-text-muted">{_('app.cap.deniedBody')} ({_(capKey)})</p>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="text-xs border border-immersive-border rounded px-3 py-1.5 text-immersive-text-muted hover:text-immersive-text-bright transition-colors"
+      >
+        {_('app.cap.openSecurity')}
+      </button>
+    </div>
+  );
+}
 
 export default function App() {
   const [telemetry, setTelemetry] = useState<HealthTelemetry | null>(null);
   const [activeTab, setActiveTab] = useState<string>("telemetry");
   const [notifications, setNotifications] = useState<{ id: string; msg: string; type: "success" | "error" | "info" }[]>([]);
   const { _ } = useLingui();
+  const perms = telemetry?.permissions ?? null; // vF11 — backend-granted capabilities (deny-by-default until known)
 
   const notify = (msg: string, type: "success" | "error" | "info" = "info") => {
     const id = Math.random().toString(36).slice(2, 9);
@@ -103,6 +126,7 @@ export default function App() {
   };
 
   return (
+    <CapabilityProvider permissions={perms}>
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-immersive-bg text-immersive-text-muted">
       
       {/* Dynamic Toast Notifications (Corner Overlay) */}
@@ -157,21 +181,27 @@ export default function App() {
           <div className="p-4 rounded border bg-immersive-sidebar border-immersive-border">
             <span className="text-[10px] text-slate-500 font-mono uppercase block mb-3.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
             <nav aria-label="Primary" className="flex flex-col gap-1.5">
-              {tabs.map((tab) => (
+              {tabs.map((tab) => {
+                const enabled = isTabEnabled(tab.id, perms);
+                return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { if (enabled) setActiveTab(tab.id); }}
+                  disabled={!enabled}
+                  aria-disabled={!enabled}
                   aria-current={activeTab === tab.id ? "page" : undefined}
+                  title={enabled ? undefined : _('app.cap.locked')}
                   className={`flex items-center gap-3 px-3 py-2 rounded text-xs font-medium font-mono transition-all text-left ${
                     activeTab === tab.id
                       ? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
                       : "text-slate-400 hover:text-white hover:bg-white/5"
-                  }`}
+                  } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-slate-400"}`}
                 >
-                  {tab.icon}
+                  {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
                   <span>{_(`app.tab.${tab.id}`)}</span>
                 </button>
-              ))}
+                );
+              })}
             </nav>
           </div>
 
@@ -240,12 +270,14 @@ export default function App() {
 
           {activeTab === "files" && (
             <div className="animate-fade-in">
-              <WorkspaceTree 
-                onNotify={notify} 
-                activePath={telemetry ? telemetry.workspacePath : ""}
-                onPathChange={(newPath) => setTelemetry((p) => p ? { ...p, workspacePath: newPath } : null)}
-                isLive={telemetry ? telemetry.mode !== "demo" : false}
-              />
+              <CapabilityGate need="fileRead" fallback={<CapabilityDenied capKey="app.cap.fileRead" onOpen={() => setActiveTab("security")} />}>
+                <WorkspaceTree
+                  onNotify={notify}
+                  activePath={telemetry ? telemetry.workspacePath : ""}
+                  onPathChange={(newPath) => setTelemetry((p) => p ? { ...p, workspacePath: newPath } : null)}
+                  isLive={telemetry ? telemetry.mode !== "demo" : false}
+                />
+              </CapabilityGate>
             </div>
           )}
 
@@ -257,10 +289,12 @@ export default function App() {
 
           {activeTab === "terminal" && (
             <div className="animate-fade-in">
-              <CommandLineTerminal 
-                onNotify={notify} 
-                isLive={telemetry ? telemetry.mode !== "demo" : false}
-              />
+              <CapabilityGate need="commandExec" fallback={<CapabilityDenied capKey="app.cap.commandExec" onOpen={() => setActiveTab("security")} />}>
+                <CommandLineTerminal
+                  onNotify={notify}
+                  isLive={telemetry ? telemetry.mode !== "demo" : false}
+                />
+              </CapabilityGate>
             </div>
           )}
 
@@ -282,13 +316,17 @@ export default function App() {
 
           {activeTab === "backup" && (
             <div className="animate-fade-in">
-              <BackupControl onNotify={notify} />
+              <CapabilityGate need="fileWrite" fallback={<CapabilityDenied capKey="app.cap.fileWrite" onOpen={() => setActiveTab("security")} />}>
+                <BackupControl onNotify={notify} />
+              </CapabilityGate>
             </div>
           )}
 
           {activeTab === "automation" && (
             <div className="animate-fade-in">
-              <VirtualController />
+              <CapabilityGate need="commandExec" fallback={<CapabilityDenied capKey="app.cap.commandExec" onOpen={() => setActiveTab("security")} />}>
+                <VirtualController />
+              </CapabilityGate>
             </div>
           )}
 
@@ -317,5 +355,6 @@ export default function App() {
         <p>{_('app.footer.copyright')}</p>
       </footer>
     </div>
+    </CapabilityProvider>
   );
 }

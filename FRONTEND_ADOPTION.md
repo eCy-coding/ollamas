@@ -22,12 +22,16 @@
 | `lingui/js-lingui` (`@lingui/core`+`@lingui/react` v6) | MIT | vF9 | **Runtime** TR/EN i18n (macro/vite-plugin YOK = build riski sıfır); ölçülen en küçük bundle (vs i18next ~22KB / react-intl ~13KB); `i18n.load/activate` + `useLingui()._` + `<I18nProvider>` | ✅ `src/lib/i18n.ts` + `src/locales/{en,tr}.ts` + `LanguageToggle.tsx` |
 | `[data-theme]` + CSS-var + no-flash (standart desen) | — (pattern) | vF9 | Tailwind v4 token-flip; `<head>` inline FOUC-guard script; component'ler theme-agnostik (`dark:` prefix yok) | ✅ `src/lib/theme.tsx` + `tokens-light/` + `index.html` + `ThemeToggle.tsx` |
 | `fnando/sparkline` (desen) | MIT | vF10 | Zero-dep SVG `<polyline>` sparkline deseni (normalize→points) — kod kopyalanmadı, reimplement; `stroke=currentColor`→theme-aware; 0 bundle. RUM lib'leri (baselime/react-rum, aws-rum-web) REDDEDİLDİ (ağır+harici, sovereign ihlali) | ✅ `src/components/Sparkline.tsx` |
+| `rbac-ui` **AccessGate deseni** | desen (zero-dep) | vF11 | Declarative capability gate (`<CapabilityGate need fallback>` + `useCapability`, deny-by-default/pessimistic) — kod kopyalanmadı, reimplement. `@rbac-ui/react`/`@casl/react`/`ra-rbac` REDDEDİLDİ (dep + role/claim modeli yok, bizde boolean permission map) | ✅ `src/components/CapabilityGate.tsx` + `src/lib/capabilities.ts` |
+
+## Backend backlog (bu lane çözemez — Scope Law)
+- **Tenant tier expose**: `/api/health` veya yeni `/api/session/me` per-session `tier`/`plan.allowed_tiers` döndürmeli → frontend tier-gating (host/privileged görünürlük) ancak o zaman eklenir. vF11 yalnız `permissions{}` üzerinden gate eder.
 
 ## Sıradaki adopsiyonlar (planlı)
 
 | Repo | Lisans | vF | Ne için |
 |------|--------|----|---------|
-| (vF11) tier/scope gate deseni (yeni dep yok) | — | vF11 | Tenant-aware cockpit — tier-gated UI görünürlük (backend yetkisini yansıtır, deny-by-default) |
+| (vF12) pure-SVG usage-bar (yeni dep yok) | — | vF12 | Billing & Usage UX — `/api/saas/self/usage` quota/used + Stripe portal/checkout linki |
 
 ## Notlar
 - **iOS uyumluluğu** her adopsiyonun ön-koşulu: Safari/web-clip'te çalışmayan kütüphane alınmaz.

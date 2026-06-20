@@ -13,7 +13,7 @@ describe('App shell', () => {
         os: { platform: 'darwin', release: '24.6.0', arch: 'arm64', uptime: 1 },
         metrics: { cpuLoad1Min: 0.5, memory: { total: 16, free: 8, percentageUsed: 50 } },
         workspacePath: '/tmp',
-        permissions: {},
+        permissions: { fileRead: true, fileWrite: true, commandExec: true, git: true },
         hasBackupEnabled: false,
       },
     });

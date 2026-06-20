@@ -18,6 +18,16 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ tree: [], mode: 'demo', workspaceRoot: '/mock' }),
     }),
   );
+  // vF10 ObservabilityPanel (Cockpit Dashboard tab) fetches /api/logbook live;
+  // stub it so the panel renders deterministically and axe never scans a
+  // half-loaded async region under parallel load (FE-013 pattern).
+  await page.route('**/api/logbook**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 0, total: 0, entries: [] }),
+    }),
+  );
 });
 
 for (const tab of TABS) {

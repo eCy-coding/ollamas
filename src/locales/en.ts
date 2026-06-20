@@ -41,4 +41,12 @@ export const messages: Record<string, string> = {
   'app.obs.err.window': 'Window',
   'app.obs.err.unhandled': 'Promise',
   'app.obs.err.api': 'API',
+  'app.cap.locked': 'Locked — requires a permission',
+  'app.cap.deniedTitle': 'Capability required',
+  'app.cap.deniedBody': 'This area needs a permission that is currently disabled.',
+  'app.cap.openSecurity': 'Open Guard Policies',
+  'app.cap.fileRead': 'File read',
+  'app.cap.fileWrite': 'File write',
+  'app.cap.commandExec': 'Command execution',
+  'app.cap.git': 'Git',
 };
