@@ -18,11 +18,13 @@ import { parseNotes, type DiagnosticNote } from "./lib/note";
 import { dedupe, resolveDiscourse, buildReport, type PanelReport } from "./lib/rank";
 import { PERSONA_NAMES } from "./lib/personas";
 import { runAllScans } from "./scan";
+import { snapshotOf, diffSnapshots, renderTrend, parseHistory, lastSnapshot } from "./lib/trend";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const PLANS_DIR = join(ORCH_DIR, "plans");
 const NOTES_DIR = join(PLANS_DIR, "notes");
+const HISTORY_FILE = join(PLANS_DIR, "panel-history.jsonl");
 
 // ── Pure çekirdek ──────────────────────────────────────────────────────────────
 
@@ -155,13 +157,25 @@ function main(): void {
 
   const rep = buildReport(deduped, { ts, staleIds, duplicatesMerged, consensusBoosted, unresolvedDebates });
 
+  // vO4.2 Trend: önceki snapshot ile delta + append-only history (KARARLI noteKey eşleştirme).
+  const prevHistory = existsSync(HISTORY_FILE) ? parseHistory(readFileSync(HISTORY_FILE, "utf8")) : [];
+  const prevSnap = lastSnapshot(prevHistory);
+  const currSnap = snapshotOf(deduped, ts, head);
+  const delta = diffSnapshots(prevSnap, currSnap);
+  const trendMd = renderTrend(delta);
+
   if (!existsSync(PLANS_DIR)) mkdirSync(PLANS_DIR, { recursive: true });
   const mdOut = join(PLANS_DIR, "PANEL_REPORT.md");
   const jsonOut = join(PLANS_DIR, "panel-report.json");
-  writeFileSync(mdOut, renderReport(rep, deduped) + "\n");
-  writeFileSync(jsonOut, JSON.stringify({ report: rep, notes: deduped }, null, 2) + "\n");
+  // Trend bölümünü raporun sonuna ekle (renderReport pure kalsın → golden-test bozulmaz).
+  writeFileSync(mdOut, renderReport(rep, deduped) + "\n\n" + trendMd + "\n");
+  writeFileSync(jsonOut, JSON.stringify({ report: rep, trend: delta, notes: deduped }, null, 2) + "\n");
+  // History'ye append (kompakt snapshot satırı).
+  writeFileSync(HISTORY_FILE, prevHistory.map((s) => JSON.stringify(s)).join("\n") + (prevHistory.length ? "\n" : "") + JSON.stringify(currSnap) + "\n");
+
   console.log(`[panel] ${deduped.length} not (detected ${detected.length} + authored ${authored.length}); HEAD ${head}`);
-  console.log(`[panel] yazıldı → ${mdOut} + ${jsonOut}`);
+  console.log(`[panel] trend: new=${delta.new.length} resolved=${delta.resolved.length} regressed=${delta.regressed.length} improved=${delta.improved.length} persistent=${delta.persistent.length}${delta.isBaseline ? " (baseline)" : ""}`);
+  console.log(`[panel] yazıldı → ${mdOut} + ${jsonOut} + ${HISTORY_FILE}`);
 }
 
 if (process.argv[1] && /panel\.ts$/.test(process.argv[1])) main();

@@ -1,6 +1,6 @@
 # PANEL_REPORT — ollamas Expert Diagnostic Panel (vO4)
 
-> Üretici: `panel.ts` (DETERMİNİSTİK; LLM yok). ts: 2026-06-19T22:39:53.558Z
+> Üretici: `panel.ts` (DETERMİNİSTİK; LLM yok). ts: 2026-06-20T07:58:05.393Z
 > Bayrak: 🤝 consensus-boost · ⚔️ unresolved-debate · 📭 refDeficit · 🕒 stale
 
 ## Özet
@@ -55,3 +55,11 @@
 
 ---
 _Bu sekme (orchestration) lane kodunu yazmaz (§3). Bulgular = öneri; çözüm lane sekmesinde uygulanır._
+
+## 📈 Trend (run-to-run delta)
+
+- 🆕 **new** (0): —
+- ✅ **resolved** (0): —
+- 🔺 **regressed** (0, severity↑): —
+- 🔻 **improved** (0, severity↓): —
+- ➖ **persistent** (31): değişmeyen bulgu

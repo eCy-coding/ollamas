@@ -1,6 +1,6 @@
 {
   "report": {
-    "ts": "2026-06-19T22:39:53.558Z",
+    "ts": "2026-06-20T07:58:05.393Z",
     "personaCoverage": {
       "backend": 1,
       "frontend": 15,
@@ -90,6 +90,170 @@
       "open": 31,
       "adopted": 0
     }
+  },
+  "trend": {
+    "isBaseline": false,
+    "new": [],
+    "resolved": [],
+    "regressed": [],
+    "improved": [],
+    "persistent": [
+      {
+        "key": "server/metrics.ts::promclientbal4kullanmamatketicidashboardyokobservabilityboluu",
+        "severity": "high",
+        "id": "backend-backend-1"
+      },
+      {
+        "key": "src/components::13componentapiclientchokepointiniatlayprawfetcharyorvf6banihlali",
+        "severity": "med",
+        "id": "frontend-frontend-1"
+      },
+      {
+        "key": "src/components/reactagenttab.tsx::reactagenttab764multiagentpipeline533satrteksorumlulukambakmyk",
+        "severity": "low",
+        "id": "frontend-frontend-2"
+      },
+      {
+        "key": "src/components/clustermanager.tsx::srccomponentsclustermanagertsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-3"
+      },
+      {
+        "key": "src/components/commandlineterminal.tsx::srccomponentscommandlineterminaltsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-4"
+      },
+      {
+        "key": "src/components/googledrivebrowser.tsx::srccomponentsgoogledrivebrowsertsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-5"
+      },
+      {
+        "key": "src/components/keyvault.tsx::srccomponentskeyvaulttsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-6"
+      },
+      {
+        "key": "src/components/multiagentpipeline.tsx::srccomponentsmultiagentpipelinetsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-7"
+      },
+      {
+        "key": "src/components/reactagenttab.tsx::srccomponentsreactagenttabtsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-8"
+      },
+      {
+        "key": "src/components/saasadmin.tsx::srccomponentssaasadmintsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-9"
+      },
+      {
+        "key": "src/components/securitypolicies.tsx::srccomponentssecuritypoliciestsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-10"
+      },
+      {
+        "key": "src/components/selftestgates.tsx::srccomponentsselftestgatestsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-11"
+      },
+      {
+        "key": "src/components/virtualcontroller.tsx::srccomponentsvirtualcontrollertsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-12"
+      },
+      {
+        "key": "src/components/workspacetree.tsx::srccomponentsworkspacetreetsxchokepointbypassrawfetchaxiosapiclientdar",
+        "severity": "med",
+        "id": "frontend-frontend-13"
+      },
+      {
+        "key": "src/components/multiagentpipeline.tsx::srccomponentsmultiagentpipelinetsxoversizedcomponent533satr400blrefactor",
+        "severity": "low",
+        "id": "frontend-frontend-14"
+      },
+      {
+        "key": "src/components/reactagenttab.tsx::srccomponentsreactagenttabtsxoversizedcomponent764satr400blrefactor",
+        "severity": "low",
+        "id": "frontend-frontend-15"
+      },
+      {
+        "key": "*.sh::4shellscriptseteuopipefaileksiksessizhatayutmaunsetvarriski",
+        "severity": "low",
+        "id": "macos-scripts-1"
+      },
+      {
+        "key": "join-cluster.sh::joinclustershseteuopipefaileksiksessizhatayutmariski",
+        "severity": "low",
+        "id": "macos-scripts-2"
+      },
+      {
+        "key": "setup.sh::setupshseteuopipefaileksiksessizhatayutmariski",
+        "severity": "low",
+        "id": "macos-scripts-3"
+      },
+      {
+        "key": "uninstall.sh::uninstallshseteuopipefaileksiksessizhatayutmariski",
+        "severity": "low",
+        "id": "macos-scripts-4"
+      },
+      {
+        "key": "server/diagnostic.ts::desktopcommanderexecutedorudandiagnostictsorchestratortstoolregistrychokepointdhostexec",
+        "severity": "med",
+        "id": "mcp-integrations-1"
+      },
+      {
+        "key": "server/orchestrator.ts::serverorchestratortschokepointbypasstoolregistryexecuteddorudanexecutehandler",
+        "severity": "med",
+        "id": "mcp-integrations-2"
+      },
+      {
+        "key": "package.json::packagejsonnamereactexampleversion000releasepleaseserverjsonileuyumsuz",
+        "severity": "low",
+        "id": "project-architect-repo-1"
+      },
+      {
+        "key": "package.json::packagejsonversion000releasepleaseilesenkrondeil",
+        "severity": "low",
+        "id": "project-architect-repo-2"
+      },
+      {
+        "key": "backend/contracts::backendcontractsorphankaynakaacndaimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-repo-3"
+      },
+      {
+        "key": "backend/daemon::backenddaemonorphankaynakaacndaimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-repo-4"
+      },
+      {
+        "key": "backend/mesh::backendmeshorphankaynakaacndaimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-repo-5"
+      },
+      {
+        "key": "backend/orchestrator::backendorchestratororphankaynakaacndaimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-repo-6"
+      },
+      {
+        "key": "backend/sandbox::backendsandboxorphankaynakaacndaimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-repo-7"
+      },
+      {
+        "key": "backend/::backendcontractsdaemonmeshorchestratorsandboxorphanhibirimportyokunusedcode7",
+        "severity": "med",
+        "id": "project-architect-backend-orphans"
+      },
+      {
+        "key": "project_cortex.md::failuresinkprojectcortexmdboseyirmanuelonlyhatarenmedngskapal",
+        "severity": "med",
+        "id": "prompt-engineer-repo-1"
+      }
+    ]
   },
   "notes": [
     {
@@ -255,7 +419,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -284,7 +448,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -313,7 +477,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -342,7 +506,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -371,7 +535,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -400,7 +564,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -429,7 +593,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -458,7 +622,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -487,7 +651,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -516,7 +680,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -545,7 +709,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -574,7 +738,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -603,7 +767,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "frontend"
       ]
@@ -677,7 +841,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "macos"
       ]
@@ -706,7 +870,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "macos"
       ]
@@ -735,7 +899,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "macos"
       ]
@@ -809,7 +973,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "mcp"
       ]
@@ -883,7 +1047,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
@@ -912,7 +1076,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
@@ -941,7 +1105,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
@@ -970,7 +1134,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
@@ -999,7 +1163,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
@@ -1028,7 +1192,7 @@
       },
       "source": "detected",
       "targetHash": "e7b8b6b",
-      "ts": "2026-06-19T22:39:53.564Z",
+      "ts": "2026-06-20T07:58:05.401Z",
       "consensus": [
         "project-architect"
       ]
