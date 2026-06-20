@@ -271,6 +271,91 @@ cmd_up_jupyter() {
 }
 
 # ---------------------------------------------------------------------------
+# run — execute the dev-loop notebook headless, report pass/fail (zero-manual)
+# WHY: lets the full ollamas dev loop run without opening Colab + clicking
+# "Run all". Starts the runtime if needed, executes the notebook via nbconvert
+# inside the container, then parses the executed copy for the quality-gate
+# result and exits nonzero if any gate failed (honest, scriptable gate).
+# ---------------------------------------------------------------------------
+cmd_run() {
+  local nb="notebooks/ollamas-colab-dev.ipynb"
+  local executed="/tmp/ollamas-colab-executed.ipynb"
+
+  # Ensure the container is running (idempotent: new / start / reuse).
+  local state
+  state=$(docker inspect --format '{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || true)
+  if [[ "${state}" != "running" ]]; then
+    log "Runtime not running — bringing it up first."
+    cmd_up_docker "$(pick_port "${PORT_OVERRIDE}")"
+  fi
+
+  log "Executing ${nb} headless inside the runtime."
+  log "This can take several minutes under amd64 emulation (npm ci + lint + build + full test suite)."
+  if ! docker exec "${CONTAINER_NAME}" bash -lc \
+      "cd /content/ollamas && jupyter nbconvert --to notebook --execute \
+       --ExecutePreprocessor.timeout=2400 --ExecutePreprocessor.kernel_name=python3 \
+       ${nb} --output ${executed}" >&2; then
+    die "Notebook execution failed (nbconvert returned nonzero). See output above."
+  fi
+
+  # Parse the executed notebook for the quality-gate summary and key markers.
+  # WHY: nbconvert exiting 0 only means no cell raised; the test cell does not
+  # assert on test==0, so we must inspect the captured outputs to gate honestly.
+  log "Parsing results..."
+  docker exec -i "${CONTAINER_NAME}" python3 - "${executed}" <<'PY'
+import json, re, sys
+
+path = sys.argv[1]
+nb = json.load(open(path))
+blob = []
+for c in nb.get("cells", []):
+    if c.get("cell_type") != "code":
+        continue
+    for o in c.get("outputs", []):
+        t = o.get("output_type")
+        if t == "stream":
+            blob.append("".join(o.get("text", [])))
+        elif t == "error":
+            blob.append("ERROR " + o.get("ename", "") + ": " + o.get("evalue", ""))
+        elif t in ("execute_result", "display_data"):
+            blob.append("".join(o.get("data", {}).get("text/plain", [])))
+text = "\n".join(blob)
+
+m = re.search(r"\{'lint':\s*(\d+),\s*'build':\s*(\d+),\s*'test':\s*(\d+)\}", text)
+lint = build = test = None
+if m:
+    lint, build, test = (int(m.group(i)) for i in (1, 2, 3))
+
+# review: a non-empty body after the "Reviewing:" marker line
+review_ok = False
+rm = re.search(r"Reviewing:.*", text)
+if rm:
+    after = text[rm.end():].strip()
+    review_ok = len(after) > 40 and "local review FAIL" not in after
+
+gateway_ok = "GET /api/health -> 200" in text
+
+def mark(ok):
+    return "PASS" if ok else "FAIL"
+
+print("")
+print("========== ollamas Colab dev-loop result ==========")
+print(f"  lint     : {mark(lint == 0)}  (exit {lint})")
+print(f"  build    : {mark(build == 0)}  (exit {build})")
+print(f"  test     : {mark(test == 0)}  (exit {test})")
+print(f"  review   : {mark(review_ok)}  (local-model code review)")
+print(f"  gateway  : {mark(gateway_ok)}  (/api/health 200)")
+print("===================================================")
+
+gates = [lint == 0, build == 0, test == 0]
+if not all(g is True for g in gates):
+    print("RESULT: FAIL — one or more quality gates did not pass.")
+    sys.exit(1)
+print("RESULT: PASS — full dev loop green.")
+PY
+}
+
+# ---------------------------------------------------------------------------
 # stop
 # ---------------------------------------------------------------------------
 _kill_jupyter_pid() {
@@ -408,6 +493,7 @@ colab-local-runtime.sh — Google Colab local runtime manager for ollamas
 
 USAGE:
   colab-local-runtime.sh [up] [--jupyter] [--port N]
+  colab-local-runtime.sh run
   colab-local-runtime.sh stop
   colab-local-runtime.sh status
   colab-local-runtime.sh url
@@ -417,6 +503,10 @@ SUBCOMMANDS:
   up       Start the runtime (default if no subcommand given).
            Default method: Docker (us-docker.pkg.dev/colab-images/public/runtime).
            Idempotent: reuses a running container, restarts a stopped one.
+
+  run      Execute the dev-loop notebook (notebooks/ollamas-colab-dev.ipynb)
+           headless and report pass/fail — zero manual Colab interaction.
+           Starts the runtime first if needed. Exits nonzero if a gate fails.
 
   stop     Stop Docker container + Jupyter server (if running).
 
@@ -443,6 +533,7 @@ EXAMPLES:
   colab-local-runtime.sh up                # Docker, auto port
   colab-local-runtime.sh up --port 9000   # Docker, specific port
   colab-local-runtime.sh up --jupyter     # Jupyter fallback, auto port
+  colab-local-runtime.sh run              # headless full dev loop, 0 manual
   colab-local-runtime.sh status
   colab-local-runtime.sh url
   colab-local-runtime.sh stop
@@ -471,7 +562,7 @@ _positional_seen=0
 
 for arg in "$@"; do
   case "${arg}" in
-    up|stop|status|url)
+    up|stop|status|url|run)
       SUBCOMMAND="${arg}"
       _positional_seen=1
       ;;
@@ -521,6 +612,9 @@ case "${SUBCOMMAND}" in
     ;;
   url)
     cmd_url
+    ;;
+  run)
+    cmd_run
     ;;
   up)
     PORT=$(pick_port "${PORT_OVERRIDE}")

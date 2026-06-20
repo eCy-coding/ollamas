@@ -16,6 +16,18 @@ Runs the full ollamas dev+quality loop (lint → build → test → local-model 
 4. Open / upload `notebooks/ollamas-colab-dev.ipynb`.
 5. **Runtime → Run all**.
 
+## Zero-manual run
+
+Instead of opening Colab and clicking "Run all", you can execute the entire notebook headless from the terminal:
+
+```
+./scripts/colab-local-runtime.sh run
+```
+
+This starts the runtime if it is not already running, executes `notebooks/ollamas-colab-dev.ipynb` via `jupyter nbconvert` inside the container, then inspects the captured outputs and prints a PASS/FAIL table for each quality gate (lint, build, test, local-model review, /api/health). The command exits nonzero if any gate fails — scriptable and CI-friendly.
+
+The interactive "Run all" steps above remain the alternative when you want to observe cell-by-cell output in the Colab UI.
+
 ## Notes
 
 - **Node 24**: the Colab image ships Node 20, but ollamas' store uses `node:sqlite` (`DatabaseSync`, stable in Node 24). The notebook provisions Node 24 (pinned to the host's `v24.16.0`) into `/opt` before installing — without it the store and server-boot tests fail with `No such built-in module: node:sqlite`.

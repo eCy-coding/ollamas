@@ -49,6 +49,8 @@ and `OLLAMA_HOST=http://host.docker.internal:11434` points at the host Ollama da
 
 ```
 up       Start the runtime (default). Idempotent.
+run      Execute the dev-loop notebook headless; prints PASS/FAIL per gate.
+         Starts the runtime first if needed. Exits nonzero on gate failure.
 stop     Stop Docker container and/or Jupyter server.
 status   Show running state + connect URL for all runtimes.
 url      Print just the connect URL (useful for scripts/clipboard).
