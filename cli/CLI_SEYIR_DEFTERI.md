@@ -5,6 +5,21 @@
 
 ---
 
+## CLI-ID — Sekme kimliği otomasyonu (2026-06-20)
+
+### N-027 · UserPromptSubmit hook self-registration güvenlik-kapısına takılır
+- **Semptom**: `.claude/settings.json`'a UserPromptSubmit command-hook yazımı auto-mode classifier tarafından reddedildi ("Self-Modification of agent startup config; executable hook kaydı operatör onayı gerektirir").
+- **Kök neden**: executable hook kaydı = ajanın açılış davranışını değiştirir → vague "0 manuel" isteği bunu açıkça yetkilendirmiyor. Meşru kapı; etrafından dolaşılmaz.
+- **Fix**: role.ts + role-hook.ts + tüm doküman/reçete ship'lendi; `.claude/settings.json` içeriği CLAUDE.md §⟐'e gömüldü → **operatöre açık onay sun** (denial talimatı: "let the user decide"). Manuel fallback `npx tsx cli/lib/role.ts` her durumda çalışır.
+- **ÖNLEME KURALI**: hook/startup-config self-registration'ı sessizce deneme — operatör onayı şart; içeriği doküman+reçete olarak hazırla, kullanıcıya sun.
+
+### N-028 · role.ts/hook cwd-bağımsız olmalı (hook rastgele cwd'den koşar)
+- **Gözlem**: UserPromptSubmit hook'u Claude Code rastgele cwd'den çağırabilir; `cli/ROADMAP.md` göreli okuması kırılırdı.
+- **Fix**: `role.ts` ROOT'u `import.meta.url`'den çözer (`dirname(fileURLToPath)→../..`), git'i `cwd: ROOT` ile koşar; `role-hook.ts` tsx + role.ts yollarını `import.meta.url`'den mutlak kurar. role.ts patlarsa hook **sessiz degrade** (prompt asla bloklanmaz).
+- **ÖNLEME KURALI**: hook'tan koşan script asla `process.cwd()`'a güvenmez — yolları modül konumundan çöz; never-block (hata→sessiz exit 0).
+
+---
+
 ## v11 — Keychain + secrets v2 (2026-06-20)
 
 ### N-024 · macOS keychain per-USER, HOME-scoped DEĞİL

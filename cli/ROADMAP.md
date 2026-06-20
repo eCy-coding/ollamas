@@ -18,6 +18,7 @@
 | **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `resolveKeySource` precedence + `config keystore` migrate (aynı key bytes) + `--insecure-storage` opt-out | ✅ DONE |
 | **v12** | Node-SEA binary | `node --build-sea` canonical tek-binary (host Node≥25.5); `sea-config.json` + `build:sea` + codesign `-s -`; Bun default kalır, SEA canonical Node yolu | ▶ NEXT |
 | **v12+** | Ufuk (önceden-hesap) | v13 Completions-v2+man · v14 TUI-v2 · v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
+| **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
 - `cli/` : `index.ts` (router+config), `lib/{client,output,config}.ts`, `commands/{chat,doctor}.ts`, `bin/ollamas.sh`
