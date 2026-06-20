@@ -16,6 +16,7 @@ import { runUpdate } from "./commands/update";
 import { runPlugin } from "./commands/plugin";
 import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from "./lib/plugins";
 import { spawnSync } from "node:child_process";
+import { isSea } from "node:sea";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 import { describeKeystore, migrateKeySource } from "./lib/keystore";
 
@@ -254,10 +255,19 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 // Only run when invoked directly (not when imported by tests).
-// Run when launched directly (node/tsx) OR as a compiled binary named ollamas*
-// (Bun --compile output is ollamas-darwin-arm64 etc.). Importing in tests does
-// not match (argv[1] is the test runner).
-const invokedDirectly = process.argv[1] && /(?:^|[\\/])(?:index\.(?:ts|cjs|js)|ollamas[\w.\-]*)$/.test(process.argv[1]);
+// Three launch shapes: (a) node/tsx → argv[1] is the script; (b) Bun --compile
+// binary → argv[1] is the binary path (ollamas-darwin-arm64); (c) Node SEA → there
+// is NO script, so argv[1] is the FIRST USER ARG, not the binary — the regex would
+// miss it and the binary would no-op. isSea() detects (c) explicitly (N-029).
+// Importing in tests matches none (argv[1] is the test runner; isSea() is false).
+let runningAsSea = false;
+try {
+  runningAsSea = isSea();
+} catch {
+  runningAsSea = false; // node:sea absent (Node < 20) → not a SEA
+}
+const invokedDirectly =
+  runningAsSea || (process.argv[1] && /(?:^|[\\/])(?:index\.(?:ts|cjs|js)|ollamas[\w.\-]*)$/.test(process.argv[1]));
 if (invokedDirectly) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))
