@@ -287,6 +287,50 @@ export async function stripeEventSeen(eventId: string): Promise<boolean> {
   return seen;
 }
 
+/** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].
+ *  When eventType is a non-empty string, only rows with that event_type are returned. */
+export async function listStageEvents(limit = 100, eventType?: string): Promise<any[]> {
+  const lim = Math.min(Math.max(1, limit), 1000);
+  if (eventType && eventType.length > 0) {
+    return (await d().query(
+      "SELECT id, event_type, ts, received_at FROM ukp_stage_events WHERE event_type = ? ORDER BY ts DESC LIMIT ?",
+      [eventType, lim]
+    )).rows;
+  }
+  return (await d().query(
+    "SELECT id, event_type, ts, received_at FROM ukp_stage_events ORDER BY ts DESC LIMIT ?",
+    [lim]
+  )).rows;
+}
+
+/** Delete UKP stage-events older than `days` days. Returns the number of rows removed.
+ *  days <= 0 is a no-op (returns 0) — default env is 0 = retention disabled. */
+export async function pruneStageEvents(days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+  const r = await d().run("DELETE FROM ukp_stage_events WHERE ts < ?", [cutoff]);
+  return r.changes;
+}
+
+/** Insert a UKP stage-event exactly once. Returns recorded:true on first write,
+ *  recorded:false on a duplicate id (replay / retry dedup).
+ *  After a successful insert, opportunistically prunes events older than
+ *  UKP_RETENTION_DAYS (0 = disabled, default). Never fails the ingest. */
+export async function recordStageEvent(e: { id: string; eventType: string; payload: string; ts: number }): Promise<{ recorded: boolean }> {
+  const r = await d().run(
+    "INSERT INTO ukp_stage_events (id, event_type, payload, ts, received_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+    [e.id, e.eventType, e.payload, e.ts, nowIso()]
+  );
+  // DbRun.changes: 1 on first insert, 0 when ON CONFLICT DO NOTHING fires.
+  const recorded = r.changes > 0;
+  if (recorded) {
+    // Best-effort retention prune — env-gated, never throws (zero cost when days=0).
+    const days = Number(process.env.UKP_RETENTION_DAYS || 0);
+    if (days > 0) { try { await pruneStageEvents(days); } catch {} }
+  }
+  return { recorded };
+}
+
 // --- Per-tenant upstream MCP servers (Faz 9E) ---
 export interface UpstreamServer { id: string; tenant_id: string; name: string; transport: "stdio" | "http"; url?: string | null; command?: string | null; args?: string[]; allowed_tools?: string[]; }
 export async function addUpstreamServer(tenantId: string, s: Omit<UpstreamServer, "id" | "tenant_id">): Promise<{ id: string }> {

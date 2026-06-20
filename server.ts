@@ -2,7 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
-import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal } from "./server/metrics";
+import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, ukpStageEventsTotal } from "./server/metrics";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -26,8 +26,8 @@ import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret } from "./server/store";
-import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
+import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -97,6 +97,9 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
+// UKP inbound stage-events: raw body required for HMAC signature verification
+// (same reason as Stripe — must be registered before the global JSON parser).
+app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -1593,6 +1596,42 @@ content
       res.json(out);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
+
+  // UKP inbound stage-events webhook receiver. Public endpoint (no auth middleware)
+  // — security comes from HMAC signature verification (same Stripe-compatible scheme
+  // used for outbound webhooks). Requires UKP_WEBHOOK_SECRET env var to be set.
+  app.post("/api/ingest/stage-events", async (req, res) => {
+    try {
+      const secret = process.env.UKP_WEBHOOK_SECRET;
+      if (!secret) return res.status(503).json({ error: "ingest disabled" });
+
+      const raw = (req.body as Buffer).toString("utf8");
+      const sigHeader = String(req.headers["x-ukp-signature"] || "");
+      if (!verifyWebhook(secret, raw, sigHeader)) return res.status(401).json({ error: "invalid signature" });
+
+      const parsed = JSON.parse(raw) as { type?: string; ts?: number };
+      // Extract the timestamp from the signature header ("t={unix_sec},v1={hex}").
+      const tStr = sigHeader.split(",").find((p) => p.startsWith("t="))?.slice(2) ?? "0";
+      const id = crypto.createHash("sha256").update(`${tStr}.${raw}`).digest("hex");
+
+      const eventType = String(parsed.type ?? "");
+      const ts = Number(parsed.ts ?? 0);
+      const { recorded } = await recordStageEvent({ id, eventType, payload: raw, ts });
+      ukpStageEventsTotal.labels(eventType, String(recorded)).inc();
+      return res.json({ ok: true, recorded });
+    } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  });
+
+  // List received UKP stage-events. Admin-gated; supports ?limit (clamped 1-1000)
+  // and optional ?event_type filter (exact match, parameterized).
+  app.get("/api/ingest/stage-events", adminGuard, async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 100;
+      const eventType = typeof req.query.event_type === "string" ? req.query.event_type : undefined;
+      res.json(await listStageEvents(limit, eventType));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
   app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {
     try {

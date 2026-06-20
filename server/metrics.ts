@@ -27,6 +27,13 @@ export function recordToolMetric(tool: string, tier: string, ok: boolean) {
   toolCalls.labels(tool, tier, String(ok)).inc();
 }
 
+export const ukpStageEventsTotal = new client.Counter({
+  name: "ukp_stage_events_total",
+  help: "UKP stage-events received, by type and recorded status",
+  labelNames: ["event_type", "recorded"],
+  registers: [register],
+});
+
 // --- Observability depth (Faz 14C) ---
 
 /** Graceful-shutdown counter — incremented once on SIGTERM/SIGINT. */
