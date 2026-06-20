@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v13 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v14 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v13` — Gate Watch Dev-Loop + TDD Scaffold (zero-manual bootstrap): `gate.mjs --watch` otonom dev-loop (fs.watch debounce, watch read-only) + `scaffold.mjs` (red test+lib stub, validSlug+no-overwrite) + `make watch`/`make scaffold` · gate: GATE GREEN + watch/scaffold 9 test + dogfood self-commit · inventory 13.0.0.
-- **next:** `v14` — **incremental gate**. İlk hamle: `lib/affected.mjs` pure `affectedSteps(changedPaths)` (path→step: .sh→harden+drift, swift→swift, .ts→tsc+vitest) + `gate.mjs --since <ref>` git-diff parse → yalnız etkilenen step'leri koş (watch hızı).
-- **horizon (geliştirilebilir):** v14 incremental gate → sonrası backlog (en zayıf gate sinyalinden türet).
+- **shipped:** `v14 GÜVENLİK` — Host-Bridge Security Hardening (CRITICAL): /write path-confine (403, traversal kapatıldı ERR-SCR-006) + payload-cap 16MB (413, ERR-SCR-007) + non-loopback fail-closed bind (RISK-SCR-019) · gate: bridge-security 8 test + CANLI saldırı smoke (traversal/403, 20MB/413, /etc yazılmadı, fail-closed refuse, /health 200) + dogfood · inventory 14.0.0.
+- **next:** `v15` — **real e2e bridge harness** (mock-only açığı kapat). İlk hamle: `bridge-e2e.test.ts` opt-in (BRIDGE_E2E=1) — `startBridge(port,token)` helper (spawn+health-poll+teardown) + gerçek health_probe roundtrip + güvenlik regresyon (403/413) assert.
+- **horizon (geliştirilebilir):** v15 e2e-harness → v16 install.sh LaunchAgent auto-load (restart→bridge-down) → sonrası backlog. (incremental-gate=düşük-öncelik backlog.)
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -51,8 +51,10 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v11 | Autonomous Gate + Scripts-as-SaaS Metering (one-command `make gate` + host-cost `usage` + zero-manual) | ✅ |
 | v12 | Gate Auto-Commit + Budget (`gate.mjs --commit` scope-guard + opt-in `usage --budget` SLO-step) | ✅ |
 | v13 | Gate Watch Dev-Loop + TDD Scaffold (`gate --watch` fs.watch + `scaffold` stub generator) | ✅ |
-| **v14** | **incremental gate** (`gate --since`/changed-file → etkilenen step seçimi) | ⬜ NEXT |
-| v15+ | backlog — türetilir (en zayıf gate sinyalinden) | açık |
+| v14 | Host-Bridge Security Hardening (/write confine 403 + payload-cap 413 + fail-closed bind) | ✅ GÜVENLİK |
+| **v15** | **real e2e bridge harness** (gerçek bridge spawn + tool roundtrip + güvenlik regresyon) | ⬜ NEXT |
+| v16 | install.sh LaunchAgent auto-load (restart→bridge-down) | backlog |
+| v17+ | backlog (incremental-gate düşük-öncelik) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 

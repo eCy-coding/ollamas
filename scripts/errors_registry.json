@@ -291,6 +291,48 @@
       "prevention_rule": "Dosya üreten her generator slug/path'i allow-regex'ten geçirir (traversal/slash red) + mevcut dosyayı ASLA overwrite etmez (varsa refuse) + dry default.",
       "test_added": "scripts/tests/scaffold.test.ts (validSlug traversal red + scaffoldPlan throw + paths)",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-006",
+      "ts": "2026-06-20",
+      "version": "v14",
+      "file": "bin/host-bridge/terminal-bridge.mjs:262-274 (/write)",
+      "category": "ios",
+      "severity": "CRITICAL",
+      "root_cause": "/write endpoint body.path'i doğrudan fs.mkdirSync(path.dirname(body.path))+fs.writeFileSync(body.path) ile kullanıyordu — HİÇ path sınırı yok. Auth'lu istemci path-traversal (../../etc/, ~/.ssh, cross-lane server/*.ts) ile keyfi dosya yazabilirdi. §5 Hard Law 'host-komut sınırı' ihlali; North Star #3 (iOS/LAN) öncesi sömürülebilir.",
+      "evidence": "canlı: bridge+token, curl /write path=/tmp/v14ok/../../etc/evilx → 403 (eskiden 200+yazardı); /etc/evilx oluşmadı (confined); in-root /write → 200 (legit korundu)",
+      "fix": "lib/bridge-guard.mjs safeWritePath(WRITE_ROOTS, body.path): resolve()+startsWith(root+sep) (server/files.ts deseni); escape→403; ok→guard.resolved'a yaz. WRITE_ROOTS=repo+tmp/llm-bridge+~/.llm-mission-control (BRIDGE_WRITE_ROOTS override).",
+      "prevention_rule": "Host'a dosya yazan her endpoint DAİMA hedefi resolve edip allowlist-root içinde olduğunu doğrular (startsWith(root+sep)); dışı→403. Kullanıcı-kontrollü path asla doğrudan fs'e gitmez.",
+      "test_added": "scripts/tests/bridge-security.test.ts (safeWritePath traversal/prefix-sibling/in-root) + canlı curl smoke",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-007",
+      "ts": "2026-06-20",
+      "version": "v14",
+      "file": "bin/host-bridge/terminal-bridge.mjs:197-203 (readBody)",
+      "category": "ios",
+      "severity": "high",
+      "root_cause": "readBody body'yi sınırsız biriktiriyordu (d += c, cap yok); /write contentB64 boyut-sınırı yoktu (/exec'te maxBuffer 8MB vardı, /write'ta yok). GB'lık POST → host RAM tükenmesi (DoS/OOM).",
+      "evidence": "canlı: 20MB payload /write → 413 (eskiden RAM'e birikirdi); withinLimit testleri",
+      "fix": "readBody MAX_BODY (16MB, BRIDGE_MAX_BODY override) — withinLimit aşımında append durur (memory bound) + handler 413 döner. /run /exec /write hepsi tooLarge→413.",
+      "prevention_rule": "Gövde okuyan her HTTP handler DAİMA byte-cap uygular (aşımda biriktirmeyi durdur + 413); sınırsız stream-to-memory yasak.",
+      "test_added": "scripts/tests/bridge-security.test.ts (withinLimit) + canlı 20MB→413 smoke",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-019",
+      "ts": "2026-06-20",
+      "version": "v14",
+      "file": "bin/host-bridge/terminal-bridge.mjs:205-209 (authed) + listen",
+      "category": "ios",
+      "severity": "high",
+      "root_cause": "authed() token yoksa true döner (dev-açık) + BRIDGE_BIND env LAN'a (0.0.0.0) alınabilir → North Star #3 (iPhone LAN) auth'suz LAN host-exec'e dönüşür (fail-open).",
+      "evidence": "canlı: BRIDGE_BIND=0.0.0.0 + no token → 'REFUSING to start' + exit 1; loopback dev akışı bozulmadı (127.0.0.1 token-OFF hâlâ başlar)",
+      "fix": "bindRequiresAuth(BIND, hasToken||hasHmac): non-loopback (127.0.0.1/::1/localhost dışı) && !auth → startup'ta exit 1 (fail-closed). Loopback dev değişmedi.",
+      "prevention_rule": "Host-exec servisi non-loopback bind'de DAİMA auth zorunlu (yoksa fail-closed başlamayı reddet); fail-open (auth-yok→aç) yasak. LAN/iOS exposure auth ön-koşulludur.",
+      "test_added": "scripts/tests/bridge-security.test.ts (bindRequiresAuth) + canlı refuse smoke",
+      "recurrence_count": 0
     }
   ]
 }

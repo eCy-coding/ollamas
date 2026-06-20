@@ -2,7 +2,9 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅** (gate `--watch` otonom dev-loop [fs.watch debounce, chokidar yok] + TDD `scaffold` [red test+lib stub, validSlug+no-overwrite]; watch+scaffold 9 test + dogfood self-commit), **v14 NEXT (incremental gate: değişen-dosyaya göre etkilenen step'leri koş)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK** (host-bridge hardening: /write path-confine [403] + payload-cap [413] + non-loopback fail-closed bind; bridge-security 8 test + CANLI saldırı smoke + dogfood), **v15 NEXT (real e2e bridge test harness — mock-only açığı kapat)**.
+
+> ⚠️ **v14 sapması (dürüst):** precomputed v14 (incremental-gate) = saf-DX cila, ürüne değmez → **backlog'a alındı**. İki audit host-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14 = **güvenlik** (North Star §0-2, iOS/LAN ön-koşulu). Backlog: incremental-gate (düşük), install.sh LaunchAgent auto-load (orta, v16).
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -257,7 +259,28 @@
 
 **Gate (kanıt):** `make gate` GATE GREEN + watch-debounce 4 + scaffold 5 test + watch bounded smoke (başlar→ilk gate→kill, hang yok) + drift 18 + dogfood self-commit.
 
-**Next precomputed (→v14 incremental gate):** `gate.mjs`'e `--since <ref>` / değişen-dosya tabanlı **etkilenen-step seçimi** (yalnız .sh değişti→harden+drift; yalnız swift→swift; .ts→tsc+vitest) — watch loop'ta tam-gate yerine incremental koş (hız); ilk hamle = `lib/affected.mjs` pure `affectedSteps(changedPaths)` haritası (path→step seti) + gate.mjs `--since` git-diff parse.
+**Next precomputed (→v14 incremental gate):** [GERÇEKLEŞMEDİ — incremental-gate backlog'a alındı; v14 güvenliğe pivot etti, aşağıya bak.]
+
+---
+
+## v14 — Host-Bridge Security Hardening ✅ (CRITICAL, North Star §0-2)
+
+**Tema:** host-exec bridge'i iOS/LAN exposure öncesi sömürülemez yap. **DONE** (canlı saldırı smoke + dogfood). **Pivot:** precomputed incremental-gate (saf-DX) yerine — iki audit `terminal-bridge.mjs`'de 3 gerçek açık buldu (kod-okuma kanıtlı, ajan iddiası değil).
+
+**Phases (gerçekleşen):**
+1. ✅ **Guard core** (`lib/bridge-guard.mjs`, pure): `safeWritePath(roots,target)` (resolve+startsWith(root+sep), server/files.ts deseni) + `withinLimit(len,max)` + `bindRequiresAuth(bind,hasAuth)` (non-loopback+no-auth→true).
+2. ✅ **/write path-confine** (ERR-SCR-006 CRITICAL): `terminal-bridge.mjs` /write → safeWritePath(WRITE_ROOTS)→escape 403, ok→resolved'a yaz. WRITE_ROOTS=repo+tmp/llm-bridge+~/.llm-mission-control (BRIDGE_WRITE_ROOTS).
+3. ✅ **payload-cap** (ERR-SCR-007 high): readBody MAX_BODY 16MB (BRIDGE_MAX_BODY) — aşımda append-durdur+413; /run /exec /write hepsi.
+4. ✅ **fail-closed bind** (RISK-SCR-019 high): non-loopback BIND + auth-yok → startup exit 1 (fail-open kapatıldı); loopback dev değişmedi.
+5. ✅ `/run`+`/exec` DOKUNULMADI (tasarım-gereği auth'lu exec, regresyon yok — /health 200).
+
+**Adopt:** in-repo `server/files.ts:31`/`server/commander.ts:31` path-guard deseni (proje-kanıtlı, dep yok), Node http builtin payload-cap, OWASP path-traversal/upload prensibi. Zero yeni dep.
+
+**Canonical prompt:** "host-bridge hardening: pure bridge-guard.mjs (safeWritePath resolve+startsWith confine + withinLimit + bindRequiresAuth) + terminal-bridge /write 403-confine + readBody 16MB-cap→413 + non-loopback fail-closed bind exit1; /run+/exec dokunma."
+
+**Gate (kanıt):** bridge-security 8 test + CANLI smoke (traversal→403, in-root→200, no-auth→401, 20MB→413, /etc/evilx yazılmadı, fail-closed refuse, /health 200) + make gate GREEN + dogfood.
+
+**Next precomputed (→v15 real e2e bridge harness):** mock-only açığı kapat — `scripts/tests/bridge-e2e.test.ts` opt-in (env BRIDGE_E2E=1): geçici port'ta gerçek terminal-bridge spawn + token + birkaç tool (health_probe/git_ops read-only) gerçek roundtrip + güvenlik regresyon (traversal 403/payload 413) assert; CI'da macOS job opsiyonel. İlk hamle = test-helper `startBridge(port,token)` (spawn+health-poll+teardown) + ilk gerçek health_probe assert.
 
 ---
 

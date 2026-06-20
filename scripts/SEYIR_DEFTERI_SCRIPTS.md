@@ -161,6 +161,16 @@
 - `[2026-06-20] kind=phase | P5 gate + DOGFOOD | make gate GATE GREEN (tsc/vitest/harden/drift 18/swift) + scaffold demo dry; v13 gate.mjs --commit ile self-commit | git show --stat server/src yok | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v14 incremental gate) | gate.mjs --since/değişen-dosya → etkilenen-step seçimi (.sh→harden+drift, swift→swift, .ts→tsc+vitest), watch'ta incremental koş (hız); ilk hamle lib/affected.mjs pure affectedSteps(changedPaths) + gate --since git-diff parse`
 
+## v14 — Host-Bridge Security Hardening ✅ (CRITICAL, North Star §0-2)
+
+- `[2026-06-20] kind=note | PIVOT (gereksiz-iş tespiti) | precomputed v14 incremental-gate=saf-DX cila→backlog; 2 read-only audit terminal-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14=güvenlik (host op güvenlileştir, iOS/LAN ön-koşulu)`
+- `[2026-06-20] kind=phase | P1 guard core | bin/host-bridge/lib/bridge-guard.mjs pure: safeWritePath(resolve+startsWith(root+sep) server/files.ts deseni) + withinLimit + bindRequiresAuth | bridge-security.test.ts 8 case | YEŞİL`
+- `[2026-06-20] kind=fix | ERR-SCR-006 CRITICAL /write path-traversal | safeWritePath(WRITE_ROOTS=repo+tmp+~/.llm-mission-control) confine→escape 403; canlı curl /tmp/v14ok/../../etc/evilx→403, /etc/evilx oluşmadı, in-root→200 | YEŞİL`
+- `[2026-06-20] kind=fix | ERR-SCR-007 high unbounded payload | readBody MAX_BODY 16MB append-durdur+413 (/run /exec /write); canlı 20MB→413 | YEŞİL`
+- `[2026-06-20] kind=fix | RISK-SCR-019 high fail-open bind | bindRequiresAuth non-loopback+no-auth→exit1; canlı BRIDGE_BIND=0.0.0.0 no-token→REFUSING+exit; loopback dev korundu | YEŞİL`
+- `[2026-06-20] kind=phase | P3 gate + DOGFOOD | /run+/exec dokunulmadı (/health 200 regresyon yok); make gate GREEN + bridge-security 8 + canlı saldırı smoke; v14 gate.mjs --commit self-commit | git show --stat server/src yok | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v15 real e2e bridge harness) | mock-only açığı kapat: bridge-e2e.test.ts opt-in (BRIDGE_E2E=1) gerçek terminal-bridge spawn+token+tool roundtrip+güvenlik regresyon (403/413) assert; ilk hamle startBridge(port,token) helper + health_probe assert`
+
 ---
 
 ## Hata Anlatıları

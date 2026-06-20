@@ -18,12 +18,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { verifyHmacHeaders } from "./hmac.mjs";
+import { safeWritePath, withinLimit, bindRequiresAuth, defaultWriteRoots } from "./lib/bridge-guard.mjs";
 
 const execFileP = promisify(execFile);
 
 const PORT = Number(process.env.PORT) || 7345;
 const BIND = process.env.BRIDGE_BIND || "127.0.0.1";
 const TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
+// Max request body (v14). /write base64 + /run|/exec payloads share this cap so a
+// giant POST can't exhaust host RAM (ERR-SCR-007). Override via BRIDGE_MAX_BODY.
+const MAX_BODY = Number(process.env.BRIDGE_MAX_BODY) || 16 * 1024 * 1024;
+// Roots /write may target — everything else is a traversal escape (ERR-SCR-006).
+const WRITE_ROOTS = defaultWriteRoots();
 // HMAC-SHA256 request signing (Faz 10E). Mirrors server/bridge-hmac.ts — the
 // signed message MUST stay byte-identical. Server uses HMAC; host-side tools
 // (bridge-client.mjs) keep using the token — both accepted.
@@ -197,8 +203,18 @@ function send(res, code, obj) {
 function readBody(req) {
   return new Promise((resolve) => {
     let d = "";
-    req.on("data", (c) => (d += c));
-    req.on("end", () => { let json = {}; try { json = d ? JSON.parse(d) : {}; } catch {} resolve({ raw: d, body: json }); });
+    let aborted = false;
+    req.on("data", (c) => {
+      if (aborted) return; // stop accumulating past the cap — bound memory (ERR-SCR-007)
+      d += c;
+      if (!withinLimit(Buffer.byteLength(d), MAX_BODY)) {
+        aborted = true;
+        d = ""; // drop what we have; handler returns 413
+        resolve({ raw: "", body: {}, tooLarge: true });
+      }
+    });
+    req.on("end", () => { if (aborted) return; let json = {}; try { json = d ? JSON.parse(d) : {}; } catch {} resolve({ raw: d, body: json }); });
+    req.on("error", () => { if (!aborted) resolve({ raw: "", body: {} }); });
   });
 }
 // Accept a valid HMAC signature (server) OR the plain token (host tools / dev).
@@ -222,7 +238,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/run") {
-    const { raw, body } = await readBody(req);
+    const { raw, body, tooLarge } = await readBody(req);
+    if (tooLarge) return send(res, 413, { ok: false, error: "payload too large" });
     if (!authed(req, raw, "/run")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.command) return send(res, 400, { ok: false, error: "command required" });
     try {
@@ -243,7 +260,8 @@ const server = http.createServer(async (req, res) => {
   // Holds no terminal mutex, so host tools that themselves call /run won't
   // deadlock. Used by the agent's first-class bridge tools.
   if (req.method === "POST" && url.pathname === "/exec") {
-    const { raw, body } = await readBody(req);
+    const { raw, body, tooLarge } = await readBody(req);
+    if (tooLarge) return send(res, 413, { ok: false, error: "payload too large" });
     if (!authed(req, raw, "/exec")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.command) return send(res, 400, { ok: false, error: "command required" });
     try {
@@ -260,14 +278,18 @@ const server = http.createServer(async (req, res) => {
   // Write a file straight to the host filesystem (base64 body) — reliable host
   // authoring without fragile heredoc-over-keystrokes.
   if (req.method === "POST" && url.pathname === "/write") {
-    const { raw, body } = await readBody(req);
+    const { raw, body, tooLarge } = await readBody(req);
+    if (tooLarge) return send(res, 413, { ok: false, error: "payload too large" });
     if (!authed(req, raw, "/write")) return send(res, 401, { ok: false, error: "bad auth" });
     if (!body.path) return send(res, 400, { ok: false, error: "path required" });
+    // Confine writes to allowed roots — block path traversal (ERR-SCR-006).
+    const guard = safeWritePath(WRITE_ROOTS, body.path);
+    if (!guard.ok) return send(res, 403, { ok: false, error: guard.error || "path outside allowed roots" });
     try {
       const buf = Buffer.from(body.contentB64 || "", "base64");
-      fs.mkdirSync(path.dirname(body.path), { recursive: true });
-      fs.writeFileSync(body.path, buf);
-      return send(res, 200, { ok: true, path: body.path, bytes: buf.length });
+      fs.mkdirSync(path.dirname(guard.resolved), { recursive: true });
+      fs.writeFileSync(guard.resolved, buf);
+      return send(res, 200, { ok: true, path: guard.resolved, bytes: buf.length });
     } catch (e) {
       return send(res, 500, { ok: false, error: String(e.message || e) });
     }
@@ -275,6 +297,12 @@ const server = http.createServer(async (req, res) => {
 
   send(res, 404, { ok: false, error: "not found" });
 });
+
+// Fail-closed: never expose auth-less host-exec on a non-loopback bind (RISK-SCR-019).
+if (bindRequiresAuth(BIND, !!TOKEN || !!HMAC_SECRET)) {
+  console.error(`[bridge] REFUSING to start: BRIDGE_BIND=${BIND} is non-loopback with no auth. Set HOST_BRIDGE_TOKEN or HOST_BRIDGE_HMAC_SECRET, or bind to 127.0.0.1.`);
+  process.exit(1);
+}
 
 server.listen(PORT, BIND, () => {
   console.log(`[bridge] macOS terminal bridge on http://${BIND}:${PORT} (token ${TOKEN ? "required" : "OFF"})`);
