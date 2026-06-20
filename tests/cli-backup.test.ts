@@ -1,8 +1,22 @@
 import { describe, it, expect } from "vitest";
+import { vi } from "vitest";
 import { formatBackupConfig, summarizeReport, backupOutName } from "../cli/lib/backup";
 import { GatewayClient } from "../cli/lib/client";
+import { runBackup } from "../cli/commands/backup";
 
 const ctx = { color: false } as any;
+
+async function run(argv: string[]): Promise<{ code: number; out: string }> {
+  let out = "";
+  const so = vi.spyOn(process.stdout, "write").mockImplementation((c: any) => ((out += c), true));
+  const se = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  try {
+    return { code: await runBackup(argv), out };
+  } finally {
+    so.mockRestore();
+    se.mockRestore();
+  }
+}
 
 describe("formatBackupConfig", () => {
   it("renders enabled + masked accessKey (as returned by the gateway)", () => {
@@ -72,6 +86,28 @@ describe("GatewayClient backup (mock fetch)", () => {
     globalThis.fetch = (async () => new Response("ENCRYPTEDBLOB==", { status: 200 })) as any;
     try {
       expect(await new GatewayClient("http://x").downloadBackup()).toBe("ENCRYPTEDBLOB==");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
+describe("runBackup dispatch", () => {
+  it("--help exits 0, no action exits 2, unknown action exits 2", async () => {
+    expect((await run(["--help"])).code).toBe(0);
+    expect((await run([])).code).toBe(2);
+    expect((await run(["bogus"])).code).toBe(2);
+  });
+  it("restore with no file → exit 2 (before any network)", async () => {
+    expect((await run(["restore"])).code).toBe(2);
+  });
+  it("restore --yes with a missing file → exit 2 (read error, not a destructive call)", async () => {
+    const original = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = (async () => ((called = true), new Response("{}", { status: 200 }))) as any;
+    try {
+      expect((await run(["restore", "/no/such/backup.enc", "--yes"])).code).toBe(2);
+      expect(called).toBe(false); // never POSTed a restore for an unreadable file
     } finally {
       globalThis.fetch = original;
     }

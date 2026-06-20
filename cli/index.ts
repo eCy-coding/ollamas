@@ -9,6 +9,7 @@ import { runAgent } from "./commands/agent";
 import { runSaas } from "./commands/saas";
 import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
+import { runBackup } from "./commands/backup";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
 import { complete, completionScript, COMMAND_TREE, type DynamicValues } from "./lib/completion";
@@ -35,7 +36,8 @@ commands:
     agent sessions   list persisted agent sessions
     agent rm <id>    delete a session
   saas <action>      manage the SaaS layer (plans|tenants|keys|audit|usage|billing)
-  mcp <action>       MCP client (info|tools|call|upstreams|add|rm) via /mcp
+  mcp <action>       MCP client (info|tools|call|resources|prompts|upstreams) via /mcp
+  backup <action>    gateway encrypted config backup (config|trigger|download|restore)
   bench              benchmark models (tok/s, TTFB) and pick the fastest
   top [--watch]      live metrics dashboard (requests, latency, tool calls)
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
@@ -195,7 +197,8 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   chat: "one-shot prompt or interactive REPL against the gateway",
   agent: "drive the ReAct agent loop (thought, step, done)",
   saas: "manage the SaaS layer (plans, tenants, keys, audit, usage, billing)",
-  mcp: "MCP client (info, tools, call, upstreams, add, rm) via /mcp",
+  mcp: "MCP client (info, tools, call, resources, prompts, upstreams) via /mcp",
+  backup: "gateway encrypted config backup (config, trigger, download, restore)",
   bench: "benchmark models (tok/s, TTFB) and pick the fastest",
   top: "live metrics dashboard (requests, latency, tool calls)",
   shortcuts: "generate an Apple Shortcuts pack",
@@ -274,6 +277,8 @@ export async function main(argv: string[]): Promise<number> {
       return runBench(rest);
     case "mcp":
       return runMcp(rest);
+    case "backup":
+      return runBackup(rest);
     case "shortcuts":
       return runShortcuts(rest);
     case "top":

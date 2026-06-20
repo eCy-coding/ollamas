@@ -22,6 +22,7 @@ export const COMMAND_TREE: CommandTree = {
     "agent",
     "saas",
     "mcp",
+    "backup",
     "bench",
     "top",
     "shortcuts",
@@ -38,6 +39,7 @@ export const COMMAND_TREE: CommandTree = {
     agent: ["sessions", "rm"],
     saas: ["plans", "tenants", "tenant", "keys", "key", "audit", "usage", "billing"],
     mcp: ["info", "tools", "call", "resources", "read", "prompts", "prompt", "upstreams", "add", "rm"],
+    backup: ["config", "trigger", "download", "restore"],
     shortcuts: ["build"],
     // config: profile ops + the settable keys
     config: ["use", "profiles", "keystore", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
