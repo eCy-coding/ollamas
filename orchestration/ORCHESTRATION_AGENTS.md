@@ -244,3 +244,23 @@ tsx orchestration/bin/driftguard.ts --json   # makine
 `currentAndNext`, shared `discoverWorktrees`. conduct.ts (worker autopilot) bunu **DRIFT-tier sinyali** olarak
 çağırabilir (ben gate'i yaparım, worker bağlar). **Scope §3:** yalnız okur + `DRIFT.md` yazar.
 Adoption (idea/pattern, zero-dep): release-please/changesets single-source-of-truth + Terraform-drift diff + lefthook gate.
+
+---
+
+## §15. Autopilot Readiness Doctor Protokolü (vO-AUTO.1 — 0-manuel canlılık görünürlüğü)
+
+vO-AUTO mekanizması (autopilot/model-hook/plist) kuruldu; **AKTİF olup olmadığı** görünmüyordu.
+`bin/doctor.ts` girdisiz read-only koşar, "0-manuel gerçekten CANLI + TAZE mi?" deterministik denetler:
+```
+tsx orchestration/bin/doctor.ts          # DOCTOR.md + GO/NO-GO + remediation + exit (NO-GO→1)
+tsx orchestration/bin/doctor.ts --fix    # yalnız selfHealable (bench/artifacts); aktivasyon ASLA otomatik
+```
+**4 check:** (1) **hook-wiring** SessionStart+model-hook `.claude/settings.json`'da mı (HARD-fail);
+(2) **launchd** autopilot agent yüklü mü (WARN); (3) **bench-freshness** MODEL_SELECTION stale/yaş (WARN-selfHealable);
+(4) **artifacts** MODEL_PROMPT/CONDUCTOR/AUTOPILOT var mı. verdict: fail→NO-GO, yalnız-warn→GO-uyarılı.
+
+**Guardrail sınırı:** doctor 0-manuel'i AKTİVE ETMEZ — settings.json yazımı + launchctl load **privileged**
+(ajan kendi başlangıç-config'ini açık-izinsiz değiştiremez) → exact-komutla kullanıcıya devreder (`AUTOPILOT_SETUP.md`).
+`autopilot.ts` 4. adım=doctor → her SessionStart/launchd tick'i readiness raporlar (self-observing).
+**Scope §3:** yalnız okur (settings.json/launchctl-list/MODEL_SELECTION) + `DOCTOR.md` yazar. Non-dup: critic=codebase,
+driftguard=branch/version, doctor=runtime-readiness. Adopt-pattern brew/npm/flutter doctor (check{name,status,fix}+exit-code, zero-dep).
