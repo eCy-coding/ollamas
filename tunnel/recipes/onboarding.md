@@ -15,7 +15,7 @@ brew install headscale         # Sovereign mesh (vT3)
 ## Kur (tek komut)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel
+cd ~/Desktop/ollamas/tunnel
 node src/cli.ts setup --daemon
 ```
 

@@ -14,9 +14,10 @@ echo
 # --- git: branch + recent commits (truth source for shipped work) ---
 BRANCH="$(git branch --show-current 2>/dev/null || echo '?')"
 echo "branch: $BRANCH"
-if [ "$BRANCH" != "feat/tunnel-v1" ]; then
-  echo "  ⚠️  branch beklenen feat/tunnel-v1 DEĞİL → hijack riski RISK-TUNNEL-001, doğrula"
-fi
+case "$BRANCH" in
+  feat/tunnel-v1 | integration/*) ;; # lane branch VEYA konsolide integration (meşru)
+  *) echo "  ⚠️  branch feat/tunnel-v1|integration/* DEĞİL → hijack riski RISK-TUNNEL-001, doğrula" ;;
+esac
 echo "recent commits:"
 git log --oneline -3 2>/dev/null | sed 's/^/  /'
 echo

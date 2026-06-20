@@ -20,7 +20,7 @@ switch** ağ katmanını kurmak — **egemen (sıfır dış hesap), kendi-barın
 
 ## §1. Scope Law (değişmez)
 
-- **Yazılabilir:** YALNIZ `~/Desktop/ollamas-tunnel-wt/tunnel/**`. Branch `feat/tunnel-v1` (ve sonraki vT'ler).
+- **Yazılabilir:** YALNIZ `~/Desktop/ollamas/tunnel/**`. Branch `feat/tunnel-v1` veya `integration/all-lanes` (konsolide).
 - **Yasak:** `server.ts`, `server/`, `src/` (frontend), diğer lane dizinleri. Bunlara dokunmak = hata.
 - **Erişilebilirlik ihtiyaçları** (TLS origin, `ALLOWED_ORIGINS`, `MCP_PUBLIC_URL`) → **env/config +
   reverse-proxy** olarak üretilir ve integrations lane'e **doküman** olarak devredilir. Asla `server.ts` edit'i değil.
@@ -62,7 +62,7 @@ switch** ağ katmanını kurmak — **egemen (sıfır dış hesap), kendi-barın
 node --test (tüm green, fresh run)  ✓
 tsc --noEmit (0)                    ✓  (typescript varsa; yoksa Node strip + node:test yeterli minimum)
 git status → yalnız tunnel/ değişti ✓
-branch == feat/tunnel-v1           ✓
+branch ∈ {feat/tunnel-v1, integration/*}  ✓
 → sonra conventional commit: feat(tunnel): ...
 ```
 
@@ -103,9 +103,10 @@ branch == feat/tunnel-v1           ✓
 
 ## §9. Çalışma Modeli (worktree/commit disiplini)
 
-- İzole worktree `~/Desktop/ollamas-tunnel-wt`, branch `feat/tunnel-v1`.
-- **Oturum başı:** `git branch --show-current` == `feat/tunnel-v1` doğrula (RISK-TUNNEL-001 branch-hijack).
-- Yalnız local branch'e commit; main'e PR ile (orchestration lane koordine eder).
+- **KONSOLİDE (2026-06-21):** lane artık `~/Desktop/ollamas/tunnel/` (izole worktree silindi), branch
+  `integration/all-lanes`. vT1-vT10 entegre, 148 test (ERR-TUNNEL-004).
+- **Oturum başı:** `git branch --show-current` ∈ {`feat/tunnel-v1`, `integration/*`} doğrula (RISK-TUNNEL-001).
+- Yalnız `tunnel/**` commit (başka lane WIP'ine dokunma); push orchestration/Emre kararı (cross-lane + outward).
 - Eşzamanlı sekmeler → green biter bitmez commit, clobber etme.
 
 ---

@@ -13,7 +13,7 @@ brew install headscale          # BSD-3, binary-invoke (kaynak kopyalanmaz)
 ## 1. Config üret (MacBook)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel
+cd ~/Desktop/ollamas/tunnel
 node src/cli.ts mesh
 # → keys/headscale.yaml (gitignored), Coordination URL + sıradaki adımları yazdırır
 ```

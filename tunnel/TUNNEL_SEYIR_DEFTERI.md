@@ -5,13 +5,13 @@
 ## Faz 0 — Lane doğuşu (vT1 P0)
 
 - **Ne:** Tünel/switch lane bootstrap. İzole worktree + 5 governance dosya + zero-dep TS proje iskeleti.
-- **Nasıl:** `git worktree add ~/Desktop/ollamas-tunnel-wt -b feat/tunnel-v1`. `tunnel/` altında
+- **Nasıl:** `git worktree add ~/Desktop/ollamas -b feat/tunnel-v1`. `tunnel/` altında
   `TUNNEL_AGENTS.md` (master prompt §0-§11) + `TUNNEL_ROADMAP.md` (vT1→vT10) + `TUNNEL_ADOPTION.md`
   (WireGuard/Caddy/Headscale/FRP matris) + `errors_registry.json` (6 preloaded risk) + `VERSION` 1.0.0
   + `package.json`/`tsconfig.json` (Node 24 native TS strip, `node --test`, sıfır npm bağımlılığı).
 - **Niçin:** Diğer lane'lerin (frontend/cli/scripts/integrations/orchestration) governance pattern'i
   ile aynı sözleşme; her oturum aynı kurallarla, hatasız, kesintisiz sürdürülebilir çalışsın.
-- **Kanıt:** `git -C ~/Desktop/ollamas-tunnel-wt branch --show-current` → `feat/tunnel-v1`. Dosyalar `tunnel/` altında.
+- **Kanıt:** `git -C ~/Desktop/ollamas branch --show-current` → `feat/tunnel-v1`. Dosyalar `tunnel/` altında.
 
 ## Faz 1 — Switch iskeleti (vT1 P1)
 
@@ -210,9 +210,23 @@
 - select/status "no healthy transport" = wg/caddy/headscale binary yok (transport-IP endpoint'leri Emre cihaz-
   kanıtı); ama UPSTREAM (ollamas reachability) artık DOĞRU path'te canlı doğrulandı.
 
+## Faz 13 — Konsolidasyon Adaptasyonu + Canlı E2E (vT11) — entegre tree
+
+- **Kullanıcı: "ollamas'ı çalıştır + tüm değişiklikleri projeye entegre et + canlı test."** BULGU: lane'ler
+  `~/Desktop/ollamas` (branch **integration/all-lanes**) altında KONSOLİDE edilmiş; tünel (vT1-vT10, tunnel/)
+  ZATEN entegre — git-entegrasyonu yapılmış. İzole worktree `ollamas-tunnel-wt` silinmiş.
+- **Eksik (ERR-TUNNEL-004):** konsolidasyon sonrası 10 dosyada eski absolute yol `ollamas-tunnel-wt` kaldı
+  (whoami refresh-cmd/reçete/portable/IDENTITY/AGENTS) + whoami branch-guard feat/tunnel-v1'e sabitti → kırık.
+- **Fix:** path-ref `ollamas-tunnel-wt`→`ollamas/tunnel` (xargs, zsh-word-split gotcha); whoami branch-guard
+  {feat/tunnel-v1|integration/*}; AGENTS/IDENTITY konsolidasyon notu. Yalnız metin → kod davranışı değişmedi.
+- **Kararlar (AskUser):** PUSH YOK (yalnız tunnel/** yerel commit; cross-lane+outward, remote eCy-coding≠
+  adobemre1); QR/Ecosystem-2 → vT12.
+- **CANLI E2E KANIT (entegre tree):** `node src/cli.ts doctor` → ollamas upstream OK ~22ms /api/health;
+  `npm run whoami` → branch integration/all-lanes (hijack-uyarısı YOK); `node --test` 148/148; tsc 0.
+  VERSION 11.0.0. Başka lane WIP'ine (orchestration/, src/lib/) DOKUNULMADI.
+
 ---
-**Toplam (vT1..vT10 kod):** 5 governance + 23 src modül (…+doctor) + 22 test dosya (148 test) + 6 reçete +
-1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 148/148. VERSION 10.0.0.
-Gotcha ERR-TUNNEL-001 (strip param-property), -002 (test glob → node --test), **-003 (health-path /healthz→
-/api/health, canlı-e2e şart)**. vT1/vT2/vT3 + vT7 daemon + vT9 setup cihaz-kanıtı Emre'de; **vT10 ollamas
-upstream CANLI 200 doğrulandı**; transport-IP endpoint'leri (binary gerektirir) Emre'de. RISK-018/020 vT8'de çözüldü.
+**Toplam (vT1..vT11):** lane konsolide @ `~/Desktop/ollamas/tunnel` (integration/all-lanes). 5 governance +
+23 src modül + 22 test (148) + 6 reçete + 1 taşınabilir prompt. Zero-dep, zero-account. tsc 0 + test 148/148.
+VERSION 11.0.0. Gotcha ERR-TUNNEL-001/-002/-003 (health-path)/-004 (konsolidasyon path-drift). vT10 ollamas
+upstream CANLI 200; transport-IP endpoint'leri (binary) Emre cihaz-kanıtı. RISK-018/020 vT8'de çözüldü.

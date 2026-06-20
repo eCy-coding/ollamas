@@ -223,6 +223,20 @@
       "prevention_rule": "Unit-test gerçek health-path'i VARSAYAMAZ (fake-fetch her path'e 200 döner) → entegrasyon her zaman CANLI ollamas'a karşı doğrulanır (`tunnel doctor`). Endpoint sözleşmeleri tek sabitte merkezi tutulur.",
       "test_added": "src/doctor.test.ts + health.test.ts (HEALTH_PATH default /api/health) + canlı doctor",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-004",
+      "ts": "2026-06-21",
+      "version": "vT11",
+      "file": "governance + recipes + prompts (10 dosya) + scripts/whoami.sh",
+      "category": "tooling",
+      "severity": "med",
+      "root_cause": "Lane'ler ~/Desktop/ollamas (integration/all-lanes) altında konsolide edilince izole worktree ollamas-tunnel-wt SİLİNDİ; ama governance/recipe/portable/IDENTITY içindeki ABSOLUTE yol referansları (~/Desktop/ollamas-tunnel-wt/...) ve whoami branch-guard (==feat/tunnel-v1) eski layout'a sabitti → komutlar olmayan dizini işaret etti / yanlış hijack-uyarısı.",
+      "evidence": "grep -rl ollamas-tunnel-wt tunnel/ → 10 dosya; whoami branch=integration/all-lanes → spurious uyarı.",
+      "fix": "Tüm yol-ref ollamas-tunnel-wt→ollamas/tunnel; whoami branch-guard {feat/tunnel-v1|integration/*} kabul; AGENTS/IDENTITY konsolidasyon notu.",
+      "prevention_rule": "Yol-referanslarını mümkünse repo-göreli tut. Konsolidasyon/taşımada absolute-path + branch-sabit referansları TOPLU güncelle (grep -rl doğrula). zsh gotcha: for f in $FILES word-split YAPMAZ → xargs/while-read kullan.",
+      "test_added": "grep -rl ollamas-tunnel-wt tunnel/ == boş; canlı doctor + whoami integration/all-lanes",
+      "recurrence_count": 0
     }
   ]
 }

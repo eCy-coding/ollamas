@@ -14,7 +14,7 @@ brew install qrencode          # opsiyonel, QR için (zero-dep değil ama opsiyo
 ## 1. Anahtar + config üret (MacBook)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel
+cd ~/Desktop/ollamas/tunnel
 node src/cli.ts config
 ```
 

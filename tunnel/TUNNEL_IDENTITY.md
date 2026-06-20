@@ -19,7 +19,7 @@ Cevaptan ÖNCE refresh zorunlu (evidence-first). Ezberden / bu dosyadaki örnek 
 ## 2. REFRESH PROSEDÜRÜ (cevaptan önce — zorunlu)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel && npm run whoami
+cd ~/Desktop/ollamas/tunnel && npm run whoami
 ```
 
 `scripts/whoami.sh` read-only çalışır (hiçbir şeyi değiştirmez) ve canlı basar:
@@ -45,7 +45,7 @@ GÖREV: ollamas'ı MacBook + iPhone'dan e2e %100 erişilebilir kılan egemen ağ
        — sıfır dış-hesap (Tailscale/Cloudflare SaaS YOK, self-host).
 
 SCOPE LAW:
-  • worktree: ~/Desktop/ollamas-tunnel-wt · branch: {{branch}}
+  • konum: ~/Desktop/ollamas/tunnel (konsolide) · branch: {{branch}}
   • yazarım: yalnız tunnel/**   • YASAK: server.ts/server//src/ → env+reverse-proxy devri
   • choke-point: switch.ts → TunnelEndpoint{url,transport,healthy} (pri LAN-TLS<mesh<reverse)
 
@@ -86,15 +86,15 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1..vT10 (son vT10) · test 148 · risk 23+3err · VERSION 10.0.0 (aligned)
-next: vT11 Ecosystem-2 (QR + iOS Shortcut status--json + endpoint handoff) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: integration/all-lanes (konsolide; eski izole-worktree silindi) · shipped: vT1..vT11 (son vT11) · test 148 · risk 23+4err · VERSION 11.0.0 (aligned)
+next: vT12 Ecosystem-2 (QR + iOS Shortcut status--json + endpoint handoff) · konum ~/Desktop/ollamas/tunnel · ollamas core v1.6.0
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
 health: HEALTH_PATH=/api/health (env-override) — ERR-TUNNEL-003 /healthz→/api/health (canlı ollamas'a karşı doğrulandı)
 onboarding: `tunnel setup [--daemon]` + `teardown` · canlı e2e: `tunnel doctor` (ollamas upstream OK ~24ms)
 otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench`/`doctor` · log-rotation oto
 güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free+rotated
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-✓ VERSION 10.0.0 = son shipped vT10 (drift yok)
+✓ VERSION 11.0.0 = son shipped vT11 (drift yok)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -133,3 +133,8 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
   ollamas'a karşı tünel KIRIKTI; 143 unit-test fake-fetch ile kör). Fix: merkezi HEALTH_PATH=/api/health.
   Yeni sürekli-yetenek `tunnel doctor` canlı e2e. KANIT: doctor → ollamas upstream OK 24-46ms /api/health.
   VERSION 10.0.0. 148/148. Ders: unit-test gerçek-path varsayamaz → canlı-e2e şart.
+- 2026-06-21 — vT11 (Konsolidasyon Adaptasyonu) ship: lane'ler `~/Desktop/ollamas` (integration/all-lanes)
+  altında KONSOLİDE edildi (izole worktree silindi) → tünel zaten entegre (vT1-vT10, tunnel/). EKSİK-FIX
+  (ERR-TUNNEL-004): 10 dosyada stale `ollamas-tunnel-wt`→`ollamas/tunnel` + whoami branch-guard
+  {feat/tunnel-v1|integration/*} + AGENTS/IDENTITY konsolidasyon notu. PUSH YOK (kullanıcı kararı, cross-lane).
+  CANLI E2E entegre-tree'de doğrulandı (doctor OK ~22ms, 148/148). VERSION 11.0.0. zsh word-split gotcha→xargs.

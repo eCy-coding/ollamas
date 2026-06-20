@@ -13,7 +13,7 @@ brew install caddy mkcert
 ## 1. CA + cert + Caddyfile + iOS profili üret
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel
+cd ~/Desktop/ollamas/tunnel
 node src/cli.ts tls
 ```
 

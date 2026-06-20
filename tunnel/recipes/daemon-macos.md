@@ -7,7 +7,7 @@
 ## Kur (bir kez)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel
+cd ~/Desktop/ollamas/tunnel
 node src/cli.ts daemon install
 # → ~/Library/LaunchAgents/com.ollamas.tunnel.autopilot.plist yazar + launchctl load
 ```
@@ -20,7 +20,7 @@ LaunchAgent şunu çalıştırır: `node src/cli.ts auto --watch` (otonom seçim
 
 ```bash
 node src/cli.ts daemon status          # installed/loaded/pid
-tail -f ~/Desktop/ollamas-tunnel-wt/tunnel/keys/daemon.log
+tail -f ~/Desktop/ollamas/tunnel/keys/daemon.log
 node src/cli.ts status                 # aktif transport + connectivity (online/lan-only/offline)
 ```
 

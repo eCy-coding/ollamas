@@ -4,7 +4,7 @@
   Bu dosyayı NEREYE yapıştırırsan yapıştır (yeni Claude/Opus oturumu, başka sekme, CI),
   tünel lane'i mevcut çalışma prensipleriyle, en verimli seçimlerle, KENDİ-İÇİNDE-YETER
   şekilde bootstrap eder. Revize gerektirmez. Yürütme dili İngilizce; operatör notu TR.
-  Tek varsayım: makinede ~/Desktop/ollamas-tunnel-wt worktree + Node ≥24 mevcut.
+  Tek varsayım: makinede ~/Desktop/ollamas worktree + Node ≥24 mevcut.
 -->
 
 # OLLAMAS TUNNEL/SWITCH LANE — PORTABLE EXECUTION PROMPT
@@ -16,7 +16,7 @@ and iPhone** — zero external account (no Tailscale/Cloudflare SaaS), self-host
 ## 0. FIRST ACTION (always — refresh live state, never answer from memory)
 
 ```bash
-cd ~/Desktop/ollamas-tunnel-wt/tunnel && git branch --show-current && npm run whoami
+cd ~/Desktop/ollamas/tunnel && git branch --show-current && npm run whoami
 ```
 - Verify branch == `feat/tunnel-v1` (else STOP: branch-hijack RISK-TUNNEL-001).
 - `npm run whoami` prints live: shipped versions (ROADMAP ✅ DONE) · NEXT · test count · errors_registry ·
@@ -64,10 +64,12 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
   vT6 (Observability `status`) · vT7 (Resilience `daemon`) · vT8 (Benchmark `bench` + log-rotation) ·
   vT9 (Onboarding `setup`) · **vT10 (Live integration fix: health-path /healthz→/api/health [ERR-TUNNEL-003,
   the tunnel was BROKEN against real ollamas] + `tunnel doctor` live e2e self-test — proven against running
-  ollamas: upstream OK ~24ms /api/health)**. Tests: 148/148, tsc 0, VERSION 10.0.0.
-- **NEXT = vT11** — Ecosystem-2 (QR onboarding `tunnel qr` + iOS Shortcut consuming `status --json` + endpoint
-  handoff to integrations-gateway). Pure, 0-manuel. (See ROADMAP vT11.)
-- Roadmap horizon: vT12+ connectivity-routing + remote reverse-tunnel (FRP/Bore — **parked**: manual VPS
+  ollamas: upstream OK ~24ms /api/health) · **vT11 (Consolidation: lane moved to `~/Desktop/ollamas/tunnel`
+  on branch `integration/all-lanes` — already integrated into the whole project; path refs fixed
+  ERR-TUNNEL-004; live e2e re-validated)**. Tests: 148/148, tsc 0, VERSION 11.0.0.
+- **NEXT = vT12** — Ecosystem-2 (QR onboarding `tunnel qr` + iOS Shortcut consuming `status --json` + endpoint
+  handoff to integrations-gateway). Pure, 0-manuel. (See ROADMAP vT12.)
+- Roadmap horizon: vT13+ connectivity-routing + remote reverse-tunnel (FRP/Bore — **parked**: manual VPS
   breaks 0-manuel + sovereign-zero-account; routing marginal since probe-timeout already gives correctness).
 - **Lesson (ERR-TUNNEL-003):** unit tests use fake fetch → they CANNOT assume the real health path. Always
   validate integration LIVE against running ollamas (`tunnel doctor`). Endpoint contracts live in one constant.

@@ -15,7 +15,8 @@
 | **vT8** | **Benchmark + Log-rotation** | per-transport p50/p90/min/max latency (`tunnel bench`) + size-based log-rotation (decisions.jsonl + daemon.log, RISK-018/020 ÇÖZÜLDÜ); **0 manuel** | percentile-nearest-rank/file-rotator (fikir) | ✅ DONE |
 | **vT9** | **Ecosystem Onboarding** | tek-komut `tunnel setup [--daemon]` (capability-detect → configure-capable → autoUp → daemon, idempotent) + `teardown`; **0-manuel onboarding capstone** | tailscale-up zero-config (fikir) + cmd-reuse | ✅ DONE |
 | **vT10** | **Live Integration Fix + `doctor`** | health-path /healthz→**/api/health** (ERR-TUNNEL-003, gerçek ollamas'a karşı tünel kırıktı) + `tunnel doctor` canlı e2e self-test; **CANLI 200 kanıtı** | ollamas-introspection | ✅ DONE |
-| vT11 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | NEXT |
+| **vT11** | **Konsolidasyon Adaptasyonu + Canlı E2E** | lane `ollamas-tunnel-wt`→`ollamas/tunnel` (integration/all-lanes), 10-dosya path-fix + whoami branch-guard + ERR-TUNNEL-004; **entegre-tree'de canlı doctor OK** | — | ✅ DONE |
+| vT12 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | NEXT |
 | vT12+ | Connectivity-routing + Remote reverse-tunnel | reachVia routing (reverse geldiğinde değerli) + FRP/Bore. **⚠️ PARKED**: reverse VPS+dış-hesap+manuel → "0 manuel"+egemen-zero-account ihlali; routing marjinal (probe-timeout yeter) | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
@@ -169,7 +170,21 @@
 - **Kanıt:** `node --test` **148/148 GREEN**, tsc 0. VERSION 10.0.0. (select "no healthy transport" = transport
   binary'leri yok; upstream-probe DOĞRU = Emre cihaz-kanıtı transport-IP'leri için.)
 
-## vT11 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
+## vT11 — DONE (kanıt) — Konsolidasyon Adaptasyonu + Canlı E2E
+
+> Kullanıcı "ollamas'ı çalıştır + tüm değişiklikleri projeye entegre et + canlı test" dedi. Bulgu: lane'ler
+> `~/Desktop/ollamas` (integration/all-lanes) altında KONSOLİDE edilmiş; tünel zaten entegre (vT1-vT10).
+
+- **Durum:** izole worktree `ollamas-tunnel-wt` silindi → lane `~/Desktop/ollamas/tunnel/` (integration/all-lanes).
+  Git-entegrasyonu ZATEN yapılmış (tunnel/ ağaçta, 148 test, tsc 0).
+- **Fix (ERR-TUNNEL-004):** 10 dosyada stale `ollamas-tunnel-wt`→`ollamas/tunnel`; whoami branch-guard
+  {feat/tunnel-v1|integration/*}; AGENTS/IDENTITY konsolidasyon notu. (zsh word-split gotcha→xargs.)
+- **Kararlar:** PUSH YOK (yalnız tunnel/** yerel commit; cross-lane+outward, remote eCy-coding≠adobemre1).
+  connectivity-routing/QR → vT12.
+- **CANLI E2E (entegre tree):** `node src/cli.ts doctor` → ollamas upstream OK ~22ms /api/health; whoami →
+  integration/all-lanes (hijack-uyarısı yok); node --test 148/148; tsc 0. VERSION 11.0.0.
+
+## vT12 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
 
 1. `src/qr.ts` — PURE QR (ANSI/SVG) endpoint/onboarding-URL render (zero-dep, qrencode binary opsiyonel) →
    iPhone tek-tarama. `cli.ts qr [endpoint]`.

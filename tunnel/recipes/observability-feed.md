@@ -7,7 +7,7 @@
 ## Feed dosyası
 
 ```
-~/Desktop/ollamas-tunnel-wt/tunnel/keys/decisions.jsonl   (gitignored, 0600, append-only)
+~/Desktop/ollamas/tunnel/keys/decisions.jsonl   (gitignored, 0600, append-only)
 ```
 
 `tunnel auto`, `tunnel select`, `tunnel status` her çalıştığında bir satır eklenir (best-effort).
@@ -35,7 +35,7 @@ Anahtar, preauth-key, URL-credential, private-key **ASLA** yazılmaz.
 
 ```bash
 # canlı tail → SSE / collect.ts'e besle (orchestration lane'de):
-tail -f ~/Desktop/ollamas-tunnel-wt/tunnel/keys/decisions.jsonl
+tail -f ~/Desktop/ollamas/tunnel/keys/decisions.jsonl
 # veya son N kararı oku (size-cap: dosya büyürse tail -n):
 tail -n 50 .../keys/decisions.jsonl | while read -r line; do echo "$line"; done
 ```
