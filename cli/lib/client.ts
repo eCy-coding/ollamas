@@ -3,6 +3,7 @@
 // choke-point (AGENTS.md §4). This file holds no dispatch logic.
 import type { DoctorReport } from "./output";
 import type { McpTool, McpProgress, McpResource, McpPrompt } from "./mcp";
+import type { BackupConfig } from "./backup";
 import { rpcEnvelope, parseRpcResponse } from "./mcp";
 
 export interface ChatMessage {
@@ -202,6 +203,29 @@ export class GatewayClient {
     });
     if (!r.ok) throw new Error(`gateway ${path} → ${r.status}`);
     return r.json();
+  }
+
+  // --- backup (v15): config-level encrypted backup ops. Admin-scoped (X-Admin-Token
+  // when set; falls back to Bearer). The downloaded blob is opaque ciphertext.
+  getBackupConfig(): Promise<BackupConfig> {
+    return this.adminGet("/api/backup/config");
+  }
+  setBackupConfig(cfg: Partial<BackupConfig> & { secretKey?: string }): Promise<{ success?: boolean }> {
+    return this.adminPost("/api/backup/config", cfg);
+  }
+  triggerBackup(): Promise<Record<string, any>> {
+    return this.adminPost("/api/backup/trigger", {});
+  }
+  async downloadBackup(): Promise<string> {
+    const r = await fetch(`${this.baseUrl}/api/backup/download`, {
+      headers: this.adminHeaders(),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!r.ok) throw new Error(adminError("/api/backup/download", r.status));
+    return r.text(); // encrypted blob — opaque, written verbatim to a file
+  }
+  restoreBackup(hexBlob: string): Promise<{ success?: boolean }> {
+    return this.adminPost("/api/backup/restore", { hexBlob });
   }
 
   // --- MCP client surface (v5). Tools cross the gateway's single choke-point at
