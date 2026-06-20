@@ -333,6 +333,34 @@
       "prevention_rule": "Host-exec servisi non-loopback bind'de DAİMA auth zorunlu (yoksa fail-closed başlamayı reddet); fail-open (auth-yok→aç) yasak. LAN/iOS exposure auth ön-koşulludur.",
       "test_added": "scripts/tests/bridge-security.test.ts (bindRequiresAuth) + canlı refuse smoke",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-020",
+      "ts": "2026-06-20",
+      "version": "v15",
+      "file": "scripts/tests/helpers/real-bridge.mjs + bridge-e2e.test.ts",
+      "category": "ios",
+      "severity": "med",
+      "root_cause": "Gerçek-bridge spawn'lı e2e: sabit port çakışması (paralel/leftover) + spawn edilen süreç sızıntısı (kill edilmezse zombie bridge) + her test run'da spawn yavaşlığı.",
+      "evidence": "real-bridge.mjs freePort() (net listen 0) + close() SIGTERM+await-exit; bridge-e2e describe.skipIf(!BRIDGE_E2E) (normal gate spawn etmez); afterEach tüm bridge'leri kapatır; canlı: pgrep terminal-bridge.mjs → sızıntı yok",
+      "fix": "freePort ile ephemeral port (PORT=0 falsy→7345 tuzağı bypass); afterEach garantili teardown; skipIf-default (opt-in BRIDGE_E2E=1, CI'da env); health-poll timeout'lu (asılı kalmaz).",
+      "prevention_rule": "Süreç-spawn'lı e2e DAİMA: ephemeral/free port + garantili teardown (afterEach close, SIGTERM+await) + opt-in (default skip, CI env) + readiness-poll timeout'lu; leftover süreç pgrep ile doğrula.",
+      "test_added": "scripts/tests/bridge-e2e.test.ts (BRIDGE_E2E=1 → 3 pass; env yok → 4 skip; leftover yok)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-021",
+      "ts": "2026-06-20",
+      "version": "v15",
+      "file": "bin/host-bridge/tools/*.mjs (hepsi bridgeRun) + tools-golden.test.ts",
+      "category": "ios",
+      "severity": "med",
+      "root_cause": "18 host tool'un HEPSİ bridge `/run` (osascript→görünür macOS terminal, TCC Automation izni + GUI oturum) kullanır → per-tool roundtrip HEADLESS/CI'da test EDİLEMEZ (platform kısıtı, fix'lenecek boşluk değil). Sahte-geçen e2e testi yazma riski.",
+      "evidence": "grep: tüm tools/*.mjs bridgeRun; git_ops headless e2e denendi→fail (osascript yok); /exec headless çalışır ama tool'lar /run kullanır",
+      "fix": "v15 e2e bridge'in HEADLESS yüzeyini kapsar (/exec roundtrip + v14 güvenlik 403/413/401 + fail-closed); /run→osascript path'i manual/local kısıt olarak BELGELENDİ (sahte test yazılmadı).",
+      "prevention_rule": "GUI/TCC-bağımlı path için otomatik 'geçen' test UYDURMA — dürüstçe limitasyon belgele; otomatik-edilebilir yüzeyi (headless /exec + güvenlik) test et. (İleride istenirse: bir tool'a opt-in /exec modu → v-sonraki.)",
+      "test_added": "bridge-e2e.test.ts header-note + bu kayıt (limitasyon dokümantasyonu)",
+      "recurrence_count": 0
     }
   ]
 }

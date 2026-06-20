@@ -171,6 +171,14 @@
 - `[2026-06-20] kind=phase | P3 gate + DOGFOOD | /run+/exec dokunulmadı (/health 200 regresyon yok); make gate GREEN + bridge-security 8 + canlı saldırı smoke; v14 gate.mjs --commit self-commit | git show --stat server/src yok | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v15 real e2e bridge harness) | mock-only açığı kapat: bridge-e2e.test.ts opt-in (BRIDGE_E2E=1) gerçek terminal-bridge spawn+token+tool roundtrip+güvenlik regresyon (403/413) assert; ilk hamle startBridge(port,token) helper + health_probe assert`
 
+## v15 — Real E2E Bridge Harness ✅ (mock-only açığı kapat)
+
+- `[2026-06-20] kind=phase | P1 real-bridge helper | tests/helpers/real-bridge.mjs: freePort (net listen 0, PORT=0→7345 tuzağı bypass) + startRealBridge gerçek terminal-bridge spawn + /health-poll timeout'lu → {started,url,proc,exitCode,close SIGTERM+await}; mock-bridge.mjs deseni | YEŞİL`
+- `[2026-06-20] kind=phase | P2 e2e test | bridge-e2e.test.ts skipIf(!BRIDGE_E2E): /health 200 + /exec echo roundtrip (gerçek bash) + v14 güvenlik regresyon-kilidi (traversal 403/etc-yazılmadı, oversized 413, no-auth 401, in-root 200) + fail-closed (0.0.0.0+no-auth→started:false exitCode≠0) | BRIDGE_E2E=1→3 pass, env yok→4 skip, leftover yok | YEŞİL`
+- `[2026-06-20] kind=note | DÜRÜST limitasyon RISK-SCR-021 | 18 tool HEPSİ /run (osascript GUI+TCC) → per-tool roundtrip headless-edilemez (platform kısıtı). Sahte-geçen test YAZILMADI; e2e headless yüzeyi (/exec+güvenlik+fail-closed) kapsar, /run manual/local belgelendi. git_ops headless denendi→fail→kaldırıldı`
+- `[2026-06-20] kind=phase | P3 wire + DOGFOOD | make e2e + scripts-ci.yml macOS gate step env BRIDGE_E2E=1 (CI gerçek e2e, local skip); RISK-SCR-020 (port/teardown) + 021; v15 gate.mjs --commit self-commit | make gate GREEN + drift 18 | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v16 install.sh LaunchAgent auto-load) | restart→bridge-down fix: install.sh plist install (renderPlist template→~/Library/LaunchAgents + launchctl bootstrap/enable, idempotent; uninstall bootout); ilk hamle pure renderPlist(template,{path,token}) + lib/test`
+
 ---
 
 ## Hata Anlatıları

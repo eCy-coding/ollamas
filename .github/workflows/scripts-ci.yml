@@ -45,6 +45,10 @@ jobs:
       # manual step-stitching, one source of gate truth (bin/host-bridge/gate.mjs).
       - name: Gate (make gate)
         run: make gate
+        env:
+          # Real-bridge e2e (spawns terminal-bridge headless: /exec + v14 security +
+          # fail-closed). Un-skips bridge-e2e.test.ts inside the gate's vitest run.
+          BRIDGE_E2E: "1"
 
   lint-workflows:
     runs-on: ubuntu-latest

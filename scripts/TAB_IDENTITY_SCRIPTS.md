@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v14 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v15 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v14 GÜVENLİK` — Host-Bridge Security Hardening (CRITICAL): /write path-confine (403, traversal kapatıldı ERR-SCR-006) + payload-cap 16MB (413, ERR-SCR-007) + non-loopback fail-closed bind (RISK-SCR-019) · gate: bridge-security 8 test + CANLI saldırı smoke (traversal/403, 20MB/413, /etc yazılmadı, fail-closed refuse, /health 200) + dogfood · inventory 14.0.0.
-- **next:** `v15` — **real e2e bridge harness** (mock-only açığı kapat). İlk hamle: `bridge-e2e.test.ts` opt-in (BRIDGE_E2E=1) — `startBridge(port,token)` helper (spawn+health-poll+teardown) + gerçek health_probe roundtrip + güvenlik regresyon (403/413) assert.
-- **horizon (geliştirilebilir):** v15 e2e-harness → v16 install.sh LaunchAgent auto-load (restart→bridge-down) → sonrası backlog. (incremental-gate=düşük-öncelik backlog.)
+- **shipped:** `v15` — Real E2E Bridge Harness (mock-only açığı kapat): gerçek terminal-bridge spawn (`helpers/real-bridge.mjs` freePort+health-poll+teardown) → `/exec` roundtrip + v14 güvenlik regresyon-kilidi (403/413/401/fail-closed), opt-in `BRIDGE_E2E=1` (`make e2e` + CI env) · gate: e2e 3 test (env yok→skip) + make gate GREEN + leftover-yok + dogfood · inventory 15.0.0. **Limitasyon:** 18 tool /run-osascript GUI-bağımlı→headless test-edilemez (RISK-SCR-021, dürüst belge).
+- **next:** `v16` — **install.sh LaunchAgent auto-load** (restart→bridge-down kapat). İlk hamle: pure `renderPlist(template,{path,token})` (string-replace) + lib/test → install.sh plist'i `~/Library/LaunchAgents/`'a yaz + `launchctl bootstrap/enable` (idempotent); uninstall.sh `bootout`.
+- **horizon (geliştirilebilir):** v16 LaunchAgent → sonrası backlog (incremental-gate düşük-öncelik; tool /exec-modu opsiyonel).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -52,9 +52,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v12 | Gate Auto-Commit + Budget (`gate.mjs --commit` scope-guard + opt-in `usage --budget` SLO-step) | ✅ |
 | v13 | Gate Watch Dev-Loop + TDD Scaffold (`gate --watch` fs.watch + `scaffold` stub generator) | ✅ |
 | v14 | Host-Bridge Security Hardening (/write confine 403 + payload-cap 413 + fail-closed bind) | ✅ GÜVENLİK |
-| **v15** | **real e2e bridge harness** (gerçek bridge spawn + tool roundtrip + güvenlik regresyon) | ⬜ NEXT |
-| v16 | install.sh LaunchAgent auto-load (restart→bridge-down) | backlog |
-| v17+ | backlog (incremental-gate düşük-öncelik) | açık |
+| v15 | Real E2E Bridge Harness (gerçek bridge spawn + /exec roundtrip + v14 güvenlik regresyon-kilidi) | ✅ |
+| **v16** | **install.sh LaunchAgent auto-load** (restart→bridge-down kapat) | ⬜ NEXT |
+| v17+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 

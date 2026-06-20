@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK** (host-bridge hardening: /write path-confine [403] + payload-cap [413] + non-loopback fail-closed bind; bridge-security 8 test + CANLI saldırı smoke + dogfood), **v15 NEXT (real e2e bridge test harness — mock-only açığı kapat)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅** (real e2e bridge harness: gerçek terminal-bridge spawn → /exec roundtrip + v14 güvenlik regresyon-kilidi [403/413/401/fail-closed], opt-in BRIDGE_E2E=1; e2e 3 test + CI env + dogfood), **v16 NEXT (install.sh LaunchAgent auto-load — restart→bridge-down kapat)**.
 
 > ⚠️ **v14 sapması (dürüst):** precomputed v14 (incremental-gate) = saf-DX cila, ürüne değmez → **backlog'a alındı**. İki audit host-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14 = **güvenlik** (North Star §0-2, iOS/LAN ön-koşulu). Backlog: incremental-gate (düşük), install.sh LaunchAgent auto-load (orta, v16).
 >
@@ -280,7 +280,28 @@
 
 **Gate (kanıt):** bridge-security 8 test + CANLI smoke (traversal→403, in-root→200, no-auth→401, 20MB→413, /etc/evilx yazılmadı, fail-closed refuse, /health 200) + make gate GREEN + dogfood.
 
-**Next precomputed (→v15 real e2e bridge harness):** mock-only açığı kapat — `scripts/tests/bridge-e2e.test.ts` opt-in (env BRIDGE_E2E=1): geçici port'ta gerçek terminal-bridge spawn + token + birkaç tool (health_probe/git_ops read-only) gerçek roundtrip + güvenlik regresyon (traversal 403/payload 413) assert; CI'da macOS job opsiyonel. İlk hamle = test-helper `startBridge(port,token)` (spawn+health-poll+teardown) + ilk gerçek health_probe assert.
+**Next precomputed (→v15 real e2e bridge harness):** [DONE — aşağı bak.]
+
+---
+
+## v15 — Real E2E Bridge Harness ✅ (mock-only açığı kapat)
+
+**Tema:** 18 tool + v14 güvenlik yalnız mock/manuel test edilmişti → gerçek terminal-bridge spawn'lı otomatik e2e. **DONE** (dogfood).
+
+**Phases (gerçekleşen):**
+1. ✅ **real-bridge helper** (`tests/helpers/real-bridge.mjs`): `freePort()` (net listen 0 — PORT=0 falsy→7345 tuzağı bypass) + `startRealBridge({token,bind,writeRoots,maxBody})` gerçek `terminal-bridge.mjs` spawn + /health-poll (timeout'lu) → `{started,url,proc,exitCode,close}`; close SIGTERM+await (sızıntı yok). mock-bridge.mjs deseni adopt.
+2. ✅ **e2e test** (`bridge-e2e.test.ts`, `describe.skipIf(!BRIDGE_E2E)`): /health 200 + /exec "echo e2e-ok" roundtrip (gerçek bash); **v14 güvenlik regresyon-kilidi** traversal→403 (/etc yazılmadı) / oversized→413 / no-auth→401 / in-root→200; **fail-closed** bind=0.0.0.0+no-auth→started:false+exitCode≠0.
+3. ✅ **wire**: `make e2e` + scripts-ci.yml macOS gate step `env BRIDGE_E2E=1` (CI gerçek e2e; local gate skipIf-atlar).
+
+**DÜRÜST limitasyon (RISK-SCR-021):** 18 tool'un HEPSİ `/run` (osascript→GUI terminal+TCC) kullanır → per-tool roundtrip headless test EDİLEMEZ (platform kısıtı). Sahte-geçen test yazılmadı; e2e headless yüzeyi (/exec + güvenlik + fail-closed) kapsar, /run path'i manual/local belgelendi.
+
+**Adopt:** in-repo `helpers/mock-bridge.mjs` spawn/teardown deseni + v14 smoke assertion'ları otomatikleştirildi + node child_process/net (builtin, wait-on fikri). Zero yeni dep.
+
+**Canonical prompt:** "real e2e bridge: helpers/real-bridge.mjs (freePort + startRealBridge spawn+health-poll+SIGTERM-teardown) + bridge-e2e.test.ts skipIf(!BRIDGE_E2E) (/exec roundtrip + v14 güvenlik 403/413/401 + fail-closed); make e2e + CI env; /run osascript headless-edilemez→belgele."
+
+**Gate (kanıt):** `BRIDGE_E2E=1 vitest bridge-e2e` 3 pass; env yok→4 skip; leftover süreç yok; make gate GREEN; drift 18; dogfood.
+
+**Next precomputed (→v16 install.sh LaunchAgent auto-load):** audit bulgusu — cihaz restart→bridge-down (kullanıcı elle start.sh). `install.sh`'e plist install adımı: `com.missioncontrol.terminalbridge.plist` template'i REPLACE_WITH_ABSOLUTE_PATH/TOKEN değerleriyle doldur → `~/Library/LaunchAgents/`'a yaz + `launchctl bootstrap/enable`; idempotent + uninstall.sh'te `launchctl bootout`. İlk hamle = pure `renderPlist(template, {path,token})` (string-replace) + lib/test, sonra install.sh wire.
 
 ---
 

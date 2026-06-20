@@ -6,7 +6,7 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e
 
 # Output binary folder
 BIN_DIR = bin
@@ -144,6 +144,10 @@ watch:
 ## scaffold: generate next-version TDD skeleton (test + lib stub). Usage: make scaffold F=<feature> [WRITE=1] [TOOL=1]
 scaffold:
 	@node bin/host-bridge/scaffold.mjs $(F) $(if $(TOOL),--tool,) $(if $(WRITE),--write,)
+
+## e2e: real-bridge end-to-end (spawns terminal-bridge; headless /exec + v14 security + fail-closed)
+e2e:
+	@BRIDGE_E2E=1 npx vitest run scripts/tests/bridge-e2e.test.ts
 
 ## clean: Remove all compiled target files and caches
 clean:
