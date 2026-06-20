@@ -6,7 +6,7 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e install-agent
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e install-agent doctor
 
 # Output binary folder
 BIN_DIR = bin
@@ -152,6 +152,10 @@ e2e:
 ## install-agent: install the host bridge as a reboot-durable macOS LaunchAgent (DRY_RUN=1 to rehearse)
 install-agent:
 	@bash bin/host-bridge/install-agent.sh
+
+## doctor: one-command M4 preflight — is the ollamas host setup e2e ready? (actionable hints)
+doctor:
+	@node bin/host-bridge/doctor.mjs
 
 ## clean: Remove all compiled target files and caches
 clean:

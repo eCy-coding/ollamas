@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v17 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v18 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v17` — Efficient Local-Model Auto-Select (§0-1, M4 verimlilik): pure `lib/model-select.mjs` (rankModels/pickModel — correct-first + tps/latency + data-driven min-tok/s+sizeGb) + `model_select` host-tool (cached benchmark.json→öner, re-bench yok) + benchmark.mjs DRY-refactor · gate: model-select 8 test + vitest 223/4skip + drift **19** + dogfood · inventory 17.0.0. (server/providers.ts dokunulmadı=advisory.)
-- **next:** `v18` — **cluster join/enroll hardening** (`join-cluster.sh` güvenli düğüm-kaydı). İlk hamle: pure `lib/enroll.mjs` `validateEnrollment({peer,token})` (URL/token şekil + loopback/LAN ayrımı, v14 bind-deseni) + test → join-cluster.sh wire. (Cluster lane cross-lane kontrol → yalnız scripts-domain join.sh.)
-- **horizon (geliştirilebilir):** v18 enroll → sonrası backlog (incremental-gate + tool /exec-modu düşük-öncelik).
+- **shipped:** `v18` — Doctor Preflight Readiness (M4 e2e tek-komut): `make doctor` — pure `lib/doctor.mjs` (nodeVersionOk + parseLaunchctlLoaded + evaluate iki-seviye critical/warn) + `doctor.mjs` CLI (node/drift critical + ollama/bridge/launchagent/token/benchmark warn + actionable hint) · gate: doctor 5 test + canlı dürüst readiness + drift **19** + dogfood · inventory 18.0.0. (standalone, registered-tool değil.)
+- **next:** `v19` — **operatör onboarding README** (v1-v18 tek e2e akış belgesi). İlk hamle: `bin/host-bridge/README.md` (veya OPERATING.md) iskeleti — install.sh→make install-agent→make doctor→tools_doctor→model_select→iOS; E2E_FLOW.md/MACOS_BASH_GUIDE.md'yi tek giriş-noktasına bağla; "0 manuel" akış + komut-referansı.
+- **horizon (geliştirilebilir):** v19 onboarding → backlog (join-cluster çok-düğüm/incremental-gate/tool-exec-modu düşük-öncelik).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -55,8 +55,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v15 | Real E2E Bridge Harness (gerçek bridge spawn + /exec roundtrip + v14 güvenlik regresyon-kilidi) | ✅ |
 | v16 | LaunchAgent Auto-Load (render-plist + install-agent.sh, reboot-durable bridge) | ✅ |
 | v17 | Efficient Local-Model Auto-Select (rankModels/pickModel + model_select tool, §0-1) | ✅ |
-| **v18** | **cluster join/enroll hardening** (`join-cluster.sh` güvenli düğüm-kaydı) | ⬜ NEXT |
-| v19+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
+| v18 | Doctor Preflight Readiness (`make doctor` — M4 e2e tek-komut hazırlık) | ✅ |
+| **v19** | **operatör onboarding README** (v1-v18 tek e2e akış belgesi) | ⬜ NEXT |
+| v20+ | backlog (join-cluster çok-düğüm / incremental-gate / tool /exec-modu düşük-öncelik) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 

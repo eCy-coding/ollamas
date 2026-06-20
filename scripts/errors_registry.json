@@ -417,6 +417,20 @@
       "prevention_rule": "Model/kaynak seçimi: correctness her zaman hıza üstün (yanlış-ama-hızlı diskalifiye); kaynak-kısıtı (RAM/size) DAİMA ölçülen-veriden (alan varsa), isimden TAHMİN etme; canlı bench'i test-suite ile eşzamanlı koşma (fixture kullan); ranking tek-kaynak pure fn (inline duplikasyon yok).",
       "test_added": "scripts/tests/model-select.test.ts (8 case: rank/metric/minTokS/maxSizeGb/fallback/empty)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-025",
+      "ts": "2026-06-20",
+      "version": "v18",
+      "file": "bin/host-bridge/doctor.mjs + lib/doctor.mjs",
+      "category": "registration",
+      "severity": "med",
+      "root_cause": "Preflight 'doctor' runtime/servis check'lerini (bridge-up, ollama-up, launchagent-loaded) CRITICAL yaparsa, sağlıklı-ama-çalışmayan (servis henüz başlatılmamış) kurulumda false-alarm verir; ayrıca fail'ler actionable olmazsa kullanıcı ne yapacağını bilmez (0-manuel ihlali).",
+      "evidence": "evaluate: critical yalnız invariant (node>=24, registry-drift); runtime check'ler warn (ok=true, ready=false); canlı make doctor → invariants PASS exit0, launchagent/bridge WARN+hint (dürüst, çünkü daemon kurulmadı)",
+      "fix": "İki-seviye: critical (değişmez gereksinim node/drift) vs warn (env-bağımlı runtime). ok=critical-fail-yok (exit0); ready=hepsi-ok. Her check actionable hint taşır (ne çalıştıracağını söyler). doctor standalone (registered tool değil → drift 19 sabit, tools_doctor ile çakışmaz).",
+      "prevention_rule": "Readiness/preflight: invariant'lar (sürüm, bütünlük) CRITICAL; runtime/servis (up/loaded) WARN (env-bağımlı, false-alarm yok); her fail DAİMA actionable-hint (çalıştırılacak komut). ok≠ready ayrımı netleştir.",
+      "test_added": "scripts/tests/doctor.test.ts (5 case: nodeVersionOk/parseLaunchctlLoaded/evaluate critical-vs-warn) + canlı make doctor",
+      "recurrence_count": 0
     }
   ]
 }

@@ -197,6 +197,14 @@
 - `[2026-06-20] kind=phase | P4 gate + DOGFOOD | make gate GREEN (model-select 8 + vitest 223/4skip + drift 19 + tsc 0); canlı ollama bench KOŞULMADI (flaky-eşzamanlı UK-08); v17 gate.mjs --commit self-commit | server/providers.ts dokunulmadı (advisory) | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v18 cluster join/enroll hardening) | join-cluster.sh güvenli düğüm-kaydı: pure lib/enroll.mjs validateEnrollment({peer,token}) URL/token şekil + loopback/LAN ayrımı (v14 deseni) + test→.sh wire; cluster lane cross-lane kontrol (yalnız scripts join.sh)`
 
+## v18 — Doctor Preflight Readiness ✅ (M4 e2e tek-komut hazırlık)
+
+- `[2026-06-20] kind=note | PIVOT (gereksiz-iş) | precomputed v18 join-cluster = çok-düğüm mesh (orchestrator binary, ToS-prompt, ayrı lane) → tek-M4+iPhone kullanıcı için spekülatif → backlog. Gerçek boşluk: v16 LaunchAgent yüklü-mü doğrulanmıyor + bütünsel M4-readiness tek-komut yok → v18=doctor`
+- `[2026-06-20] kind=phase | P1 pure lib | lib/doctor.mjs nodeVersionOk + parseLaunchctlLoaded (exit0/stdout) + evaluate iki-seviye {ok=critical-fail-yok, ready=hepsi-ok}; runtime=warn (env-bağımlı false-alarm yok RISK-SCR-025) | doctor.test.ts 5 case | YEŞİL`
+- `[2026-06-20] kind=phase | P2 doctor CLI | doctor.mjs critical(node≥24,drift exit0)+warn(ollama-cli/up,bridge.token,launchagent-loaded[launchctl print],bridge-health,app-health,benchmark.json) + actionable hint; standalone (registered değil→drift 19 sabit); make doctor | canlı: node✓/drift✓/ollama✓/app✓/token✓/benchmark✓ + launchagent/bridge WARN+hint (dürüst), exit0 | YEŞİL`
+- `[2026-06-20] kind=phase | P3 gate + DOGFOOD | drift-check/health_probe/install-agent-label beste (re-impl yok); make gate GREEN + drift 19; v18 gate.mjs --commit self-commit | server/tools dokunulmadı | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v19 operatör onboarding README) | v1-v18 tek e2e akışta belgele (install→install-agent→doctor→tools→model_select→iOS); E2E_FLOW/MACOS_BASH_GUIDE'ı tek giriş-noktasına bağla; ilk hamle README iskeleti + komut-referansı`
+
 ---
 
 ## Hata Anlatıları

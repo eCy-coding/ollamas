@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅ · v16 ✅ · v17 ✅** (efficient local-model auto-select §0-1: pure rankModels/pickModel [correct-first + tps/latency + data-driven min-tok/s+sizeGb-fit] + model_select host-tool [cached benchmark.json, re-bench yok] + benchmark.mjs DRY-refactor; model-select 8 test + drift 19 + dogfood), **v18 NEXT (cluster join/enroll script-hardening — join-cluster.sh güvenli düğüm kaydı)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅ · v16 ✅ · v17 ✅ · v18 ✅** (doctor preflight: tek-komut `make doctor` M4 e2e-hazırlık [node/drift critical + ollama/bridge/launchagent/token/benchmark warn+actionable-hint]; doctor 5 test + canlı dürüst readiness + drift 19 + dogfood), **v19 NEXT (operatör onboarding README — v1-v18 yeteneğini tek e2e akışta belgele: install→agent→doctor→tools→iOS)**.
 
 > ⚠️ **v14 sapması (dürüst):** precomputed v14 (incremental-gate) = saf-DX cila, ürüne değmez → **backlog'a alındı**. İki audit host-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14 = **güvenlik** (North Star §0-2, iOS/LAN ön-koşulu). Backlog: incremental-gate (düşük), install.sh LaunchAgent auto-load (orta, v16).
 >
@@ -339,7 +339,26 @@
 
 **Gate (kanıt):** model-select 8 test + vitest 223/4skip + drift 19 + tsc 0 + canlı `model_select --json` (mevcut benchmark.json→fallback-reason, correct-yok) + make gate GREEN + dogfood. **Canlı ollama bench KOŞULMADI** (flaky-eşzamanlı UK-08; mevcut json yeter).
 
-**Next precomputed (→v18 cluster join/enroll hardening):** `join-cluster.sh` (mevcut, DRY-guarded) güvenli düğüm-kaydı — token/peer doğrulama + idempotent enroll. İlk hamle: join-cluster.sh oku → pure `lib/enroll.mjs` `validateEnrollment({peer,token})` (URL/token şekil-doğrula, loopback/LAN ayrımı v14 bind-deseni) + test; sonra .sh wire. (Cluster lane ayrı olabilir → cross-lane kontrol; yalnız scripts-domain join.sh.)
+**Next precomputed (→v18 cluster join/enroll hardening):** [SAPILDI — join-cluster çok-düğüm mesh, tek-M4 kullanıcı için spekülatif → backlog. v18=doctor preflight. Aşağı bak.]
+
+---
+
+## v18 — Doctor Preflight Readiness ✅ (M4 e2e tek-komut hazırlık)
+
+**Tema:** "M4 ollamas'ım e2e hazır mı?" tek-komut (`make doctor`). **DONE** (dogfood). **Pivot:** precomputed join-cluster (çok-düğüm mesh) tek-M4+iPhone kullanıcı için spekülatif → backlog; gerçek boşluk = bütünsel readiness (v16 LaunchAgent'in yüklü olduğunu hiçbir şey doğrulamıyordu).
+
+**Phases (gerçekleşen):**
+1. ✅ **pure lib** (`lib/doctor.mjs`): `nodeVersionOk` (vXX≥min) + `parseLaunchctlLoaded` (exit0/stdout) + `evaluate(checks)` → iki-seviye `{ok=critical-fail-yok, ready=hepsi-ok}` (runtime=warn, env-bağımlı false-alarm yok RISK-SCR-025).
+2. ✅ **doctor CLI** (`doctor.mjs`, --json): critical (node≥24, drift exit0) + warn (ollama-cli/ollama-up/bridge.token/launchagent-loaded[launchctl print]/bridge-health/app-health/benchmark.json); her fail **actionable hint**. Standalone (registered tool DEĞİL → drift 19 sabit, tools_doctor çakışmaz). `make doctor`.
+3. ✅ Mevcut beste: drift-check (spawn) + health_probe fetch deseni + install-agent label + model_select benchmark.json. Re-impl yok.
+
+**Adopt:** brew/flutter `doctor` preflight+hint deseni; in-repo health_probe+drift-check beste. Zero yeni dep.
+
+**Canonical prompt:** "doctor preflight: pure lib/doctor.mjs (nodeVersionOk + parseLaunchctlLoaded + evaluate two-level critical/warn) + doctor.mjs CLI (node/drift critical + ollama/bridge/launchagent/token/benchmark warn + actionable hints) + make doctor; standalone (drift 19 sabit)."
+
+**Gate (kanıt):** doctor 5 test + canlı `make doctor` (bu M4: node✓/drift✓ critical→exit0; ollama✓/app✓/token✓/benchmark✓; launchagent+bridge WARN+hint dürüst çünkü daemon-kurulmadı) + drift 19 + make gate GREEN + dogfood.
+
+**Next precomputed (→v19 operatör onboarding README):** v1-v18 yeteneğini tek **e2e operatör akışında** belgele (`bin/host-bridge/README.md` veya `OPERATING.md`): install.sh → make install-agent → make doctor → tools (tools_doctor) → model_select → iOS (ios-bridge/Shortcuts). Mevcut E2E_FLOW.md/MACOS_BASH_GUIDE.md'yi tek giriş-noktasına bağla; "0 manuel" akışı netleştir. İlk hamle = README iskeleti + doctor/install-agent/gate komut-referansı (kanıt: dosya var + linkler geçerli).
 
 ---
 
