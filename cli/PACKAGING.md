@@ -47,10 +47,29 @@ npm run build:binary       # → dist/ollamas-darwin-arm64 (gitignored)
 - The compiled binary is named `ollamas-<os>-<arch>`; the CLI's launch guard
   matches `ollamas*`, so it runs correctly under any such name.
 
-> Future: when the host Node reaches **≥ 25.5**, a canonical `--build-sea` binary
-> can be added alongside Bun (codesign + notarize) — see ROADMAP v12.
+## 4. Single native binary (Node SEA — canonical, v12)
 
-## 4. Homebrew (draft)
+```sh
+npm run build:sea          # → dist/ollamas-darwin-arm64 (gitignored)
+./dist/ollamas-darwin-arm64 version
+```
+
+- Uses Node's official **Single Executable Application** flow via the **classic**
+  `node --experimental-sea-config` path — works on **Node ≥ 20** (no need for the
+  newer `--build-sea`, which lands in Node 25.5). Pipeline: esbuild bundle →
+  generate `dist/sea-prep.blob` → copy the running `node` → inject the blob with
+  **postject** → ad-hoc codesign.
+- `postject` is a **build-time devDependency** only; the CLI runtime stays zero-dep.
+- macOS: a signed binary's signature is **stripped before** injection and **re-signed
+  after** (postject edits a Mach-O segment, which breaks the signature).
+- **SEA vs Bun (honest):** SEA embeds the *same Node runtime the CLI targets* — no
+  third-party compiler, more robust — but is **larger** (~full Node, ~80 MB) and
+  starts a touch slower. Bun (`build:binary`) is **smaller/faster** but a separate
+  toolchain. Both are shipped; pick SEA where Bun isn't available, Bun where size
+  matters. The launch guard handles SEA via `node:sea` `isSea()` (a SEA has no
+  `argv[1]` script, so a name check alone would no-op the binary — N-029).
+
+## 5. Homebrew (draft)
 
 `packaging/Formula/ollamas.rb` is a **draft** prebuilt-binary formula. Shipping it
 is an explicit, outward-facing step (your account):

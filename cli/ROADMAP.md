@@ -16,8 +16,9 @@
 | **v9** | Packaging | shell completion (bash/zsh/fish) + hidden `__complete`; Bun `--compile` tek-binary (1.3.13 arm64 pin + ad-hoc codesign); Homebrew formula draft + PACKAGING.md; npm link | ✅ DONE |
 | **v10** | Self-update + plugin | `ollamas update` (manifest+sha256-verify+atomic-replace); checksum-gated plugin alt-komut sistemi; release-binary CI draft; UPDATE.md | ✅ DONE |
 | **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `resolveKeySource` precedence + `config keystore` migrate (aynı key bytes) + `--insecure-storage` opt-out | ✅ DONE |
-| **v12** | Node-SEA binary | `node --build-sea` canonical tek-binary (host Node≥25.5); `sea-config.json` + `build:sea` + codesign `-s -`; Bun default kalır, SEA canonical Node yolu | ▶ NEXT |
-| **v12+** | Ufuk (önceden-hesap) | v13 Completions-v2+man · v14 TUI-v2 · v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
+| **v12** | Node-SEA binary | **classic** `node --experimental-sea-config` (host Node 24.16, `--build-sea`/25.5 gerekmez) + postject inject + macOS remove-sign→inject→re-sign; `sea.ts` saf + `build:sea`; Bun alternate kalır, SEA canonical runtime-integrity | ✅ DONE |
+| **v13** | Completions v2 + man | `__complete` dinamik VALUES (model/profil canlı via gateway) + `man ollamas` (saf troff jeneratör) | ▶ NEXT |
+| **v13+** | Ufuk (önceden-hesap) | v14 TUI-v2 · v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
@@ -121,8 +122,15 @@
 - Testler: `cli-keychain`(8 saf)+`cli-keystore-source`(12 precedence matrisi)+parser/completion ek → **full 302 pass/1 skip** (v10:280). `cli-keychain-live`(3, **opt-in** `OLLAMAS_LIVE_KEYCHAIN=1`, macOS-guard, TEST service): canlı M4 keychain write→read **32-byte tam sadakat**→delete→null + `-U` upsert; TEST item temizlendi, **gerçek `ollamas/master-key` dokunulmadı**.
 - Choke-point korunur (`grep --include="*.ts" "from.*tool-registry" cli/` boş); VERSION **11.0.0**. `cli/KEYCHAIN.md` (kaynaklar+precedence+dürüst argv-leak/ACL notu+migrate+non-breaking). **Gotcha**: N-024 keychain per-USER (HOME-scoped değil) → live test TEST-service zorunlu; N-025 argv-leak-on-write (`security` stdin-yok, kabul+dokümante, READ sızdırmaz).
 
-## v12 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `sea-config.json` (main=dist bundle, disableExperimentalSEAWarning) + `package.json` `build:sea` script: `node --build-sea`→blob→`postject` inject→codesign `-s -`. Host Node≥25.5 guard (mevcut 24.16 → CI/doc, graceful-skip).
-2. İlk check = SEA binary `ollamas version` raporlar + `__complete` çalışır (E-006 binary-name guard zaten kapsar).
-3. Bun `--compile` default kalır; SEA canonical Node yolu (codesign/notarize→v18 imza).
-4. Testler: sea-config saf doğrulama; build-sea smoke (Node≥25.5 guard altında skip).
+## v12 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-RUNTIME-dep): Node.js resmi SEA (`node:sea`+`--experimental-sea-config`, MIT) **classic flow** — host Node 24.16 yeterli, `--build-sea`(25.5) GEREKMEZ; **nodejs/postject** (MIT, build-time devDep) blob inject; in-repo `build-binary.sh` codesign/target/dist-gitignore aynalandı; Bun `--compile` (v9) **alternate korundu**.
+- `cli/lib/sea.ts` (NEW saf): `seaConfigObject`+`SEA_FUSE`(resmi sentinel)+`postjectArgs`(testable argv, macho-segment off-macOS optional)+`seaOutName`(build-binary.sh ile aynı ad). `sea-config.json` (kök) + `cli/build-sea.sh` (bundle→`--experimental-sea-config` blob→`cp node`→macOS **remove-sign→postject NODE_SEA inject→re-sign**→verify) + `build:sea` script + `postject` devDep.
+- `cli/index.ts` `invokedDirectly` **SEA-aware** `isSea()` — Node SEA'da `argv[1]` script DEĞİL (ilk user arg) → isim-regex tek başına binary'yi no-op ederdi (**N-029**). VERSION 11.0.0→**12.0.0**.
+- Testler: `cli-sea`(7 saf) → **full 324 pass/4 skip** (v11-set:317). **Canlı macOS build** (`npm run build:sea`): blob→inject→ad-hoc-sign→`dist/ollamas-darwin-arm64 version`==12.0.0 + `__complete mcp`→sub-actions + help; dist gitignored.
+- Choke-point korunur; zero-RUNTIME-dep (`node dist/cli/index.cjs` hâlâ saf built-in, postject yalnız devDep). **Gotcha**: N-029 SEA-argv1-yok→isSea()-guard-şart; N-030 macOS-imzalı-binary-postject-öncesi-remove-sign-sonrası-re-sign; N-031 postject-build-time-devDep-runtime-zero-dep-korunur. **Outward-facing**: release upload kullanıcı kararı (release-binary.yml SEA target draft, publish YOK).
+
+## v13 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `__complete` dinamik VALUES: `config use <TAB>`→profiller (`listProfiles`), `-m/--model <TAB>`→modeller (gateway `/api/models` canlı, offline→statik). `completion.ts` pozisyon-derinliği genişlet (v5 N-019: shell prefix-filtreler).
+2. `man ollamas` saf troff jeneratör (`cli/lib/man.ts`, ronn/asciidoc-free) — HELP'ten üret; `ollamas man` veya build-time `dist/ollamas.1`.
+3. İlk check = `__complete config use`→profil listesi + `man` sayfası `mandoc -Tlint` temiz.
+4. Testler: dinamik-complete saf (profil/model fixture); troff jeneratör saf.

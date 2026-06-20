@@ -2,6 +2,11 @@
 # attaches them to the GitHub release on a vX.Y.Z tag. Wired, not auto-run: it
 # fires only when the maintainer pushes a tag (outward-facing, account-scoped).
 # Consumers then `ollamas update --manifest <release latest.json url>`.
+#
+# This draft builds via Bun (build:binary). The Node-SEA path (v12, `build:sea`) is
+# the canonical alternative — swap the `setup-bun` step for `actions/setup-node`
+# (>= 20) + `npm i -D postject` and run `npm run build:sea`; both emit the same
+# `dist/ollamas-<target>` name, so the checksum/upload steps are unchanged.
 name: release-binary
 
 on:
