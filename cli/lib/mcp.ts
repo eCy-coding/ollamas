@@ -137,3 +137,71 @@ export function renderToolResult(result: { content?: any[]; isError?: boolean })
   );
   return parts.join("\n");
 }
+
+// --- resources + prompts (v14) — the other half of the MCP spec surface the
+// gateway exposes (server/mcp/server.ts). Same JSON-RPC plumbing as tools. ---
+
+export interface McpResource {
+  uri: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface McpPromptArg {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+export interface McpPrompt {
+  name: string;
+  title?: string;
+  description?: string;
+  arguments?: McpPromptArg[];
+}
+
+// Flatten a resources/read result `contents[]` to text. Text contents print raw; a
+// binary blob is summarized (not dumped) so the terminal stays readable.
+export function renderResourceContents(result: { contents?: any[] }): string {
+  const parts = (result.contents || []).map((p) => {
+    if (typeof p?.text === "string") return p.text;
+    if (typeof p?.blob === "string") return `[blob ${p.mimeType || "application/octet-stream"}, ${p.blob.length} base64 chars]`;
+    return JSON.stringify(p);
+  });
+  return parts.join("\n");
+}
+
+// Render a prompts/get result (a templated message chain) as `role: text` lines.
+export function renderPromptMessages(result: { messages?: any[]; description?: string }): string {
+  const lines: string[] = [];
+  if (result.description) lines.push(`# ${result.description}`);
+  for (const m of result.messages || []) {
+    const role = m?.role || "?";
+    const ct = m?.content;
+    const text = ct?.type === "text" ? String(ct.text ?? "") : typeof ct === "string" ? ct : JSON.stringify(ct);
+    lines.push(`${role}: ${text}`);
+  }
+  return lines.join("\n");
+}
+
+// Prompt signature `name(req, [opt])` — required args green, optional in [brackets].
+// Mirrors formatToolSignature but over prompt arguments (which are plain strings).
+export function formatPromptSignature(p: McpPrompt, ctx: OutputCtx): string {
+  const parts = (p.arguments || []).map((a) =>
+    a.required ? c("green", a.name, ctx.color) : c("yellow", `[${a.name}]`, ctx.color),
+  );
+  return `${c("cyan", p.name, ctx.color)}(${parts.join(", ")})`;
+}
+
+// Build a prompts/get arguments object from repeated `k=v` pairs. Prompt arguments
+// are strings per the MCP spec — no schema coercion (unlike tool args).
+export function promptArgsFromPairs(pairs: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of pairs) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) continue;
+    out[pair.slice(0, eq)] = pair.slice(eq + 1);
+  }
+  return out;
+}
