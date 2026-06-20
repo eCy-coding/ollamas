@@ -169,3 +169,25 @@ GPL/bilinmeyen→`ref-only` · konsept→`idea`. (RISK-ORCH-005 ile uyumlu; vO5 
 **Scope law (§3):** detector git-grep/Read-only; panel yalnız `orchestration/plans/` altına yazar,
 lane tree'ye 0 yazım. Logbook: panel hataları `PANEL_SEYIR.md`'de (paylaşılan registry clobber
 edilmemesi için), T0 reconcile'da kanonik registry'ye merge.
+
+---
+
+## §12. Self-Identity Protokolü (kalıcı, daima-geliştirilebilir)
+
+**Kural:** "Bu sekmede görevin nedir? Ne yaparsın?" (veya kimlik/görev/rol sorusu) sorulunca,
+yanıtı **asla bayat memory'den** verme. `orchestration/bin/role.ts` canlı durumu üretir:
+mission (§0) + mevcut/sıradaki vO (ROADMAP, canlı parse via plan-next) + ollamas proje aşaması
+(server.json version + git branch) + **per-lane canlı tablo** (her lane shipped → geliştirilebilir
+sonraki + dirty; `collect()` REUSE) + araç envanteri + lane-bazlı NEXT sinyalleri.
+
+**Otomasyon:** Proje-local `.claude/settings.json` UserPromptSubmit hook → `role-hook.ts` soruyu
+regex'le yakalar → `role.ts` çıktısını `additionalContext` enjekte eder (eşleşmezse sessiz). Yalnız bu
+worktree'den açılan sekmede yüklenir = tek-sekme. Bu sekmeyi `cd ~/Desktop/ollamas-orchestration-wt`
+ile aç (proje-local settings o zaman yüklenir).
+
+**Self-update:** role.ts HARDCODE içermez — governance + git okur. ollamas ilerledikçe (yeni vO, yeni
+araç, yeni lane) yanıt otomatik güncellenir; elle bakım gerekmez (RISK-ORCH-002 stale-drift kapanır).
+
+**Daima-geliştirilebilir:** role.ts'i genişletmek serbest — yeni canlı sinyal ekle (örn dev-server
+durumu, son commit, test sayısı). Kaynak daima canlı dosyalar; yanıt onlarla birlikte gelişir.
+Manuel koşum: `tsx orchestration/bin/role.ts` → stdout + `ROLE.md`.

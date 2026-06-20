@@ -79,6 +79,13 @@
       "severity": "med",
       "note": "Version-drift false-negative/positive: drift.ts range karşılaştırması SALT-STRING ('^18.0.0' ≠ '^18.2.0' farklı sayılır, '~5.4' vs '5.4.0' farklı). Semver-aware DEĞİL → kasıtlı (pin tutarlılığı tam-eşitlik politikası, syncpack varsayılanı) ama bir lane '^18' diğeri '^18.0.0' yazarsa yanlış-pozitif drift raporlar. Prevention: drift yalnız SİNYAL (soft-warn, exit 0); gerçek uyumsuzluk için lane sekmesi `npm ls`/semver-satisfies ile doğrular; orchestration fixlemez, backlog verir (§3). Ayrıca git-worktree'ler aynı repo'nun ise root package.json paylaşır → drift=0 beklenir (ayrı paket dizinleri olmadıkça).",
       "applies_version": "vO5"
+    },
+    {
+      "id": "RISK-ORCH-012",
+      "category": "multi-worker-collision",
+      "severity": "med",
+      "note": "Tek 'self-answer' isteğine 3 paralel sekme aynı anda 3 ayrı impl yazdı (whoami/rolecard collect-tabanlı + identity/laneinfo duplikat + role/role-hook hook-tabanlı), hepsi untracked, suite RED (identity.test 1 fail). Çözüm T0-onaylı SENTEZ: oto-tetik hook (role-hook.ts) KORU + tek jeneratörü canonical collect.ts'e bağla (per-lane shipped→next fold) + plan-next doğru versiyon parser; duplikat sil (identity/laneinfo/whoami/rolecard+testleri). Prevention: aynı isteğe çok untracked impl → TEK sentezde birleştir (clobber etme, fikri fold et), kararı T0'a sun (deliverable şekli = kullanıcı kararı), commit-öncesi suite YEŞİL (kırık worker-test karantina/sil). LİMİT: per-lane tablo roadmapStruct (collect) gürültülü/truncated string verir (cockpit ile aynı) — bug değil, dürüst-canlı sinyal; lane ROADMAP body güncellenince düzelir; orchestration KENDİ current/next'i plan-next ile DOĞRU.",
+      "applies_version": "vO-ID"
     }
   ],
   "errors": [

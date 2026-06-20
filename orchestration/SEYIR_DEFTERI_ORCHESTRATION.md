@@ -194,3 +194,32 @@ renovate AGPL → idea-only (bundle yasak). GPL kod YOK.
 (MacBook + iOS); `MinhNgyuen/llm-benchmark` MIT + Rapid-MLX/mlx-lm Apple-Silicon baseline (scripts lane v4 zaten
 adopt etti — onların bench-metrics.mjs çıktısını TÜKET, yeniden hesaplama). Cockpit'e bench paneli + BENCH.md.
 collect.ts'e bench alanı. Oturum başı branch==feat/orchestration-v3.
+
+---
+
+## vO-ID — Self-Identity Protokolü (DONE 2026-06-20)
+
+**Hedef (T0/Emre):** "Bu sekmede görevin nedir? Ne yaparsın?" sorusuna **kalıcı + daima-geliştirilebilir
+self-answer** — ollamas'ın O ANki aşamasını (her lane shipped→geliştirilebilir) + bu sekmenin rolünü canlı yansıt.
+
+**Yapıldı (SENTEZ):** 3 paralel sekme aynı özelliği yazmıştı (whoami/rolecard + identity/laneinfo + role/role-hook),
+hepsi untracked, suite RED (identity.test 1 fail). T0 onayıyla TEK temiz sentez:
+- **Koru:** `role.ts` (mission §0 + plan-next vO doğru parser + ollamas server.json + araç envanteri) +
+  `role-hook.ts` (UserPromptSubmit regex → `additionalContext` oto-enjeksiyon, eşleşmezse sessiz) +
+  proje-local `.claude/settings.json` hook (yalnız bu worktree'de yüklenir = tek-sekme kapsamı) + `ROLE.md`.
+- **Fold (benim katkı):** `collect()` REUSE → **per-lane canlı tablo** (her lane shipped→geliştirilebilir + dirty)
+  + lane-bazlı NEXT sinyalleri. buildRoleAnswer'a additive, mevcut testler korundu.
+- **Sil:** `identity.ts`/`lib/laneinfo.ts`/`identity.test.ts` (duplikat + kırık) + `whoami.ts`/`lib/rolecard.ts`/
+  `whoami.test.ts` (redundant jeneratör — fikir role.ts'e fold edildi).
+
+**Kanıt:** vitest **195/195** yeşil (role.test per-lane tablo + laneNext + boş-graceful eklendi).
+Canlı `role.ts` → `[role] vO5→vO6, 8 lane, 10 araç` + ROLE.md per-lane tablo gerçek veri. Hook E2E:
+rol-sorusu→tam cevap enjekte, alakasız prompt→sessiz exit 0. Self-update: governance ilerleyince yanıt
+otomatik güncellenir (hardcode yok). Scope: yalnız orchestration/** + .claude; 8 lane ağacı 0 yazım.
+
+**GOTCHA (RISK-ORCH-012):** marker-collision — statik prose'a literal `AUTO:BEGIN/END` yazmak splice regex'ini
+yanılttı (ilk impl'imde); fix prose'dan literal marker çıkar. Per-lane string'leri roadmapStruct gürültülü
+(cockpit ile aynı, dürüst-canlı); orchestration KENDİ current/next'i plan-next ile DOĞRU.
+
+**Next precomputed (→vO6):** değişmedi — Benchmark aggregation (yukarı). role.ts genişletilebilir: bench tok/s
+özeti, son commit, test sayısı gibi canlı sinyaller (§12 daima-geliştirilebilir).
