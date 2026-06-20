@@ -25,6 +25,7 @@ export const SCHEMAS = {
   logbook: z.object({ action: z.enum(["add", "tail"]).optional(), text: z.string().optional(), n: z.number().int().positive().optional() }).strict(),
   self_heal: z.object({ apply: z.boolean().optional() }).strict(),
   seyir_stats: z.object({ json: z.boolean().optional(), window: z.number().int().positive().optional(), slo: z.number().positive().max(1).optional() }).strict(),
+  usage: z.object({ json: z.boolean().optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), rate: z.number().nonnegative().optional(), budget: z.number().nonnegative().optional() }).strict(),
 };
 
 // Zod schema -> JSON-schema (OpenAPI3 dialect; the shape the ReAct `tools:` param

@@ -38,21 +38,13 @@ jobs:
           node-version: "24"
       - name: Install deps
         run: npm ci
-      - name: Typecheck
-        run: npx tsc --noEmit
-      - name: Unit tests (vitest)
-        run: npx vitest run
       - name: Shell hardening tools
         run: brew install shellcheck shfmt bats-core
-      - name: Shell gate (shellcheck + shfmt + bats)
-        run: make harden
-      - name: Drift guard (inventory == schema == builders == files)
-        run: node bin/host-bridge/drift-check.mjs
-      - name: Swift build + test (iOS bridge, HMAC RFC 4231 parity)
-        run: |
-          cd bin/ios-bridge
-          swift build
-          swift test
+      # ONE command = the whole gate (tsc + vitest + make harden + drift-check + swift
+      # build/test). Same runner the autonomous trigger chain uses locally — zero
+      # manual step-stitching, one source of gate truth (bin/host-bridge/gate.mjs).
+      - name: Gate (make gate)
+        run: make gate
 
   lint-workflows:
     runs-on: ubuntu-latest

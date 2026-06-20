@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA** (drift detector + RFC4231 HMAC KAT parity + macOS CI + actionlint + portable operating prompt; node 174/1 + swift 15 + drift exit0 + harden 9), **v11 NEXT (Scripts-as-SaaS metering)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅** (autonomous one-command `make gate` + scripts-as-saas host-cost metering [usage tool, tier-weighted] + zero-manual decision defaults; node 185/1 + swift 15 + drift 18 + GATE GREEN), **v12 NEXT (gate auto-commit + metering budget enforcement)**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -196,6 +196,28 @@
 **Gate (kanıt):** `tsc 0 · vitest 174/1 · make harden 9 bats · drift-check exit0 (17 aligned) · swift build+test 15/0 · scripts-ci.yml YAML valid`.
 
 **Next precomputed (→v11 Scripts-as-SaaS metering):** `server/tool-registry.ts` execute()'taki metering noktasını oku (dokunma) → host tool invoke'larına per-call realtime usage event'i (tenant+tool+latency+exit) `recordEvent`/billing seam'ine yay; canonical AGENTS.md SaaS metering backlog'u ile hizala; ilk hamle = mevcut metering interceptor'ı + bridge-client emit() seam'ini eşle, çift-sayım önle (execute zaten sayıyorsa script-side sayma).
+
+---
+
+## v11 — Autonomous Gate + Scripts-as-SaaS Metering ✅ (zero-manual)
+
+**Tema:** 0 manuel seçim / 0 manuel işlem — tek-komut gate + host-cost metering. **DONE.**
+
+**Keşif düzeltmesi (scope):** tenant-billing SERVER-side (`execute()`→`store.recordUsage`→`billing/stripe`, tenantId'li) = **integrations lane, YASAK**. Host-bridge event'leri tenant taşımaz → v11 metering = **host-LOCAL cost telemetry** (çift-sayım yok, RISK-SCR-013).
+
+**Phases (gerçekleşen):**
+1. ✅ **Zero-manual gate runner**: `bin/host-bridge/gate.mjs` — pure `runGate(steps, exec)` (injectable, test'li) + CLI; sıralı tsc→vitest→harden→drift→swift→actionlint(skip-if-absent, sessiz değil); her step exit-code ZORUNLU (non-zero→throw, false-green imkansız RISK-SCR-014); JSON verdict + exit. `Makefile` `gate`/`ship` hedefi. `scripts-ci.yml` macOS job → tek `make gate`.
+2. ✅ **Host-cost metering**: `lib/metering.mjs` (pure) `meter(events,{toolTier,tierWeights,rate,budget})` → per-tool count/errors/billableUnits(tier-weighted safe1<host3<privileged10)/estCost + period rollup + budget breach. `lib/stats.mjs` deseni. + `tools/usage.mjs` (yeni host-tier tool) seyir jsonl→rapor (--json/--month/--budget→exit1). execute()/store/billing DOKUNULMADI.
+3. ✅ **4-nokta registration**: `usage` → inventory(v11.0.0)+schema.mjs+BUILDERS+tools/usage.mjs; drift-check **18 aligned**.
+4. ✅ **Zero-manual sözleşme**: `SCRIPTS_PORTABLE_PROMPT.md` "ZERO-MANUAL DECISION DEFAULTS" (adoption=en-yıldız+permissive, model auto-route, gate=`make gate`, yeşil→auto-commit, push/tag asla otomatik) + gate→tek-komut; `SCRIPTS_AGENTS §6` GATE=`make gate`+auto-commit+zero-manual; `TAB_IDENTITY` self-refresh+make gate.
+
+**Adopt:** `openmeterio/openmeter` (Apache, meter SUM/period **deseni**), `AgentOps-AI/tokencost` (MIT, rate-map **deseni**), `casey/just` (command-runner **fikri**; Makefile kullanıldı, yeni tool yok), GitHub `macos-latest`+`make gate`. Hepsi desen-port, zero yeni dep.
+
+**Canonical prompt:** "scripts zero-manual: pure runGate(steps,exec) tek-komut gate (tsc+vitest+harden+drift+swift, exit-code zorunlu, skip-loud) + Makefile gate/ship + scripts-ci tek make gate; pure metering.mjs (tier-weighted billable units + budget) + usage host-tool (seyir stream, host-local, tenant-billing'e dokunma); 4-nokta drift-safe; portable prompt ZERO-MANUAL DECISION DEFAULTS."
+
+**Gate (kanıt):** `make gate` → PASS tsc/vitest(185/1)/harden(9)/drift(18)/swift(15) · SKIP actionlint · **GATE GREEN exit0**. usage canlı: self_heal 33 call×host3=99 units.
+
+**Next precomputed (→v12 gate auto-commit + budget enforcement):** `gate.mjs`'e `--commit` modu (yeşilde per-file auto-stage + conventional commit, push hariç) — zero-manual COMMIT adımını da otomatikle; + `usage.mjs --budget`'i `make gate`'e opsiyonel SLO-step olarak ekle (aylık unit bütçesi aşımı→gate uyarısı); ilk hamle = gate.mjs commit-step iskeleti (git status --porcelain parse + scope-guard: yalnız scripts/+bin/ değişmişse).
 
 ---
 

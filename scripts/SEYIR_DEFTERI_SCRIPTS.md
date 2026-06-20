@@ -133,6 +133,16 @@
 - `[2026-06-20] kind=phase | P7 gate (taze) | tsc 0 + vitest 174/1 skip (+7: drift 6 + RFC KAT 1, regresyon yok) + make harden 9 bats + drift-check exit0 (17 aligned) + swift build+test 15/0 (was 14, +1 KAT) | YEŞİL — GA`
 - `[2026-06-20] kind=note | Next precomputed (→v11 Scripts-as-SaaS metering) | tool-registry.execute() metering noktasını oku (dokunma) → host tool invoke'larına per-call usage event (tenant+tool+latency+exit) billing/recordEvent seam'ine yay; çift-sayım önle (execute zaten sayıyorsa script-side sayma); canonical AGENTS.md SaaS metering backlog ile hizala`
 
+## v11 — Autonomous Gate + Scripts-as-SaaS Metering ✅ (zero-manual)
+
+- `[2026-06-20] kind=phase | P1 zero-manual gate | bin/host-bridge/gate.mjs pure runGate(steps,exec) injectable + CLI (tsc→vitest→harden→drift→swift→actionlint, exit-code zorunlu non-zero→throw, skip-loud); Makefile gate/ship; scripts-ci.yml macOS job→tek make gate | gate-runner.test.ts 5 case; canlı tsc-kırıkken GATE RED exit1→düzeltince GATE GREEN exit0 (RISK-SCR-014 false-green imkansız) | YEŞİL`
+- `[2026-06-20] kind=phase | P2 host-cost metering | lib/metering.mjs pure meter(events,{toolTier,tierWeights,rate,budget}) per-tool tier-weighted billableUnits+estCost+period+budget; tools/usage.mjs host-tier seyir-stream raporu (--json/--month/--budget→exit1) | metering.test.ts 6 case; canlı usage self_heal 33call×host3=99units | YEŞİL`
+- `[2026-06-20] kind=note | SCOPE düzeltmesi | tenant-billing SERVER-side (execute→store.recordUsage→stripe, tenantId) = integrations lane YASAK; host-bridge events tenant taşımaz → metering host-LOCAL cost telemetry, çift-sayım yok (RISK-SCR-013); execute()/store/billing DOKUNULMADI`
+- `[2026-06-20] kind=phase | P3 registration | usage → inventory(v11.0.0)+schema.mjs+BUILDERS+tools/usage.mjs; drift-check 18 aligned exit0 | YEŞİL`
+- `[2026-06-20] kind=phase | P4 zero-manual sözleşme | SCRIPTS_PORTABLE_PROMPT.md ZERO-MANUAL DECISION DEFAULTS (adoption/model/gate/commit auto; push+tag asla otomatik) + gate=make gate; SCRIPTS_AGENTS §6 GATE→make gate+auto-commit+zero-manual; TAB_IDENTITY self-refresh+make gate | — | YEŞİL`
+- `[2026-06-20] kind=phase | P5 gate (TEK KOMUT) | make gate → PASS tsc/vitest 185-1/harden 9/drift 18/swift 15 · SKIP actionlint · GATE GREEN exit0 | 0 manuel işlem kanıtı | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v12 gate auto-commit + budget enforcement) | gate.mjs --commit modu (yeşilde per-file auto-stage+conventional commit, push hariç, scope-guard scripts/+bin/) + usage --budget'i make gate'e opsiyonel SLO-step; ilk hamle gate.mjs commit-step iskeleti (git status --porcelain parse)`
+
 ---
 
 ## Hata Anlatıları

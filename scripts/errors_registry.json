@@ -207,6 +207,34 @@
       "prevention_rule": "Kripto paritesi DAİMA harici referansa (RFC/wycheproof) bağlanır, yalnız self-consistency'e değil; KAT üreteci beklenen sabite karşı self-check yapar.",
       "test_added": "scripts/tests/ios-hmac-vectors.test.ts (RFC4231 KAT) + HMACParityTests.swift testRFC4231KATsMatch",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-013",
+      "ts": "2026-06-20",
+      "version": "v11",
+      "file": "bin/host-bridge/lib/metering.mjs + tools/usage.mjs",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "Scripts-side metering tenant-billing'i (server tool-registry.execute()→store.recordUsage→billing/stripe, tenantId'li) çift-sayabilir; ya da execute() dispatch/billing mantığına dokunarak scope ihlali yapabilir.",
+      "evidence": "keşif: host-bridge events.mjs tenant alanı TAŞIMAZ (host-local); usage.mjs yalnız seyir jsonl okur, server store/billing'e yazmaz/çağırmaz",
+      "fix": "metering host-LOCAL cost telemetry olarak konumlandı (tenant-billing integrations lane'de kalır); usage.mjs read-only seyir stream tüketir, execute()/store/billing DOKUNULMADI; doc-note ile sınır işaretlendi.",
+      "prevention_rule": "Scripts metering yalnız host-local seyir event'leri üstünde çalışır (tenant alanı yok); tenant-billing (Stripe) ASLA scripts'ten — o integrations lane execute() seam'i. Scripts store/billing/execute() dispatch'e dokunmaz (yalnız read).",
+      "test_added": "scripts/tests/metering.test.ts (tier-weight/budget/period, pure)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-014",
+      "ts": "2026-06-20",
+      "version": "v11",
+      "file": "bin/host-bridge/gate.mjs",
+      "category": "shell",
+      "severity": "high",
+      "root_cause": "Tek-komut gate runner bir step'in non-zero exit'ini yutarsa false-green verir (CI yeşil sanır, kırık kod geçer). Skip'ler sessizce düşerse kapsam yanılgısı olur.",
+      "evidence": "spawnExec status!==0→throw; runGate her step ok'ını toplar, ok=every(non-skip ok); skip açıkça raporlanır (reason); canlı: tsc kırıkken GATE RED exit1, düzeltince GATE GREEN exit0",
+      "fix": "spawnExec non-zero exit'te THROW; runGate verdict.ok yalnız tüm non-skip step PASS ise true; skip'ler reason ile loglanır (sessiz düşme yok); runGate pure + gate-runner.test.ts ile doğrulanır.",
+      "prevention_rule": "Gate/CI runner her adımın exit-code'unu ZORUNLU kontrol eder (non-zero→fail); skip ASLA sessiz değil (reason logla); verdict pure ve unit-test'li olsun (false-green imkansız).",
+      "test_added": "scripts/tests/gate-runner.test.ts (5 case: all-pass/fail-names/skip-recorded/order/misuse-guard)",
+      "recurrence_count": 0
     }
   ]
 }

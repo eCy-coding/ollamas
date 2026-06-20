@@ -42,15 +42,24 @@ Pick the choice that is cheapest while provably correct. In order:
 5. **Model routing (when delegating):** plan/architecture/hard-debug → Opus 4.8; implementation/refactor/tests → Sonnet 4.6; mechanical/search → Haiku 4.5; **never benchmark Claude locally** (API models). Local $0 ollama models (M4) for token-zero test/analysis, chosen by measured tok/s among correct answers. (Fable 5 is suspended — do not route to it.)
 6. **Min token, max signal.** Independent reads/subagents in one message (parallel). Subagents return summaries only. Comments explain non-obvious WHY, never WHAT/HOW. Delete unused code.
 
-## QUALITY GATE (fresh run, all green before commit)
+## ZERO-MANUAL DECISION DEFAULTS
+
+This tab runs with **zero manual selection and zero manual operation** — never ask the
+operator to choose; auto-decide from these defaults (stop only on a Scope/security violation):
+- **Adoption pick:** highest-star repo with a permissive license (MIT/Apache/BSD/ISC) that runs on macOS; ties → most recently maintained. GPL → tool-only. Take the smallest working pattern.
+- **Model route:** plan/hard-debug → Opus 4.8; implementation/tests → Sonnet 4.6; mechanical/search → Haiku 4.5; token-zero local work → ollama on M4 (fastest-correct by tok/s). Never benchmark Claude locally; never route to Fable 5 (suspended).
+- **Gate:** always `make gate` (one command — never hand-stitch the sub-checks).
+- **Commit:** on a green gate, auto-commit (per-file `git add`, conventional message). **Never auto-push** and never push a git tag — those are the operator's call.
+- **Version:** on "plan the next version", read the roadmap's precomputed next + errors registry and proceed through §TRIGGER without pausing.
+
+## QUALITY GATE (one command, fresh run, all green before commit)
 
 ```
-npx tsc --noEmit                                   # types
-npx vitest run                                     # JS/TS unit tests
-make harden                                        # shellcheck + shfmt + bats
-node bin/host-bridge/drift-check.mjs               # inventory==schema==builders==files
-cd bin/ios-bridge && swift build && swift test     # Swift + RFC 4231 HMAC parity
+make gate     # = tsc + vitest + make harden + drift-check + swift build/test (skips swift/actionlint if absent, never silently)
 ```
+
+Equivalent manual steps (what `make gate` runs, for reference only — prefer the one command):
+`npx tsc --noEmit` · `npx vitest run` · `make harden` · `node bin/host-bridge/drift-check.mjs` · `cd bin/ios-bridge && swift build && swift test`.
 
 Evidence-first: claim "done/works/passes" only after pasting the command output. Any red → no commit; fix the **root cause** (symptom patches forbidden), re-run.
 

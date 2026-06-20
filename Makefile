@@ -6,7 +6,7 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship
 
 # Output binary folder
 BIN_DIR = bin
@@ -124,6 +124,14 @@ test-sh:
 ## harden: full shell hardening gate (lint + format-check + bats)
 harden: lint-sh fmt-sh-check test-sh
 	@echo "[+] shell hardening gate complete."
+
+## gate: ONE-command scripts quality gate (tsc + vitest + harden + drift + swift). Zero-manual.
+gate:
+	@node bin/host-bridge/gate.mjs
+
+## ship: run the full gate, then print the conventional-commit reminder (push stays manual)
+ship: gate
+	@echo "[+] gate green — stage per file and commit: feat|fix|refactor|chore|docs|test(scripts): vN <delta>"
 
 ## clean: Remove all compiled target files and caches
 clean:

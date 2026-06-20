@@ -1,6 +1,6 @@
 {
   "$comment": "Single source of truth for host-bridge tool registration (scripts lane, GA v10). registerHostScripts() reads this and registers each tool into ToolRegistry under the `host_` namespace. tier mirrors server/tool-registry.ts; schema validation is generated from bin/host-bridge/schema.mjs (zod -> zod-to-json-schema). Drift guard ENFORCED (v10): bin/host-bridge/drift-check.mjs asserts inventory names == schema.mjs keys == register BUILDERS == bin/host-bridge/tools/*.mjs files, and every entry file exists; run in CI (scripts-ci.yml). version follows the lane roadmap (vN -> N.0.0); 10.0.0 = GA.",
-  "version": "10.0.0",
+  "version": "11.0.0",
   "namespace": "host_",
   "tools": [
     { "name": "run_tests",    "tier": "safe",       "entry": "run_tests.mjs",    "description": "Run the project test suite on the host and return pass/fail." },
@@ -19,6 +19,7 @@
     { "name": "shell_check",  "tier": "safe",       "entry": "shell_check.mjs",  "description": "Syntax-check a shell command on the host." },
     { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." },
     { "name": "self_heal",    "tier": "host",       "entry": "self_heal.mjs",    "description": "Detect bridge failure and repair it (stale pid, hung 7345 node, restart/kickstart). DRY by default; pass apply=true to execute." },
-    { "name": "seyir_stats",  "tier": "host",       "entry": "seyir_stats.mjs",  "description": "Observability dashboard over the seyir event stream: error-rate, p50/p95/p99 latency, per-tool breakdown, SLO burn-rate. Exits non-zero on SLO alert. Host-operator tool (reads host-local ~/.llm-mission-control), not tenant-exposed." }
+    { "name": "seyir_stats",  "tier": "host",       "entry": "seyir_stats.mjs",  "description": "Observability dashboard over the seyir event stream: error-rate, p50/p95/p99 latency, per-tool breakdown, SLO burn-rate. Exits non-zero on SLO alert. Host-operator tool (reads host-local ~/.llm-mission-control), not tenant-exposed." },
+    { "name": "usage",        "tier": "host",       "entry": "usage.mjs",        "description": "Scripts-as-SaaS metering over the seyir event stream: per-tool call counts, tier-weighted billable units, estimated cost, period rollup, budget gate (exits non-zero over budget). Host-local cost telemetry (tenant billing is server-side), not tenant-exposed." }
   ]
 }

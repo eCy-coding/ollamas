@@ -29,17 +29,18 @@ git log --oneline -1                                  # son shipped commit + ver
 git branch --show-current                             # feat/scripts-v1 doğrula (branch-hijack ERR-SCR-001 kontrolü)
 grep -nE '^## v|Next precomputed|NEXT' scripts/ROADMAP_SCRIPTS.md | tail -8   # güncel ✅ + NEXT ⬜ + sonraki ilk hamle
 grep -c '"recurrence_count": [1-9]' scripts/errors_registry.json              # tekrarlayan hata var mı (>0 = proses borcu)
+# Sağlık/iş: make gate (v11 tek-komut gate) · node bin/host-bridge/tools/usage.mjs --json (metering)
 ```
 
 Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROADMAP'teki ilk `⬜` versiyon + onun "Next precomputed" bloğu. **horizon** = sonraki `⬜`/precomputed temalar.
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v10 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v11 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v10 GA` — GA & Drift Guard (standalone bidirectional drift detector + RFC4231 HMAC KAT parity + macOS CI scripts-ci.yml + actionlint + portable operating prompt + GA release notes) · gate: node 174/1 · swift 15 · drift-check exit0 (17 aligned) · make harden 9 · inventory 10.0.0 GA.
-- **next:** `v11` — **Scripts-as-SaaS metering**. İlk hamle: `tool-registry.execute()` metering noktasını oku (dokunma) → host tool invoke'larına per-call usage event (tenant+tool+latency+exit) billing/recordEvent seam'ine yay; çift-sayım önle (execute zaten sayıyorsa script-side sayma); canonical AGENTS.md SaaS metering backlog ile hizala.
-- **horizon (geliştirilebilir):** v11 metering → sonrası GA-sonrası backlog (en zayıf gate sinyalinden türet).
+- **shipped:** `v11` — Autonomous Gate + Scripts-as-SaaS Metering (zero-manual): tek-komut `make gate` (pure runGate, exit-code zorunlu) + host-cost metering `usage` tool (tier-weighted billable units + budget) + ZERO-MANUAL DECISION DEFAULTS · gate: GATE GREEN (tsc/vitest 185-1/harden 9/drift 18/swift 15, actionlint skip) · inventory 11.0.0.
+- **next:** `v12` — **gate auto-commit + budget enforcement**. İlk hamle: `gate.mjs --commit` modu (yeşilde per-file auto-stage + conventional commit, push hariç, scope-guard scripts/+bin/) + `usage --budget`'i `make gate`'e opsiyonel SLO-step.
+- **horizon (geliştirilebilir):** v12 auto-commit/budget → sonrası backlog (en zayıf gate sinyalinden türet).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -47,8 +48,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 |-------|------|-------|
 | v1–v9 | Foundation→Test Harness→iOS Bridge→Bench→Registration→Hardening→Self-Healing→Observability→iOS Deepening | ✅ DONE |
 | v10 | GA & Drift Guard (drift detector + RFC4231 HMAC KAT + macOS CI + actionlint + portable prompt) | ✅ GA |
-| **v11** | **Scripts-as-SaaS metering** (per-call realtime metering hook) | ⬜ NEXT |
-| v12+ | backlog — GA sonrası türetilir (en zayıf gate sinyalinden) | açık |
+| v11 | Autonomous Gate + Scripts-as-SaaS Metering (one-command `make gate` + host-cost `usage` + zero-manual) | ✅ |
+| **v12** | **gate auto-commit + budget enforcement** (`gate.mjs --commit` + `usage --budget` SLO-step) | ⬜ NEXT |
+| v13+ | backlog — türetilir (en zayıf gate sinyalinden) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 
