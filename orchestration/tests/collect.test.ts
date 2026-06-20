@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, type LaneStatus } from "../bin/lib/collect";
+import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, liveTabMap, type LaneStatus } from "../bin/lib/collect";
 import { parseAdoptionRows, gate } from "../bin/adopt";
 
 describe("roadmapStruct", () => {
@@ -95,5 +95,19 @@ describe("summarizeAdoptions (adopt.ts/licenses.ts REUSE)", () => {
   });
   it("boş satır → 0 total, 0 ihlal", () => {
     expect(summarizeAdoptions([], [])).toEqual({ total: 0, permissive: 0, weakCopyleft: 0, copyleft: 0, unknown: 0, violations: [] });
+  });
+});
+
+describe("liveTabMap — graceful (osascript'siz, deterministik)", () => {
+  it("ORCH_TAB_SIM=fail → null (sekme keşfi atlanır, asla throw)", () => {
+    const prev = process.env.ORCH_TAB_SIM;
+    process.env.ORCH_TAB_SIM = "fail";
+    try {
+      const r = liveTabMap();
+      expect(r).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.ORCH_TAB_SIM;
+      else process.env.ORCH_TAB_SIM = prev;
+    }
   });
 });
