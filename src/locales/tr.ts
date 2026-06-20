@@ -1,0 +1,26 @@
+// vF9 — Türkçe mesaj kataloğu (runtime id'ler, macro yok). en.ts ile aynı anahtarlar.
+export const messages: Record<string, string> = {
+  'app.tab.telemetry': 'Kokpit Paneli',
+  'app.tab.swarm': 'P2P Hesaplama Sürüsü',
+  'app.tab.saas': 'SaaS Ağ Geçidi',
+  'app.tab.pipeline': 'Pipeline Ajanı',
+  'app.tab.react-agent': 'ReAct Uzmanı',
+  'app.tab.files': 'Dosya Gezgini',
+  'app.tab.drive': 'Google Drive',
+  'app.tab.terminal': 'Etkileşimli CLI',
+  'app.tab.keys': 'Donanım Kasası',
+  'app.tab.security': 'Koruma Politikaları',
+  'app.tab.backup': 'AES Bulut Yedek',
+  'app.tab.automation': 'Sanal Denetleyici',
+  'app.tab.selftest': 'Doğrulama Kapıları',
+  'app.sidebar.explorer': 'Proje Gezgini',
+  'app.status.activeHost': 'Aktif Ana Makine:',
+  'app.status.workspace': 'Çalışma Alanı:',
+  'app.footer.copyright':
+    '© 2026 LLM Mission Control. Önce-Çevrimdışı, Gizlilik Korumalı Makine Kokpiti.',
+  'app.theme.toLight': 'Aydınlık temaya geç',
+  'app.theme.toDark': 'Karanlık temaya geç',
+  'app.lang.label': 'Dil',
+  'app.lang.tr': 'Türkçe',
+  'app.lang.en': 'English',
+};

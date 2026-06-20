@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:web": "playwright test -c playwright.web.config.ts",
-    "tokens": "style-dictionary build --config style-dictionary.config.js",
+    "tokens": "style-dictionary build --config style-dictionary.config.js && style-dictionary build --config style-dictionary.light.config.js",
     "build:client": "vite build",
     "size": "size-limit",
     "perf": "lhci autorun"
@@ -21,6 +21,8 @@
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^2.4.0",
+    "@lingui/core": "^6.4.0",
+    "@lingui/react": "^6.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pg": "^8.20.0",

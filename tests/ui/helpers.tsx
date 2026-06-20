@@ -1,11 +1,18 @@
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { vi } from 'vitest';
+import { I18nProvider } from '@lingui/react';
+import { ThemeProvider } from '../../src/lib/theme';
+import { i18n } from '../../src/lib/i18n';
 
-// Render an element with RTL. Thin wrapper so future providers (theme/i18n in
-// vF5/vF9) are added in one place.
+// Render an element with RTL wrapped in the app providers (theme + i18n, vF9),
+// so every UI test gets a working `useTheme()`/`useLingui()` in one place.
 export function renderUI(ui: ReactElement) {
-  return render(ui);
+  return render(
+    <ThemeProvider>
+      <I18nProvider i18n={i18n}>{ui}</I18nProvider>
+    </ThemeProvider>,
+  );
 }
 
 type RouteMap = Record<string, unknown>;

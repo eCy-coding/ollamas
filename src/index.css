@@ -1,6 +1,8 @@
 @import "tailwindcss";
 /* vF5 — design tokens generated from tokens/*.json via style-dictionary. */
 @import "./styles/tokens.css";
+/* vF9 — light theme override; applies only under [data-theme="light"]. */
+@import "./styles/tokens-light.css";
 
 /* @theme maps Tailwind utilities onto the generated token vars. Single source of
    truth = tokens/*.json, NOT here. Run `npm run tokens` to regenerate. */

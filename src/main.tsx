@@ -1,9 +1,12 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ErrorBoundary} from 'react-error-boundary';
+import {I18nProvider} from '@lingui/react';
 import App from './App.tsx';
 import './index.css';
 import {ErrorFallback} from './components/ErrorFallback';
+import {ThemeProvider} from './lib/theme';
+import {i18n} from './lib/i18n';
 import {logClientEvent} from './lib/apiClient';
 import {reportWebVitals} from './lib/vitals';
 
@@ -19,7 +22,11 @@ createRoot(document.getElementById('root')!).render(
         })
       }
     >
-      <App />
+      <ThemeProvider>
+        <I18nProvider i18n={i18n}>
+          <App />
+        </I18nProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

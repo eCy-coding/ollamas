@@ -19,12 +19,14 @@
 | `jsx-eslint/eslint-plugin-react-hooks` + `typescript-eslint` | MIT | vF6 | Flat-config temel (rules-of-hooks + TSX parser) | ✅ `eslint.config.js` |
 | `lesichkovm/chatui` + `deftio/quikchat` (desen) | fikir-level | vF7 | Zero-dep **Shadow-DOM** kapsülleme + `getReader()` SSE okuma deseni — kod kopyalanmadı, reimplement | ✅ `public/embed.js` |
 | `bvaughn/react-error-boundary` | MIT | vF8 | `<ErrorBoundary>` + `FallbackComponent` + `onError`→`logClientEvent`→/api/logbook | ✅ `src/main.tsx` + `ErrorFallback.tsx` |
+| `lingui/js-lingui` (`@lingui/core`+`@lingui/react` v6) | MIT | vF9 | **Runtime** TR/EN i18n (macro/vite-plugin YOK = build riski sıfır); ölçülen en küçük bundle (vs i18next ~22KB / react-intl ~13KB); `i18n.load/activate` + `useLingui()._` + `<I18nProvider>` | ✅ `src/lib/i18n.ts` + `src/locales/{en,tr}.ts` + `LanguageToggle.tsx` |
+| `[data-theme]` + CSS-var + no-flash (standart desen) | — (pattern) | vF9 | Tailwind v4 token-flip; `<head>` inline FOUC-guard script; component'ler theme-agnostik (`dark:` prefix yok) | ✅ `src/lib/theme.tsx` + `tokens-light/` + `index.html` + `ThemeToggle.tsx` |
 
 ## Sıradaki adopsiyonlar (planlı)
 
 | Repo | Lisans | vF | Ne için |
 |------|--------|----|---------|
-| `lingui/js-lingui` (`@lingui/core`) | MIT | vF9 | 2kB compile-time i18n (TR/EN), dead-code elim |
+| pure-SVG sparkline deseni (yeni dep yok) | — | vF10 | In-cockpit RUM/observability paneli (web-vitals + client error oranı) |
 
 ## Notlar
 - **iOS uyumluluğu** her adopsiyonun ön-koşulu: Safari/web-clip'te çalışmayan kütüphane alınmaz.

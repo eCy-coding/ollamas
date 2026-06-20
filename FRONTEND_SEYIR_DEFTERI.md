@@ -116,6 +116,21 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF9 — i18n (TR/EN) + Theming (light/dark) (DONE)
+- **Ne:** Gerçek light/dark tema (token-tabanlı, no-flash) + runtime TR/EN dil değişimi (kalıcı) + shell'de `ThemeToggle`+`LanguageToggle`. Ölçülü adoption (i18next ~22KB · react-intl ~13KB · **Lingui en küçük**) → `@lingui/core`+`@lingui/react` v6 **runtime** (macro/vite-plugin YOK = build riski sıfır).
+- **Nasıl:**
+  - **Light token katmanı** (vF5 üzerine): `tokens-light/color.json` (ayrı kaynak, key-collision yok) + `style-dictionary.light.config.js` → `src/styles/tokens-light.css` `[data-theme="light"]` scope; `npm run tokens` dark+light üretir, **dark byte-aynı** (`git diff` temiz). `index.css` light import.
+  - **Theme** (`src/lib/theme.tsx`): `ThemeProvider`+`useTheme`; init no-flash DOM `data-theme`→localStorage `ollamas.theme`→`prefers-color-scheme`; effect `documentElement.dataset.theme`+persist. `index.html` `<head>` no-flash inline script (paint öncesi `data-theme`+`lang`). `ThemeToggle.tsx` (Sun/Moon, `aria-pressed`, i18n label).
+  - **Shell migration** (`App.tsx`): `themeMode` state SİL → token utility (`bg-immersive-bg/sidebar`, `text-immersive-*`, `border-immersive-border`); 5 themeMode-gated nokta. Dark görünüm korunur (token dark = eski hardcoded).
+  - **i18n** (`src/lib/i18n.ts`): `i18n.load({en,tr})` + `activateLocale` (persist `ollamas.locale` + `<html lang>`); init `navigator.language` fallback. `src/locales/{en,tr}.ts` ~22 key (13 tab + shell). `main.tsx` `<I18nProvider>` (ThemeProvider içinde). `App.tsx` `useLingui()._` ile shell+tab çeviri. `LanguageToggle.tsx` (TR/EN, reaktif).
+  - **Test** (`helpers.tsx` renderUI → ThemeProvider+I18nProvider wrap; mevcut testler otomatik provider alır): `theme.test.tsx` (data-theme flip+persist+aria-pressed), `i18n.test.tsx` (catalog swap + LanguageToggle persist + `<html lang>`).
+- **Niçin:** Eski tema toggle kozmetikti (renkler hardcoded); gerçek token-flip + no-flash. Operatör TR, cockpit EN → çift dil. En hafif i18n = bütçe-dostu.
+- **Kanıt:** `npm run lint` 0 · `vitest` **114 pass/1 skip** (+3) · React e2e **10 pass** · web e2e **5 pass** · `vite build` OK · size cockpit **112.14KB/140** (@lingui+theme/i18n +~4KB) / embed 2.51KB · `npm run tokens` dark byte-aynı.
+- **Açık iz (tracked, gizlenmedi):** Derin component renk-migration'ı (13 component'in hardcoded `bg-[#08090d]`/`text-slate-*`'leri — demo wizard, status bar, panel iç renkleri, badge'ler) bu versiyonda DEĞİL → ayrı **contrast/theme sweep** (vF10+ veya bağımsız). Shell theme-aware; iç paneller hâlâ dark-sabit. Status badge'leri (LIVE/DEMO) + demo wizard metni i18n DIŞI (teknik/monospace) → ikinci string batch.
+- **Sonraki (önceden hesaplandı):** **vF10 Observability & Self-Heal** — vF8 client error sinyalleri (`react_error`/`window_error`/`unhandled_rejection` → `/api/logbook`) + web-vitals'ı toplayan in-cockpit RUM paneli (pure-SVG timeseries, yeni dep yok) + perf/görsel-regresyon gate. İlk adım: `/api/logbook` GET'ten son N olayı çeken `useLogbook` hook + `ObservabilityPanel` component (telemetry tab altına) + hata-oranı/p75-vitals özet kartı.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).

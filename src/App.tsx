@@ -14,6 +14,9 @@ import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
 import { VirtualController } from "./components/VirtualController";
 import { SaaSAdmin } from "./components/SaaSAdmin";
+import { ThemeToggle } from "./components/ThemeToggle";
+import { LanguageToggle } from "./components/LanguageToggle";
+import { useLingui } from "@lingui/react";
 import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
 import { 
@@ -26,7 +29,7 @@ export default function App() {
   const [telemetry, setTelemetry] = useState<HealthTelemetry | null>(null);
   const [activeTab, setActiveTab] = useState<string>("telemetry");
   const [notifications, setNotifications] = useState<{ id: string; msg: string; type: "success" | "error" | "info" }[]>([]);
-  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
+  const { _ } = useLingui();
 
   const notify = (msg: string, type: "success" | "error" | "info" = "info") => {
     const id = Math.random().toString(36).slice(2, 9);
@@ -53,20 +56,21 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Tab labels resolve via i18n at render: `_(`app.tab.${id}`)` (vF9).
   const tabs = [
-    { id: "telemetry", label: "Cockpit Dashboard", icon: <Cpu className="w-4 h-4" /> },
-    { id: "swarm", label: "P2P Computing Swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
-    { id: "saas", label: "SaaS Gateway", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
-    { id: "pipeline", label: "Pipeline Agent", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
-    { id: "react-agent", label: "ReAct Specialist", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
-    { id: "files", label: "Files Explorer", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
-    { id: "drive", label: "Google Drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
-    { id: "terminal", label: "Interactive CLI", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
-    { id: "keys", label: "Hardware Vault", icon: <Key className="w-4 h-4 text-indigo-400" /> },
-    { id: "security", label: "Guard Policies", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
-    { id: "backup", label: "AES Cloud Backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
-    { id: "automation", label: "Virtual Controller", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
-    { id: "selftest", label: "Verify Gates", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
+    { id: "telemetry", icon: <Cpu className="w-4 h-4" /> },
+    { id: "swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
+    { id: "saas", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
+    { id: "pipeline", icon: <Sparkles className="w-4 h-4 text-purple-400" /> },
+    { id: "react-agent", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
+    { id: "files", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
+    { id: "drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
+    { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
+    { id: "keys", icon: <Key className="w-4 h-4 text-indigo-400" /> },
+    { id: "security", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
+    { id: "backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
+    { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
+    { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
   ];
 
   // Map header status badge
@@ -98,11 +102,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
-      themeMode === "dark" 
-        ? "bg-[#050608] text-slate-300" 
-        : "bg-slate-50 text-slate-900"
-    }`}>
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-immersive-bg text-immersive-text-muted">
       
       {/* Dynamic Toast Notifications (Corner Overlay) */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
@@ -127,9 +127,7 @@ export default function App() {
       </div>
 
       {/* Global Header */}
-      <header className={`border-b h-14 px-6 flex items-center justify-between gap-4 ${
-        themeMode === "dark" ? "border-white/5 bg-[#08090d]" : "border-slate-200 bg-white"
-      }`}>
+      <header className="border-b h-14 px-6 flex items-center justify-between gap-4 border-immersive-border bg-immersive-sidebar">
         <div className="flex items-center gap-4">
           <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-lg">
             <div className="w-4 h-4 border-2 border-white/90 rotate-45"></div>
@@ -145,12 +143,8 @@ export default function App() {
 
         <div className="flex items-center gap-3.5">
           {getHeaderBadge()}
-          <button 
-            onClick={() => setThemeMode(themeMode === "dark" ? "light" : "dark")}
-            className="text-slate-400 hover:text-white text-xs border border-white/10 rounded px-2.5 py-1 whitespace-nowrap"
-          >
-            {themeMode === "dark" ? "Light theme" : "Dark theme"}
-          </button>
+          <LanguageToggle />
+          <ThemeToggle />
         </div>
       </header>
 
@@ -159,10 +153,8 @@ export default function App() {
         
         {/* Left Side Sidebar / Tab Controls */}
         <div className="lg:col-span-1 space-y-4">
-          <div className={`p-4 rounded border ${
-            themeMode === "dark" ? "bg-[#08090d] border-white/5" : "bg-white border-slate-200"
-          }`}>
-            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-3.5 tracking-widest font-bold">Project Explorer</span>
+          <div className="p-4 rounded border bg-immersive-sidebar border-immersive-border">
+            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-3.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
             <nav aria-label="Primary" className="flex flex-col gap-1.5">
               {tabs.map((tab) => (
                 <button
@@ -176,7 +168,7 @@ export default function App() {
                   }`}
                 >
                   {tab.icon}
-                  <span>{tab.label}</span>
+                  <span>{_(`app.tab.${tab.id}`)}</span>
                 </button>
               ))}
             </nav>
@@ -211,12 +203,12 @@ export default function App() {
           {/* Top Status Indicators bar */}
           <div className="bg-[#08090d] border border-white/5 rounded px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 text-xs font-mono">
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-slate-500">Active Host:</span>
+              <span className="text-slate-500">{_('app.status.activeHost')}</span>
               <span className="text-slate-300 font-semibold">{telemetry ? telemetry.os.platform : "Loading..."}</span>
             </div>
             <div className="hidden md:block text-slate-800">|</div>
             <div className="flex items-center gap-1.5 truncate">
-              <span className="text-slate-500">Workspace:</span>
+              <span className="text-slate-500">{_('app.status.workspace')}</span>
               <span className="text-slate-300 truncate font-semibold" title={telemetry?.workspacePath}>{telemetry ? telemetry.workspacePath : "Connecting..."}</span>
             </div>
           </div>
@@ -319,10 +311,8 @@ export default function App() {
       </main>
 
       {/* Global Footer */}
-      <footer className={`border-t px-6 py-4 text-center text-xs font-mono tracking-wider ${
-        themeMode === "dark" ? "border-white/5 bg-[#050608] text-slate-500" : "border-slate-200 bg-white text-slate-600"
-      }`}>
-        <p>© 2026 LLM Mission Control. Offline-First Privacy Secured Machine Cockpit.</p>
+      <footer className="border-t px-6 py-4 text-center text-xs font-mono tracking-wider border-immersive-border bg-immersive-bg text-immersive-text-dim">
+        <p>{_('app.footer.copyright')}</p>
       </footer>
     </div>
   );

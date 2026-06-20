@@ -1,0 +1,15 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+[data-theme="light"] {
+  --ollamas-color-bg-base: #ffffff;
+  --ollamas-color-bg-sidebar: #f8fafc;
+  --ollamas-color-bg-panel: #f1f5f9;
+  --ollamas-color-border-subtle: rgba(15, 23, 42, 0.08);
+  --ollamas-color-text-bright: #0f172a;
+  --ollamas-color-text-muted: #475569;
+  --ollamas-color-text-dim: #94a3b8;
+  --ollamas-color-accent-indigo: #4f46e5;
+  --ollamas-color-accent-emerald: #059669;
+}
