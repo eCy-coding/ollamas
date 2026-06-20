@@ -71,6 +71,27 @@ describe("auditDuplication", () => {
       { name: "adopt.ts", purpose: "lisans disiplini gate" },
     ])).toEqual([]);
   });
+  it("FP-regression: yalnız corpus-common (yüksek-DF) kelime paylaşımı → dup YOK (ERR-ORCH-016)", () => {
+    // autopilot↔horizon FP analoğu: ortak kelimeler corpus'ta her tool'da → yüksek-DF → ayırt-edici değil.
+    const gaps = auditDuplication([
+      { name: "autopilot.ts", purpose: "orchestration çalıştır auto manuel chainrunner zincir" },
+      { name: "horizon.ts", purpose: "orchestration çalıştır auto manuel roadmapgen ufuk" },
+      { name: "doctor.ts", purpose: "orchestration çalıştır auto manuel readiness teşhis" },
+      { name: "status.ts", purpose: "orchestration çalıştır auto manuel matris durum" },
+    ]);
+    expect(gaps).toEqual([]);
+  });
+  it("corpus içinde GERÇEK dup (distinktif ortak kelime) → flag", () => {
+    // alpha/beta/gamma yalnız 2 tool'da (düşük-DF, distinktif) → gerçek örtüşme yakalanır.
+    const gaps = auditDuplication([
+      { name: "dupA.ts", purpose: "orchestration çalıştır alpha beta gamma" },
+      { name: "dupB.ts", purpose: "orchestration çalıştır alpha beta gamma" },
+      { name: "other1.ts", purpose: "orchestration çalıştır delta" },
+      { name: "other2.ts", purpose: "orchestration çalıştır epsilon" },
+    ]);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].target).toMatch(/dupA.*dupB/);
+  });
 });
 
 describe("scoreCompleteness — deterministik", () => {

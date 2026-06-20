@@ -75,15 +75,22 @@ export function auditCoverage(exportsByFile: { file: string; fns: string[] }[], 
 /** Duplication: iki aracın amaç-keyword örtüşmesi yüksekse olası-dup. */
 export function auditDuplication(tools: { name: string; purpose: string }[]): Gap[] {
   const out: Gap[] = [];
+  // TF-IDF mantığı (FP kök-fix, ERR-ORCH-016): corpus'ta ÇOK dosyada geçen kelime ayırt-edici DEĞİL
+  // (yüksek document-frequency → stopword). Önceki heuristic generic corpus-common kelimelerle
+  // ("orchestration/çalıştır/zero/read/only/json"...) 2-overlap'ta sahte-dup üretiyordu (autopilot↔horizon FP).
+  const df = new Map<string, number>();
+  for (const t of tools) for (const w of new Set(keywords(t.purpose))) df.set(w, (df.get(w) || 0) + 1);
+  const maxDF = Math.max(2, Math.ceil(tools.length * 0.3)); // ayırt-edici = tool'ların ≤%30'unda görülür
+  const distinctive = (w: string) => (df.get(w) || 0) <= maxDF;
   for (let i = 0; i < tools.length; i++) {
     for (let j = i + 1; j < tools.length; j++) {
-      const a = new Set(keywords(tools[i].purpose));
-      const b = keywords(tools[j].purpose);
+      const a = new Set(keywords(tools[i].purpose).filter(distinctive));
+      const b = keywords(tools[j].purpose).filter(distinctive);
       if (!a.size || !b.length) continue;
       const overlap = b.filter((k) => a.has(k)).length;
       const ratio = overlap / Math.min(a.size, b.length);
       if (overlap >= 2 && ratio >= 0.5) {
-        out.push({ kind: "duplication", severity: "med", target: `${tools[i].name}↔${tools[j].name}`, detail: `${tools[i].name} ve ${tools[j].name} amaç-örtüşmesi yüksek (${overlap} ortak kelime) — olası duplicate`, action: `${tools[i].name}/${tools[j].name} dedup ya da rol ayrımını netleştir` });
+        out.push({ kind: "duplication", severity: "med", target: `${tools[i].name}↔${tools[j].name}`, detail: `${tools[i].name} ve ${tools[j].name} ayırt-edici amaç-örtüşmesi (${overlap} distinktif kelime) — olası duplicate`, action: `${tools[i].name}/${tools[j].name} dedup ya da rol ayrımını netleştir` });
       }
     }
   }
