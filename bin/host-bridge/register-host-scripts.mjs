@@ -18,9 +18,16 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SCHEMAS, toJsonSchema, validateArgs } from "./schema.mjs";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-// repo root is two levels up from bin/host-bridge/
-const DEFAULT_INVENTORY = join(HERE, "..", "..", "scripts", "inventory.json");
+// import.meta.url is a real URL under ESM (tsx/node), but esbuild's CJS bundle
+// rewrites import.meta to {} → fileURLToPath(undefined) throws at module load and
+// crashes the bundled dist/server.cjs at boot. Guard it: ESM keeps the correct
+// source-relative path; the CJS bundle falls back to cwd (correct when the server
+// is launched from the repo root, where scripts/inventory.json lives).
+const HERE = (() => { try { return dirname(fileURLToPath(import.meta.url)); } catch { return undefined; } })();
+// repo root is two levels up from bin/host-bridge/ (ESM); cwd-relative in the bundle.
+const DEFAULT_INVENTORY = HERE
+  ? join(HERE, "..", "..", "scripts", "inventory.json")
+  : join(process.cwd(), "scripts", "inventory.json");
 
 // argv builders mirror server/tool-registry.ts. Each gets the validated args +
 // deps (for shArg shell-quoting) and returns { argv, timeoutMs?, stdin? }.
