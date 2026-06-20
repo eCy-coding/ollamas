@@ -102,6 +102,11 @@ fi
 # Bridge tools run on the host, so the container needs the HOST repo path. Export
 # it (unless already set) so docker-compose's ${HOST_TOOLS_DIR} passthrough works.
 export HOST_TOOLS_DIR="${HOST_TOOLS_DIR:-$(pwd)/bin/host-bridge/tools}"
+# Canonical artifacts/ binary architecture: compile native binaries + manifest
+# (non-fatal — Makefile skips per-language when a toolchain is absent). The
+# gateway discovers them via ARTIFACTS_DIR (server/artifacts.ts).
+export ARTIFACTS_DIR="${ARTIFACTS_DIR:-$(pwd)/artifacts}"
+make build-all >/dev/null 2>&1 && log "native binaries built → artifacts/" || warn "native binary build skipped (toolchain absent)"
 log "container build + up --wait..."
 if [ "$DRY_RUN" = "1" ]; then
   printf '\033[35m[DRY]\033[0m would run: docker compose up -d --build --wait\n'

@@ -50,6 +50,7 @@ function logSeyir(entry: Record<string, any>) {
 // Host-side macOS bridge client (iTerm2/Terminal.app, host exec, host writes).
 // Extracted to ./server/host-bridge (v1.8) so the stdio entry point shares it.
 import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } from "./server/host-bridge";
+import { discoverBinaries } from "./server/artifacts";
 
 // Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
 const TOOL_DEPS: ToolDeps = {
@@ -254,6 +255,7 @@ async function initializeServer() {
       workspacePath: db.data.workspacePath,
       permissions: db.data.permissions,
       hasBackupEnabled: db.data.backup.enabled,
+      binaries: discoverBinaries(),
       db: dbUp ? "up" : "down",
     });
   });
