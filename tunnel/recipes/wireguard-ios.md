@@ -45,7 +45,7 @@ wg show                   # peer + handshake doğrula
 iPhone'da (Safari, Shortcuts HTTP, veya bir terminal app):
 
 ```
-GET http://10.7.0.1:3000/healthz   →  200 OK
+GET http://10.7.0.1:3000/api/health   →  200 OK
 ```
 
 `tunnel select` MacBook'tan da doğrular:

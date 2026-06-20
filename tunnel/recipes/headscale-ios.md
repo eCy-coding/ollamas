@@ -41,7 +41,7 @@ headscale preauthkeys create --user ollamas --reusable --expiration 24h   # ← 
 
 iPhone (mesh aktif, WiFi'de VEYA hücresel/remote):
 ```
-http://100.64.0.1:3000/healthz  → 200
+http://100.64.0.1:3000/api/health  → 200
 ```
 > 100.64.0.1 = headscale'in bu Mac'e atadığı mesh IP (`node src/cli.ts mesh` → "ollamas over mesh").
 

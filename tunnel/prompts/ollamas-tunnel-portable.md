@@ -60,16 +60,17 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
-- **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Switch Engine `tunnel auto`) ·
-  vT5 (Security: guard + vault + `rotate`) · vT6 (Observability: `status` + sparkline + JSONL feed) ·
-  vT7 (Resilience: `daemon install` LaunchAgent login-auto + crash-restart) · vT8 (Benchmark `bench` p50/p90 +
-  log-rotation) · **vT9 (Ecosystem onboarding: `tunnel setup [--daemon]` = one command detects capable
-  transports → configures → brings up → installs daemon; idempotent; `teardown` — the 0-manuel onboarding
-  capstone)**. Tests: 143/143, tsc 0, VERSION 9.0.0.
-- **NEXT = vT10** — Ecosystem-2 (QR onboarding `tunnel qr` + iOS Shortcut consuming `status --json` + endpoint
-  handoff to integrations-gateway). Pure, 0-manuel. (See ROADMAP vT10.)
-- Roadmap horizon: vT11+ connectivity-routing + remote reverse-tunnel (FRP/Bore — **parked**: manual VPS
+- **Shipped:** vT1–vT3 (WireGuard / LAN-TLS / Headscale mesh) · vT4 (Switch Engine `auto`) · vT5 (Security) ·
+  vT6 (Observability `status`) · vT7 (Resilience `daemon`) · vT8 (Benchmark `bench` + log-rotation) ·
+  vT9 (Onboarding `setup`) · **vT10 (Live integration fix: health-path /healthz→/api/health [ERR-TUNNEL-003,
+  the tunnel was BROKEN against real ollamas] + `tunnel doctor` live e2e self-test — proven against running
+  ollamas: upstream OK ~24ms /api/health)**. Tests: 148/148, tsc 0, VERSION 10.0.0.
+- **NEXT = vT11** — Ecosystem-2 (QR onboarding `tunnel qr` + iOS Shortcut consuming `status --json` + endpoint
+  handoff to integrations-gateway). Pure, 0-manuel. (See ROADMAP vT11.)
+- Roadmap horizon: vT12+ connectivity-routing + remote reverse-tunnel (FRP/Bore — **parked**: manual VPS
   breaks 0-manuel + sovereign-zero-account; routing marginal since probe-timeout already gives correctness).
+- **Lesson (ERR-TUNNEL-003):** unit tests use fake fetch → they CANNOT assume the real health path. Always
+  validate integration LIVE against running ollamas (`tunnel doctor`). Endpoint contracts live in one constant.
 - **0-manuel invariant:** `setup --daemon` one command from zero → autonomous tunnel; afterward login-auto +
   crash-restart; `auto` self-heals; `status`/`bench` read-only; secrets auto-keyfile; logs auto-rotate. Nothing
   prompts; transport choice is capability-automatic. Honest limit: auto-keyfile co-located (RISK-014); brew

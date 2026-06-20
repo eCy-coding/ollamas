@@ -10,7 +10,7 @@
 import { spawn } from "node:child_process";
 import type { Transport, TunnelEndpoint } from "../transport.ts";
 import { PRIORITY } from "../transport.ts";
-import { probeHttp } from "../health.ts";
+import { probeHttp, HEALTH_PATH } from "../health.ts";
 
 export interface HeadscalePlan {
   /** Self-hosted coordination URL clients log in to, e.g. "https://emre-mbp.local:8080". */
@@ -127,7 +127,7 @@ export class HeadscaleTransport implements Transport {
 
   async probe(): Promise<boolean> {
     // requirePrivateHost: only probe the CGNAT mesh IP (DNS-rebind guard, vT5).
-    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz", { requirePrivateHost: true });
+    this.healthy = await probeHttp(serviceUrl(this.plan), HEALTH_PATH, { requirePrivateHost: true });
     return this.healthy;
   }
 

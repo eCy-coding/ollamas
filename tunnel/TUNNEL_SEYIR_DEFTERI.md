@@ -191,9 +191,28 @@
 - **Kanıt:** `node --test` → **143/143 green** (setup 6 yeni); `typecheck` 0; `node src/cli.ts setup` →
   binary-yok zarif plan+brew-hint (0-prompt). VERSION 9.0.0.
 
+## Faz 12 — Live Integration Fix + `doctor` (vT10) — GERÇEK ollamas'a karşı
+
+- **Kullanıcı: "ollamas'ı çalıştır + gerçek görevde test et."** 9 versiyon unit-test'liydi ama hiç canlı
+  ollamas'a koşulmamıştı. Canlı koşum **kritik bug açığa çıkardı (ERR-TUNNEL-003):** tünel `/healthz` probe
+  ediyordu, ollamas health = `/api/health` (`/healthz`=401) → gerçek ollamas'a karşı switch hiçbir transport'u
+  healthy görmez = TÜNEL KIRIK. 143 unit-test yakalayamadı (fake-fetch /healthz=200 = canlı-kör nokta).
+- **Ne:** merkezi `HEALTH_PATH` (default /api/health, env-override) → probe default + 3 transport + cli + 3 recipe.
+  `doctor.ts` PURE report + `cli.ts doctor [--json]` (ollamas upstream probe + selectAuto + connectivity + capable).
+- **Nasıl:** tek-sabit merkezi endpoint sözleşmesi; doctor canlı self-test (localhost:3000 loopback→guard izin).
+  Probe-path testleri PURE; entegrasyon CANLI doğrulandı (unit-test gerçek-path varsayamaz — prevention).
+- **Niçin:** kullanıcının "gerçek görevde test" isteği = canlı-kör noktayı kapat; tünel artık gerçek ollamas'a
+  forward edebileceğini KANITLAR.
+- **CANLI KANIT (gerçek ollamas, port 3000):**
+  - `node src/cli.ts doctor` → `ollamas upstream : OK 46ms (http://localhost:3000/api/health)` · exit 0 · online.
+  - Regresyon: `OLLAMAS_HEALTH_PATH=/healthz doctor` → `UNREACHABLE (.../healthz)` (eski bug) vs default `OK 24ms`.
+  - `node --test` **148/148 green** (doctor 3 + health +2); tsc 0. VERSION 10.0.0.
+- select/status "no healthy transport" = wg/caddy/headscale binary yok (transport-IP endpoint'leri Emre cihaz-
+  kanıtı); ama UPSTREAM (ollamas reachability) artık DOĞRU path'te canlı doğrulandı.
+
 ---
-**Toplam (vT1..vT9 kod):** 5 governance + 21 src modül (…+setup) + 20 test dosya (143 test) + 6
-iOS/feed/daemon/onboarding reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
-tsc 0 + test 143/143. VERSION 9.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
-ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7 device-daemon + vT9 sıfırdan-kurulum
-Emre'de; vT4/vT5/vT6/vT8 cihaz-kanıtı gerektirmez — 0 manuel. RISK-018/020 vT8'de çözüldü.
+**Toplam (vT1..vT10 kod):** 5 governance + 23 src modül (…+doctor) + 22 test dosya (148 test) + 6 reçete +
+1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 148/148. VERSION 10.0.0.
+Gotcha ERR-TUNNEL-001 (strip param-property), -002 (test glob → node --test), **-003 (health-path /healthz→
+/api/health, canlı-e2e şart)**. vT1/vT2/vT3 + vT7 daemon + vT9 setup cihaz-kanıtı Emre'de; **vT10 ollamas
+upstream CANLI 200 doğrulandı**; transport-IP endpoint'leri (binary gerektirir) Emre'de. RISK-018/020 vT8'de çözüldü.

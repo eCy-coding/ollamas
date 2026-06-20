@@ -43,7 +43,7 @@ caddy run --config keys/Caddyfile --adapter caddyfile
 iPhone Safari/Shortcuts (aynı WiFi):
 
 ```
-GET https://<host>.local/healthz   →  200 OK  (kilit ikonu, sertifika güvenilir)
+GET https://<host>.local/api/health   →  200 OK  (kilit ikonu, sertifika güvenilir)
 ```
 
 MacBook'tan switch doğrula (LAN-TLS, WireGuard'a tercih edilir):

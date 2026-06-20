@@ -86,14 +86,15 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1..vT9 (son vT9) · test 143 · risk 23+2err · VERSION 9.0.0 (aligned)
-next: vT10 Ecosystem-2 (QR + iOS Shortcut status--json + endpoint handoff) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: feat/tunnel-v1 · shipped: vT1..vT10 (son vT10) · test 148 · risk 23+3err · VERSION 10.0.0 (aligned)
+next: vT11 Ecosystem-2 (QR + iOS Shortcut status--json + endpoint handoff) · ollamas core v1.6.0 / feat/v1.11-roots-abort
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
-onboarding: `tunnel setup [--daemon]` tek-komut sıfırdan-otonom (idempotent, capability-detect) + `teardown`
-otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench` · log-rotation oto
+health: HEALTH_PATH=/api/health (env-override) — ERR-TUNNEL-003 /healthz→/api/health (canlı ollamas'a karşı doğrulandı)
+onboarding: `tunnel setup [--daemon]` + `teardown` · canlı e2e: `tunnel doctor` (ollamas upstream OK ~24ms)
+otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench`/`doctor` · log-rotation oto
 güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free+rotated
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-✓ VERSION 9.0.0 = son shipped vT9 (drift yok)
+✓ VERSION 10.0.0 = son shipped vT10 (drift yok)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -127,3 +128,8 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
   sıfırdan-otonom (capability-detect→configure-capable→autoUp→daemon, idempotent) + `teardown`. mevcut cmd
   REUSE (gereksiz-iş yok). connectivity-routing yine ertelendi (marjinal — probe-timeout yeter, dürüst).
   Critical-tespit: onboarding > routing (0-manuel North-Star). VERSION 9.0.0. 143/143.
+- 2026-06-20 — vT10 (Live Integration Fix + doctor) ship: kullanıcı "ollamas'ı çalıştır+gerçek test" → CANLI
+  koşum **ERR-TUNNEL-003** açığa çıkardı (tünel `/healthz` probe ediyordu, ollamas=`/api/health`; gerçek
+  ollamas'a karşı tünel KIRIKTI; 143 unit-test fake-fetch ile kör). Fix: merkezi HEALTH_PATH=/api/health.
+  Yeni sürekli-yetenek `tunnel doctor` canlı e2e. KANIT: doctor → ollamas upstream OK 24-46ms /api/health.
+  VERSION 10.0.0. 148/148. Ders: unit-test gerçek-path varsayamaz → canlı-e2e şart.

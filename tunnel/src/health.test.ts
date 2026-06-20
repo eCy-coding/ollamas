@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { probeHttp, probeHttps, type HttpsRequestImpl } from "./health.ts";
+import { probeHttp, probeHttps, HEALTH_PATH, type HttpsRequestImpl } from "./health.ts";
 
 // Fake node:https request: an EventEmitter doubling as ClientRequest.
 // `behavior` decides what happens after .end() is called.
@@ -45,6 +45,21 @@ function fakeHttps(behavior: { status?: number; error?: boolean; hang?: boolean 
 
 const fakeFetch = (status: number): typeof fetch =>
   (async () => new Response(null, { status })) as unknown as typeof fetch;
+
+test("HEALTH_PATH defaults to ollamas /api/health (NOT /healthz — ERR-TUNNEL-003)", () => {
+  // env may override, but default must be the real ollamas public health route.
+  assert.equal(HEALTH_PATH, process.env.OLLAMAS_HEALTH_PATH ?? "/api/health");
+});
+
+test("probeHttp default path is HEALTH_PATH (hits /api/health)", async () => {
+  let seen = "";
+  const capturing = (async (url: string) => {
+    seen = url;
+    return new Response(null, { status: 200 });
+  }) as unknown as typeof fetch;
+  await probeHttp("http://10.7.0.1:3000", undefined, { fetchImpl: capturing });
+  assert.equal(seen, `http://10.7.0.1:3000${HEALTH_PATH}`);
+});
 
 test("probe returns true on 200", async () => {
   assert.equal(await probeHttp("http://x:3000", "/healthz", { fetchImpl: fakeFetch(200) }), true);

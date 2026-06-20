@@ -14,8 +14,9 @@
 | **vT7** | **Resilience / Always-On Daemon** | LaunchAgent (RunAtLoad+KeepAlive) `tunnel auto --watch` login'de oto + crash-restart + connectivity classify (online/lan-only/offline); **0 manuel işlem capstone** | launchd-keepalive/Connectivity (MIT/fikir) | ✅ DONE |
 | **vT8** | **Benchmark + Log-rotation** | per-transport p50/p90/min/max latency (`tunnel bench`) + size-based log-rotation (decisions.jsonl + daemon.log, RISK-018/020 ÇÖZÜLDÜ); **0 manuel** | percentile-nearest-rank/file-rotator (fikir) | ✅ DONE |
 | **vT9** | **Ecosystem Onboarding** | tek-komut `tunnel setup [--daemon]` (capability-detect → configure-capable → autoUp → daemon, idempotent) + `teardown`; **0-manuel onboarding capstone** | tailscale-up zero-config (fikir) + cmd-reuse | ✅ DONE |
-| vT10 | Ecosystem-2 | QR onboarding + iOS Shortcut `status --json` tüketimi + integrations-gateway federation doc + multi-tenant exposure policy | — | NEXT |
-| vT11+ | Connectivity-routing + Remote reverse-tunnel | reachVia routing (reverse geldiğinde değerli) + FRP/Bore. **⚠️ PARKED**: reverse VPS+dış-hesap+manuel → "0 manuel"+egemen-zero-account ihlali; routing marjinal (probe-timeout yeter) | FRP(Apache,107k)/Bore(MIT,11k) | parked |
+| **vT10** | **Live Integration Fix + `doctor`** | health-path /healthz→**/api/health** (ERR-TUNNEL-003, gerçek ollamas'a karşı tünel kırıktı) + `tunnel doctor` canlı e2e self-test; **CANLI 200 kanıtı** | ollamas-introspection | ✅ DONE |
+| vT11 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | NEXT |
+| vT12+ | Connectivity-routing + Remote reverse-tunnel | reachVia routing (reverse geldiğinde değerli) + FRP/Bore. **⚠️ PARKED**: reverse VPS+dış-hesap+manuel → "0 manuel"+egemen-zero-account ihlali; routing marjinal (probe-timeout yeter) | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -154,7 +155,21 @@
 - **Kanıt:** `node --test` **143/143 GREEN**, tsc 0; `node src/cli.ts setup` → binary-yok zarif plan+brew-hint
   (0-prompt, crash yok); idempotent. VERSION 9.0.0.
 
-## vT10 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
+## vT10 — DONE (kanıt) — Live Integration Fix + `doctor`
+
+> Kullanıcı "ollamas'ı çalıştır + gerçek görevde test et" dedi → 9 versiyon unit-test'liydi ama hiç canlı
+> ollamas'a koşulmamıştı. Canlı koşum **ERR-TUNNEL-003** açığa çıkardı (tünel gerçek ollamas'a karşı kırıktı).
+
+- **ERR-TUNNEL-003 fix:** merkezi `HEALTH_PATH` (default `/api/health`, env-override); probeHttp/probeHttps default
+  + 3 transport probe + cli prints + 3 recipe `/healthz`→`/api/health`.
+- `src/doctor.ts` PURE buildDoctorReport + renderDoctorReport; `cli.ts doctor [--json]` canlı e2e (ollamas
+  upstream probe + selectAuto + connectivity + capable). **doctor 3 + health +2 test.**
+- **CANLI KANIT:** `node src/cli.ts doctor` → `ollamas upstream : OK 46ms (http://localhost:3000/api/health)`,
+  exit 0, connectivity online. Regresyon: `OLLAMAS_HEALTH_PATH=/healthz` → UNREACHABLE(401) vs default → OK.
+- **Kanıt:** `node --test` **148/148 GREEN**, tsc 0. VERSION 10.0.0. (select "no healthy transport" = transport
+  binary'leri yok; upstream-probe DOĞRU = Emre cihaz-kanıtı transport-IP'leri için.)
+
+## vT11 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
 
 1. `src/qr.ts` — PURE QR (ANSI/SVG) endpoint/onboarding-URL render (zero-dep, qrencode binary opsiyonel) →
    iPhone tek-tarama. `cli.ts qr [endpoint]`.

@@ -12,6 +12,7 @@
 //   status   observability: active transport + latency sparkline + breaker + connectivity; --json|--watch (vT6)
 //   daemon   install|uninstall|status a LaunchAgent running `auto --watch` at login + on crash (vT7)
 //   bench    per-transport p50/p90 latency over N samples (--samples N, --json) (vT8)
+//   doctor   live e2e self-test: real ollamas upstream + selectAuto + connectivity (--json) (vT10)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -48,7 +49,9 @@ import {
   serviceUrl as meshServiceUrl,
   type HeadscalePlan,
 } from "./transports/headscale.ts";
-import { autoUp, runLoop } from "./autopilot.ts";
+import { autoUp, runLoop, detectCapable } from "./autopilot.ts";
+import { probeHttp, HEALTH_PATH } from "./health.ts";
+import { buildDoctorReport, renderDoctorReport } from "./doctor.ts";
 import type { Transport } from "./transport.ts";
 import {
   DEFAULT_MAX_AGE_DAYS,
@@ -197,7 +200,7 @@ async function cmdTls(): Promise<void> {
   console.log(`  1) caddy run --config ${caddyfilePath} --adapter caddyfile`);
   console.log(`  2) AirDrop ${profilePath} to the iPhone → install profile`);
   console.log("  3) iPhone: Settings → General → About → Certificate Trust Settings → enable 'mkcert ...'");
-  console.log(`  4) iPhone Safari: ${tlsServiceUrl(plan)}/healthz → 200`);
+  console.log(`  4) iPhone Safari: ${tlsServiceUrl(plan)}/api/health → 200`);
 }
 
 async function cmdMesh(): Promise<void> {
@@ -222,7 +225,7 @@ async function cmdMesh(): Promise<void> {
   console.log(`  4) iPhone Tailscale app → Settings → ALTERNATE COORDINATION SERVER URL = ${plan.serverUrl}`);
   console.log(`     → log in → approve:  headscale nodes register --user ${plan.user} --key <mkey>`);
   console.log(`  5) CLI peer (optional): ${clientUpCommand(plan)}`);
-  console.log(`  6) iPhone: ${meshServiceUrl(plan)}/healthz → 200`);
+  console.log(`  6) iPhone: ${meshServiceUrl(plan)}/api/health → 200`);
 }
 
 // Age-based automatic WireGuard key rotation (vT5). Zero prompt. Old config is backed up into
@@ -438,6 +441,30 @@ async function cmdTeardown(): Promise<void> {
   console.log("configs kept in keys/ — run `setup` to bring everything back up.");
 }
 
+// Live e2e self-test (vT10): probe the real ollamas upstream + selectAuto + connectivity. 0 prompt.
+async function cmdDoctor(): Promise<void> {
+  const json = process.argv.includes("--json");
+  const upstreamBase = "http://localhost:3000";
+  const start = performance.now();
+  const reachable = await probeHttp(upstreamBase, HEALTH_PATH, { requirePrivateHost: true });
+  const ms = performance.now() - start;
+
+  const { sw, transports } = buildSwitch();
+  await sw.selectAuto();
+  await persistDecision(sw);
+  const capable = (await detectCapable(transports)).map((t) => t.name);
+  const connectivity = classify({ lan: sw.activeName() !== null, internet: await internetReachable() });
+
+  const report = buildDoctorReport({
+    ollamasUpstream: { url: `${upstreamBase}${HEALTH_PATH}`, reachable, ms },
+    active: sw.activeName(),
+    connectivity,
+    capable,
+  });
+  console.log(json ? JSON.stringify(report, null, 2) : renderDoctorReport(report));
+  process.exitCode = report.ok ? 0 : 1;
+}
+
 // Benchmark (vT8): N timed probes per transport → p50/p90 table. Read-only, 0 prompt.
 async function cmdBench(): Promise<void> {
   const json = process.argv.includes("--json");
@@ -510,9 +537,11 @@ async function main(): Promise<void> {
       return cmdSetup();
     case "teardown":
       return cmdTeardown();
+    case "doctor":
+      return cmdDoctor();
     default:
       console.log(
-        "usage: tunnel <setup|teardown|config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--daemon|--watch|--json|--force|--samples N]",
+        "usage: tunnel <setup|teardown|doctor|config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--daemon|--watch|--json|--force|--samples N]",
       );
   }
 }

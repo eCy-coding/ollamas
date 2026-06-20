@@ -9,7 +9,7 @@
 import { spawn, execFileSync } from "node:child_process";
 import type { Transport, TunnelEndpoint } from "../transport.ts";
 import { PRIORITY } from "../transport.ts";
-import { probeHttps } from "../health.ts";
+import { probeHttps, HEALTH_PATH } from "../health.ts";
 
 export interface CaddyTlsPlan {
   /** Bonjour hostname clients hit, e.g. "emre-mbp.local". */
@@ -96,7 +96,7 @@ export class CaddyTlsTransport implements Transport {
   async probe(): Promise<boolean> {
     // Verified TLS: mkcert root CA is in the system trust store after `mkcert -install`.
     // requirePrivateHost: only probe the private <mac>.local host (DNS-rebind guard, vT5).
-    this.healthy = await probeHttps(tlsServiceUrl(this.plan), "/healthz", { requirePrivateHost: true });
+    this.healthy = await probeHttps(tlsServiceUrl(this.plan), HEALTH_PATH, { requirePrivateHost: true });
     return this.healthy;
   }
 

@@ -209,6 +209,20 @@
       "prevention_rule": "Test koşumu için shell glob kullanma; 'node --test' auto-discovery'ye bırak. Kalite kapısı sayısı node --test çıktısıyla doğrulanır, npm glob'a güvenilmez.",
       "test_added": "doğrulama: npm test == node --test == 48",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-003",
+      "ts": "2026-06-20",
+      "version": "vT10",
+      "file": "src/health.ts + transports/*",
+      "category": "network",
+      "severity": "CRITICAL",
+      "root_cause": "Tüm probe'lar `/healthz` kullanıyordu ama ollamas'ın health endpoint'i `/api/health` (200, public); `/healthz` = 401. Gerçek ollamas'a karşı her transport unhealthy görünür → switch hiçbirini seçmez → tünel tamamen kırık. 143 unit-test yakalayamadı çünkü fake-fetch `/healthz`=200 dönüyordu (canlı-kör nokta).",
+      "evidence": "curl localhost:3000/healthz → 401 ; /api/health → 200. `OLLAMAS_HEALTH_PATH=/healthz doctor` → UNREACHABLE ; default → OK 24ms.",
+      "fix": "Merkezi HEALTH_PATH sabiti (default /api/health, env OLLAMAS_HEALTH_PATH override); probeHttp/probeHttps default + 3 transport + cli prints + 3 recipe bunu kullanır.",
+      "prevention_rule": "Unit-test gerçek health-path'i VARSAYAMAZ (fake-fetch her path'e 200 döner) → entegrasyon her zaman CANLI ollamas'a karşı doğrulanır (`tunnel doctor`). Endpoint sözleşmeleri tek sabitte merkezi tutulur.",
+      "test_added": "src/doctor.test.ts + health.test.ts (HEALTH_PATH default /api/health) + canlı doctor",
+      "recurrence_count": 0
     }
   ]
 }

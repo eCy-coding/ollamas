@@ -5,6 +5,13 @@ import { request as httpsRequest, type RequestOptions } from "node:https";
 import type { IncomingMessage, ClientRequest } from "node:http";
 import { assertPrivateUrl } from "./guard.ts";
 
+/**
+ * ollamas health endpoint. The real server exposes `/api/health` (200, public) — NOT `/healthz`
+ * (which 401s). Probing the wrong path made every transport look unhealthy against live ollamas
+ * (ERR-TUNNEL-003, caught only by running it for real). Override via OLLAMAS_HEALTH_PATH if needed.
+ */
+export const HEALTH_PATH = process.env.OLLAMAS_HEALTH_PATH ?? "/api/health";
+
 export interface ProbeOptions {
   /** Abort the request after this many ms. */
   timeoutMs?: number;
@@ -26,7 +33,7 @@ export interface ProbeOptions {
  */
 export async function probeHttp(
   baseUrl: string,
-  path = "/healthz",
+  path = HEALTH_PATH,
   opts: ProbeOptions = {},
 ): Promise<boolean> {
   const { timeoutMs = 2000, okStatuses, requirePrivateHost = false, fetchImpl = fetch } = opts;
@@ -77,7 +84,7 @@ export interface HttpsProbeOptions {
  */
 export function probeHttps(
   baseUrl: string,
-  path = "/healthz",
+  path = HEALTH_PATH,
   opts: HttpsProbeOptions = {},
 ): Promise<boolean> {
   const { timeoutMs = 2000, okStatuses, insecure = false, requirePrivateHost = false, requestImpl = httpsRequest } = opts;

@@ -7,7 +7,7 @@
 import { spawn } from "node:child_process";
 import type { Transport, TunnelEndpoint } from "../transport.ts";
 import { PRIORITY } from "../transport.ts";
-import { probeHttp } from "../health.ts";
+import { probeHttp, HEALTH_PATH } from "../health.ts";
 
 export interface WgKeypair {
   privateKey: string;
@@ -148,7 +148,7 @@ export class WireGuardTransport implements Transport {
 
   async probe(): Promise<boolean> {
     // requirePrivateHost: only probe the private WG address (DNS-rebind guard, vT5).
-    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz", { requirePrivateHost: true });
+    this.healthy = await probeHttp(serviceUrl(this.plan), HEALTH_PATH, { requirePrivateHost: true });
     return this.healthy;
   }
 
