@@ -5,6 +5,25 @@
 
 ---
 
+## v16 — TUI-v2 live cockpit (2026-06-20)
+
+### N-040 · multi-pane hizalama → ANSI-aware `visibleLen` + width-enjekte saf
+- **Gözlem**: pane içeriği renkli (c()/sparkline ANSI içerir); ham `.length` ile pad edersem renkli satırlar yanlış hizalanır (görünmez kaçış-kodları sayılır).
+- **Fix**: `visibleLen(s)=s.replace(/\x1b\[[0-9;]*m/g,"").length`; `padOrTrunc` görünür-uzunlukla pad/truncate. `renderPanes(panes,width,ctx)` width'i ENJEKTE alır (TTY-sorgu yok) → saf, unit-test. Yan-yana box'lar eşit-yüksekliğe pad → border'lar hizalı.
+- **ÖNLEME KURALI**: terminal-layout'ta genişlik hesabı GÖRÜNÜR uzunlukla (ANSI-strip); width'i enjekte et (process.stdout.columns'u render-fn'e sokma) → saf+test-edilebilir.
+
+### N-041 · multi-pane yalnız TTY≥100col; pipe→dikey (doğru, bug değil)
+- **Gözlem**: dogfood'da `top | head` dikey çıktı verdi (multi-pane değil) — `process.stdout.columns` pipe'da undefined → 0 → dikey fallback.
+- **Karar**: DOĞRU davranış — box'lar pipe'da/dar'da anlamsız; non-TTY→dikey. Multi-pane gerçek-TTY≥100col'de (fixture-görsel + width=120 test kanıtladı). COLUMNS env'i non-TTY'de okumuyoruz (standart).
+- **ÖNLEME KURALI**: TUI layout'u TTY-genişliğine bağla; non-TTY/pipe → düz/dikey degrade. "pipe'da multi-pane yok" bir bug değil; canlı-TTY'de doğrula (fixture render + width-param test).
+
+### N-042 · sessions-pane best-effort network (cockpit asla kırılmaz)
+- **Gözlem**: sessions-paneli `listSessions()` (auth/network) ister; 401 veya hata cockpit'i kırmamalı.
+- **Fix**: try/catch→pane atla; `--no-sessions` ağ-çağrısını tümden kapatır. usage-paneli zaten aynı (401→hint). Metrikler (`/metrics` open) çekirdek, daima render.
+- **ÖNLEME KURALI**: canlı-dashboard'da opsiyonel-veri-paneli best-effort; bir panel-fetch hatası tüm cockpit'i düşürmez; çekirdek (auth'suz metrics) her zaman render.
+
+---
+
 ## v15 — Backup CLI (2026-06-20)
 
 ### N-037 · download=BINARY, restore=HEX → `r.text()` ikiliyi bozar (canlı e2e yakaladı)

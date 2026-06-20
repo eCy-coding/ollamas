@@ -20,8 +20,9 @@
 | **v13** | Completions v2 + man | `__complete` dinamik VALUES (`config use`→profil, `-m`→model-cache, `-p`→provider; **TAB'da network/keychain YOK** N-032) + `man ollamas` saf troff (`mandoc -Tlint` temiz) | ✅ DONE |
 | **v14** | MCP client completeness | `mcp resources\|read\|prompts\|prompt` — gateway'in resources/prompts/completion yüzeyine erişim (v5'te eksikti); aynı stateless JSON-RPC + cursor; canlı architect/coder/reviewer prompt render | ✅ DONE |
 | **v15** | Backup CLI | `ollamas backup config\|trigger\|download\|restore` — gateway `/api/backup/*` (CLI'da erişilemezdi); binary-safe download/hex-restore round-trip + restore-HIL + 0600 | ✅ DONE |
-| **v16** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
-| **v16+** | Ufuk (önceden-hesap) | v17 plugin-SDK · v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA · (cluster-CLI/webhooks-CLI/billing-portal düşük-öncelik gap) | |
+| **v16** | TUI v2 live cockpit | `top` multi-pane (requests/latency/tools/sessions yan-yana box, genişlik-otomatik ≥100col, dar→dikey-fallback) + `renderPanes` saf ANSI-aware layout; dogfood canlı | ✅ DONE |
+| **v17** | agent --watch (canlı oturum tail) | ÖN-KOŞUL server `GET /api/agent/sessions/:id/events` (cross-lane); yoksa plugin-SDK'ye geç | ▶ NEXT |
+| **v17+** | Ufuk (önceden-hesap) | v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA · (cluster-CLI/webhooks-CLI/billing-portal düşük-öncelik gap) | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
@@ -154,8 +155,14 @@
 - **KÖK-FİX (canlı e2e yakaladı)**: gateway download=**binary** octet-stream, restore=**hex** bekler → ilk impl `r.text()` ikiliyi UTF-8-bozuyordu (dosya 28243≠blob 14774, restore 500). Fix: download `arrayBuffer→Buffer→0600 binary dosya`, restore `readFileSync→toString("hex")`. Canlı round-trip: download 15577B=dosya 15577B → restore **"backup restored"** (200).
 - Testler: `cli-backup`(saf + mock-fetch round-trip + dispatch + Buffer-binary) → **full 374 pass/4 skip** (v14:363). VERSION 14.0.0→**15.0.0**; choke-point korunur; zero-RUNTIME-dep. **Gotcha**: N-037 download-binary-restore-hex-r.text()-bozar→arrayBuffer+toString(hex); N-038 restore-destructive-HIL+`--json`→`--yes`-şart; N-039 secretKey-GET'te-yok+accessKey-maskeli-merge-set-yapma.
 
-## v16 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `top` multi-pane: `cli/commands/top.ts` `renderDashboard` → çoklu panel (requests | latency | tool-calls ayrı kutu); v8 saf-renderer + sparkline reuse.
-2. `agent --watch`: canlı ReAct akış görünümü (alt-screen, v8 SIGINT-restore N-016 deseni); non-TTY→tek-snapshot degrade.
-3. İlk check = multi-pane render saf-test (fixture metrics) + non-TTY degrade; agent-watch SIGINT cursor-restore.
-4. Testler: panel-layout saf; watch-loop cleanup.
+## v16 — DONE (kanıt)
+- **TUI-v2 canlı cockpit** (precompute'tan: v14/v15'te kritik-gap'ler için ertelendi → backup/mcp kapandı, kullanıcı "gerçek-zaman görev takibi" istedi → şimdi doğru sıradaki, polish değil).
+- **Adoption** (lisans disiplinli, zero-dep): k9s/docker-stats/htop multi-pane + 2s-repaint (fikir-only); boxen Unicode box ┌─┐ (MIT) + holman/spark sparkline (v8 port); in-repo `output.ts`/`top.ts` v8 watch-loop/SIGINT/metrics AYNEN reuse. Yeni dep yok.
+- `cli/lib/output.ts` (+saf): `renderPanes(panes, width, ctx)` + `Pane` + `visibleLen`(ANSI-aware) — genişlik≥100 yan-yana box (eşit-yükseklik-pad→border-hizalı), dar→stack; width ENJEKTE (TTY-sorgu yok) → unit-test. `cli/commands/top.ts`: `renderDashboard(s, ctx, width=0)` — width≥100→`renderDashboardWide` (requests|latency|tool-calls|sessions pane) yoksa v8 dikey (regresyon-yok); `sessions` pane (`listSessions` best-effort, `--no-sessions` ağ-kapalı); width `process.stdout.columns??0` oto-algı (0-manuel).
+- Testler: `cli-panes`(6 saf: geniş/dar/truncate/hizalı) + `cli-top`(+multi-pane/sessions/dikey-fallback) → **full 383 pass/4 skip** (v15:374). **DOGFOOD canlı** (kullanıcı isteği): gateway-boot→`doctor`(gateway/ollama-v0.30.10/ready/agent UP mode=live)+`mcp tools`=22+`mcp prompts`=3+`backup config`+gerçek `mcp call list_tree` choke-point→**`top` requests 8→13→16 gerçek-zaman artış** (cockpit canlı aktivite yansıttı). VERSION 15→**16.0.0**; choke-point korunur; zero-RUNTIME-dep + SIGINT-restore. **Gotcha**: N-040 renderPanes-ANSI-aware-visibleLen(renkli-içerik-hizalama)+width-enjekte-saf; N-041 multi-pane-yalnız-TTY≥100col(pipe→dikey-doğru, columns-undefined-non-TTY); N-042 sessions-pane-best-effort-network(401/hata→pane-atla-cockpit-render).
+
+## v17 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. **ÖN-KOŞUL** (cross-lane/ana-ollamas-sekme): server `GET /api/agent/sessions/:id/events` (çalışan-oturum event-stream/poll) — CLI_AGENTS §1 küçük-choke-point-endpoint istisnası; YOKSA v17=plugin-SDK'ye geç.
+2. `agent --watch <id>`: oturum canlı-tail (alt-screen, v8 SIGINT-restore N-016 + renderPanes reuse); non-TTY→tek-snapshot.
+3. İlk check = endpoint-var→canlı-tail / yok→plugin-SDK pivot kararı.
+4. Testler: tail-render saf; watch-loop cleanup.

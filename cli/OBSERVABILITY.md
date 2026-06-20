@@ -43,3 +43,25 @@ shows a hint instead — everything else still works.
   `seyir-defteri.jsonl` on *this* machine. Pointed at a remote gateway, the panel
   is skipped (the file isn't there). No HTTP endpoint exposes it yet.
 - **`NO_COLOR` / non-TTY** drop ANSI; the dashboard renders as plain text.
+
+## Live cockpit — multi-pane (v16)
+
+On a **wide terminal (≥100 cols)** `top` renders side-by-side panes — **requests |
+latency | tool calls | sessions** — instead of the vertical list. Width is
+auto-detected from `process.stdout.columns`, so there is nothing to configure; a
+narrow terminal or a piped/non-TTY run falls back to the vertical layout
+(unchanged). `--watch` repaints the cockpit every 2 s (k9s/docker-stats model);
+SIGINT still restores the terminal.
+
+```sh
+ollamas top                # snapshot — panes if the terminal is wide enough
+ollamas top --watch        # live cockpit, repaint every 2s
+ollamas top --no-sessions  # skip the sessions network call
+```
+
+- The **sessions pane** lists recent agent sessions (`GET /api/agent/sessions`);
+  it is best-effort — a missing tenant key or a fetch error just omits the pane.
+- Live activity shows up in real time: as requests hit the gateway, the requests
+  pane count + req/s sparkline climb (dogfooded: 8 → 16 while driving commands).
+- A live **tail of a running agent session** (`agent --watch <id>`) needs a server
+  event-stream endpoint that does not exist yet — planned for v17.
