@@ -50,3 +50,26 @@ autoscaling:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+
+# Container-level securityContext (closes semgrep allow-privilege-escalation-no-securitycontext).
+# readOnlyRootFilesystem requires the writable emptyDir volumes declared in the deployment
+# template; swap the data volume for a PVC for durability across pod restarts.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+
+# Where the app writes seyir-defteri.jsonl, .master_key, config.json (saas.db in sqlite mode).
+# Must match the mountPath of the data emptyDir volume in the deployment template.
+missionControlDataDir: /data/llm-mission-control
+
+# Persistent storage for the data directory (holds .master_key + vault-encrypted data).
+# Disable only for local dev/CI where pod restarts are acceptable.
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""   # "" = cluster default
