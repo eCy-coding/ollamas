@@ -193,8 +193,11 @@ export class ProviderRouter {
     onStreamChunk?: (text: string) => void,
     signal?: AbortSignal
   ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; toolCalls?: ToolCall[] }> {
-    const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
-    const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
+    // Defensive: a malformed call (no messages) must not crash the router with a
+    // TypeError — fall through to an empty conversation (provider/demo handles it).
+    const msgs = config.messages || [];
+    const systemMessage = msgs.find((m) => m.role === "system")?.content || "";
+    const nonSystemMessages = msgs.filter((m) => m.role !== "system");
 
     switch (config.provider) {
       case "ollama-local": {

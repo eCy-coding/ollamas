@@ -476,7 +476,12 @@ async function initializeServer() {
    */
   app.post("/api/generate", async (req, res) => {
     const { provider, model, messages, temperature, stream } = req.body;
-    
+    // Raw endpoint contract: messages[] required. (For a single-string prompt use
+    // POST /api/ai/generate.) Reject malformed input with a clear 400, not a 500.
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages (non-empty array) required; use POST /api/ai/generate for a single prompt string" });
+    }
+
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
