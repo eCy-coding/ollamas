@@ -82,6 +82,19 @@ describe("buildRoleAnswer — vO6 optimal runtime surface", () => {
   });
 });
 
+describe("buildRoleAnswer — vO9 lane health surface", () => {
+  it("health VARSA 🩺 lane-health satırı (green/red/unknown)", () => {
+    const out = buildRoleAnswer({ ...BASE, health: { green: 1, red: 1, unknown: 7 } });
+    expect(out).toMatch(/🩺.*Lane health/i);
+    expect(out).toContain("1🟢");
+    expect(out).toContain("1🔴");
+    expect(out).toContain("QUALITY.md");
+  });
+  it("health YOKSA quality-koş fallback (graceful)", () => {
+    expect(buildRoleAnswer(BASE)).toMatch(/quality\.ts/);
+  });
+});
+
 describe("isRoleQuestion — hook matcher", () => {
   it("kimlik/görev sorularını yakalar", () => {
     expect(isRoleQuestion("Bu terminal sekmesinde görevin nedir? Ne yaparsın?")).toBe(true);

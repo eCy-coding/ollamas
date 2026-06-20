@@ -30,6 +30,7 @@ export interface RoleInputs {
   lanes: { branch: string; done?: string; next?: string; dirty?: number }[];
   tools: { name: string; gist: string }[];
   optimal?: { model: string; tokS: number; chip: string } | null; // vO6 0-manuel optimal runtime (MODEL_SELECTION.json)
+  health?: { green: number; red: number; unknown: number } | null;  // vO9 lane sağlık roll-up (QUALITY.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -85,6 +86,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     `- Orchestration: **${cur} DONE** → sıradaki **${nxt}**`,
     `- İzlenen lane'ler (${i.lanes.length}): ${laneList}`,
     i.optimal ? `- 🏆 **Optimal runtime (0-manuel):** \`${i.optimal.model}\` @ ${i.optimal.chip} (${i.optimal.tokS} tok/s) — \`MODEL_PROMPT.md\`` : `- Optimal runtime: \`tsx bin/benchprompt.ts\` koş (henüz MODEL_SELECTION.json yok)`,
+    i.health ? `- 🩺 **Lane health (vO9):** ${i.health.green}🟢 / ${i.health.red}🔴 / ${i.health.unknown}⚪ — \`QUALITY.md\` (tsc canlı + vitest cache)` : `- Lane health: \`tsx bin/quality.ts\` koş (henüz QUALITY.json yok)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -173,6 +175,16 @@ async function main(): Promise<void> {
     }
   } catch { /* graceful */ }
 
+  // vO9 lane sağlık roll-up (QUALITY.json varsa; graceful absent).
+  let health: RoleInputs["health"] = null;
+  try {
+    const qF = join(ORCH_DIR, "QUALITY.json");
+    if (existsSync(qF)) {
+      const q = JSON.parse(readFileSync(qF, "utf8"));
+      if (q?.totals) health = { green: q.totals.green ?? 0, red: q.totals.red ?? 0, unknown: q.totals.unknown ?? 0 };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -181,6 +193,7 @@ async function main(): Promise<void> {
     lanes,
     tools: readTools(),
     optimal,
+    health,
   });
 
   console.log(answer);

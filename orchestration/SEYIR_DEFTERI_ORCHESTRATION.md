@@ -280,3 +280,32 @@ seçimle çalışan TEK portable prompt.
 **RISK-ORCH-013:** 4-worker prompt-proliferation→füzyon; cross-dep silme (conduct→optimize) ref-tara; stale-bench (isStale+opt-in-refresh, sürekli-tazelik bench-lane işi); versiyon-etiket drift (optimize 'vO7'≠ROADMAP).
 
 **Next precomputed (→vO7):** drift-guard (branch≡roadmap; optimize.ts header vO7→vO6 düzelt). benchprompt: per-task champ + iOS device kolonu.
+
+---
+
+## vO9 — Quality-Gate Roll-Up + Conduct Wiring (2026-06-20)
+
+**Tetik (Emre/T0):** "sıradaki versiyonu planla" + **YARIM bırakma, eksik tespit et, eş zamanlı gerekenleri yap,
+tamamlamadan sonraki adıma geçme**, 0-manuel kapsayıcı.
+
+**Yapıldı:**
+- `bin/lib/quality.ts` (saf): parseTscResult ("Found N errors"/error-TS-sayım) + parseLastRun (vitest .last-run.json) +
+  rollup (tsc-fail VEYA test-failed → RED; conduct-uyumlu `redLanes{lane,detail}[]`) + toQualityTable. test 9/9.
+- `bin/quality.ts` CLI: discoverWorktrees → her lane `tsc --noEmit` CANLI (stateless, kendi node_modules/.bin/tsc,
+  timeout 45s, tsconfig-yoksa skip) + `.last-run.json` cache (mtime→isStale) → QUALITY.md/QUALITY.json. **vitest CANLI
+  KOŞULMAZ** (pahalı+flaky, UK-08). `--no-tsc` cache-only.
+- **EŞ-ZAMANLI (kritik): CONDUCT WIRING** — conduct.ts:73 `redLanes:[]`→`QUALITY.json.redLanes`. Roll-up artık ORPHAN
+  DEĞİL, autonomous conductor tüketir.
+- `role.ts` +🩺 lane-health satırı (QUALITY.json totals) + test +2.
+
+**BUG-FIX (no-half kanıtı):** CANLI conduct koşusu (Phase-6 verify) vO6'dan kalan YARIM ref-onarımı yakaladı —
+`optimal.config.num_ctx` summary-satırı MODEL_SELECTION.json nested-shape'e güncellenmemişti → conduct.ts:109 CANLI
+TypeError crash (test mock-data ile geçmiş, yakalamamış). Fix: `optimal?.selection.config?.num_ctx` guard. **Ders
+RISK-ORCH-014:** ref-shape refactor'unda TÜM kullanımları grep'le + CANLI koş (mock yetmez).
+
+**Kanıt (uçtan-uca 0-touch):** vitest **339/24** yeşil. `tsx bin/quality.ts` → 9 lane gerçek matris (backend🔴 test-failed,
+frontend🟢, 7⚪). `tsx bin/conduct.ts` → QUALITY.redLanes tüketti → **eylem=RED:backend** (CONDUCTOR.md `[RED] backend:
+test failed`), exit=1 gate. `role.ts` → 🩺 1🟢/1🔴/7⚪. Scope: orchestration/** + per-lane tsc read-only (0 lane-yazım).
+
+**Next precomputed (→vO10):** Heartbeat/notification (idle-lane + takılı-tab); worker heartbeat.ts draftı var → konsolide.
+quality genişletme: live-eslint (frontend), coverage%, gh-api CI-status, turbo-affected-only roll-up.

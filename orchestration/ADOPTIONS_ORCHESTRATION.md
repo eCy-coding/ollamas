@@ -80,3 +80,30 @@ zero-dep** (no vibe-code, dep eklenmedi).
 ps/git, tmux (ISC), terminal-notifier (MIT). 2 MIT lib eval-only (zero-dep korundu). workmux/sesh/tmux-orch
 future-ref (vO-ileri). iTerm2 GPL **kod kopyalanmadı** — yalnız app scripting property'si + delimiter deseni özgün
 yazıldı (RISK-ORCH-005 korundu). GPL kod yok. Lisans-ihlali yok.
+
+---
+
+## vO6.1 — Benchmark-prompt adoption (e2e GitHub search, top-star, macOS)
+
+| # | Repo | ⭐ | Lisans | Karar | Ne adopt edilir |
+|---|------|-----|--------|-------|-----------------|
+| 1 | f/prompts.chat | 164k | permissive | ADOPT-pattern | global-standart **role→constraints→evidence→examples→output** prompt yapısı (kod değil, yapı) |
+| 2 | gszhangwei/structured-prompts-driven-development | düşük | MIT | ADOPT-pattern | XML-section şablon (`<role><task><constraints><evidence><output_format>`) paste-anywhere |
+| 3 | lm-sys/RouteLLM | 5k | Apache-2.0 | idea-only | benchmark-evidence ile model-routing **kavramı**; ML-classifier→bizim tok/s+correctness farklı, kod kopyası YOK |
+| 4 | LarHope/ollama-benchmark + aidatatools/ollama-benchmark | 164/372 | MIT | parity-ref | tok/s = eval_count/eval_duration·1e9 metodolojisi — worker bench-core'da zaten adopte |
+| 5 | ml-explore/mlx-lm | 6k | MIT (Apple) | idea-ref | MLX tok/s introspection — Apple-native; MODEL_PROMPT.md'de "MLX backend tercih" notu |
+
+**Karar:** `benchprompt.ts` yalnız **yapı/kavram** adopt etti (f/prompts.chat + structured-prompts deseni). Hiç kod
+vendor edilmedi; tok/s metodolojisi worker bench-core'da (MIT). RouteLLM/mlx-lm idea-only. Lisans-ihlali yok.
+
+## vO9 — Quality-Gate Roll-Up (research)
+
+| # | Repo | ⭐ | Lisans | Karar | Ne |
+|---|------|-----|--------|-------|-----|
+| 14 | vercel/turborepo | 27k | MPL-2.0 | idea-only | affected-graph / per-package task roll-up kavramı; biz per-lane tsc+cache, kod kopyası YOK |
+| 15 | nrwl/nx | 24k | MIT | idea-only | monorepo task-matrix + affected deseni; zero-dep TS yeniden, vendor YOK |
+| 16 | reviewdog/reviewdog | 8k | MIT | idea-ref | tsc/lint çıktısı → yapılandırılmış bulgu deseni; parseTscResult kendi impl |
+
+**Karar (vO9):** quality.ts tamamen **kendi zero-dep impl**'i (tsc exit + .last-run.json parse). turbo/nx/reviewdog
+yalnız roll-up/affected **kavramı** (idea-only) — kod vendor YOK. **Ekleyebilecekler:** live-eslint (frontend lane),
+coverage% (vitest cache), gh-api CI-status (workflow conclusion), turbo-style affected-only (git-diff→etkilenen-lane).
