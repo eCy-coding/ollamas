@@ -19,6 +19,18 @@ export interface Migration {
 // Advisory-lock key (arbitrary constant, unique to this app's migration runner).
 const MIGRATION_LOCK_KEY = 778124;
 
+// Guarded ADD COLUMN: sqlite has no `ADD COLUMN IF NOT EXISTS`, so a retry that
+// finds the column already present (duplicate) is a no-op. Retro-added columns
+// are nullable — a NOT NULL add would fail on an already-populated table; the
+// NOT NULL contract still holds for fresh DBs via the baseline CREATE TABLE.
+async function addColumnIfMissing(db: DbClient, table: string, columnDdl: string): Promise<void> {
+  try {
+    await db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDdl}`);
+  } catch (e: any) {
+    if (!/duplicate column|already exists/i.test(String(e?.message))) throw e;
+  }
+}
+
 // Ordered, append-only. Never renumber or mutate a shipped migration — add a new
 // one. `up` must be idempotent (IF NOT EXISTS / guarded) so a retry is safe.
 export const MIGRATIONS: Migration[] = [
@@ -108,6 +120,23 @@ export const MIGRATIONS: Migration[] = [
         used INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )`);
+      // Drift repair: if an older-shaped oauth_refresh_tokens already exists, the
+      // CREATE TABLE IF NOT EXISTS above is a no-op and the family_id index below
+      // would fail with "no such column: family_id" (boot crash). Guarded-add the
+      // required columns first so the migration is idempotent against drift, per
+      // the file's own "up must be idempotent/guarded" contract.
+      for (const col of [
+        "family_id TEXT",
+        "client_id TEXT",
+        "tenant_id TEXT",
+        "scopes TEXT",
+        "resource TEXT",
+        "expires_at TEXT",
+        "used INTEGER",
+        "created_at TEXT",
+      ]) {
+        await addColumnIfMissing(db, "oauth_refresh_tokens", col);
+      }
       await db.exec("CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens(family_id)");
     },
   },
