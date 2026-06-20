@@ -1,0 +1,110 @@
+{
+  "persona": "macos",
+  "count": 4,
+  "notes": [
+    {
+      "id": "macos-scripts-1",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "install.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "install.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "install.sh",
+          "lineHint": "1",
+          "fact": "e=true u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "macos-scripts-2",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "join-cluster.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "join-cluster.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "join-cluster.sh",
+          "lineHint": "1",
+          "fact": "e=false u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "macos-scripts-3",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "setup.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "setup.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "setup.sh",
+          "lineHint": "1",
+          "fact": "e=true u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "macos-scripts-4",
+      "persona": "macos",
+      "targetLane": "scripts",
+      "targetPath": "uninstall.sh",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "uninstall.sh 'set -euo pipefail' eksik — sessiz hata-yutma riski",
+      "evidence": [
+        {
+          "path": "uninstall.sh",
+          "lineHint": "1",
+          "fact": "e=true u=false pipefail=false"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "ts": "2026-06-20T13:07:50.328Z",
+  "readiness": 66,
+  "top": {
+    "criticality": "COMPLETENESS",
+    "source": "conduct+dod",
+    "target": "dod:concurrent-task:adopt-gate",
+    "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
+    "action": "adopt-gate için test aynı anda tamamla",
+    "score": 40
+  },
+  "requirements": [
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:adopt-gate",
+      "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
+      "action": "adopt-gate için test aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:claim",
+      "detail": "claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry",
+      "action": "claim için test + SEYIR-entry aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:driftguard",
+      "detail": "driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry",
+      "action": "driftguard için SEYIR-entry aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:ops",
+      "detail": "ops kısmen tamam — eksik eş-zamanlı: roadmap-row",
+      "action": "ops için roadmap-row aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:scan",
+      "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
+      "action": "scan için test aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:concurrent-task:status",
+      "detail": "status kısmen tamam — eksik eş-zamanlı: test",
+      "action": "status için test aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:uncommitted-green:28 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json…",
+      "action": "yeşil parçayı commit'le (per-file git add + conventional)",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+conduct(stale)",
+      "target": "red:backend",
+      "detail": "test failed — testTs bayat, güvenilmez (phantom-critical önlendi)",
+      "action": "backend: testi taze koş; gerçekten kırıksa CRITICAL olur",
+      "score": 35
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "quality(stale)",
+      "target": "stale:quality",
+      "detail": "quality verisi 74 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)",
+      "action": "quality.ts yeniden koş (taze quality üret)",
+      "score": 35
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:roadmap-coherence:ops",
+      "detail": "ops aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
+      "action": "ops'yi ilgili vO satırına ekle",
+      "score": 15
+    },
+    {
+      "criticality": "ROADMAP",
+      "source": "conduct",
+      "target": "next:cli",
+      "detail": "cli sıradaki: v16 TUI v2 / agent watch top multi pane (request",
+      "action": "cli: \"sıradaki versiyonu planla cli\"",
+      "score": 10
+    },
+    {
+      "criticality": "ROADMAP",
+      "source": "conduct",
+      "target": "next:deploy",
+      "detail": "deploy sıradaki: ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF",
+      "action": "deploy: \"sıradaki versiyonu planla deploy\"",
+      "score": 10
+    },
+    {
+      "criticality": "ROADMAP",
+      "source": "conduct",
+      "target": "next:scripts",
+      "detail": "scripts sıradaki: Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. ",
+      "action": "scripts: \"sıradaki versiyonu planla scripts\"",
+      "score": 10
+    },
+    {
+      "criticality": "ROADMAP",
+      "source": "conduct",
+      "target": "next:ukp",
+      "detail": "ukp sıradaki: ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF",
+      "action": "ukp: \"sıradaki versiyonu planla ukp\"",
+      "score": 10
+    }
+  ]
+}

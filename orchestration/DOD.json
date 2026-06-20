@@ -1,0 +1,78 @@
+{
+  "ts": "2026-06-20T13:07:44.901Z",
+  "score": 64,
+  "findings": [
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:uncommitted-green:28 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json…",
+      "action": "yeşil parçayı commit'le (per-file git add + conventional)",
+      "severity": 40,
+      "concurrent": false
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:adopt-gate",
+      "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
+      "action": "adopt-gate için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:claim",
+      "detail": "claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry",
+      "action": "claim için test + SEYIR-entry aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:driftguard",
+      "detail": "driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry",
+      "action": "driftguard için SEYIR-entry aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:ops",
+      "detail": "ops kısmen tamam — eksik eş-zamanlı: roadmap-row",
+      "action": "ops için roadmap-row aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:scan",
+      "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
+      "action": "scan için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:status",
+      "detail": "status kısmen tamam — eksik eş-zamanlı: test",
+      "action": "status için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:roadmap-coherence:ops",
+      "detail": "ops aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
+      "action": "ops'yi ilgili vO satırına ekle",
+      "severity": 15,
+      "concurrent": false
+    }
+  ]
+}
