@@ -5,6 +5,26 @@
 
 ---
 
+## v15 — Backup CLI (2026-06-20)
+
+### N-037 · download=BINARY, restore=HEX → `r.text()` ikiliyi bozar (canlı e2e yakaladı)
+- **Semptom**: `backup download --out f.enc` çalıştı görünüyordu ama dosya 28243B ≠ raporlanan 14774; `backup restore` → **500**. Round-trip kırık.
+- **Kök neden**: gateway `download`=`res.send(Buffer)` ham ikili octet-stream; `restore`=`Buffer.from(hexBlob,"hex")` **hex** bekler. İlk impl `downloadBackup` `r.text()` kullanıyordu → ikiliyi UTF-8-decode → U+FFFD replacement → bozulma + boyut şişme; restore'a utf8 gönderiyordu.
+- **Fix**: `downloadBackup` `Buffer.from(await r.arrayBuffer())` (byte-exact); `download` komut `writeFileSync(buf,0600)` ikili; `restore` `readFileSync(file).toString("hex")`. Canlı: download 15577B=dosya 15577B → restore "backup restored".
+- **ÖNLEME KURALI**: ikili endpoint'i ASLA `r.text()` ile okuma → `arrayBuffer()→Buffer`. download/restore format-eşleşmesini (binary↔hex) canlı round-trip ile DOĞRULA; mock yetmez (encoding bug'ı yalnız gerçek byte'larda çıkar). Evidence-first bu bug'ı yakaladı.
+
+### N-038 · restore destructive → HIL + `--json`→`--yes`-şart
+- **Gözlem**: restore live config'i EZER (`db.save(parsedConfig)`). Yanlış restore = veri-kaybı.
+- **Fix**: TTY confirm (saas-revoke deseni); `--yes` bypass; `--json` non-interactive → `--yes`'siz **reddet** (sessiz destructive yok). Okunamayan dosya → restore POST'undan ÖNCE exit 2 (test: fetch çağrılmaz).
+- **ÖNLEME KURALI**: destructive komut daima HIL + non-interactive'de explicit `--yes`; I/O hatası destructive çağrıdan önce kısa-devre.
+
+### N-039 · secretKey GET'te yok, accessKey maskeli → merge-set YAPMA
+- **Gözlem**: `GET config` accessKey'i `sk-***` maskeler, secretKey hiç dönmez → GET+merge+POST kırılgan (creds kaybolur).
+- **Karar**: `config` show salt-okuma; set = açık `--access-key`/`--secret-key` flag'leriyle TAM POST. CLI ham secret basmaz.
+- **ÖNLEME KURALI**: maskeli/never-returned alanlı config'te round-trip-merge yapma; set'i explicit-full-flag iste.
+
+---
+
 ## v14 — MCP client completeness (resources + prompts) (2026-06-20)
 
 ### N-035 · `mcp resources` boş ≠ hata (workspace-bağlı)

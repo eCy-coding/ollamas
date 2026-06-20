@@ -19,8 +19,9 @@
 | **v12** | Node-SEA binary | **classic** `node --experimental-sea-config` (host Node 24.16, `--build-sea`/25.5 gerekmez) + postject inject + macOS remove-sign→inject→re-sign; `sea.ts` saf + `build:sea`; Bun alternate kalır, SEA canonical runtime-integrity | ✅ DONE |
 | **v13** | Completions v2 + man | `__complete` dinamik VALUES (`config use`→profil, `-m`→model-cache, `-p`→provider; **TAB'da network/keychain YOK** N-032) + `man ollamas` saf troff (`mandoc -Tlint` temiz) | ✅ DONE |
 | **v14** | MCP client completeness | `mcp resources\|read\|prompts\|prompt` — gateway'in resources/prompts/completion yüzeyine erişim (v5'te eksikti); aynı stateless JSON-RPC + cursor; canlı architect/coder/reviewer prompt render | ✅ DONE |
-| **v15** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
-| **v15+** | Ufuk (önceden-hesap) | v16 profile-sync · v17 plugin-SDK · v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA | |
+| **v15** | Backup CLI | `ollamas backup config\|trigger\|download\|restore` — gateway `/api/backup/*` (CLI'da erişilemezdi); binary-safe download/hex-restore round-trip + restore-HIL + 0600 | ✅ DONE |
+| **v16** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
+| **v16+** | Ufuk (önceden-hesap) | v17 plugin-SDK · v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA · (cluster-CLI/webhooks-CLI/billing-portal düşük-öncelik gap) | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
@@ -146,7 +147,14 @@
 - Testler: `cli-mcp-resources`(saf render + mock-fetch round-trip/pagination) → **full 363 pass/4 skip** (v13:350). **Canlı** (gateway :3399 boot): `mcp prompts`→3 gerçek (architect/coder/reviewer+args), `--sig` imza, `mcp prompt architect --arg task=…`→**gerçek message-chain render** (task interpole), `resources`→0 (workspace boş=beklenen, zarif). VERSION 13.0.0→**14.0.0**.
 - Choke-point korunur (registry import YOK, /mcp choke-point üstünden); zero-RUNTIME-dep. **Gotcha**: N-035 resources-boş≠hata (workspace-bağlı, zarif-0-satır); N-036 prompt-args-string-spec-coercion-yok (tool-args'tan farklı).
 
-## v15 — NEXT (önceden-hesaplanmış ilk todo'lar)
+## v15 — DONE (kanıt)
+- **Kritik-gap tespiti** (precompute TUI-v2 idi → "critical tespit et, gereksiz işle uğraşma"): capability-audit → gateway `/api/backup/*` 5 endpoint (AES-GCM encrypted config backup) sunuyor, CLI'da **SIFIR erişim**; CI/cron/disaster-recovery blokluydu. OAuth=gerçek-gap-değil (opaque-key). Backup en kritik/non-redundant/testable. TUI-v2→v16.
+- **Adoption** (lisans disiplinli, zero-dep): restic/borg (download→0600-file, restore→destructive-HIL, encrypted-blob-opaque, fikir) + in-repo `saas.ts` adminGet/adminPost reuse. Yeni dep yok.
+- `cli/lib/backup.ts` (NEW saf): `formatBackupConfig`(accessKey-maskeli-gateway'den)+`summarizeReport`+`backupOutName`(`:`/`.`→`-`). `client.ts`: `getBackupConfig`/`setBackupConfig`/`triggerBackup`/`downloadBackup`(**Buffer arrayBuffer binary-safe**)/`restoreBackup`(hex). `commands/backup.ts`: config show/set, trigger, download(0600+TTY-refuse), restore(HIL `--yes`, `--json`→`--yes`-şart). index route+HELP+man+completion.
+- **KÖK-FİX (canlı e2e yakaladı)**: gateway download=**binary** octet-stream, restore=**hex** bekler → ilk impl `r.text()` ikiliyi UTF-8-bozuyordu (dosya 28243≠blob 14774, restore 500). Fix: download `arrayBuffer→Buffer→0600 binary dosya`, restore `readFileSync→toString("hex")`. Canlı round-trip: download 15577B=dosya 15577B → restore **"backup restored"** (200).
+- Testler: `cli-backup`(saf + mock-fetch round-trip + dispatch + Buffer-binary) → **full 374 pass/4 skip** (v14:363). VERSION 14.0.0→**15.0.0**; choke-point korunur; zero-RUNTIME-dep. **Gotcha**: N-037 download-binary-restore-hex-r.text()-bozar→arrayBuffer+toString(hex); N-038 restore-destructive-HIL+`--json`→`--yes`-şart; N-039 secretKey-GET'te-yok+accessKey-maskeli-merge-set-yapma.
+
+## v16 — NEXT (önceden-hesaplanmış ilk todo'lar)
 1. `top` multi-pane: `cli/commands/top.ts` `renderDashboard` → çoklu panel (requests | latency | tool-calls ayrı kutu); v8 saf-renderer + sparkline reuse.
 2. `agent --watch`: canlı ReAct akış görünümü (alt-screen, v8 SIGINT-restore N-016 deseni); non-TTY→tek-snapshot degrade.
 3. İlk check = multi-pane render saf-test (fixture metrics) + non-TTY degrade; agent-watch SIGINT cursor-restore.
