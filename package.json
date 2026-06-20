@@ -16,7 +16,8 @@
     "test": "vitest run",
     "conformance": "vitest run tests/conformance.e2e.test.ts",
     "conformance:http": "mcp-inspector --cli http://localhost:${PORT:-3000}/mcp --transport http --method tools/list",
-    "conformance:stdio": "mcp-inspector --cli node dist/mcp-stdio.cjs --method tools/list"
+    "conformance:stdio": "mcp-inspector --cli node dist/mcp-stdio.cjs --method tools/list",
+    "smoke": "vitest run tests/smoke-live.e2e.test.ts"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",

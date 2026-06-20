@@ -213,6 +213,16 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Güvenlik invariant (KRİTİK):** reconnect `connectUpstream(cfg, s.owner)` → **owner KORUNUR** → per-tenant tool reconnect'te ownerless'a DÜŞMEZ (Faz 24 izolasyon korunur, spy-test ile kanıtlı). **Prevention:** her reconnect/re-register güvenlik-bağlamını (owner/tenant) taşımalı — connect-once'ı resilient yaparken izolasyon sessizce kaybolmamalı.
 - **Sonraki (önceden hesaplandı):** v1.19 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). Consume+expose MCP yüzeyi artık üretim-olgun (federation+resilience+isolation+abort+roots+sampling).
 
+## Faz 28 — v1.19 (Live Runtime Validation + `npm run smoke` deploy-gate, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** ollamas İLK KEZ canlı boot edilip gerçek-zamanlı kullanıldı (lane'in ertelediği canlı-kanıt) + bulunan runtime-defekt fix + tek-komut deploy-gate. **0 yeni dep**.
+- **Canlı kanıt (28A, gerçek instance PORT=3019):** health `db:up`+ollama 0.30.10 · ready 200 · metrics prom · discovery caps[roots,tools,...] protocol 2025-06-18 · **MCP tools/list=23, sample LIVE** · gerçek `tools/call list_tree` · **OAuth TAM ZİNCİR** tenant→key→DCR(cc)→`/token` cc→`ot_`→**authed /mcp init=200** · supervisor `/upstreams/status`=[] 200 · **DOGFOOD gerçek ollama `/api/ai/generate`→`{source:ollama_local, model:qwen3:8b-16k, text:"ALIVE", 115.47 tok/s}`**.
+- **28B DEFEKT (canlı-koşu yakaladı, unit'ler kaçırdı):** `/api/generate` ESKİ raw endpoint `messages[]` bekliyor; `{prompt}` ile → `providers.ts:196 config.messages.find` undefined→**TypeError 500**. **Fix:** `executeProvider` `config.messages||[]` guard (asla TypeError, demo-fallback graceful) + `/api/generate` `messages` array-validation→clean 400 (`/api/ai/generate` yönlendir). Regresyon testi `providers-guard.test`. Canlı re-doğrulama: `{prompt}`→400, `messages[]`→200, dogfood ALIVE.
+- **28C durable:** `tests/smoke-live.e2e.test.ts` tek zincirli üretim senaryosu (self-boot→health→tenant-key→MCP tools/list+tool-call→OAuth cc→authed→supervisor→ollama-gated-dogfood) + `package.json` `npm run smoke`.
+- **Niçin:** "çalıştır+test+kullan" — unit kapsamı runtime gerçeğini garanti etmez; canlı koşu gerçek-ollama + boot + handshake defektlerini yakalar (yakaladı da).
+- **Kanıt:** gerçek suite **202 passed/2 skipped** (+5); `npm run smoke` yeşil; tsc temiz; conformance:stdio exit 0; bundle; server kill (port temiz).
+- **Prevention (RISK-MCP):** her versiyon ürün hedefini canlı boot ile bir kez gerçek-zamanlı doğrula (unit-only yetmez); router/parse hot-path'leri malformed input'ta TypeError-crash değil graceful olmalı (`|| []` guard).
+- **Sonraki (önceden hesaplandı):** v1.20 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). Üretim yüzeyi artık CANLI-doğrulanmış.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
