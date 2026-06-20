@@ -264,3 +264,22 @@ tsx orchestration/bin/doctor.ts --fix    # yalnız selfHealable (bench/artifacts
 `autopilot.ts` 4. adım=doctor → her SessionStart/launchd tick'i readiness raporlar (self-observing).
 **Scope §3:** yalnız okur (settings.json/launchctl-list/MODEL_SELECTION) + `DOCTOR.md` yazar. Non-dup: critic=codebase,
 driftguard=branch/version, doctor=runtime-readiness. Adopt-pattern brew/npm/flutter doctor (check{name,status,fix}+exit-code, zero-dep).
+
+---
+
+## §16. Roadmap Horizon Auto-Generator Protokolü (vO12 — sürdürebilirlik, 0-manuel)
+
+**Kök sorun:** ROADMAP vO1→vO11 tükendi → lane STALL eder; "10-versiyon-ileri / sürdürebilir" mandate'i
+için hiçbir şey sonraki horizon'u üretmiyordu. `bin/horizon.ts` girdisiz koşar, birikmiş sinyalleri
+(CRITIC.json gap'leri + panel-report.json open finding + driftguard branch-lane HARD + lane backlog)
+TÜKETİR → dedup + **consensus-boost** (çok-kaynak/çok-kez=yüksek öncelik) → sıralı **vO(N+1..N+10)** →
+`ROADMAP_HORIZON.md` (insan/conductor onayıyla ROADMAP'e işlenir).
+```
+tsx orchestration/bin/horizon.ts          # ROADMAP_HORIZON.md (vO12→vO21)
+tsx orchestration/bin/horizon.ts --json   # makine
+```
+**Non-dup:** critic=gap DETECT · conduct=TEK eylem seç · plan-next=BİLİNEN versiyon draft · **horizon=
+exhausted-roadmap'i 10-versiyon olarak SIRALA/ÜRET**. Untracked worker dosyalarını IMPORT ETMEZ (JSON
+runtime okur); yalnız committed plan-next/shared/driftguard. **Scope §3:** yalnız okur + `ROADMAP_HORIZON.md`.
+Adopt idea/pattern (zero-dep): knip/ts-prune (gap→action), OpenSSF Scorecard (checklist→backlog), WSJF/RICE
+(severity×frekans önceliklendirme). Canlı kanıt: 43 sinyal → vO12-vO21, top=backend obs-gap (sev 80).
