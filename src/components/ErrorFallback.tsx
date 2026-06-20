@@ -12,7 +12,7 @@ export function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
       <p className="mb-4 text-rose-200/80">
         This panel hit an unexpected error and was isolated so the rest of the app keeps running.
       </p>
-      <pre className="mb-4 max-h-40 overflow-auto rounded bg-black/40 p-3 text-xs text-rose-300/90">
+      <pre className="mb-4 max-h-40 overflow-auto rounded bg-immersive-inset p-3 text-xs text-rose-300/90">
         {error instanceof Error ? error.message : String(error)}
       </pre>
       <button

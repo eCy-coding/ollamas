@@ -6,10 +6,12 @@
   --ollamas-color-bg-base: #050608;
   --ollamas-color-bg-sidebar: #08090d;
   --ollamas-color-bg-panel: #0a0b10;
+  --ollamas-color-bg-inset: #04050a;
   --ollamas-color-border-subtle: rgba(255, 255, 255, 0.05);
+  --ollamas-color-border-strong: rgba(255, 255, 255, 0.10);
   --ollamas-color-text-bright: #f8fafc;
   --ollamas-color-text-muted: #94a3b8;
-  --ollamas-color-text-dim: #64748b;
+  --ollamas-color-text-dim: #97a4b8;
   --ollamas-color-accent-indigo: #6366f1;
   --ollamas-color-accent-emerald: #10b981;
   --ollamas-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

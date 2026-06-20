@@ -225,46 +225,46 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
         return <AlertCircle className="w-5 h-5 text-rose-400" />;
       case "pending":
       default:
-        return <div className="w-5 h-5 rounded-full border border-slate-700 bg-slate-950"></div>;
+        return <div className="w-5 h-5 rounded-full border border-immersive-border bg-immersive-bg"></div>;
     }
   };
 
   return (
-    <div className="bg-[#08090d] border border-white/5 rounded p-5 shadow-lg">
+    <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Multi-Agent Development Pipeline</h2>
+          <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Multi-Agent Development Pipeline</h2>
         </div>
       </div>
 
       {/* Input Prompter */}
       <div className="mb-5">
-        <label htmlFor="pipeline-prompt" className="text-[10px] text-slate-500 font-mono tracking-widest block mb-1.5 uppercase">Prompt Requirements</label>
+        <label htmlFor="pipeline-prompt" className="text-[10px] text-immersive-text-dim font-mono tracking-widest block mb-1.5 uppercase">Prompt Requirements</label>
         <textarea
           id="pipeline-prompt"
           rows={3}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="E.g. Create a FastAPI microservice returning a random quote list, containing custom health checkpoints and Pytest coverages..."
-          className="w-full bg-black/40 border border-white/5 rounded p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 font-mono resize-none transition-colors"
+          className="w-full bg-immersive-inset border border-immersive-border rounded p-3 text-xs text-immersive-text-bright placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 font-mono resize-none transition-colors"
         />
       </div>
 
       {/* Controls & Configuration Block */}
-      <h3 className="text-[10px] text-slate-500 font-mono tracking-widest block uppercase mb-2">Agent Assignments</h3>
+      <h3 className="text-[10px] text-immersive-text-dim font-mono tracking-widest block uppercase mb-2">Agent Assignments</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
         {/* Architect Role */}
-        <div className="bg-black/30 border border-white/5 p-3.5 rounded flex flex-col justify-between">
+        <div className="bg-immersive-inset border border-immersive-border p-3.5 rounded flex flex-col justify-between">
           <div>
-            <span className="text-xs font-mono font-bold text-slate-200 block">1. Systems Architect</span>
-            <span className="text-[9px] text-slate-500 block mb-2.5">Layout structures, directories mapper</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">1. Systems Architect</span>
+            <span className="text-[9px] text-immersive-text-dim block mb-2.5">Layout structures, directories mapper</span>
           </div>
           <div className="space-y-1.5">
             <select
               value={architectProv}
               onChange={(e) => setArchitectProv(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -273,7 +273,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <select
               value={architectModel}
               onChange={(e) => setArchitectModel(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {(modelsList[architectProv] || ["Loading..."]).map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -283,16 +283,16 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
         </div>
 
         {/* Coder Role */}
-        <div className="bg-black/30 border border-white/5 p-3.5 rounded flex flex-col justify-between">
+        <div className="bg-immersive-inset border border-immersive-border p-3.5 rounded flex flex-col justify-between">
           <div>
-            <span className="text-xs font-mono font-bold text-slate-200 block">2. Developer Coder</span>
-            <span className="text-[9px] text-slate-500 block mb-2.5">Writes full executable code blocks</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">2. Developer Coder</span>
+            <span className="text-[9px] text-immersive-text-dim block mb-2.5">Writes full executable code blocks</span>
           </div>
           <div className="space-y-1.5">
             <select
               value={coderProv}
               onChange={(e) => setCoderProv(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -301,7 +301,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <select
               value={coderModel}
               onChange={(e) => setCoderModel(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {(modelsList[coderProv] || ["Loading..."]).map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -311,16 +311,16 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
         </div>
 
         {/* Reviewer Role */}
-        <div className="bg-black/30 border border-white/5 p-3.5 rounded flex flex-col justify-between">
+        <div className="bg-immersive-inset border border-immersive-border p-3.5 rounded flex flex-col justify-between">
           <div>
-            <span className="text-xs font-mono font-bold text-slate-200 block">3. Inspector Reviewer</span>
-            <span className="text-[9px] text-slate-500 block mb-2.5">Algorithmic inspection, security audit</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">3. Inspector Reviewer</span>
+            <span className="text-[9px] text-immersive-text-dim block mb-2.5">Algorithmic inspection, security audit</span>
           </div>
           <div className="space-y-1.5">
             <select
               value={reviewerProv}
               onChange={(e) => setReviewerProv(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>{p.label}</option>
@@ -329,7 +329,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <select
               value={reviewerModel}
               onChange={(e) => setReviewerModel(e.target.value)}
-              className="w-full bg-[#050608] border border-white/5 text-[10px] rounded px-1.5 py-1 text-slate-300 focus:outline-none font-mono"
+              className="w-full bg-immersive-bg border border-immersive-border text-[10px] rounded px-1.5 py-1 text-immersive-text-muted focus:outline-none font-mono"
             >
               {(modelsList[reviewerProv] || ["Loading..."]).map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -340,18 +340,18 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       </div>
 
       {/* Advanced pipeline parameters toggles */}
-      <div className="bg-black/20 border border-white/5 p-3 rounded mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-immersive-inset border border-immersive-border p-3 rounded mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Write files */}
         <div className="flex items-center justify-between">
           <div className="text-left">
-            <span className="text-xs font-mono font-bold text-slate-200 block">Auto-Write Workspace Files</span>
-            <span className="text-[10px] text-slate-500 block">Directly write parsed FILE structures to disk</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">Auto-Write Workspace Files</span>
+            <span className="text-[10px] text-immersive-text-dim block">Directly write parsed FILE structures to disk</span>
           </div>
           <button onClick={() => setWriteFiles(!writeFiles)}>
             {writeFiles ? (
               <ToggleRight className="w-8 h-8 text-indigo-400 cursor-pointer" />
             ) : (
-              <ToggleLeft className="w-8 h-8 text-slate-600 cursor-pointer" />
+              <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
             )}
           </button>
         </div>
@@ -359,8 +359,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
         {/* Self Improve */}
         <div className="flex items-center justify-between">
           <div className="text-left">
-            <span className="text-xs font-mono font-bold text-slate-200 block">Bounded Self-Improve Loop</span>
-            <span className="text-[10px] text-slate-500 block">Iterate debugger cycle when Pytest asserts fail</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">Bounded Self-Improve Loop</span>
+            <span className="text-[10px] text-immersive-text-dim block">Iterate debugger cycle when Pytest asserts fail</span>
           </div>
           <div className="flex items-center gap-1.5">
             {enableSelfImprove && (
@@ -370,14 +370,14 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
                 max={3}
                 value={maxIterations}
                 onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="w-10 bg-[#050608] border border-white/10 text-[10px] font-mono px-1 py-0.5 rounded text-white"
+                className="w-10 bg-immersive-bg border border-immersive-border-strong text-[10px] font-mono px-1 py-0.5 rounded text-immersive-text-bright"
               />
             )}
             <button onClick={() => setEnableSelfImprove(!enableSelfImprove)}>
               {enableSelfImprove ? (
                 <ToggleRight className="w-8 h-8 text-indigo-400 cursor-pointer" />
               ) : (
-                <ToggleLeft className="w-8 h-8 text-slate-600 cursor-pointer" />
+                <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
               )}
             </button>
           </div>
@@ -385,8 +385,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       </div>
 
       <div className="flex justify-between items-center mb-6">
-        <div className="text-[10px] text-slate-500 font-mono italic">
-          Target Workspace: <span className="text-slate-400">{workspacePath}</span>
+        <div className="text-[10px] text-immersive-text-dim font-mono italic">
+          Target Workspace: <span className="text-immersive-text-muted">{workspacePath}</span>
         </div>
         <div className="flex gap-2">
           {running && (
@@ -409,17 +409,17 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       </div>
 
       {/* DAG GRAPH GRAPHICS */}
-      <h3 className="text-[10px] text-slate-500 font-mono tracking-widest block uppercase mb-3">Pipeline Execution DAG (Directed Acyclic Graph)</h3>
-      <div className="flex flex-col md:flex-row items-center justify-around gap-4 p-5 bg-black/40 border border-white/5 rounded mb-6">
+      <h3 className="text-[10px] text-immersive-text-dim font-mono tracking-widest block uppercase mb-3">Pipeline Execution DAG (Directed Acyclic Graph)</h3>
+      <div className="flex flex-col md:flex-row items-center justify-around gap-4 p-5 bg-immersive-inset border border-immersive-border rounded mb-6">
         {/* Architect Node */}
         <div className={`p-3 rounded border flex items-center gap-3 w-48 ${
           stages.architect.status === "running" ? "bg-indigo-500/10 border-indigo-500 animate-pulse" :
-          stages.architect.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-[#08090d] border-white/5"
+          stages.architect.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-immersive-sidebar border-immersive-border"
         }`}>
           {getStageIcon(stages.architect.status)}
           <div className="overflow-hidden">
-            <span className="text-xs font-mono font-bold text-white block">Architect</span>
-            <span className="text-[9px] font-mono text-slate-500 block truncate">{architectModel}</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">Architect</span>
+            <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{architectModel}</span>
             {stages.architect.tokensPerSec !== undefined && stages.architect.tokensPerSec > 0 && (
               <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.architect.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
@@ -429,17 +429,17 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           </div>
         </div>
 
-        <ArrowRight className="w-5 h-5 text-slate-700 hidden md:block" />
+        <ArrowRight className="w-5 h-5 text-immersive-text-dim hidden md:block" />
 
         {/* Coder Node */}
         <div className={`p-3 rounded border flex items-center gap-3 w-48 ${
           stages.coder.status === "running" ? "bg-indigo-500/10 border-indigo-500 animate-pulse" :
-          stages.coder.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-[#08090d] border-white/5"
+          stages.coder.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-immersive-sidebar border-immersive-border"
         }`}>
           {getStageIcon(stages.coder.status)}
           <div className="overflow-hidden">
-            <span className="text-xs font-mono font-bold text-white block">Developer Coder</span>
-            <span className="text-[9px] font-mono text-slate-500 block truncate">{coderModel}</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">Developer Coder</span>
+            <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{coderModel}</span>
             {stages.coder.tokensPerSec !== undefined && stages.coder.tokensPerSec > 0 && (
               <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.coder.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
@@ -449,17 +449,17 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           </div>
         </div>
 
-        <ArrowRight className="w-5 h-5 text-slate-700 hidden md:block" />
+        <ArrowRight className="w-5 h-5 text-immersive-text-dim hidden md:block" />
 
         {/* Reviewer Node */}
         <div className={`p-3 rounded border flex items-center gap-3 w-48 ${
           stages.reviewer.status === "running" ? "bg-indigo-500/10 border-indigo-500 animate-pulse" :
-          stages.reviewer.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-[#08090d] border-white/5"
+          stages.reviewer.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" : "bg-immersive-sidebar border-immersive-border"
         }`}>
           {getStageIcon(stages.reviewer.status)}
           <div className="overflow-hidden">
-            <span className="text-xs font-mono font-bold text-white block">Inspector Reviewer</span>
-            <span className="text-[9px] font-mono text-slate-500 block truncate">{reviewerModel}</span>
+            <span className="text-xs font-mono font-bold text-immersive-text-bright block">Inspector Reviewer</span>
+            <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{reviewerModel}</span>
             {stages.reviewer.tokensPerSec !== undefined && stages.reviewer.tokensPerSec > 0 && (
               <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.reviewer.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
@@ -490,8 +490,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       <div className="space-y-4">
         {stages.architect.text && (
           <div>
-            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Architect Outputs ({stages.architect.elapsed ? (stages.architect.elapsed / 1000).toFixed(1) : ""} s)</span>
-            <pre className="p-3 bg-black/55 rounded text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-40 border border-white/5">
+            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-1">Architect Outputs ({stages.architect.elapsed ? (stages.architect.elapsed / 1000).toFixed(1) : ""} s)</span>
+            <pre className="p-3 bg-immersive-inset rounded text-xs font-mono text-immersive-text-muted overflow-x-auto whitespace-pre-wrap max-h-40 border border-immersive-border">
               {stages.architect.text}
             </pre>
           </div>
@@ -499,8 +499,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
 
         {stages.coder.text && (
           <div>
-            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Coder Outputs ({stages.coder.elapsed ? (stages.coder.elapsed / 1000).toFixed(1) : ""} s)</span>
-            <pre className="p-3 bg-black/55 rounded text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-52 border border-white/5">
+            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-1">Coder Outputs ({stages.coder.elapsed ? (stages.coder.elapsed / 1000).toFixed(1) : ""} s)</span>
+            <pre className="p-3 bg-immersive-inset rounded text-xs font-mono text-immersive-text-muted overflow-x-auto whitespace-pre-wrap max-h-52 border border-immersive-border">
               {stages.coder.text}
             </pre>
           </div>
@@ -508,8 +508,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
 
         {stages.reviewer.text && (
           <div>
-            <span className="text-[10px] text-slate-500 font-mono uppercase block mb-1">Reviewer Critique ({stages.reviewer.elapsed ? (stages.reviewer.elapsed / 1000).toFixed(1) : ""} s)</span>
-            <pre className="p-3 bg-black/55 rounded text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-40 border border-white/5">
+            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-1">Reviewer Critique ({stages.reviewer.elapsed ? (stages.reviewer.elapsed / 1000).toFixed(1) : ""} s)</span>
+            <pre className="p-3 bg-immersive-inset rounded text-xs font-mono text-immersive-text-muted overflow-x-auto whitespace-pre-wrap max-h-40 border border-immersive-border">
               {stages.reviewer.text}
             </pre>
           </div>

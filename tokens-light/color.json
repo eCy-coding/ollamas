@@ -3,15 +3,17 @@
     "bg": {
       "base":    { "value": "#ffffff" },
       "sidebar": { "value": "#f8fafc" },
-      "panel":   { "value": "#f1f5f9" }
+      "panel":   { "value": "#f1f5f9" },
+      "inset":   { "value": "#e2e8f0" }
     },
     "border": {
-      "subtle": { "value": "rgba(15, 23, 42, 0.08)" }
+      "subtle": { "value": "rgba(15, 23, 42, 0.08)" },
+      "strong": { "value": "rgba(15, 23, 42, 0.14)" }
     },
     "text": {
       "bright": { "value": "#0f172a" },
       "muted":  { "value": "#475569" },
-      "dim":    { "value": "#94a3b8" }
+      "dim":    { "value": "#586477" }
     },
     "accent": {
       "indigo":  { "value": "#4f46e5" },

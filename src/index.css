@@ -10,7 +10,9 @@
   --color-immersive-bg: var(--ollamas-color-bg-base);
   --color-immersive-sidebar: var(--ollamas-color-bg-sidebar);
   --color-immersive-panel: var(--ollamas-color-bg-panel);
+  --color-immersive-inset: var(--ollamas-color-bg-inset);
   --color-immersive-border: var(--ollamas-color-border-subtle);
+  --color-immersive-border-strong: var(--ollamas-color-border-strong);
   --color-immersive-text-bright: var(--ollamas-color-text-bright);
   --color-immersive-text-muted: var(--ollamas-color-text-muted);
   --color-immersive-text-dim: var(--ollamas-color-text-dim);

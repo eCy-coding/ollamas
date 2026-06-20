@@ -126,7 +126,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
       case "untracked": return "text-emerald-400 border-emerald-400/20 bg-emerald-500/10";
       case "modified": return "text-amber-400 border-amber-400/20 bg-amber-500/10";
       case "staged": return "text-indigo-400 border-indigo-400/20 bg-indigo-500/10";
-      default: return "text-slate-500 border-slate-800 bg-slate-950";
+      default: return "text-immersive-text-dim border-immersive-border bg-immersive-bg";
     }
   };
 
@@ -151,9 +151,9 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
             {item.isDirectory ? (
               <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             ) : (
-              <File className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <File className="w-3.5 h-3.5 text-immersive-text-muted shrink-0" />
             )}
-            <span className="text-slate-300 truncate font-mono">{item.name}</span>
+            <span className="text-immersive-text-muted truncate font-mono">{item.name}</span>
             {item.gitStatus && item.gitStatus !== "none" && (
               <span className={`text-[8px] px-1 font-mono rounded border ${getGitColor(item.gitStatus)}`}>
                 {item.gitStatus.substring(0, 1).toUpperCase()}
@@ -164,7 +164,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
           {!item.isDirectory && (
             <button 
               onClick={(e) => handleDeleteFile(item.relativePath, e)}
-              className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+              className="text-immersive-text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -172,7 +172,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
         </div>
 
         {item.isDirectory && item.children && (
-          <div className="pl-3.5 border-l border-white/5 space-y-1">
+          <div className="pl-3.5 border-l border-immersive-border space-y-1">
             {item.children.map((child) => renderItem(child))}
           </div>
         )}
@@ -181,13 +181,13 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
   };
 
   return (
-    <div className="bg-[#08090d] border border-white/5 rounded p-5 shadow-lg">
+    <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <FolderOpen className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Target Directory Explorer</h2>
+          <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Target Directory Explorer</h2>
         </div>
-        <button aria-label="Refresh file tree" onClick={fetchTree} disabled={loading} className="text-slate-400 hover:text-white cursor-pointer">
+        <button aria-label="Refresh file tree" onClick={fetchTree} disabled={loading} className="text-immersive-text-muted hover:text-immersive-text-bright cursor-pointer">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
@@ -199,7 +199,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
           value={pathInput}
           onChange={(e) => setPathInput(e.target.value)}
           placeholder="/users/macbook/projects/workspace"
-          className="flex-1 bg-[#050608] border border-white/5 rounded px-2.5 py-1.5 text-xs text-slate-300 font-mono placeholder-slate-700 focus:outline-none"
+          className="flex-1 bg-immersive-bg border border-immersive-border rounded px-2.5 py-1.5 text-xs text-immersive-text-muted font-mono placeholder-slate-700 focus:outline-none"
         />
         <button 
           onClick={handleSelectWorkspace}
@@ -211,22 +211,22 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Traversal Tree Side */}
-        <div className="bg-black/45 p-4 rounded border border-white/5 max-h-96 overflow-y-auto space-y-2">
+        <div className="bg-immersive-inset p-4 rounded border border-immersive-border max-h-96 overflow-y-auto space-y-2">
           <div className="flex gap-2 mb-3">
             <input
               type="text"
               placeholder="index.js"
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
-              className="flex-1 bg-[#050608] border border-white/5 rounded text-xs px-2 py-1 text-slate-300 font-mono focus:outline-none placeholder-slate-700"
+              className="flex-1 bg-immersive-bg border border-immersive-border rounded text-xs px-2 py-1 text-immersive-text-muted font-mono focus:outline-none placeholder-slate-700"
             />
-            <button aria-label="Create file" onClick={handleCreateFile} className="bg-white/5 text-indigo-400 border border-white/10 rounded px-2 hover:bg-white/10 cursor-pointer">
+            <button aria-label="Create file" onClick={handleCreateFile} className="bg-white/5 text-indigo-400 border border-immersive-border-strong rounded px-2 hover:bg-white/10 cursor-pointer">
               <FilePlus className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {tree.length === 0 ? (
-            <div className="text-center py-10 text-slate-600 italic text-xs font-mono">
+            <div className="text-center py-10 text-immersive-text-dim italic text-xs font-mono">
               Workspace path is empty or inaccessible. See settings permissions.
             </div>
           ) : (
@@ -235,14 +235,14 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
         </div>
 
         {/* Text Area Code Editor */}
-        <div className="md:col-span-2 flex flex-col justify-between bg-black/55 border border-white/5 p-4 rounded min-h-[300px]">
+        <div className="md:col-span-2 flex flex-col justify-between bg-immersive-inset border border-immersive-border p-4 rounded min-h-[300px]">
           {editingFile ? (
             <div className="flex flex-col h-full flex-grow justify-between">
               <div>
-                <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                <div className="flex items-center justify-between border-b border-immersive-border pb-2 mb-3">
                   <div className="flex items-center gap-2">
                     <Edit className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs font-mono font-semibold text-slate-200">{editingFile}</span>
+                    <span className="text-xs font-mono font-semibold text-immersive-text-bright">{editingFile}</span>
                   </div>
                   <button 
                     onClick={handleSaveFile}
@@ -256,13 +256,13 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
                   rows={14}
                   value={editorContent}
                   onChange={(e) => setEditorContent(e.target.value)}
-                  className="w-full bg-transparent text-slate-300 font-mono text-xs focus:outline-none p-1 resize-none"
+                  className="w-full bg-transparent text-immersive-text-muted font-mono text-xs focus:outline-none p-1 resize-none"
                 />
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col justify-center items-center text-center text-slate-500">
-              <FolderOpen className="w-8 h-8 text-slate-700 mb-2" />
+            <div className="flex-1 flex flex-col justify-center items-center text-center text-immersive-text-dim">
+              <FolderOpen className="w-8 h-8 text-immersive-text-dim mb-2" />
               <p className="text-xs font-mono">Select a file from the explorer on the left to read or write</p>
               {treeMode === "demo" && (
                 <span className="text-[10px] mt-1.5 text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-mono">

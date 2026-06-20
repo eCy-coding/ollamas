@@ -122,18 +122,18 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
 
   const copy = (s: string) => { navigator.clipboard?.writeText(s); onNotify("Copied", "info"); };
 
-  const card = "bg-white/[0.03] border border-white/10 rounded-xl p-4";
+  const card = "bg-white/[0.03] border border-immersive-border-strong rounded-xl p-4";
   const btn = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition";
 
   // Zero-dep pure-SVG sparkline for the usage timeseries.
   const Spark: React.FC<{ data: number[]; color: string; label: string }> = ({ data, color, label }) => {
-    if (!data.length) return <div className="text-xs text-slate-500">{label}: no data</div>;
+    if (!data.length) return <div className="text-xs text-immersive-text-dim">{label}: no data</div>;
     const max = Math.max(...data, 1), w = Math.max(data.length * 8, 40), h = 48;
     const pts = data.map((v, i) => `${i * 8},${h - (v / max) * h}`).join(" ");
     return (
       <div>
-        <div className="text-xs text-slate-400 mb-1">{label} <span className="text-slate-500">(peak {max})</span></div>
-        <svg width={w} height={h} className="border border-white/10 rounded bg-black/20"><polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" /></svg>
+        <div className="text-xs text-immersive-text-muted mb-1">{label} <span className="text-immersive-text-dim">(peak {max})</span></div>
+        <svg width={w} height={h} className="border border-immersive-border-strong rounded bg-immersive-inset"><polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" /></svg>
       </div>
     );
   };
@@ -141,33 +141,33 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-immersive-text-bright">
           <Network className="w-5 h-5 text-cyan-400" /> SaaS Gateway Control
         </h2>
-        <button onClick={refresh} className={`${btn} bg-white/5 text-slate-300 hover:bg-white/10`}><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
+        <button onClick={refresh} className={`${btn} bg-white/5 text-immersive-text-muted hover:bg-white/10`}><RefreshCw className="w-3.5 h-3.5" /> Refresh</button>
       </div>
 
       <div className={card}>
-        <label htmlFor="saas-admin-token" className="text-xs font-mono text-slate-400">Admin Token (X-Admin-Token; needed when SAAS_ENFORCE=1)</label>
+        <label htmlFor="saas-admin-token" className="text-xs font-mono text-immersive-text-muted">Admin Token (X-Admin-Token; needed when SAAS_ENFORCE=1)</label>
         <input id="saas-admin-token" value={adminToken} onChange={(e) => setAdminToken(e.target.value)} type="password" placeholder="SAAS_ADMIN_TOKEN"
-          className="mt-1 w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono" />
+          className="mt-1 w-full bg-immersive-inset border border-immersive-border-strong rounded-lg px-3 py-2 text-sm text-immersive-text-bright font-mono" />
       </div>
 
       {gateway && (
         <div className={card}>
-          <div className="flex items-center gap-2 text-sm text-slate-200 mb-1"><Network className="w-4 h-4 text-cyan-400" /> Gateway</div>
-          <div className="text-xs font-mono text-slate-400">exposed tools: <span className="text-cyan-300">{gateway.exposedTools?.length ?? 0}</span> · tiers: {(gateway.exposeTiers || []).join(", ")} · upstreams: {(gateway.upstreams || []).length}</div>
+          <div className="flex items-center gap-2 text-sm text-immersive-text-bright mb-1"><Network className="w-4 h-4 text-cyan-400" /> Gateway</div>
+          <div className="text-xs font-mono text-immersive-text-muted">exposed tools: <span className="text-cyan-300">{gateway.exposedTools?.length ?? 0}</span> · tiers: {(gateway.exposeTiers || []).join(", ")} · upstreams: {(gateway.upstreams || []).length}</div>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Tenants */}
         <div className={card}>
-          <div className="flex items-center gap-2 text-sm text-slate-200 mb-3"><Building2 className="w-4 h-4 text-emerald-400" /> Tenants</div>
+          <div className="flex items-center gap-2 text-sm text-immersive-text-bright mb-3"><Building2 className="w-4 h-4 text-emerald-400" /> Tenants</div>
           <div className="flex gap-2 mb-3">
             <input aria-label="Tenant name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="tenant name"
-              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200" />
-            <select aria-label="Subscription plan" value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="bg-black/40 border border-white/10 rounded-lg px-2 text-sm text-slate-200">
+              className="flex-1 bg-immersive-inset border border-immersive-border-strong rounded-lg px-3 py-1.5 text-sm text-immersive-text-bright" />
+            <select aria-label="Subscription plan" value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="bg-immersive-inset border border-immersive-border-strong rounded-lg px-2 text-sm text-immersive-text-bright">
               {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <button onClick={createTenant} className={`${btn} bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}><Plus className="w-3.5 h-3.5" /> Add</button>
@@ -175,19 +175,19 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
           <ul className="space-y-1 max-h-64 overflow-auto">
             {tenants.map((t) => (
               <li key={t.id}>
-                <button onClick={() => loadTenant(t)} className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${selected?.id === t.id ? "bg-cyan-500/15 text-cyan-200" : "hover:bg-white/5 text-slate-300"}`}>
-                  <span className="font-medium">{t.name}</span> <span className="text-xs font-mono text-slate-500">· {t.plan_id} · {t.id}</span>
+                <button onClick={() => loadTenant(t)} className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${selected?.id === t.id ? "bg-cyan-500/15 text-cyan-200" : "hover:bg-white/5 text-immersive-text-muted"}`}>
+                  <span className="font-medium">{t.name}</span> <span className="text-xs font-mono text-immersive-text-dim">· {t.plan_id} · {t.id}</span>
                 </button>
               </li>
             ))}
-            {tenants.length === 0 && <li className="text-xs text-slate-500 px-3 py-2">No tenants. Create one above.</li>}
+            {tenants.length === 0 && <li className="text-xs text-immersive-text-dim px-3 py-2">No tenants. Create one above.</li>}
           </ul>
         </div>
 
         {/* Selected tenant detail */}
         <div className={card}>
-          <div className="flex items-center gap-2 text-sm text-slate-200 mb-3"><KeyRound className="w-4 h-4 text-indigo-400" /> API Keys {selected && <span className="text-xs font-mono text-slate-500">· {selected.name}</span>}</div>
-          {!selected && <div className="text-xs text-slate-500">Select a tenant to manage keys + usage.</div>}
+          <div className="flex items-center gap-2 text-sm text-immersive-text-bright mb-3"><KeyRound className="w-4 h-4 text-indigo-400" /> API Keys {selected && <span className="text-xs font-mono text-immersive-text-dim">· {selected.name}</span>}</div>
+          {!selected && <div className="text-xs text-immersive-text-dim">Select a tenant to manage keys + usage.</div>}
           {selected && (
             <>
               <button onClick={issueKey} className={`${btn} bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25 mb-2`}><Plus className="w-3.5 h-3.5" /> Issue key</button>
@@ -199,12 +199,12 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
               )}
               <ul className="space-y-1 mb-3">
                 {keys.map((k) => (
-                  <li key={k.id} className="flex items-center justify-between text-xs font-mono text-slate-400 px-2 py-1 rounded bg-black/30">
+                  <li key={k.id} className="flex items-center justify-between text-xs font-mono text-immersive-text-muted px-2 py-1 rounded bg-immersive-inset">
                     <span>{k.id} {k.label && `(${k.label})`} {k.revoked ? <span className="text-rose-400">· revoked</span> : <span className="text-emerald-400">· active</span>}</span>
                     {!k.revoked && <button aria-label="Revoke key" onClick={() => revokeKey(k.id)} className="text-rose-400 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </li>
                 ))}
-                {keys.length === 0 && <li className="text-xs text-slate-500">No keys yet.</li>}
+                {keys.length === 0 && <li className="text-xs text-immersive-text-dim">No keys yet.</li>}
               </ul>
             </>
           )}
@@ -214,11 +214,11 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
       {/* Billing */}
       <div className={card}>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-sm text-slate-200"><Receipt className="w-4 h-4 text-amber-400" /> Billing (current period)</div>
+          <div className="flex items-center gap-2 text-sm text-immersive-text-bright"><Receipt className="w-4 h-4 text-amber-400" /> Billing (current period)</div>
           <button onClick={previewBilling} className={`${btn} bg-amber-500/15 text-amber-300 hover:bg-amber-500/25`}><Gauge className="w-3.5 h-3.5" /> Preview</button>
         </div>
         {billing && (
-          <div className="text-xs font-mono text-slate-400">
+          <div className="text-xs font-mono text-immersive-text-muted">
             <div>period {billing.period} · {billing.dryRun ? <span className="text-amber-300">DRY-RUN (no Stripe key)</span> : <span className="text-emerald-300">LIVE</span>} · total {billing.total}</div>
             <ul className="mt-1 space-y-0.5">
               {(billing.lines || []).map((l: any) => <li key={l.tenantId}>{l.tenantId}: {l.calls} calls → {l.amount}</li>)}
@@ -229,16 +229,16 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
 
       {/* Audit log (host/privileged/upstream tool calls) */}
       <div className={card}>
-        <div className="flex items-center gap-2 text-sm text-slate-200 mb-2"><ShieldAlert className="w-4 h-4 text-rose-400" /> Security Audit (recent)</div>
-        {audit.length === 0 && <div className="text-xs text-slate-500">No host/privileged tool calls recorded yet.</div>}
+        <div className="flex items-center gap-2 text-sm text-immersive-text-bright mb-2"><ShieldAlert className="w-4 h-4 text-rose-400" /> Security Audit (recent)</div>
+        {audit.length === 0 && <div className="text-xs text-immersive-text-dim">No host/privileged tool calls recorded yet.</div>}
         <ul className="space-y-0.5 max-h-56 overflow-auto">
           {audit.map((a) => (
-            <li key={a.id} className="text-xs font-mono text-slate-400 flex items-center gap-2">
+            <li key={a.id} className="text-xs font-mono text-immersive-text-muted flex items-center gap-2">
               <span className={a.ok ? "text-emerald-400" : "text-rose-400"}>{a.ok ? "✓" : "✗"}</span>
-              <span className="text-slate-300">{a.tool}</span>
+              <span className="text-immersive-text-muted">{a.tool}</span>
               <span className="text-amber-300">[{a.tier}]</span>
-              <span className="text-slate-500">{a.tenant_id}</span>
-              <span className="text-slate-600 ml-auto">{a.ts?.slice(11, 19)}</span>
+              <span className="text-immersive-text-dim">{a.tenant_id}</span>
+              <span className="text-immersive-text-dim ml-auto">{a.ts?.slice(11, 19)}</span>
             </li>
           ))}
         </ul>
@@ -247,15 +247,15 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
       {/* Tenant Self-Service (uses a tenant API key, not the admin token) */}
       <div className={card}>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-sm text-slate-200"><KeyRound className="w-4 h-4 text-cyan-300" /> Self-Service (tenant key)</div>
+          <div className="flex items-center gap-2 text-sm text-immersive-text-bright"><KeyRound className="w-4 h-4 text-cyan-300" /> Self-Service (tenant key)</div>
           <button onClick={openPortal} className={`${btn} bg-amber-500/15 text-amber-300 hover:bg-amber-500/25`}><Receipt className="w-3.5 h-3.5" /> Billing portal</button>
         </div>
         <div className="flex gap-2 mb-3">
           <input value={tenantKey} onChange={(e) => setTenantKey(e.target.value)} type="password" placeholder="olm_… (needs usage:read / webhooks:write scopes)"
-            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-200 font-mono" />
+            className="flex-1 bg-immersive-inset border border-immersive-border-strong rounded-lg px-3 py-1.5 text-sm text-immersive-text-bright font-mono" />
           <button onClick={loadSelf} className={`${btn} bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25`}><RefreshCw className="w-3.5 h-3.5" /> Load</button>
         </div>
-        {selfUsage && <div className="text-xs font-mono text-slate-400 mb-2">plan {selfUsage.plan} · used {selfUsage.used}{selfUsage.quota ? ` / ${selfUsage.quota}` : ""}</div>}
+        {selfUsage && <div className="text-xs font-mono text-immersive-text-muted mb-2">plan {selfUsage.plan} · used {selfUsage.used}{selfUsage.quota ? ` / ${selfUsage.quota}` : ""}</div>}
         {series.length > 0 && (
           <div className="flex gap-6 mb-3">
             <Spark data={series.map((s) => s.calls)} color="#22d3ee" label="daily calls" />
@@ -265,32 +265,32 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Webhooks */}
           <div>
-            <div className="text-xs text-slate-300 mb-1">Webhooks</div>
+            <div className="text-xs text-immersive-text-muted mb-1">Webhooks</div>
             <div className="flex gap-1 mb-1">
-              <input aria-label="Webhook URL" value={whUrl} onChange={(e) => setWhUrl(e.target.value)} placeholder="https://your.app/hook" className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-200" />
+              <input aria-label="Webhook URL" value={whUrl} onChange={(e) => setWhUrl(e.target.value)} placeholder="https://your.app/hook" className="flex-1 bg-immersive-inset border border-immersive-border-strong rounded px-2 py-1 text-xs text-immersive-text-bright" />
               <button aria-label="Add webhook" onClick={addHook} className={`${btn} bg-emerald-500/15 text-emerald-300`}><Plus className="w-3 h-3" /></button>
             </div>
-            <input aria-label="Webhook events (comma-separated)" value={whEvents} onChange={(e) => setWhEvents(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-slate-500 mb-1" />
+            <input aria-label="Webhook events (comma-separated)" value={whEvents} onChange={(e) => setWhEvents(e.target.value)} className="w-full bg-immersive-inset border border-immersive-border-strong rounded px-2 py-1 text-xs text-immersive-text-dim mb-1" />
             <ul className="space-y-0.5">
               {webhooks.map((w) => (
-                <li key={w.id} className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                  <span className="truncate flex-1">{w.url}</span><span className="text-slate-600">{(w.events || []).length}ev</span>
+                <li key={w.id} className="flex items-center gap-2 text-xs font-mono text-immersive-text-muted">
+                  <span className="truncate flex-1">{w.url}</span><span className="text-immersive-text-dim">{(w.events || []).length}ev</span>
                   <button aria-label="Delete webhook" onClick={() => delHook(w.id)} className="text-rose-400"><Trash2 className="w-3 h-3" /></button>
                 </li>
               ))}
-              {webhooks.length === 0 && <li className="text-xs text-slate-600">none</li>}
+              {webhooks.length === 0 && <li className="text-xs text-immersive-text-dim">none</li>}
             </ul>
           </div>
           {/* Upstreams */}
           <div>
-            <div className="text-xs text-slate-300 mb-1">Upstream MCP servers</div>
+            <div className="text-xs text-immersive-text-muted mb-1">Upstream MCP servers</div>
             <ul className="space-y-0.5">
               {upstreams.map((u) => (
-                <li key={u.id} className="text-xs font-mono text-slate-400 flex items-center gap-2">
-                  <span className="text-slate-300">{u.name}</span><span className="text-slate-600">[{u.transport}]</span>
+                <li key={u.id} className="text-xs font-mono text-immersive-text-muted flex items-center gap-2">
+                  <span className="text-immersive-text-muted">{u.name}</span><span className="text-immersive-text-dim">[{u.transport}]</span>
                 </li>
               ))}
-              {upstreams.length === 0 && <li className="text-xs text-slate-600">none (POST /api/saas/upstreams)</li>}
+              {upstreams.length === 0 && <li className="text-xs text-immersive-text-dim">none (POST /api/saas/upstreams)</li>}
             </ul>
           </div>
         </div>

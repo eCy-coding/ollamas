@@ -62,10 +62,10 @@ export function GoogleDriveBrowser() {
 
   if (needsAuth) {
     return (
-      <div className="bg-[#08090d] border border-white/5 rounded p-8 flex flex-col items-center justify-center min-h-[300px] text-center shadow-lg">
+      <div className="bg-immersive-sidebar border border-immersive-border rounded p-8 flex flex-col items-center justify-center min-h-[300px] text-center shadow-lg">
         <Folder className="w-12 h-12 text-indigo-400 mb-4 opacity-50" />
-        <h2 className="text-sm font-bold text-slate-100 font-mono tracking-wider uppercase mb-2">Connect Google Drive</h2>
-        <p className="text-xs text-slate-400 mb-6 max-w-sm">Sign in with Google to browse and manage your Drive files directly from this cockpit.</p>
+        <h2 className="text-sm font-bold text-immersive-text-bright font-mono tracking-wider uppercase mb-2">Connect Google Drive</h2>
+        <p className="text-xs text-immersive-text-muted mb-6 max-w-sm">Sign in with Google to browse and manage your Drive files directly from this cockpit.</p>
         
         {authError && (
           <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs px-4 py-3 rounded mb-6 max-w-md font-mono text-left">
@@ -76,7 +76,7 @@ export function GoogleDriveBrowser() {
         <button 
           onClick={handleLogin} 
           disabled={isLoggingIn}
-          className="gsi-material-button bg-white text-slate-800 border border-slate-200 rounded px-4 py-2 flex items-center gap-2 hover:bg-slate-50 transition cursor-pointer font-medium text-sm disabled:opacity-50"
+          className="gsi-material-button bg-immersive-bg text-immersive-text-dim border border-immersive-border rounded px-4 py-2 flex items-center gap-2 hover:bg-immersive-bg transition cursor-pointer font-medium text-sm disabled:opacity-50"
         >
           {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : (
             <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
@@ -97,15 +97,15 @@ export function GoogleDriveBrowser() {
     if (mimeType.includes("folder")) return <Folder className="w-4 h-4 text-amber-400" />;
     if (mimeType.includes("document") || mimeType.includes("text")) return <FileText className="w-4 h-4 text-blue-400" />;
     if (mimeType.includes("spreadsheet")) return <FileSpreadsheet className="w-4 h-4 text-emerald-400" />;
-    return <File className="w-4 h-4 text-slate-400" />;
+    return <File className="w-4 h-4 text-immersive-text-muted" />;
   };
 
   return (
-    <div className="bg-[#08090d] border border-white/5 rounded p-5 shadow-lg flex flex-col h-full min-h-[400px]">
+    <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg flex flex-col h-full min-h-[400px]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Folder className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Google Drive Storage</h2>
+          <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Google Drive Storage</h2>
         </div>
         <button 
           onClick={fetchFiles} 
@@ -123,13 +123,13 @@ export function GoogleDriveBrowser() {
         </div>
       ) : null}
 
-      <div className="flex-1 bg-black/30 border border-white/5 rounded overflow-y-auto mt-2">
+      <div className="flex-1 bg-immersive-inset border border-immersive-border rounded overflow-y-auto mt-2">
         {loading && files.length === 0 ? (
           <div className="flex items-center justify-center h-full min-h-[200px]">
-             <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+             <Loader2 className="w-6 h-6 animate-spin text-immersive-text-dim" />
           </div>
         ) : files.length === 0 ? (
-           <div className="flex items-center justify-center h-full min-h-[200px] text-xs text-slate-500 font-mono">
+           <div className="flex items-center justify-center h-full min-h-[200px] text-xs text-immersive-text-dim font-mono">
              No files found in your Google Drive.
            </div>
         ) : (
@@ -138,12 +138,12 @@ export function GoogleDriveBrowser() {
               <div key={file.id} className="flex justify-between items-center p-3 hover:bg-white/5 transition group">
                 <div className="flex items-center gap-3 overflow-hidden">
                   {getFileIcon(file.mimeType)}
-                  <span className="text-xs text-slate-300 font-mono truncate max-w-[200px] sm:max-w-xs">{file.name}</span>
+                  <span className="text-xs text-immersive-text-muted font-mono truncate max-w-[200px] sm:max-w-xs">{file.name}</span>
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
                   <button 
                     onClick={() => handleDelete(file.id, file.name)}
-                    className="text-slate-500 hover:text-red-400 cursor-pointer p-1"
+                    className="text-immersive-text-dim hover:text-red-400 cursor-pointer p-1"
                     title="Delete file"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

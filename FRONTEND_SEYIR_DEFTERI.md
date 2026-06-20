@@ -173,6 +173,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF13 — Deep Component Theme-Sweep (light/dark her yerde) (DONE)
+- **Ne:** vF9 light/dark yalnız App shell'e uygulanmıştı; 22 component dark-hardcoded → light tema yarı-bozuk. vF13 ~495 yapısal-nötr sınıfı **semantik token utility**'ye migrate etti + axe `color-contrast` kuralını (vF6'dan beri kapalı) gate'e geri aldı. Light tema artık gerçekten çalışır; dark WCAG AA contrast kapı-altında.
+- **Nasıl:**
+  - **Token genişletme (semantik COLLAPSE, sprawl yok):** +2 token (`bg.inset` koyu-oturmuş yüzey, `border.strong` white/10) + `@theme` 2 mapping. 11 slate seviyesi 3 mevcut rol'e toplandı (100/200→bright, 300/400/450→muted, 500-800→dim); `bg-black/*`→inset, hex→bg/sidebar/panel. style-dictionary regen.
+  - **Deterministik codemod** (ephemeral `/tmp/theme-codemod.mjs`, commit DIŞI): sıralı regex (`(?!\d)` prefix-collision-guard, prefix `hover:`/`md:` korunur), tüm `src/components/**/*.tsx`+`App.tsx` → 487+8 değişim/16 dosya. Status renkleri (indigo/emerald/rose/amber/cyan 324) DOKUNULMADI.
+  - **Contrast tuning (token tek-kaynak):** `text-dim` dark `#64748b`→`#97a4b8` (white-overlay bg'lerde L≈.02'de ≥4.5), light `#94a3b8`→`#586477` (beyazda AA). Sadece token değişti, component değil.
+  - **axe gate:** `a11y.spec` `disableRules(['color-contrast'])` KALDIRILDI; **`test.use({colorScheme:'dark'})`** (canonical dark tema taranır — headless chromium light-default'u yerine) + scan-öncesi `document.fonts.ready`+200ms settle (FE-021).
+- **Niçin:** Light tema yarı-bozuktu (paneller dark-sabit); semantik token = matematiksel collapse (495 hardcode→~12 utility, sprawl yok); dark contrast borcu kapandı.
+- **Kanıt:** `npm run lint` 0 · `vitest` **139 pass/1 skip** (sınıf-değişimi role/metin-testlerini etkilemedi) · React e2e **10 pass × 3 ardışık** (a11y `color-contrast` AÇIK, 4 tab) · web e2e **5 pass** · `vite build` OK · size cockpit **116.22KB/140** (CSS 7.38KB↓, arbitrary-value azaldı).
+- **Açık iz (tracked):** **Light-tema STATUS renkleri** (text-emerald/cyan/amber/indigo açık-bg'de düşük-kontrast) AA değil → ayrı light-status-paleti gerek = **vF14 design-system v2** (axe canonical-dark taradı, light-status ertelendi, gizlenmedi). 2 dekoratif residual bırakıldı (logo `border-white/90`, demo ping-dot `bg-slate-500`).
+- **Sonraki (önceden hesaplandı):** **vF14 Design-System v2 (light-status palette + tenant-tier gating)** — status renklerine `[data-theme=light]` koyulaştırılmış varyant (emerald/amber/rose/cyan/indigo light-AA) + a11y'yi her iki temada tara (colorScheme matrix). İlk adım: status renklerini semantik token'a çek (`--color-status-ok/warn/err/info/accent`, dark+light) + axe spec'i `['dark','light']` parametrize.
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -199,6 +213,8 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-017 | 2026-06-20 | ReactAgentTab stream unmount sonrası setState (leak/uyarı) | Stream component'ten uzun yaşıyordu; abort/cleanup yoktu | `abortRef`+`mountedRef`+unmount-abort + finally guard | Abortable stream consumer'ı unmount'ta abort + state-set'i mounted/aborted guard'la (Pipeline deseni) |
 | FE-018 | 2026-06-20 | "chunk-sonra-drop" testi yanlış kuruldu (chunk teslim edilmeden error) | `ReadableStream.start()` enqueue-sonra-error sıradaki chunk'ı okutmadan drop eder | Pull-based stream: 1. pull enqueue, 2. pull error | Streaming-then-drop simülasyonu `pull()` ile (start()+error chunk'ı yutar) |
 | FE-019 | 2026-06-20 | a11y "Cockpit Dashboard" e2e flaky (1. koşu fail, re-run pass) | vF10 ObservabilityPanel canlı `/api/logbook` fetch'i 8-worker paralel yükte yarı-render; axe async-region'ı tarıyor | a11y spec beforeEach'e `**/api/logbook**` route-stub (boş entries) | Yeni async-fetch'li panel a11y/gate testine girdiğinde endpoint'ini STUB'la (FE-013 ailesi); axe yarı-yüklü DOM taramasın, retry-ile-geçme yasak |
+| FE-020 | 2026-06-20 | color-contrast AÇ → 4 tab fail; suçlu sanılan nötr DEĞİL, **status renkleri** (emerald/cyan/amber light-bg'de) | headless chromium `prefers-color-scheme: light` default → no-flash light tema seçti → axe LIGHT taradı; status renkleri light-bg'de AA değil ("theme-agnostik" varsayımı yanlış) | axe scan'i canonical **dark** tema'ya sabitle (`test.use({colorScheme:'dark'})`); light-status-paleti vF14'e ertele (tracked) | Status/accent renkleri theme-agnostik DEĞİL; light tema status-contrast ayrı palet işi. a11y-gate'i hangi temada taradığını bil (headless default=light) |
+| FE-021 | 2026-06-20 | full-suite paralel yükte Cockpit a11y flaky (standalone pass) | color-contrast scan yarı-painted DOM'u (font-swap/async-panel) ölçüyor | scan-öncesi `document.fonts.ready` + 200ms settle | Contrast/visual axe scan'inden ÖNCE font+async yerleşsin (`fonts.ready`+settle); paralel-yük varyansını kök-nedenden çöz, retry değil |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

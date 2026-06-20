@@ -58,12 +58,12 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
   ];
 
   return (
-    <div className="bg-[#08090d] border border-white/5 rounded p-5 flex flex-col justify-between shadow-lg">
+    <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 flex flex-col justify-between shadow-lg">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-indigo-400" />
-            <h2 className="text-xs font-bold text-slate-100 font-mono tracking-wider uppercase">Interactive Sandbox Terminal</h2>
+            <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Interactive Sandbox Terminal</h2>
           </div>
           {!isLive && (
             <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 font-mono">
@@ -73,7 +73,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
         </div>
 
         {/* Console Box */}
-        <div className="bg-black/55 border border-white/5 rounded p-4 min-h-[190px] max-h-[240px] overflow-y-auto font-mono text-xs text-slate-300 space-y-1.5" ref={scrollRef}>
+        <div className="bg-immersive-inset border border-immersive-border rounded p-4 min-h-[190px] max-h-[240px] overflow-y-auto font-mono text-xs text-immersive-text-muted space-y-1.5" ref={scrollRef}>
           {logs.map((log, index) => (
             <div key={index} className="whitespace-pre-wrap leading-relaxed">
               {log.startsWith("$") ? (
@@ -99,7 +99,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
               key={act.label}
               disabled={loading}
               onClick={() => runCommand(act.cmd)}
-              className="text-[10px] font-mono bg-[#050608] hover:bg-indigo-500/10 border border-white/5 rounded px-2.5 py-1 text-slate-400 hover:text-indigo-400 transition cursor-pointer disabled:opacity-50"
+              className="text-[10px] font-mono bg-immersive-bg hover:bg-indigo-500/10 border border-immersive-border rounded px-2.5 py-1 text-immersive-text-muted hover:text-indigo-400 transition cursor-pointer disabled:opacity-50"
             >
               {act.cmd}
             </button>
@@ -107,7 +107,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
         </div>
 
         {/* Input Field */}
-        <div className="flex items-center gap-3 bg-black/55 border border-white/5 rounded px-3 py-2 transition focus-within:border-indigo-505/50">
+        <div className="flex items-center gap-3 bg-immersive-inset border border-immersive-border rounded px-3 py-2 transition focus-within:border-indigo-505/50">
           <span className="text-xs text-indigo-500 font-bold font-mono">$</span>
           <input
             type="text"
@@ -116,20 +116,20 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
             onKeyDown={handleKeyPress}
             onChange={(e) => setCommand(e.target.value)}
             placeholder='Type target binary command here (e.g. pytest, git status)...'
-            className="flex-1 bg-transparent text-xs text-slate-200 font-mono focus:outline-none placeholder-slate-700"
+            className="flex-1 bg-transparent text-xs text-immersive-text-bright font-mono focus:outline-none placeholder-slate-700"
           />
           <button 
             onClick={() => { runCommand(command); setCommand(""); }}
             disabled={loading || !command.trim()}
-            className="text-indigo-400 hover:text-indigo-300 disabled:text-slate-700 cursor-pointer"
+            className="text-indigo-400 hover:text-indigo-300 disabled:text-immersive-text-dim cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
           </button>
         </div>
 
         {/* Help block */}
-        <div className="mt-3 flex gap-1.5 items-center text-[10px] text-slate-500 font-mono">
-          <ShieldAlert className="w-3.5 h-3.5 text-slate-600" />
+        <div className="mt-3 flex gap-1.5 items-center text-[10px] text-immersive-text-dim font-mono">
+          <ShieldAlert className="w-3.5 h-3.5 text-immersive-text-dim" />
           <span>Allowlist locks sandbox commands parameters. Blocking redirects, sudo, curl or file removals (rm).</span>
         </div>
       </div>
