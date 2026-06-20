@@ -95,7 +95,8 @@ export class CaddyTlsTransport implements Transport {
 
   async probe(): Promise<boolean> {
     // Verified TLS: mkcert root CA is in the system trust store after `mkcert -install`.
-    this.healthy = await probeHttps(tlsServiceUrl(this.plan), "/healthz");
+    // requirePrivateHost: only probe the private <mac>.local host (DNS-rebind guard, vT5).
+    this.healthy = await probeHttps(tlsServiceUrl(this.plan), "/healthz", { requirePrivateHost: true });
     return this.healthy;
   }
 

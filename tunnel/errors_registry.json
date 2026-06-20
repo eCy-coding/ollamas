@@ -107,6 +107,27 @@
       "severity": "low",
       "note": "Switch decision-log (DecisionRecord) ileride diske/feed'e yazılırsa secret sızdırmamalı. Log yalnız transport adı/priority/latency/score/breaker-state/reason içerir — anahtar/preauth/URL-credential YOK. vT7 observability feed'inde de bu invariant korunur.",
       "applies_version": "vT4"
+    },
+    {
+      "id": "RISK-TUNNEL-014",
+      "category": "keys",
+      "severity": "med",
+      "note": "DÜRÜSTLÜK: secrets-at-rest auto-keyfile (keys/.master.key) vault.enc ile AYNI dizinde. Casual disk-read/backup-leak/yanlışlıkla-commit'e karşı korur AMA keyfile'a erişen yerel saldırgana karşı DEĞİL. Daha güçlü (passphrase/macOS Keychain) '0 manuel seçim/işlem' kısıtını bozar (prompt). Karar: 0-manuel için keyfile + bu limit açıkça belgelenir, overclaim yok. keys/ gitignored + 0600.",
+      "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-015",
+      "category": "network",
+      "severity": "med",
+      "note": "WireGuard key-rotation sırasında iki peer aynı AllowedIPs'e sahip olursa öngörülemez routing (WireGuard paper). ÇÖZÜM: rotate.ts rotationPlan vT1 PURE renderer'larını reuse eder → AllowedIPs hep /32 (server peer'i, peer server'ı), çakışma yok; rotation tek-atomik config-takası (eski session ~3dk içinde doğal expire, kill-switch yok).",
+      "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-016",
+      "category": "network",
+      "severity": "high",
+      "note": "DNS-rebinding: zehirli DNS switch'i public/saldırgan IP'ye probe/seçim yaptırabilir. ÇÖZÜM vT5: guard.ts isPrivateHost + health.ts requirePrivateHost (3 transport probe true geçer) → yalnız loopback/RFC1918/CGNAT/.local hedef probe edilir; public host probe-öncesi reddedilir (fetch hiç çağrılmaz). opt-in default false=geri-uyum.",
+      "applies_version": "vT5"
     }
   ],
   "errors": [

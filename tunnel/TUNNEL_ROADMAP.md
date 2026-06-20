@@ -9,11 +9,11 @@
 | **vT2** | LAN-TLS | Caddy reverse-proxy + mkcert local CA + **iOS .mobileconfig render** + `<Mac>.local` auto-host → `https://<host>.local` | Caddy(Apache,73k), mkcert(BSD,59k) | ✅ DONE |
 | **vT3** | Sovereign mesh | Headscale self-host control-plane + embedded DERP + zero-account preauth; çok-cihaz + remote tek overlay (WG data-plane reuse) | Headscale(BSD,38k) binary-only | ✅ DONE |
 | **vT4** | **Otonom Switch Engine** | ölçülen-latency scoring + 3-durum circuit-breaker + hysteresis (anti-flap) + autopilot (capability-detect + auto-up + self-heal) + decision-log; **0 manuel seçim/işlem** | hysteresis/CB/multipath pattern (fikir/MIT) | ✅ DONE |
-| vT5 | Security hardening | WG key-rotation, mTLS, DNS-rebind guard, secrets-at-rest (CLI AES-256-GCM reuse), gateway origin/auth doc | — | NEXT |
-| vT6 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server, MacBook client expose; mesh yokken fallback. **⚠️ ERTELENDİ vT4'ten**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account kısıtlarını ihlal; yalnız kullanıcı remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
-| vT7 | Observability | `tunnel status` endpoint/TUI, latency/throughput, switch kararları → orchestration feed | — | planned |
-| vT8 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | planned |
-| vT9 | Resilience | auto-reconnect, LaunchAgent daemon, NAT/captive-portal detect, IPv6, fallback-chain | — | planned |
+| **vT5** | **Security hardening** | private-host DNS-rebind guard + AES-256-GCM vault (auto-keyfile, **0-manuel**) + age-based auto WG key-rotation; mTLS ertelendi (iPhone client-cert manuel) | guard/GCM/rotation pattern (fikir/MIT) | ✅ DONE |
+| vT6 | Observability | `tunnel status` endpoint/TUI, latency/throughput, switch decision-log → orchestration feed (pure, 0-manuel) | — | NEXT |
+| vT7 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | planned |
+| vT8 | Resilience | auto-reconnect, LaunchAgent daemon, NAT/captive-portal detect, IPv6, fallback-chain | — | planned |
+| vT9 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server. **⚠️ ERTELENDİ (parked)**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
 | vT10 | Ecosystem | `ollamas tunnel up` one-command, QR onboarding, federation w/ integrations gateway, multi-tenant exposure policy | — | planned |
 
 ---
@@ -70,10 +70,27 @@
 - **Kanıt:** `node --test` **75/75 GREEN**, tsc 0; `node src/cli.ts auto` → binary yokken zarif
   "no capable transport" (sıfır prompt). 0-manuel: kullanıcı hiç seçim yapmaz/komut çalıştırmaz.
 
-## vT5 — NEXT (önceden-hesaplanmış ilk todo'lar) — Security hardening
+## vT5 — DONE (kanıt) — Security hardening (0 manuel)
 
-1. `src/rotate.ts` — WireGuard key-rotation (PURE re-render + güvenli takas; eski key revoke); CLI `rotate`.
-2. secrets-at-rest: CLI lane'in AES-256-GCM (authTagLength:16) desenini reuse → `keys/` şifreli; passphrase/keyfile.
-3. mTLS opsiyonu (LAN-TLS transport) + DNS-rebind guard (probe host allowlist).
-4. gateway origin/auth doc → integrations lane'e devir (server.ts edit YASAK, RISK-TUNNEL-002).
-5. `errors_registry` key-rotation/secrets riskleri; `TUNNEL_ADOPTION.md` ilgili pattern'ler.
+- `src/guard.ts` PURE isPrivateHost/assertPrivateUrl (loopback/RFC1918/CGNAT 100.64/.local) → `health.ts`
+  opt-in `requirePrivateHost` (default false=geri-uyum); 3 transport `probe()` true geçer → public/rebind
+  hedef reddedilir. **7+4 test.**
+- `src/crypto.ts` PURE AES-256-GCM seal/open (12-byte IV, authTagLength:16, base64 zarf; tamper→throw). **7 test.**
+- `src/keystore.ts` loadOrCreateKeyfile (auto 32-byte 0600, passphrase YOK) + sealToFile/openFromFile
+  (graceful-degrade). **5 test.**
+- `src/rotate.ts` PURE needsRotation/daysUntilRotation (yaş-tabanlı) + rotationPlan (render reuse, /32 korunur).
+  **5 test.**
+- `cli.ts rotate [--force]`: yaş-tabanlı oto-rotation; eski config rotation öncesi vault.enc'e seal (auto-keyfile);
+  0-prompt (wg yoksa zarif).
+- **mTLS ERTELENDİ** (iPhone client-cert manuel = 0-manuel ihlali). errors_registry RISK-TUNNEL-014 (auto-keyfile
+  co-location limiti, dürüst) / -015 (rotation AllowedIPs-overlap-yasak) / -016 (guard public-host-refuse).
+- **Kanıt:** `node --test` **103/103 GREEN**, tsc 0; `node src/cli.ts rotate` → wg yoksa zarif mesaj (0-prompt).
+
+## vT6 — NEXT (önceden-hesaplanmış ilk todo'lar) — Observability
+
+1. `src/status.ts` — PURE statusReport(switch.decisions() + transport endpoint'leri) → JSON özet
+   (aktif transport, latency'ler, breaker durumları, son karar). whoami.sh bunu absorbe eder.
+2. `cli.ts status [--json|--watch]` — canlı tablo/TUI (zero-dep, sparkline opsiyonel); 0-manuel okuma.
+3. decision-log → opsiyonel JSONL feed (`keys/decisions.jsonl`, secret-free RISK-013) orchestration lane tüketir.
+4. `recipes/` veya doc: orchestration cockpit'in tunnel-status feed'ini nasıl okuyacağı (cross-lane choke-point).
+5. errors_registry observability riskleri; ADOPTION sparkline/TUI pattern (MIT).

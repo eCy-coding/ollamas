@@ -6,6 +6,7 @@
 //   mesh     self-hosted Headscale config + zero-account preauth steps for sovereign mesh (vT3)
 //   select   selectAuto: scored probe of all transports → best endpoint + decision (vT4)
 //   auto     autopilot: auto-detect capable transports, bring up the best, self-heal (--watch) (vT4)
+//   rotate   age-based auto WireGuard key rotation; old config sealed to vault; --force (vT5)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -44,6 +45,14 @@ import {
 } from "./transports/headscale.ts";
 import { autoUp, runLoop } from "./autopilot.ts";
 import type { Transport } from "./transport.ts";
+import {
+  DEFAULT_MAX_AGE_DAYS,
+  daysUntilRotation,
+  needsRotation,
+  rotationPlan,
+  type KeyMeta,
+} from "./rotate.ts";
+import { loadOrCreateKeyfile, openFromFile, sealToFile } from "./keystore.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
 
 const KEYS_DIR = join(import.meta.dirname, "..", "keys");
@@ -173,6 +182,62 @@ async function cmdMesh(): Promise<void> {
   console.log(`  6) iPhone: ${meshServiceUrl(plan)}/healthz → 200`);
 }
 
+// Age-based automatic WireGuard key rotation (vT5). Zero prompt. Old config is backed up into
+// an encrypted vault (auto-keyfile) before being overwritten — no plaintext key left behind.
+async function cmdRotate(): Promise<void> {
+  const force = process.argv.includes("--force");
+  const metaPath = join(KEYS_DIR, "wg-meta.json");
+  let meta: KeyMeta;
+  try {
+    meta = JSON.parse(await readFile(metaPath, "utf8")) as KeyMeta;
+  } catch {
+    meta = { createdAt: 0, version: 0 }; // never rotated → due
+  }
+
+  const now = Date.now();
+  if (!force && !needsRotation(meta, now)) {
+    console.log(`rotation not due — ${daysUntilRotation(meta, now)}/${DEFAULT_MAX_AGE_DAYS} days left (v${meta.version})`);
+    return;
+  }
+
+  const plan: WgPlan = { ...DEFAULT_PLAN, endpointHost: detectLanIp() };
+  let server: Awaited<ReturnType<typeof genKeypair>>;
+  let peer: Awaited<ReturnType<typeof genKeypair>>;
+  try {
+    server = await genKeypair();
+    peer = await genKeypair();
+  } catch (e) {
+    console.log(`cannot rotate: ${e instanceof Error ? e.message : String(e)}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  await mkdir(KEYS_DIR, { recursive: true });
+  await chmod(KEYS_DIR, 0o700);
+
+  // Back up the outgoing config into the encrypted vault (auto-keyfile, 0-manuel) before overwrite.
+  try {
+    const oldServer = await readFile(join(KEYS_DIR, "wg0.conf"), "utf8").catch(() => null);
+    if (oldServer) {
+      const keyfile = loadOrCreateKeyfile(join(KEYS_DIR, ".master.key"));
+      const vaultPath = join(KEYS_DIR, "vault.enc");
+      const vault = openFromFile<Record<string, string>>(vaultPath, keyfile) ?? {};
+      vault[`wg-server-v${meta.version}`] = oldServer;
+      sealToFile(vaultPath, vault, keyfile);
+    }
+  } catch {
+    // backup is best-effort; never block rotation on it.
+  }
+
+  const out = rotationPlan(plan, server, peer, meta, now);
+  await writeFile(join(KEYS_DIR, "wg0.conf"), out.serverConf, { mode: 0o600 });
+  await writeFile(join(KEYS_DIR, "iphone.conf"), out.peerConf, { mode: 0o600 });
+  await writeFile(metaPath, JSON.stringify(out.meta), { mode: 0o600 });
+
+  console.log(`rotated → v${out.meta.version}. New keys written; re-import keys/iphone.conf on the phone.`);
+  console.log("Old WireGuard session expires within ~3 min (no kill-switch); old config backed up to vault.enc.");
+}
+
 function wgQuick(action: "up" | "down"): Promise<number> {
   return new Promise((resolve) => {
     const p = spawn("wg-quick", [action, "wg0"], { stdio: "inherit" });
@@ -247,8 +312,10 @@ async function main(): Promise<void> {
       return cmdSelect();
     case "auto":
       return cmdAuto();
+    case "rotate":
+      return cmdRotate();
     default:
-      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto> [--watch]");
+      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto|rotate> [--watch|--force]");
   }
 }
 

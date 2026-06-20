@@ -3,12 +3,19 @@
 
 import { request as httpsRequest, type RequestOptions } from "node:https";
 import type { IncomingMessage, ClientRequest } from "node:http";
+import { assertPrivateUrl } from "./guard.ts";
 
 export interface ProbeOptions {
   /** Abort the request after this many ms. */
   timeoutMs?: number;
   /** Treat these status codes as healthy. Default: any 2xx. */
   okStatuses?: number[];
+  /**
+   * Refuse to probe (return false) unless the target host is private/sovereign
+   * (loopback / RFC1918 / CGNAT / .local). Defends against DNS-rebinding to a public
+   * IP (RISK-TUNNEL-016). Default false (backward-compatible); transports pass true.
+   */
+  requirePrivateHost?: boolean;
   /** Injected for tests; defaults to global fetch. */
   fetchImpl?: typeof fetch;
 }
@@ -22,11 +29,13 @@ export async function probeHttp(
   path = "/healthz",
   opts: ProbeOptions = {},
 ): Promise<boolean> {
-  const { timeoutMs = 2000, okStatuses, fetchImpl = fetch } = opts;
+  const { timeoutMs = 2000, okStatuses, requirePrivateHost = false, fetchImpl = fetch } = opts;
+  const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+  if (requirePrivateHost && !assertPrivateUrl(url)) return false; // DNS-rebind guard
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}${path}`, {
+    const res = await fetchImpl(url, {
       signal: ctrl.signal,
       redirect: "manual",
     });
@@ -56,6 +65,8 @@ export interface HttpsProbeOptions {
    * disabling verification exposes the probe to LAN MITM (RISK-TUNNEL-007).
    */
   insecure?: boolean;
+  /** Refuse non-private hosts (DNS-rebind guard, RISK-TUNNEL-016). Default false. */
+  requirePrivateHost?: boolean;
   /** Injected for tests; defaults to node:https request. */
   requestImpl?: HttpsRequestImpl;
 }
@@ -69,8 +80,9 @@ export function probeHttps(
   path = "/healthz",
   opts: HttpsProbeOptions = {},
 ): Promise<boolean> {
-  const { timeoutMs = 2000, okStatuses, insecure = false, requestImpl = httpsRequest } = opts;
+  const { timeoutMs = 2000, okStatuses, insecure = false, requirePrivateHost = false, requestImpl = httpsRequest } = opts;
   const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+  if (requirePrivateHost && !assertPrivateUrl(url)) return Promise.resolve(false); // DNS-rebind guard
   return new Promise((resolve) => {
     let settled = false;
     const done = (ok: boolean) => {

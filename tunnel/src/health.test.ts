@@ -123,3 +123,39 @@ test("https: insecure:true opt-in disables verification", async () => {
   await probeHttps("https://m.local", "/healthz", { requestImpl: impl, insecure: true });
   assert.equal(lastOpts().rejectUnauthorized, false);
 });
+
+// ---- vT5: requirePrivateHost (DNS-rebind guard) ----
+
+test("http requirePrivateHost: refuses public host without fetching", async () => {
+  let called = false;
+  const spy = (async () => {
+    called = true;
+    return new Response(null, { status: 200 });
+  }) as unknown as typeof fetch;
+  const r = await probeHttp("http://8.8.8.8:3000", "/healthz", { requirePrivateHost: true, fetchImpl: spy });
+  assert.equal(r, false);
+  assert.equal(called, false); // guard short-circuits before any request
+});
+
+test("http requirePrivateHost: allows private host", async () => {
+  assert.equal(
+    await probeHttp("http://10.7.0.1:3000", "/healthz", { requirePrivateHost: true, fetchImpl: fakeFetch(200) }),
+    true,
+  );
+});
+
+test("https requirePrivateHost: refuses public host", async () => {
+  const { impl } = fakeHttps({ status: 200 });
+  assert.equal(
+    await probeHttps("https://1.1.1.1", "/healthz", { requirePrivateHost: true, requestImpl: impl }),
+    false,
+  );
+});
+
+test("https requirePrivateHost: allows .local host", async () => {
+  const { impl } = fakeHttps({ status: 200 });
+  assert.equal(
+    await probeHttps("https://m.local", "/healthz", { requirePrivateHost: true, requestImpl: impl }),
+    true,
+  );
+});

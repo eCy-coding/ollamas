@@ -102,9 +102,28 @@
   `npm run typecheck` → 0; `node src/cli.ts auto` → binary yokken zarif "no capable transport" + decision-log JSON
   (sıfır prompt). RISK-TUNNEL-011 (flapping→hysteresis) / -012 (auto-up capable-only) / -013 (log secret-free).
 
+## Faz 7 — Security hardening (vT5) — 0 manuel
+
+- **Karar (research):** DNS-rebind guard (GitHub Blog/Palo Alto/pfSense), AES-256-GCM (AndiDittrich/rjz +
+  Node docs, authTagLength:16), WG key-rotation 90g + AllowedIPs-çakışmasız (Pro Custodibus/defguard).
+  0-manuel için secrets passphrase YOK → auto-keyfile; rotation yaş-tabanlı otomatik. mTLS ERTELENDİ
+  (iPhone client-cert manuel).
+- **Ne:** `guard.ts` (isPrivateHost/assertPrivateUrl) + `health.ts` opt-in `requirePrivateHost` (3 transport
+  probe true) · `crypto.ts` (seal/open GCM, tamper→throw) · `keystore.ts` (loadOrCreateKeyfile auto-0600 +
+  vault sealToFile/openFromFile graceful) · `rotate.ts` (needsRotation/daysUntilRotation/rotationPlan PURE) ·
+  `cli.ts rotate [--force]` (eski config→vault.enc seal, sonra yeni key; 0-prompt).
+- **Nasıl:** Tüm kripto/guard/rotate PURE+deterministik (enjekte key/iv/clock) → round-trip+tamper test, canlı yok.
+  guard opt-in default false → mevcut 24 health/switch testi kırılmadı. keys/ 0600 gitignored.
+- **Dürüstlük (RISK-014):** auto-keyfile vault ile co-located → casual leak'e karşı korur, keyfile'a erişen
+  yerel saldırgana karşı DEĞİL; passphrase/Keychain 0-manuel'i bozar → belgelendi, overclaim yok.
+- **Niçin:** switch'i rebind-zehirli endpoint'ten koru (guard), sırları düz-metin bırakma (vault), WG anahtarını
+  süresi dolunca otomatik döndür (rotate) — hepsi kullanıcı eylemi olmadan.
+- **Kanıt:** `node --test` → **103/103 green** (guard 7 + crypto 7 + keystore 5 + rotate 5 + health +4);
+  `typecheck` 0; `node src/cli.ts rotate` → wg yoksa zarif "cannot rotate" (0-prompt). RISK-014/015/016.
+
 ---
-**Toplam (vT1..vT4 kod):** 5 governance + 11 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/headscale/breaker/scoring/autopilot/cli) + 10 test dosya (75 test) + 3 iOS reçete + 1 taşınabilir
-prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 75/75. Gotcha ERR-TUNNEL-001
-(strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de; vT4
-tamamen otonom (cihaz-kanıtı gerektirmez — 0 manuel).
+**Toplam (vT1..vT5 kod):** 5 governance + 15 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/cli) + 14 test dosya (103 test)
++ 3 iOS reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 103/103.
+Gotcha ERR-TUNNEL-001 (strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-
+kanıtları Emre'de; vT4 (otonom switch) + vT5 (security) cihaz-kanıtı gerektirmez — 0 manuel.

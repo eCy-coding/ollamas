@@ -126,7 +126,8 @@ export class HeadscaleTransport implements Transport {
   }
 
   async probe(): Promise<boolean> {
-    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz");
+    // requirePrivateHost: only probe the CGNAT mesh IP (DNS-rebind guard, vT5).
+    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz", { requirePrivateHost: true });
     return this.healthy;
   }
 

@@ -86,12 +86,13 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1, vT2, vT3, vT4 (son vT4) · test 75 · risk 13+2err
-next: vT5 Security hardening (key-rotation/secrets/mTLS) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: feat/tunnel-v1 · shipped: vT1..vT5 (son vT5) · test 103 · risk 16+2err
+next: vT6 Observability (`tunnel status`) · ollamas core v1.6.0 / feat/v1.11-roots-abort
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
-otonom: `tunnel auto [--watch]` 0-manuel seçim/işlem (autopilot capability-detect+auto-up+self-heal)
+otonom: `tunnel auto [--watch]` 0-manuel seç/işlem · `tunnel rotate` yaş-tabanlı WG key-rotation (0-prompt)
+güvenlik: private-host DNS-rebind guard + AES-256-GCM vault (auto-keyfile, RISK-014 co-location limit)
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-⚠️ VERSION dosyası 1.0.0 = stale (gerçek vT4)
+⚠️ VERSION dosyası 1.0.0 = stale (gerçek vT5)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -107,3 +108,7 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
 - 2026-06-20 — vT4 (Otonom Switch Engine) ship: `tunnel auto` 0-manuel seçim/işlem (autopilot). Yeni sürekli-
   yetenek: switch artık selectAuto (scoring+breaker+hysteresis+decision-log). Roadmap re-sequence (reverse-
   tunnel→vT6 deferred, Security→vT5) — "0 manuel" kısıtı kaynaklı. 75/75 test.
+- 2026-06-20 — vT5 (Security hardening) ship: yeni sürekli-yetenekler — private-host DNS-rebind guard (probe'lar
+  yalnız private hedef), AES-256-GCM vault (auto-keyfile, RISK-014 dürüst-limit), `tunnel rotate` yaş-tabanlı
+  WG key-rotation. mTLS ertelendi (manuel). Roadmap re-sequence: vT6=Observability NEXT, reverse-tunnel→vT9
+  parked. 103/103 test.

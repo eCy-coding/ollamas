@@ -147,7 +147,8 @@ export class WireGuardTransport implements Transport {
   }
 
   async probe(): Promise<boolean> {
-    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz");
+    // requirePrivateHost: only probe the private WG address (DNS-rebind guard, vT5).
+    this.healthy = await probeHttp(serviceUrl(this.plan), "/healthz", { requirePrivateHost: true });
     return this.healthy;
   }
 
