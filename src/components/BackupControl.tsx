@@ -110,12 +110,12 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center gap-2.5 mb-4">
-        <CloudLightning className="w-4 h-4 text-indigo-400" />
+        <CloudLightning className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Client-Side Encrypted Backups</h2>
       </div>
 
       <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-4 rounded mb-6 text-xs text-immersive-text-muted font-mono">
-        <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
+        <ShieldCheck className="w-4 h-4 text-status-accent shrink-0" />
         <div>
           <strong className="text-immersive-text-bright">Zero-Knowledge Protocol:</strong>
           <p className="mt-0.5 leading-relaxed text-immersive-text-muted">
@@ -139,7 +139,7 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
                 <span className="font-semibold text-immersive-text-bright block">Export AES Blob</span>
                 <span className="text-[10px] text-immersive-text-dim">Download current hardware config as single .enc file</span>
               </div>
-              <Download className="w-4 h-4 text-indigo-400" />
+              <Download className="w-4 h-4 text-status-accent" />
             </a>
 
             <label className="border border-immersive-border border-dashed rounded p-3 text-xs text-immersive-text-muted flex items-center justify-between cursor-pointer hover:bg-white/5 transition">
@@ -147,7 +147,7 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
                 <span className="font-semibold text-immersive-text-bright block">Restore Local Backup</span>
                 <span className="text-[10px] text-immersive-text-dim">Upload encrypted .enc file to restore settings</span>
               </div>
-              <Upload className="w-4 h-4 text-emerald-400" />
+              <Upload className="w-4 h-4 text-status-ok" />
               <input type="file" accept=".enc" className="hidden" onChange={handleFileRestore} disabled={loading} />
             </label>
           </div>
@@ -156,7 +156,7 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
             <button
               onClick={handleTriggerSync}
               disabled={loading}
-              className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs rounded py-2 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-xs rounded py-2 transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudLightning className="w-3.5 h-3.5" />}
               Sync Encrypted Cloud Remote Backup Now
@@ -240,7 +240,7 @@ export const BackupControl: React.FC<BackupProps> = ({ onNotify }) => {
           <div className="flex gap-2 items-center pt-2">
             <button
               onClick={handleSaveConfig}
-              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs rounded px-4 py-1.5 transition cursor-pointer"
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-xs rounded px-4 py-1.5 transition cursor-pointer"
             >
               Save Cloud Parameters
             </button>

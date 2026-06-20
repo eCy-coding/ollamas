@@ -17,15 +17,15 @@ import { Sparkline } from './Sparkline';
 import { Skeleton } from './Skeleton';
 
 const RATING_COLOR: Record<Rating, string> = {
-  good: 'text-emerald-400',
-  'needs-improvement': 'text-amber-400',
-  poor: 'text-rose-400',
+  good: 'text-status-ok',
+  'needs-improvement': 'text-status-warn',
+  poor: 'text-status-err',
 };
 
 const VERDICT_COLOR: Record<Verdict, string> = {
-  healthy: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
-  degraded: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
-  critical: 'text-rose-400 border-rose-500/30 bg-rose-500/10',
+  healthy: 'text-status-ok border-emerald-500/30 bg-emerald-500/10',
+  degraded: 'text-status-warn border-amber-500/30 bg-amber-500/10',
+  critical: 'text-status-err border-rose-500/30 bg-rose-500/10',
 };
 
 const ERROR_CATEGORIES: ErrorCategory[] = ['react', 'window', 'unhandled', 'api'];
@@ -87,7 +87,7 @@ export function ObservabilityPanel() {
       </div>
 
       {error && (
-        <p role="alert" className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded px-3 py-2 font-mono">
+        <p role="alert" className="text-xs text-status-err bg-rose-500/10 border border-rose-500/20 rounded px-3 py-2 font-mono">
           {_('app.obs.loadError')}
         </p>
       )}
@@ -120,16 +120,16 @@ export function ObservabilityPanel() {
               <h4 className="text-[10px] text-immersive-text-dim font-mono uppercase tracking-widest font-bold">
                 {_('app.obs.errors')}
               </h4>
-              <span className={`text-sm font-bold font-mono ${errsTotal > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{errsTotal}</span>
+              <span className={`text-sm font-bold font-mono ${errsTotal > 0 ? 'text-status-err' : 'text-status-ok'}`}>{errsTotal}</span>
             </div>
-            <div className={`mb-3 ${errsTotal > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <div className={`mb-3 ${errsTotal > 0 ? 'text-status-err' : 'text-status-ok'}`}>
               <Sparkline data={buckets} width={320} height={28} ariaLabel={`${_('app.obs.errors')} — ${errsTotal}`} className="w-full" />
             </div>
             <div className="grid grid-cols-4 gap-2">
               {ERROR_CATEGORIES.map((cat) => (
                 <div key={cat} className="text-center">
                   <div className="text-[10px] text-immersive-text-dim font-mono uppercase tracking-widest">{_(`app.obs.err.${cat}`)}</div>
-                  <div className={`text-sm font-bold font-mono ${counts[cat] > 0 ? 'text-rose-400' : 'text-immersive-text-muted'}`}>{counts[cat]}</div>
+                  <div className={`text-sm font-bold font-mono ${counts[cat] > 0 ? 'text-status-err' : 'text-immersive-text-muted'}`}>{counts[cat]}</div>
                 </div>
               ))}
             </div>

@@ -218,11 +218,11 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
   const getStageIcon = (status: string) => {
     switch (status) {
       case "running":
-        return <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />;
+        return <Loader2 className="w-5 h-5 text-status-accent animate-spin" />;
       case "done":
-        return <CheckCircle2 className="w-5 h-5 text-emerald-400" />;
+        return <CheckCircle2 className="w-5 h-5 text-status-ok" />;
       case "fail":
-        return <AlertCircle className="w-5 h-5 text-rose-400" />;
+        return <AlertCircle className="w-5 h-5 text-status-err" />;
       case "pending":
       default:
         return <div className="w-5 h-5 rounded-full border border-immersive-border bg-immersive-bg"></div>;
@@ -233,7 +233,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <Sparkles className="w-4 h-4 text-status-accent" />
           <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Multi-Agent Development Pipeline</h2>
         </div>
       </div>
@@ -349,7 +349,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           </div>
           <button onClick={() => setWriteFiles(!writeFiles)}>
             {writeFiles ? (
-              <ToggleRight className="w-8 h-8 text-indigo-400 cursor-pointer" />
+              <ToggleRight className="w-8 h-8 text-status-accent cursor-pointer" />
             ) : (
               <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
             )}
@@ -375,7 +375,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             )}
             <button onClick={() => setEnableSelfImprove(!enableSelfImprove)}>
               {enableSelfImprove ? (
-                <ToggleRight className="w-8 h-8 text-indigo-400 cursor-pointer" />
+                <ToggleRight className="w-8 h-8 text-status-accent cursor-pointer" />
               ) : (
                 <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
               )}
@@ -392,7 +392,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           {running && (
             <button
               onClick={handleStop}
-              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 font-mono font-bold text-xs px-5 py-2 rounded transition cursor-pointer"
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-status-err border border-rose-500/20 font-mono font-bold text-xs px-5 py-2 rounded transition cursor-pointer"
             >
               Stop
             </button>
@@ -400,7 +400,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
           <button
             onClick={handleRun}
             disabled={running}
-            className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-xs px-5 py-2 rounded disabled:opacity-50 flex items-center gap-2 cursor-pointer transition"
+            className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-xs px-5 py-2 rounded disabled:opacity-50 flex items-center gap-2 cursor-pointer transition"
           >
             {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
             Execute Pipeline
@@ -421,10 +421,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-immersive-text-bright block">Architect</span>
             <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{architectModel}</span>
             {stages.architect.tokensPerSec !== undefined && stages.architect.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.architect.tokensPerSec).toFixed(1)} tokens/s</span>
+              <span className="text-[9px] font-mono text-status-accent block">{Number(stages.architect.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
             {stages.architect.fallback && stages.architect.status === "running" && (
-              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.architect.fallback}>{stages.architect.fallback}</span>
+              <span className="text-[8px] font-mono text-status-warn block truncate" title={stages.architect.fallback}>{stages.architect.fallback}</span>
             )}
           </div>
         </div>
@@ -441,10 +441,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-immersive-text-bright block">Developer Coder</span>
             <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{coderModel}</span>
             {stages.coder.tokensPerSec !== undefined && stages.coder.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.coder.tokensPerSec).toFixed(1)} tokens/s</span>
+              <span className="text-[9px] font-mono text-status-accent block">{Number(stages.coder.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
             {stages.coder.fallback && stages.coder.status === "running" && (
-              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.coder.fallback}>{stages.coder.fallback}</span>
+              <span className="text-[8px] font-mono text-status-warn block truncate" title={stages.coder.fallback}>{stages.coder.fallback}</span>
             )}
           </div>
         </div>
@@ -461,25 +461,25 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
             <span className="text-xs font-mono font-bold text-immersive-text-bright block">Inspector Reviewer</span>
             <span className="text-[9px] font-mono text-immersive-text-dim block truncate">{reviewerModel}</span>
             {stages.reviewer.tokensPerSec !== undefined && stages.reviewer.tokensPerSec > 0 && (
-              <span className="text-[9px] font-mono text-indigo-400 block">{Number(stages.reviewer.tokensPerSec).toFixed(1)} tokens/s</span>
+              <span className="text-[9px] font-mono text-status-accent block">{Number(stages.reviewer.tokensPerSec).toFixed(1)} tokens/s</span>
             )}
             {stages.reviewer.fallback && stages.reviewer.status === "running" && (
-              <span className="text-[8px] font-mono text-amber-500 block truncate" title={stages.reviewer.fallback}>{stages.reviewer.fallback}</span>
+              <span className="text-[8px] font-mono text-status-warn block truncate" title={stages.reviewer.fallback}>{stages.reviewer.fallback}</span>
             )}
           </div>
         </div>
       </div>
 
       {stages.self_improve.status !== "pending" && (
-        <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded mb-6 flex items-center gap-3 text-xs text-amber-300">
-          <RotateCw className="w-4 h-4 animate-spin text-amber-500/80" />
+        <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded mb-6 flex items-center gap-3 text-xs text-status-warn">
+          <RotateCw className="w-4 h-4 animate-spin text-status-warn" />
           <span>{stages.self_improve.text}</span>
         </div>
       )}
 
       {writeCount !== null && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded mb-5 flex items-center gap-3 text-xs text-emerald-400 font-mono">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded mb-5 flex items-center gap-3 text-xs text-status-ok font-mono">
+          <CheckCircle2 className="w-4 h-4 text-status-ok" />
           <span>
             <strong>Write Lock Released:</strong> Successfully wrote {writeCount} files recursively into your workspace root.
           </span>

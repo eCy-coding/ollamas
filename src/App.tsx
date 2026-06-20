@@ -35,7 +35,7 @@ function CapabilityDenied({ capKey, onOpen }: { capKey: string; onOpen: () => vo
   const { _ } = useLingui();
   return (
     <div className="bg-immersive-panel border border-immersive-border rounded p-6 text-center space-y-3 animate-fade-in">
-      <Lock className="w-6 h-6 mx-auto text-amber-400" />
+      <Lock className="w-6 h-6 mx-auto text-status-warn" />
       <h3 className="text-sm font-bold font-mono text-immersive-text-bright">{_('app.cap.deniedTitle')}</h3>
       <p className="text-xs text-immersive-text-muted">{_('app.cap.deniedBody')} ({_(capKey)})</p>
       <button
@@ -104,7 +104,7 @@ export default function App() {
     if (telemetry.mode === "live") {
       const activeCount = telemetry.metrics?.loadedModels?.length || 0;
       return (
-        <span className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full font-mono font-medium">
+        <span className="flex items-center gap-1.5 text-xs text-status-ok bg-emerald-500/10 border border-emerald-500/25 px-3 py-1 rounded-full font-mono font-medium">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           LIVE · {activeCount > 0 ? `${activeCount} models active` : "Ollama online"}
         </span>
@@ -112,7 +112,7 @@ export default function App() {
     }
     if (telemetry.mode === "degraded-live") {
       return (
-        <span className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/15 border border-amber-500/20 px-3 py-1 rounded-full font-mono font-medium">
+        <span className="flex items-center gap-1.5 text-xs text-status-warn bg-amber-500/15 border border-amber-500/20 px-3 py-1 rounded-full font-mono font-medium">
           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
           DEGRADED · Ollama offline
         </span>
@@ -136,9 +136,9 @@ export default function App() {
           <div 
             key={n.id} 
             className={`p-3.5 rounded border flex items-center justify-between shadow-2xl transition duration-300 text-xs font-mono ${
-              n.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" :
-              n.type === "error" ? "bg-red-500/10 border-red-500/20 text-red-300" :
-              "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
+              n.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-status-ok" :
+              n.type === "error" ? "bg-red-500/10 border-red-500/20 text-status-err" :
+              "bg-indigo-500/10 border-indigo-500/20 text-status-accent"
             }`}
           >
             <div className="flex gap-2">
@@ -159,9 +159,9 @@ export default function App() {
             <div className="w-4 h-4 border-2 border-white/90 rotate-45"></div>
           </div>
           <div className="flex flex-col">
-            <h1 className="text-xs font-bold tracking-widest text-indigo-400 uppercase leading-none flex items-center gap-2">
+            <h1 className="text-xs font-bold tracking-widest text-status-accent uppercase leading-none flex items-center gap-2">
               LLM Mission Control
-              <span className="text-[9px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-1 py-0.5 rounded">V1.0</span>
+              <span className="text-[9px] font-mono text-status-info bg-cyan-500/10 border border-cyan-500/20 px-1 py-0.5 rounded">V1.0</span>
             </h1>
             <span className="text-xs text-immersive-text-muted font-semibold mt-0.5">E2E_ORCHESTRATOR_V3</span>
           </div>
@@ -194,7 +194,7 @@ export default function App() {
                   title={enabled ? undefined : _('app.cap.locked')}
                   className={`flex items-center gap-3 px-3 py-2 rounded text-xs font-medium font-mono transition-all text-left ${
                     activeTab === tab.id
-                      ? "bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+                      ? "bg-indigo-500/10 text-status-accent border border-indigo-500/20"
                       : "text-immersive-text-muted hover:text-immersive-text-bright hover:bg-white/5"
                   } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
                 >
@@ -209,7 +209,7 @@ export default function App() {
           {/* Setup Guide / Demowizard (M10, AC-32) */}
           {telemetry?.mode === "demo" && (
             <div className="bg-immersive-sidebar border border-immersive-border rounded p-4 space-y-3">
-              <div className="flex items-center gap-2 text-indigo-400">
+              <div className="flex items-center gap-2 text-status-accent">
                 <Info className="w-4 h-4 shrink-0" />
                 <h3 className="text-[10px] block font-bold font-mono tracking-widest uppercase">SETUP WORKSPACE WIZARD</h3>
               </div>
@@ -221,7 +221,7 @@ export default function App() {
                 <ol className="list-decimal pl-4 text-immersive-text-muted space-y-1">
                   <li>Download repository Zip using **Export** menu in AI Studio.</li>
                   <li>Extract download folder.</li>
-                  <li>In terminal, execute: <code className="text-indigo-400 font-bold font-mono">./install.sh</code></li>
+                  <li>In terminal, execute: <code className="text-status-accent font-bold font-mono">./install.sh</code></li>
                   <li>Open browser directly at <code className="text-immersive-text-bright">http://localhost:3000</code></li>
                 </ol>
               </div>

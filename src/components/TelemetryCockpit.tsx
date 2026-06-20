@@ -40,9 +40,9 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   
   // Choose badge color
   const badgeColors = {
-    live: "bg-emerald-500/15 border-emerald-500/25 text-emerald-400",
-    "degraded-live": "bg-amber-500/15 border-amber-500/25 text-amber-400",
-    demo: "bg-blue-500/15 border-blue-500/25 text-blue-400",
+    live: "bg-emerald-500/15 border-emerald-500/25 text-status-ok",
+    "degraded-live": "bg-amber-500/15 border-amber-500/25 text-status-warn",
+    demo: "bg-blue-500/15 border-blue-500/25 text-status-info",
   };
 
   const modeLabels = {
@@ -85,7 +85,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
         <div className="flex justify-between items-center mb-3">
           <span className="text-[10px] text-immersive-text-dim font-mono tracking-widest uppercase">Compute Load</span>
           <div className="flex items-center gap-1.5 text-[10px] text-immersive-text-muted font-mono">
-            <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+            <Cpu className="w-3.5 h-3.5 text-status-accent" />
             <span>Dual Core Polling</span>
           </div>
         </div>
@@ -156,7 +156,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
           {metrics.loadedModels && metrics.loadedModels.length > 0 ? (
             <div className="flex flex-wrap gap-1 max-h-12 overflow-y-auto">
               {metrics.loadedModels.map((m) => (
-                <span key={m.name} className="text-[9px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span key={m.name} className="text-[9px] font-mono bg-indigo-500/10 border border-indigo-500/20 text-status-accent px-1.5 py-0.5 rounded flex items-center gap-1">
                    <Zap className="w-2.5 h-2.5" />
                   {m.name} ({(m.size / 1024 / 1024 / 1024).toFixed(1)}GB)
                 </span>

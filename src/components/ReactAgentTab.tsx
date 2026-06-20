@@ -459,7 +459,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         <div className="flex flex-col justify-end space-y-1">
           <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded p-1 px-3">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-status-ok" />
               <span className="text-[11px] font-mono text-immersive-text-muted">Auto-Apply Writes</span>
             </div>
             <button 
@@ -471,7 +471,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               title="When enabled, file updates are instantly written to the workspace. When disabled, the agent displays file diffs and awaits manual authorization."
             >
               {autoApply ? (
-                <ToggleRight className="w-8 h-8 text-indigo-400" />
+                <ToggleRight className="w-8 h-8 text-status-accent" />
               ) : (
                 <ToggleLeft className="w-8 h-8 text-immersive-text-dim" />
               )}
@@ -493,7 +493,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             <button
               onClick={startNewSession}
               disabled={isLoading}
-              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none"
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none"
             >
               + NEW
             </button>
@@ -522,7 +522,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     }}
                     className={`group w-full text-left p-2 rounded cursor-pointer transition flex items-center justify-between border ${
                       isActive 
-                        ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                        ? "bg-indigo-500/10 border-indigo-500/30 text-status-accent"
                         : "bg-immersive-panel/30 border-immersive-border hover:bg-immersive-panel/60 text-immersive-text-muted hover:text-immersive-text-bright"
                     }`}
                   >
@@ -532,7 +532,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     </div>
                     <button
                       onClick={(e) => deleteSession(e, sess.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-immersive-text-dim hover:text-rose-400 hover:bg-rose-500/10 rounded transition shrink-0"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-immersive-text-dim hover:text-status-err hover:bg-rose-500/10 rounded transition shrink-0"
                       title="Delete Session"
                     >
                       <X className="w-3 h-3" />
@@ -582,7 +582,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             {/* Typing status bar */}
             {isLoading && (
               <div className="flex items-center gap-3 mr-auto">
-                <div className="w-7 h-7 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xs text-indigo-400 animate-pulse">
+                <div className="w-7 h-7 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xs text-status-accent animate-pulse">
                   R
                 </div>
                 <div className="px-3.5 py-2.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-xs font-mono text-immersive-text-muted flex items-center gap-2">
@@ -621,13 +621,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           {/* List of core Tools */}
           <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-immersive-border">
-              <Hammer className="w-4 h-4 text-indigo-400" />
+              <Hammer className="w-4 h-4 text-status-accent" />
               <h3 className="text-[10px] font-mono tracking-wider font-bold uppercase text-immersive-text-muted">WORKSPACE TOOL BINDINGS</h3>
             </div>
             
             <div className="grid grid-cols-1 gap-2.5">
               <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
-                <FolderGit className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <FolderGit className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">list_tree</h4>
                   <p className="text-[9px] text-immersive-text-dim font-mono">Iterate the entire project space files layout recursively.</p>
@@ -635,7 +635,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               </div>
 
               <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
-                <FileText className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <FileText className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">read_file</h4>
                   <p className="text-[9px] text-immersive-text-dim font-mono">Load absolute context and code content parameters synchronously.</p>
@@ -651,7 +651,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               </div>
 
               <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
-                <Terminal className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <Terminal className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">run_command</h4>
                   <p className="text-[9px] text-immersive-text-dim font-mono">Execute testing allowlist commands (pytest, cargo, npm, ruff, black).</p>
@@ -659,7 +659,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               </div>
 
               <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
-                <Search className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <Search className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">grep_search</h4>
                   <p className="text-[9px] text-immersive-text-dim font-mono">Execute recursive keyword search queries across text layers.</p>
@@ -672,8 +672,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           {pendingApproval && (
             <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">AUTHORIZATION REQUIRED</h4>
+                <AlertCircle className="w-4 h-4 text-status-warn shrink-0" />
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-status-warn">AUTHORIZATION REQUIRED</h4>
               </div>
               <p className="text-[11px] font-mono text-immersive-text-muted leading-relaxed">
                 The agent proposes updates to: <code className="bg-immersive-panel border border-immersive-border-strong px-1.5 py-0.5 rounded text-immersive-text-bright text-[10px]">{pendingApproval.path}</code>
@@ -696,7 +696,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <button
                   onClick={cancelWrite}
                   disabled={approving}
-                  className="flex-1 bg-rose-950/40 hover:bg-rose-950 border border-rose-500/20 text-rose-300 py-2 rounded text-[10px] font-bold font-mono transition"
+                  className="flex-1 bg-rose-950/40 hover:bg-rose-950 border border-rose-500/20 text-status-err py-2 rounded text-[10px] font-bold font-mono transition"
                 >
                   REJECT
                 </button>
@@ -730,9 +730,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               <tbody className="divide-y divide-white/5 text-xs">
                 {traceSteps.map((s, idx) => (
                   <tr key={idx} className="hover:bg-white/[0.01] transition duration-200">
-                    <td className="px-4 py-3 text-indigo-400 font-bold whitespace-nowrap">STEP {s.stepNum}</td>
+                    <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap">STEP {s.stepNum}</td>
                     <td className="px-4 py-3 font-semibold whitespace-nowrap text-purple-300 flex items-center gap-1.5 mt-0.5">
-                      <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <Terminal className="w-3.5 h-3.5 text-status-info shrink-0" />
                       <span>{s.tool}</span>
                     </td>
                     <td className="px-4 py-3 text-[11px] text-immersive-text-muted whitespace-pre">
@@ -741,11 +741,11 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     <td className="px-4 py-3 text-immersive-text-muted font-medium whitespace-nowrap">{s.latency} ms</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {s.ok ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-status-ok">
                           SUCCESS
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 border border-rose-500/20 text-status-err">
                           FAILED
                         </span>
                       )}

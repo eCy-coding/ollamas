@@ -57,9 +57,9 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
 
   const getStatusColor = (status: SecurityEvent["status"]) => {
     switch (status) {
-      case "allow": return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-      case "deny": return "text-rose-400 bg-rose-500/10 border-rose-500/20 font-bold";
-      case "warning": return "text-amber-400 bg-amber-500/10 border-amber-500/20";
+      case "allow": return "text-status-ok bg-emerald-500/10 border-emerald-500/20";
+      case "deny": return "text-status-err bg-rose-500/10 border-rose-500/20 font-bold";
+      case "warning": return "text-status-warn bg-amber-500/10 border-amber-500/20";
       default: return "text-immersive-text-muted bg-immersive-bg border-immersive-border";
     }
   };
@@ -69,7 +69,7 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center gap-2.5 mb-4">
-        <ShieldCheck className="w-4 h-4 text-indigo-400" />
+        <ShieldCheck className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Security & Permissions Journal</h2>
       </div>
 
@@ -87,7 +87,7 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
               </div>
               <button onClick={() => handleToggle("fileRead", permissions.fileRead)}>
                 {permissions.fileRead ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-400 cursor-pointer" />
+                  <ToggleRight className="w-8 h-8 text-status-ok cursor-pointer" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
                 )}
@@ -102,7 +102,7 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
               </div>
               <button onClick={() => handleToggle("fileWrite", permissions.fileWrite)}>
                 {permissions.fileWrite ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-400 cursor-pointer" />
+                  <ToggleRight className="w-8 h-8 text-status-ok cursor-pointer" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
                 )}
@@ -117,7 +117,7 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
               </div>
               <button onClick={() => handleToggle("commandExec", permissions.commandExec)}>
                 {permissions.commandExec ? (
-                  <ToggleRight className="w-8 h-8 text-emerald-400 cursor-pointer" />
+                  <ToggleRight className="w-8 h-8 text-status-ok cursor-pointer" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-immersive-text-dim cursor-pointer" />
                 )}

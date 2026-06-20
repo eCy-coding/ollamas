@@ -18,6 +18,13 @@
     "accent": {
       "indigo":  { "value": "#4f46e5" },
       "emerald": { "value": "#059669" }
+    },
+    "status": {
+      "accent": { "value": "#4f46e5" },
+      "ok":     { "value": "#047857" },
+      "warn":   { "value": "#92400e" },
+      "err":    { "value": "#be123c" },
+      "info":   { "value": "#155e75" }
     }
   }
 }

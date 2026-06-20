@@ -112,12 +112,12 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center gap-2.5 mb-4">
-        <Key className="w-4 h-4 text-indigo-400" />
+        <Key className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Cryptographic API Key Vault</h2>
       </div>
 
       <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-3.5 rounded mb-6 text-[10px] text-immersive-text-muted font-mono leading-relaxed">
-        <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+        <Info className="w-4 h-4 text-status-accent shrink-0" />
         <p>
           <strong>Privacy Protocol Enabled:</strong> All keys configured here live strictly server-side on your hardware, encrypted with 
           AES-256-GCM. Unencrypted plaintext keys are never embedded in client bundles or public responses.
@@ -140,7 +140,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 {/* Active Key Status Meter */}
                 <span className={`inline-block mt-2 text-[8px] font-mono px-2 py-0.5 rounded border ${
                   isConfigured 
-                    ? "bg-indigo-500/15 border-indigo-500/20 text-indigo-400" 
+                    ? "bg-indigo-500/15 border-indigo-500/20 text-status-accent" 
                     : "bg-immersive-bg border-immersive-border text-immersive-text-dim"
                 }`}>
                   {isConfigured ? `CONFIGURED: ${maskText}` : "KEYS INACTIVE"}
@@ -150,12 +150,12 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 {testReport && (
                   <div className="mt-2 flex items-center gap-1.5 text-[10px] font-mono">
                     {testReport.ok ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
+                      <span className="text-status-ok flex items-center gap-1">
                         <CheckCircle className="w-3.5 h-3.5" />
                         Online ({testReport.latency}ms)
                       </span>
                     ) : (
-                      <span className="text-rose-400 flex items-center gap-1 group relative">
+                      <span className="text-status-err flex items-center gap-1 group relative">
                         <XCircle className="w-3.5 h-3.5" />
                         Ping Failed
                       </span>
@@ -188,7 +188,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                   <button
                     onClick={() => handleSave(prov.id)}
                     disabled={loading || !inputs[prov.id]}
-                    className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-bold text-[10px] rounded px-3 py-1.5 disabled:opacity-50 transition cursor-pointer"
+                    className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-bold text-[10px] rounded px-3 py-1.5 disabled:opacity-50 transition cursor-pointer"
                   >
                     Save
                   </button>
@@ -203,7 +203,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                   {isConfigured && (
                     <button
                       onClick={() => handleClear(prov.id)}
-                      className="bg-red-500/10 text-red-400 border border-red-500/20 font-mono font-bold text-[10px] rounded px-2.5 py-1.5 hover:bg-red-500/20 transition cursor-pointer"
+                      className="bg-red-500/10 text-status-err border border-red-500/20 font-mono font-bold text-[10px] rounded px-2.5 py-1.5 hover:bg-red-500/20 transition cursor-pointer"
                     >
                       Clear
                     </button>

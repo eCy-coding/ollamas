@@ -62,11 +62,11 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-indigo-400" />
+            <Terminal className="w-4 h-4 text-status-accent" />
             <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Interactive Sandbox Terminal</h2>
           </div>
           {!isLive && (
-            <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 font-mono">
+            <span className="text-[9px] bg-amber-500/10 text-status-warn border border-amber-500/20 px-2 py-0.5 font-mono">
               EMULATOR OUTS
             </span>
           )}
@@ -77,16 +77,16 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
           {logs.map((log, index) => (
             <div key={index} className="whitespace-pre-wrap leading-relaxed">
               {log.startsWith("$") ? (
-                <span className="text-indigo-400 font-bold">{log}</span>
+                <span className="text-status-accent font-bold">{log}</span>
               ) : log.startsWith("[FAIL]") ? (
-                <span className="text-rose-400 font-medium">{log}</span>
+                <span className="text-status-err font-medium">{log}</span>
               ) : (
                 <span>{log}</span>
               )}
             </div>
           ))}
           {loading && (
-            <div className="text-indigo-400 animate-pulse font-bold">Executing task subprocess...</div>
+            <div className="text-status-accent animate-pulse font-bold">Executing task subprocess...</div>
           )}
         </div>
       </div>
@@ -99,7 +99,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
               key={act.label}
               disabled={loading}
               onClick={() => runCommand(act.cmd)}
-              className="text-[10px] font-mono bg-immersive-bg hover:bg-indigo-500/10 border border-immersive-border rounded px-2.5 py-1 text-immersive-text-muted hover:text-indigo-400 transition cursor-pointer disabled:opacity-50"
+              className="text-[10px] font-mono bg-immersive-bg hover:bg-indigo-500/10 border border-immersive-border rounded px-2.5 py-1 text-immersive-text-muted hover:text-status-accent transition cursor-pointer disabled:opacity-50"
             >
               {act.cmd}
             </button>
@@ -108,7 +108,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
 
         {/* Input Field */}
         <div className="flex items-center gap-3 bg-immersive-inset border border-immersive-border rounded px-3 py-2 transition focus-within:border-indigo-505/50">
-          <span className="text-xs text-indigo-500 font-bold font-mono">$</span>
+          <span className="text-xs text-status-accent font-bold font-mono">$</span>
           <input
             type="text"
             value={command}
@@ -121,7 +121,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
           <button 
             onClick={() => { runCommand(command); setCommand(""); }}
             disabled={loading || !command.trim()}
-            className="text-indigo-400 hover:text-indigo-300 disabled:text-immersive-text-dim cursor-pointer"
+            className="text-status-accent hover:text-status-accent disabled:text-immersive-text-dim cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
           </button>

@@ -58,7 +58,7 @@ export function UsagePanel() {
   if (state === 'error') {
     return (
       <section aria-label={_('app.usage.title')}>
-        <p role="alert" className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded px-3 py-2 font-mono">
+        <p role="alert" className="text-xs text-status-err bg-rose-500/10 border border-rose-500/20 rounded px-3 py-2 font-mono">
           {error ?? _('app.usage.loadError')}
         </p>
       </section>
@@ -84,7 +84,7 @@ export function UsagePanel() {
           <span>
             {_('app.usage.used')}: {usage?.used ?? 0} / {unlimited ? _('app.usage.unlimited') : usage?.quota}
           </span>
-          {!unlimited && <span className={status === 'over' ? 'text-rose-400' : status === 'warn' ? 'text-amber-400' : 'text-emerald-400'}>{percent}%</span>}
+          {!unlimited && <span className={status === 'over' ? 'text-status-err' : status === 'warn' ? 'text-status-warn' : 'text-status-ok'}>{percent}%</span>}
         </div>
         <UsageMeter percent={percent} status={status} label={_('app.usage.meterLabel')} />
       </div>
@@ -117,9 +117,9 @@ export function UsagePanel() {
           <ArrowUpCircle className="w-4 h-4" />
           {_('app.usage.upgrade')}
         </button>
-        {billingNote === 'notConfigured' && <span className="text-[11px] font-mono text-amber-400">{_('app.usage.notConfigured')}</span>}
+        {billingNote === 'notConfigured' && <span className="text-[11px] font-mono text-status-warn">{_('app.usage.notConfigured')}</span>}
         {billingNote === 'error' && (
-          <span role="alert" className="text-[11px] font-mono text-rose-400">
+          <span role="alert" className="text-[11px] font-mono text-status-err">
             {_('app.usage.loadError')}{' '}
             <button type="button" onClick={refetch} className="underline">↻</button>
           </span>

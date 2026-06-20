@@ -25,6 +25,7 @@
 | `rbac-ui` **AccessGate deseni** | desen (zero-dep) | vF11 | Declarative capability gate (`<CapabilityGate need fallback>` + `useCapability`, deny-by-default/pessimistic) — kod kopyalanmadı, reimplement. `@rbac-ui/react`/`@casl/react`/`ra-rbac` REDDEDİLDİ (dep + role/claim modeli yok, bizde boolean permission map) | ✅ `src/components/CapabilityGate.tsx` + `src/lib/capabilities.ts` |
 | WAI-ARIA **`meter` rolü** deseni (react-aria `useMeter` fikri) | desen (zero-dep) | vF12 | Erişilebilir kota-metre (`role="meter"`+`aria-valuenow/min/max/valuetext`) — quota=quantity→meter (progressbar değil). `react-circular-progressbar`/`@react-aria/meter`/Stripe-SDK REDDEDİLDİ (dep; billing `{url}` redirect→`window.location` yeter) | ✅ `src/components/UsageMeter.tsx` + `UsagePanel.tsx` |
 | `dequelabs/axe-core` `color-contrast` kuralı | MPL-2.0 | vF13 | vF6'da çıkarılan `color-contrast` axe gate'ine geri (canonical dark tema); 22 component nötr-renk→semantik token migrate'i objektif kanıtlar (forcing-function). style-dictionary token (vF5) tek-kaynak contrast tuning | ✅ `tests/e2e/a11y.spec.ts` (disableRules kaldırıldı, colorScheme dark) |
+| `style-dictionary` semantik status-token (vF5 altyapı) | Apache-2.0 | vF14 | 5 status-TEXT rolü (`status-accent/ok/warn/err/info`, dark=parlak/light=koyu-AA) → `text-status-*`; status renklerini theme-aware AA yapar. axe gate `['dark','light']` matris parametrize (light tema da gated) | ✅ `tokens*/color.json status` + `a11y.spec.ts` (colorScheme matris) |
 
 ## Backend backlog (bu lane çözemez — Scope Law)
 - **Tenant tier expose**: `/api/health` veya yeni `/api/session/me` per-session `tier`/`plan.allowed_tiers` döndürmeli → frontend tier-gating (host/privileged görünürlük) ancak o zaman eklenir. vF11 yalnız `permissions{}` üzerinden gate eder.
@@ -33,7 +34,7 @@
 
 | Repo | Lisans | vF | Ne için |
 |------|--------|----|---------|
-| (vF14) status-renk light-paleti (yeni dep yok) | — | vF14 | Design-system v2 — status renklerine `[data-theme=light]` AA-varyant + a11y'yi dark+light matris tara |
+| `vite-pwa/vite-plugin-pwa` Workbox `runtimeCaching` (mevcut, MIT) | MIT | vF15 | Offline-first — GET-API StaleWhileRevalidate cache (iPhone/MacBook offline cockpit) + `navigator.onLine` rozeti |
 
 ## Notlar
 - **iOS uyumluluğu** her adopsiyonun ön-koşulu: Safari/web-clip'te çalışmayan kütüphane alınmaz.

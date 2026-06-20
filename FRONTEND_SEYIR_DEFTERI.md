@@ -187,6 +187,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF14 — Design-System v2: light-AA status palette + a11y matris (DONE)
+- **Ne:** vF13 FE-020'yi kapattı — status renkleri (emerald/rose/amber/cyan/indigo TEXT) light-bg'de AA-fail'di. vF14 status-TEXT'i **5 semantik token**'a aldı (dark=parlak / light=koyu-AA) + a11y'yi **dark+light matris** taradı. Light tema artık **tam erişilebilir**; theming dürüstçe bitti.
+- **Nasıl:**
+  - **Lean scope:** axe color-contrast yalnız METİN kontrol eder → fail = status-TEXT. `bg-{c}/10` tint + `border-{c}/20` light'ta çalışır + contrast-kritik DEĞİL → DOKUNULMADI. Tab ikonları SVG=axe-atlar + rainbow tasarım → status-codemod sonrası App tabs-array restore (rainbow korundu).
+  - **5 token** (`status.{accent,ok,warn,err,info}`, tokens/+tokens-light/ + `@theme` → `text-status-*`). Codemod (ephemeral `/tmp`, commit-DIŞI) `text-{indigo/emerald/amber/rose/cyan…}`→`text-status-{role}` 178 değişim/16 dosya; `bg-`/`border-` DOKUNULMADI.
+  - **a11y MATRİS:** `a11y.spec` `for scheme of ['dark','light']` describe + `test.use({colorScheme})` (no-flash data-theme'i prefers'tan türetir) → 4 tab × 2 tema = **8 scan**. `fonts.ready`+settle korundu.
+  - **Light residual tuning (token-tek-kaynak):** warn `#b45309`→`#92400e` (amber-800, kendi tint'inde 4.07→AA), info `#0e7490`→`#155e75` (cyan-800, 3.93→AA). Dark değişmedi.
+- **Niçin:** Light tema status-metni okunmuyordu (düşük-kontrast); semantik status-token theme-aware AA; a11y matris her iki temayı kanıtlar.
+- **Kanıt:** `npm run lint` 0 · `vitest` **139/1skip** · React e2e **14 pass × 3 ardışık** (a11y **8 scan dark+light**, color-contrast dahil) · web e2e **5 pass** · `vite build` OK · size cockpit **116.18KB/140** (CSS 7.33KB↓).
+- **Açık iz (tracked):** bg/border status tint'leri token-DIŞI (light'ta görsel-yeterli, contrast-kritik değil) — istenirse vF15+ tokenize. Tenant-tier-gating hâlâ backend-blocked.
+- **Sonraki (önceden hesaplandı):** **vF15 Offline-First Resilience** — SW (vF4 vite-plugin-pwa) ile GET-API yanıtlarını (`/api/health`, `/api/saas/self/usage`) StaleWhileRevalidate cache → iPhone/MacBook offline'da cockpit son-bilinen veriyle açılır + "offline" rozeti. İlk adım: `vite.config.ts` workbox `runtimeCaching` GET-API kuralı + `useOnline` hook (`navigator.onLine`+event) + header offline-rozeti (i18n). (tenant-tier-gating backend tier-expose'a bağlı kaldı → ayrı.)
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).

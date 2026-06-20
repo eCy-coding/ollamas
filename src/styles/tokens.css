@@ -14,6 +14,11 @@
   --ollamas-color-text-dim: #97a4b8;
   --ollamas-color-accent-indigo: #6366f1;
   --ollamas-color-accent-emerald: #10b981;
+  --ollamas-color-status-accent: #818cf8;
+  --ollamas-color-status-ok: #34d399;
+  --ollamas-color-status-warn: #fbbf24;
+  --ollamas-color-status-err: #fb7185;
+  --ollamas-color-status-info: #22d3ee;
   --ollamas-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ollamas-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ollamas-radius-sm: 3px;

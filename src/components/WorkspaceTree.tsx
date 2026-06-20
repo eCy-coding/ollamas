@@ -123,9 +123,9 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
 
   const getGitColor = (status?: string) => {
     switch (status) {
-      case "untracked": return "text-emerald-400 border-emerald-400/20 bg-emerald-500/10";
-      case "modified": return "text-amber-400 border-amber-400/20 bg-amber-500/10";
-      case "staged": return "text-indigo-400 border-indigo-400/20 bg-indigo-500/10";
+      case "untracked": return "text-status-ok border-emerald-400/20 bg-emerald-500/10";
+      case "modified": return "text-status-warn border-amber-400/20 bg-amber-500/10";
+      case "staged": return "text-status-accent border-indigo-400/20 bg-indigo-500/10";
       default: return "text-immersive-text-dim border-immersive-border bg-immersive-bg";
     }
   };
@@ -149,7 +149,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
         >
           <div className="flex items-center gap-2 max-w-[80%] overflow-hidden truncate">
             {item.isDirectory ? (
-              <Folder className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <Folder className="w-3.5 h-3.5 text-status-accent shrink-0" />
             ) : (
               <File className="w-3.5 h-3.5 text-immersive-text-muted shrink-0" />
             )}
@@ -164,7 +164,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
           {!item.isDirectory && (
             <button 
               onClick={(e) => handleDeleteFile(item.relativePath, e)}
-              className="text-immersive-text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+              className="text-immersive-text-dim hover:text-status-err opacity-0 group-hover:opacity-100 transition cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -184,7 +184,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <FolderOpen className="w-4 h-4 text-indigo-400" />
+          <FolderOpen className="w-4 h-4 text-status-accent" />
           <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Target Directory Explorer</h2>
         </div>
         <button aria-label="Refresh file tree" onClick={fetchTree} disabled={loading} className="text-immersive-text-muted hover:text-immersive-text-bright cursor-pointer">
@@ -203,7 +203,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
         />
         <button 
           onClick={handleSelectWorkspace}
-          className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 font-mono font-medium text-xs rounded px-3 py-1.5 transition shrink-0 cursor-pointer"
+          className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono font-medium text-xs rounded px-3 py-1.5 transition shrink-0 cursor-pointer"
         >
           Select CWD
         </button>
@@ -220,7 +220,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
               onChange={(e) => setNewFileName(e.target.value)}
               className="flex-1 bg-immersive-bg border border-immersive-border rounded text-xs px-2 py-1 text-immersive-text-muted font-mono focus:outline-none placeholder-slate-700"
             />
-            <button aria-label="Create file" onClick={handleCreateFile} className="bg-white/5 text-indigo-400 border border-immersive-border-strong rounded px-2 hover:bg-white/10 cursor-pointer">
+            <button aria-label="Create file" onClick={handleCreateFile} className="bg-white/5 text-status-accent border border-immersive-border-strong rounded px-2 hover:bg-white/10 cursor-pointer">
               <FilePlus className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -241,12 +241,12 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
               <div>
                 <div className="flex items-center justify-between border-b border-immersive-border pb-2 mb-3">
                   <div className="flex items-center gap-2">
-                    <Edit className="w-4 h-4 text-indigo-400" />
+                    <Edit className="w-4 h-4 text-status-accent" />
                     <span className="text-xs font-mono font-semibold text-immersive-text-bright">{editingFile}</span>
                   </div>
                   <button 
                     onClick={handleSaveFile}
-                    className="flex items-center gap-1.5 text-xs text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded hover:bg-indigo-500/20 transition cursor-pointer font-mono font-bold"
+                    className="flex items-center gap-1.5 text-xs text-status-accent bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded hover:bg-indigo-500/20 transition cursor-pointer font-mono font-bold"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>Save</span>
@@ -265,7 +265,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
               <FolderOpen className="w-8 h-8 text-immersive-text-dim mb-2" />
               <p className="text-xs font-mono">Select a file from the explorer on the left to read or write</p>
               {treeMode === "demo" && (
-                <span className="text-[10px] mt-1.5 text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-mono">
+                <span className="text-[10px] mt-1.5 text-status-info bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-mono">
                   DEMO Workspace emulated
                 </span>
               )}

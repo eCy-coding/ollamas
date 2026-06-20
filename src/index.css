@@ -19,6 +19,12 @@
   --color-accent-indigo: var(--ollamas-color-accent-indigo);
   --color-accent-emerald: var(--ollamas-color-accent-emerald);
 
+  --color-status-accent: var(--ollamas-color-status-accent);
+  --color-status-ok: var(--ollamas-color-status-ok);
+  --color-status-warn: var(--ollamas-color-status-warn);
+  --color-status-err: var(--ollamas-color-status-err);
+  --color-status-info: var(--ollamas-color-status-info);
+
   --font-sans: var(--ollamas-font-sans);
   --font-mono: var(--ollamas-font-mono);
 }

@@ -34,7 +34,7 @@ export const ClusterManager: React.FC<Props> = ({ onNotify }) => {
     if (status === 'disconnected') {
         return (
             <div className="max-w-2xl mx-auto mt-10 p-6 border border-amber-900 bg-immersive-bg text-immersive-text-bright rounded-lg">
-                <h2 className="text-amber-500 font-mono text-lg flex items-center gap-2 mb-4">
+                <h2 className="text-status-warn font-mono text-lg flex items-center gap-2 mb-4">
                     <ShieldCheck /> Informed Consent Required (L1)
                 </h2>
                 <div className="space-y-4">
@@ -58,7 +58,7 @@ export const ClusterManager: React.FC<Props> = ({ onNotify }) => {
     return (
         <div className="p-6 space-y-6 bg-immersive-bg text-immersive-text-bright min-h-screen">
             {orchestratorError && (
-                <div className="p-4 bg-red-950 border border-red-900 rounded text-red-100 font-mono text-sm">
+                <div className="p-4 bg-red-950 border border-red-900 rounded text-status-err font-mono text-sm">
                     {orchestratorError}
                 </div>
             )}
@@ -81,7 +81,7 @@ export const ClusterManager: React.FC<Props> = ({ onNotify }) => {
 
                 <div className="p-4 bg-immersive-panel border border-immersive-border rounded-lg">
                     <h3 className="flex items-center gap-2 mb-4 font-bold"><Terminal size={18}/> Sandbox Status</h3>
-                    <div className="p-3 bg-emerald-950 border border-emerald-900 text-emerald-100 rounded">
+                    <div className="p-3 bg-emerald-950 border border-emerald-900 text-status-ok rounded">
                         <p className="font-bold">WASM/WASI Active</p>
                         <p className="text-xs">Foreign tasks are isolated and fuel-restricted.</p>
                     </div>
