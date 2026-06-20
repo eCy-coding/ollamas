@@ -6,7 +6,7 @@
       "transport": "stdio",
       "command": "python3",
       "args": ["/Users/emrecnyngmail.com/Desktop/uk-pipeline/ukp.py", "--mcp-server"],
-      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest"],
+      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest", "smart", "planla"],
       "webhook": {
         "emits": "stage-events",
         "format": "standard-webhooks-hmac",
