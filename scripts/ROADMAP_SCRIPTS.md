@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅** (real e2e bridge harness: gerçek terminal-bridge spawn → /exec roundtrip + v14 güvenlik regresyon-kilidi [403/413/401/fail-closed], opt-in BRIDGE_E2E=1; e2e 3 test + CI env + dogfood), **v16 NEXT (install.sh LaunchAgent auto-load — restart→bridge-down kapat)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅ · v16 ✅** (LaunchAgent auto-load: render-plist [node-path+token+repo enjekte, REPLACE_ leftover-reject] + install-agent.sh [idempotent bootstrap, chmod 600] + install/uninstall wire; reboot→bridge ayakta; render-plist 6 + bats 11 + dogfood), **v17 NEXT (provider/model bench → en-verimli lokal model otomatik seçim, scripts-v4 bench-metrics tüket)**.
 
 > ⚠️ **v14 sapması (dürüst):** precomputed v14 (incremental-gate) = saf-DX cila, ürüne değmez → **backlog'a alındı**. İki audit host-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14 = **güvenlik** (North Star §0-2, iOS/LAN ön-koşulu). Backlog: incremental-gate (düşük), install.sh LaunchAgent auto-load (orta, v16).
 >
@@ -301,7 +301,26 @@
 
 **Gate (kanıt):** `BRIDGE_E2E=1 vitest bridge-e2e` 3 pass; env yok→4 skip; leftover süreç yok; make gate GREEN; drift 18; dogfood.
 
-**Next precomputed (→v16 install.sh LaunchAgent auto-load):** audit bulgusu — cihaz restart→bridge-down (kullanıcı elle start.sh). `install.sh`'e plist install adımı: `com.missioncontrol.terminalbridge.plist` template'i REPLACE_WITH_ABSOLUTE_PATH/TOKEN değerleriyle doldur → `~/Library/LaunchAgents/`'a yaz + `launchctl bootstrap/enable`; idempotent + uninstall.sh'te `launchctl bootout`. İlk hamle = pure `renderPlist(template, {path,token})` (string-replace) + lib/test, sonra install.sh wire.
+**Next precomputed (→v16 install.sh LaunchAgent auto-load):** [DONE — aşağı bak.]
+
+---
+
+## v16 — LaunchAgent Auto-Load ✅ (reboot→bridge-down kapat)
+
+**Tema:** host bridge reboot-dayanıklı LaunchAgent (audit CRITICAL #2). **DONE** (dogfood). **GÜVENLİK:** gerçek `launchctl bootstrap` kalıcı daemon (outward-facing) → operatör install.sh çalıştırınca; ben DRY+unit ile kanıtladım, daemon başlatmadım.
+
+**Phases (gerçekleşen):**
+1. ✅ **render-plist** (`render-plist.mjs`, pure `renderPlist`): template→node-path(`command -v node`)+repo+token+port enjekte; REPLACE_WITH leftover→throw (yarım-render imkansız RISK-SCR-023); absolute-path/token assert. CLI stdout.
+2. ✅ **install-agent.sh** (DRY-guarded, idempotent): token-ensure (start-bridge deseni) → render → `~/Library/LaunchAgents/<label>.plist` + **chmod 600** (token plaintext RISK-SCR-022) → `launchctl bootout||true → bootstrap gui/$UID → enable → kickstart -k` (modern API, deprecated `load` değil).
+3. ✅ **wire**: install.sh macOS'ta `run bash install-agent.sh`; uninstall.sh `launchctl bootout + rm plist` (purge'dan önce); Makefile SH_FILES+=install-agent.sh + `install-agent`/DRY target; plist template "render-only" yorum.
+
+**Adopt:** `tjluoma/launchd-keepalive` (KeepAlive, mevcut), Apple launchctl modern bootstrap/enable/kickstart (builtin), in-repo start-bridge token + install.sh run()-DRY deseni. Zero yeni dep.
+
+**Canonical prompt:** "LaunchAgent auto-load: pure render-plist.mjs (command -v node + token + repo enjekte, REPLACE_ leftover→throw) + install-agent.sh (token-ensure→render→chmod600→bootout||true→bootstrap→enable→kickstart, DRY-guarded idempotent) + install/uninstall wire; gerçek bootstrap=operatör (outward-facing daemon)."
+
+**Gate (kanıt):** render-plist 6 test + bats 11 (install-agent/uninstall DRY no-write) + canlı render (REPLACE=0, node-path doğru) + make harden clean + make gate GREEN + drift 18 + dogfood. Gerçek `launchctl bootstrap` KOŞULMADI (operatör kararı).
+
+**Next precomputed (→v17 efficient local-model auto-select):** North Star §0-1 (host op hızlandır) — scripts-v4 `bench-metrics.mjs` tok/s çıktısını TÜKET: pure `pickModel(benchResults, {minTokS, fitsRAM})` (en-hızlı-doğru lokal model seç) + `model-select.mjs` tool (host-tier, benchmark.json oku→öner) + `MinhNgyuen/llm-benchmark` MIT deseni. İlk hamle = `lib/model-select.mjs` pure `pickModel` + test (fixture bench → en verimli model).
 
 ---
 

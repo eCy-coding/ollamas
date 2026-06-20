@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v15 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v16 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v15` — Real E2E Bridge Harness (mock-only açığı kapat): gerçek terminal-bridge spawn (`helpers/real-bridge.mjs` freePort+health-poll+teardown) → `/exec` roundtrip + v14 güvenlik regresyon-kilidi (403/413/401/fail-closed), opt-in `BRIDGE_E2E=1` (`make e2e` + CI env) · gate: e2e 3 test (env yok→skip) + make gate GREEN + leftover-yok + dogfood · inventory 15.0.0. **Limitasyon:** 18 tool /run-osascript GUI-bağımlı→headless test-edilemez (RISK-SCR-021, dürüst belge).
-- **next:** `v16` — **install.sh LaunchAgent auto-load** (restart→bridge-down kapat). İlk hamle: pure `renderPlist(template,{path,token})` (string-replace) + lib/test → install.sh plist'i `~/Library/LaunchAgents/`'a yaz + `launchctl bootstrap/enable` (idempotent); uninstall.sh `bootout`.
-- **horizon (geliştirilebilir):** v16 LaunchAgent → sonrası backlog (incremental-gate düşük-öncelik; tool /exec-modu opsiyonel).
+- **shipped:** `v16` — LaunchAgent Auto-Load (reboot→bridge-down kapat): `render-plist.mjs` (node-path/token/repo enjekte, REPLACE_ leftover-reject) + `install-agent.sh` (idempotent bootout→bootstrap→kickstart, chmod 600) + install/uninstall wire · gate: render-plist 6 + bats 11 + harden clean + make gate GREEN + drift 18 + dogfood · inventory 16.0.0. **GÜVENLİK:** gerçek launchctl bootstrap=operatör (outward-facing daemon, ben koşmadım).
+- **next:** `v17` — **efficient local-model auto-select** (North Star §0-1 host op hızlandır). İlk hamle: pure `lib/model-select.mjs` `pickModel(benchResults,{minTokS,fitsRAM})` + fixture test → scripts-v4 `bench-metrics.mjs` tok/s çıktısını tüket → `model-select.mjs` host-tool (benchmark.json→en-hızlı-doğru lokal model öner).
+- **horizon (geliştirilebilir):** v17 model-select → sonrası backlog (incremental-gate + tool /exec-modu düşük-öncelik).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -53,8 +53,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v13 | Gate Watch Dev-Loop + TDD Scaffold (`gate --watch` fs.watch + `scaffold` stub generator) | ✅ |
 | v14 | Host-Bridge Security Hardening (/write confine 403 + payload-cap 413 + fail-closed bind) | ✅ GÜVENLİK |
 | v15 | Real E2E Bridge Harness (gerçek bridge spawn + /exec roundtrip + v14 güvenlik regresyon-kilidi) | ✅ |
-| **v16** | **install.sh LaunchAgent auto-load** (restart→bridge-down kapat) | ⬜ NEXT |
-| v17+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
+| v16 | LaunchAgent Auto-Load (render-plist + install-agent.sh, reboot-durable bridge) | ✅ |
+| **v17** | **efficient local-model auto-select** (bench tok/s → en-hızlı-doğru model, §0-1) | ⬜ NEXT |
+| v18+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 

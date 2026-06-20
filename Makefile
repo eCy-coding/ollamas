@@ -6,13 +6,13 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e install-agent
 
 # Output binary folder
 BIN_DIR = bin
 
 # In-scope shell scripts (scripts lane, v6 hardening)
-SH_FILES = start.sh stop.sh install.sh setup.sh setup-keys.sh join-cluster.sh uninstall.sh bin/host-bridge/start-bridge.sh
+SH_FILES = start.sh stop.sh install.sh setup.sh setup-keys.sh join-cluster.sh uninstall.sh bin/host-bridge/start-bridge.sh bin/host-bridge/install-agent.sh
 
 all: help
 
@@ -148,6 +148,10 @@ scaffold:
 ## e2e: real-bridge end-to-end (spawns terminal-bridge; headless /exec + v14 security + fail-closed)
 e2e:
 	@BRIDGE_E2E=1 npx vitest run scripts/tests/bridge-e2e.test.ts
+
+## install-agent: install the host bridge as a reboot-durable macOS LaunchAgent (DRY_RUN=1 to rehearse)
+install-agent:
+	@bash bin/host-bridge/install-agent.sh
 
 ## clean: Remove all compiled target files and caches
 clean:

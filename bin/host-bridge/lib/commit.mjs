@@ -9,12 +9,15 @@
 // Scope this lane may auto-stage. Matches SCRIPTS_AGENTS §3 Scope Law.
 export const SCOPE_PREFIXES = ["scripts/", "bin/", ".github/workflows/"];
 export const SCOPE_EXACT = ["Makefile"];
+// Root-level shell scripts (install/setup/start/stop/uninstall/…) are scripts-lane
+// per Scope Law §3 ("root *.sh"). A top-level *.sh (no slash) is in scope.
+const ROOT_SH_RE = /^[^/]+\.sh$/;
 
 const CONVENTIONAL_RE =
   /^(feat|fix|refactor|chore|docs|test|build|ci|perf|revert|style)(\([\w\-./]+\))?(!)?: .+/;
 
 export function isInScope(path) {
-  return SCOPE_EXACT.includes(path) || SCOPE_PREFIXES.some((p) => path.startsWith(p));
+  return SCOPE_EXACT.includes(path) || ROOT_SH_RE.test(path) || SCOPE_PREFIXES.some((p) => path.startsWith(p));
 }
 
 // First line only must match the spec (body/footer free-form).

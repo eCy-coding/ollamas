@@ -83,8 +83,19 @@ if [ "$SERVER_READY" = false ]; then
   exit 1
 fi
 
+# 5. Host terminal-bridge as a reboot-durable LaunchAgent (macOS, v16). Host-side
+#    concern, independent of the docker app; idempotent + DRY-aware.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if command -v launchctl >/dev/null 2>&1; then
+  echo "[+] Installing host terminal-bridge LaunchAgent (survives reboot)..."
+  run bash "$SCRIPT_DIR/bin/host-bridge/install-agent.sh"
+else
+  echo "[*] Skipping LaunchAgent (launchctl not found — non-macOS host)."
+fi
+
 echo "==================================================="
 echo "[+] SUCCESS: LLM Mission Control is now active!"
 echo "    Web panel reachable at: http://localhost:3000"
 echo "    Local DB mapped at: ~/.llm-mission-control/"
+echo "    Host bridge LaunchAgent: com.missioncontrol.terminalbridge (port 7345)"
 echo "==================================================="

@@ -21,6 +21,8 @@ describe("commit guard core", () => {
     expect(isInScope("bin/host-bridge/gate.mjs")).toBe(true);
     expect(isInScope(".github/workflows/scripts-ci.yml")).toBe(true);
     expect(isInScope("Makefile")).toBe(true);
+    expect(isInScope("install.sh")).toBe(true); // root *.sh — Scope Law §3
+    expect(isInScope("uninstall.sh")).toBe(true);
     expect(isInScope("src/App.tsx")).toBe(false);
     expect(isInScope("server/tool-registry.ts")).toBe(false);
     expect(isInScope("package.json")).toBe(false);

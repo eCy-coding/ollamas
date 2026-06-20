@@ -179,6 +179,15 @@
 - `[2026-06-20] kind=phase | P3 wire + DOGFOOD | make e2e + scripts-ci.yml macOS gate step env BRIDGE_E2E=1 (CI gerçek e2e, local skip); RISK-SCR-020 (port/teardown) + 021; v15 gate.mjs --commit self-commit | make gate GREEN + drift 18 | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v16 install.sh LaunchAgent auto-load) | restart→bridge-down fix: install.sh plist install (renderPlist template→~/Library/LaunchAgents + launchctl bootstrap/enable, idempotent; uninstall bootout); ilk hamle pure renderPlist(template,{path,token}) + lib/test`
 
+## v16 — LaunchAgent Auto-Load ✅ (reboot→bridge-down kapat)
+
+- `[2026-06-20] kind=phase | P1 render-plist | bin/host-bridge/render-plist.mjs pure renderPlist(template,{repoPath,token,nodePath,port}): /usr/local/bin/node→command-v-node, REPLACE_WITH_*→değer, PORT enjekte; REPLACE_WITH leftover→throw (RISK-SCR-023), absolute/token assert | render-plist.test.ts 6 case + canlı render REPLACE=0 | YEŞİL`
+- `[2026-06-20] kind=phase | P2 install-agent.sh | DRY-guarded idempotent: token-ensure (start-bridge deseni)→render→~/Library/LaunchAgents chmod 600 (token plaintext RISK-SCR-022)→launchctl bootout||true→bootstrap gui/UID→enable→kickstart -k (modern API, load değil) | launchagent.bats DRY no-write | YEŞİL`
+- `[2026-06-20] kind=phase | P3 wire | install.sh macOS run bash install-agent.sh; uninstall.sh bootout+rm plist (purge öncesi); Makefile SH_FILES+=install-agent.sh + install-agent/DRY target; plist 'render-only' yorum; shfmt -w format | make harden 11 bats clean | YEŞİL`
+- `[2026-06-20] kind=note | GÜVENLİK kararı (outward-facing) | gerçek launchctl bootstrap = kullanıcı Mac'inde kalıcı daemon (port 7345) → BEN koşmadım; DRY_RUN+unit ile kanıt; gerçek install=operatör install.sh. Dogfood yalnız kodu commit'ler`
+- `[2026-06-20] kind=phase | P4 gate + DOGFOOD | make gate GREEN (render-plist 6 + harden 11) + drift 18; v16 gate.mjs --commit self-commit | git show --stat server/src yok | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v17 efficient local-model auto-select) | North Star §0-1: scripts-v4 bench-metrics tok/s tüket → pure pickModel(benchResults,{minTokS,fitsRAM}) + model-select.mjs host-tool (benchmark.json→en-hızlı-doğru model); ilk hamle lib/model-select.mjs pickModel + fixture test`
+
 ---
 
 ## Hata Anlatıları

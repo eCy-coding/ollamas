@@ -1,6 +1,6 @@
 {
   "$comment": "Single source of truth for host-bridge tool registration (scripts lane, GA v10). registerHostScripts() reads this and registers each tool into ToolRegistry under the `host_` namespace. tier mirrors server/tool-registry.ts; schema validation is generated from bin/host-bridge/schema.mjs (zod -> zod-to-json-schema). Drift guard ENFORCED (v10): bin/host-bridge/drift-check.mjs asserts inventory names == schema.mjs keys == register BUILDERS == bin/host-bridge/tools/*.mjs files, and every entry file exists; run in CI (scripts-ci.yml). version follows the lane roadmap (vN -> N.0.0); 10.0.0 = GA.",
-  "version": "15.0.0",
+  "version": "16.0.0",
   "namespace": "host_",
   "tools": [
     { "name": "run_tests",    "tier": "safe",       "entry": "run_tests.mjs",    "description": "Run the project test suite on the host and return pass/fail." },

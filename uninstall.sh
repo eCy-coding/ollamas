@@ -18,6 +18,17 @@ echo "==============================================="
 echo "LLM Mission Control Uninstallation Assistant..."
 echo "==============================================="
 
+run() { if [ "$DRY_RUN" = "1" ]; then printf '[DRY] would run: %s\n' "$*"; else "$@"; fi; }
+
+# Remove the host terminal-bridge LaunchAgent (v16) before any data purge.
+if command -v launchctl &>/dev/null; then
+  LABEL="com.missioncontrol.terminalbridge"
+  PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+  echo "[+] Removing host bridge LaunchAgent..."
+  run launchctl bootout "gui/$(id -u)/$LABEL" || true
+  run rm -f "$PLIST"
+fi
+
 if command -v docker &>/dev/null; then
   echo "[+] Stopping containers and tearing down network stacks..."
   if [ "$DRY_RUN" = "1" ]; then echo "[DRY] would run: docker compose down -v"; else docker compose down -v; fi

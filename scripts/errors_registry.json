@@ -361,6 +361,48 @@
       "prevention_rule": "GUI/TCC-bağımlı path için otomatik 'geçen' test UYDURMA — dürüstçe limitasyon belgele; otomatik-edilebilir yüzeyi (headless /exec + güvenlik) test et. (İleride istenirse: bir tool'a opt-in /exec modu → v-sonraki.)",
       "test_added": "bridge-e2e.test.ts header-note + bu kayıt (limitasyon dokümantasyonu)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-022",
+      "ts": "2026-06-20",
+      "version": "v16",
+      "file": "bin/host-bridge/install-agent.sh + render-plist.mjs",
+      "category": "ios",
+      "severity": "med",
+      "root_cause": "LaunchAgent plist EnvironmentVariables içinde HOST_BRIDGE_TOKEN plaintext taşır; ~/Library/LaunchAgents default 0644 ise başka kullanıcı/proses token'ı okuyabilir.",
+      "evidence": "install-agent.sh plist'i yazdıktan sonra chmod 600; plist host-local user LaunchAgents dizininde (loopback bridge auth, host-local)",
+      "fix": "Render edilen plist `chmod 600` (yalnız sahip okur); token zaten loopback-only bridge auth (v14 fail-closed non-loopback'i engeller). Plist template artık 'do NOT load directly' + render-only.",
+      "prevention_rule": "Sır içeren plist/config DAİMA 0600 yazılır; sır-taşıyan dosya world/group-readable bırakılmaz. Token loopback-scope dışına auth'suz çıkmaz (v14 ile birlikte).",
+      "test_added": "scripts/tests/sh/launchagent.bats (DRY no-write) + manuel chmod 600 (install path)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-023",
+      "ts": "2026-06-20",
+      "version": "v16",
+      "file": "bin/host-bridge/render-plist.mjs + install-agent.sh",
+      "category": "ios",
+      "severity": "med",
+      "root_cause": "Plist node-path hardcoded `/usr/local/bin/node` (Apple Silicon brew=/opt/homebrew/bin/node → agent yüklenemez); REPLACE_ placeholder yarım-render kalırsa bozuk agent sessizce yüklenir; launchctl load tekrar-çalıştırmada 'already loaded' hata verir (non-idempotent).",
+      "evidence": "render-plist.mjs nodePath=`command -v node` enjekte + REPLACE_WITH leftover→throw (render-plist.test 6 case); install-agent.sh bootout-before-bootstrap (idempotent) + kickstart -k",
+      "fix": "renderPlist `command -v node` (hardcode değil) + absolute-path assert + REPLACE_WITH leftover→throw (yarım-render imkansız). install-agent.sh `launchctl bootout||true` → `bootstrap` → `enable` → `kickstart -k` (modern API, idempotent; deprecated `load` değil).",
+      "prevention_rule": "Üretilen config'te araç-yolu DAİMA runtime keşfedilir (command -v), hardcode edilmez; template render'ı leftover-placeholder'da fail eder; servis (re)install idempotent olmalı (bootout-before-bootstrap, kickstart).",
+      "test_added": "scripts/tests/render-plist.test.ts (node-path inject + leftover reject + absolute assert) + launchagent.bats",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-SCR-008",
+      "ts": "2026-06-20",
+      "version": "v16",
+      "file": "bin/host-bridge/lib/commit.mjs (isInScope)",
+      "category": "registration",
+      "severity": "med",
+      "root_cause": "v12 commit-guard SCOPE listesi (scripts/+bin/+.github/workflows+Makefile) root *.sh'i ATLADI; oysa Scope Law §3 root *.sh'i (install/uninstall/setup/start/stop...) scripts-lane MAY-touch sayar. v16 dogfood `gate.mjs --commit` install.sh/uninstall.sh'i 'cross-lane contamination' sanıp commit'i bloklamış (false-block).",
+      "evidence": "v16 dogfood: 'auto-commit blocked: out-of-scope tracked changes → install.sh, uninstall.sh' (GATE GREEN'di); commit-guard kendi config eksiğini yakaladı (doğru davranış, eksik allow-list)",
+      "fix": "isInScope'a ROOT_SH_RE=/^[^/]+\\.sh$/ eklendi (top-level *.sh in-scope); Scope Law §3 ile hizalı. commit-guard.test.ts install.sh/uninstall.sh in-scope assert eklendi.",
+      "prevention_rule": "Auto-commit/scope-guard allow-list'i Scope Law (SCRIPTS_AGENTS §3) ile BİREBİR aynı olmalı — root *.sh dahil; scope-list değişince Scope Law'a karşı çapraz-doğrula. Guard false-block ederse önce allow-list'i Scope Law'a göre düzelt (suppress etme).",
+      "test_added": "scripts/tests/commit-guard.test.ts (install.sh/uninstall.sh in-scope)",
+      "recurrence_count": 0
     }
   ]
 }
