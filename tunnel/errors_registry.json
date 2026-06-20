@@ -1,0 +1,228 @@
+{
+  "_schema": {
+    "description": "Tunnel lane kalıcı hata DB. TUNNEL_AGENTS.md §3.9 + §9: her hata kök-nedeniyle kaydedilir, prevention_rule aynı sınıfı engeller. recurrence_count artarsa kural yetersiz demektir.",
+    "fields": {
+      "id": "ERR-TUNNEL-NNN | RISK-TUNNEL-NNN",
+      "ts": "ISO 8601",
+      "version": "vTN (TUNNEL_ROADMAP)",
+      "file": "etkilenen dosya yolu",
+      "category": "scope | branch | routing | auth | isolation | keys | license | network | tooling",
+      "severity": "CRITICAL | high | med | low",
+      "root_cause": "semptom değil kök neden",
+      "evidence": "komut + çıktı",
+      "fix": "uygulanan düzeltme",
+      "prevention_rule": "gelecekte aynı sınıfı engelleyen tek cümle",
+      "test_added": "regresyon testi yolu",
+      "recurrence_count": 0
+    }
+  },
+  "known_risks_preloaded": [
+    {
+      "id": "RISK-TUNNEL-001",
+      "category": "branch",
+      "severity": "high",
+      "note": "Eşzamanlı sekmeler aynı repo'da checkout ile branch çalabilir (ref ERR-SCR-001, ERR-ORCH-004). Oturum başı `git branch --show-current` == feat/tunnel-v1 doğrula.",
+      "applies_version": "vT0"
+    },
+    {
+      "id": "RISK-TUNNEL-002",
+      "category": "scope",
+      "severity": "high",
+      "note": "Erişilebilirlik için server.ts (origin/TLS) edit etmek YASAK. env/config + reverse-proxy üret, integrations lane'e doküman devret.",
+      "applies_version": "vT0"
+    },
+    {
+      "id": "RISK-TUNNEL-003",
+      "category": "network",
+      "severity": "CRITICAL",
+      "note": "Güvensiz WiFi'de ham 0.0.0.0:3000 ifşası (ref RISK-SCR-006 openclaw#24018). Off-LAN yalnız WG-şifreli arayüz üzerinden eriş.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-004",
+      "category": "keys",
+      "severity": "CRITICAL",
+      "note": "WireGuard private key repo'ya/log'a sızabilir. Anahtarlar worktree dışı, .gitignore (*.conf/*.key), çıktı redaction.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-005",
+      "category": "license",
+      "severity": "high",
+      "note": "wireguard-tools GPL-2.0; kaynak kopyalamak bulaşma yaratır. Yalnız spawn('wg',...) binary çağrısı.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-006",
+      "category": "tooling",
+      "severity": "med",
+      "note": "İzole worktree'de node_modules yok (gitignored). Zero-dep: Node 24 native TS strip + node:test kullan; typescript/tsx kurulumu opsiyonel gate.",
+      "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-007",
+      "category": "network",
+      "severity": "high",
+      "note": "HTTPS probe'da rejectUnauthorized:false TLS doğrulamasını kapatır → LAN MITM. mkcert -install sonrası CA sistem trust store'da, varsayılan DOĞRULA (insecure opt-in yalnız debug). semgrep bypass-tls-verification.",
+      "applies_version": "vT2"
+    },
+    {
+      "id": "RISK-TUNNEL-008",
+      "category": "network",
+      "severity": "med",
+      "note": "Headscale mesh'te iki uç da simetrik-NAT arkasındaysa doğrudan UDP delik açılamaz → relay gerekir. Çözüm: headscale config'de GÖMÜLÜ DERP (derp.server.enabled:true + STUN 3478) → kendi relay'imiz, Tailscale SaaS DERP'e bağımlılık YOK (egemenlik korunur).",
+      "applies_version": "vT3"
+    },
+    {
+      "id": "RISK-TUNNEL-009",
+      "category": "license",
+      "severity": "med",
+      "note": "iOS tarafı resmi Tailscale App Store client'ı kullanır (kendi mesh client'ımız yok). Egemenlik tanımı = CONTROL-PLANE self-host (Headscale) + zero-account (preauth); client binary'si üçüncü-taraf ama ücretsiz/hesapsız çalışır. Tam-client-egemenliği istenirse Nebula (kendi Mobile Nebula app'i) alternatifi notlandı — ama WireGuard data-plane'den sapar (kod-bütünlüğü). Karar: Headscale (vT3 ADOPTION matris).",
+      "applies_version": "vT3"
+    },
+    {
+      "id": "RISK-TUNNEL-010",
+      "category": "keys",
+      "severity": "high",
+      "note": "Headscale preauth key (zero-account kimlik) loglanır/commit'lenirse mesh'e izinsiz katılım. keys/ 0600 gitignored; cli.ts mesh çıktısı GERÇEK key basmaz (clientUpCommand default <PREAUTH_KEY> placeholder); gerçek key yalnız `headscale preauthkeys create` ile elde edilir, redaction.",
+      "applies_version": "vT3"
+    },
+    {
+      "id": "RISK-TUNNEL-011",
+      "category": "network",
+      "severity": "med",
+      "note": "Otomatik switch iki transport arası hızlı gidip-gelirse (flapping) bağlantı kararsızlaşır (VoIP/VPN kopar). ÇÖZÜLDÜ vT4: scoring.ts chooseWithHysteresis margin (challenger >= marginMs daha iyi olmalı) + holdRounds (N ardışık tur sürdürmeli) → fail-over hızlı, takeover yavaş. Aktif sağlıklıyken eşik-altı challenger için switch YOK.",
+      "applies_version": "vT4"
+    },
+    {
+      "id": "RISK-TUNNEL-012",
+      "category": "tooling",
+      "severity": "med",
+      "note": "autopilot auto-up yalnız MEVCUT binary'li transport'u ayağa kaldırmalı (capability-detect `which`); eksik binary'de spawn ENOENT/crash YASAK. autopilot.ts detectCapable + autoUp never-throws (up() hatası catch→rapor), eksikse zarifçe 'no capable transport' döner — kullanıcıya ASLA seçim sordurmaz (0-manuel).",
+      "applies_version": "vT4"
+    },
+    {
+      "id": "RISK-TUNNEL-013",
+      "category": "keys",
+      "severity": "low",
+      "note": "Switch decision-log (DecisionRecord) ileride diske/feed'e yazılırsa secret sızdırmamalı. Log yalnız transport adı/priority/latency/score/breaker-state/reason içerir — anahtar/preauth/URL-credential YOK. vT7 observability feed'inde de bu invariant korunur.",
+      "applies_version": "vT4"
+    },
+    {
+      "id": "RISK-TUNNEL-014",
+      "category": "keys",
+      "severity": "med",
+      "note": "DÜRÜSTLÜK: secrets-at-rest auto-keyfile (keys/.master.key) vault.enc ile AYNI dizinde. Casual disk-read/backup-leak/yanlışlıkla-commit'e karşı korur AMA keyfile'a erişen yerel saldırgana karşı DEĞİL. Daha güçlü (passphrase/macOS Keychain) '0 manuel seçim/işlem' kısıtını bozar (prompt). Karar: 0-manuel için keyfile + bu limit açıkça belgelenir, overclaim yok. keys/ gitignored + 0600.",
+      "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-015",
+      "category": "network",
+      "severity": "med",
+      "note": "WireGuard key-rotation sırasında iki peer aynı AllowedIPs'e sahip olursa öngörülemez routing (WireGuard paper). ÇÖZÜM: rotate.ts rotationPlan vT1 PURE renderer'larını reuse eder → AllowedIPs hep /32 (server peer'i, peer server'ı), çakışma yok; rotation tek-atomik config-takası (eski session ~3dk içinde doğal expire, kill-switch yok).",
+      "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-016",
+      "category": "network",
+      "severity": "high",
+      "note": "DNS-rebinding: zehirli DNS switch'i public/saldırgan IP'ye probe/seçim yaptırabilir. ÇÖZÜM vT5: guard.ts isPrivateHost + health.ts requirePrivateHost (3 transport probe true geçer) → yalnız loopback/RFC1918/CGNAT/.local hedef probe edilir; public host probe-öncesi reddedilir (fetch hiç çağrılmaz). opt-in default false=geri-uyum.",
+      "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-017",
+      "category": "tooling",
+      "severity": "low",
+      "note": "`tunnel status --watch` alt-ekran (\\x1b[?1049h) açar; çıkışta restore edilmezse terminal bozuk kalır (CLI top N-016 dersi). ÇÖZÜM: SIGINT handler \\x1b[?1049l ile restore + process.exit. Render fn PURE, watch yalnız ince glue.",
+      "applies_version": "vT6"
+    },
+    {
+      "id": "RISK-TUNNEL-018",
+      "category": "tooling",
+      "severity": "low",
+      "note": "decision-log JSONL feed (keys/decisions.jsonl) append-only → sınırsız büyür. ÇÖZÜLDÜ vT8: logrotate.ts rotateIfNeeded(maxBytes:1MB,keep:3) persistDecision'da çağrılır → ring-buffer. (vT6 ara-çözüm readDecisions({limit}) okuma-cap korunur.)",
+      "applies_version": "vT6",
+      "resolved_in": "vT8"
+    },
+    {
+      "id": "RISK-TUNNEL-019",
+      "category": "tooling",
+      "severity": "med",
+      "note": "LaunchAgent KeepAlive açık servis kod-güncellemesini/shutdown'ı bloklayabilir (launchd job sürekli relaunch). ÇÖZÜM: büyük güncelleme/restart öncesi `tunnel daemon uninstall` (launchctl unload), sonra `install`. Reçetede belgelendi. ThrottleInterval=10 restart-fırtınası önler.",
+      "applies_version": "vT7"
+    },
+    {
+      "id": "RISK-TUNNEL-020",
+      "category": "tooling",
+      "severity": "low",
+      "note": "daemon StandardOut/ErrorPath (keys/daemon.log) sınırsız büyür (`auto --watch` sürekli yazar). ÇÖZÜLDÜ vT8: cmdAuto her (re)start'ta rotateIfNeeded(daemon.log, 1MB, keep:3) çağırır → daemon restart'ında log döner.",
+      "applies_version": "vT7",
+      "resolved_in": "vT8"
+    },
+    {
+      "id": "RISK-TUNNEL-021",
+      "category": "network",
+      "severity": "low",
+      "note": "internetReachable PUBLIC endpoint (captive.apple.com) probe eder → private-host guard'ı BİLEREK bypass eder. Bu bir connectivity-check'tir (gerçek-internet var mı), TÜNEL-probe DEĞİL → guard uygulanmaz. Tünel transport probe'ları hâlâ requirePrivateHost:true (RISK-016). İki yol açıkça ayrı fn (connectivity.ts vs health requirePrivateHost).",
+      "applies_version": "vT7"
+    },
+    {
+      "id": "RISK-TUNNEL-022",
+      "category": "tooling",
+      "severity": "low",
+      "note": "`tunnel bench` canlı probe yapar; daemon (`auto --watch`) eşzamanlı çalışıyorsa ölçümler birbirini etkileyebilir (CPU/ağ paylaşımı → latency gürültüsü). Çözüm: samples küçük (default 5, ardışık) + bench diagnostic'tir (live scoring'i etkilemez). Hassas ölçüm için daemon geçici durdurulabilir (daemon uninstall). Belgelendi.",
+      "applies_version": "vT8"
+    },
+    {
+      "id": "RISK-TUNNEL-023",
+      "category": "tooling",
+      "severity": "low",
+      "note": "`tunnel setup` çok-adımlı (configure×N + autoUp + daemon); bir adım yarıda kalırsa (ör. mkcert -install başarısız) kısmi-kurulum. ÇÖZÜM: setup IDEMPOTENT — var-olan config'ler skip-exists ile atlanır, re-run yalnız eksiği tamamlar; her configure adımı try/catch (biri patlarsa diğerleri sürer) + net rapor. Crash/prompt yok.",
+      "applies_version": "vT9"
+    }
+  ],
+  "errors": [
+    {
+      "id": "ERR-TUNNEL-001",
+      "ts": "2026-06-20",
+      "version": "vT1",
+      "file": "src/transports/wireguard.ts",
+      "category": "tooling",
+      "severity": "med",
+      "root_cause": "Node 24 strip-only TS execution does not support TS parameter properties (constructor(private x)). class field shorthand needs full transpiler, not type-strip.",
+      "evidence": "SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript parameter property is not supported in strip-only mode (node --test src/transports/wireguard.test.ts)",
+      "fix": "Declare fields explicitly + assign in constructor body (no access-modifier params).",
+      "prevention_rule": "Bu lane zero-dep Node-strip kullanır: ASLA `constructor(private/public/readonly x)` yazma; alanları açıkça tanımla + gövdede ata. Ayrıca enum/namespace/decorator da yok.",
+      "test_added": "src/transports/wireguard.test.ts (transport metadata)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-002",
+      "ts": "2026-06-20",
+      "version": "vT3",
+      "file": "package.json",
+      "category": "tooling",
+      "severity": "med",
+      "root_cause": "test script glob 'node --test src/**/*.test.ts' npm tarafından /bin/sh ile çalıştırılır; sh globstar (**) desteklemez → yalnız bir-seviye (src/transports/*.test.ts) eşleşir, top-level src/*.test.ts (health/switch/mobileconfig) SESSIZCE atlanır → kalite kapısı testlerin yarısını koşmaz (21 vs gerçek 48).",
+      "evidence": "npm test → tests 21; node --test (recursive auto-discovery) → tests 48",
+      "fix": "package.json test script → 'node --test' (built-in recursive auto-discovery, glob yok).",
+      "prevention_rule": "Test koşumu için shell glob kullanma; 'node --test' auto-discovery'ye bırak. Kalite kapısı sayısı node --test çıktısıyla doğrulanır, npm glob'a güvenilmez.",
+      "test_added": "doğrulama: npm test == node --test == 48",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-003",
+      "ts": "2026-06-20",
+      "version": "vT10",
+      "file": "src/health.ts + transports/*",
+      "category": "network",
+      "severity": "CRITICAL",
+      "root_cause": "Tüm probe'lar `/healthz` kullanıyordu ama ollamas'ın health endpoint'i `/api/health` (200, public); `/healthz` = 401. Gerçek ollamas'a karşı her transport unhealthy görünür → switch hiçbirini seçmez → tünel tamamen kırık. 143 unit-test yakalayamadı çünkü fake-fetch `/healthz`=200 dönüyordu (canlı-kör nokta).",
+      "evidence": "curl localhost:3000/healthz → 401 ; /api/health → 200. `OLLAMAS_HEALTH_PATH=/healthz doctor` → UNREACHABLE ; default → OK 24ms.",
+      "fix": "Merkezi HEALTH_PATH sabiti (default /api/health, env OLLAMAS_HEALTH_PATH override); probeHttp/probeHttps default + 3 transport + cli prints + 3 recipe bunu kullanır.",
+      "prevention_rule": "Unit-test gerçek health-path'i VARSAYAMAZ (fake-fetch her path'e 200 döner) → entegrasyon her zaman CANLI ollamas'a karşı doğrulanır (`tunnel doctor`). Endpoint sözleşmeleri tek sabitte merkezi tutulur.",
+      "test_added": "src/doctor.test.ts + health.test.ts (HEALTH_PATH default /api/health) + canlı doctor",
+      "recurrence_count": 0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# WireGuard keys / configs NEVER committed (RISK-TUNNEL-004 key-leakage)
+*.key
+*.conf
+secrets/
+keys/
+wg-*.conf
+*.png
+*.pem
+*.mobileconfig
+Caddyfile
+node_modules
+node_modules/
+dist/
