@@ -93,3 +93,18 @@ Kullanıcı **"sıradaki versiyonu planla"** dediğinde:
 ## §8 — Permanence
 Her gelecek görev §1 scope + §2 roller + §3 yasalar + §4 döngü ile yürür.
 Sözleşme yalnız bu dosyada değişir; kod sonra.
+
+## §9 — Sekme Kimliği Otomasyonu (CLI-ID, 0 manuel)
+Kimlik/görev sorusu (*"görevin nedir / ne yaparsın / rolün ne"*) **asla bayat memory'den
+veya ezberden** yanıtlanmaz. `cli/lib/role.ts` canlı durumu üretir: mission (§0) +
+shipped/next versiyon (`cli/ROADMAP.md` ✅DONE/▶NEXT canlı parse) + VERSION (`cli/index.ts`) +
+branch + son commit (git) + aktif gotcha'lar (`cli/CLI_SEYIR_DEFTERI.md` son `### (E|N)-`).
+**Hardcode yok** → proje ilerledikçe yanıt otomatik tazelenir.
+
+Otomasyon: proje-local `.claude/settings.json` UserPromptSubmit hook → `cli/bin/role-hook.ts`
+soruyu `ROLE_QUESTION_RE` ile yakalar → `role.ts` çıktısını `additionalContext` enjekte eder;
+eşleşmezse sessiz exit 0; role.ts patlarsa sessiz degrade (prompt asla bloklanmaz). Hook kaydı
+**executable** olduğu için operatör onayı gerektirir (kurulum reçetesi `CLAUDE.md` §⟐); manuel
+fallback `npx tsx cli/lib/role.ts`. Saf parser+renderer vitest ile test edilir (CLI-ID).
+Adopte: orchestration vO-ID + tunnel whoami (in-repo desen). Veri otomatik / yapı manuel
+(role.ts şablonu + CLAUDE.md §1–§3 ile senkron).
