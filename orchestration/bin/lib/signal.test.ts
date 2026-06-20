@@ -28,7 +28,7 @@ ok(!isAllowedCmd("git status > /etc/x"), "redirect rejected");
 
 // --- nudge: dry-run default → HİÇBİR şey göndermez --------------------------
 {
-  const tmuxTab = { app: "tmux", session: "cli", tty: "/dev/ttys005", title: "cli:zsh", cwd: "/x", cmd: "zsh", busy: false };
+  const tmuxTab = { app: "tmux" as const, session: "cli", tty: "/dev/ttys005", title: "cli:zsh", cwd: "/x", cmd: "zsh", busy: false };
   let calls = 0;
   const run: Runner = () => { calls++; return ""; };
   const r = nudge(tmuxTab, "git status", { dryRun: true, run, log: () => {} });
@@ -39,7 +39,7 @@ ok(!isAllowedCmd("git status > /etc/x"), "redirect rejected");
 
 // --- nudge: allowlist dışı komut → REDDET, gönderme yok ---------------------
 {
-  const tab = { app: "tmux", session: "cli", tty: "/dev/ttys005", title: "x", cwd: "/x", cmd: "zsh", busy: false };
+  const tab = { app: "tmux" as const, session: "cli", tty: "/dev/ttys005", title: "x", cwd: "/x", cmd: "zsh", busy: false };
   let calls = 0;
   const run: Runner = () => { calls++; return ""; };
   const r = nudge(tab, "rm -rf /", { dryRun: false, run, log: () => {} });
@@ -51,7 +51,7 @@ ok(!isAllowedCmd("git status > /etc/x"), "redirect rejected");
 
 // --- nudge: gerçek gönderim (dryRun=false, allow) → runner çağrılır + loglanır
 {
-  const tab = { app: "tmux", session: "cli", tty: "/dev/ttys005", title: "x", cwd: "/x", cmd: "zsh", busy: false };
+  const tab = { app: "tmux" as const, session: "cli", tty: "/dev/ttys005", title: "x", cwd: "/x", cmd: "zsh", busy: false };
   const seen: string[][] = [];
   const run: Runner = (f, a) => { seen.push([f, ...a]); return ""; };
   let logged = 0;
@@ -64,7 +64,7 @@ ok(!isAllowedCmd("git status > /etc/x"), "redirect rejected");
 
 // --- nudge: AppleScript tab (tmux yok) → osascript write text ---------------
 {
-  const tab = { app: "iterm2", tty: "/dev/ttys008", title: "x", cwd: "/x", cmd: "", busy: false };
+  const tab = { app: "iterm2" as const, tty: "/dev/ttys008", title: "x", cwd: "/x", cmd: "", busy: false };
   const seen: string[][] = [];
   const run: Runner = (f, a) => { seen.push([f, ...a]); return ""; };
   const r = nudge(tab, "git status", { dryRun: false, run, log: () => {} });
