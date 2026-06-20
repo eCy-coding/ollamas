@@ -5,6 +5,25 @@
 
 ---
 
+## v11 — Keychain + secrets v2 (2026-06-20)
+
+### N-024 · macOS keychain per-USER, HOME-scoped DEĞİL
+- **Gözlem**: live migrate testini temp HOME ile izole etmeyi planladım; ama `security` login keychain'i **kullanıcıya** bağlı, `HOME`'a değil. Temp HOME yalnız keyfile'ı izole eder; `writeMasterKey` gerçek login keychain'e gerçek `ollamas/master-key` servisine yazardı → kullanıcının gerçek key'iyle ÇAKIŞMA riski.
+- **Fix**: live probe `read/write/deleteMasterKey`'i **TEST service** (`ollamas-test-probe`/`v11-live`) parametresiyle çağırır; gerçek `ollamas/master-key` item'ına asla dokunmaz; `afterAll` temizler. Probe **opt-in** (`OLLAMAS_LIVE_KEYCHAIN=1`) → default `npm test` keychain prompt tetiklemez.
+- **ÖNLEME KURALI**: keychain canlı testinde HOME izolasyonuna GÜVENME — keychain user-scoped. Daima ayrı TEST service + cleanup + opt-in gate.
+
+### N-025 · argv-leak on WRITE (kabul edilen tradeoff, gizleme yok)
+- **Gözlem**: `security add-generic-password -w <b64key>` master key'i `ps`'te ~100ms 1 kez gösterir (`/usr/bin/security`'nin stdin/file value alternatifi yok). READ (`find -w`) sızdırmaz.
+- **Karar**: zero-dep'i korumak için kabul + KEYCHAIN.md'de dürüstçe dokümante (native binding = native addon = zero-dep ihlali; keytar arşivli). `-A` (allow-any-app) ZORLAMADIK (ACL'i zayıflatırdı).
+- **ÖNLEME KURALI**: güvenlik tradeoff'unu over-claim etme; maliyeti dokümana yaz, suppress etme. Secret'i argv'de SON eleman yap (`buildSecurityArgs`) → test yapı doğrular, secret erken pozisyona sızmaz.
+
+### N-026 · key-source-agnostic seam → config/secrets'e sıfır dokunuş
+- **Gözlem**: master key'in kaynağını (keyfile→keychain) değiştirmek `secrets.ts` seal/open ve `config.ts`'i etkilemedi — ikisi de yalnız 32-byte Buffer ister.
+- **Doğrulama**: yalnız `keystore.ts` + yeni `keychain.ts` değişti; migrate **aynı key bytes** taşır → sealed `*Enc` okunur kalır (keyfile silinmeden önce keychain read-back doğrulanır = verify-before-destroy, N-021 disiplini).
+- **ÖNLEME KURALI**: kaynak-agnostik seam (tek `loadMasterKey`) sayesinde backend swap güvenli; invariant = 32-byte. Migration'da bytes'ı ASLA yeniden üretme, taşı.
+
+---
+
 ## v1 — İskelet + chat + doctor (2026-06-19)
 
 ### E-001 · Çift shebang → bin SyntaxError

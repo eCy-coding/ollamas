@@ -19,7 +19,7 @@ import { spawnSync } from "node:child_process";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 import { describeKeystore, migrateKeySource } from "./lib/keystore";
 
-const VERSION = "10.0.0";
+const VERSION = "11.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
