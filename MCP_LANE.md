@@ -102,3 +102,18 @@ Emre "**Onaylıyorum sıradaki adımı/versiyonu planla**" dediğinde, kesintisi
 8. **Conventional commit** + AGENTS.md roadmap/Backlog + `SEYIR_DEFTERI.md` (Ne/Nasıl/Niçin/Kanıt/Sonraki) + **vN+1 önceden-hesapla** (zero-wait).
 
 **Emergency-stop (DUR, `project_cortex.md`'ye yaz):** aynı root-cause 3× çözülmeden · gate önceki versiyona göre >%5 regresyon · privileged-tier (macos_terminal/write_host_file) uzak-tenant'a açılacak değişiklik. İnsan onayı olmadan kod üretme.
+
+---
+
+## §H — ZERO-MANUAL OPERATING MODE (0 manuel seçim, 0 manuel işlem)
+
+Bu sekme nereye yapıştırılırsa otonom çalışır; tetik geldiğinde **soru sormadan** §G'yi yürütür. Tüm kararlar deterministik — manuel seçim yok.
+
+- **AskUserQuestion YOK.** Belirsizlik → §F rubric ile çöz. Skor eşitliği → kır: **zero-dep > en-düşük-risk (code-integrity) > en-az-LOC > alfabetik**. Tek doğru karar üretilir.
+- **Versiyon otomatik seçilir:** §C self-update → (a) uçuş-halinde commit'siz **TUTARLI** iş + gate-yeşil varsa O versiyon = sıradaki (additive tamamla); (b) yoksa `AGENTS.md ### Backlog` en üst yapılmamış madde, §F ile.
+- **Uçtan uca otomatik:** araştır (`gh search`) → skorla → todo/phase → TDD (test önce) → kalite kapısı → **yeşilde commit** → AGENTS/SEYIR güncelle → vN+1 önceden-hesapla. Hiçbir adımda durup sormaz.
+- **Anti-collision (multi-worker, ZORUNLU):** kodlamadan önce `git status`. Yabancı commit'siz iş **gate-RED / yarım-statement** → o dosyalara DOKUNMA; izole worktree `~/Desktop/ollamas-mcp-wt` (son temiz commit'ten) aç, orada çalış. **Tutarlı + gate-yeşil** → additive tamamla (test/docs ekle, o dosyaları REWRITE etme), yeşilse commit. `git add` daima **selective**, asla `git add -A`. Branch hijack guard: oturum başı `git branch --show-current` doğrula.
+- **Tek izinli manuel = güvenlik kapısı (otomatik DEĞİL):** push / publish / registry-yayını / geri-alınamaz dışa-dönük işlem → ASLA otomatik, insan onayı bekler. Emergency-stop (§G) tetiklenirse dur.
+- **Verimlilik:** minimum token (subagent yalnız summary, Tier-1 paralel tek mesaj, /compact >%80); maximum performans. Yanıt TR, kod/commit/id İngilizce.
+
+**Özet karar ağacı:** `tetik → §C oku → in-flight tutarlı+yeşil? evet:tamamla / hayır-yarım:izole-worktree / yok:Backlog-§F → TDD → gate → yeşil:commit, kırmızı:root-cause-düzelt → docs → next-precompute`. İnsan yalnız push/publish/emergency'de devrede.
