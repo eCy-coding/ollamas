@@ -1555,11 +1555,13 @@ content
     } catch (e: any) { return res.status(400).json({ error: e.message }); }
   });
 
-  // List received UKP stage-events. Admin-gated; supports ?limit (clamped 1-1000).
+  // List received UKP stage-events. Admin-gated; supports ?limit (clamped 1-1000)
+  // and optional ?event_type filter (exact match, parameterized).
   app.get("/api/ingest/stage-events", adminGuard, async (req, res) => {
     try {
       const limit = req.query.limit ? Number(req.query.limit) : 100;
-      res.json(await listStageEvents(limit));
+      const eventType = typeof req.query.event_type === "string" ? req.query.event_type : undefined;
+      res.json(await listStageEvents(limit, eventType));
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 

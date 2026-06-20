@@ -191,4 +191,26 @@ describe("UKP stage-events live HTTP", () => {
     expect(body).toContain("ukp_stage_events_total");
     expect(body).toContain('recorded="true"');
   });
+
+  test("(9) event_type filter: POST deploy+rollback then GET ?event_type=stage.deploy → only deploy rows", async () => {
+    const baseTs = Math.floor(Date.now() / 1000);
+
+    const deployBody = JSON.stringify({ type: "stage.deploy", ts: baseTs + 100, data: { job: "filter-test" } });
+    const rollbackBody = JSON.stringify({ type: "stage.rollback", ts: baseTs + 101, data: { job: "filter-test" } });
+
+    // POST both event types.
+    await postIngest(deployBody, signWebhook(UKP_SECRET, deployBody));
+    await postIngest(rollbackBody, signWebhook(UKP_SECRET, rollbackBody));
+
+    // GET with event_type=stage.deploy filter.
+    const res = await fetch(`${BASE}/api/ingest/stage-events?event_type=stage.deploy&limit=100`, {
+      headers: { "x-admin-token": ADMIN },
+    });
+    expect(res.status).toBe(200);
+    const rows = await res.json() as Array<{ event_type: string }>;
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    // Every returned row must be stage.deploy — rollback must not appear.
+    expect(rows.every((r) => r.event_type === "stage.deploy")).toBe(true);
+  });
 });

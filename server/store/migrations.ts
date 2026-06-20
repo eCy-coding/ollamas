@@ -127,6 +127,15 @@ export const MIGRATIONS: Migration[] = [
       )`);
     },
   },
+  {
+    version: 6,
+    name: "ukp_stage_events_ts_index",
+    // Speeds up retention prune (DELETE WHERE ts < cutoff) and ts-DESC list scans
+    // on ukp_stage_events. Mirrors the usage_events_ts_index pattern (v1 above).
+    up: async (db) => {
+      await db.exec("CREATE INDEX IF NOT EXISTS idx_ukp_stage_events_ts ON ukp_stage_events(ts)");
+    },
+  },
 ];
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:

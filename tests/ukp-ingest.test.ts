@@ -2,7 +2,7 @@
 // Hermetic store test — same tmp-DB pattern as dcr.test.ts / saas-store.test.ts.
 // Tests drive the handler logic via the imported store + outbound helpers rather
 // than booting the full HTTP server (faster, dialect-agnostic, no port conflicts).
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -99,5 +99,118 @@ describe("UKP stage-events ingest receiver", () => {
     const result = await handleIngest(undefined, body, "t=0,v1=aabbcc");
     expect(result.status).toBe(503);
     expect(result.body).toMatchObject({ error: "ingest disabled" });
+  });
+});
+
+describe("UKP stage-events retention prune", () => {
+  const savedRetentionDays = process.env.UKP_RETENTION_DAYS;
+
+  afterEach(() => {
+    // Restore env so other tests are not affected.
+    if (savedRetentionDays === undefined) delete process.env.UKP_RETENTION_DAYS;
+    else process.env.UKP_RETENTION_DAYS = savedRetentionDays;
+  });
+
+  test("(5) pruneStageEvents: retention=1d removes row older than 2d, keeps row from 1h ago", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const oldTs = nowSec - 2 * 86400;   // 2 days ago — should be pruned
+    const freshTs = nowSec - 3600;       // 1 hour ago — should survive
+
+    const idOld = `prune-old-${crypto.randomBytes(4).toString("hex")}`;
+    const idFresh = `prune-fresh-${crypto.randomBytes(4).toString("hex")}`;
+
+    await store.recordStageEvent({ id: idOld, eventType: "stage.prune-old", payload: "{}", ts: oldTs });
+    await store.recordStageEvent({ id: idFresh, eventType: "stage.prune-fresh", payload: "{}", ts: freshTs });
+
+    // Verify both rows are present before pruning.
+    const before = await store.listStageEvents(1000);
+    expect(before.some((r: any) => r.id === idOld)).toBe(true);
+    expect(before.some((r: any) => r.id === idFresh)).toBe(true);
+
+    const pruned = await store.pruneStageEvents(1);
+    expect(pruned).toBeGreaterThanOrEqual(1); // at least the old row was removed
+
+    const after = await store.listStageEvents(1000);
+    expect(after.some((r: any) => r.id === idOld)).toBe(false);   // gone
+    expect(after.some((r: any) => r.id === idFresh)).toBe(true);  // still here
+  });
+
+  test("(6) pruneStageEvents: days=0 is a no-op (returns 0, no rows deleted)", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const idRow = `prune-noop-${crypto.randomBytes(4).toString("hex")}`;
+    // Use a very old ts so it would be pruned if days>0.
+    await store.recordStageEvent({ id: idRow, eventType: "stage.noop", payload: "{}", ts: nowSec - 999999 });
+
+    const pruned = await store.pruneStageEvents(0);
+    expect(pruned).toBe(0);
+
+    const rows = await store.listStageEvents(1000);
+    expect(rows.some((r: any) => r.id === idRow)).toBe(true); // still present
+  });
+
+  test("(7) env-gated prune via recordStageEvent: UKP_RETENTION_DAYS=1 prunes stale on insert", async () => {
+    process.env.UKP_RETENTION_DAYS = "1";
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const staleTs = nowSec - 2 * 86400; // 2 days ago
+    const freshTs = nowSec - 60;
+
+    const idStale = `env-stale-${crypto.randomBytes(4).toString("hex")}`;
+    // Insert the stale row directly (skip env-prune by inserting into store directly).
+    // We use recordStageEvent but with UKP_RETENTION_DAYS still set — the FIRST insert
+    // would prune itself, so insert the stale row first without env, then set env.
+    delete process.env.UKP_RETENTION_DAYS;
+    await store.recordStageEvent({ id: idStale, eventType: "stage.stale", payload: "{}", ts: staleTs });
+
+    // Now set env and insert a fresh row — the prune fires during this second insert.
+    process.env.UKP_RETENTION_DAYS = "1";
+    const idFresh = `env-fresh-${crypto.randomBytes(4).toString("hex")}`;
+    await store.recordStageEvent({ id: idFresh, eventType: "stage.fresh", payload: "{}", ts: freshTs });
+
+    const rows = await store.listStageEvents(1000);
+    expect(rows.some((r: any) => r.id === idStale)).toBe(false);  // pruned
+    expect(rows.some((r: any) => r.id === idFresh)).toBe(true);   // kept
+  });
+
+  test("(8) env-gated prune disabled (UKP_RETENTION_DAYS unset): both rows survive", async () => {
+    delete process.env.UKP_RETENTION_DAYS;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const idA = `nodisable-a-${crypto.randomBytes(4).toString("hex")}`;
+    const idB = `nodisable-b-${crypto.randomBytes(4).toString("hex")}`;
+
+    await store.recordStageEvent({ id: idA, eventType: "stage.a", payload: "{}", ts: nowSec - 999999 });
+    await store.recordStageEvent({ id: idB, eventType: "stage.b", payload: "{}", ts: nowSec - 60 });
+
+    const rows = await store.listStageEvents(1000);
+    expect(rows.some((r: any) => r.id === idA)).toBe(true);
+    expect(rows.some((r: any) => r.id === idB)).toBe(true);
+  });
+});
+
+describe("UKP stage-events event_type filter (listStageEvents)", () => {
+  test("(9) listStageEvents with eventType filter → only matching type returned", async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const idDeploy = `filter-deploy-${crypto.randomBytes(4).toString("hex")}`;
+    const idRollback = `filter-rollback-${crypto.randomBytes(4).toString("hex")}`;
+
+    await store.recordStageEvent({ id: idDeploy, eventType: "stage.filter-deploy", payload: "{}", ts: nowSec - 5 });
+    await store.recordStageEvent({ id: idRollback, eventType: "stage.filter-rollback", payload: "{}", ts: nowSec - 4 });
+
+    const deployRows = await store.listStageEvents(1000, "stage.filter-deploy");
+    expect(deployRows.every((r: any) => r.event_type === "stage.filter-deploy")).toBe(true);
+    expect(deployRows.some((r: any) => r.id === idDeploy)).toBe(true);
+    expect(deployRows.some((r: any) => r.id === idRollback)).toBe(false);
+
+    const rollbackRows = await store.listStageEvents(1000, "stage.filter-rollback");
+    expect(rollbackRows.every((r: any) => r.event_type === "stage.filter-rollback")).toBe(true);
+    expect(rollbackRows.some((r: any) => r.id === idRollback)).toBe(true);
+    expect(rollbackRows.some((r: any) => r.id === idDeploy)).toBe(false);
+  });
+
+  test("(10) listStageEvents with no eventType → all rows returned (no filter)", async () => {
+    const rows = await store.listStageEvents(1000);
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows.length).toBeGreaterThan(0);
   });
 });

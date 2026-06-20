@@ -190,6 +190,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tam suite **189 passed/2 skipped** (+4 consumer: list ts-DESC + tip-içerik, limit-clamp, no-token 401/403, `/metrics` scrape `ukp_stage_events_total recorded="true"`); tsc temiz; conformance 3/3; vite+server+stdio bundle. Opus bağımsız gate doğruladı. İzole branch'te commit (merge operatöre); push yok.
 - **Sonraki (önceden hesaplandı):** real-time surface (ÜRÜN event-bus/SSE eklerse) · by-id fetch + `ukp_stage_events` retention/prune; sonra plan.next.md §AUTO-SELECT ile bir sonraki kritik-sahipsiz.
 
+## Faz 26 — UKP ingest OPERASYONEL TAMAMLAMA (retention + ts index + type filter, branch feat/ukp-ingest-receiver, izole worktree, zero-dep)
+- **Ne:** `ukp_stage_events` sınırsız-büyüyen append-only tablo idi (latent disk/PII-compliance riski) = operasyonel boşluk. Kapatıldı. Bağımsız audit: yeni kritik-sahipsiz iş yoktu → **gold-plating REDDEDİLDİ** (by-id fetch, SSE-feed). Sadece gerçek operasyonel boşluk + okuma yüzeyi tamamlandı. **0 yeni dep.**
+- **Nasıl:** `migrations.ts` v6 `idx_ukp_stage_events_ts` (usage_events_ts_index deseni). `store/index.ts` `pruneStageEvents(days)` (`DELETE WHERE ts < now-days*86400`, `.changes`) + `recordStageEvent`'te insert sonrası opportunistic gated prune (`UKP_RETENTION_DAYS`, default **0=kapalı→sıfır maliyet, sürpriz silme yok**, best-effort try/catch). `listStageEvents(limit, eventType?)` filtre. `server.ts` GET `?event_type` thread. Reuse: env `Number(...||0)` konvansiyonu + migration index deseni — **vibe-kod yok**.
+- **Niçin:** Üretim-sınıfı webhook receiver retention mekanizması olmadan tam değil (tablo sonsuz büyür). Default-off → geriye-uyumlu, operatör enable eder. Filter = ops sorgu yüzeyi. by-id/SSE/cron BİLEREK ertelendi (gereksiz/altyapı yok) — yarım bırakma değil, dürüst sınır.
+- **Kanıt:** tam suite **196 passed/2 skipped** (+7: prune-direct, prune-disabled, env-gated prune via record, retention-baseline, type-filter çift-yön, http ?event_type); tsc temiz; conformance 3/3; vite+server+stdio bundle. Opus bağımsız gate doğruladı.
+- **HAND-OFF:** ingest feature artık operasyonel olarak TAM (receiver↔consumer↔retention). Branch `feat/ukp-ingest-receiver` (4 commit: 8810459+c7e0369+bu) operatör merge'üne hazır. **Bu lane'de kritik-sahipsiz iş KALMADI** — sonraki general-lane turu YENİ kritik boşluğa bağlı (plan.next.md §AUTO-SELECT); yoksa doğru aksiyon merge'dir, izole commit üretmek değil. Busywork üretme.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
