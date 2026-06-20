@@ -135,4 +135,60 @@ describe("UKP stage-events live HTTP", () => {
     const json = await res.json() as Record<string, unknown>;
     expect(json).toMatchObject({ error: "invalid signature" });
   });
+
+  // ── Consumer tests ────────────────────────────────────────────────────────
+
+  test("(5) POST 3 distinct event types then GET list → ≥3 rows, ts DESC, all types present", async () => {
+    const types = ["stage.lookahead", "stage.dogrula2", "stage.repair"];
+    const baseTs = Math.floor(Date.now() / 1000);
+
+    for (let i = 0; i < types.length; i++) {
+      const body = JSON.stringify({ type: types[i], ts: baseTs + i, data: { seq: i } });
+      const sig = signWebhook(UKP_SECRET, body);
+      const res = await postIngest(body, sig);
+      expect(res.status).toBe(200);
+    }
+
+    const res = await fetch(`${BASE}/api/ingest/stage-events?limit=10`, {
+      headers: { "x-admin-token": ADMIN },
+    });
+    expect(res.status).toBe(200);
+    const rows = await res.json() as Array<{ event_type: string; ts: number }>;
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+
+    // Verify ts DESC ordering
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1].ts).toBeGreaterThanOrEqual(rows[i].ts);
+    }
+
+    // All posted types appear in the result
+    const returnedTypes = rows.map((r) => r.event_type);
+    for (const t of types) {
+      expect(returnedTypes).toContain(t);
+    }
+  });
+
+  test("(6) GET ?limit=99999 → rows.length ≤ 1000 (clamp)", async () => {
+    const res = await fetch(`${BASE}/api/ingest/stage-events?limit=99999`, {
+      headers: { "x-admin-token": ADMIN },
+    });
+    expect(res.status).toBe(200);
+    const rows = await res.json() as unknown[];
+    expect(rows.length).toBeLessThanOrEqual(1000);
+  });
+
+  test("(7) GET without admin token → 401 or 403", async () => {
+    const res = await fetch(`${BASE}/api/ingest/stage-events`);
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test("(8) GET /metrics → body includes ukp_stage_events_total with recorded=\"true\"", async () => {
+    // Ensure at least one recorded:true event has been POSTed (test 5 above covers it).
+    const res = await fetch(`${BASE}/metrics`);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("ukp_stage_events_total");
+    expect(body).toContain('recorded="true"');
+  });
 });

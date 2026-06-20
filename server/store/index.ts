@@ -287,6 +287,15 @@ export async function stripeEventSeen(eventId: string): Promise<boolean> {
   return seen;
 }
 
+/** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000]. */
+export async function listStageEvents(limit = 100): Promise<any[]> {
+  const lim = Math.min(Math.max(1, limit), 1000);
+  return (await d().query(
+    "SELECT id, event_type, ts, received_at FROM ukp_stage_events ORDER BY ts DESC LIMIT ?",
+    [lim]
+  )).rows;
+}
+
 /** Insert a UKP stage-event exactly once. Returns recorded:true on first write,
  *  recorded:false on a duplicate id (replay / retry dedup). */
 export async function recordStageEvent(e: { id: string; eventType: string; payload: string; ts: number }): Promise<{ recorded: boolean }> {

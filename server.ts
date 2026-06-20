@@ -2,7 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
-import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal } from "./server/metrics";
+import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, ukpStageEventsTotal } from "./server/metrics";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -23,7 +23,7 @@ import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent } from "./server/store";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -1550,9 +1550,19 @@ content
       const eventType = String(parsed.type ?? "");
       const ts = Number(parsed.ts ?? 0);
       const { recorded } = await recordStageEvent({ id, eventType, payload: raw, ts });
+      ukpStageEventsTotal.labels(eventType, String(recorded)).inc();
       return res.json({ ok: true, recorded });
     } catch (e: any) { return res.status(400).json({ error: e.message }); }
   });
+
+  // List received UKP stage-events. Admin-gated; supports ?limit (clamped 1-1000).
+  app.get("/api/ingest/stage-events", adminGuard, async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 100;
+      res.json(await listStageEvents(limit));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
   app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {
     try {

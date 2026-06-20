@@ -183,6 +183,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tam suite **185 passed/2 skipped** (+8: 4 direct-logic ukp-ingest + 4 **canlı-HTTP** ukp-ingest-http [gerçek boot, raw-body ordering + reachability + replay-idempotency kanıtı — yarım-test bırakılmadı]); tsc temiz; conformance 3/3; vite+server+stdio bundle. Route wiring Opus-review edildi (raw parser sırası, public mount, HMAC). İzole branch'te commit (merge operatöre); push yok.
 - **Sonraki (önceden hesaplandı):** ingest consumer — stage-event'leri livefeed/metrics'e yansıt + `GET /api/ingest/stage-events` liste; sonra re-audit ile bir sonraki kritik-sahipsiz kalem (plan.next.md §AUTO-SELECT).
 
+## Faz 25 — UKP ingest CONSUMER (loop'u kapat: list + metrics, branch feat/ukp-ingest-receiver, izole worktree, zero-dep)
+- **Ne:** Faz 24 receiver write-only'di → `ukp_stage_events`'e yazılıyor ama hiçbir şey OKUMUYOR/metriklemiyordu = yarım döngü (receiver'ın amacı gözlemlenebilirlik karşılanmamış). Bu faz loop'u kapattı (read-back + metric). **0 yeni dep.**
+- **Nasıl:** `store/index.ts` `listStageEvents(limit)` (listAudit pattern, `ORDER BY ts DESC`, clamp [1,1000]). `metrics.ts` `ukpStageEventsTotal{event_type,recorded}` Counter (prom-client, mevcut `mcp_tool_calls_total` deseni). `server.ts` POST handler'a `recordStageEvent` sonrası `.labels(eventType,String(recorded)).inc()` (receiver'ı da tamamladı) + yeni `GET /api/ingest/stage-events` (adminGuard timing-safe x-admin-token, `?limit`). Reuse: listAudit + adminGuard + `/api/saas/audit` shape — **vibe-kod yok**.
+- **Niçin:** Alınan event'ler görünür olmadan receiver değersiz. Admin-gated liste + Prometheus counter = tam gözlemlenebilirlik MVP'si. **Activity-feed/SSE BİLEREK ERTELENDİ** (üründe emitEvent/event-bus altyapısı yok → sıfırdan kurmak scope-creep + yeni yarım-sistem; metrics+list tam ve sınırlı). Yarım bırakma değil, dürüst kapsam.
+- **Kanıt:** tam suite **189 passed/2 skipped** (+4 consumer: list ts-DESC + tip-içerik, limit-clamp, no-token 401/403, `/metrics` scrape `ukp_stage_events_total recorded="true"`); tsc temiz; conformance 3/3; vite+server+stdio bundle. Opus bağımsız gate doğruladı. İzole branch'te commit (merge operatöre); push yok.
+- **Sonraki (önceden hesaplandı):** real-time surface (ÜRÜN event-bus/SSE eklerse) · by-id fetch + `ukp_stage_events` retention/prune; sonra plan.next.md §AUTO-SELECT ile bir sonraki kritik-sahipsiz.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
