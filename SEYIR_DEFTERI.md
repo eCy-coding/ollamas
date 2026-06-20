@@ -185,6 +185,15 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Prevention (RISK-MCP):** Görünürlük filtresi ASLA tek başına erişim-kontrolü değildir → her per-tenant kaynak `execute` choke-point'inde deny-by-default gate'lenir. İsim-konvansiyonuyla izolasyon YASAK → explicit owner map.
 - **Sonraki (önceden hesaplandı):** v1.16 — RFC 8707 resource-binding enforcement (`/mcp`'de token.resource vs request-URI; çok-resource deploy için). v1.17 — resource subscriptions.
 
+## Faz 25 — v1.16 (RFC 8707 Resource-Binding Enforcement — HIGH güvenlik fix, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** Opaque OAuth token audience-confusion açığını kapattı. **0 yeni dep** (JWT-audience deseni opaque path'e simetrik + stdlib URL).
+- **Açık (kök-neden):** `auth.ts resolveOAuth` `resolveOAuthToken`'dan `resource`'u alıyordu ama **doğrulamıyordu** (audience-drop) → resource-A için basılan `ot_` token resource-B'de geçerli (cross-resource reuse / confused-deputy). JWT path `:60-62` audience'ı enforce ediyordu → asimetri.
+- **Nasıl:** `canonicalResource(u)` (URL normalize + trailing-slash strip) + `resolveOAuth(token, expectedResource)`: `r.resource` non-null & `canonical` eşleşmezse → null (401 invalid_token); null-resource → kısıtsız (geriye-uyum). Çağrı `resolveOAuth(key, OAUTH_AUDIENCE || \`${base}/mcp\`)` — JWT path ile AYNI beklenen-resource (iki path tutarlı).
+- **Niçin:** RFC 8707/9728 + MCP 2025-06-18 — token bir resource-server'a bağlıysa başkasında kullanılamaz (üretim çok-resource SaaS güvenliği).
+- **Kanıt:** gerçek suite **183 passed/2 skipped** (+4 oauth-resource-binding: match→auth, mismatch→401, null→backward-compat, trailing-slash-canonical); tsc temiz; conformance:stdio exit 0; bundle. Regresyon yok (cc/refresh resource göndermez→null→geçer; api-key path ayrı).
+- **Prevention (RISK-MCP):** Token'ın audience/resource alanı SAKLANIYORSA resolve'da MUTLAKA enforce edilmeli (saklamak≠doğrulamak); tüm token-türleri (JWT+opaque) aynı beklenen-resource kaynağını kullanmalı.
+- **Sonraki (önceden hesaplandı):** v1.17 — resource subscriptions (stdio-stateful path; stateless-HTTP best-effort belgeli). OAuth tarafı artık tam (authcode+PKCE+refresh-rotation+client_credentials+resource-binding+tenant-isolation).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
