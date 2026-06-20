@@ -7,17 +7,18 @@
     "ollamas-mcp": "dist/mcp-stdio.cjs"
   },
   "scripts": {
-    "dev": "tsx server.ts",
-    "mcp:stdio": "tsx bin/mcp-stdio.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild bin/mcp-stdio.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/mcp-stdio.cjs",
-    "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
-    "test": "vitest run",
     "conformance": "vitest run tests/conformance.e2e.test.ts",
     "conformance:http": "mcp-inspector --cli http://localhost:${PORT:-3000}/mcp --transport http --method tools/list",
     "conformance:stdio": "mcp-inspector --cli node dist/mcp-stdio.cjs --method tools/list",
-    "smoke": "vitest run tests/smoke-live.e2e.test.ts"
+    "dev": "tsx server.ts",
+    "harden": "make harden",
+    "lint": "tsc --noEmit",
+    "mcp:stdio": "tsx bin/mcp-stdio.ts",
+    "smoke": "vitest run tests/smoke-live.e2e.test.ts",
+    "start": "node dist/server.cjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
@@ -46,7 +47,9 @@
     "stripe": "^22.2.1",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@modelcontextprotocol/inspector": "^0.22.0",

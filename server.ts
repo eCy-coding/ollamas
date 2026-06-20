@@ -18,6 +18,7 @@ import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
+import { registerHostScripts } from "./bin/host-bridge/register-host-scripts.mjs"; // scripts lane v5 register-seam
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata, AUTH_SERVER_METADATA_PATH, REGISTRATION_PATH } from "./server/mcp/oauth-metadata";
 import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
@@ -54,6 +55,11 @@ import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } f
 const TOOL_DEPS: ToolDeps = {
   FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
 };
+
+// scripts lane v5: manifest-driven host tool registration (scripts/inventory.json
+// -> ToolRegistry under the host_ namespace). Best-effort — a bad manifest must
+// not crash boot; the static built-in tools still serve.
+try { registerHostScripts(ToolRegistry, TOOL_DEPS); } catch (e) { console.error("registerHostScripts failed:", (e as Error)?.message); }
 
 // Security headers (helmet, Faz 9A). CSP/COEP disabled: the app serves a Vite
 // SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
