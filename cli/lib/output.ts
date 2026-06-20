@@ -32,6 +32,61 @@ export function c(code: keyof typeof CODES, s: string, enabled: boolean): string
   return `${CODES[code]}${s}${CODES.reset}`;
 }
 
+// --- multi-pane layout (v16). Pure: the width is INJECTED (no TTY query), so the
+// whole thing is unit-testable. Box-drawing ported from boxen (MIT); pane content
+// reuses sparkline/bar/formatTable. Wide terminal → side-by-side; narrow → stacked.
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+
+// Visible length of a string, ignoring ANSI color escapes — so padding aligns.
+export function visibleLen(s: string): number {
+  return s.replace(ANSI_RE, "").length;
+}
+
+function padOrTrunc(s: string, width: number): string {
+  const len = visibleLen(s);
+  if (len === width) return s;
+  if (len < width) return s + " ".repeat(width - len);
+  return s.replace(ANSI_RE, "").slice(0, width); // over-long → drop styling, hard-cut
+}
+
+export interface Pane {
+  title: string;
+  lines: string[];
+}
+
+// One titled box of a fixed outer `width`; content padded/truncated to fit.
+function boxPane(p: Pane, width: number, ctx: OutputCtx): string {
+  const inner = Math.max(4, width - 2);
+  const titleStr = `─ ${p.title} `;
+  const tvis = Math.min(visibleLen(titleStr), inner);
+  const titleClipped = titleStr.replace(ANSI_RE, "").slice(0, tvis);
+  const top = "┌" + c("bold", titleClipped, ctx.color) + "─".repeat(inner - tvis) + "┐";
+  const body = p.lines.map((l) => "│" + padOrTrunc(l, inner) + "│");
+  const bottom = "└" + "─".repeat(inner) + "┘";
+  return [top, ...body, bottom].join("\n");
+}
+
+// Lay panes out as titled boxes — side-by-side when `width` allows, else stacked.
+// Side-by-side boxes are padded to equal height so their borders line up. Pure.
+export function renderPanes(panes: Pane[], width: number, ctx: OutputCtx): string {
+  const visible = panes.filter((p) => p && Array.isArray(p.lines));
+  if (visible.length === 0) return "";
+  const SIDE_MIN = 100; // narrower than this → stack vertically
+  if (width < SIDE_MIN || visible.length === 1) {
+    const w = Math.max(20, Math.min(width, 80));
+    return visible.map((p) => boxPane(p, w, ctx)).join("\n");
+  }
+  const gap = 1;
+  const boxW = Math.max(16, Math.floor((width - gap * (visible.length - 1)) / visible.length));
+  const maxLines = Math.max(...visible.map((p) => p.lines.length));
+  const padded = visible.map((p) => ({ title: p.title, lines: [...p.lines, ...Array(maxLines - p.lines.length).fill("")] }));
+  const boxes = padded.map((p) => boxPane(p, boxW, ctx).split("\n"));
+  const height = boxes[0].length; // every box is the same height now
+  const rows: string[] = [];
+  for (let r = 0; r < height; r++) rows.push(boxes.map((b) => b[r]).join(" ".repeat(gap)));
+  return rows.join("\n");
+}
+
 // Render the doctor health report. JSON mode => raw; else compact human lines.
 export function formatDoctor(report: DoctorReport, ctx: OutputCtx): string {
   if (ctx.json) return JSON.stringify(report, null, 2);
