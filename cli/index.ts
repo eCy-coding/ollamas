@@ -11,9 +11,10 @@ import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
-import { complete, completionScript, type DynamicValues } from "./lib/completion";
+import { complete, completionScript, COMMAND_TREE, type DynamicValues } from "./lib/completion";
 import { PROVIDERS } from "./lib/providers";
 import { cachedModels } from "./lib/modelcache";
+import { generateManPage, type ManPage } from "./lib/man";
 import { runUpdate } from "./commands/update";
 import { runPlugin } from "./commands/plugin";
 import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from "./lib/plugins";
@@ -44,6 +45,7 @@ commands:
     config profiles    list profiles
     config keystore [keychain|file]  show/migrate the master-key store (macOS Keychain)
   completion <shell> print a shell completion script (bash|zsh|fish)
+  man                print a man(1) page (troff) — ollamas man > …/man1/ollamas.1
   update [--check]   self-update from a release manifest (sha256-verified)
   plugin <action>    manage external subcommands (list|install|remove)
   help               this message
@@ -188,6 +190,73 @@ function runCompletion(rest: string[]): number {
   return 0;
 }
 
+// One-line description per command, for the man page COMMANDS list.
+const COMMAND_DESCRIPTIONS: Record<string, string> = {
+  chat: "one-shot prompt or interactive REPL against the gateway",
+  agent: "drive the ReAct agent loop (thought, step, done)",
+  saas: "manage the SaaS layer (plans, tenants, keys, audit, usage, billing)",
+  mcp: "MCP client (info, tools, call, upstreams, add, rm) via /mcp",
+  bench: "benchmark models (tok/s, TTFB) and pick the fastest",
+  top: "live metrics dashboard (requests, latency, tool calls)",
+  shortcuts: "generate an Apple Shortcuts pack",
+  doctor: "health of gateway, ollama, bridge, ready and agent",
+  config: "show config or set a key; manage profiles and the keystore",
+  completion: "print a shell completion script (bash, zsh, fish)",
+  update: "self-update from a release manifest (sha256-verified)",
+  plugin: "manage external subcommands (list, install, remove)",
+  man: "print this man page (troff)",
+  help: "print the help message",
+  version: "print the version",
+};
+
+// Build the man(1) page data from the command surface — pure (date injected).
+export function buildManPage(version: string, date: string): ManPage {
+  return {
+    name: "ollamas",
+    section: 1,
+    version,
+    date,
+    tagline: "LLM Mission Control CLI, driven from the terminal and iPhone",
+    synopsis: "[--gateway url] [--profile name] <command> [options]",
+    sections: [
+      {
+        heading: "Commands",
+        items: COMMAND_TREE.commands.map((c) => ({ term: c, def: COMMAND_DESCRIPTIONS[c] ?? "" })),
+      },
+      {
+        heading: "Environment",
+        items: [
+          { term: "OLLAMAS_GATEWAY", def: "gateway base url (default http://localhost:3000)" },
+          { term: "OLLAMAS_API_KEY", def: "bearer key for SAAS-enforced gateways" },
+          { term: "OLLAMAS_SAAS_ADMIN", def: "admin token for saas/billing commands" },
+          { term: "OLLAMAS_MODEL", def: "default model (default qwen3:8b)" },
+          { term: "OLLAMAS_KEYSTORE", def: "force the master-key store: file or keychain" },
+          { term: "NO_COLOR", def: "disable color" },
+        ],
+      },
+      {
+        heading: "Options",
+        items: [
+          { term: "--gateway url", def: "override the gateway for this invocation" },
+          { term: "--profile name", def: "use a named gateway profile" },
+          { term: "--insecure-storage", def: "force the file keystore (skip the macOS Keychain)" },
+          { term: "--json", def: "machine-readable output" },
+        ],
+      },
+      {
+        heading: "See Also",
+        paragraphs: ["Docs in the ollamas repo:", "cli/PACKAGING.md, cli/KEYCHAIN.md, cli/SECRETS.md."],
+      },
+    ],
+  };
+}
+
+function runMan(): number {
+  const date = new Date().toISOString().slice(0, 10);
+  process.stdout.write(generateManPage(buildManPage(VERSION, date)));
+  return 0;
+}
+
 export async function main(argv: string[]): Promise<number> {
   const g = extractGlobalFlags(argv);
   if (g.gateway) process.env.OLLAMAS_GATEWAY = g.gateway; // env wins in loadConfig (G10)
@@ -211,6 +280,8 @@ export async function main(argv: string[]): Promise<number> {
       return runTop(rest);
     case "completion":
       return runCompletion(rest);
+    case "man":
+      return runMan();
     case "update":
       return runUpdate(rest, VERSION);
     case "plugin":

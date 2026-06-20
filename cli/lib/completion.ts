@@ -30,6 +30,7 @@ export const COMMAND_TREE: CommandTree = {
     "completion",
     "update",
     "plugin",
+    "man",
     "help",
     "version",
   ],
