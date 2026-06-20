@@ -28,8 +28,32 @@ ollamas completion fish > ~/.config/fish/completions/ollamas.fish
 ```
 
 Completes top-level commands, sub-actions (`mcp …`, `saas …`, `config …`,
-`agent …`, `shortcuts …`), and global flags. Dynamic values (model/profile names)
-land in v13.
+`agent …`, `shortcuts …`), and global flags.
+
+**Dynamic values (v13):** TAB also completes real values —
+
+```sh
+ollamas config use <TAB>      # → your profile names
+ollamas chat -m <TAB>         # → cached model names for the active provider
+ollamas bench -p <TAB>        # → provider names
+```
+
+`__complete` reads these from **local disk only** — never a network call or keychain
+read on TAB (a model fetch would hang it; a keychain read has a 5 s timeout — N-019 /
+N-032). Profiles come from `~/.ollamas/profiles/`; models from a cache that
+`ollamas bench` (or `doctor`) writes after it queries the gateway. So run **`ollamas
+bench`** once to populate model completion; until then `-m <TAB>` is simply empty.
+
+## 2b. Man page (v13)
+
+```sh
+ollamas man                                   # print the troff man(1) page
+ollamas man > /usr/local/share/man/man1/ollamas.1   # install it
+man ollamas
+```
+
+Generated (pure troff, zero-dep) from the live command surface, so it tracks the
+version. Validated with `mandoc -Tlint` (clean).
 
 ## 3. Single native binary (Bun)
 

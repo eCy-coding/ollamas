@@ -17,8 +17,9 @@
 | **v10** | Self-update + plugin | `ollamas update` (manifest+sha256-verify+atomic-replace); checksum-gated plugin alt-komut sistemi; release-binary CI draft; UPDATE.md | ✅ DONE |
 | **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `resolveKeySource` precedence + `config keystore` migrate (aynı key bytes) + `--insecure-storage` opt-out | ✅ DONE |
 | **v12** | Node-SEA binary | **classic** `node --experimental-sea-config` (host Node 24.16, `--build-sea`/25.5 gerekmez) + postject inject + macOS remove-sign→inject→re-sign; `sea.ts` saf + `build:sea`; Bun alternate kalır, SEA canonical runtime-integrity | ✅ DONE |
-| **v13** | Completions v2 + man | `__complete` dinamik VALUES (model/profil canlı via gateway) + `man ollamas` (saf troff jeneratör) | ▶ NEXT |
-| **v13+** | Ufuk (önceden-hesap) | v14 TUI-v2 · v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
+| **v13** | Completions v2 + man | `__complete` dinamik VALUES (`config use`→profil, `-m`→model-cache, `-p`→provider; **TAB'da network/keychain YOK** N-032) + `man ollamas` saf troff (`mandoc -Tlint` temiz) | ✅ DONE |
+| **v14** | TUI v2 / agent-watch | `top` multi-pane (requests/latency/tools ayrı panel) + `agent --watch` canlı ReAct (alt-screen, v8 SIGINT-restore reuse) | ▶ NEXT |
+| **v14+** | Ufuk (önceden-hesap) | v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)
@@ -129,8 +130,16 @@
 - Testler: `cli-sea`(7 saf) → **full 324 pass/4 skip** (v11-set:317). **Canlı macOS build** (`npm run build:sea`): blob→inject→ad-hoc-sign→`dist/ollamas-darwin-arm64 version`==12.0.0 + `__complete mcp`→sub-actions + help; dist gitignored.
 - Choke-point korunur; zero-RUNTIME-dep (`node dist/cli/index.cjs` hâlâ saf built-in, postject yalnız devDep). **Gotcha**: N-029 SEA-argv1-yok→isSea()-guard-şart; N-030 macOS-imzalı-binary-postject-öncesi-remove-sign-sonrası-re-sign; N-031 postject-build-time-devDep-runtime-zero-dep-korunur. **Outward-facing**: release upload kullanıcı kararı (release-binary.yml SEA target draft, publish YOK).
 
-## v13 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `__complete` dinamik VALUES: `config use <TAB>`→profiller (`listProfiles`), `-m/--model <TAB>`→modeller (gateway `/api/models` canlı, offline→statik). `completion.ts` pozisyon-derinliği genişlet (v5 N-019: shell prefix-filtreler).
-2. `man ollamas` saf troff jeneratör (`cli/lib/man.ts`, ronn/asciidoc-free) — HELP'ten üret; `ollamas man` veya build-time `dist/ollamas.1`.
-3. İlk check = `__complete config use`→profil listesi + `man` sayfası `mandoc -Tlint` temiz.
-4. Testler: dinamik-complete saf (profil/model fixture); troff jeneratör saf.
+## v13 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-RUNTIME-dep): git/gh + cobra ValidArgsFunction (dinamik-completion desen-only, tool-candidate-döndür-shell-filtreler); npm `~/.npm` cache deseni (TTL); git/npm man yapısı + **mandoc** (BSD, host'ta /usr/bin/mandoc) doğrulama; ronn/marked-man **EKLENMEDİ** (saf troff jeneratör).
+- `cli/lib/providers.ts` (NEW): `PROVIDERS` tek-kaynak (6 sağlayıcı). `completion.ts` `complete(words, dyn?)` SAF + `DynamicValues{profiles,models,providers}` enjekte (`-m/--model`→models, `-p/--provider`→providers, `config use`→profiles; geri-uyumlu dyn-yok→eski).
+- `cli/lib/modelcache.ts` (NEW): `~/.ollamas/models.json` TTL (saf parseModelCache/selectModels/mergeModelCache + best-effort I/O). `index.ts` `__complete` dyn'i **LOKAL diskten** toplar — provider env'den (config-unseal YOK→keychain-5s-timeout-YOK N-032), profiller plain `listProfiles`, modeller cache. `bench` listModels sonrası `writeModelCache` (0-manuel populate).
+- `cli/lib/man.ts` (NEW saf): `generateManPage`+`troffEscape`(backslash/hyphen/leading-dot) → `.TH/.SH NAME/SYNOPSIS/COMMANDS/ENV/OPTIONS/SEE ALSO`; `buildManPage` COMMAND_TREE'den; `ollamas man` komut + completion/HELP. `.PP`-after-`.SH` düzeltildi + <80b → `mandoc -Tlint` **TEMİZ**.
+- Testler: `cli-completion-dynamic`+`cli-modelcache`+`cli-man` → **full pass** (v12-set:324→+). Canlı: `__complete config use`→default, `-p`→6 provider, `-m`→boş(cache yok), `ollamas man | mandoc -Tlint` temiz, TAB'da network/keychain yok (5s timeout altında).
+- VERSION 12.0.0→**13.0.0**; choke-point korunur; zero-RUNTIME-dep. **Gotcha**: N-032 `__complete` keychain/network-tetikleme-YASAK→env+cache+plain-disk; N-033 troff `.PP`-after-`.SH`-redundant→ilk-paragraf-bare; N-034 model-completion-cache-populate-via-bench (manuel değil ama bench-bir-kez-koş).
+
+## v14 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `top` multi-pane: `cli/commands/top.ts` `renderDashboard` → çoklu panel (requests | latency | tool-calls ayrı kutu); v8 saf-renderer + sparkline reuse.
+2. `agent --watch`: canlı ReAct akış görünümü (alt-screen, v8 SIGINT-restore N-016 deseni); non-TTY→tek-snapshot degrade.
+3. İlk check = multi-pane render saf-test (fixture metrics) + non-TTY degrade; agent-watch SIGINT cursor-restore.
+4. Testler: panel-layout saf; watch-loop cleanup.

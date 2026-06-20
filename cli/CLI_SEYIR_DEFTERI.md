@@ -5,6 +5,25 @@
 
 ---
 
+## v13 — Completions v2 + man (2026-06-20)
+
+### N-032 · `__complete` her TAB'da koşar → keychain/network TETİKLEME YASAK
+- **Gözlem (öngörülen+kapatılan)**: Dinamik model-completion için `__complete`'te `loadConfig()` çağırmak cazipti — ama loadConfig→unsealOrWarn→`loadMasterKey` v11'de **keychain read (5s timeout, prompt riski)** tetikler; ayrıca canlı `listModels` network'tür. Her TAB'da bu = donma/prompt.
+- **Fix**: `__complete` dyn'i YALNIZ lokal+ucuz toplar — provider `process.env.OLLAMAS_PROVIDER` (config-unseal YOK), profiller plain `listProfiles` (unseal etmez), modeller `~/.ollamas/models.json` cache (bench yazar). Canlı doğrulama 5s timeout altında bitti.
+- **ÖNLEME KURALI**: completion callback'i (her-TAB) ASLA network/keychain/unseal yapmaz; yalnız env + plain-disk + cache. Pahalı veri başka komutta (bench/doctor) cache'lenir.
+
+### N-033 · troff `.PP` hemen `.SH`'den sonra redundant (mandoc skip+warn)
+- **Gözlem**: `generateManPage` her paragrafı `.PP` ile öncülüyordu → `.SH`'den sonraki ilk `.PP` → `mandoc -Tlint` "skipping paragraph macro: PP after SH".
+- **Fix**: bölüm içinde ilk paragraf `.PP`'siz, 2.+ paragraflar `.PP` ile ayrılır. `.TP` `.SH`'den sonra sorunsuz. +satır <80b → STYLE temiz.
+- **ÖNLEME KURALI**: troff'ta `.SH` zaten blok başlatır; ilk içerik `.PP` istemez. man çıktısını daima `mandoc -Tlint`'ten geçir (host'ta /usr/bin/mandoc var).
+
+### N-034 · model-completion cache'i bench/doctor populate eder (manuel değil, ama bir-kez)
+- **Gözlem**: `-m <TAB>` modelleri cache'ten gelir; cache yoksa boş (zarif). Cache'i `ollamas bench` (listModels sonrası `writeModelCache`) yazar.
+- **Karar**: 0-manuel-ish — bench normal akışta koşar; ilk bench'e kadar `-m` boş. doctor model-fetch etmiyor (eklenmedi, scope tight).
+- **ÖNLEME KURALI**: lazy-cache UX'ini dokümante et (PACKAGING: "bench'i bir kez koş"); cache-miss daima zarif-boş, hata değil.
+
+---
+
 ## v12 — Node-SEA canonical binary (2026-06-20)
 
 ### N-029 · Node SEA'da `argv[1]` script DEĞİL → isim-guard tek başına binary'yi no-op eder
