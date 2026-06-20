@@ -10,7 +10,10 @@ const HEALTH = JSON.stringify({
     cpuLoad1Min: 2.34,
     memory: { total: 100, free: 40, percentageUsed: 60 },
     ollamaVersion: "0.5.7",
-    loadedModels: [{ name: "qwen3" }, { name: "llama3" }],
+    loadedModels: [
+      { name: "qwen3", size_vram: 6_200_000_000, details: { quantization_level: "Q4_K_M" } },
+      { model: "llama3" },
+    ],
   },
   db: "up",
 });
@@ -25,7 +28,14 @@ describe("parseHealth", () => {
       mode: "live",
       db: "up",
       models: 2,
+      loaded: [
+        { name: "qwen3", vramGB: 6.2, quant: "Q4_K_M" },
+        { name: "llama3", vramGB: 0, quant: "" },   // name yoksa model; vram/quant yoksa 0/""
+      ],
     });
+  });
+  it("loadedModels yoksa → loaded []", () => {
+    expect(parseHealth(JSON.stringify({ mode: "live", metrics: {} }))?.loaded).toEqual([]);
   });
   it("ollamaVersion 'unavailable'/'unknown' → null", () => {
     expect(parseHealth(JSON.stringify({ metrics: { ollamaVersion: "unavailable" } }))?.ollamaVersion).toBeNull();

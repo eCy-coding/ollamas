@@ -98,6 +98,7 @@
     el.innerHTML='<div class="brow"><span class="badge '+esc(b.mode)+'">'+esc(b.mode)+'</span>'
       +'<span class="badge '+(b.db==="up"?"live":"down")+'">db '+esc(b.db)+'</span>'
       +'<span class="sub">ollama '+esc(b.ollamaVersion||"yok")+' · '+esc(b.models)+' model</span></div>'
+      +'<div class="sub">🧠 '+((b.loaded&&b.loaded.length)?b.loaded.map(function(m){return esc(m.name)+(m.quant?" "+esc(m.quant):"")+(m.vramGB?" "+esc(m.vramGB)+"GB":"")}).join(", "):"model yüklü değil")+'</div>'
       +'<div class="metrics">'
       +'<span>CPU <b>'+esc(b.cpu)+'</b> '+sparkline(cpuHist)+'</span>'
       +'<span>RAM <b>'+esc(b.ram)+'%</b></span>'

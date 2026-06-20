@@ -10,13 +10,17 @@
  */
 
 /** /api/health'ten cockpit'in ihtiyacı olan alt-küme. */
+/** Canlı yüklü model (LLM Mission Control için en kritik sinyal: hangi model + VRAM + quant). */
+export interface LoadedModel { name: string; vramGB: number; quant: string; }
+
 export interface BackendHealth {
   cpu: number;               // metrics.cpuLoad1Min (1-dk load avg)
   ram: number;               // metrics.memory.percentageUsed
   ollamaVersion: string | null;
   mode: string;              // live | demo | degraded
   db: string;                // up | down
-  models: number;            // loadedModels.length
+  models: number;            // loadedModels.length (geri-uyum sayısı)
+  loaded: LoadedModel[];     // /api/health loadedModels[] detayı (name/vramGB/quant)
 }
 
 const UNKNOWN_VER = new Set(["unavailable", "unknown", ""]);
@@ -39,6 +43,13 @@ export function parseHealth(raw: string): BackendHealth | null {
     mode: typeof j.mode === "string" ? j.mode : "unknown",
     db: typeof j.db === "string" ? j.db : "unknown",
     models: Array.isArray(m.loadedModels) ? m.loadedModels.length : 0,
+    loaded: Array.isArray(m.loadedModels)
+      ? m.loadedModels.map((x: any): LoadedModel => ({
+          name: String(x?.name || x?.model || "?"),
+          vramGB: Math.round((Number(x?.size_vram) || 0) / 1e9 * 10) / 10,
+          quant: String(x?.details?.quantization_level || ""),
+        }))
+      : [],
   };
 }
 
