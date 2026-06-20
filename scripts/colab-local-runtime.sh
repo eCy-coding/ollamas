@@ -86,16 +86,19 @@ wait_http() {
   return 1
 }
 
-# docker_token PORT — extract jupyter token from container logs
+# docker_token — extract jupyter token from container logs.
+# The Colab runtime image prints `http://127.0.0.1:<p>/?token=<hex>` a couple of
+# seconds AFTER the HTTP port binds, so poll the logs (don't grep once — race).
 docker_token() {
-  local port="${1}"
-  # The Colab runtime image prints a line like:
-  #   http://127.0.0.1:8080/?token=<hex>
-  local token
-  token=$(docker logs "${CONTAINER_NAME}" 2>&1 \
-    | grep -oE 'token=[a-f0-9]+' \
-    | head -1 \
-    | sed 's/token=//')
+  local token="" i
+  for i in $(seq 1 20); do
+    token=$(docker logs "${CONTAINER_NAME}" 2>&1 \
+      | grep -oE 'token=[a-zA-Z0-9]+' \
+      | head -1 \
+      | sed 's/token=//')
+    [[ -n "${token}" ]] && break
+    sleep 1
+  done
   echo "${token}"
 }
 
