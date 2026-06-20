@@ -450,6 +450,13 @@ const TOOLS: Record<string, ToolDef> = {
 // Namespaced `mcp__<server>__<tool>` so they never collide with built-ins.
 const DYNAMIC: Record<string, ToolDef> = {};
 
+// Faz 24 (v1.15): per-tenant ownership of upstream tools. A dynamic tool MAY be
+// owned by a tenant (explicit map — never parse the name). An owned tool is visible
+// to and invokable by ONLY its owner; an ownerless tool (built-ins + global
+// tools.json upstreams) is shared. Closes the cross-tenant invoke hole where
+// visibility filtering alone did not gate execute().
+const OWNERS = new Map<string, string>();
+
 function get(name: string): ToolDef | undefined {
   return TOOLS[name] || DYNAMIC[name];
 }
@@ -462,26 +469,28 @@ export const ToolRegistry = {
 
   /**
    * Tool names + tiers (for MCP expose + per-plan allowlisting). Optionally
-   * tier-filtered. When `tenantId` is given, per-tenant upstream tools
-   * (namespaced `mcp__tnt_<id>_...`) are visible ONLY to their owner; built-ins
-   * and global upstreams stay visible to all (Faz 10A tenant isolation).
+   * tier-filtered. When `tenantId` is given, tenant-OWNED upstream tools are
+   * visible ONLY to their owner; built-ins and ownerless (global) upstreams stay
+   * visible to all (Faz 24 tenant isolation — explicit owner map, not name parsing).
    */
   list(tiers?: ToolTier[], tenantId?: string): { name: string; tier: ToolTier; schema: ToolSchema }[] {
     return [...Object.entries(TOOLS), ...Object.entries(DYNAMIC)]
       .filter(([, t]) => !tiers || tiers.includes(t.tier))
-      .filter(([name]) => !name.startsWith("mcp__tnt_") || (!!tenantId && name.startsWith(`mcp__${tenantId}_`)))
+      .filter(([name]) => { const o = OWNERS.get(name); return !o || o === tenantId; })
       .map(([name, t]) => ({ name, tier: t.tier, schema: t.schema }));
   },
 
-  /** Register an upstream MCP tool into the choke-point (consume side). */
-  register(name: string, def: { tier: ToolTier; schema: ToolSchema; invoke: ToolDef["invoke"] }): void {
+  /** Register an upstream MCP tool into the choke-point (consume side). When
+   *  `owner` (a tenantId) is given, the tool is tenant-scoped (Faz 24). */
+  register(name: string, def: { tier: ToolTier; schema: ToolSchema; invoke: ToolDef["invoke"] }, owner?: string): void {
     DYNAMIC[name] = def;
+    if (owner) OWNERS.set(name, owner); else OWNERS.delete(name);
   },
 
   /** Remove dynamic tools whose name starts with `prefix` (e.g. on upstream delete). Returns count removed. */
   unregisterByPrefix(prefix: string): number {
     let n = 0;
-    for (const k of Object.keys(DYNAMIC)) if (k.startsWith(prefix)) { delete DYNAMIC[k]; n++; }
+    for (const k of Object.keys(DYNAMIC)) if (k.startsWith(prefix)) { delete DYNAMIC[k]; OWNERS.delete(k); n++; }
     return n;
   },
 
@@ -512,6 +521,14 @@ export const ToolRegistry = {
     if (!tool) {
       emit(false);
       return { ok: false, output: { error: `Unrecognized framework tool: '${name}'` }, diff: "", applied: false, halt: false };
+    }
+    // Per-tenant ownership gate (Faz 24, deny-by-default). An owned upstream tool
+    // is invokable ONLY by its owner — visibility filtering is not enough, the
+    // choke-point must refuse a cross-tenant invoke even when the name is guessed.
+    const owner = OWNERS.get(name);
+    if (owner && owner !== ctx.tenantId) {
+      emit(false);
+      return { ok: false, output: { error: `tool_not_permitted: '${name}' belongs to another tenant` }, diff: "", applied: false, halt: false };
     }
     // Per-tenant allowlist (AGENTS.md §5). No allowlist set = single-user/full access.
     if (ctx.allowedTiers && !ctx.allowedTiers.includes(tool.tier)) {

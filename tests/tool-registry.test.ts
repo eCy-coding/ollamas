@@ -108,18 +108,18 @@ describe("ToolRegistry choke-point", () => {
     expect(r.ok).toBe(true);
   });
 
-  test("per-tenant tool visibility isolation (Faz 10A)", () => {
+  test("per-tenant tool visibility isolation (Faz 24 owner-gate)", () => {
     const def = (n: string) => ({ tier: "host_upstream" as const, schema: { type: "function" as const, function: { name: n, description: "", parameters: { type: "object", properties: {} } } }, invoke: async () => "ok" });
-    ToolRegistry.register("mcp__tnt_AAA_up__x", def("mcp__tnt_AAA_up__x"));
-    ToolRegistry.register("mcp__tnt_BBB_up__y", def("mcp__tnt_BBB_up__y"));
-    ToolRegistry.register("mcp__global__z", def("mcp__global__z"));
+    ToolRegistry.register("mcp__AAA_up__x", def("mcp__AAA_up__x"), "AAA"); // owned by AAA
+    ToolRegistry.register("mcp__BBB_up__y", def("mcp__BBB_up__y"), "BBB"); // owned by BBB
+    ToolRegistry.register("mcp__global__z", def("mcp__global__z"));        // ownerless (shared)
     const names = (tenantId?: string) => ToolRegistry.list(undefined, tenantId).map((t) => t.name);
-    // Tenant AAA sees its own + global, not BBB's.
-    expect(names("tnt_AAA")).toContain("mcp__tnt_AAA_up__x");
-    expect(names("tnt_AAA")).not.toContain("mcp__tnt_BBB_up__y");
-    expect(names("tnt_AAA")).toContain("mcp__global__z");
-    // No tenant → tenant-scoped hidden, global visible.
-    expect(names()).not.toContain("mcp__tnt_AAA_up__x");
+    // Tenant AAA sees its own + global, not BBB's (ownership, not name parsing).
+    expect(names("AAA")).toContain("mcp__AAA_up__x");
+    expect(names("AAA")).not.toContain("mcp__BBB_up__y");
+    expect(names("AAA")).toContain("mcp__global__z");
+    // No tenant → owned tools hidden, global visible.
+    expect(names()).not.toContain("mcp__AAA_up__x");
     expect(names()).toContain("mcp__global__z");
   });
 

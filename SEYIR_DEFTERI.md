@@ -176,6 +176,15 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** gerçek suite **177 passed/2 skipped** (+4: 3 sample unit + 1 sample-stdio e2e [sampling-capable client→callTool→client-LLM cevabı, bidirectional]); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle.
 - **Sonraki (önceden hesaplandı):** v1.15 — **resource subscriptions** (ERTELENDİ gerekçe: stateless Streamable-HTTP server per-request kuruluyor → subscription state kalıcı değil + güvenilir server→client teslimat yok [v1.5 dersi] + fs.watch infra; yarım kurmaktansa belgelendi). Alternatif aday: host-bridge token TTL/TLS.
 
+## Faz 24 — v1.15 (Per-Tenant Upstream Tool Isolation — CRITICAL güvenlik fix, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** Kritik-gap audit ile bulunan çok-tenant güvenlik açığını kapattı. **0 yeni dep** (explicit OWNERS map, integrations-lane v2.3 ispatlı deseni).
+- **Açık (kök-neden):** Per-tenant upstream tool'ları `mcp__<tenantId>_<srv>__<tool>` adıyla kayıtlıydı ama (1) `list()` filtresi `mcp__tnt_` prefix bekliyordu → gerçek adla hiç eşleşmez → **tüm tenant'lara görünür**; (2) `execute()` owner-gate içermiyordu → **görünürlük≠yetki**: tenant B, A'nın tool adını tahmin edip invoke edebiliyordu. Faz 9E (per-tenant upstream storage) yarım kalmıştı.
+- **Nasıl:** `tool-registry.ts` `OWNERS` Map (toolName→tenantId) + `register(name,def,owner?)` + `list` owner-gate (`!o||o===tenantId`, kırık prefix-filtre KALDIRILDI) + **`execute` deny-by-default** (owner≠ctx.tenantId → `tool_not_permitted`, emit(false)) + `unregisterByPrefix` OWNERS temizler. `client.ts` `connectUpstream(cfg,owner?)`+`connectAllUpstreams(...,owner?)`. `server.ts` global tools.json **ownerless**, per-tenant store upstream **owner=tenant_id** (boot + runtime POST, mevcut adlandırma korundu → delete-path kırılmadı).
+- **Niçin:** Ürün hedefi = üretim çok-tenant SaaS gateway → cross-tenant tool erişimi kabul edilemez. deny-by-default = güvenlik temel ilkesi.
+- **Kanıt:** gerçek suite **179 passed/2 skipped** (+2 upstream-isolation: owner-visibility + cross-tenant-deny + unregister-cleanup); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle. Eski "Faz 10A name-convention" testi owner-gate semantiğine güncellendi (no-half).
+- **Prevention (RISK-MCP):** Görünürlük filtresi ASLA tek başına erişim-kontrolü değildir → her per-tenant kaynak `execute` choke-point'inde deny-by-default gate'lenir. İsim-konvansiyonuyla izolasyon YASAK → explicit owner map.
+- **Sonraki (önceden hesaplandı):** v1.16 — RFC 8707 resource-binding enforcement (`/mcp`'de token.resource vs request-URI; çok-resource deploy için). v1.17 — resource subscriptions.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

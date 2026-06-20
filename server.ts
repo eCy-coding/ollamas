@@ -164,9 +164,10 @@ async function initializeServer() {
         console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
       }
     }
-    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), namespaced by tenant.
+    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), tenant-OWNED so a
+    // tenant can neither see nor invoke another tenant's upstream tools (Faz 24).
     for (const u of await allUpstreamServers()) {
-      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools });
+      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
   } catch (e: any) {
@@ -1454,7 +1455,7 @@ content
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
-      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools });
+      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId); // Faz 24: tenant-owned
       res.json({ id, connect });
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });

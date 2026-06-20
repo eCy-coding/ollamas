@@ -150,8 +150,10 @@ export function sanitizeUpstreamOutput(text: string): string {
 
 const builtinNames = new Set(ToolRegistry.list().filter(t => t.tier !== "host_upstream").map(t => t.name));
 
-/** Connect one upstream MCP server and register its tools. Never throws. */
-export async function connectUpstream(cfg: UpstreamConfig): Promise<UpstreamResult> {
+/** Connect one upstream MCP server and register its tools. Never throws. When
+ *  `owner` (a tenantId) is given, the merged tools are tenant-scoped (Faz 24):
+ *  visible to and invokable by only that tenant. Omit for global/shared upstreams. */
+export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Promise<UpstreamResult> {
   try {
     const samplingOn = SAMPLING_ENABLED();
     const client = new Client(
@@ -218,7 +220,7 @@ export async function connectUpstream(cfg: UpstreamConfig): Promise<UpstreamResu
           if (r?.isError) throw new Error(text || `Upstream tool ${cfg.name}:${t.name} failed`);
           return text;
         },
-      });
+      }, owner); // Faz 24: tenant-scope the tool when owner is set
       registered++;
     }
 
@@ -244,9 +246,10 @@ export async function connectUpstream(cfg: UpstreamConfig): Promise<UpstreamResu
   }
 }
 
-/** Connect all configured upstreams; best-effort, returns per-server status. */
-export async function connectAllUpstreams(configs: UpstreamConfig[]): Promise<UpstreamResult[]> {
-  return Promise.all(configs.map(connectUpstream));
+/** Connect all configured upstreams; best-effort, returns per-server status. When
+ *  `owner` is given, every merged tool is tenant-scoped to it (Faz 24). */
+export async function connectAllUpstreams(configs: UpstreamConfig[], owner?: string): Promise<UpstreamResult[]> {
+  return Promise.all(configs.map((c) => connectUpstream(c, owner)));
 }
 
 export function listUpstreams(): string[] {
