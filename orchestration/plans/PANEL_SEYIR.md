@@ -63,3 +63,21 @@ coverage-critic: yetenek-bazlı (target'sız persona) — vO4.1 sonrası 8'in he
 ### Kanıt (P6 canlı + P8 gate)
 - `panel.ts --refresh`: 29 detected + 9 authored; severity blocker:0/high:1/med:21/low:9; uncovered [].
 - Test: detectors2 34 + rank uncovered 1 yeni; **full 163/163**. tsc --strict temiz. Scope: ollamas lane tree 0 yazım (yalnız 1 pre-existing worker değişikliği, benim değil).
+
+---
+
+## vO4.2 — Panel Trend & History (daefe19)
+
+Panel tek-snapshot'tı → append-only `panel-history.jsonl` + run-to-run delta. `trend.ts` (pure):
+snapshotOf/diffSnapshots/renderTrend/parseHistory/lastSnapshot. SARIF baselineState (new/unchanged/
+updated/absent) deseni → new/resolved/regressed/improved/persistent. **KARARLI eşleştirme noteKey ile**
+(id her scan yeniden numaralanır → KARARSIZ; içerik-tabanlı key kullan). panel.ts: history oku→diff→
+Trend bölümü→jsonl append. noteKey (note.ts)+severityWeight (rank.ts) reuse, zero-dep.
+
+### Kanıt (idempotency = key-kararlılık ispatı)
+- run1 baseline: new=31 resolved=0 (false-resolved YOK); run2: **new=0 resolved=0 persistent=31** →
+  id-churn'e rağmen 0 sahte-delta (kritik içgörü doğrulandı). history 2 satır.
+- Test: trend 10 yeni; **full 173/173**. tsc --strict temiz. Scope: ollamas lane tree 0 yazım.
+- Worker collision yok: trend.ts YENİ + panel.ts MENİM; eşzamanlı vO6-bench worker (`bench.ts` untracked)
+  dokunulmadı; explicit-path commit (worker dosyası İÇERMEZ).
+- GOTCHA (ders): note.ts `Severity`yi re-export ETMİYOR → trend.ts `Severity`yi detectors.ts'ten import etmeli (rank.ts deseni).
