@@ -15,8 +15,9 @@
 | **v8** | Observability/TUI | `ollamas top` — saf prom-parser (`/metrics`) + sparkline/gauge + usage timeseries + seyir tail + `--watch` (alt-screen, SIGINT-restore) | ✅ DONE |
 | **v9** | Packaging | shell completion (bash/zsh/fish) + hidden `__complete`; Bun `--compile` tek-binary (1.3.13 arm64 pin + ad-hoc codesign); Homebrew formula draft + PACKAGING.md; npm link | ✅ DONE |
 | **v10** | Self-update + plugin | `ollamas update` (manifest+sha256-verify+atomic-replace); checksum-gated plugin alt-komut sistemi; release-binary CI draft; UPDATE.md | ✅ DONE |
-| **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `--insecure-storage` opt-out | ▶ NEXT |
-| **v11+** | Ufuk (önceden-hesap) | Native Swift Shortcuts derinleştirme; WASM build; otonom agent loop; multi-gateway mesh kontrolü | |
+| **v11** | Keychain + secrets v2 | v7-ertelenen macOS Keychain backend (`/usr/bin/security`) v7 key-source seam arkasında; `resolveKeySource` precedence + `config keystore` migrate (aynı key bytes) + `--insecure-storage` opt-out | ✅ DONE |
+| **v12** | Node-SEA binary | `node --build-sea` canonical tek-binary (host Node≥25.5); `sea-config.json` + `build:sea` + codesign `-s -`; Bun default kalır, SEA canonical Node yolu | ▶ NEXT |
+| **v12+** | Ufuk (önceden-hesap) | v13 Completions-v2+man · v14 TUI-v2 · v15 profile-sync · v16 plugin-SDK · v17 i18n/a11y · v18 imza(minisign/cosign) · v19 enterprise · v20 GA | |
 
 ## v1 — DONE (kanıt)
 - `cli/` : `index.ts` (router+config), `lib/{client,output,config}.ts`, `commands/{chat,doctor}.ts`, `bin/ollamas.sh`
@@ -111,8 +112,16 @@
 - Testler: `cli-secrets`(14) + `cli-config-secrets`(10) + `cli-profiles`(11) → **full 211 pass/1 skip** (v6:176). Canlı (izole HOME): migration+roundtrip+tamper+env-no-persist+graceful-degrade + profil create/switch/isolation/no-plaintext doğrulandı.
 - Choke-point korunur (`grep --include="*.ts"` boş); VERSION **7.0.0**.
 
-## v11 — NEXT (önceden-hesaplanmış ilk todo'lar)
-1. `cli/lib/keychain.ts` (seam) — `keychainAvailable()` (macOS + GUI), `keychainGet/Set/Delete(account, service)` `/usr/bin/security` `execFileSync`; ilk test = komut-arg kurulumu (secret argv'de loglanmaz) + non-macOS → null (v7 keyfile fallback).
-2. `keystore.ts` entegrasyon: opsiyonel key-source = Keychain (v7 seam arkasında); `--insecure-storage` opt-out file-key'e döner.
-3. SSH/headless'te Keychain sessiz-fail → graceful fallback (v7 keyfile/PASSPHRASE).
-4. Testler: keychain arg-construction; fallback-to-keyfile; round-trip (macOS-guard live).
+## v11 — DONE (kanıt)
+- **GitHub adoption** (lisans disiplinli, zero-dep, binary vendor yok): 99designs/aws-vault(9k)+sorah/envchain+r-lib/keyring (MIT) → `/usr/bin/security` generic-password CRUD reçetesi + **always-degrade→null** sözleşmesi; kishikawakatsumi/KeychainAccess (MIT) ACL semantiği (fikir-only, `-A` zorlamadık); atom/node-keytar **ARŞİVLİ**+native → EKLENMEDİ (shell-out doğru).
+- `cli/lib/keychain.ts` (NEW): saf `buildSecurityArgs(op,svc,acct,b64?)` (secret SON eleman → test sızdırmaz, `-U` upsert) + `keychainAvailable(platform)` (darwin-only) + I/O `read/write/deleteMasterKey(svc,acct)` `execFileSync("/usr/bin/security",…)` 5s timeout, ANY error→null/false.
+- `cli/lib/keystore.ts` (MODIFY): saf `resolveKeySource(env,hasKeyfile,keychainOk,marker)` precedence (passphrase>explicit-env>marker>**existing-keyfile back-compat**>keychain-default>file); `loadMasterKey` bağlandı (keychain miss→generate+store; write-fail SSH/locked→keyfile fallback, **asla throw**); `.keystore` marker (sealed config DIŞINDA); `describeKeystore`+`migrateKeySource` (aynı key bytes; keychain-switch **verify-before-destroy** N-021; passphrase-set→reddet).
+- `cli/index.ts` (MODIFY): global `--insecure-storage`→`OLLAMAS_KEYSTORE=file`; `config keystore [keychain|file]` show/migrate; HELP. `completion.ts`: `config keystore` + `--insecure-storage`. **`config.ts`/`secrets.ts` DEĞİŞMEDİ** (key-source-agnostic — v11'in tüm güvenliği bu).
+- Testler: `cli-keychain`(8 saf)+`cli-keystore-source`(12 precedence matrisi)+parser/completion ek → **full 302 pass/1 skip** (v10:280). `cli-keychain-live`(3, **opt-in** `OLLAMAS_LIVE_KEYCHAIN=1`, macOS-guard, TEST service): canlı M4 keychain write→read **32-byte tam sadakat**→delete→null + `-U` upsert; TEST item temizlendi, **gerçek `ollamas/master-key` dokunulmadı**.
+- Choke-point korunur (`grep --include="*.ts" "from.*tool-registry" cli/` boş); VERSION **11.0.0**. `cli/KEYCHAIN.md` (kaynaklar+precedence+dürüst argv-leak/ACL notu+migrate+non-breaking). **Gotcha**: N-024 keychain per-USER (HOME-scoped değil) → live test TEST-service zorunlu; N-025 argv-leak-on-write (`security` stdin-yok, kabul+dokümante, READ sızdırmaz).
+
+## v12 — NEXT (önceden-hesaplanmış ilk todo'lar)
+1. `sea-config.json` (main=dist bundle, disableExperimentalSEAWarning) + `package.json` `build:sea` script: `node --build-sea`→blob→`postject` inject→codesign `-s -`. Host Node≥25.5 guard (mevcut 24.16 → CI/doc, graceful-skip).
+2. İlk check = SEA binary `ollamas version` raporlar + `__complete` çalışır (E-006 binary-name guard zaten kapsar).
+3. Bun `--compile` default kalır; SEA canonical Node yolu (codesign/notarize→v18 imza).
+4. Testler: sea-config saf doğrulama; build-sea smoke (Node≥25.5 guard altında skip).
