@@ -29,6 +29,12 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ count: 0, total: 0, entries: [] }),
     }),
   );
+  // vF12 UsagePanel + SaaSAdmin (SaaS Gateway tab) fetch /api/saas/* live; stub
+  // them so the panel renders deterministically and axe never scans a half-loaded
+  // async region under the 8-scan dark+light matrix load (FE-019 family).
+  await page.route('**/api/saas/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }),
+  );
 });
 
 for (const scheme of SCHEMES) {
@@ -42,7 +48,7 @@ for (const scheme of SCHEMES) {
         // vF13 — let fonts + async panels settle before the color-contrast scan, so
         // axe never measures a half-painted DOM under parallel load (FE-019 family).
         await page.evaluate(() => document.fonts.ready);
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(300); // settle margin for the 8-scan dark+light matrix under parallel load (FE-021)
 
         const results = await new AxeBuilder({ page })
           .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])

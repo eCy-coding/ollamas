@@ -201,6 +201,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF15 — Offline-First Resilience (DONE)
+- **Ne:** Footer "Offline-First" diyordu ama sıfır implementasyon vardı — ağ kesilince cockpit CONNECTING'de takılırdı. vF15 GET-API'yi Workbox ile cache'ler (offline = son-bilinen veri) + `navigator.onLine` rozetiyle kullanıcıyı uyarır. Sovereign MacBook+iPhone PWA hedefini güçlendirir.
+- **Nasıl:**
+  - **Workbox runtimeCaching EXTEND** (`vite.config.ts`, vF4 üzerine): mevcut `/api/health` NetworkFirst KORUNDU + general `sameOrigin && /api/* GET` NetworkFirst (`cacheName:'ollamas-api'`, 3s-timeout, 50 entry/300s, `cacheableResponse:[0,200]`). First-match → health-spesifik önce. POST/SSE (chat/pipeline) GET-değil → cache'lenMEZ. **Kanıt: `dist/sw.js` grep `ollamas-api`=1** (runtimeCaching gerçekten generate). SW vF4'ten auto-register (devOptions:false → dev'de pasif, e2e etkilenmez).
+  - **useOnline** (`src/hooks/useOnline.ts`): `navigator.onLine` + `online`/`offline` event (cleanup'lı, SSR-safe).
+  - **OfflineBadge** (`src/components/OfflineBadge.tsx`): online→`null`, offline→`role="status" aria-live="polite"` rozet (`text-status-warn` vF14 token + `WifiOff` + i18n). App header'a (`getHeaderBadge` yanı, backend-mode ekseninden ayrı). i18n en/tr (`app.offline.badge/hint`).
+  - **SW şeffaflığı:** offline'da GET'ler cache'ten çözülür → `api.get` reject etmez → paneller son-bilinen veriyle dolu; rozet "stale" der.
+- **Niçin:** Offline'da boş cockpit yerine son-bilinen veri + net "Offline" göstergesi; iPhone/Mac sovereign PWA. Yeni dep yok (Workbox mevcut + web-standart `navigator.onLine`).
+- **Kanıt:** `npm run lint` 0 · `vitest` **145/1skip** (+6: useOnline 3 + offlineBadge 2 + pwa-config 1) · React e2e **14 pass × 3 ardışık** (a11y 8 dark+light) · web e2e **5 pass** · `vite build` + `dist/sw.js` `ollamas-api` kanıt · size cockpit **116.62KB/140**.
+- **Açık iz (tracked):** SW yalnız build'de aktif (dev'de pasif) → offline davranışı `vite preview`/prod'da manuel doğrulanır (e2e dev'de SW yok). SW update-prompt UI yok (autoUpdate sessiz) — istenirse vF16+ `virtual:pwa-register` prompt.
+- **Sonraki (önceden hesaplandı):** **vF16 RUM Trend Persistence + SW update-prompt** — vF10 ObservabilityPanel'i web-vitals/error trend'lerini `localStorage`'a persist edip oturumlar-arası sparkline + (opsiyonel) `virtual:pwa-register` `onNeedRefresh` ile "yeni sürüm" reload-prompt'u. İlk adım: `useLocalStorage` hook (JSON-safe, quota-guard) + ObservabilityPanel'e p75-vitals zaman-serisi persist + `UpdatePrompt` component. (tenant-tier-gating hâlâ backend-blocked.)
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
@@ -228,7 +242,8 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 | FE-018 | 2026-06-20 | "chunk-sonra-drop" testi yanlış kuruldu (chunk teslim edilmeden error) | `ReadableStream.start()` enqueue-sonra-error sıradaki chunk'ı okutmadan drop eder | Pull-based stream: 1. pull enqueue, 2. pull error | Streaming-then-drop simülasyonu `pull()` ile (start()+error chunk'ı yutar) |
 | FE-019 | 2026-06-20 | a11y "Cockpit Dashboard" e2e flaky (1. koşu fail, re-run pass) | vF10 ObservabilityPanel canlı `/api/logbook` fetch'i 8-worker paralel yükte yarı-render; axe async-region'ı tarıyor | a11y spec beforeEach'e `**/api/logbook**` route-stub (boş entries) | Yeni async-fetch'li panel a11y/gate testine girdiğinde endpoint'ini STUB'la (FE-013 ailesi); axe yarı-yüklü DOM taramasın, retry-ile-geçme yasak |
 | FE-020 | 2026-06-20 | color-contrast AÇ → 4 tab fail; suçlu sanılan nötr DEĞİL, **status renkleri** (emerald/cyan/amber light-bg'de) | headless chromium `prefers-color-scheme: light` default → no-flash light tema seçti → axe LIGHT taradı; status renkleri light-bg'de AA değil ("theme-agnostik" varsayımı yanlış) | axe scan'i canonical **dark** tema'ya sabitle (`test.use({colorScheme:'dark'})`); light-status-paleti vF14'e ertele (tracked) | Status/accent renkleri theme-agnostik DEĞİL; light tema status-contrast ayrı palet işi. a11y-gate'i hangi temada taradığını bil (headless default=light) |
-| FE-021 | 2026-06-20 | full-suite paralel yükte Cockpit a11y flaky (standalone pass) | color-contrast scan yarı-painted DOM'u (font-swap/async-panel) ölçüyor | scan-öncesi `document.fonts.ready` + 200ms settle | Contrast/visual axe scan'inden ÖNCE font+async yerleşsin (`fonts.ready`+settle); paralel-yük varyansını kök-nedenden çöz, retry değil |
+| FE-021 | 2026-06-20 | full-suite paralel yükte Cockpit a11y flaky (standalone pass) | color-contrast scan yarı-painted DOM'u (font-swap/async-panel) ölçüyor | scan-öncesi `document.fonts.ready` + 300ms settle (matris yükünde 200→300) | Contrast/visual axe scan'inden ÖNCE font+async yerleşsin (`fonts.ready`+settle); paralel-yük varyansını kök-nedenden çöz, retry değil |
+| FE-022 | 2026-06-20 | vF14 a11y light-matris sonrası SaaS tab flaky (40s+retry, izole pass) | SaaS tab'ı vF12 UsagePanel `/api/saas/self/usage` STUB'sız (gerçek backend) async fetch; 8-scan matris yükünde axe yarı-render tarar | a11y beforeEach'e `**/api/saas/**` route-stub (FE-013/FE-019 ailesi) | Yeni async-fetch panel a11y-gate'e girince endpoint'ini STUB'la; tab eklendikçe (UsagePanel/ObservabilityPanel) stub-listesini güncel tut, retry-ile-geçme yasak |
 
 ### Devralınan gotcha (eklenen)
 - **Semgrep pre-commit hook backend bulguları:** Commit'te repo-geneli Semgrep 17 bulgu listeledi (server.ts HTTP-fetch/GCM-tag, server/*.ts path-traversal/child_process, deploy/k8s privilege-escalation, docker-compose). **Hepsi backend** — frontend diff'te 0 bulgu, Scope Law dışı. Commit yine de geçti (hook bloke etmiyor). Frontend lane düzeltmez; backend lane backlog'u.

@@ -62,4 +62,6 @@ export const messages: Record<string, string> = {
   'app.usage.notConfigured': 'Billing not configured (dry-run).',
   'app.usage.connectKey': 'Connect a tenant API key to view usage.',
   'app.usage.loadError': "Couldn't load usage.",
+  'app.offline.badge': 'Offline',
+  'app.offline.hint': 'Network unavailable — showing last-known data.',
 };

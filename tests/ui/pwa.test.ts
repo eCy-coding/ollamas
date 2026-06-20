@@ -28,4 +28,11 @@ describe('vF4 — PWA / iOS web-clip', () => {
     expect(cfg).toContain("display: 'standalone'");
     expect(cfg).toContain('runtimeCaching');
   });
+
+  it('vF15 — caches GET /api/* network-first for offline resilience', () => {
+    const cfg = read('vite.config.ts');
+    expect(cfg).toContain("cacheName: 'ollamas-api'");
+    expect(cfg).toContain("url.pathname.startsWith('/api/')");
+    expect(cfg).toContain("handler: 'NetworkFirst'");
+  });
 });

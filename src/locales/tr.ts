@@ -61,4 +61,6 @@ export const messages: Record<string, string> = {
   'app.usage.notConfigured': 'Faturalama yapılandırılmadı (kuru çalışma).',
   'app.usage.connectKey': 'Kullanımı görmek için bir tenant API anahtarı bağla.',
   'app.usage.loadError': 'Kullanım yüklenemedi.',
+  'app.offline.badge': 'Çevrimdışı',
+  'app.offline.hint': 'Ağ yok — son bilinen veri gösteriliyor.',
 };

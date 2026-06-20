@@ -18,6 +18,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { UsagePanel } from "./components/UsagePanel";
+import { OfflineBadge } from "./components/OfflineBadge";
 import { CapabilityProvider, CapabilityGate } from "./components/CapabilityGate";
 import { isTabEnabled } from "./lib/capabilities";
 import { useLingui } from "@lingui/react";
@@ -168,6 +169,7 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3.5">
+          <OfflineBadge />
           {getHeaderBadge()}
           <LanguageToggle />
           <ThemeToggle />

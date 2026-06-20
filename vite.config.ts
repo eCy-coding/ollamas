@@ -34,6 +34,8 @@ export default defineConfig(() => {
           globPatterns: ['**/*.{js,css,html,svg,woff2}'],
           navigateFallback: '/index.html',
           // Telemetry is live data: try network first, fall back to last-known.
+          // First-match wins, so the health-specific rule precedes the general one.
+          // Workbox only caches GET requests → POST/SSE (chat, pipeline) untouched.
           runtimeCaching: [
             {
               urlPattern: ({url}) => url.pathname === '/api/health',
@@ -42,6 +44,18 @@ export default defineConfig(() => {
                 cacheName: 'ollamas-health',
                 networkTimeoutSeconds: 3,
                 expiration: {maxEntries: 8, maxAgeSeconds: 60},
+              },
+            },
+            {
+              // vF15 — offline-first: all same-origin GET /api/* served network-first,
+              // falling back to the last-known cached response when offline.
+              urlPattern: ({url, sameOrigin}) => sameOrigin && url.pathname.startsWith('/api/'),
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'ollamas-api',
+                networkTimeoutSeconds: 3,
+                expiration: {maxEntries: 50, maxAgeSeconds: 300},
+                cacheableResponse: {statuses: [0, 200]},
               },
             },
           ],
