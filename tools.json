@@ -6,7 +6,14 @@
       "transport": "stdio",
       "command": "python3",
       "args": ["/Users/emrecnyngmail.com/Desktop/uk-pipeline/ukp.py", "--mcp-server"],
-      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest"]
+      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest"],
+      "webhook": {
+        "emits": "stage-events",
+        "format": "standard-webhooks-hmac",
+        "events": ["lookahead", "dogrula", "repair", "escalate"],
+        "envOptIn": "UKP_WEBHOOK",
+        "receiverTodo": "POST /api/ingest/stage-events (HMAC-verify X-Ukp-Signature) — ollamas-lane"
+      }
     }
   ],
   "tools": {
