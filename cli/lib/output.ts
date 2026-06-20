@@ -1,0 +1,195 @@
+// TTY-aware output helpers. Pure functions where possible → unit-testable.
+// Honors NO_COLOR (https://no-color.org) and --json. Color only on a real TTY.
+
+const CODES: Record<string, string> = {
+  reset: "\x1b[0m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  cyan: "\x1b[36m",
+};
+
+export interface OutputCtx {
+  color: boolean;
+  json: boolean;
+}
+
+// Decide whether to emit ANSI color. NO_COLOR or non-TTY or --json => no color.
+export function shouldColor(opts: { noColor?: boolean; isTTY?: boolean; json?: boolean }): boolean {
+  if (opts.json) return false;
+  if (opts.noColor) return false;
+  return !!opts.isTTY;
+}
+
+export function resolveOutputCtx(env: NodeJS.ProcessEnv, isTTY: boolean, json: boolean): OutputCtx {
+  return { color: shouldColor({ noColor: !!env.NO_COLOR, isTTY, json }), json };
+}
+
+export function c(code: keyof typeof CODES, s: string, enabled: boolean): string {
+  if (!enabled) return s;
+  return `${CODES[code]}${s}${CODES.reset}`;
+}
+
+// --- multi-pane layout (v16). Pure: the width is INJECTED (no TTY query), so the
+// whole thing is unit-testable. Box-drawing ported from boxen (MIT); pane content
+// reuses sparkline/bar/formatTable. Wide terminal → side-by-side; narrow → stacked.
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+
+// Visible length of a string, ignoring ANSI color escapes — so padding aligns.
+export function visibleLen(s: string): number {
+  return s.replace(ANSI_RE, "").length;
+}
+
+function padOrTrunc(s: string, width: number): string {
+  const len = visibleLen(s);
+  if (len === width) return s;
+  if (len < width) return s + " ".repeat(width - len);
+  return s.replace(ANSI_RE, "").slice(0, width); // over-long → drop styling, hard-cut
+}
+
+export interface Pane {
+  title: string;
+  lines: string[];
+}
+
+// One titled box of a fixed outer `width`; content padded/truncated to fit.
+function boxPane(p: Pane, width: number, ctx: OutputCtx): string {
+  const inner = Math.max(4, width - 2);
+  const titleStr = `─ ${p.title} `;
+  const tvis = Math.min(visibleLen(titleStr), inner);
+  const titleClipped = titleStr.replace(ANSI_RE, "").slice(0, tvis);
+  const top = "┌" + c("bold", titleClipped, ctx.color) + "─".repeat(inner - tvis) + "┐";
+  const body = p.lines.map((l) => "│" + padOrTrunc(l, inner) + "│");
+  const bottom = "└" + "─".repeat(inner) + "┘";
+  return [top, ...body, bottom].join("\n");
+}
+
+// Lay panes out as titled boxes — side-by-side when `width` allows, else stacked.
+// Side-by-side boxes are padded to equal height so their borders line up. Pure.
+export function renderPanes(panes: Pane[], width: number, ctx: OutputCtx): string {
+  const visible = panes.filter((p) => p && Array.isArray(p.lines));
+  if (visible.length === 0) return "";
+  const SIDE_MIN = 100; // narrower than this → stack vertically
+  if (width < SIDE_MIN || visible.length === 1) {
+    const w = Math.max(20, Math.min(width, 80));
+    return visible.map((p) => boxPane(p, w, ctx)).join("\n");
+  }
+  const gap = 1;
+  const boxW = Math.max(16, Math.floor((width - gap * (visible.length - 1)) / visible.length));
+  const maxLines = Math.max(...visible.map((p) => p.lines.length));
+  const padded = visible.map((p) => ({ title: p.title, lines: [...p.lines, ...Array(maxLines - p.lines.length).fill("")] }));
+  const boxes = padded.map((p) => boxPane(p, boxW, ctx).split("\n"));
+  const height = boxes[0].length; // every box is the same height now
+  const rows: string[] = [];
+  for (let r = 0; r < height; r++) rows.push(boxes.map((b) => b[r]).join(" ".repeat(gap)));
+  return rows.join("\n");
+}
+
+// Render the doctor health report. JSON mode => raw; else compact human lines.
+export function formatDoctor(report: DoctorReport, ctx: OutputCtx): string {
+  if (ctx.json) return JSON.stringify(report, null, 2);
+  const ok = (b: boolean) => c(b ? "green" : "red", b ? "● up" : "● down", ctx.color);
+  const row = (label: string, comp: { ok: boolean; detail: string }) =>
+    `  ${label.padEnd(8)} ${ok(comp.ok)}  ${c("dim", comp.detail, ctx.color)}`;
+  const lines = [
+    c("bold", "ollamas doctor", ctx.color),
+    row("gateway", report.gateway),
+    row("ollama", report.ollama),
+    row("bridge", report.bridge),
+    row("ready", report.ready),
+    row("agent", report.agent),
+    row("saas", report.saas),
+    row("mcp", report.mcp),
+    "",
+    report.healthy
+      ? c("green", "healthy", ctx.color)
+      : c("yellow", "degraded — see down components above", ctx.color),
+  ];
+  return lines.join("\n");
+}
+
+export interface DoctorReport {
+  ts: string;
+  healthy: boolean;
+  gateway: { ok: boolean; detail: string };
+  ollama: { ok: boolean; detail: string };
+  bridge: { ok: boolean; detail: string };
+  ready: { ok: boolean; detail: string };
+  agent: { ok: boolean; detail: string };
+  saas: { ok: boolean; detail: string };
+  mcp: { ok: boolean; detail: string };
+}
+
+// One line per agent tool step: tool · ok · latency · trimmed result/diff hint.
+export function formatStep(ev: { stepNum?: number; tool?: string; ok?: boolean; latency?: number; diff?: string; applied?: boolean }, ctx: OutputCtx): string {
+  const mark = c(ev.ok ? "green" : "red", ev.ok ? "✓" : "✗", ctx.color);
+  const lat = typeof ev.latency === "number" ? c("dim", `${ev.latency}ms`, ctx.color) : "";
+  const tag = ev.diff ? c("yellow", ev.applied ? "(applied)" : "(diff)", ctx.color) : "";
+  return `  ${mark} ${c("cyan", `[${ev.stepNum ?? "?"}] ${ev.tool ?? "?"}`, ctx.color)} ${lat} ${tag}`.trimEnd();
+}
+
+// Colorize a unified-diff string (+ green / − red) when color is enabled.
+export function formatDiff(diff: string, ctx: OutputCtx): string {
+  if (!diff) return "";
+  if (!ctx.color) return diff;
+  return diff
+    .split("\n")
+    .map((l) => (l.startsWith("+") ? c("green", l, true) : l.startsWith("-") ? c("red", l, true) : l))
+    .join("\n");
+}
+
+// Render an aligned text table. Pure → unit-testable. Header dim; columns sized
+// to the widest cell. Caller handles --json separately (raw data, not this).
+export function formatTable(headers: string[], rows: unknown[][], ctx: OutputCtx): string {
+  // Coerce every cell to string — callers may pass numbers/arrays (E-004).
+  const cell = (v: unknown): string => (v == null ? "" : String(v));
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => cell(r[i]).length)));
+  const pad = (cells: unknown[]) => cells.map((v, i) => cell(v).padEnd(widths[i])).join("  ").trimEnd();
+  const head = c("dim", pad(headers), ctx.color);
+  if (!rows.length) return head + "\n" + c("dim", "(empty)", ctx.color);
+  return [head, ...rows.map((r) => pad(r))].join("\n");
+}
+
+// --- v8 observability primitives (pure) ---
+
+const SPARK_BLOCKS = "▁▂▃▄▅▆▇█";
+
+// Unicode sparkline: min/max-normalize a series onto 8 block levels. Algorithm
+// ported from holman/spark + sindresorhus/sparkly (MIT). Empty → ""; an all-equal
+// series renders at the mid block (a flat line, not all-min).
+export function sparkline(values: number[]): string {
+  if (!values.length) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const mid = SPARK_BLOCKS[Math.floor((SPARK_BLOCKS.length - 1) / 2)];
+  return values
+    .map((v) => (range === 0 ? mid : SPARK_BLOCKS[Math.round(((v - min) / range) * (SPARK_BLOCKS.length - 1))]))
+    .join("");
+}
+
+// Horizontal gauge bar: filled █ + empty ░ to `width`, fraction clamped 0..1.
+export function bar(fraction: number, width: number): string {
+  const f = Math.max(0, Math.min(1, fraction));
+  const fill = Math.round(f * width);
+  return "█".repeat(fill) + "░".repeat(Math.max(0, width - fill));
+}
+
+// Compact a count for dense dashboards: 999 → "999", 1200 → "1.2k", 3.4M → "3.4M".
+export function compactNum(n: number): string {
+  const strip = (s: string) => s.replace(/\.0$/, "");
+  if (Math.abs(n) < 1000) return String(n);
+  if (Math.abs(n) < 1e6) return strip((n / 1e3).toFixed(1)) + "k";
+  return strip((n / 1e6).toFixed(1)) + "M";
+}
+
+// Final one-line footer after a streamed answer: source + speed.
+export function streamFooter(meta: { source?: string; latencyMs?: number; tokensPerSec?: number }, ctx: OutputCtx): string {
+  const parts: string[] = [];
+  if (meta.source) parts.push(meta.source);
+  if (typeof meta.latencyMs === "number") parts.push(`${meta.latencyMs}ms`);
+  if (typeof meta.tokensPerSec === "number") parts.push(`${meta.tokensPerSec.toFixed(1)} tok/s`);
+  return c("dim", `[${parts.join(" · ")}]`, ctx.color);
+}
