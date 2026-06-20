@@ -410,6 +410,40 @@ const TOOLS: Record<string, ToolDef> = {
       return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/logbook.mjs tail ${Number(args.n) || 20}`);
     },
   },
+
+  // Faz 23 (v1.14): expose-side SAMPLING. Asks the CONNECTING client's own LLM to
+  // generate text via MCP sampling (server→client createMessage). The expose layer
+  // sets ctx.onSample ONLY when the client advertised the `sampling` capability
+  // (bidirectional transport, e.g. stdio); otherwise the tool returns a notice.
+  // Symmetric to the consume-side sampling provider (Faz 18C). safe tier: it spends
+  // the CALLER's model, never ollamas' host/resources. No output sanitization — the
+  // text comes from the caller's own LLM, not an untrusted upstream.
+  sample: {
+    tier: "safe",
+    schema: fn(
+      "sample",
+      "Ask the CONNECTING MCP client's own LLM to generate text (MCP sampling). Works only when the client advertised the `sampling` capability (bidirectional transport, e.g. stdio); otherwise returns a notice.",
+      {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "The user prompt to send to the client's LLM." },
+          system: { type: "string", description: "Optional system prompt." },
+          maxTokens: { type: "number", description: "Max tokens to generate (default 1024)." },
+        },
+        required: ["prompt"],
+      }
+    ),
+    invoke: async (args, ctx) => {
+      if (!args.prompt) throw new Error("Missing 'prompt'.");
+      if (!ctx.onSample) return "sampling unavailable: the connected client did not advertise the sampling capability";
+      const r = await ctx.onSample({
+        messages: [{ role: "user", content: { type: "text", text: String(args.prompt) } }],
+        systemPrompt: args.system ? String(args.system) : undefined,
+        maxTokens: Number(args.maxTokens) || 1024,
+      });
+      return r.text;
+    },
+  },
 };
 
 // Tools merged in at runtime from upstream MCP servers (consume side, Faz 1).

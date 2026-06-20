@@ -169,6 +169,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** gerçek suite **173 passed/2 skipped** (+10: 7 refresh store+provider, 3 cc self-boot e2e); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle. **NOT:** tam-tarama 1 fail = `.claude/worktrees/agent-*/ClusterE2ELive.test.ts` (BAŞKA lane'in subagent-worktree'si, `/api/cluster` relative-URL kendi bug'ı) — MCP scope DIŞI, regresyon değil; `--exclude '**/.claude/**'` ile gerçek suite 0-fail.
 - **Sonraki (önceden hesaplandı):** v1.14 — expose-side sampling'i somut tool'a bağlama · resource subscriptions (stateless transport sınırı) · (OAuth tarafı tam: authcode+PKCE+refresh-rotation+client_credentials).
 
+## Faz 23 — v1.14 (Expose-Side Sampling Tool, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** Bidirectional sampling'i tamamladı — `ctx.onSample` köprüsü (Faz 18A) vardı ama hiçbir tool kullanmıyordu. **0 yeni dep** (SDK `ctx.onSample`→`server.createMessage`).
+- **Nasıl:** `server/tool-registry.ts` yeni **safe-tier** `sample` tool: `{prompt,system?,maxTokens?}` → `ctx.onSample` → bağlanan client'ın LLM cevabı. Capability yoksa graceful notice (throw yok). safe = ollamas kaynağı harcamaz (caller'ın modeli); çıktı caller'ın kendi LLM'i → sanitize yok. **No-half:** tool ekleme yan-etkisi → built-in 22→23 + free-plan safe 15→16, **3 sayı assertion** güncellendi (tool-registry / mcp-gateway-e2e / **mcp-stdio-e2e — checklist'te kaçmıştı, grep-tarama ile yakalandı**).
+- **Niçin:** Simetri — v1.9 ollamas-CLIENT upstream sampling'i cevaplar (consume), v1.14 ollamas-SERVER bağlanan client'ın LLM'ini bir tool ile kullanır (expose). Gateway'in iki yönlü MCP yüzeyi tam.
+- **Kanıt:** gerçek suite **177 passed/2 skipped** (+4: 3 sample unit + 1 sample-stdio e2e [sampling-capable client→callTool→client-LLM cevabı, bidirectional]); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle.
+- **Sonraki (önceden hesaplandı):** v1.15 — **resource subscriptions** (ERTELENDİ gerekçe: stateless Streamable-HTTP server per-request kuruluyor → subscription state kalıcı değil + güvenilir server→client teslimat yok [v1.5 dersi] + fs.watch infra; yarım kurmaktansa belgelendi). Alternatif aday: host-bridge token TTL/TLS.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
