@@ -11,8 +11,8 @@
 | **vT4** | **Otonom Switch Engine** | ölçülen-latency scoring + 3-durum circuit-breaker + hysteresis (anti-flap) + autopilot (capability-detect + auto-up + self-heal) + decision-log; **0 manuel seçim/işlem** | hysteresis/CB/multipath pattern (fikir/MIT) | ✅ DONE |
 | **vT5** | **Security hardening** | private-host DNS-rebind guard + AES-256-GCM vault (auto-keyfile, **0-manuel**) + age-based auto WG key-rotation; mTLS ertelendi (iPhone client-cert manuel) | guard/GCM/rotation pattern (fikir/MIT) | ✅ DONE |
 | **vT6** | **Observability** | `tunnel status [--json\|--watch]` (active + latency sparkline + breaker) + secret-free decision-log JSONL feed → orchestration cockpit; pure, **0-manuel** | node-sparkline/CLI-best-practice/JSONL-feed (MIT/fikir) | ✅ DONE |
-| vT7 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | NEXT |
-| vT8 | Resilience | auto-reconnect, LaunchAgent daemon, NAT/captive-portal detect, IPv6, fallback-chain | — | planned |
+| **vT7** | **Resilience / Always-On Daemon** | LaunchAgent (RunAtLoad+KeepAlive) `tunnel auto --watch` login'de oto + crash-restart + connectivity classify (online/lan-only/offline); **0 manuel işlem capstone** | launchd-keepalive/Connectivity (MIT/fikir) | ✅ DONE |
+| vT8 | Benchmark | MacBook↔iOS per-transport latency/throughput, p50/p90, en-verimli seçim, leaderboard (scripts bench-metrics reuse) + connectivity-aware routing (offline'da mesh/reverse atla) + log-rotation | — | NEXT |
 | vT9 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server. **⚠️ ERTELENDİ (parked)**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
 | vT10 | Ecosystem | `ollamas tunnel up` one-command, QR onboarding, federation w/ integrations gateway, multi-tenant exposure policy | — | planned |
 
@@ -101,11 +101,32 @@
 - **Kanıt:** `node --test` **112/112 GREEN**, tsc 0; `node src/cli.ts status --json` → transport yokken zarif
   active:null (0-prompt); feed secret-free.
 
-## vT7 — NEXT (önceden-hesaplanmış ilk todo'lar) — Benchmark
+## vT7 — DONE (kanıt) — Resilience / Always-On Daemon (0 manuel işlem)
 
-1. `src/bench.ts` — PURE per-transport latency/throughput örnekleme (selectAuto timed-probe serisini topla) +
-   p50/p90 özet (yaklaşık, CLI top N-018 deseni). Leaderboard skor reuse (scoring.ts).
-2. `cli.ts bench [--json]` — her transport'a N-örnek probe → tablo (tok/s değil, ms/throughput); 0-manuel.
-3. scripts lane `bench-metrics.mjs` çıktı-formatı ile uyumlu (cross-lane doküman, edit YOK).
-4. decision-log JSONL'den geçmiş latency → benchmark trend (status.ts history reuse).
+> **Re-sequence:** "critical tespit + gereksiz işten kaçın" → North-Star "0 manuel işlem" daemon olmadan
+> tamamlanmıyordu (`tunnel auto` elle başlıyordu). Daemon öne (vT7); Benchmark→vT8 (zaten-çalışan seçimi
+> optimize eder, görece düşük-kritik).
+
+- `src/daemon.ts` PURE renderLaunchAgent (RunAtLoad+KeepAlive{SuccessfulExit:false}+ThrottleInterval+
+  Background, XML-escape) + agentPath + installAgent/uninstallAgent/agentStatus (launchctl injectable,
+  capability-gated, never-throws). **8 test.**
+- `src/connectivity.ts` PURE classify(online/lan-only/offline) + internetReachable (captive.apple.com,
+  guard-BYPASS connectivity-only RISK-021). **7 test.**
+- `cli.ts daemon <install|uninstall|status>` (plist→~/Library/LaunchAgents + launchctl load; 0-prompt) +
+  `status` çıktısına connectivity satırı. `recipes/daemon-macos.md`.
+- Adoption: launchd.plist manpage + tjluoma/launchd-keepalive (reference) + rwbutler/Connectivity (MIT fikir).
+- RISK-TUNNEL-019 (KeepAlive update-block→uninstall-before-update) / -020 (daemon.log büyüme) / -021
+  (internet-probe public guard-bypass yalnız connectivity).
+- **Kanıt:** `node --test` **127/127 GREEN**, tsc 0; `node src/cli.ts daemon status` → yüklü-değil zarif
+  (0-prompt); renderLaunchAgent RunAtLoad+KeepAlive+`auto --watch` deterministik. VERSION 7.0.0.
+- **0-manuel:** install tek-seferlik; sonrası login-oto + crash-restart → recurring manuel işlem YOK.
+
+## vT8 — NEXT (önceden-hesaplanmış ilk todo'lar) — Benchmark + connectivity-aware
+
+1. `src/bench.ts` — PURE per-transport latency örnekleme (selectAuto timed-probe serisi) + p50/p90 (yaklaşık,
+   CLI top N-018 deseni). Leaderboard skor reuse (scoring.ts). `cli.ts bench [--json]`.
+2. **connectivity-aware routing:** offline/lan-only'de mesh/reverse transport'ları skorlamadan ele (vT7
+   classify + transport `requiresInternet` metadata) — futile probe önle.
+3. **log-rotation:** daemon.log + decisions.jsonl boyut/yaş-tabanlı döndürme (RISK-020/018 tam çözüm).
+4. scripts lane `bench-metrics.mjs` format uyumu (cross-lane doküman, edit YOK).
 5. errors_registry bench riskleri; ADOPTION MinhNgyuen/llm-benchmark (MIT, ölçüm deseni).

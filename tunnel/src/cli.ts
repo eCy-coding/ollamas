@@ -7,7 +7,8 @@
 //   select   selectAuto: scored probe of all transports → best endpoint + decision (vT4)
 //   auto     autopilot: auto-detect capable transports, bring up the best, self-heal (--watch) (vT4)
 //   rotate   age-based auto WireGuard key rotation; old config sealed to vault; --force (vT5)
-//   status   observability: active transport + latency sparkline + breaker; --json|--watch (vT6)
+//   status   observability: active transport + latency sparkline + breaker + connectivity; --json|--watch (vT6)
+//   daemon   install|uninstall|status a LaunchAgent running `auto --watch` at login + on crash (vT7)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -55,6 +56,15 @@ import {
 } from "./rotate.ts";
 import { loadOrCreateKeyfile, openFromFile, sealToFile } from "./keystore.ts";
 import { appendDecision, readDecisions, renderStatusTable, statusReport } from "./status.ts";
+import {
+  DEFAULT_LABEL,
+  agentPath,
+  agentStatus,
+  installAgent,
+  uninstallAgent,
+  type DaemonPlan,
+} from "./daemon.ts";
+import { classify, internetReachable } from "./connectivity.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
 
 const DECISIONS_PATH = () => join(KEYS_DIR, "decisions.jsonl");
@@ -324,7 +334,9 @@ async function cmdStatus(): Promise<void> {
     await persistDecision(sw);
     const persisted = readDecisions(DECISIONS_PATH(), { limit: 50 });
     const report = statusReport([...persisted, ...sw.decisions()]);
-    return json ? JSON.stringify(report, null, 2) : renderStatusTable(report);
+    const conn = classify({ lan: report.active !== null, internet: await internetReachable() });
+    if (json) return JSON.stringify({ ...report, connectivity: conn }, null, 2);
+    return `${renderStatusTable(report)}\nconnectivity: ${conn}`;
   };
 
   if (watch) {
@@ -340,6 +352,50 @@ async function cmdStatus(): Promise<void> {
     }
   }
   console.log(await render());
+}
+
+// Always-on daemon (vT7): install a LaunchAgent that runs `tunnel auto --watch` at login + on crash.
+// One-time install; running afterwards is fully autonomous (0 manuel işlem). 0 prompt.
+function daemonPlan(): DaemonPlan {
+  return {
+    label: DEFAULT_LABEL,
+    nodeBin: process.execPath,
+    cliPath: join(import.meta.dirname, "cli.ts"),
+    args: ["auto", "--watch"],
+    logPath: join(KEYS_DIR, "daemon.log"),
+    workdir: join(import.meta.dirname, ".."),
+  };
+}
+
+async function cmdDaemon(): Promise<void> {
+  const sub = process.argv[3] ?? "status";
+  const plan = daemonPlan();
+  switch (sub) {
+    case "install": {
+      await mkdir(KEYS_DIR, { recursive: true });
+      const r = installAgent(plan);
+      console.log(JSON.stringify({ ...r, plist: agentPath(plan.label) }, null, 2));
+      console.log(
+        r.ok
+          ? "daemon installed: `tunnel auto --watch` runs at login + restarts on crash (0 manuel işlem)."
+          : `plist written; load manually: launchctl load -w ${agentPath(plan.label)}`,
+      );
+      process.exitCode = r.ok ? 0 : 1;
+      return;
+    }
+    case "uninstall": {
+      const r = uninstallAgent(plan.label);
+      console.log(JSON.stringify(r, null, 2));
+      process.exitCode = r.ok ? 0 : 1;
+      return;
+    }
+    case "status":
+    default: {
+      const s = agentStatus(plan.label);
+      console.log(JSON.stringify({ ...s, log: plan.logPath }, null, 2));
+      return;
+    }
+  }
 }
 
 async function main(): Promise<void> {
@@ -365,8 +421,12 @@ async function main(): Promise<void> {
       return cmdRotate();
     case "status":
       return cmdStatus();
+    case "daemon":
+      return cmdDaemon();
     default:
-      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status> [--watch|--json|--force]");
+      console.log(
+        "usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status|daemon> [install|uninstall|status] [--watch|--json|--force]",
+      );
   }
 }
 

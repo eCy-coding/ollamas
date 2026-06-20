@@ -142,6 +142,27 @@
       "severity": "low",
       "note": "decision-log JSONL feed (keys/decisions.jsonl) append-only → sınırsız büyür. vT6 hafif çözüm: readDecisions({limit}) son-N geçerli kayıt okur (okuma-zamanı size-cap) + reçetede tail -n önerisi. Tam log-rotation (boyut/yaş tabanlı dosya döndürme) vT8 resilience'a ertelendi (belgelendi, gizli-cap değil).",
       "applies_version": "vT6"
+    },
+    {
+      "id": "RISK-TUNNEL-019",
+      "category": "tooling",
+      "severity": "med",
+      "note": "LaunchAgent KeepAlive açık servis kod-güncellemesini/shutdown'ı bloklayabilir (launchd job sürekli relaunch). ÇÖZÜM: büyük güncelleme/restart öncesi `tunnel daemon uninstall` (launchctl unload), sonra `install`. Reçetede belgelendi. ThrottleInterval=10 restart-fırtınası önler.",
+      "applies_version": "vT7"
+    },
+    {
+      "id": "RISK-TUNNEL-020",
+      "category": "tooling",
+      "severity": "low",
+      "note": "daemon StandardOut/ErrorPath (keys/daemon.log) sınırsız büyür (`auto --watch` sürekli yazar). vT7 hafif: tek dosya, elle döndürülebilir; tam boyut/yaş-tabanlı log-rotation vT8'e ertelendi (belgelendi).",
+      "applies_version": "vT7"
+    },
+    {
+      "id": "RISK-TUNNEL-021",
+      "category": "network",
+      "severity": "low",
+      "note": "internetReachable PUBLIC endpoint (captive.apple.com) probe eder → private-host guard'ı BİLEREK bypass eder. Bu bir connectivity-check'tir (gerçek-internet var mı), TÜNEL-probe DEĞİL → guard uygulanmaz. Tünel transport probe'ları hâlâ requirePrivateHost:true (RISK-016). İki yol açıkça ayrı fn (connectivity.ts vs health requirePrivateHost).",
+      "applies_version": "vT7"
     }
   ],
   "errors": [

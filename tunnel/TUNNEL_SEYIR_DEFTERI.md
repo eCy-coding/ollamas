@@ -138,10 +138,30 @@
 - **Kanıt:** `node --test` → **112/112 green** (status 9 yeni); `typecheck` 0; `node src/cli.ts status --json`
   → transport yokken zarif active:null (0-prompt); whoami VERSION-drift uyarısı GİTTİ. RISK-017/018.
 
+## Faz 9 — Resilience / Always-On Daemon (vT7) — 0 manuel işlem capstone
+
+- **Critical tespit (gereksiz işten kaçın):** North-Star "0 manuel işlem" `tunnel auto` elle başladığı için
+  TAMAMLANMAMIŞTI. ROADMAP-NEXT Benchmark zaten-çalışan seçimi optimize eder (düşük-kritik). EN KRİTİK boşluk =
+  always-on daemon → re-sequence vT7=Daemon, Benchmark→vT8.
+- **Karar (research):** LaunchAgent RunAtLoad+KeepAlive (launchd.plist + tjluoma/launchd-keepalive), captive-
+  portal endpoint-probe (rwbutler/Connectivity MIT fikir). Fikir-port.
+- **Ne:** `daemon.ts` PURE renderLaunchAgent + agentPath + installAgent/uninstallAgent/agentStatus (launchctl
+  injectable, capability-gated, never-throws) · `connectivity.ts` PURE classify + internetReachable (guard-bypass
+  connectivity-only) · `cli.ts daemon <install|uninstall|status>` + status'a connectivity satırı ·
+  `recipes/daemon-macos.md`. VERSION 6.0.0→7.0.0.
+- **Nasıl:** renderLaunchAgent/classify PURE+deterministik (enjekte path/launchctl/fetch) → launchctl gerektirmez
+  test. install plist'i ~/Library/LaunchAgents'e yazar (runtime; kaynak tree'de kalır, wg-quick/etc-wireguard gibi).
+  internet-probe public endpoint → guard BİLEREK bypass (RISK-021), tünel-probe'lar hâlâ requirePrivateHost.
+- **Niçin (0-manuel capstone):** install tek-seferlik (brew-benzeri); sonrası login-oto-başlat + crash-restart →
+  kullanıcı bir daha hiçbir şey çalıştırmaz. "0 manuel işlem" hedefi SAĞLANDI.
+- **Kanıt:** `node --test` → **127/127 green** (daemon 8 + connectivity 7 yeni); `typecheck` 0;
+  `node src/cli.ts daemon status` → yüklü-değil zarif (0-prompt). RISK-019/020/021. Device-daemon kanıtı
+  (login restart) Emre'de.
+
 ---
-**Toplam (vT1..vT6 kod):** 5 governance + 16 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/status/cli) + 15 test dosya
-(112 test) + 4 iOS/feed reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
-tsc 0 + test 112/112. VERSION 6.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
-ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de; vT4/vT5/vT6 cihaz-kanıtı
-gerektirmez — 0 manuel.
+**Toplam (vT1..vT7 kod):** 5 governance + 18 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/status/daemon/connectivity/cli)
++ 17 test dosya (127 test) + 5 iOS/feed/daemon reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip +
+node:test), zero-account. tsc 0 + test 127/127. VERSION 7.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001
+(strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7
+device-daemon Emre'de; vT4/vT5/vT6 cihaz-kanıtı gerektirmez — 0 manuel.

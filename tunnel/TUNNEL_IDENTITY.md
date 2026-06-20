@@ -86,13 +86,13 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1..vT6 (son vT6) · test 112 · risk 18+2err · VERSION 6.0.0 (aligned)
-next: vT7 Benchmark (`tunnel bench`) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: feat/tunnel-v1 · shipped: vT1..vT7 (son vT7) · test 127 · risk 21+2err · VERSION 7.0.0 (aligned)
+next: vT8 Benchmark + connectivity-aware routing + log-rotation · ollamas core v1.6.0 / feat/v1.11-roots-abort
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
-otonom: `tunnel auto [--watch]` 0-manuel · `tunnel rotate` yaş-tabanlı · `tunnel status [--json|--watch]` görünürlük
+otonom: `tunnel daemon install` login-oto+crash-restart (0-manuel-işlem capstone) · `auto`/`rotate`/`status`
 güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-✓ VERSION 6.0.0 = son shipped vT6 (drift yok)
+✓ VERSION 7.0.0 = son shipped vT7 (drift yok)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -116,3 +116,6 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
   secret-free decision-log JSONL feed (orchestration cockpit handoff). EKSİK-TEMİZLİK: vT5 commit'lendi
   (kaldığın-yer), VERSION 1.0.0→6.0.0 align, whoami `**` strip + drift-check major-vs-vT (artık drift uyarısı
   yok). YAPI değişimi (whoami.sh): drift-check hardcode kaldırıldı → bu §5 cache + §3'e dokunmadı. 112/112.
+- 2026-06-20 — vT7 (Resilience/Daemon) ship: yeni sürekli-yetenek — `tunnel daemon install` LaunchAgent
+  (RunAtLoad+KeepAlive) `auto --watch` login-oto+crash-restart = 0-manuel-işlem CAPSTONE; connectivity classify
+  status'a eklendi. Critical-tespit re-sequence: Benchmark→vT8 (daemon daha kritik). VERSION 7.0.0. 127/127.

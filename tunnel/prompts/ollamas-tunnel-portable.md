@@ -61,17 +61,18 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
 - **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Autonomous Switch Engine;
-  `tunnel auto`) · vT5 (Security: DNS-rebind guard + AES-256-GCM vault + auto key-rotation `tunnel rotate`) ·
-  **vT6 (Observability: `tunnel status [--json|--watch]` = active + latency sparkline + breaker; secret-free
-  decision-log JSONL feed `keys/decisions.jsonl` for the orchestration cockpit)**. Tests: 112/112, tsc 0,
-  VERSION 6.0.0 (roadmap-aligned).
-- **NEXT = vT7** — Benchmark (per-transport latency/throughput sampling + p50/p90 + leaderboard reuse;
-  `tunnel bench [--json]`; aligns with scripts-lane bench-metrics format). Pure, 0-manuel. (See ROADMAP vT7.)
-- Roadmap horizon: vT8 resilience (LaunchAgent daemon + log-rotation) → vT9 remote reverse-tunnel (FRP/Bore —
-  **deferred/parked**, needs manual VPS, breaks 0-manuel + sovereign-zero-account) → vT10 ecosystem.
-- **0-manuel invariant:** `auto` self-selects + self-heals; `rotate` is age-based; `status` is read-only;
-  secrets use an auto-keyfile (no passphrase). Nothing prompts the user. Honest limit: auto-keyfile co-located
-  (RISK-014); JSONL feed read-capped, full rotation in vT8 (RISK-018).
+  `tunnel auto`) · vT5 (Security: DNS-rebind guard + AES-256-GCM vault + `tunnel rotate`) · vT6 (Observability:
+  `tunnel status` + sparkline + decision-log JSONL feed) · **vT7 (Resilience: `tunnel daemon install` =
+  LaunchAgent RunAtLoad+KeepAlive running `auto --watch` at login + crash-restart; connectivity classify
+  online/lan-only/offline — the 0-manuel-işlem capstone)**. Tests: 127/127, tsc 0, VERSION 7.0.0.
+- **NEXT = vT8** — Benchmark (per-transport latency p50/p90 + leaderboard; `tunnel bench`) + connectivity-aware
+  routing (skip mesh/reverse when offline) + log-rotation (daemon.log/decisions.jsonl). (See ROADMAP vT8.)
+- Roadmap horizon: vT9 remote reverse-tunnel (FRP/Bore — **deferred/parked**, manual VPS, breaks 0-manuel +
+  sovereign-zero-account) → vT10 ecosystem.
+- **0-manuel invariant:** `daemon install` is one-time (brew-like); afterward login-auto-start + crash-restart →
+  the user never runs anything again. `auto` self-selects/heals; `rotate` age-based; `status` read-only; secrets
+  auto-keyfile (no passphrase). Honest limits: auto-keyfile co-located (RISK-014); logs read-capped, full
+  rotation vT8 (RISK-018/020).
 
 ## 6. SELF-REPORT
 

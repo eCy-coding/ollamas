@@ -26,6 +26,8 @@
 | `adrienv1520/node-sparkline` (elysiumphase) | ~0.1k | MIT | vT6 | zero-dep ▁▂▃▄▅▆▇█ → status.ts sparkline | ✅ pattern-port |
 | `lirantal/nodejs-cli-apps-best-practices` | ~9k | (reference) | vT6 | --json opt-out (renk/animasyon-suz makine çıktısı) | ✅ fikir-port |
 | Gatus / Burnd JSONL feed | — | (reference) | vT6 | secret-free decision-log JSONL → cockpit feed | ✅ fikir-port |
+| launchd.plist(5) + `tjluoma/launchd-keepalive` | ~0.2k | (reference) | vT7 | RunAtLoad+KeepAlive plist → daemon.ts | ✅ fikir-port |
+| `rwbutler/Connectivity` | ~1.4k | MIT | vT7 | captive-portal/internet endpoint-probe → connectivity.ts | ✅ fikir-port |
 | `fatedier/frp` | 107k | Apache-2.0 | vT6 | reverse TCP tunnel (kendi VPS) — ⚠️ ertelendi (VPS/manuel) | deferred |
 | `ekzhang/bore` | 11k | MIT | vT6 | minimal Rust tunnel (alt) | deferred |
 
