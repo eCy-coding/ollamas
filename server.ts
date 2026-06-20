@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { ProviderRouter } from "./server/providers";
+import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
@@ -22,7 +23,8 @@ import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata
 import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
-import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
@@ -162,17 +164,18 @@ async function initializeServer() {
   try {
     const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
     const upstreams: UpstreamConfig[] = reg.mcpServers || [];
-    if (upstreams.length) {
-      for (const r of await connectAllUpstreams(upstreams)) {
-        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-      }
+    // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
+    // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
+    // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
+    for (const cfg of upstreams) {
+      const r = await superviseUpstream(cfg);
+      console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
     }
-    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), tenant-OWNED so a
-    // tenant can neither see nor invoke another tenant's upstream tools (Faz 24).
     for (const u of await allUpstreamServers()) {
-      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
+      const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
+    startSupervisor(); // periodic health/reconnect (opt-in via MCP_HEALTH_INTERVAL_MS)
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
   }
@@ -504,6 +507,49 @@ async function initializeServer() {
         res.json(result);
       } catch (err: any) {
         res.status(500).json({ error: err?.message || "Execution engine failure" });
+      }
+    }
+  });
+
+  /**
+   * Colab-style ergonomic AI façade (v1.11) — single-string prompt, zero-config.
+   * Mirrors `google.colab.ai`: `GET /api/ai/models` + `POST /api/ai/generate`.
+   * Thin wrapper over server/ai.ts → ProviderRouter (ollama-local, auto default model).
+   */
+  app.get("/api/ai/models", async (_req, res) => {
+    try {
+      res.json(await aiListModels());
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "model listing failure" });
+    }
+  });
+
+  app.post("/api/ai/generate", async (req, res) => {
+    const { prompt, model, stream, temperature } = req.body;
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt (non-empty string) is required" });
+    }
+
+    if (stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      try {
+        for await (const chunk of aiGenerateTextStream(prompt, { model, temperature })) {
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ error: err?.message || "streaming failure" })}\n\n`);
+        res.end();
+      }
+    } else {
+      try {
+        const result = await aiGenerate(prompt, { model, temperature });
+        res.json({ text: result.text, model: result.modelUsed, source: result.source, tokensPerSec: result.tokensPerSec });
+      } catch (err: any) {
+        res.status(500).json({ error: err?.message || "generation failure" });
       }
     }
   });
@@ -1458,7 +1504,8 @@ content
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
-      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId); // Faz 24: tenant-owned
+      // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.
+      const connect = await superviseUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId);
       res.json({ id, connect });
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
@@ -1467,8 +1514,13 @@ content
     const up = (await listUpstreamServers(tId)).find(u => u.id === req.params.id);
     if (!up) return res.status(404).json({ error: "Not found" });
     await deleteUpstreamServer(tId, req.params.id);
-    const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
-    res.json({ deleted: req.params.id, toolsRemoved: removed });
+    await removeUpstream(`${tId}_${up.name}`); // unsupervise + unregister + disconnect (Faz 27)
+    res.json({ deleted: req.params.id });
+  });
+  app.get("/api/saas/upstreams/status", authMiddleware(true), async (req, res) => {
+    const tId = req.tenant!.tenantId;
+    // Surface only this tenant's supervised upstreams (names are `<tenantId>_<name>`).
+    res.json(getUpstreamStatus().filter((s) => s.name.startsWith(`${tId}_`)));
   });
 
   // --- Tenant SELF-SERVE (Faz 10B). Tenant's OWN API key + scope; no admin token. ---
@@ -1875,6 +1927,7 @@ content
     try {
       stopWebhookWorker();
       stopOAuthGc();
+      stopSupervisor();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeStore();
       clearTimeout(force);

@@ -204,6 +204,15 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Prevention (RISK-MCP):** Süreli her tablo (token/code/session) bir retention-sweeper ister; sweeper YALNIZ expired siler (aktif güvenlik-pencerelerini bozma).
 - **Sonraki (önceden hesaplandı):** v1.18 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). OAuth AS artık üretim-tam (authcode+PKCE+refresh-rotation+client_credentials+resource-binding+tenant-isolation+GC).
 
+## Faz 27 — v1.18 (Consume-Side Upstream Resilience — federation supervisor, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** consume-side connect-once → resilient federation. **0 yeni dep** (integrations-lane ispatlı `supervisor.ts` adopte — VIBE değil, en-güvenilir eşleşen kaynak = kendi projemiz; LibreChat MCP_CB_* + IBM backoff desen).
+- **Açık (kök-neden):** `client.ts` upstream'e bir kez bağlanıp bırakıyordu; reconnect/health/circuit-breaker yoktu → upstream ölünce tool'ları süresiz fail (manuel restart'a dek).
+- **Nasıl:** 27A `client.ts` `pingUpstream`/`disconnectUpstream`/`toolNames`. 27B `supervisor.ts` `superviseUpstream(cfg,owner?)` + `tickOnce` (connected→ping; degraded→due-reconnect; circuit→cooldown re-arm) + `computeBackoff` (exp+cap) + `schedule` (MAX_CYCLES→circuit) + status/collisions/remove + `startSupervisor`(opt-in `MCP_HEALTH_INTERVAL_MS`, unref)/`stopSupervisor`. 27C `server.ts` boot supervise (global ownerless + per-tenant owner) + start + runtime POST/DELETE→supervise/remove + `/upstreams/status` + SIGTERM stop.
+- **Niçin:** Federation gateway üretimde upstream dalgalanmalarına dayanmalı; tek choke-point korunur (supervisor connectUpstream/ToolRegistry sürer, ikinci dispatch yok).
+- **Kanıt:** gerçek suite **197 passed/2 skipped** (+8 upstream-supervisor); tsc temiz; conformance:stdio exit 0; bundle; graceful-shutdown regresyon yok.
+- **Güvenlik invariant (KRİTİK):** reconnect `connectUpstream(cfg, s.owner)` → **owner KORUNUR** → per-tenant tool reconnect'te ownerless'a DÜŞMEZ (Faz 24 izolasyon korunur, spy-test ile kanıtlı). **Prevention:** her reconnect/re-register güvenlik-bağlamını (owner/tenant) taşımalı — connect-once'ı resilient yaparken izolasyon sessizce kaybolmamalı.
+- **Sonraki (önceden hesaplandı):** v1.19 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). Consume+expose MCP yüzeyi artık üretim-olgun (federation+resilience+isolation+abort+roots+sampling).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

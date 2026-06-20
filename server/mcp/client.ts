@@ -116,6 +116,8 @@ export interface UpstreamResult {
   scanned?: boolean;
   /** Raw tool names the scanner flagged (skipped unless MCP_SCAN_DRY_RUN=1). */
   flagged?: string[];
+  /** Raw (un-namespaced) tool names actually registered (Faz 27 — supervisor health/collisions). */
+  toolNames?: string[];
   error?: string;
 }
 
@@ -188,6 +190,7 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
 
     const allow = cfg.allowedTools && cfg.allowedTools.length ? new Set(cfg.allowedTools) : null;
     const skipped: string[] = [];
+    const registeredNames: string[] = [];
     let registered = 0;
 
     for (const t of tools) {
@@ -221,6 +224,7 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
           return text;
         },
       }, owner); // Faz 24: tenant-scope the tool when owner is set
+      registeredNames.push(t.name);
       registered++;
     }
 
@@ -236,7 +240,7 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     }
 
     return {
-      name: cfg.name, ok: true, tools: registered,
+      name: cfg.name, ok: true, tools: registered, toolNames: registeredNames,
       skipped: skipped.length ? skipped : undefined, manifestChanged,
       ...(scanned ? { scanned: true } : {}),
       ...(flagged.size ? { flagged: [...flagged] } : {}),
@@ -254,4 +258,19 @@ export async function connectAllUpstreams(configs: UpstreamConfig[], owner?: str
 
 export function listUpstreams(): string[] {
   return [...clients.keys()];
+}
+
+/** Health probe for a connected upstream (Faz 27): a successful tools/list = alive. */
+export async function pingUpstream(name: string): Promise<boolean> {
+  const c = clients.get(name);
+  if (!c) return false;
+  try { await c.listTools(); return true; } catch { return false; }
+}
+
+/** Close + forget an upstream connection (Faz 27 — reconnect/remove). Best-effort. */
+export async function disconnectUpstream(name: string): Promise<void> {
+  const c = clients.get(name);
+  if (!c) return;
+  try { await c.close(); } catch { /* best effort */ }
+  clients.delete(name);
 }
