@@ -457,6 +457,19 @@ export async function verifyClientSecret(clientId: string, secret: string): Prom
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/** Delete EXPIRED OAuth rows (codes, access + refresh tokens). Run periodically so
+ *  a busy authorization server does not accumulate dead rows (Faz 26). Only rows
+ *  whose `expires_at` is in the past are removed — a used-but-unexpired refresh
+ *  token is kept so RFC 9700 reuse detection still works within its TTL. ISO
+ *  timestamps compare lexicographically on both dialects (same as resolve*). */
+export async function purgeExpiredOAuth(): Promise<{ codes: number; tokens: number; refresh: number }> {
+  const now = nowIso();
+  const codes = (await d().run("DELETE FROM oauth_codes WHERE expires_at < ?", [now])).changes;
+  const tokens = (await d().run("DELETE FROM oauth_tokens WHERE expires_at < ?", [now])).changes;
+  const refresh = (await d().run("DELETE FROM oauth_refresh_tokens WHERE expires_at < ?", [now])).changes;
+  return { codes, tokens, refresh };
+}
+
 // --- Tenant webhooks (Faz 11B) ---
 export interface Webhook { id: string; tenant_id: string; url: string; events: string[]; active: number; created_at: string; }
 export async function addWebhook(tenantId: string, url: string, events: string[]): Promise<{ id: string; secret: string }> {

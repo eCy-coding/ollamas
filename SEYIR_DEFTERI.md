@@ -194,6 +194,16 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Prevention (RISK-MCP):** Token'ın audience/resource alanı SAKLANIYORSA resolve'da MUTLAKA enforce edilmeli (saklamak≠doğrulamak); tüm token-türleri (JWT+opaque) aynı beklenen-resource kaynağını kullanmalı.
 - **Sonraki (önceden hesaplandı):** v1.17 — resource subscriptions (stdio-stateful path; stateless-HTTP best-effort belgeli). OAuth tarafı artık tam (authcode+PKCE+refresh-rotation+client_credentials+resource-binding+tenant-isolation).
 
+## Faz 26 — v1.17 (OAuth Token Retention / Expired-Row GC, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** Üretim lifecycle defekti — OAuth AS expired satırları (codes/tokens/refresh) süresiz birikiyordu → tablo şişmesi. **0 yeni dep** (standart GC deseni + webhook-worker scheduler + nowIso).
+- **Nasıl:** `store.purgeExpiredOAuth()` = 3× `DELETE WHERE expires_at < now` (`{codes,tokens,refresh}` sayı döner, iki-dialekt ISO-compare). `server/oauth-gc.ts` `startOAuthGc` (boot'ta bir-kez-hemen + `OAUTH_GC_INTERVAL_MS||1h` interval, `unref`, never-throw) / `stopOAuthGc`. server.ts: boot `startWebhookWorker` yanı + SIGTERM shutdown `stopWebhookWorker` yanı (timer sızıntısı yok).
+- **Niçin:** Üretim SaaS gateway = sınırsız token-issuance → GC olmadan DB sonsuz büyür. Operasyonel zorunluluk.
+- **Kanıt:** gerçek suite **185 passed/2 skipped** (+2 oauth-gc); tsc temiz; conformance:stdio exit 0; bundle; graceful-shutdown regresyon yok.
+- **Güvenlik invariant (kritik):** SADECE `expires_at < now` silinir → used-ama-**unexpired** refresh KORUNUR → RFC 9700 reuse-detection penceresi (=14g TTL) bozulmaz (test ile kanıtlı). revoked-unexpired token: resolveOAuthToken `revoked=0` zaten filtreler, expire'da GC'lenir.
+- **Atlanan (gereksiz, kanıtla):** token-endpoint rate-limit (`rateLimitMiddleware:85 !t→next()` = pre-auth no-op; 192-bit secret brute-force-infeasible; DoS infra-katmanı) · gcm:1705 (false-positive: self-test + setAuthTag mevcut + tam tag).
+- **Prevention (RISK-MCP):** Süreli her tablo (token/code/session) bir retention-sweeper ister; sweeper YALNIZ expired siler (aktif güvenlik-pencerelerini bozma).
+- **Sonraki (önceden hesaplandı):** v1.18 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). OAuth AS artık üretim-tam (authcode+PKCE+refresh-rotation+client_credentials+resource-binding+tenant-isolation+GC).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

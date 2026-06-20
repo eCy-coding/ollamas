@@ -25,6 +25,7 @@ import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
+import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
@@ -151,6 +152,8 @@ async function initializeServer() {
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
   // Background outbound-webhook delivery worker (Faz 11B).
   startWebhookWorker();
+  // Periodic OAuth retention sweeper — delete expired codes/tokens (Faz 26).
+  startOAuthGc();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -1871,6 +1874,7 @@ content
     force.unref?.();
     try {
       stopWebhookWorker();
+      stopOAuthGc();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeStore();
       clearTimeout(force);
