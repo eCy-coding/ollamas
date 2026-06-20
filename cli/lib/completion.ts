@@ -47,21 +47,42 @@ export const COMMAND_TREE: CommandTree = {
   globalFlags: ["--gateway", "--profile", "--insecure-storage", "--json", "--help"],
 };
 
+// Dynamic VALUE candidates, injected by the __complete handler (v13). Kept OUT of
+// this pure function so it stays unit-testable and so TAB never triggers I/O here —
+// the handler gathers these from LOCAL disk only (profiles + a model cache), never a
+// network call (N-019).
+export interface DynamicValues {
+  profiles?: string[]; // listProfiles().map(p => p.name)
+  models?: string[]; // cached models for the active provider
+  providers?: string[]; // PROVIDERS
+}
+
 // Candidate set for the position implied by `words` (the args BEFORE the cursor).
-// - 0 words or a single empty word → top-level commands + global flags
-// - exactly the command word → that command's sub-actions (or [])
+// - 0 words / single empty word → top-level commands + global flags
+// - the command word → that command's sub-actions
+// - a value slot (`-m`/`--model`, `-p`/`--provider`, `config use`) → injected dyn
 // Pure → unit-testable. Returns the full set; the shell prefix-filters.
-export function complete(words: string[]): string[] {
+export function complete(words: string[], dyn: DynamicValues = {}): string[] {
   const real = words.filter((w, i) => !(i === words.length - 1 && w === ""));
   if (real.length === 0) {
     return [...COMMAND_TREE.commands, ...COMMAND_TREE.globalFlags];
   }
+
+  // Value slots — the token right before the cursor names what value comes next.
+  // Checked before the sub-action lookup so `chat -m <TAB>` works at any depth.
+  const prev = real[real.length - 1];
+  if ((prev === "-m" || prev === "--model") && dyn.models) return dyn.models;
+  if ((prev === "-p" || prev === "--provider") && dyn.providers) return dyn.providers;
+  if (real.length >= 2 && real[real.length - 2] === "config" && prev === "use" && dyn.profiles) {
+    return dyn.profiles;
+  }
+
   if (real.length === 1) {
     const cmd = real[0];
     if (!COMMAND_TREE.commands.includes(cmd)) return [];
     return COMMAND_TREE.subActions[cmd] ?? [];
   }
-  // Deeper positions: no further static candidates (dynamic values land in v13).
+  // Deeper positions with no recognized value slot → no static candidates.
   return [];
 }
 
