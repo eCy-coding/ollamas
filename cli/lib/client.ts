@@ -216,14 +216,17 @@ export class GatewayClient {
   triggerBackup(): Promise<Record<string, any>> {
     return this.adminPost("/api/backup/trigger", {});
   }
-  async downloadBackup(): Promise<string> {
+  // The gateway sends the encrypted blob as a raw BINARY Buffer (octet-stream).
+  // r.text() would UTF-8-mangle it — read the bytes verbatim.
+  async downloadBackup(): Promise<Buffer> {
     const r = await fetch(`${this.baseUrl}/api/backup/download`, {
       headers: this.adminHeaders(),
       signal: AbortSignal.timeout(60_000),
     });
     if (!r.ok) throw new Error(adminError("/api/backup/download", r.status));
-    return r.text(); // encrypted blob — opaque, written verbatim to a file
+    return Buffer.from(await r.arrayBuffer());
   }
+  // restore expects the bytes as a HEX string (server: Buffer.from(hexBlob,"hex")).
   restoreBackup(hexBlob: string): Promise<{ success?: boolean }> {
     return this.adminPost("/api/backup/restore", { hexBlob });
   }

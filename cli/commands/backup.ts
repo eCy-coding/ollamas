@@ -111,16 +111,16 @@ async function runTrigger(client: GatewayClient, ctx: OutputCtx): Promise<number
 }
 
 async function runDownload(client: GatewayClient, v: any, ctx: OutputCtx): Promise<number> {
-  const blob = await client.downloadBackup();
-  // The blob is opaque ciphertext — never print it to a TTY (it is not human
-  // content and floods the terminal). Default to a 0600 file.
+  const blob = await client.downloadBackup(); // Buffer of raw encrypted bytes
+  // The blob is opaque binary ciphertext — never print it to a TTY (not human
+  // content; floods the terminal). Default to a 0600 file.
   if (v.out || !process.stdout.isTTY || ctx.json) {
     const out = v.out || backupOutName(new Date().toISOString());
     if (ctx.json && !v.out) {
       // --json with no --out: emit a small receipt, not the blob.
       return json({ ok: true, bytes: blob.length, hint: "pass --out to save the encrypted blob" });
     }
-    writeFileSync(out, blob, { mode: 0o600 });
+    writeFileSync(out, blob, { mode: 0o600 }); // binary, verbatim
     if (ctx.json) return json({ ok: true, file: out, bytes: blob.length });
     process.stdout.write(c("green", `saved ${blob.length} bytes → ${out}`, ctx.color) + c("dim", " (encrypted, 0600)", ctx.color) + "\n");
     return 0;
@@ -135,9 +135,11 @@ async function runRestore(client: GatewayClient, file: string | undefined, v: an
     process.stderr.write("backup restore: missing <file>\n");
     return 2;
   }
-  let blob: string;
+  let hexBlob: string;
   try {
-    blob = readFileSync(file, "utf8").trim();
+    // Read the binary backup file and hex-encode it — the gateway's restore expects
+    // hex (Buffer.from(hexBlob,"hex")). This is the exact inverse of download.
+    hexBlob = readFileSync(file).toString("hex");
   } catch (e: any) {
     process.stderr.write(c("red", `backup restore: cannot read ${file}: ${String(e?.message || e)}`, ctx.color) + "\n");
     return 2;
@@ -155,7 +157,7 @@ async function runRestore(client: GatewayClient, file: string | undefined, v: an
       return 0;
     }
   }
-  const r = await client.restoreBackup(blob);
+  const r = await client.restoreBackup(hexBlob);
   if (ctx.json) return json(r);
   process.stdout.write(c("green", "backup restored", ctx.color) + "\n");
   return 0;

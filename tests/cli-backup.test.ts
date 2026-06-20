@@ -81,11 +81,14 @@ describe("GatewayClient backup (mock fetch)", () => {
     }
   });
 
-  it("downloadBackup returns the raw encrypted blob (text, not JSON)", async () => {
+  it("downloadBackup returns raw bytes as a Buffer (binary-safe, not r.text())", async () => {
     const original = globalThis.fetch;
-    globalThis.fetch = (async () => new Response("ENCRYPTEDBLOB==", { status: 200 })) as any;
+    const bytes = new Uint8Array([0x00, 0xde, 0xad, 0xbe, 0xef, 0xff]); // non-UTF8 bytes
+    globalThis.fetch = (async () => new Response(bytes, { status: 200 })) as any;
     try {
-      expect(await new GatewayClient("http://x").downloadBackup()).toBe("ENCRYPTEDBLOB==");
+      const buf = await new GatewayClient("http://x").downloadBackup();
+      expect(Buffer.isBuffer(buf)).toBe(true);
+      expect(buf.toString("hex")).toBe("00deadbeefff"); // bytes preserved exactly
     } finally {
       globalThis.fetch = original;
     }
