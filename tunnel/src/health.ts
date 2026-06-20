@@ -1,6 +1,9 @@
 // Timeout-guarded HTTP health probe. Zero-dep (global fetch + AbortSignal).
 // Used by transports to confirm ollamas answers through a candidate endpoint.
 
+import { request as httpsRequest, type RequestOptions } from "node:https";
+import type { IncomingMessage, ClientRequest } from "node:http";
+
 export interface ProbeOptions {
   /** Abort the request after this many ms. */
   timeoutMs?: number;
@@ -34,4 +37,62 @@ export async function probeHttp(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Minimal request signature so tests can inject a fake instead of node:https. */
+export type HttpsRequestImpl = (
+  url: string,
+  options: RequestOptions,
+  callback: (res: IncomingMessage) => void,
+) => ClientRequest;
+
+export interface HttpsProbeOptions {
+  timeoutMs?: number;
+  okStatuses?: number[];
+  /**
+   * Skip TLS chain verification. Default FALSE — verify against the system trust
+   * store, which already contains the mkcert root CA after `mkcert -install`, so a
+   * normal verified probe succeeds on the Mac. Only enable for local debugging;
+   * disabling verification exposes the probe to LAN MITM (RISK-TUNNEL-007).
+   */
+  insecure?: boolean;
+  /** Injected for tests; defaults to node:https request. */
+  requestImpl?: HttpsRequestImpl;
+}
+
+/**
+ * HTTPS health probe. Verifies TLS by default (mkcert CA is system-trusted).
+ * Never throws; timeout / connection error / non-ok status → false.
+ */
+export function probeHttps(
+  baseUrl: string,
+  path = "/healthz",
+  opts: HttpsProbeOptions = {},
+): Promise<boolean> {
+  const { timeoutMs = 2000, okStatuses, insecure = false, requestImpl = httpsRequest } = opts;
+  const url = `${baseUrl.replace(/\/$/, "")}${path}`;
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    try {
+      const req = requestImpl(url, { rejectUnauthorized: !insecure, method: "GET" }, (res) => {
+        const status = res.statusCode ?? 0;
+        res.resume(); // drain so the socket frees
+        if (okStatuses) return done(okStatuses.includes(status));
+        done(status >= 200 && status < 300);
+      });
+      req.setTimeout(timeoutMs, () => {
+        req.destroy();
+        done(false);
+      });
+      req.on("error", () => done(false));
+      req.end();
+    } catch {
+      done(false);
+    }
+  });
 }

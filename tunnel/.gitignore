@@ -5,6 +5,9 @@ secrets/
 keys/
 wg-*.conf
 *.png
+*.pem
+*.mobileconfig
+Caddyfile
 node_modules
 node_modules/
 dist/

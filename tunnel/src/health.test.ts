@@ -1,6 +1,47 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { probeHttp } from "./health.ts";
+import { EventEmitter } from "node:events";
+import { probeHttp, probeHttps, type HttpsRequestImpl } from "./health.ts";
+
+// Fake node:https request: an EventEmitter doubling as ClientRequest.
+// `behavior` decides what happens after .end() is called.
+function fakeHttps(behavior: { status?: number; error?: boolean; hang?: boolean }): {
+  impl: HttpsRequestImpl;
+  lastOpts: () => Record<string, unknown>;
+} {
+  let captured: Record<string, unknown> = {};
+  const impl = ((url, options, callback) => {
+    captured = options as Record<string, unknown>;
+    const req = new EventEmitter() as unknown as {
+      setTimeout: (ms: number, cb: () => void) => void;
+      destroy: () => void;
+      end: () => void;
+      on: (e: string, cb: (...a: unknown[]) => void) => void;
+      emit: (e: string, ...a: unknown[]) => void;
+    };
+    let timeoutCb: (() => void) | null = null;
+    req.setTimeout = (_ms, cb) => {
+      timeoutCb = cb;
+    };
+    req.destroy = () => {};
+    req.end = () => {
+      queueMicrotask(() => {
+        if (behavior.hang) {
+          timeoutCb?.();
+          return;
+        }
+        if (behavior.error) {
+          (req as unknown as EventEmitter).emit("error", new Error("ECONNREFUSED"));
+          return;
+        }
+        const res = { statusCode: behavior.status ?? 200, resume: () => {} } as never;
+        callback(res);
+      });
+    };
+    return req as never;
+  }) as HttpsRequestImpl;
+  return { impl, lastOpts: () => captured };
+}
 
 const fakeFetch = (status: number): typeof fetch =>
   (async () => new Response(null, { status })) as unknown as typeof fetch;
@@ -46,4 +87,39 @@ test("probe strips trailing slash from base", async () => {
   }) as unknown as typeof fetch;
   await probeHttp("http://x:3000/", "/healthz", { fetchImpl: capturing });
   assert.equal(seen, "http://x:3000/healthz");
+});
+
+test("https: 200 → true", async () => {
+  const { impl } = fakeHttps({ status: 200 });
+  assert.equal(await probeHttps("https://m.local", "/healthz", { requestImpl: impl }), true);
+});
+
+test("https: 503 → false", async () => {
+  const { impl } = fakeHttps({ status: 503 });
+  assert.equal(await probeHttps("https://m.local", "/healthz", { requestImpl: impl }), false);
+});
+
+test("https: connection error → false (never throws)", async () => {
+  const { impl } = fakeHttps({ error: true });
+  assert.equal(await probeHttps("https://m.local", "/healthz", { requestImpl: impl }), false);
+});
+
+test("https: timeout/hang → false", async () => {
+  const { impl } = fakeHttps({ hang: true });
+  assert.equal(
+    await probeHttps("https://m.local", "/healthz", { requestImpl: impl, timeoutMs: 10 }),
+    false,
+  );
+});
+
+test("https: VERIFIES TLS by default (rejectUnauthorized true)", async () => {
+  const { impl, lastOpts } = fakeHttps({ status: 200 });
+  await probeHttps("https://m.local", "/healthz", { requestImpl: impl });
+  assert.equal(lastOpts().rejectUnauthorized, true);
+});
+
+test("https: insecure:true opt-in disables verification", async () => {
+  const { impl, lastOpts } = fakeHttps({ status: 200 });
+  await probeHttps("https://m.local", "/healthz", { requestImpl: impl, insecure: true });
+  assert.equal(lastOpts().rejectUnauthorized, false);
 });

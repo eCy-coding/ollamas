@@ -1,14 +1,15 @@
-// ollamas tunnel CLI (vT1). Zero-dep. Commands:
+// ollamas tunnel CLI. Zero-dep. Commands:
 //   config   generate keypairs + render MacBook/iPhone WireGuard configs (+ QR if qrencode present)
-//   up       wg-quick up wg0   (requires generated /etc/wireguard/wg0.conf via `config --install`)
+//   up       wg-quick up wg0
 //   down     wg-quick down wg0
-//   select   probe registered transports, print the chosen TunnelEndpoint
+//   tls      mkcert local CA + cert + Caddyfile + iOS .mobileconfig for LAN-TLS (vT2)
+//   select   probe registered transports (LAN-TLS preferred, WireGuard fallback), print endpoint
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
-import { mkdir, writeFile, chmod } from "node:fs/promises";
+import { mkdir, writeFile, chmod, readFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TunnelSwitch } from "./switch.ts";
@@ -21,6 +22,15 @@ import {
   WireGuardTransport,
   type WgPlan,
 } from "./transports/wireguard.ts";
+import {
+  DEFAULT_TLS_PLAN,
+  detectLocalHostname,
+  renderCaddyfile,
+  tlsServiceUrl,
+  CaddyTlsTransport,
+  type CaddyTlsPlan,
+} from "./transports/caddy-tls.ts";
+import { renderMobileConfig } from "./mobileconfig.ts";
 
 const KEYS_DIR = join(import.meta.dirname, "..", "keys");
 
@@ -72,6 +82,58 @@ function printQr(conf: string, peerPath: string): Promise<void> {
   });
 }
 
+/** Run a binary synchronously, return trimmed stdout; throws with a brew hint if missing. */
+function run(cmd: string, args: string[]): string {
+  try {
+    return execFileSync(cmd, args, { encoding: "utf8" }).trim();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/ENOENT/.test(msg)) throw new Error(`${cmd} not found — \`brew install ${cmd}\``);
+    throw new Error(`${cmd} ${args.join(" ")} failed: ${msg}`);
+  }
+}
+
+async function cmdTls(): Promise<void> {
+  const host = detectLocalHostname();
+  await mkdir(KEYS_DIR, { recursive: true });
+  await chmod(KEYS_DIR, 0o700);
+  const certPath = join(KEYS_DIR, "cert.pem");
+  const keyPath = join(KEYS_DIR, "key.pem");
+  const caddyfilePath = join(KEYS_DIR, "Caddyfile");
+  const profilePath = join(KEYS_DIR, `${host}.mobileconfig`);
+
+  // 1. local CA + per-host cert (mkcert, binary-invoke; BSD-3)
+  run("mkcert", ["-install"]);
+  run("mkcert", ["-cert-file", certPath, "-key-file", keyPath, host]);
+  await chmod(keyPath, 0o600).catch(() => {});
+
+  // 2. Caddyfile (reverse_proxy → ollamas, serve mkcert cert)
+  const plan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host, certPath, keyPath };
+  await writeFile(caddyfilePath, renderCaddyfile(plan), { mode: 0o600 });
+
+  // 3. export mkcert rootCA → iOS .mobileconfig (so the iPhone trusts the cert)
+  const caRoot = run("mkcert", ["-CAROOT"]);
+  const caPem = await readFile(join(caRoot, "rootCA.pem"), "utf8");
+  const profile = renderMobileConfig(caPem, {
+    certName: "ollamas Local CA",
+    identifier: "com.ollamas.tunnel.lan-tls",
+    displayName: "ollamas LAN-TLS",
+    description: `Trust the ollamas local CA to reach ${tlsServiceUrl(plan)} over HTTPS.`,
+  });
+  await writeFile(profilePath, profile, { mode: 0o600 });
+
+  console.log(`Caddyfile        → ${caddyfilePath}`);
+  console.log(`cert / key       → ${certPath} / ${keyPath}`);
+  console.log(`iOS profile      → ${profilePath}`);
+  console.log(`ollamas over TLS = ${tlsServiceUrl(plan)}`);
+  console.log("");
+  console.log("Next:");
+  console.log(`  1) caddy run --config ${caddyfilePath} --adapter caddyfile`);
+  console.log(`  2) AirDrop ${profilePath} to the iPhone → install profile`);
+  console.log("  3) iPhone: Settings → General → About → Certificate Trust Settings → enable 'mkcert ...'");
+  console.log(`  4) iPhone Safari: ${tlsServiceUrl(plan)}/healthz → 200`);
+}
+
 function wgQuick(action: "up" | "down"): Promise<number> {
   return new Promise((resolve) => {
     const p = spawn("wg-quick", [action, "wg0"], { stdio: "inherit" });
@@ -81,10 +143,14 @@ function wgQuick(action: "up" | "down"): Promise<number> {
 }
 
 async function cmdSelect(): Promise<void> {
-  const plan: WgPlan = { ...DEFAULT_PLAN, endpointHost: detectLanIp() };
-  const sw = new TunnelSwitch().register(new WireGuardTransport(plan));
+  const wgPlan: WgPlan = { ...DEFAULT_PLAN, endpointHost: detectLanIp() };
+  const tlsPlan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host: detectLocalHostname() };
+  // LAN-TLS (pri 10) preferred when on home WiFi; WireGuard (pri 20) fallback off-LAN.
+  const sw = new TunnelSwitch()
+    .register(new CaddyTlsTransport(tlsPlan))
+    .register(new WireGuardTransport(wgPlan));
   const ep = await sw.select();
-  console.log(ep ? JSON.stringify(ep) : "no healthy transport (is ollamas + tunnel up?)");
+  console.log(ep ? JSON.stringify(ep) : "no healthy transport (is ollamas + a tunnel up?)");
   process.exitCode = ep ? 0 : 1;
 }
 
@@ -99,10 +165,12 @@ async function main(): Promise<void> {
     case "down":
       process.exitCode = await wgQuick("down");
       return;
+    case "tls":
+      return cmdTls();
     case "select":
       return cmdSelect();
     default:
-      console.log("usage: tunnel <config|up|down|select>");
+      console.log("usage: tunnel <config|up|down|tls|select>");
   }
 }
 

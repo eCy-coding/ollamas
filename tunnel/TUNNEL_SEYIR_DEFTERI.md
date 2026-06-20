@@ -43,7 +43,23 @@
 - **Not:** Server-side `ALLOWED_ORIGINS`/`MCP_PUBLIC_URL` (WG IP) integrations lane'e devredildi (reçete §5) —
   bu lane server.ts edit etmez (RISK-TUNNEL-002).
 
+## Faz 4 — LAN-TLS transport (vT2)
+
+- **Ne:** `mobileconfig.ts` (pure Apple .mobileconfig render, root CA payload), `transports/caddy-tls.ts`
+  (detectLocalHostname `scutil`, pure renderCaddyfile, CaddyTlsTransport pri=LAN_TLS), `health.ts`
+  `probeHttpsInsecure` (node:https rejectUnauthorized:false), `cli.ts tls` + `select` çift-transport,
+  `recipes/caddy-mkcert-ios.md`.
+- **Nasıl:** Adoption: caddy(Apache)+mkcert(BSD) **binary-spawn-only** (kaynak kopya yok). iOS .mobileconfig
+  güvenilir OSS jeneratörü yok → plist'i kendimiz render ettik (mullvad/encrypted-dns-profiles şekli, fikir).
+  Hostname otomatik `<Mac>.local` (Bonjour, dns-sd gerekmez). cert/key/profile `keys/` 0600 gitignored.
+- **Niçin:** Aynı-WiFi yaygın senaryo: VPN'siz, hesapsız HTTPS. LAN_TLS(10)<MESH(20) → switch WiFi'de
+  LAN-TLS seçer, off-LAN WireGuard'a düşer (gerçek failover vT5).
+- **Kanıt:** `node --test` → **37/37 green** (mobileconfig 7 + caddy-tls 6 + health 11 + switch 6 + wg 5 + cli 2);
+  `tsc -p` → 0; `cli select` exit 1 + temiz mesaj (transport yokken); `cli tls` mkcert yokken temiz
+  "brew install mkcert". iOS cihaz-kanıtı (https://<host>.local 200) Emre'de (reçete hazır).
+
 ---
-**Toplam (vT1 kod):** 5 governance dosya + 5 src modül (transport/switch/health/wireguard/cli) + 4 test dosya
-(19 test) + iOS reçete. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 19/19.
-Gotcha: ERR-TUNNEL-001 (Node strip param-property yasak). vT1 done-gate cihaz-kanıtı Emre'de.
+**Toplam (vT1+vT2 kod):** 5 governance + 7 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/cli) + 6 test dosya (37 test) + 2 iOS reçete. Zero-dep (Node 24 strip + node:test),
+zero-account. tsc 0 + test 37/37. Gotcha ERR-TUNNEL-001 (strip param-property yasak).
+vT1 (WireGuard 200) + vT2 (LAN-TLS 200) cihaz-kanıtları Emre'de.

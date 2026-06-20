@@ -5,8 +5,8 @@
 
 | Ver | Tema | Çekirdek | Adopt | Durum |
 |-----|------|----------|-------|-------|
-| **vT1** | Foundation + iOS reach | governance 5-dosya + `Transport` iface + `switch.ts` skeleton + **WireGuard p2p** (QR, zero-acct) + iPhone→ollamas 200 e2e | wireguard-apple(MIT), wireguard-tools | ▶ **IN PROGRESS** |
-| vT2 | LAN-TLS | Caddy reverse-proxy + mkcert local CA + iOS cert profile reçete → `https://ollamas.local` | Caddy(Apache,73k), mkcert(MIT) | planned |
+| **vT1** | Foundation + iOS reach | governance 5-dosya + `Transport` iface + `switch.ts` skeleton + **WireGuard p2p** (QR, zero-acct) + iPhone→ollamas 200 e2e | wireguard-apple(MIT), wireguard-tools | ✅ DONE (97d65a1) |
+| **vT2** | LAN-TLS | Caddy reverse-proxy + mkcert local CA + **iOS .mobileconfig render** + `<Mac>.local` auto-host → `https://<host>.local` | Caddy(Apache,73k), mkcert(BSD,59k) | ✅ DONE |
 | vT3 | Sovereign mesh | Headscale self-host control-plane + WG client; çok-cihaz + remote tek overlay | Headscale(BSD,38k) | planned |
 | vT4 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server, MacBook client expose; mesh yokken fallback | FRP(Apache,107k)/Bore(MIT,11k) | planned |
 | vT5 | **Switch engine** | health-probe + scoring + auto-failover + priority policy + decision-log | — | planned |
@@ -30,11 +30,18 @@
 
 ---
 
-## vT2 — NEXT (önceden-hesaplanmış ilk todo'lar)
+## vT2 — DONE (kanıt)
 
-1. `transports/caddy-tls.ts` — `Caddyfile` render (reverse_proxy localhost:3000 → `ollamas.local:443`), `caddy run` sarmalayıcı.
-2. `recipes/mkcert-ios.md` — `mkcert -install` local CA + `ollamas.local` cert + iOS `.mobileconfig` trust profile reçetesi (adopt mkcert MIT).
-3. mDNS/`.local` ad çözümü doğrulama (Bonjour, MacBook hostname).
-4. `switch.ts` priority listesine LAN-TLS'i **mesh+reverse üstüne** ekle; probe `https://ollamas.local/healthz`.
-5. iOS e2e: aynı WiFi'de iPhone Safari/Shortcut → `https://ollamas.local` → 200 (cert trust kurulu).
-6. `TUNNEL_ADOPTION.md` Caddy+mkcert satırlarını ✅ işaretle; errors_registry'ye TLS/cert riskleri ekle.
+- P1 `mobileconfig.ts` pure plist render (com.apple.security.root payload, 7 test).
+- P2 `transports/caddy-tls.ts` detectLocalHostname(scutil)+renderCaddyfile+CaddyTlsTransport(pri LAN_TLS, 6 test).
+- P3 `health.ts` `probeHttpsInsecure` (node:https rejectUnauthorized:false, injectable, 5 yeni test).
+- P4 `cli.ts tls` (mkcert -install+cert + Caddyfile + rootCA→.mobileconfig) + `select` LAN-TLS>WireGuard + `recipes/caddy-mkcert-ios.md`.
+- P5 Gate: **37/37 test, tsc 0**. iOS cihaz-kanıtı (https://<host>.local 200) Emre'de (reçete hazır).
+
+## vT3 — NEXT (önceden-hesaplanmış ilk todo'lar)
+
+1. `transports/headscale.ts` — Headscale self-host control-plane (BSD-3) sarmalayıcı: `headscale` config + `headscale nodes register`, WG client config üret.
+2. `recipes/headscale-ios.md` — Headscale self-host + iOS WireGuard/Tailscale-client (kendi control URL) reçetesi; çok-cihaz + remote tek overlay.
+3. Mesh transport `priority=PRIORITY.MESH` (zaten WireGuard p2p ile aynı bant) — Headscale p2p-üstü koordinasyon; switch'e register.
+4. Zero-account doğrula: Headscale tamamen self-host (Tailscale SaaS yok).
+5. `TUNNEL_ADOPTION.md` Headscale ✅; errors_registry mesh/NAT-traversal riskleri.

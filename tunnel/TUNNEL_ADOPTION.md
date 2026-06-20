@@ -11,8 +11,9 @@
 |------|----|--------|----|---------|-------|
 | `WireGuard/wireguard-apple` | ~1.3k | MIT | vT1 | iOS native WG client (QR import) | ✅ reçete `recipes/wireguard-ios.md` |
 | wireguard-tools (`wg`,`wg-quick`) | — | GPL-2.0 | vT1 | keygen + arayüz; **binary-invoke only**, kaynak kopya YOK | ✅ `transports/wireguard.ts` (spawn) |
-| `FiloSottile/mkcert` | — | MIT | vT2 | local CA, iOS trust profile | planned |
-| `caddyserver/caddy` | 73k | Apache-2.0 | vT2 | reverse-proxy + auto-TLS | planned |
+| `caddyserver/caddy` | 73k | Apache-2.0 | vT2 | reverse_proxy localhost:3000 + TLS serve | ✅ `transports/caddy-tls.ts` (spawn) |
+| `FiloSottile/mkcert` | 59k | BSD-3 | vT2 | local CA + `<host>.local` cert | ✅ `cli.ts tls` (spawn) |
+| `mullvad/encrypted-dns-profiles` | ~0.7k | (reference) | vT2 | `.mobileconfig` plist şekli — fikir, kod-kopya YOK | ✅ `mobileconfig.ts` (kendi render) |
 | `juanfont/headscale` | 38k | BSD-3 | vT3 | sovereign mesh control-plane | planned |
 | `fatedier/frp` | 107k | Apache-2.0 | vT4 | reverse TCP tunnel (kendi VPS) | planned |
 | `ekzhang/bore` | 11k | MIT | vT4 | minimal Rust tunnel (alt) | planned |

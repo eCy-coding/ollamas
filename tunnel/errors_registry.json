@@ -58,6 +58,13 @@
       "severity": "med",
       "note": "İzole worktree'de node_modules yok (gitignored). Zero-dep: Node 24 native TS strip + node:test kullan; typescript/tsx kurulumu opsiyonel gate.",
       "applies_version": "vT1"
+    },
+    {
+      "id": "RISK-TUNNEL-007",
+      "category": "network",
+      "severity": "high",
+      "note": "HTTPS probe'da rejectUnauthorized:false TLS doğrulamasını kapatır → LAN MITM. mkcert -install sonrası CA sistem trust store'da, varsayılan DOĞRULA (insecure opt-in yalnız debug). semgrep bypass-tls-verification.",
+      "applies_version": "vT2"
     }
   ],
   "errors": [
