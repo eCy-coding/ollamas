@@ -4,6 +4,17 @@
 > başlangıç-config'ini (`.claude/settings.json`) otomatik düzenleyemez (harness guardrail:
 > self-modification açık-izin ister). Aşağıdaki **iki bir-kerelik adım** 0-manuel'i açar.
 
+## ⚡ TEK KOMUT (önerilen — vO-FND.2)
+
+```bash
+bash orchestration/bin/activate.sh            # settings.json hook patch + launchd + doctor doğrula
+bash orchestration/bin/activate.sh --dry-run  # önce ne yapacağını gör (dosya YAZMAZ)
+```
+
+Idempotent: hook'lar varsa ekleme yapmaz; mevcut `role-hook` korunur. Bu komut `settings.json`'ı
+yazar (senin yetkin) → SessionStart→autopilot + UserPromptSubmit→model-hook + launchd agent + doctor GO.
+Manuel istersen aşağıdaki 2 adımı kendin yap:
+
 ## 1. Claude Code hook'ları (sekme açılışı + model-sorusu auto-inject)
 
 `.claude/settings.json`'a şu `hooks` bloğunu yapıştır (mevcut role-hook KORUNUR):
