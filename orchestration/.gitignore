@@ -1,0 +1,18 @@
+# orchestration — generated runtime outputs (her koşuda yeniden üretilir; git-dışı).
+# dod R3 "uncommitted-green" false-noise + sürekli-dirty churn'ü kökten önler.
+# Authored deliverable'lar (governance .md, *_AGENTS.md, ROADMAP, SEYIR, plist, HEARTBEAT.md) İZLENİR.
+
+# Append-only state ledger'ları
+*-state.jsonl
+seyir/nudge-log.jsonl
+
+# Autofix backup + temp
+*.bak
+*.tmp
+
+# Üretilen raporlar (analizör çıktıları — REQUIREMENTS/BENCH/CONDUCTOR vb worker-tracked kalabilir;
+# yalnız kesinlikle-geçici olanları yoksay)
+AUTOFIX.md
+ADOPTIONS_STATUS.md
+heartbeat.out.log
+heartbeat.err.log
