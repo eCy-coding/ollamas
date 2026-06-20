@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅ · v16 ✅** (LaunchAgent auto-load: render-plist [node-path+token+repo enjekte, REPLACE_ leftover-reject] + install-agent.sh [idempotent bootstrap, chmod 600] + install/uninstall wire; reboot→bridge ayakta; render-plist 6 + bats 11 + dogfood), **v17 NEXT (provider/model bench → en-verimli lokal model otomatik seçim, scripts-v4 bench-metrics tüket)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅ · v14 ✅ GÜVENLİK · v15 ✅ · v16 ✅ · v17 ✅** (efficient local-model auto-select §0-1: pure rankModels/pickModel [correct-first + tps/latency + data-driven min-tok/s+sizeGb-fit] + model_select host-tool [cached benchmark.json, re-bench yok] + benchmark.mjs DRY-refactor; model-select 8 test + drift 19 + dogfood), **v18 NEXT (cluster join/enroll script-hardening — join-cluster.sh güvenli düğüm kaydı)**.
 
 > ⚠️ **v14 sapması (dürüst):** precomputed v14 (incremental-gate) = saf-DX cila, ürüne değmez → **backlog'a alındı**. İki audit host-bridge'de 3 gerçek sömürülebilir açık buldu (kod-okuma kanıtlı) → v14 = **güvenlik** (North Star §0-2, iOS/LAN ön-koşulu). Backlog: incremental-gate (düşük), install.sh LaunchAgent auto-load (orta, v16).
 >
@@ -320,7 +320,26 @@
 
 **Gate (kanıt):** render-plist 6 test + bats 11 (install-agent/uninstall DRY no-write) + canlı render (REPLACE=0, node-path doğru) + make harden clean + make gate GREEN + drift 18 + dogfood. Gerçek `launchctl bootstrap` KOŞULMADI (operatör kararı).
 
-**Next precomputed (→v17 efficient local-model auto-select):** North Star §0-1 (host op hızlandır) — scripts-v4 `bench-metrics.mjs` tok/s çıktısını TÜKET: pure `pickModel(benchResults, {minTokS, fitsRAM})` (en-hızlı-doğru lokal model seç) + `model-select.mjs` tool (host-tier, benchmark.json oku→öner) + `MinhNgyuen/llm-benchmark` MIT deseni. İlk hamle = `lib/model-select.mjs` pure `pickModel` + test (fixture bench → en verimli model).
+**Next precomputed (→v17 efficient local-model auto-select):** [DONE — aşağı bak.]
+
+---
+
+## v17 — Efficient Local-Model Auto-Select ✅ (North Star §0-1, M4 verimlilik)
+
+**Tema:** M4'te en-verimli lokal modeli kanıtla seç (kullanıcı çekirdek mandatesı). **DONE** (dogfood). benchmark.mjs ZATEN inline bestModel hesaplıyordu → naive dup yerine pure'e ÇIKARILDI (DRY) + constraint-aware + cached-json tool.
+
+**Phases (gerçekleşen):**
+1. ✅ **pure lib** (`lib/model-select.mjs`): `rankModels(results,{metric,minTokS,maxSizeGb})` + `pickModel` → `{model,correct,reason,ranked}`; correctness-gate DAİMA (correct-first, hiç-yok→fallback+reason); metric tps|latency; min-tok/s + sizeGb-fit **data-driven** (isimden RAM tahmini YOK, RISK-SCR-024); filtre-boşaltırsa gevşet.
+2. ✅ **benchmark.mjs DRY-refactor**: inline rank/bestModel (`:116-118`) → `rankModels`/`pickModel` import; davranış-koruyan (default latency = eski sıralama); tek-kaynak ranking.
+3. ✅ **model_select host-tool** (`tools/model_select.mjs`, read-only seyir_stats deseni): cached `benchmark.json` oku → pickModel → öneri (--json/--metric tps|latency/--min-tps); re-bench YOK. 4-nokta kayıt (inventory+schema+BUILDERS+tool), drift 18→**19**.
+
+**Adopt:** `MinhNgyuen/llm-benchmark` (MIT, tok/s+correct-first, zaten v4) + `rockyRunnr/ollama-bench` (MIT seçim fikri) + in-repo inline ranking pure'e çıkarıldı. Zero yeni dep.
+
+**Canonical prompt:** "efficient model-select: pure lib/model-select.mjs (rankModels/pickModel, correctness-gate + metric tps|latency + data-driven minTokS/maxSizeGb, fallback) + benchmark.mjs inline→pickModel (DRY) + tools/model_select.mjs (cached benchmark.json oku→öner, re-bench yok); 4-nokta kayıt drift 19."
+
+**Gate (kanıt):** model-select 8 test + vitest 223/4skip + drift 19 + tsc 0 + canlı `model_select --json` (mevcut benchmark.json→fallback-reason, correct-yok) + make gate GREEN + dogfood. **Canlı ollama bench KOŞULMADI** (flaky-eşzamanlı UK-08; mevcut json yeter).
+
+**Next precomputed (→v18 cluster join/enroll hardening):** `join-cluster.sh` (mevcut, DRY-guarded) güvenli düğüm-kaydı — token/peer doğrulama + idempotent enroll. İlk hamle: join-cluster.sh oku → pure `lib/enroll.mjs` `validateEnrollment({peer,token})` (URL/token şekil-doğrula, loopback/LAN ayrımı v14 bind-deseni) + test; sonra .sh wire. (Cluster lane ayrı olabilir → cross-lane kontrol; yalnız scripts-domain join.sh.)
 
 ---
 

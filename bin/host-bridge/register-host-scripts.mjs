@@ -45,6 +45,7 @@ const BUILDERS = {
   self_heal: (a) => ({ argv: a.apply ? "--apply" : "", timeoutMs: 90000 }),
   seyir_stats: (a) => ({ argv: [a.json ? "--json" : "", a.window ? `--window ${Number(a.window)}` : "", a.slo ? `--slo ${Number(a.slo)}` : ""].filter(Boolean).join(" ") }),
   usage: (a, d) => ({ argv: [a.json ? "--json" : "", a.month ? `--month ${d.shArg(String(a.month))}` : "", a.rate != null ? `--rate ${Number(a.rate)}` : "", a.budget != null ? `--budget ${Number(a.budget)}` : ""].filter(Boolean).join(" ") }),
+  model_select: (a, d) => ({ argv: [a.json ? "--json" : "", a.metric ? `--metric ${d.shArg(String(a.metric))}` : "", a.minTps != null ? `--min-tps ${Number(a.minTps)}` : ""].filter(Boolean).join(" ") }),
 };
 
 export function loadInventory(inventoryPath = DEFAULT_INVENTORY) {

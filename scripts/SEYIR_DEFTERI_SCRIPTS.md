@@ -188,6 +188,15 @@
 - `[2026-06-20] kind=phase | P4 gate + DOGFOOD | make gate GREEN (render-plist 6 + harden 11) + drift 18; v16 gate.mjs --commit self-commit | git show --stat server/src yok | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v17 efficient local-model auto-select) | North Star §0-1: scripts-v4 bench-metrics tok/s tüket → pure pickModel(benchResults,{minTokS,fitsRAM}) + model-select.mjs host-tool (benchmark.json→en-hızlı-doğru model); ilk hamle lib/model-select.mjs pickModel + fixture test`
 
+## v17 — Efficient Local-Model Auto-Select ✅ (North Star §0-1, M4 verimlilik)
+
+- `[2026-06-20] kind=note | dup-önleme tespiti | benchmark.mjs:116-118 ZATEN bestModel hesaplıyor (inline, correct-first→total_ms) → naive pickModel=dup(gereksiz). Karar: pure'e ÇIKAR (DRY refactor) + constraint-aware + cached-json tool`
+- `[2026-06-20] kind=phase | P1 pure lib | lib/model-select.mjs rankModels/pickModel: correctness-gate (correct-first, hiç-yok→fallback+reason) + metric tps|latency + data-driven minTokS/maxSizeGb (isimden RAM tahmini YOK RISK-SCR-024) + filtre-boşalırsa gevşet | model-select.test.ts 8 case | YEŞİL`
+- `[2026-06-20] kind=phase | P2 benchmark.mjs DRY-refactor | inline rank/bestModel→rankModels/pickModel import; davranış-koruyan (default latency=eski); report.bestModel=best.model (string); node --check OK | YEŞİL`
+- `[2026-06-20] kind=phase | P3 model_select host-tool | tools/model_select.mjs cached benchmark.json oku→pickModel→öneri (--json/--metric/--min-tps), re-bench yok, read-only; 4-nokta kayıt (inventory+schema+BUILDERS+tool) drift 18→19 | canlı --json mevcut json→fallback-reason | YEŞİL`
+- `[2026-06-20] kind=phase | P4 gate + DOGFOOD | make gate GREEN (model-select 8 + vitest 223/4skip + drift 19 + tsc 0); canlı ollama bench KOŞULMADI (flaky-eşzamanlı UK-08); v17 gate.mjs --commit self-commit | server/providers.ts dokunulmadı (advisory) | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v18 cluster join/enroll hardening) | join-cluster.sh güvenli düğüm-kaydı: pure lib/enroll.mjs validateEnrollment({peer,token}) URL/token şekil + loopback/LAN ayrımı (v14 deseni) + test→.sh wire; cluster lane cross-lane kontrol (yalnız scripts join.sh)`
+
 ---
 
 ## Hata Anlatıları

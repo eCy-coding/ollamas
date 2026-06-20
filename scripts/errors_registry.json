@@ -403,6 +403,20 @@
       "prevention_rule": "Auto-commit/scope-guard allow-list'i Scope Law (SCRIPTS_AGENTS §3) ile BİREBİR aynı olmalı — root *.sh dahil; scope-list değişince Scope Law'a karşı çapraz-doğrula. Guard false-block ederse önce allow-list'i Scope Law'a göre düzelt (suppress etme).",
       "test_added": "scripts/tests/commit-guard.test.ts (install.sh/uninstall.sh in-scope)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-024",
+      "ts": "2026-06-20",
+      "version": "v17",
+      "file": "bin/host-bridge/lib/model-select.mjs + tools/model_select.mjs",
+      "category": "bench",
+      "severity": "med",
+      "root_cause": "Model seçimi yanlış yapılabilir: (1) RAM-fit'i model ADINDAN tahmin etmek (qwen3:8b→8GB?) kırılgan/yanlış; (2) hızlı ama YANLIŞ yanıt veren modeli seçmek; (3) canlı ollama bench'i test-suite ile EŞZAMANLI koşmak → flaky (UK-08 ailesi); (4) benchmark.mjs inline ranking duplikasyonu.",
+      "evidence": "model-select.test 8 case; drift 19; canlı model_select --json mevcut benchmark.json'dan fallback-reason (correct-yok); benchmark.mjs artık pickModel import eder (tek-kaynak)",
+      "fix": "rankModels correctness-gate DAİMA (correct-first; hiç-correct→fallback+explicit reason); RAM-fit DATA-DRIVEN (yalnız sizeGb alanı VARSA filtrele, isim-parse YOK); filtre havuzu boşaltırsa gevşet; benchmark.mjs inline ranking→pickModel (DRY); testler fixture (canlı bench yok); tool cached benchmark.json okur (re-bench yok).",
+      "prevention_rule": "Model/kaynak seçimi: correctness her zaman hıza üstün (yanlış-ama-hızlı diskalifiye); kaynak-kısıtı (RAM/size) DAİMA ölçülen-veriden (alan varsa), isimden TAHMİN etme; canlı bench'i test-suite ile eşzamanlı koşma (fixture kullan); ranking tek-kaynak pure fn (inline duplikasyon yok).",
+      "test_added": "scripts/tests/model-select.test.ts (8 case: rank/metric/minTokS/maxSizeGb/fallback/empty)",
+      "recurrence_count": 0
     }
   ]
 }

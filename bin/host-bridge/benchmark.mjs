@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parsePlatformArg, detectDevice, benchRecord } from "./bench-metrics.mjs";
+import { rankModels, pickModel } from "./lib/model-select.mjs";
 
 const APP = process.env.APP_URL || "http://127.0.0.1:3000";
 const STATE = path.join(os.homedir(), ".llm-mission-control");
@@ -113,13 +114,15 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
     }
   }
 
-  // Rank: correct first, then lowest total_ms (gen+exec)
-  const ranked = [...results].sort((a, b) => (Number(b.correct) - Number(a.correct)) || ((a.total_ms || 1e12) - (b.total_ms || 1e12)));
-  const bestModel = ranked.find((r) => r.correct) || ranked[0];
+  // Rank + pick via the shared pure selector (v17, single source of ranking
+  // truth; default metric "latency" preserves the prior correct-first→total_ms).
+  const ranked = rankModels(results);
+  const best = pickModel(results);
+  const bestModel = best.model;
 
   console.log("\n== RANKED (correct first, then total latency) ==");
   ranked.forEach((r, i) => console.log(`  ${i + 1}. ${r.model} ${r.correct ? "✓" : "✗"} total=${r.total_ms || "-"}ms tok/s=${r.tok_s || "-"}`));
-  console.log(`\n>> bestModel: ${bestModel?.model}  bestTerminal: ${bestTerminal}`);
+  console.log(`\n>> bestModel: ${bestModel}  (${best.reason})  bestTerminal: ${bestTerminal}`);
 
   // v4 cross-platform schema: one normalized record per model, keyed by
   // platform+device+method so macOS and iOS runs accumulate in the same file.
@@ -137,7 +140,7 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
       ts,
     }),
   );
-  const report = { ts, platform: PLATFORM, device: DEVICE, task: "first10primes", expected: EXPECTED, results: ranked, records, termStats, bestModel: bestModel?.model, bestTerminal };
+  const report = { ts, platform: PLATFORM, device: DEVICE, task: "first10primes", expected: EXPECTED, results: ranked, records, termStats, bestModel, bestTerminal };
   fs.mkdirSync(STATE, { recursive: true });
   fs.writeFileSync(path.join(STATE, "benchmark.json"), JSON.stringify(report, null, 2));
   console.log(`\nreport -> ${path.join(STATE, "benchmark.json")}`);

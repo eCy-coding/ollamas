@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v16 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v17 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v16` — LaunchAgent Auto-Load (reboot→bridge-down kapat): `render-plist.mjs` (node-path/token/repo enjekte, REPLACE_ leftover-reject) + `install-agent.sh` (idempotent bootout→bootstrap→kickstart, chmod 600) + install/uninstall wire · gate: render-plist 6 + bats 11 + harden clean + make gate GREEN + drift 18 + dogfood · inventory 16.0.0. **GÜVENLİK:** gerçek launchctl bootstrap=operatör (outward-facing daemon, ben koşmadım).
-- **next:** `v17` — **efficient local-model auto-select** (North Star §0-1 host op hızlandır). İlk hamle: pure `lib/model-select.mjs` `pickModel(benchResults,{minTokS,fitsRAM})` + fixture test → scripts-v4 `bench-metrics.mjs` tok/s çıktısını tüket → `model-select.mjs` host-tool (benchmark.json→en-hızlı-doğru lokal model öner).
-- **horizon (geliştirilebilir):** v17 model-select → sonrası backlog (incremental-gate + tool /exec-modu düşük-öncelik).
+- **shipped:** `v17` — Efficient Local-Model Auto-Select (§0-1, M4 verimlilik): pure `lib/model-select.mjs` (rankModels/pickModel — correct-first + tps/latency + data-driven min-tok/s+sizeGb) + `model_select` host-tool (cached benchmark.json→öner, re-bench yok) + benchmark.mjs DRY-refactor · gate: model-select 8 test + vitest 223/4skip + drift **19** + dogfood · inventory 17.0.0. (server/providers.ts dokunulmadı=advisory.)
+- **next:** `v18` — **cluster join/enroll hardening** (`join-cluster.sh` güvenli düğüm-kaydı). İlk hamle: pure `lib/enroll.mjs` `validateEnrollment({peer,token})` (URL/token şekil + loopback/LAN ayrımı, v14 bind-deseni) + test → join-cluster.sh wire. (Cluster lane cross-lane kontrol → yalnız scripts-domain join.sh.)
+- **horizon (geliştirilebilir):** v18 enroll → sonrası backlog (incremental-gate + tool /exec-modu düşük-öncelik).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -54,8 +54,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v14 | Host-Bridge Security Hardening (/write confine 403 + payload-cap 413 + fail-closed bind) | ✅ GÜVENLİK |
 | v15 | Real E2E Bridge Harness (gerçek bridge spawn + /exec roundtrip + v14 güvenlik regresyon-kilidi) | ✅ |
 | v16 | LaunchAgent Auto-Load (render-plist + install-agent.sh, reboot-durable bridge) | ✅ |
-| **v17** | **efficient local-model auto-select** (bench tok/s → en-hızlı-doğru model, §0-1) | ⬜ NEXT |
-| v18+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
+| v17 | Efficient Local-Model Auto-Select (rankModels/pickModel + model_select tool, §0-1) | ✅ |
+| **v18** | **cluster join/enroll hardening** (`join-cluster.sh` güvenli düğüm-kaydı) | ⬜ NEXT |
+| v19+ | backlog (incremental-gate + tool /exec-modu düşük-öncelik) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 
