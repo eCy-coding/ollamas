@@ -1,4 +1,6 @@
 // ollamas tunnel CLI. Zero-dep. Commands:
+//   setup    one-command onboarding: detect capable transports → configure → bring up → [--daemon] (vT9)
+//   teardown stop WireGuard + uninstall daemon (configs kept) (vT9)
 //   config   generate keypairs + render MacBook/iPhone WireGuard configs (+ QR if qrencode present)
 //   up       wg-quick up wg0
 //   down     wg-quick down wg0
@@ -68,6 +70,15 @@ import {
 import { classify, internetReachable } from "./connectivity.ts";
 import { benchmarkTransports, renderBenchTable } from "./bench.ts";
 import { rotateIfNeeded } from "./logrotate.ts";
+import { commandExists } from "./autopilot.ts";
+import {
+  kindsToConfigure,
+  planSetup,
+  renderSetupPlan,
+  type Capabilities,
+  type ExistingConfigs,
+} from "./setup.ts";
+import { existsSync } from "node:fs";
 import { renderMobileConfig } from "./mobileconfig.ts";
 
 const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
@@ -375,6 +386,58 @@ function daemonPlan(): DaemonPlan {
   };
 }
 
+// One-command onboarding (vT9): detect capable transports → configure the missing ones (idempotent)
+// → bring the best up → optionally install the daemon. Zero manual selection, 0 prompt.
+async function cmdSetup(): Promise<void> {
+  const wantDaemon = process.argv.includes("--daemon");
+  const caps: Capabilities = {
+    wgTools: await commandExists("wg-quick"),
+    caddy: await commandExists("caddy"),
+    mkcert: await commandExists("mkcert"),
+    headscale: await commandExists("headscale"),
+  };
+  const existing: ExistingConfigs = {
+    wireguard: existsSync(join(KEYS_DIR, "wg0.conf")),
+    lanTls: existsSync(join(KEYS_DIR, "Caddyfile")),
+    mesh: existsSync(join(KEYS_DIR, "headscale.yaml")),
+  };
+  const steps = planSetup(caps, existing);
+  console.log(renderSetupPlan(steps));
+  console.log("");
+
+  for (const kind of kindsToConfigure(steps)) {
+    try {
+      if (kind === "wireguard") await cmdConfig();
+      else if (kind === "lan-tls") await cmdTls();
+      else if (kind === "mesh") await cmdMesh();
+    } catch (e) {
+      console.log(`  ${kind} setup failed (skipped): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  const { sw, transports } = buildSwitch();
+  const r = await autoUp(sw, transports);
+  await persistDecision(sw);
+  console.log("");
+  console.log(`autopilot: ${r.reason}${r.endpoint ? ` → ${r.endpoint.url}` : ""}`);
+
+  if (wantDaemon) {
+    const dr = installAgent(daemonPlan());
+    console.log(`daemon: ${dr.reason}`);
+  } else {
+    console.log("tip: `setup --daemon` to keep it always-on (login + crash-restart).");
+  }
+}
+
+// Tear down: stop WireGuard + uninstall the daemon. Configs stay in keys/ (re-run `setup` to restore).
+async function cmdTeardown(): Promise<void> {
+  const code = await wgQuick("down");
+  console.log(`wireguard: down (exit ${code})`);
+  const r = uninstallAgent(DEFAULT_LABEL);
+  console.log(`daemon: ${r.reason}`);
+  console.log("configs kept in keys/ — run `setup` to bring everything back up.");
+}
+
 // Benchmark (vT8): N timed probes per transport → p50/p90 table. Read-only, 0 prompt.
 async function cmdBench(): Promise<void> {
   const json = process.argv.includes("--json");
@@ -443,9 +506,13 @@ async function main(): Promise<void> {
       return cmdDaemon();
     case "bench":
       return cmdBench();
+    case "setup":
+      return cmdSetup();
+    case "teardown":
+      return cmdTeardown();
     default:
       console.log(
-        "usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--watch|--json|--force|--samples N]",
+        "usage: tunnel <setup|teardown|config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--daemon|--watch|--json|--force|--samples N]",
       );
   }
 }

@@ -174,9 +174,26 @@
 - **Kanıt:** `node --test` → **137/137 green** (bench 5 + logrotate 5 yeni); `typecheck` 0; `node src/cli.ts
   bench` → transport-yokken healthy 0% zarif (0-prompt). RISK-022. VERSION 8.0.0.
 
+## Faz 11 — Ecosystem Onboarding (vT9) — 0-manuel one-command
+
+- **Critical-tespit (gereksiz işten kaçın):** precomputed connectivity-routing ERTELENDİ (dürüst: probe-timeout
+  offline-correctness verir → marjinal; internet-only transport yok). Gerçek kritik = tek-komut onboarding
+  (çok-komut `config`+`tls`+`mesh`+`daemon` = manuel-seçim/sıralama → tek `setup`).
+- **Karar (research):** tailscale `up` zero-config idempotent onboarding (fikir). Mevcut cmd REUSE = yeni
+  transport kodu yok.
+- **Ne:** `setup.ts` PURE planSetup(caps,existing)→configure/skip-exists/missing-binary + kindsToConfigure +
+  renderSetupPlan · `cli.ts setup [--daemon]` (capability-detect→configure-capable[cmdConfig/Tls/Mesh reuse]→
+  autoUp→daemon, idempotent) + `teardown` · `recipes/onboarding.md`.
+- **Nasıl:** planSetup PURE+deterministik (enjekte caps+existing) → ağ/fs'siz test. setup idempotent (config-var
+  skip) + her adım try/catch (RISK-023). 0-prompt, transport-seçimi otomatik (capability-based).
+- **Niçin (0-manuel capstone):** sıfırdan otonom-tünel TEK komut → `setup --daemon` → kullanıcı hiç seçim
+  yapmaz/sıralamaz. North-Star "0 manuel" onboarding tamam.
+- **Kanıt:** `node --test` → **143/143 green** (setup 6 yeni); `typecheck` 0; `node src/cli.ts setup` →
+  binary-yok zarif plan+brew-hint (0-prompt). VERSION 9.0.0.
+
 ---
-**Toplam (vT1..vT8 kod):** 5 governance + 20 src modül (…+bench+logrotate) + 19 test dosya (137 test) +
-5 iOS/feed/daemon reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
-tsc 0 + test 137/137. VERSION 8.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
-ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7 device-daemon Emre'de;
-vT4/vT5/vT6/vT8 cihaz-kanıtı gerektirmez — 0 manuel. RISK-018/020 vT8'de çözüldü.
+**Toplam (vT1..vT9 kod):** 5 governance + 21 src modül (…+setup) + 20 test dosya (143 test) + 6
+iOS/feed/daemon/onboarding reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
+tsc 0 + test 143/143. VERSION 9.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
+ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7 device-daemon + vT9 sıfırdan-kurulum
+Emre'de; vT4/vT5/vT6/vT8 cihaz-kanıtı gerektirmez — 0 manuel. RISK-018/020 vT8'de çözüldü.

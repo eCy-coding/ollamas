@@ -172,6 +172,13 @@
       "severity": "low",
       "note": "`tunnel bench` canlı probe yapar; daemon (`auto --watch`) eşzamanlı çalışıyorsa ölçümler birbirini etkileyebilir (CPU/ağ paylaşımı → latency gürültüsü). Çözüm: samples küçük (default 5, ardışık) + bench diagnostic'tir (live scoring'i etkilemez). Hassas ölçüm için daemon geçici durdurulabilir (daemon uninstall). Belgelendi.",
       "applies_version": "vT8"
+    },
+    {
+      "id": "RISK-TUNNEL-023",
+      "category": "tooling",
+      "severity": "low",
+      "note": "`tunnel setup` çok-adımlı (configure×N + autoUp + daemon); bir adım yarıda kalırsa (ör. mkcert -install başarısız) kısmi-kurulum. ÇÖZÜM: setup IDEMPOTENT — var-olan config'ler skip-exists ile atlanır, re-run yalnız eksiği tamamlar; her configure adımı try/catch (biri patlarsa diğerleri sürer) + net rapor. Crash/prompt yok.",
+      "applies_version": "vT9"
     }
   ],
   "errors": [

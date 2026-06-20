@@ -86,13 +86,14 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1..vT8 (son vT8) · test 137 · risk 22+2err · VERSION 8.0.0 (aligned)
-next: vT9 Connectivity-aware routing (reachVia + offline-skip) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: feat/tunnel-v1 · shipped: vT1..vT9 (son vT9) · test 143 · risk 23+2err · VERSION 9.0.0 (aligned)
+next: vT10 Ecosystem-2 (QR + iOS Shortcut status--json + endpoint handoff) · ollamas core v1.6.0 / feat/v1.11-roots-abort
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
-otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench` · log-rotation oto (RISK-018/020 çözüldü)
+onboarding: `tunnel setup [--daemon]` tek-komut sıfırdan-otonom (idempotent, capability-detect) + `teardown`
+otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench` · log-rotation oto
 güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free+rotated
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-✓ VERSION 8.0.0 = son shipped vT8 (drift yok)
+✓ VERSION 9.0.0 = son shipped vT9 (drift yok)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -122,3 +123,7 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
 - 2026-06-20 — vT8 (Benchmark + Log-rotation) ship: `tunnel bench [--json|--samples]` p50/p90/min/max +
   size-based log-rotation (decisions.jsonl + daemon.log → RISK-018/020 çözüldü). connectivity-routing vT9'a
   ertelendi (gereksiz-iş kaçınma). Live scoring değişmedi (bench diagnostic). VERSION 8.0.0. 137/137.
+- 2026-06-20 — vT9 (Ecosystem Onboarding) ship: yeni sürekli-yetenek — `tunnel setup [--daemon]` tek-komut
+  sıfırdan-otonom (capability-detect→configure-capable→autoUp→daemon, idempotent) + `teardown`. mevcut cmd
+  REUSE (gereksiz-iş yok). connectivity-routing yine ertelendi (marjinal — probe-timeout yeter, dürüst).
+  Critical-tespit: onboarding > routing (0-manuel North-Star). VERSION 9.0.0. 143/143.

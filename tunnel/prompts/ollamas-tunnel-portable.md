@@ -60,19 +60,20 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
-- **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Autonomous Switch Engine;
-  `tunnel auto`) · vT5 (Security: guard + AES-256-GCM vault + `tunnel rotate`) · vT6 (Observability:
-  `tunnel status` + sparkline + JSONL feed) · vT7 (Resilience: `tunnel daemon install` = LaunchAgent
-  login-auto + crash-restart; the 0-manuel-işlem capstone) · **vT8 (Benchmark: `tunnel bench` per-transport
-  p50/p90/min/max; size-based log-rotation for decisions.jsonl + daemon.log — RISK-018/020 resolved)**.
-  Tests: 137/137, tsc 0, VERSION 8.0.0.
-- **NEXT = vT9** — Connectivity-aware routing (transport `reachVia` lan/internet/both + skip internet-only
-  transports when offline/lan-only, reusing vT7 classify). Pure, 0-manuel. (See ROADMAP vT9.)
-- Roadmap horizon: vT10 ecosystem (`tunnel up` one-command + QR onboarding + integrations-gateway federation)
-  → vT11+ remote reverse-tunnel (FRP/Bore — **parked**: manual VPS breaks 0-manuel + sovereign-zero-account).
-- **0-manuel invariant:** `daemon install` one-time → afterward fully autonomous; `auto` self-heals; `rotate`
-  age-based; `status`/`bench` read-only; secrets auto-keyfile; logs auto-rotate. Nothing prompts. Honest limit:
-  auto-keyfile co-located (RISK-014); p99 omitted (small N).
+- **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Switch Engine `tunnel auto`) ·
+  vT5 (Security: guard + vault + `rotate`) · vT6 (Observability: `status` + sparkline + JSONL feed) ·
+  vT7 (Resilience: `daemon install` LaunchAgent login-auto + crash-restart) · vT8 (Benchmark `bench` p50/p90 +
+  log-rotation) · **vT9 (Ecosystem onboarding: `tunnel setup [--daemon]` = one command detects capable
+  transports → configures → brings up → installs daemon; idempotent; `teardown` — the 0-manuel onboarding
+  capstone)**. Tests: 143/143, tsc 0, VERSION 9.0.0.
+- **NEXT = vT10** — Ecosystem-2 (QR onboarding `tunnel qr` + iOS Shortcut consuming `status --json` + endpoint
+  handoff to integrations-gateway). Pure, 0-manuel. (See ROADMAP vT10.)
+- Roadmap horizon: vT11+ connectivity-routing + remote reverse-tunnel (FRP/Bore — **parked**: manual VPS
+  breaks 0-manuel + sovereign-zero-account; routing marginal since probe-timeout already gives correctness).
+- **0-manuel invariant:** `setup --daemon` one command from zero → autonomous tunnel; afterward login-auto +
+  crash-restart; `auto` self-heals; `status`/`bench` read-only; secrets auto-keyfile; logs auto-rotate. Nothing
+  prompts; transport choice is capability-automatic. Honest limit: auto-keyfile co-located (RISK-014); brew
+  binary install is the one-time env prerequisite (not code).
 
 ## 6. SELF-REPORT
 

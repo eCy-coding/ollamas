@@ -13,9 +13,9 @@
 | **vT6** | **Observability** | `tunnel status [--json\|--watch]` (active + latency sparkline + breaker) + secret-free decision-log JSONL feed → orchestration cockpit; pure, **0-manuel** | node-sparkline/CLI-best-practice/JSONL-feed (MIT/fikir) | ✅ DONE |
 | **vT7** | **Resilience / Always-On Daemon** | LaunchAgent (RunAtLoad+KeepAlive) `tunnel auto --watch` login'de oto + crash-restart + connectivity classify (online/lan-only/offline); **0 manuel işlem capstone** | launchd-keepalive/Connectivity (MIT/fikir) | ✅ DONE |
 | **vT8** | **Benchmark + Log-rotation** | per-transport p50/p90/min/max latency (`tunnel bench`) + size-based log-rotation (decisions.jsonl + daemon.log, RISK-018/020 ÇÖZÜLDÜ); **0 manuel** | percentile-nearest-rank/file-rotator (fikir) | ✅ DONE |
-| vT9 | Connectivity-aware routing | transport `reachVia` (lan/internet/both) metadata + offline/lan-only'de internet-gerektiren transport'ları skorlamadan ele (vT7 classify reuse); IPv6/NAT iyileştirme | — | NEXT |
-| vT10 | Ecosystem | `ollamas tunnel up` one-command, QR onboarding, federation w/ integrations gateway, multi-tenant exposure policy | — | planned |
-| vT11+ | Remote reverse-tunnel | kendi VPS'te FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | parked |
+| **vT9** | **Ecosystem Onboarding** | tek-komut `tunnel setup [--daemon]` (capability-detect → configure-capable → autoUp → daemon, idempotent) + `teardown`; **0-manuel onboarding capstone** | tailscale-up zero-config (fikir) + cmd-reuse | ✅ DONE |
+| vT10 | Ecosystem-2 | QR onboarding + iOS Shortcut `status --json` tüketimi + integrations-gateway federation doc + multi-tenant exposure policy | — | NEXT |
+| vT11+ | Connectivity-routing + Remote reverse-tunnel | reachVia routing (reverse geldiğinde değerli) + FRP/Bore. **⚠️ PARKED**: reverse VPS+dış-hesap+manuel → "0 manuel"+egemen-zero-account ihlali; routing marjinal (probe-timeout yeter) | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -139,11 +139,26 @@
 - **Kanıt:** `node --test` **137/137 GREEN**, tsc 0; `node src/cli.ts bench` → transport-yokken healthy 0% zarif
   (0-prompt). VERSION 8.0.0.
 
-## vT9 — NEXT (önceden-hesaplanmış ilk todo'lar) — Connectivity-aware routing
+## vT9 — DONE (kanıt) — Ecosystem Onboarding (0-manuel one-command)
 
-1. `transport.ts` Transport'a `reachVia: "lan"|"internet"|"both"` ekle (WG=lan, LAN-TLS=lan, Headscale=both).
-2. `switch.ts selectAuto` connectivity (vT7 classify) al → offline/lan-only'de internet-gerektiren (reachVia
-   internet/both-uzak) transport'ları aday-dışı bırak (futile probe önle). PURE karar, geri-uyumlu.
-3. internetReachable'ı selectAuto'ya opsiyonel enjekte (default skip → mevcut testler korunur).
-4. IPv6/NAT iyileştirme notları; errors_registry routing riskleri.
-5. (vT11+ reverse-tunnel parked kalır — internet-ONLY transport o zaman gelir.)
+> **Critical-tespit re-sequence:** precomputed connectivity-routing ERTELENDİ (marjinal — probe-timeout
+> offline-correctness verir, internet-only transport yok). Gerçek kritik = tek-komut onboarding (çok-komut
+> manuel-seçimi yok eder).
+
+- `src/setup.ts` PURE planSetup(caps, existing)→SetupStep[] (configure/skip-exists idempotent/missing-binary
+  brew-hint) + kindsToConfigure + renderSetupPlan. **6 test.**
+- `cli.ts setup [--daemon]`: capability-detect (commandExists wg/caddy/mkcert/headscale) + existsSync(keys/*) →
+  planSetup → configure-capable (cmdConfig/cmdTls/cmdMesh REUSE) → autoUp → --daemon installAgent. Idempotent,
+  0-prompt. + `teardown` (wg down + uninstall, configs kalır). Mevcut cmd REUSE = yeni transport kodu yok.
+- `recipes/onboarding.md`. Adoption: tailscale-up zero-config (fikir). RISK-TUNNEL-023 (kısmi-başarı→idempotent re-run).
+- **Kanıt:** `node --test` **143/143 GREEN**, tsc 0; `node src/cli.ts setup` → binary-yok zarif plan+brew-hint
+  (0-prompt, crash yok); idempotent. VERSION 9.0.0.
+
+## vT10 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
+
+1. `src/qr.ts` — PURE QR (ANSI/SVG) endpoint/onboarding-URL render (zero-dep, qrencode binary opsiyonel) →
+   iPhone tek-tarama. `cli.ts qr [endpoint]`.
+2. iOS Shortcut reçetesi: `status --json` tüket → aktif endpoint'i Shortcut'a besle (cross-lane scripts/CLI doc).
+3. integrations-gateway federation doc: tunnel endpoint → integrations lane MCP_PUBLIC_URL devri (server.ts edit YOK).
+4. multi-tenant exposure policy notu (hangi transport hangi tenant'a; tunnel yalnız taşır, policy integrations'da).
+5. errors_registry ecosystem riskleri; ADOPTION qrcode-zero-dep (MIT).
