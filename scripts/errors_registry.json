@@ -235,6 +235,34 @@
       "prevention_rule": "Gate/CI runner her adımın exit-code'unu ZORUNLU kontrol eder (non-zero→fail); skip ASLA sessiz değil (reason logla); verdict pure ve unit-test'li olsun (false-green imkansız).",
       "test_added": "scripts/tests/gate-runner.test.ts (5 case: all-pass/fail-names/skip-recorded/order/misuse-guard)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-015",
+      "ts": "2026-06-20",
+      "version": "v12",
+      "file": "bin/host-bridge/lib/commit.mjs + gate.mjs --commit",
+      "category": "registration",
+      "severity": "high",
+      "root_cause": "Otonom auto-commit `git add -A` veya kör stage yaparsa cross-lane (server/src/başka worktree) değişikliğini scripts commit'ine sokar (ERR-SCR-001 kontaminasyon ailesi); ya da yeşil-olmayan gate'te commit kırık kod gönderir.",
+      "evidence": "commit-guard.test.ts: scope-dışı tracked değişiklik→block (server/tool-registry.ts violation); gate.mjs --commit yalnız verdict.ok sonrası çalışır; per-file `git add -- <path>` (asla -A)",
+      "fix": "commitDecision PURE scope-guard: yalnız scripts/+bin/+.github/workflows+Makefile stage; scope-dışı TRACKED değişiklik→block+violations; gate RED→commit yok; push/tag asla otomatik.",
+      "prevention_rule": "Auto-commit DAİMA explicit per-file `git add -- <path>` (asla `-A`/`.`) + scope-guard (scope-dışı tracked→block) + yalnız yeşil gate sonrası + conventional mesaj zorunlu; push/tag insan kararı.",
+      "test_added": "scripts/tests/commit-guard.test.ts (contamination block + scope-only stage + node_modules ignore)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-016",
+      "ts": "2026-06-20",
+      "version": "v12",
+      "file": "bin/host-bridge/lib/commit.mjs",
+      "category": "shell",
+      "severity": "med",
+      "root_cause": "Auto-commit non-conventional/boş mesajla ya da stage edilecek dosya yokken çalışırsa kirli/anlamsız commit üretir; mesaj shell'e enterpole edilirse injection.",
+      "evidence": "isConventional spec-regex (junk→false); commitDecision boş-stage→block; gate.mjs git'i arg-array ile çağırır (`git commit -m message`, shell yok)",
+      "fix": "isConventional ilk-satır spec-regex zorunlu; boş-stage→block; `--message` git'e arg-array olarak geçer (shell-injection yüzeyi yok); spawnSync arg-array.",
+      "prevention_rule": "Auto-commit mesajı ilk-satır Conventional-Commit regex'inden geçmeli + en az 1 scope-içi dosya olmalı; commit mesajı/yol git'e DAİMA arg-array ile (shell string interpolation yok).",
+      "test_added": "scripts/tests/commit-guard.test.ts (non-conventional block + empty-stage block + isConventional cases)",
+      "recurrence_count": 0
     }
   ]
 }

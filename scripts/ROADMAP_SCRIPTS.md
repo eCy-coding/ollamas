@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅** (autonomous one-command `make gate` + scripts-as-saas host-cost metering [usage tool, tier-weighted] + zero-manual decision defaults; node 185/1 + swift 15 + drift 18 + GATE GREEN), **v12 NEXT (gate auto-commit + metering budget enforcement)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅** (gate auto-commit `--commit`: scope-guard'lı conventional per-file commit [push/tag yok] + opt-in usage budget SLO-step; commit-guard 7 test + dogfood self-commit), **v13 NEXT (gate --watch + auto-precompute next-version scaffold)**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -218,6 +218,26 @@
 **Gate (kanıt):** `make gate` → PASS tsc/vitest(185/1)/harden(9)/drift(18)/swift(15) · SKIP actionlint · **GATE GREEN exit0**. usage canlı: self_heal 33 call×host3=99 units.
 
 **Next precomputed (→v12 gate auto-commit + budget enforcement):** `gate.mjs`'e `--commit` modu (yeşilde per-file auto-stage + conventional commit, push hariç) — zero-manual COMMIT adımını da otomatikle; + `usage.mjs --budget`'i `make gate`'e opsiyonel SLO-step olarak ekle (aylık unit bütçesi aşımı→gate uyarısı); ilk hamle = gate.mjs commit-step iskeleti (git status --porcelain parse + scope-guard: yalnız scripts/+bin/ değişmişse).
+
+---
+
+## v12 — Gate Auto-Commit + Budget Enforcement ✅ (zero-manual COMMIT)
+
+**Tema:** 0 manuel işlemin son halkası — yeşil gate'te otonom commit. **DONE** (dogfood: v12 kendi `--commit`'iyle commit'lendi).
+
+**Phases (gerçekleşen):**
+1. ✅ **Commit guard core** (`lib/commit.mjs`, pure): `parsePorcelain` (rename dahil) + `isInScope` (scripts/+bin/+.github/workflows+Makefile) + `isConventional` (spec regex, marcojahn MIT) + `commitDecision` → scope-dışı **tracked**→block (kontaminasyon RISK-SCR-015), non-conventional/boş-stage→block (RISK-SCR-016), scope-dışı **untracked** (node_modules) bloklamaz/stage'lenmez.
+2. ✅ **gate.mjs `--commit --message`**: GATE GREEN sonrası `git status --porcelain`→`commitDecision`→per-file `git add -- <path>` (asla -A)+`git commit -m` (arg-array, shell yok); **push/tag YOK**; gate RED→commit yok; message yok/non-conv→block+exit1.
+3. ✅ **usage budget SLO-step** (opt-in): `USAGE_BUDGET` env set ise `defaultSteps`'e `usage --budget` (Number-sanitized) step; over-budget→gate RED. Default OFF.
+4. ✅ **wire**: `make commit MSG="..."` hedefi; SCRIPTS_PORTABLE_PROMPT + SCRIPTS_AGENTS §6 step-7 → `gate --commit`; TAB_IDENTITY.
+
+**Adopt:** Conventional Commits spec + `marcojahn` regex (MIT), `qoomon/git-conventional-commits` type-set (MIT, desen), git porcelain/add (builtin). Zero yeni dep.
+
+**Canonical prompt:** "gate auto-commit: pure commit.mjs (parsePorcelain+isInScope+isConventional+commitDecision, scope-dışı tracked→block) + gate.mjs --commit --message (yeşil sonrası per-file git add -- + commit, arg-array, push/tag yok) + opt-in usage --budget SLO-step (USAGE_BUDGET); make commit MSG=."
+
+**Gate (kanıt):** `make gate` GATE GREEN + commit-guard 7 test + **dogfood**: `gate.mjs --commit` ile v12 kendini commit'ledi (scope-guard geçti, server/src yok).
+
+**Next precomputed (→v13 gate --watch + auto-precompute):** `gate.mjs --watch` (fs.watch scripts/+bin/ → debounce → gate koş, otonom dev-loop) + ROADMAP "next precomputed" bloğundan bir sonraki versiyonun iskelet dosyalarını (test stub + lib stub) otomatik üreten `scaffold` adımı; ilk hamle = gate.mjs'e fs.watch debounce-runner iskeleti (chokidar YOK, node:fs.watch builtin).
 
 ---
 

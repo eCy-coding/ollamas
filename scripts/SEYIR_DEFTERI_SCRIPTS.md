@@ -143,6 +143,15 @@
 - `[2026-06-20] kind=phase | P5 gate (TEK KOMUT) | make gate → PASS tsc/vitest 185-1/harden 9/drift 18/swift 15 · SKIP actionlint · GATE GREEN exit0 | 0 manuel işlem kanıtı | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v12 gate auto-commit + budget enforcement) | gate.mjs --commit modu (yeşilde per-file auto-stage+conventional commit, push hariç, scope-guard scripts/+bin/) + usage --budget'i make gate'e opsiyonel SLO-step; ilk hamle gate.mjs commit-step iskeleti (git status --porcelain parse)`
 
+## v12 — Gate Auto-Commit + Budget Enforcement ✅ (zero-manual COMMIT)
+
+- `[2026-06-20] kind=phase | P1 commit guard core | bin/host-bridge/lib/commit.mjs pure: parsePorcelain(rename) + isInScope(scripts/bin/.github-workflows/Makefile) + isConventional(spec regex marcojahn MIT) + commitDecision (scope-dışı tracked→block kontaminasyon, non-conv/boş-stage→block, node_modules ?? bloklamaz) | commit-guard.test.ts 7 case | YEŞİL`
+- `[2026-06-20] kind=phase | P2 gate --commit | gate.mjs GATE GREEN sonrası --commit --message → git status --porcelain→commitDecision→per-file git add -- (asla -A)+git commit -m (arg-array, shell yok); push/tag YOK; gate RED/message-yok/non-conv→block exit1 | YEŞİL`
+- `[2026-06-20] kind=phase | P3 budget SLO-step (opt-in) | defaultSteps USAGE_BUDGET env set ise usage --budget (Number-sanitized) step→over-budget gate RED; default OFF | YEŞİL`
+- `[2026-06-20] kind=phase | P4 wire | make commit MSG=; SCRIPTS_PORTABLE_PROMPT + SCRIPTS_AGENTS §6 step-7 → gate --commit; TAB_IDENTITY | — | YEŞİL`
+- `[2026-06-20] kind=phase | P5 gate + DOGFOOD | make gate GATE GREEN; v12 kendi gate.mjs --commit'iyle commit'lendi (zero-manual commit canlı kanıt, scope-guard geçti server/src yok) | git show --stat: yalnız scripts/+bin/+Makefile | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v13 gate --watch + auto-precompute) | gate.mjs --watch (node:fs.watch debounce, chokidar yok) otonom dev-loop + ROADMAP next-precomputed'tan sonraki versiyon iskelet (test/lib stub) üreten scaffold; ilk hamle fs.watch debounce-runner iskeleti`
+
 ---
 
 ## Hata Anlatıları

@@ -99,7 +99,7 @@ Emre **"sıradaki versiyonun todo + phase list'ini planla"** (veya "sıradaki ve
 4. CODE   en küçük diff, §3 scope içinde
 5. GATE   `make gate` (TEK komut = tsc + vitest + harden + drift-check + swift; v11) → yeşil
 6. LOG    SEYIR_DEFTERI_SCRIPTS.md + errors_registry.json güncelle; bir sonraki versiyonu precompute et; TAB_IDENTITY_SCRIPTS.md §3 STATUS SNAPSHOT'ı yeni shipped/next/horizon ile tazele (kimlik self-updating)
-7. COMMIT yeşil gate'te auto-commit (per-file `git add`, conventional `feat|fix|refactor|chore|docs|test(scripts): ...`). Push ve git tag ASLA otomatik değil — operatör kararı.
+7. COMMIT yeşil gate'te `node bin/host-bridge/gate.mjs --commit --message "<conventional>"` (veya `make commit MSG="..."`) — scope-guard'lı per-file auto-commit (cross-lane tracked değişiklik→block, ERR-SCR-001). Push ve git tag ASLA otomatik değil — operatör kararı.
 ```
 
 **Zero-manual (v11):** Bu sekme 0 manuel seçim / 0 manuel işlem ile çalışır — kararları `SCRIPTS_PORTABLE_PROMPT.md` "ZERO-MANUAL DECISION DEFAULTS"tan otomatik ver (adoption=en-yıldız+permissive, model auto-route, gate=`make gate`, yeşil→auto-commit).

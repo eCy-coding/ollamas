@@ -13,6 +13,7 @@ import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { commitDecision } from "./lib/commit.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.OLLAMAS_REPO || join(HERE, "..", "..");
@@ -59,7 +60,28 @@ export function defaultSteps() {
     have("actionlint")
       ? { name: "actionlint", cmd: "actionlint" }
       : { name: "actionlint", skip: true, reason: "actionlint not on PATH (CI docker image covers it)" },
+    // Opt-in budget SLO-step: over the monthly unit budget → gate RED (v12).
+    ...(process.env.USAGE_BUDGET
+      ? [{ name: "budget", cmd: `node bin/host-bridge/tools/usage.mjs --budget ${Number(process.env.USAGE_BUDGET) || 0}` }]
+      : []),
   ];
+}
+
+// Scope-guarded autonomous commit after a green gate (v12). git via arg-arrays
+// (no shell) — never push, never tag. Returns {ok, reason}.
+function autoCommit(message) {
+  if (!message) return { ok: false, reason: "--commit requires --message \"<conventional msg>\"" };
+  const st = spawnSync("git", ["-C", REPO, "status", "--porcelain"], { encoding: "utf8" });
+  if (st.status !== 0) return { ok: false, reason: "git status failed" };
+  const decision = commitDecision(st.stdout, message);
+  if (!decision.ok) return { ok: false, reason: decision.reason, violations: decision.violations };
+  for (const path of decision.stage) {
+    const add = spawnSync("git", ["-C", REPO, "add", "--", path], { stdio: "inherit" });
+    if (add.status !== 0) return { ok: false, reason: `git add failed: ${path}` };
+  }
+  const ci = spawnSync("git", ["-C", REPO, "commit", "-m", message], { stdio: "inherit" });
+  if (ci.status !== 0) return { ok: false, reason: "git commit failed" };
+  return { ok: true, reason: "committed", staged: decision.stage };
 }
 
 // Real runner: spawn the command, THROW on non-zero exit so runGate marks it failed.
@@ -82,5 +104,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log("───────────────────────────────────────");
     console.log(verdict.ok ? "[+] GATE GREEN" : `[!] GATE RED — failed: ${verdict.failed.join(", ")}`);
   }
-  process.exit(verdict.ok ? 0 : 1);
+  if (!verdict.ok) process.exit(1);
+
+  // --commit: autonomous scope-guarded conventional commit on a green gate (v12).
+  if (process.argv.includes("--commit")) {
+    const mi = process.argv.indexOf("--message");
+    const message = mi >= 0 ? process.argv[mi + 1] : "";
+    const res = autoCommit(message);
+    if (!res.ok) {
+      console.error(`[!] auto-commit blocked: ${res.reason}` + (res.violations?.length ? ` → ${res.violations.join(", ")}` : ""));
+      process.exit(1);
+    }
+    console.log(`[+] auto-committed ${res.staged.length} file(s) (no push, no tag): ${message.split("\n")[0]}`);
+  }
+  process.exit(0);
 }

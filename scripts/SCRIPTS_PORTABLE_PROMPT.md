@@ -49,7 +49,7 @@ operator to choose; auto-decide from these defaults (stop only on a Scope/securi
 - **Adoption pick:** highest-star repo with a permissive license (MIT/Apache/BSD/ISC) that runs on macOS; ties → most recently maintained. GPL → tool-only. Take the smallest working pattern.
 - **Model route:** plan/hard-debug → Opus 4.8; implementation/tests → Sonnet 4.6; mechanical/search → Haiku 4.5; token-zero local work → ollama on M4 (fastest-correct by tok/s). Never benchmark Claude locally; never route to Fable 5 (suspended).
 - **Gate:** always `make gate` (one command — never hand-stitch the sub-checks).
-- **Commit:** on a green gate, auto-commit (per-file `git add`, conventional message). **Never auto-push** and never push a git tag — those are the operator's call.
+- **Commit:** on a green gate, auto-commit via `node bin/host-bridge/gate.mjs --commit --message "<conventional>"` (or `make commit MSG="..."`). It scope-guards (only scripts/+bin/+.github/workflows+Makefile; cross-lane tracked change → blocked), requires a Conventional Commit message, and stages per-file. **Never auto-push** and never push a git tag — those are the operator's call.
 - **Version:** on "plan the next version", read the roadmap's precomputed next + errors registry and proceed through §TRIGGER without pausing.
 
 ## QUALITY GATE (one command, fresh run, all green before commit)
