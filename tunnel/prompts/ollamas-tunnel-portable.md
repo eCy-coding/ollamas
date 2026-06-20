@@ -61,18 +61,18 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
 - **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Autonomous Switch Engine;
-  `tunnel auto`) · vT5 (Security: DNS-rebind guard + AES-256-GCM vault + `tunnel rotate`) · vT6 (Observability:
-  `tunnel status` + sparkline + decision-log JSONL feed) · **vT7 (Resilience: `tunnel daemon install` =
-  LaunchAgent RunAtLoad+KeepAlive running `auto --watch` at login + crash-restart; connectivity classify
-  online/lan-only/offline — the 0-manuel-işlem capstone)**. Tests: 127/127, tsc 0, VERSION 7.0.0.
-- **NEXT = vT8** — Benchmark (per-transport latency p50/p90 + leaderboard; `tunnel bench`) + connectivity-aware
-  routing (skip mesh/reverse when offline) + log-rotation (daemon.log/decisions.jsonl). (See ROADMAP vT8.)
-- Roadmap horizon: vT9 remote reverse-tunnel (FRP/Bore — **deferred/parked**, manual VPS, breaks 0-manuel +
-  sovereign-zero-account) → vT10 ecosystem.
-- **0-manuel invariant:** `daemon install` is one-time (brew-like); afterward login-auto-start + crash-restart →
-  the user never runs anything again. `auto` self-selects/heals; `rotate` age-based; `status` read-only; secrets
-  auto-keyfile (no passphrase). Honest limits: auto-keyfile co-located (RISK-014); logs read-capped, full
-  rotation vT8 (RISK-018/020).
+  `tunnel auto`) · vT5 (Security: guard + AES-256-GCM vault + `tunnel rotate`) · vT6 (Observability:
+  `tunnel status` + sparkline + JSONL feed) · vT7 (Resilience: `tunnel daemon install` = LaunchAgent
+  login-auto + crash-restart; the 0-manuel-işlem capstone) · **vT8 (Benchmark: `tunnel bench` per-transport
+  p50/p90/min/max; size-based log-rotation for decisions.jsonl + daemon.log — RISK-018/020 resolved)**.
+  Tests: 137/137, tsc 0, VERSION 8.0.0.
+- **NEXT = vT9** — Connectivity-aware routing (transport `reachVia` lan/internet/both + skip internet-only
+  transports when offline/lan-only, reusing vT7 classify). Pure, 0-manuel. (See ROADMAP vT9.)
+- Roadmap horizon: vT10 ecosystem (`tunnel up` one-command + QR onboarding + integrations-gateway federation)
+  → vT11+ remote reverse-tunnel (FRP/Bore — **parked**: manual VPS breaks 0-manuel + sovereign-zero-account).
+- **0-manuel invariant:** `daemon install` one-time → afterward fully autonomous; `auto` self-heals; `rotate`
+  age-based; `status`/`bench` read-only; secrets auto-keyfile; logs auto-rotate. Nothing prompts. Honest limit:
+  auto-keyfile co-located (RISK-014); p99 omitted (small N).
 
 ## 6. SELF-REPORT
 

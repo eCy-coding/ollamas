@@ -9,6 +9,7 @@
 //   rotate   age-based auto WireGuard key rotation; old config sealed to vault; --force (vT5)
 //   status   observability: active transport + latency sparkline + breaker + connectivity; --json|--watch (vT6)
 //   daemon   install|uninstall|status a LaunchAgent running `auto --watch` at login + on crash (vT7)
+//   bench    per-transport p50/p90 latency over N samples (--samples N, --json) (vT8)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -65,7 +66,11 @@ import {
   type DaemonPlan,
 } from "./daemon.ts";
 import { classify, internetReachable } from "./connectivity.ts";
+import { benchmarkTransports, renderBenchTable } from "./bench.ts";
+import { rotateIfNeeded } from "./logrotate.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
+
+const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
 
 const DECISIONS_PATH = () => join(KEYS_DIR, "decisions.jsonl");
 
@@ -76,6 +81,7 @@ async function persistDecision(sw: TunnelSwitch): Promise<void> {
   try {
     await mkdir(KEYS_DIR, { recursive: true });
     appendDecision(DECISIONS_PATH(), d);
+    rotateIfNeeded(DECISIONS_PATH(), LOG_CAP); // bound the feed (RISK-018)
   } catch {
     // observability feed is best-effort; never block the command.
   }
@@ -306,6 +312,8 @@ async function cmdSelect(): Promise<void> {
 // Autopilot: zero manual selection / zero manual operation (vT4).
 async function cmdAuto(): Promise<void> {
   const watch = process.argv.includes("--watch");
+  // Rotate the daemon log on each (re)start so 24/7 `auto --watch` can't grow it unbounded (RISK-020).
+  rotateIfNeeded(join(KEYS_DIR, "daemon.log"), LOG_CAP);
   const { sw, transports } = buildSwitch();
   if (watch) {
     console.log("autopilot --watch: self-heal loop (Ctrl-C to stop)");
@@ -367,6 +375,16 @@ function daemonPlan(): DaemonPlan {
   };
 }
 
+// Benchmark (vT8): N timed probes per transport → p50/p90 table. Read-only, 0 prompt.
+async function cmdBench(): Promise<void> {
+  const json = process.argv.includes("--json");
+  const sIdx = process.argv.indexOf("--samples");
+  const samples = sIdx >= 0 ? Number(process.argv[sIdx + 1]) || 5 : 5;
+  const { transports } = buildSwitch();
+  const results = await benchmarkTransports(transports, { samples });
+  console.log(json ? JSON.stringify(results, null, 2) : renderBenchTable(results));
+}
+
 async function cmdDaemon(): Promise<void> {
   const sub = process.argv[3] ?? "status";
   const plan = daemonPlan();
@@ -423,9 +441,11 @@ async function main(): Promise<void> {
       return cmdStatus();
     case "daemon":
       return cmdDaemon();
+    case "bench":
+      return cmdBench();
     default:
       console.log(
-        "usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status|daemon> [install|uninstall|status] [--watch|--json|--force]",
+        "usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--watch|--json|--force|--samples N]",
       );
   }
 }

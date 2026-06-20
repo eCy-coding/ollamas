@@ -158,10 +158,25 @@
   `node src/cli.ts daemon status` → yüklü-değil zarif (0-prompt). RISK-019/020/021. Device-daemon kanıtı
   (login restart) Emre'de.
 
+## Faz 10 — Benchmark + Log-rotation (vT8) — 0 manuel
+
+- **Critical-tespit (gereksiz işten kaçın):** precomputed vT8 üçlüsünden connectivity-routing vT9'a ertelendi
+  (henüz internet-only transport yok → gereksiz). vT8 = Benchmark (kullanıcının tekrarlı isteği) + Log-rotation
+  (vT7 daemon 7/24 yazımı → şimdi kritik).
+- **Karar (research):** percentile nearest-rank (Last9/OneUptime; p99 ATLA=az-örnek-dürüst), file-rotator
+  zero-dep (rogerc/Zelgadis87). Fikir/pattern-port.
+- **Ne:** `bench.ts` PURE percentile/summarize(p50/p90/min/max/mean) + benchmarkTransports(injected timeProbe) +
+  renderBenchTable · `logrotate.ts` PURE-ish rotateIfNeeded(size→ring keep-N) · `cli.ts bench [--json|--samples]`
+  + persistDecision→rotate(decisions.jsonl) + cmdAuto-start→rotate(daemon.log).
+- **Nasıl:** percentile/summarize/rotateIfNeeded PURE+deterministik (enjekte values/timeProbe/temp-fs) → ağsız
+  test. Live scoring DEĞİŞMEDİ (bench diagnostic) → regression yok. RISK-018/020 TAM çözüldü (resolved_in vT8).
+- **Niçin:** "benchmark'tan geçen en iyi seçim" görünürlüğü (p50/p90 stabil) + daemon 7/24 log büyümesini sınırla.
+- **Kanıt:** `node --test` → **137/137 green** (bench 5 + logrotate 5 yeni); `typecheck` 0; `node src/cli.ts
+  bench` → transport-yokken healthy 0% zarif (0-prompt). RISK-022. VERSION 8.0.0.
+
 ---
-**Toplam (vT1..vT7 kod):** 5 governance + 18 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/status/daemon/connectivity/cli)
-+ 17 test dosya (127 test) + 5 iOS/feed/daemon reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip +
-node:test), zero-account. tsc 0 + test 127/127. VERSION 7.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001
-(strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7
-device-daemon Emre'de; vT4/vT5/vT6 cihaz-kanıtı gerektirmez — 0 manuel.
+**Toplam (vT1..vT8 kod):** 5 governance + 20 src modül (…+bench+logrotate) + 19 test dosya (137 test) +
+5 iOS/feed/daemon reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
+tsc 0 + test 137/137. VERSION 8.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
+ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları + vT7 device-daemon Emre'de;
+vT4/vT5/vT6/vT8 cihaz-kanıtı gerektirmez — 0 manuel. RISK-018/020 vT8'de çözüldü.

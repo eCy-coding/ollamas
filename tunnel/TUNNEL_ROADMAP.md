@@ -12,9 +12,10 @@
 | **vT5** | **Security hardening** | private-host DNS-rebind guard + AES-256-GCM vault (auto-keyfile, **0-manuel**) + age-based auto WG key-rotation; mTLS ertelendi (iPhone client-cert manuel) | guard/GCM/rotation pattern (fikir/MIT) | ✅ DONE |
 | **vT6** | **Observability** | `tunnel status [--json\|--watch]` (active + latency sparkline + breaker) + secret-free decision-log JSONL feed → orchestration cockpit; pure, **0-manuel** | node-sparkline/CLI-best-practice/JSONL-feed (MIT/fikir) | ✅ DONE |
 | **vT7** | **Resilience / Always-On Daemon** | LaunchAgent (RunAtLoad+KeepAlive) `tunnel auto --watch` login'de oto + crash-restart + connectivity classify (online/lan-only/offline); **0 manuel işlem capstone** | launchd-keepalive/Connectivity (MIT/fikir) | ✅ DONE |
-| vT8 | Benchmark | MacBook↔iOS per-transport latency/throughput, p50/p90, en-verimli seçim, leaderboard (scripts bench-metrics reuse) + connectivity-aware routing (offline'da mesh/reverse atla) + log-rotation | — | NEXT |
-| vT9 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server. **⚠️ ERTELENDİ (parked)**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
+| **vT8** | **Benchmark + Log-rotation** | per-transport p50/p90/min/max latency (`tunnel bench`) + size-based log-rotation (decisions.jsonl + daemon.log, RISK-018/020 ÇÖZÜLDÜ); **0 manuel** | percentile-nearest-rank/file-rotator (fikir) | ✅ DONE |
+| vT9 | Connectivity-aware routing | transport `reachVia` (lan/internet/both) metadata + offline/lan-only'de internet-gerektiren transport'ları skorlamadan ele (vT7 classify reuse); IPv6/NAT iyileştirme | — | NEXT |
 | vT10 | Ecosystem | `ollamas tunnel up` one-command, QR onboarding, federation w/ integrations gateway, multi-tenant exposure policy | — | planned |
+| vT11+ | Remote reverse-tunnel | kendi VPS'te FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -121,12 +122,28 @@
   (0-prompt); renderLaunchAgent RunAtLoad+KeepAlive+`auto --watch` deterministik. VERSION 7.0.0.
 - **0-manuel:** install tek-seferlik; sonrası login-oto + crash-restart → recurring manuel işlem YOK.
 
-## vT8 — NEXT (önceden-hesaplanmış ilk todo'lar) — Benchmark + connectivity-aware
+## vT8 — DONE (kanıt) — Benchmark + Log-rotation (0 manuel)
 
-1. `src/bench.ts` — PURE per-transport latency örnekleme (selectAuto timed-probe serisi) + p50/p90 (yaklaşık,
-   CLI top N-018 deseni). Leaderboard skor reuse (scoring.ts). `cli.ts bench [--json]`.
-2. **connectivity-aware routing:** offline/lan-only'de mesh/reverse transport'ları skorlamadan ele (vT7
-   classify + transport `requiresInternet` metadata) — futile probe önle.
-3. **log-rotation:** daemon.log + decisions.jsonl boyut/yaş-tabanlı döndürme (RISK-020/018 tam çözüm).
-4. scripts lane `bench-metrics.mjs` format uyumu (cross-lane doküman, edit YOK).
-5. errors_registry bench riskleri; ADOPTION MinhNgyuen/llm-benchmark (MIT, ölçüm deseni).
+> **Critical-tespit re-scope:** connectivity-aware routing vT8'den vT9'a ertelendi (henüz internet-ONLY
+> transport yok → gereksiz-iş). vT8 = Benchmark (kullanıcının tekrarlı isteği) + Log-rotation (vT7 daemon
+> 7/24 yazımı → şimdi kritik).
+
+- `src/bench.ts` PURE percentile(nearest-rank) + summarize(count/min/max/mean/p50/p90, p99 ATLA=az-örnek-dürüst)
+  + benchmarkTransports(injected timeProbe, never-throws) + renderBenchTable (sparkline reuse). **5 test.**
+- `src/logrotate.ts` PURE-ish rotateIfNeeded (size>maxBytes → .1/.2/.keep ring, en-eski-düş, never-throws). **5.**
+- `cli.ts bench [--json] [--samples N]` (read-only) + persistDecision→rotateIfNeeded(decisions.jsonl) +
+  cmdAuto-start→rotateIfNeeded(daemon.log) → RISK-018/020 TAM çözüldü.
+- Live scoring DEĞİŞMEDİ (bench diagnostic eklenti; selectAuto zaten ölçüyor) → regression yok.
+- Adoption: percentile nearest-rank (Last9/OneUptime fikir), file-stream-rotator/simple-file-rotator (pattern).
+  RISK-TUNNEL-022 (bench↔daemon live-probe ölçüm-gürültüsü → samples küçük).
+- **Kanıt:** `node --test` **137/137 GREEN**, tsc 0; `node src/cli.ts bench` → transport-yokken healthy 0% zarif
+  (0-prompt). VERSION 8.0.0.
+
+## vT9 — NEXT (önceden-hesaplanmış ilk todo'lar) — Connectivity-aware routing
+
+1. `transport.ts` Transport'a `reachVia: "lan"|"internet"|"both"` ekle (WG=lan, LAN-TLS=lan, Headscale=both).
+2. `switch.ts selectAuto` connectivity (vT7 classify) al → offline/lan-only'de internet-gerektiren (reachVia
+   internet/both-uzak) transport'ları aday-dışı bırak (futile probe önle). PURE karar, geri-uyumlu.
+3. internetReachable'ı selectAuto'ya opsiyonel enjekte (default skip → mevcut testler korunur).
+4. IPv6/NAT iyileştirme notları; errors_registry routing riskleri.
+5. (vT11+ reverse-tunnel parked kalır — internet-ONLY transport o zaman gelir.)

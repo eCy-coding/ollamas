@@ -86,13 +86,13 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1..vT7 (son vT7) · test 127 · risk 21+2err · VERSION 7.0.0 (aligned)
-next: vT8 Benchmark + connectivity-aware routing + log-rotation · ollamas core v1.6.0 / feat/v1.11-roots-abort
+branch: feat/tunnel-v1 · shipped: vT1..vT8 (son vT8) · test 137 · risk 22+2err · VERSION 8.0.0 (aligned)
+next: vT9 Connectivity-aware routing (reachVia + offline-skip) · ollamas core v1.6.0 / feat/v1.11-roots-abort
 transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
-otonom: `tunnel daemon install` login-oto+crash-restart (0-manuel-işlem capstone) · `auto`/`rotate`/`status`
-güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free
+otonom: `daemon install` login-oto+crash-restart · `auto`/`rotate`/`status`/`bench` · log-rotation oto (RISK-018/020 çözüldü)
+güvenlik: DNS-rebind guard + AES-256-GCM vault (auto-keyfile RISK-014) · feed keys/decisions.jsonl secret-free+rotated
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-✓ VERSION 7.0.0 = son shipped vT7 (drift yok)
+✓ VERSION 8.0.0 = son shipped vT8 (drift yok)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -119,3 +119,6 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
 - 2026-06-20 — vT7 (Resilience/Daemon) ship: yeni sürekli-yetenek — `tunnel daemon install` LaunchAgent
   (RunAtLoad+KeepAlive) `auto --watch` login-oto+crash-restart = 0-manuel-işlem CAPSTONE; connectivity classify
   status'a eklendi. Critical-tespit re-sequence: Benchmark→vT8 (daemon daha kritik). VERSION 7.0.0. 127/127.
+- 2026-06-20 — vT8 (Benchmark + Log-rotation) ship: `tunnel bench [--json|--samples]` p50/p90/min/max +
+  size-based log-rotation (decisions.jsonl + daemon.log → RISK-018/020 çözüldü). connectivity-routing vT9'a
+  ertelendi (gereksiz-iş kaçınma). Live scoring değişmedi (bench diagnostic). VERSION 8.0.0. 137/137.
