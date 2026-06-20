@@ -15,14 +15,39 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      volumes:
+        # Writable scratch space required when readOnlyRootFilesystem is true.
+        - name: tmp
+          emptyDir: {}
+        # Persists seyir-defteri.jsonl, .master_key, config.json (and saas.db in
+        # sqlite mode). PVC (persistence.enabled=true) keeps the AES-256-GCM vault
+        # master key alive across pod reschedules; falls back to emptyDir for dev.
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
       containers:
         - name: ollamas
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports: [{ containerPort: {{ .Values.service.targetPort }} }]
+          # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: MISSION_CONTROL_DATA_DIR
+              value: {{ .Values.missionControlDataDir }}
           envFrom:
             - configMapRef: { name: {{ .Release.Name }}-config }
             - secretRef: { name: {{ .Release.Name }}-secrets }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: {{ .Values.missionControlDataDir }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
           livenessProbe:
             httpGet: { path: /api/health, port: {{ .Values.service.targetPort }} }

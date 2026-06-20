@@ -204,6 +204,14 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Prevention (RISK-MCP):** Süreli her tablo (token/code/session) bir retention-sweeper ister; sweeper YALNIZ expired siler (aktif güvenlik-pencerelerini bozma).
 - **Sonraki (önceden hesaplandı):** v1.18 — resource subscriptions (stdio-stateful; stateless-HTTP best-effort belgeli). OAuth AS artık üretim-tam (authcode+PKCE+refresh-rotation+client_credentials+resource-binding+tenant-isolation+GC).
 
+## Faz 27 — Deploy manifest güvenlik hardening (container securityContext + master-key PVC, branch feat/deploy-hardening, izole worktree, zero-dep)
+- **Ne:** semgrep **Blocking** `allow-privilege-escalation-no-securitycontext` (CIS K8s) — 4 manifestte container-level securityContext yoktu (sadece pod-level). KRİTİK + SAHİPSİZ (hiçbir lane deploy/ dokunmuyor) + general-lane scope. Re-audit ile seçildi (yeni-repo değil, gold-plating reddedildi). **0 yeni dep.**
+- **Nasıl:** 4 manifeste (k8s ollamas+migration-job, helm deployment+migration-job) container securityContext: `allowPrivilegeEscalation:false` + `capabilities.drop:[ALL]` + `seccompProfile:RuntimeDefault` + `runAsNonRoot:true` + `readOnlyRootFilesystem:true`. readOnly için `/tmp` emptyDir. Helm `containerSecurityContext` values'ta (toYaml). docker-compose postgres zaten named-volume ile güvenli (değişmedi).
+- **Opus-review düzeltmesi (kritik regresyon önlendi):** ilk pass data dir'i emptyDir yapmıştı → `.master_key` (db.ts:118-124 diske üretir/okur) reschedule'da kaybolur → vault tüm şifreli veriyi açamaz. Kök-neden doğrulandı (env değil, dosya), data dir **PVC**'ye çevrildi (k8s `ollamas-data` PVC; helm gated `persistence` + pvc.yaml template, enabled/disabled iki mod render). Migration-job readOnly+/tmp = güvenli (yalnız Postgres'e yazar), dokunulmadı.
+- **Niçin:** Container privilege-escalation = gerçek konteyner-kaçış riski; readOnly + cap-drop = saldırı yüzeyi daralt. Master-key PVC = vault dayanıklılığı (reschedule'da veri kaybı yok).
+- **Kanıt:** k8s multi-doc YAML valid (ollamas 7 doc + PVC, migration 1); `helm template` persistence true/false İKİ mod render; rendered securityContext count=2 (her iki workload). Değişiklik YAML/helm-only → TS ağacı etkilenmez (`npm run lint` temiz doğruladı; vitest/conformance ilgisiz → çalıştırılmadı, dürüst kapsam). Canlı k8s cluster yok → apply test edilemez (dürüst not). İzole branch; push yok.
+- **Sonraki (önceden hesaplandı):** OpenAPI ingest-route ekleme BİLEREK atlandı (spec küratörlü public-SaaS yüzeyi; internal upstream webhook kasıtlı dışında — gereksiz iş). Bu lane'de başka kritik-sahipsiz deploy işi yok → operatör merge (feat/deploy-hardening + feat/ukp-ingest-receiver). Sonraki tur plan.next.md §AUTO-SELECT.
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

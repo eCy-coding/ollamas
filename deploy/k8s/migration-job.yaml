@@ -23,13 +23,31 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      volumes:
+        # /tmp writable scratch for tsx/Node.js runtime (required with readOnlyRootFilesystem).
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: migrate
           image: ghcr.io/ecy-coding/ollamas:latest
           command: ["tsx", "server.ts", "--migrate-only"]
+          # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
+          # readOnlyRootFilesystem: true is safe for --migrate-only: all writes go to
+          # Postgres via DATABASE_URL; /tmp covers any Node/tsx temp files.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
           envFrom:
             - configMapRef: { name: ollamas-config }
             - secretRef: { name: ollamas-secrets }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests: { cpu: "100m", memory: "256Mi" }
             limits: { cpu: "1", memory: "512Mi" }

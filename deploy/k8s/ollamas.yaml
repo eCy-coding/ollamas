@@ -50,13 +50,43 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      volumes:
+        # Writable scratch space required when readOnlyRootFilesystem is true.
+        - name: tmp
+          emptyDir: {}
+        # Persists seyir-defteri.jsonl, .master_key, config.json (and saas.db in
+        # sqlite mode). PVC ensures the AES-256-GCM vault master key (.master_key)
+        # survives pod reschedules — loss would make all encrypted vault data
+        # unreadable. Backed by the ollamas-data PVC defined below.
+        - name: data
+          persistentVolumeClaim:
+            claimName: ollamas-data
       containers:
         - name: ollamas
           image: ghcr.io/ecy-coding/ollamas:latest
           ports: [{ containerPort: 3000 }]
+          # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
+          # readOnlyRootFilesystem: true is safe here because /tmp and the data dir
+          # are backed by emptyDir volumes declared above.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          env:
+            - name: MISSION_CONTROL_DATA_DIR
+              value: /data/llm-mission-control
           envFrom:
             - configMapRef: { name: ollamas-config }
             - secretRef: { name: ollamas-secrets }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /data/llm-mission-control
           resources:
             requests: { cpu: "250m", memory: "512Mi" }
             limits: { cpu: "2", memory: "2Gi" }
@@ -104,3 +134,13 @@ spec:
   minAvailable: 1
   selector:
     matchLabels: { app: ollamas }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollamas-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
