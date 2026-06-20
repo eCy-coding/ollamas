@@ -24,7 +24,7 @@ import { isSea } from "node:sea";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 import { describeKeystore, migrateKeySource } from "./lib/keystore";
 
-const VERSION = "15.0.0";
+const VERSION = "16.0.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
