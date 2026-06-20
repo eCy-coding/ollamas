@@ -197,6 +197,12 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tam suite **196 passed/2 skipped** (+7: prune-direct, prune-disabled, env-gated prune via record, retention-baseline, type-filter çift-yön, http ?event_type); tsc temiz; conformance 3/3; vite+server+stdio bundle. Opus bağımsız gate doğruladı.
 - **HAND-OFF:** ingest feature artık operasyonel olarak TAM (receiver↔consumer↔retention). Branch `feat/ukp-ingest-receiver` (4 commit: 8810459+c7e0369+bu) operatör merge'üne hazır. **Bu lane'de kritik-sahipsiz iş KALMADI** — sonraki general-lane turu YENİ kritik boşluğa bağlı (plan.next.md §AUTO-SELECT); yoksa doğru aksiyon merge'dir, izole commit üretmek değil. Busywork üretme.
 
+## Faz 26-LIVE — CANLI doğrulama (ollamas gerçek-zamanlı çalıştırıldı, ingest ops M4'te e2e test edildi)
+- **Ne:** Birim/conformance ötesi: gerçek sunucu boot edilip ingest endpoint'leri canlı vuruldu (kullanıcı: "ollamas'ı artık çalıştır ve işlemlerini test et/kullan"). İzole **:3100** + temp DB + ingest env (paralel sekmenin :3000 canlı sunucusu DOKUNULMADI).
+- **Ortam:** `npx tsx server.ts` LIVE mode, db=up, **Ollama 0.30.10 + qwen3:8b-16k yüklü**, darwin arm64 (M4). Health 1sn'de yeşil.
+- **Kanıt (8/8 PASS, canlı HTTP):** receiver `200 {recorded:true}` · idempotency replay `200 {recorded:false}` · HMAC tampered `401` · admin list `200 len=2` · no-token `401` · `?event_type` filter `len=1 allDogrula` · metric `ukp_stage_events_total{event_type="stage.dogrula",recorded="true"} 1` · core `/api/capabilities 200`. Sunucu temiz kapatıldı (:3100 stopped, :3000 untouched, temp temizlendi).
+- **Sonuç:** ingest feature çalışan M4 ollamas'ında uçtan-uca KANITLI (sadece kod değil, runtime). Retention canlı-boot ile değil birim-testle kanıtlı + env-gated (dürüst kapsam). Kod değişikliği yok → gate koşulmadı (validation-only).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.
