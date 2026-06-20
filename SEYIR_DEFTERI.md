@@ -162,6 +162,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** tam suite **163 passed/2 skipped** (+2 federated-roots: agrege + graceful-boş; ilk full-run'da conformance inspector "fetch failed" **flaky**→izole 3/3 + re-run temiz, env-level port, regresyon değil); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle. Abort yolu = v1.11 birim testleri + e2e kod-yolu (providers `buildSignal` modül-private, sessiz-skip yok — dürüst not).
 - **Sonraki (önceden hesaplandı):** v1.13 — OAuth refresh + RFC 9700 rotation (migration v4) · client_credentials grant · resource subscriptions · expose-side sampling-to-tool.
 
+## Faz 22 — v1.13 (OAuth Refresh-Token Rotation [RFC 9700] + Client-Credentials Grant, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** OAuth 2.1 AS'i M2M + uzun-oturum için tamamladı. **0 yeni dep** — SDK `mcpAuthRouter` refresh_token grant'ı zaten provider'a yönlendirir; rotation deseni RFC 9700 + node-oidc-provider (MIT) fikir-port; stdlib `crypto.timingSafeEqual`/`randomUUID`.
+- **Nasıl:** 22A **refresh+rotation** — migration v4 `oauth_refresh_tokens` (`family_id`+`used`); `saveRefreshToken`/`rotateRefreshToken`/`revokeRefreshFamily`/`refreshFamilyOf`; `exchangeAuthorizationCode`→access+refresh (14g, yeni family), `exchangeRefreshToken`→her kullanımda rotate (aynı family yeni çift), **used replay→family revoke (reuse detection)**, scope yalnız daralır, `revokeToken`→access+family; DCR default grant_types+=refresh_token. 22B **client_credentials** — `verifyClientSecret` (timing-safe) + `mcpAuthRouter`-öncesi `/token` pre-route (SDK reddeder) → confidential+tenant-bound+grant-allowed→access (refresh yok), else `invalid_client`/`unauthorized_client`; diğer grant'lar SDK'ya pass-through.
+- **Niçin:** Refresh = kısa-ömürlü access + güvenli yenileme (çalınan token RFC 9700 ile tespit→family çöker); client_credentials = sunucu-sunucu (M2M) entegrasyon, ürünün SaaS-gateway kimliği.
+- **Kanıt:** gerçek suite **173 passed/2 skipped** (+10: 7 refresh store+provider, 3 cc self-boot e2e); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle. **NOT:** tam-tarama 1 fail = `.claude/worktrees/agent-*/ClusterE2ELive.test.ts` (BAŞKA lane'in subagent-worktree'si, `/api/cluster` relative-URL kendi bug'ı) — MCP scope DIŞI, regresyon değil; `--exclude '**/.claude/**'` ile gerçek suite 0-fail.
+- **Sonraki (önceden hesaplandı):** v1.14 — expose-side sampling'i somut tool'a bağlama · resource subscriptions (stateless transport sınırı) · (OAuth tarafı tam: authcode+PKCE+refresh-rotation+client_credentials).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

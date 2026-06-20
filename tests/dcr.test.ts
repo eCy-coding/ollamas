@@ -43,7 +43,7 @@ describe("DCR client registration (store)", () => {
 
   test("defaults grant_types when omitted", async () => {
     const r = await store.registerClient({});
-    expect(r.grant_types).toEqual(["authorization_code"]);
+    expect(r.grant_types).toEqual(["authorization_code", "refresh_token"]); // refresh added in v1.13
   });
 
   test("migration v2 (oauth_clients) is recorded + idempotent", async () => {

@@ -23,7 +23,7 @@ import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey } from "./server/store";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -1308,6 +1308,43 @@ content
       });
     } catch (err: any) {
       res.status(500).json({ error: "server_error", error_description: err?.message || "registration failed" });
+    }
+  });
+
+  // Faz 22 (v1.13): client_credentials grant (M2M). The SDK's /token handler
+  // rejects this grant (UnsupportedGrantTypeError), so we intercept it BEFORE
+  // mcpAuthRouter; every other grant_type falls through to the SDK unchanged.
+  // Confidential clients only (timing-safe secret verify), tenant-bound, and the
+  // grant must be in the client's registered grant_types. No refresh token (M2M).
+  const parseClientAuth = (req: express.Request): { clientId?: string; secret?: string } => {
+    const hdr = req.headers.authorization;
+    if (typeof hdr === "string" && /^Basic\s+/i.test(hdr)) {
+      const [id, sec] = Buffer.from(hdr.replace(/^Basic\s+/i, ""), "base64").toString("utf8").split(":");
+      return { clientId: id, secret: sec };
+    }
+    return { clientId: req.body?.client_id, secret: req.body?.client_secret };
+  };
+  app.post("/token", async (req, res, next) => {
+    if (req.body?.grant_type !== "client_credentials") return next(); // SDK handles the rest
+    try {
+      const { clientId, secret } = parseClientAuth(req);
+      if (!clientId || !secret || !(await verifyClientSecret(clientId, secret))) {
+        return res.status(401).json({ error: "invalid_client" });
+      }
+      const client = await getClient(clientId);
+      if (!client) return res.status(401).json({ error: "invalid_client" });
+      if (!client.grant_types.includes("client_credentials")) {
+        return res.status(400).json({ error: "unauthorized_client", error_description: "grant_type not allowed for this client" });
+      }
+      if (!client.tenant_id) {
+        return res.status(400).json({ error: "unauthorized_client", error_description: "client is not bound to a tenant" });
+      }
+      const scope = typeof req.body.scope === "string" ? req.body.scope : "";
+      const resource = typeof req.body.resource === "string" ? req.body.resource : null;
+      const access = await saveOAuthToken({ client_id: clientId, tenant_id: client.tenant_id, scopes: scope, resource, ttlSecs: 3600 });
+      return res.json({ access_token: access, token_type: "bearer", expires_in: 3600, scope: scope || undefined });
+    } catch (err: any) {
+      return res.status(500).json({ error: "server_error", error_description: err?.message });
     }
   });
 

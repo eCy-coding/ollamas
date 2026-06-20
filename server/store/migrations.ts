@@ -88,6 +88,29 @@ export const MIGRATIONS: Migration[] = [
       catch (e: any) { if (!/duplicate column|already exists/i.test(String(e?.message))) throw e; }
     },
   },
+  {
+    version: 4,
+    name: "oauth_refresh_tokens",
+    // OAuth 2.1 refresh tokens with RFC 9700 rotation (Faz 22, v1.13). Each refresh
+    // token belongs to a `family_id` (the chain born from one authorization grant).
+    // On use a token is marked used=1 and a new one is issued in the same family;
+    // presenting an already-used token (replay/theft) revokes the WHOLE family
+    // (reuse detection). Opaque, SHA-256-hashed. Text PKs → identical on both dialects.
+    up: async (db) => {
+      await db.exec(`CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+        refresh_token_hash TEXT PRIMARY KEY,
+        family_id TEXT NOT NULL,
+        client_id TEXT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        scopes TEXT NOT NULL DEFAULT '',
+        resource TEXT,
+        expires_at TEXT NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )`);
+      await db.exec("CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens(family_id)");
+    },
+  },
 ];
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:

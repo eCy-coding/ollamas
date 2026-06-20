@@ -12,9 +12,10 @@ import type { OAuthServerProvider, AuthorizationParams } from "@modelcontextprot
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import type { OAuthClientInformationFull, OAuthTokens, OAuthTokenRevocationRequest } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { getClient, saveAuthCode, getAuthCode, consumeAuthCode, saveOAuthToken, resolveOAuthToken, revokeOAuthToken } from "../store";
+import { getClient, saveAuthCode, getAuthCode, consumeAuthCode, saveOAuthToken, resolveOAuthToken, revokeOAuthToken, saveRefreshToken, rotateRefreshToken, refreshFamilyOf, revokeRefreshFamily } from "../store";
 
 const ACCESS_TTL_SECS = 3600;
+const REFRESH_TTL_SECS = 14 * 24 * 3600; // 14 days; rotated on every use (Faz 22, RFC 9700)
 const CODE_TTL_MS = 60_000;
 
 export class OllamasOAuthProvider implements OAuthServerProvider {
@@ -72,16 +73,47 @@ export class OllamasOAuthProvider implements OAuthServerProvider {
     if (!c) throw new Error("invalid_grant: code expired or already used");
     if (c.client_id !== client.client_id) throw new Error("invalid_grant: client mismatch");
     if (redirectUri && c.redirect_uri !== redirectUri) throw new Error("invalid_grant: redirect_uri mismatch");
+    const resourceHref = resource ? resource.href : c.resource;
     const token = await saveOAuthToken({
       client_id: c.client_id, tenant_id: c.tenant_id, scopes: c.scopes,
-      resource: resource ? resource.href : c.resource, ttlSecs: ACCESS_TTL_SECS,
+      resource: resourceHref, ttlSecs: ACCESS_TTL_SECS,
     });
-    return { access_token: token, token_type: "bearer", expires_in: ACCESS_TTL_SECS, scope: c.scopes || undefined };
+    // Faz 22: issue a rotating refresh token (new family born from this grant).
+    const { token: refresh } = await saveRefreshToken({
+      client_id: c.client_id, tenant_id: c.tenant_id, scopes: c.scopes,
+      resource: resourceHref, ttlSecs: REFRESH_TTL_SECS,
+    });
+    return { access_token: token, token_type: "bearer", expires_in: ACCESS_TTL_SECS, refresh_token: refresh, scope: c.scopes || undefined };
   }
 
-  async exchangeRefreshToken(): Promise<OAuthTokens> {
-    // Refresh tokens are not issued in v1.10 (single short-lived access token).
-    throw new Error("unsupported_grant_type: refresh tokens are not issued");
+  // Faz 22 (RFC 9700): rotate on every use. The SDK's /token handler routes
+  // grant_type=refresh_token here. A replayed (already-rotated) token revokes the
+  // whole family. Scope may only narrow vs the original grant.
+  async exchangeRefreshToken(
+    client: OAuthClientInformationFull, refreshToken: string,
+    scopes?: string[], resource?: URL
+  ): Promise<OAuthTokens> {
+    const rot = await rotateRefreshToken(refreshToken);
+    if (rot.status === "reuse") throw new Error("invalid_grant: refresh token reuse detected — family revoked");
+    if (rot.status === "invalid") throw new Error("invalid_grant: refresh token invalid or expired");
+    if (rot.client_id !== client.client_id) throw new Error("invalid_grant: client mismatch");
+
+    let accessScopes = rot.scopes;
+    if (scopes && scopes.length) {
+      const orig = new Set(rot.scopes.split(/\s+/).filter(Boolean));
+      if (!scopes.every((s) => orig.has(s))) throw new Error("invalid_scope: requested scope exceeds the original grant");
+      accessScopes = scopes.join(" ");
+    }
+    const resourceHref = resource ? resource.href : rot.resource;
+    const access = await saveOAuthToken({
+      client_id: rot.client_id, tenant_id: rot.tenant_id, scopes: accessScopes, resource: resourceHref, ttlSecs: ACCESS_TTL_SECS,
+    });
+    // New refresh token in the SAME family keeps the original (full) scope grant.
+    const { token: newRefresh } = await saveRefreshToken({
+      family_id: rot.family_id, client_id: rot.client_id, tenant_id: rot.tenant_id,
+      scopes: rot.scopes, resource: resourceHref, ttlSecs: REFRESH_TTL_SECS,
+    });
+    return { access_token: access, token_type: "bearer", expires_in: ACCESS_TTL_SECS, refresh_token: newRefresh, scope: accessScopes || undefined };
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -95,6 +127,12 @@ export class OllamasOAuthProvider implements OAuthServerProvider {
   }
 
   async revokeToken(_client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest): Promise<void> {
-    if (request.token) await revokeOAuthToken(request.token);
+    if (!request.token) return;
+    // The token may be an access token OR a refresh token — handle both. Revoking
+    // a refresh token kills its whole family (Faz 22). Each call is a safe no-op
+    // when the token is not of that kind.
+    await revokeOAuthToken(request.token);
+    const family = await refreshFamilyOf(request.token);
+    if (family) await revokeRefreshFamily(family);
   }
 }

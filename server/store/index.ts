@@ -331,7 +331,7 @@ export async function registerClient(req: DcrRequest): Promise<DcrResult> {
   const clientId = `oc_${crypto.randomBytes(8).toString("hex")}`;
   const authMethod = req.token_endpoint_auth_method || "client_secret_basic";
   const redirectUris = req.redirect_uris ?? [];
-  const grantTypes = req.grant_types ?? ["authorization_code"];
+  const grantTypes = req.grant_types ?? ["authorization_code", "refresh_token"];
   // Public clients (token_endpoint_auth_method=none) get no secret (RFC 7591).
   const secret = authMethod === "none" ? undefined : `ocs_${crypto.randomBytes(24).toString("hex")}`;
   const regToken = `rat_${crypto.randomBytes(24).toString("hex")}`;
@@ -398,6 +398,63 @@ export async function resolveOAuthToken(plaintext: string): Promise<ResolvedToke
 }
 export async function revokeOAuthToken(plaintext: string): Promise<void> {
   await d().run("UPDATE oauth_tokens SET revoked = 1 WHERE token_hash = ?", [sha256(plaintext)]);
+}
+
+// --- OAuth refresh tokens with RFC 9700 rotation (Faz 22, v1.13) ---
+/** Issue an opaque refresh token in a family (new family if none given). Returns
+ *  the plaintext once; stored only as a SHA-256 hash. */
+export async function saveRefreshToken(t: { family_id?: string; client_id: string; tenant_id: string; scopes: string; resource: string | null; ttlSecs: number }): Promise<{ token: string; family_id: string }> {
+  const token = `rt_${crypto.randomBytes(32).toString("hex")}`;
+  const family_id = t.family_id || crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + t.ttlSecs * 1000).toISOString();
+  await d().run(
+    "INSERT INTO oauth_refresh_tokens (refresh_token_hash, family_id, client_id, tenant_id, scopes, resource, expires_at, used, created_at) VALUES (?,?,?,?,?,?,?,0,?)",
+    [sha256(token), family_id, t.client_id, t.tenant_id, t.scopes, t.resource, expiresAt, nowIso()]
+  );
+  return { token, family_id };
+}
+
+export type RefreshRotation =
+  | { status: "ok"; family_id: string; client_id: string; tenant_id: string; scopes: string; resource: string | null }
+  | { status: "reuse" }
+  | { status: "invalid" };
+
+/** RFC 9700 rotation. used=0 → consume (mark used) and return the grant. used=1 →
+ *  REUSE (replay of an already-rotated token): revoke the WHOLE family and signal
+ *  compromise. Missing/expired → invalid. */
+export async function rotateRefreshToken(plaintext: string): Promise<RefreshRotation> {
+  const hash = sha256(plaintext);
+  const r = (await d().query("SELECT * FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [hash])).rows[0];
+  if (!r) return { status: "invalid" };
+  if (Number(r.used) === 1) {
+    await revokeRefreshFamily(r.family_id); // family compromised → kill the chain
+    return { status: "reuse" };
+  }
+  // Mark consumed regardless of expiry (a token is single-use either way).
+  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ?", [hash]);
+  if (r.expires_at <= nowIso()) return { status: "invalid" };
+  return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
+}
+
+/** Revoke every refresh token in a family (reuse detection / explicit revoke). */
+export async function revokeRefreshFamily(family_id: string): Promise<void> {
+  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE family_id = ?", [family_id]);
+}
+
+/** The family a refresh token belongs to (lets revokeToken kill the whole chain). */
+export async function refreshFamilyOf(plaintext: string): Promise<string | null> {
+  const r = (await d().query("SELECT family_id FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [sha256(plaintext)])).rows[0];
+  return r ? r.family_id : null;
+}
+
+/** Timing-safe verify of a confidential client's secret against its stored SHA-256
+ *  hash. Public clients (no stored hash) and unknown clients → false. */
+export async function verifyClientSecret(clientId: string, secret: string): Promise<boolean> {
+  const r = (await d().query("SELECT client_secret_hash FROM oauth_clients WHERE client_id = ?", [clientId])).rows[0];
+  if (!r || !r.client_secret_hash) return false;
+  const a = Buffer.from(sha256(secret), "hex");
+  const b = Buffer.from(String(r.client_secret_hash), "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 // --- Tenant webhooks (Faz 11B) ---
