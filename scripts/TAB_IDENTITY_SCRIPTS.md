@@ -36,11 +36,11 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 
 ## 3. STATUS SNAPSHOT (otomatik güncellenir — SCRIPTS_AGENTS §6 step-6 LOG)
 
-> Son güncelleme: v12 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
+> Son güncelleme: v13 LOG · Bu blok her versiyon kapanışında shipped/next ile tazelenir.
 
-- **shipped:** `v12` — Gate Auto-Commit + Budget Enforcement (zero-manual COMMIT): `gate.mjs --commit --message` scope-guard'lı conventional per-file auto-commit (push/tag yok) + opt-in `usage --budget` SLO-step + `make commit MSG=` · gate: GATE GREEN + commit-guard 7 test + dogfood self-commit · inventory 12.0.0.
-- **next:** `v13` — **gate --watch + auto-precompute scaffold**. İlk hamle: `gate.mjs --watch` (node:fs.watch debounce, chokidar yok) otonom dev-loop + ROADMAP next-precomputed'tan sonraki versiyon iskelet (test/lib stub) üreten scaffold adımı.
-- **horizon (geliştirilebilir):** v13 watch/scaffold → sonrası backlog (en zayıf gate sinyalinden türet).
+- **shipped:** `v13` — Gate Watch Dev-Loop + TDD Scaffold (zero-manual bootstrap): `gate.mjs --watch` otonom dev-loop (fs.watch debounce, watch read-only) + `scaffold.mjs` (red test+lib stub, validSlug+no-overwrite) + `make watch`/`make scaffold` · gate: GATE GREEN + watch/scaffold 9 test + dogfood self-commit · inventory 13.0.0.
+- **next:** `v14` — **incremental gate**. İlk hamle: `lib/affected.mjs` pure `affectedSteps(changedPaths)` (path→step: .sh→harden+drift, swift→swift, .ts→tsc+vitest) + `gate.mjs --since <ref>` git-diff parse → yalnız etkilenen step'leri koş (watch hızı).
+- **horizon (geliştirilebilir):** v14 incremental gate → sonrası backlog (en zayıf gate sinyalinden türet).
 
 ## 4. DEVELOPABLE STAGES (daha ne inşa edilebilir)
 
@@ -50,8 +50,9 @@ Türetme kuralı: **shipped** = son `feat(scripts): vN` commit'i. **next** = ROA
 | v10 | GA & Drift Guard (drift detector + RFC4231 HMAC KAT + macOS CI + actionlint + portable prompt) | ✅ GA |
 | v11 | Autonomous Gate + Scripts-as-SaaS Metering (one-command `make gate` + host-cost `usage` + zero-manual) | ✅ |
 | v12 | Gate Auto-Commit + Budget (`gate.mjs --commit` scope-guard + opt-in `usage --budget` SLO-step) | ✅ |
-| **v13** | **gate --watch + auto-precompute scaffold** (fs.watch dev-loop + next-version stub generator) | ⬜ NEXT |
-| v14+ | backlog — türetilir (en zayıf gate sinyalinden) | açık |
+| v13 | Gate Watch Dev-Loop + TDD Scaffold (`gate --watch` fs.watch + `scaffold` stub generator) | ✅ |
+| **v14** | **incremental gate** (`gate --since`/changed-file → etkilenen step seçimi) | ⬜ NEXT |
+| v15+ | backlog — türetilir (en zayıf gate sinyalinden) | açık |
 
 ## 5. RENDER TEMPLATE (yanıt iskeleti — self-refresh sonucuyla doldur)
 

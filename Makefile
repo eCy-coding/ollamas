@@ -6,7 +6,7 @@
 # Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
 # ==============================================================================
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit
+.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold
 
 # Output binary folder
 BIN_DIR = bin
@@ -136,6 +136,14 @@ ship: gate
 ## commit: zero-manual — gate green → scope-guarded conventional auto-commit (no push/tag). Usage: make commit MSG="feat(scripts): ..."
 commit:
 	@node bin/host-bridge/gate.mjs --commit --message "$(MSG)"
+
+## watch: autonomous dev-loop — re-run the gate on every scripts/+bin/ change (Ctrl-C to stop)
+watch:
+	@node bin/host-bridge/gate.mjs --watch
+
+## scaffold: generate next-version TDD skeleton (test + lib stub). Usage: make scaffold F=<feature> [WRITE=1] [TOOL=1]
+scaffold:
+	@node bin/host-bridge/scaffold.mjs $(F) $(if $(TOOL),--tool,) $(if $(WRITE),--write,)
 
 ## clean: Remove all compiled target files and caches
 clean:

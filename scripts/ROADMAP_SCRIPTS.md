@@ -2,7 +2,7 @@
 
 > Yürütme: `SCRIPTS_AGENTS.md` §6 trigger protokolü. Her versiyonun sonunda **"Next precomputed"** bloğu vardır — bir sonraki versiyonun ilk hamlesi orada hazırdır, böylece iş asla durmaz.
 >
-> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅** (gate auto-commit `--commit`: scope-guard'lı conventional per-file commit [push/tag yok] + opt-in usage budget SLO-step; commit-guard 7 test + dogfood self-commit), **v13 NEXT (gate --watch + auto-precompute next-version scaffold)**.
+> Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. Güncel: **v1 ✅ · v2 ✅ · v3 ✅ · v4 ✅ · v5 ✅ · v6 ✅ · v7 ✅ · v8 ✅ · v9 ✅ · v10 ✅ GA · v11 ✅ · v12 ✅ · v13 ✅** (gate `--watch` otonom dev-loop [fs.watch debounce, chokidar yok] + TDD `scaffold` [red test+lib stub, validSlug+no-overwrite]; watch+scaffold 9 test + dogfood self-commit), **v14 NEXT (incremental gate: değişen-dosyaya göre etkilenen step'leri koş)**.
 >
 > ⚠️ **İzolasyon (ERR-SCR-001):** scripts sekmesi artık izole worktree **`~/Desktop/ollamas-scripts-wt`** (branch `feat/scripts-v1`) içinde çalışır — paylaşılan `~/Desktop/ollamas` tree branch-hijack'e açıktı. Her oturum başı branch teyidi zorunlu.
 
@@ -238,6 +238,26 @@
 **Gate (kanıt):** `make gate` GATE GREEN + commit-guard 7 test + **dogfood**: `gate.mjs --commit` ile v12 kendini commit'ledi (scope-guard geçti, server/src yok).
 
 **Next precomputed (→v13 gate --watch + auto-precompute):** `gate.mjs --watch` (fs.watch scripts/+bin/ → debounce → gate koş, otonom dev-loop) + ROADMAP "next precomputed" bloğundan bir sonraki versiyonun iskelet dosyalarını (test stub + lib stub) otomatik üreten `scaffold` adımı; ilk hamle = gate.mjs'e fs.watch debounce-runner iskeleti (chokidar YOK, node:fs.watch builtin).
+
+---
+
+## v13 — Gate Watch Dev-Loop + TDD Scaffold ✅ (zero-manual bootstrap)
+
+**Tema:** Otonom dev-loop (kaydet→gate) + sonraki versiyon TDD iskeletini otomatik üret. **DONE** (dogfood self-commit).
+
+**Phases (gerçekleşen):**
+1. ✅ **Watch core** (`lib/watch.mjs`, pure): `debounce(fn,ms)` trailing-edge (injectable timer) + `isWatchable(path)` IGNORE seti (node_modules/.git/dist/.build/coverage/.swiftpm → self-trigger storm engeli RISK-SCR-017).
+2. ✅ **gate.mjs `--watch`**: `fs.watch(scripts/+bin/, {recursive})` (macOS) → watchable→debounce(300ms)→`runGate`→verdict; watch modu **read-only** (commit/write YOK); SIGINT temiz çıkış.
+3. ✅ **scaffold** (`scaffold.mjs`, pure planner+CLI): `scaffoldPlan(feature,{tool})`→red vitest test + pure lib stub (camelCase export) (+`--tool` 4-nokta registration checklist); `validSlug` path-traversal red; `--write` no-overwrite (refuse); dry default; `--from-roadmap` slug öner. **inventory'ye girmez** (dev-time generator → drift 18 sabit).
+4. ✅ **wire**: `make watch`/`make scaffold F=… [TOOL=1] [WRITE=1]`; SCRIPTS_PORTABLE_PROMPT DECISION DEFAULTS + SCRIPTS_AGENTS §6 TDD scaffold/watch.
+
+**Adopt:** `yuanchuan/node-watch` (MIT, debounce+ignore deseni), node:fs.watch recursive (builtin macOS, chokidar reddedildi=dep), `plopjs/plop`+`hygen` (MIT, plan→files deseni). Zero yeni dep.
+
+**Canonical prompt:** "gate --watch: pure lib/watch.mjs (debounce + isWatchable IGNORE) + gate.mjs fs.watch(scripts/+bin/ recursive)→debounce→runGate, watch read-only (commit/write yok); scaffold.mjs pure scaffoldPlan (red test+lib stub, validSlug traversal-red, no-overwrite, dry default) + --tool registration checklist + --from-roadmap; make watch/scaffold; inventory'ye girmez."
+
+**Gate (kanıt):** `make gate` GATE GREEN + watch-debounce 4 + scaffold 5 test + watch bounded smoke (başlar→ilk gate→kill, hang yok) + drift 18 + dogfood self-commit.
+
+**Next precomputed (→v14 incremental gate):** `gate.mjs`'e `--since <ref>` / değişen-dosya tabanlı **etkilenen-step seçimi** (yalnız .sh değişti→harden+drift; yalnız swift→swift; .ts→tsc+vitest) — watch loop'ta tam-gate yerine incremental koş (hız); ilk hamle = `lib/affected.mjs` pure `affectedSteps(changedPaths)` haritası (path→step seti) + gate.mjs `--since` git-diff parse.
 
 ---
 

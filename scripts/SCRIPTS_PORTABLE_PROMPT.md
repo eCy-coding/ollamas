@@ -51,6 +51,7 @@ operator to choose; auto-decide from these defaults (stop only on a Scope/securi
 - **Gate:** always `make gate` (one command — never hand-stitch the sub-checks).
 - **Commit:** on a green gate, auto-commit via `node bin/host-bridge/gate.mjs --commit --message "<conventional>"` (or `make commit MSG="..."`). It scope-guards (only scripts/+bin/+.github/workflows+Makefile; cross-lane tracked change → blocked), requires a Conventional Commit message, and stages per-file. **Never auto-push** and never push a git tag — those are the operator's call.
 - **Version:** on "plan the next version", read the roadmap's precomputed next + errors registry and proceed through §TRIGGER without pausing.
+- **Dev-loop:** `make watch` re-runs the gate on every scripts/+bin/ change (autonomous; never commits in watch mode). **Scaffold:** `make scaffold F=<feature> [TOOL=1] WRITE=1` generates the next version's RED test + lib stub (never overwrites); use it to bootstrap §TRIGGER step 3 (TDD) with zero manual file creation.
 
 ## QUALITY GATE (one command, fresh run, all green before commit)
 

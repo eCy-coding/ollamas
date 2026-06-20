@@ -95,7 +95,7 @@ Emre **"sıradaki versiyonun todo + phase list'ini planla"** (veya "sıradaki ve
 ```
 1. READ   errors_registry.json (tekrarlanacak hata var mı?) + ROADMAP "next precomputed" bloğu + §5.1 Adoption Map (o faz hangi repo/desen)
 2. PLAN   o versiyonun phase/todo listesini netleştir (TodoWrite)
-3. TDD    önce test (vitest / dry-run harness), sonra implementasyon
+3. TDD    önce test (vitest / dry-run harness), sonra implementasyon — iskelet için `make scaffold F=<feature> [TOOL=1] WRITE=1` (red test + lib stub, overwrite yok); dev-loop `make watch` (kaydet→gate otonom)
 4. CODE   en küçük diff, §3 scope içinde
 5. GATE   `make gate` (TEK komut = tsc + vitest + harden + drift-check + swift; v11) → yeşil
 6. LOG    SEYIR_DEFTERI_SCRIPTS.md + errors_registry.json güncelle; bir sonraki versiyonu precompute et; TAB_IDENTITY_SCRIPTS.md §3 STATUS SNAPSHOT'ı yeni shipped/next/horizon ile tazele (kimlik self-updating)

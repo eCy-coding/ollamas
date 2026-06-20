@@ -10,10 +10,11 @@
 // → a false-green gate). A step whose binary is absent is recorded as skipped
 // (never silently dropped).
 import { spawnSync } from "node:child_process";
-import { accessSync, constants } from "node:fs";
+import { accessSync, constants, watch as fsWatch } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { commitDecision } from "./lib/commit.mjs";
+import { debounce, isWatchable } from "./lib/watch.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = process.env.OLLAMAS_REPO || join(HERE, "..", "..");
@@ -90,7 +91,28 @@ function spawnExec(step) {
   if (r.status !== 0) throw new Error(`${step.name} exited ${r.status ?? "signal " + r.signal}`);
 }
 
+// --watch: autonomous dev-loop. fs.watch scripts/ + bin/ (recursive, macOS) →
+// debounce → re-run the gate. NEVER commits/writes in watch mode (just runs the
+// gate), so it can't self-trigger (RISK-SCR-017). Ctrl-C exits.
+async function watchLoop() {
+  const dirs = ["scripts", "bin"].map((d) => join(REPO, d));
+  const run = debounce(async () => {
+    const v = await runGate(defaultSteps(), { exec: spawnExec });
+    console.log(v.ok ? "[+] GATE GREEN" : `[!] GATE RED — failed: ${v.failed.join(", ")}`);
+    console.log("[watch] waiting for changes… (Ctrl-C to stop)");
+  }, 300);
+  for (const d of dirs) {
+    try { fsWatch(d, { recursive: true }, (_e, file) => { if (file && isWatchable(file)) run(); }); }
+    catch (e) { console.error(`[watch] cannot watch ${d}: ${e.message}`); }
+  }
+  process.on("SIGINT", () => { console.log("\n[watch] bye"); process.exit(0); });
+  console.log("[watch] gate dev-loop started — running initial gate…");
+  run();
+  await new Promise(() => {}); // keep alive until SIGINT
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
+  if (process.argv.includes("--watch")) { await watchLoop(); }
   const jsonOut = process.argv.includes("--json");
   const verdict = await runGate(defaultSteps(), { exec: spawnExec });
   if (jsonOut) {

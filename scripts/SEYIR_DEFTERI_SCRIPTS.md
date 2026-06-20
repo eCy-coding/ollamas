@@ -152,6 +152,15 @@
 - `[2026-06-20] kind=phase | P5 gate + DOGFOOD | make gate GATE GREEN; v12 kendi gate.mjs --commit'iyle commit'lendi (zero-manual commit canlı kanıt, scope-guard geçti server/src yok) | git show --stat: yalnız scripts/+bin/+Makefile | YEŞİL`
 - `[2026-06-20] kind=note | Next precomputed (→v13 gate --watch + auto-precompute) | gate.mjs --watch (node:fs.watch debounce, chokidar yok) otonom dev-loop + ROADMAP next-precomputed'tan sonraki versiyon iskelet (test/lib stub) üreten scaffold; ilk hamle fs.watch debounce-runner iskeleti`
 
+## v13 — Gate Watch Dev-Loop + TDD Scaffold ✅ (zero-manual bootstrap)
+
+- `[2026-06-20] kind=phase | P1 watch core | bin/host-bridge/lib/watch.mjs pure: debounce(fn,ms) trailing-edge (injectable timer) + isWatchable(path) IGNORE seti (node_modules/.git/dist/.build/coverage/.swiftpm) | watch-debounce.test.ts 4 case (collapse/cancel/ignore) | YEŞİL`
+- `[2026-06-20] kind=phase | P2 gate --watch | gate.mjs fs.watch(scripts/+bin/ recursive macOS)→watchable→debounce(300ms)→runGate→verdict; watch read-only (commit/write YOK, self-trigger storm engeli RISK-SCR-017); SIGINT temiz | bounded smoke: başlar→ilk gate→kill, hang/exception yok | YEŞİL`
+- `[2026-06-20] kind=phase | P3 scaffold | bin/host-bridge/scaffold.mjs pure scaffoldPlan (red vitest test + pure lib stub camelCase export, --tool→4-nokta checklist) + validSlug (path-traversal/slash red RISK-SCR-018) + --write no-overwrite + dry default + --from-roadmap; inventory'ye GİRMEZ (dev-time, drift 18 sabit) | scaffold.test.ts 5 case | YEŞİL`
+- `[2026-06-20] kind=phase | P4 wire | make watch/scaffold; SCRIPTS_PORTABLE_PROMPT DECISION DEFAULTS + SCRIPTS_AGENTS §6 TDD scaffold/watch | — | YEŞİL`
+- `[2026-06-20] kind=phase | P5 gate + DOGFOOD | make gate GATE GREEN (tsc/vitest/harden/drift 18/swift) + scaffold demo dry; v13 gate.mjs --commit ile self-commit | git show --stat server/src yok | YEŞİL`
+- `[2026-06-20] kind=note | Next precomputed (→v14 incremental gate) | gate.mjs --since/değişen-dosya → etkilenen-step seçimi (.sh→harden+drift, swift→swift, .ts→tsc+vitest), watch'ta incremental koş (hız); ilk hamle lib/affected.mjs pure affectedSteps(changedPaths) + gate --since git-diff parse`
+
 ---
 
 ## Hata Anlatıları

@@ -263,6 +263,34 @@
       "prevention_rule": "Auto-commit mesajı ilk-satır Conventional-Commit regex'inden geçmeli + en az 1 scope-içi dosya olmalı; commit mesajı/yol git'e DAİMA arg-array ile (shell string interpolation yok).",
       "test_added": "scripts/tests/commit-guard.test.ts (non-conventional block + empty-stage block + isConventional cases)",
       "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-017",
+      "ts": "2026-06-20",
+      "version": "v13",
+      "file": "bin/host-bridge/gate.mjs --watch + lib/watch.mjs",
+      "category": "registration",
+      "severity": "med",
+      "root_cause": "Watch dev-loop kendi/araç çıktısını (.build, coverage, node_modules) izlerse sonsuz re-trigger storm; ya da watch modunda commit/write yaparsa kendi yazdığını izleyip döngüye girer.",
+      "evidence": "lib/watch.mjs IGNORE seti (node_modules/.git/dist/.build/coverage/.swiftpm) + isWatchable segment-filtre; debounce(300ms) burst→1; gate.mjs --watch SADECE runGate koşar (commit/write YOK); watch-debounce.test.ts 4 case",
+      "fix": "isWatchable IGNORE seti gate-çıktı dizinlerini eler; trailing-edge debounce burst'ü tek koşuya indirir; watch modu read-only (asla --commit/scaffold-write); SIGINT temiz çıkış.",
+      "prevention_rule": "Dosya-izleyici DAİMA build/dep/cache dizinlerini ignore eder + debounce'lar + izleme modunda ASLA yazma/commit yapmaz (self-trigger storm engeli); recursive yalnız macOS/Windows'ta güvenilir.",
+      "test_added": "scripts/tests/watch-debounce.test.ts (debounce collapse + cancel + isWatchable ignore)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "RISK-SCR-018",
+      "ts": "2026-06-20",
+      "version": "v13",
+      "file": "bin/host-bridge/scaffold.mjs",
+      "category": "shell",
+      "severity": "high",
+      "root_cause": "Scaffold generator feature adını yola enterpole eder; `../` veya `/` içeren slug path-traversal ile scope-dışı dosya yazabilir; mevcut dosyayı overwrite ederse iş kaybı.",
+      "evidence": "validSlug `^[a-z][a-z0-9_-]*$` (../x→false, a/b→false); CLI --write existsSync→refuse (overwrite yok); scaffold.test.ts 5 case",
+      "fix": "validSlug slug'ı kebab/snake'e kısıtlar (slash/dot/traversal red); scaffoldPlan invalid slug→throw; --write mevcut dosyada refuse (no-overwrite); dry default.",
+      "prevention_rule": "Dosya üreten her generator slug/path'i allow-regex'ten geçirir (traversal/slash red) + mevcut dosyayı ASLA overwrite etmez (varsa refuse) + dry default.",
+      "test_added": "scripts/tests/scaffold.test.ts (validSlug traversal red + scaffoldPlan throw + paths)",
+      "recurrence_count": 0
     }
   ]
 }
