@@ -8,9 +8,9 @@
 | **vT1** | Foundation + iOS reach | governance 5-dosya + `Transport` iface + `switch.ts` skeleton + **WireGuard p2p** (QR, zero-acct) + iPhone→ollamas 200 e2e | wireguard-apple(MIT), wireguard-tools | ✅ DONE (97d65a1) |
 | **vT2** | LAN-TLS | Caddy reverse-proxy + mkcert local CA + **iOS .mobileconfig render** + `<Mac>.local` auto-host → `https://<host>.local` | Caddy(Apache,73k), mkcert(BSD,59k) | ✅ DONE |
 | **vT3** | Sovereign mesh | Headscale self-host control-plane + embedded DERP + zero-account preauth; çok-cihaz + remote tek overlay (WG data-plane reuse) | Headscale(BSD,38k) binary-only | ✅ DONE |
-| vT4 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server, MacBook client expose; mesh yokken fallback | FRP(Apache,107k)/Bore(MIT,11k) | planned |
-| vT5 | **Switch engine** | health-probe + scoring + auto-failover + priority policy + decision-log | — | planned |
-| vT6 | Security hardening | WG key-rotation, mTLS, DNS-rebind guard, secrets-at-rest (CLI AES-256-GCM reuse), gateway origin/auth doc | — | planned |
+| **vT4** | **Otonom Switch Engine** | ölçülen-latency scoring + 3-durum circuit-breaker + hysteresis (anti-flap) + autopilot (capability-detect + auto-up + self-heal) + decision-log; **0 manuel seçim/işlem** | hysteresis/CB/multipath pattern (fikir/MIT) | ✅ DONE |
+| vT5 | Security hardening | WG key-rotation, mTLS, DNS-rebind guard, secrets-at-rest (CLI AES-256-GCM reuse), gateway origin/auth doc | — | NEXT |
+| vT6 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server, MacBook client expose; mesh yokken fallback. **⚠️ ERTELENDİ vT4'ten**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account kısıtlarını ihlal; yalnız kullanıcı remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
 | vT7 | Observability | `tunnel status` endpoint/TUI, latency/throughput, switch kararları → orchestration feed | — | planned |
 | vT8 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | planned |
 | vT9 | Resilience | auto-reconnect, LaunchAgent daemon, NAT/captive-portal detect, IPv6, fallback-chain | — | planned |
@@ -49,10 +49,31 @@
 - errors_registry: RISK-TUNNEL-008 (NAT/DERP), -009 (iOS Tailscale-client), -010 (preauth-key sızıntısı).
 - iOS cihaz-kanıtı (`http://100.64.0.1:3000/healthz` 200, mesh) Emre'de (reçete hazır).
 
-## vT4 — NEXT (önceden-hesaplanmış ilk todo'lar)
+## vT4 — DONE (kanıt) — Otonom Switch Engine
 
-1. `transports/frp.ts` — FRP (Apache-2.0, fatedier/frp) reverse TCP tunnel: kendi VPS'te `frps`, MacBook'ta `frpc` config render (PURE) + `serviceUrl` (public host:port); mesh/LAN yokken remote fallback.
-2. `transports/bore.ts` (alt) — ekzhang/bore (MIT) minimal Rust tunnel; daha hafif, secret-tabanlı.
-3. Reverse transport `priority=PRIORITY.REVERSE` (30) — switch'e register; LAN-TLS(10)>mesh(20)>reverse(30) tam zincir.
-4. `recipes/frp-ios.md` — kendi VPS reçetesi (frps server + frpc client + iPhone public URL); zero-account (kendi sunucu).
-5. `TUNNEL_ADOPTION.md` FRP/Bore ✅; errors_registry reverse-tunnel riskleri (public-exposure RISK-TUNNEL-011, VPS-trust).
+> **Re-sequence:** "0 manuel seçim/işlem" kısıtı reverse-tunnel'i (VPS/hesap/manuel) geçersiz kıldı →
+> vT4 = Switch Engine (eski vT5) öne alındı; Security vT5'e, reverse-tunnel vT6'ya (deferred) kaydı.
+
+- **Karar (research):** hysteresis (iki-eşik+hold-down, Google Patents US20230012193A1+SD-WAN), 3-durum
+  circuit-breaker (TS-CB deseni dev.to/Resily MIT + orchestration MCP_CB), lowest-latency scheduler
+  (sigcomm20 mptp). Hepsi fikir/pattern-port (lisanssız→fikir, MIT→pattern), zero-dep.
+- `src/breaker.ts` PURE 3-durum circuit-breaker (closed/open/half-open, enjekte clock). **6 test.**
+- `src/scoring.ts` PURE `scoreCandidate` (latency*1+priority*10, düşük=iyi) + `chooseWithHysteresis`
+  (margin+holdRounds anti-flap, breaker-open elenir). **10 test.**
+- `src/switch.ts` `selectAuto` (paralel zamanlı probe `performance.now()` + breaker + scoring + hysteresis
+  + decision-log) — `select()` geri-uyumlu korundu. **+5 test.**
+- `src/autopilot.ts` `detectCapable`/`autoUp`/`runLoop` — capability-detect (binary on PATH) + best-capable
+  auto-up + self-heal loop; never-throws, **0 prompt**. **6 test.**
+- `cli.ts auto [--watch]` (0-manuel: oto-detect→selectAuto→auto-up→decision-log JSON) + `select`→selectAuto.
+- errors_registry: RISK-TUNNEL-011 (flapping→hysteresis çözdü), -012 (auto-up yalnız capable binary),
+  -013 (decision-log secret-free).
+- **Kanıt:** `node --test` **75/75 GREEN**, tsc 0; `node src/cli.ts auto` → binary yokken zarif
+  "no capable transport" (sıfır prompt). 0-manuel: kullanıcı hiç seçim yapmaz/komut çalıştırmaz.
+
+## vT5 — NEXT (önceden-hesaplanmış ilk todo'lar) — Security hardening
+
+1. `src/rotate.ts` — WireGuard key-rotation (PURE re-render + güvenli takas; eski key revoke); CLI `rotate`.
+2. secrets-at-rest: CLI lane'in AES-256-GCM (authTagLength:16) desenini reuse → `keys/` şifreli; passphrase/keyfile.
+3. mTLS opsiyonu (LAN-TLS transport) + DNS-rebind guard (probe host allowlist).
+4. gateway origin/auth doc → integrations lane'e devir (server.ts edit YASAK, RISK-TUNNEL-002).
+5. `errors_registry` key-rotation/secrets riskleri; `TUNNEL_ADOPTION.md` ilgili pattern'ler.

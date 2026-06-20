@@ -80,8 +80,31 @@
   keys/ gitignored. iOS cihaz-kanıtı (mesh `100.64.0.1:3000/healthz` 200) Emre'de. **Taşınabilir master prompt**
   `prompts/ollamas-tunnel-portable.md` üretildi.
 
+## Faz 6 — Otonom Switch Engine (vT4) — 0 manuel seçim / 0 manuel işlem
+
+- **Kısıt-kaynaklı re-sequence:** Emre "0 manuel seçim ve 0 manuel işlem" dedi → precomputed vT4
+  (reverse-tunnel) GEÇERSİZ (VPS+dış-hesap+manuel = hem 0-manuel hem egemen-zero-account ihlali). Kök-neden
+  kararı: "0 manuel seçim" = switch otomatik en-iyi transport'u seçer; "0 manuel işlem" = otomatik up + self-heal.
+  Bu = Switch Engine (eski vT5) → öne alındı. Security→vT5, reverse-tunnel→vT6 (deferred). AskUser YOK.
+- **Karar (research):** hysteresis iki-eşik+hold-down (Google Patents US20230012193A1 + SD-WAN), 3-durum
+  circuit-breaker (TS-CB dev.to/Resily MIT + orchestration MCP_CB), lowest-latency scheduler (sigcomm20 mptp).
+  Fikir/pattern-port, zero-dep.
+- **Ne:** `breaker.ts` (PURE 3-durum CB, enjekte clock) · `scoring.ts` (PURE scoreCandidate latency*1+priority*10
+  + chooseWithHysteresis margin/holdRounds anti-flap) · `switch.ts` selectAuto (paralel zamanlı probe
+  `performance.now()` + breaker + scoring + hysteresis + decision-log; select() geri-uyumlu) · `autopilot.ts`
+  (detectCapable `which` + autoUp best-capable + runLoop self-heal, never-throws) · `cli.ts auto [--watch]` +
+  select→selectAuto.
+- **Nasıl:** Tüm karar fn'leri PURE+deterministik (enjekte clock+fake transport+timeProbe) → canlı ağsız test.
+  probe() interface DEĞİŞMEDİ (latency switch'te ölçülür). auto-up yalnız capable binary (eksikse zarif atla).
+- **Niçin (0-manuel):** kullanıcı hangi transport'u seçeceğini bilmek/seçmek zorunda değil; sistem ölçer,
+  skorlar, en iyisini seçer, ayağa kaldırır, düşerse iyileştirir. Sıfır prompt, sıfır komut.
+- **Kanıt:** `node --test` → **75/75 green** (breaker 6 + scoring 10 + switch +5 + autopilot 6 yeni);
+  `npm run typecheck` → 0; `node src/cli.ts auto` → binary yokken zarif "no capable transport" + decision-log JSON
+  (sıfır prompt). RISK-TUNNEL-011 (flapping→hysteresis) / -012 (auto-up capable-only) / -013 (log secret-free).
+
 ---
-**Toplam (vT1+vT2+vT3 kod):** 5 governance + 8 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/headscale/cli) + 7 test dosya (48 test) + 3 iOS reçete + 1 taşınabilir prompt. Zero-dep
-(Node 24 strip + node:test), zero-account. tsc 0 + test 48/48. Gotcha ERR-TUNNEL-001 (strip param-property),
-ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de.
+**Toplam (vT1..vT4 kod):** 5 governance + 11 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/headscale/breaker/scoring/autopilot/cli) + 10 test dosya (75 test) + 3 iOS reçete + 1 taşınabilir
+prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 75/75. Gotcha ERR-TUNNEL-001
+(strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de; vT4
+tamamen otonom (cihaz-kanıtı gerektirmez — 0 manuel).

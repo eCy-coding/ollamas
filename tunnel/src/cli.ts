@@ -4,7 +4,8 @@
 //   down     wg-quick down wg0
 //   tls      mkcert local CA + cert + Caddyfile + iOS .mobileconfig for LAN-TLS (vT2)
 //   mesh     self-hosted Headscale config + zero-account preauth steps for sovereign mesh (vT3)
-//   select   probe registered transports (LAN-TLS > WireGuard > mesh), print endpoint
+//   select   selectAuto: scored probe of all transports → best endpoint + decision (vT4)
+//   auto     autopilot: auto-detect capable transports, bring up the best, self-heal (--watch) (vT4)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -41,6 +42,8 @@ import {
   serviceUrl as meshServiceUrl,
   type HeadscalePlan,
 } from "./transports/headscale.ts";
+import { autoUp, runLoop } from "./autopilot.ts";
+import type { Transport } from "./transport.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
 
 const KEYS_DIR = join(import.meta.dirname, "..", "keys");
@@ -178,20 +181,51 @@ function wgQuick(action: "up" | "down"): Promise<number> {
   });
 }
 
-async function cmdSelect(): Promise<void> {
+/** Build the registered transport set + switch (shared by select/auto). */
+function buildSwitch(): { sw: TunnelSwitch; transports: Transport[] } {
   const host = detectLocalHostname();
   const wgPlan: WgPlan = { ...DEFAULT_PLAN, endpointHost: detectLanIp() };
   const tlsPlan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host };
   const meshPlan: HeadscalePlan = { ...DEFAULT_MESH_PLAN, serverUrl: `http://${host}:8080` };
-  // Priority order: LAN-TLS (10) on home WiFi → mesh band (20): WireGuard p2p (same-LAN direct),
-  // then Headscale mesh (multi-device / remote overlay). First healthy in order wins.
-  const sw = new TunnelSwitch()
-    .register(new CaddyTlsTransport(tlsPlan))
-    .register(new WireGuardTransport(wgPlan))
-    .register(new HeadscaleTransport(meshPlan));
-  const ep = await sw.select();
-  console.log(ep ? JSON.stringify(ep) : "no healthy transport (is ollamas + a tunnel up?)");
+  // Priority bands: LAN-TLS (10) on home WiFi → WireGuard p2p (20, same-LAN direct) →
+  // Headscale mesh (20, multi-device/remote). selectAuto scores by measured latency within bands.
+  const transports: Transport[] = [
+    new CaddyTlsTransport(tlsPlan),
+    new WireGuardTransport(wgPlan),
+    new HeadscaleTransport(meshPlan),
+  ];
+  const sw = new TunnelSwitch();
+  for (const t of transports) sw.register(t);
+  return { sw, transports };
+}
+
+async function cmdSelect(): Promise<void> {
+  const { sw } = buildSwitch();
+  const ep = await sw.selectAuto();
+  const d = sw.lastDecision();
+  console.log(
+    ep
+      ? JSON.stringify({ endpoint: ep, decision: d?.reason })
+      : "no healthy transport (is ollamas + a tunnel up?)",
+  );
   process.exitCode = ep ? 0 : 1;
+}
+
+// Autopilot: zero manual selection / zero manual operation (vT4).
+async function cmdAuto(): Promise<void> {
+  const watch = process.argv.includes("--watch");
+  const { sw, transports } = buildSwitch();
+  if (watch) {
+    console.log("autopilot --watch: self-heal loop (Ctrl-C to stop)");
+    await runLoop(sw, transports, {
+      onTick: (r, i) =>
+        console.log(JSON.stringify({ round: i, endpoint: r.endpoint, broughtUp: r.broughtUp, reason: r.reason })),
+    });
+    return;
+  }
+  const r = await autoUp(sw, transports);
+  console.log(JSON.stringify({ ...r, decision: sw.lastDecision()?.reason, scores: sw.lastDecision()?.scores }, null, 2));
+  process.exitCode = r.endpoint ? 0 : 1;
 }
 
 async function main(): Promise<void> {
@@ -211,8 +245,10 @@ async function main(): Promise<void> {
       return cmdMesh();
     case "select":
       return cmdSelect();
+    case "auto":
+      return cmdAuto();
     default:
-      console.log("usage: tunnel <config|up|down|tls|mesh|select>");
+      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto> [--watch]");
   }
 }
 

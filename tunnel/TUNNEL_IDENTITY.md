@@ -86,11 +86,12 @@ Bu kimlik **veride otomatik**, **yapıda manuel** güncellenir:
 ## 5. CACHE (whoami koşamazsa fallback — son bilinen, 2026-06-20)
 
 ```
-branch: feat/tunnel-v1 · shipped: vT1, vT2, vT3 (son vT3) · test 48 · risk 10+2err
-next: vT4 Remote reverse-tunnel (FRP/Bore) · ollamas core v1.6.0 / feat/v1.11-roots-abort
-transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; reverse(30) vT4'te
+branch: feat/tunnel-v1 · shipped: vT1, vT2, vT3, vT4 (son vT4) · test 75 · risk 13+2err
+next: vT5 Security hardening (key-rotation/secrets/mTLS) · ollamas core v1.6.0 / feat/v1.11-roots-abort
+transports: LAN-TLS(10) > WireGuard(20) > Headscale-mesh(20) ; switch=selectAuto (scoring+breaker+hysteresis)
+otonom: `tunnel auto [--watch]` 0-manuel seçim/işlem (autopilot capability-detect+auto-up+self-heal)
 taşınabilir prompt: prompts/ollamas-tunnel-portable.md
-⚠️ VERSION dosyası 1.0.0 = stale (gerçek vT3)
+⚠️ VERSION dosyası 1.0.0 = stale (gerçek vT4)
 ```
 > Cache stale olabilir; ilk fırsatta `npm run whoami` ile tazele.
 
@@ -103,3 +104,6 @@ taşınabilir prompt: prompts/ollamas-tunnel-portable.md
 - 2026-06-20 — vT3 (Headscale sovereign mesh) ship: yeni transport `headscale` shipped'e girdi (whoami
   otomatik yakalar). Taşınabilir master prompt `prompts/ollamas-tunnel-portable.md` eklendi (nereye
   yapıştırılırsa lane'i bootstrap eder: §0 whoami refresh + §5 state snapshot).
+- 2026-06-20 — vT4 (Otonom Switch Engine) ship: `tunnel auto` 0-manuel seçim/işlem (autopilot). Yeni sürekli-
+  yetenek: switch artık selectAuto (scoring+breaker+hysteresis+decision-log). Roadmap re-sequence (reverse-
+  tunnel→vT6 deferred, Security→vT5) — "0 manuel" kısıtı kaynaklı. 75/75 test.

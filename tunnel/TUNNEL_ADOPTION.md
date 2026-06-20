@@ -17,8 +17,11 @@
 | `juanfont/headscale` | 38k | BSD-3 | vT3 | sovereign mesh control-plane (self-host); **binary-invoke** | ✅ `transports/headscale.ts` + reçete `recipes/headscale-ios.md` |
 | ~~`slackhq/nebula`~~ | 15k | MIT | vT3 | **ELENDİ**: kendi protokolü → vT1 WireGuard data-plane'den sapma (kod-bütünlüğü); en egemen (kendi Mobile Nebula app'i) ama tutarsız | reddedildi (karar-log) |
 | ~~`netbirdio/netbird`~~ | ~13k | Apache-2.0 | vT3 | **ELENDİ**: ağır (mgmt+signal+dashboard) M4 tek-binary hedefine aykırı; WG-tabanlı ama fazla parça | reddedildi (karar-log) |
-| `fatedier/frp` | 107k | Apache-2.0 | vT4 | reverse TCP tunnel (kendi VPS) | planned |
-| `ekzhang/bore` | 11k | MIT | vT4 | minimal Rust tunnel (alt) | planned |
+| hysteresis link-flap prevention (Google Patents US20230012193A1) | — | (reference) | vT4 | iki-eşik+hold-down anti-flap fikri → scoring.ts chooseWithHysteresis | ✅ fikir-port |
+| TS circuit-breaker (dev.to/Resily + orchestration MCP_CB) | — | MIT/pattern | vT4 | 3-durum closed/open/half-open → breaker.ts | ✅ pattern-port |
+| multipath lowest-latency scheduler (sigcomm20 mptp) | — | (reference) | vT4 | ölçülen-latency path seçimi → scoring | ✅ fikir-port |
+| `fatedier/frp` | 107k | Apache-2.0 | vT6 | reverse TCP tunnel (kendi VPS) — ⚠️ ertelendi (VPS/manuel) | deferred |
+| `ekzhang/bore` | 11k | MIT | vT6 | minimal Rust tunnel (alt) | deferred |
 
 ## Notlar
 

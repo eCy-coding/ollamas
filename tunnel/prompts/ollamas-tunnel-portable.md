@@ -61,11 +61,16 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
 - **Shipped:** vT1 (WireGuard p2p) · vT2 (LAN-TLS Caddy/mkcert + iOS .mobileconfig) · vT3 (Headscale sovereign
-  mesh + embedded DERP + zero-account preauth; WG data-plane reuse). Tests: 48/48, tsc 0.
-- **NEXT = vT4** — Remote reverse-tunnel (FRP Apache / Bore MIT) at `PRIORITY.REVERSE(30)`: own-VPS `frps`+
-  `frpc` config render (PURE) + recipe + register → full chain LAN-TLS>mesh>reverse. (See ROADMAP vT4 todos.)
-- Roadmap horizon: vT5 switch engine (failover/scoring) → vT6 security → vT7 observability (`tunnel status`,
-  absorbs `whoami`) → vT8 benchmark → vT9 resilience → vT10 ecosystem.
+  mesh + embedded DERP + zero-account preauth) · **vT4 (Autonomous Switch Engine: latency scoring +
+  circuit-breaker + anti-flap hysteresis + autopilot auto-up/self-heal + decision-log; ZERO manual
+  selection/operation — `tunnel auto [--watch]`)**. Tests: 75/75, tsc 0.
+- **NEXT = vT5** — Security hardening (WG key-rotation, secrets-at-rest reusing CLI AES-256-GCM, mTLS,
+  DNS-rebind guard; gateway origin/auth doc handed to integrations lane). (See ROADMAP vT5 todos.)
+- Roadmap horizon: vT6 remote reverse-tunnel (FRP/Bore — **deferred**, needs manual VPS, breaks 0-manuel +
+  sovereign-zero-account; only if user wants remote) → vT7 observability (`tunnel status`, absorbs `whoami` +
+  decision-log feed) → vT8 benchmark → vT9 resilience → vT10 ecosystem.
+- **0-manuel invariant:** `tunnel auto` auto-detects capable transports, scores by measured latency, brings up
+  the best, and self-heals — never prompts, never asks the user to choose.
 
 ## 6. SELF-REPORT
 
