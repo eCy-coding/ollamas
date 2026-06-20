@@ -37,7 +37,7 @@ export const COMMAND_TREE: CommandTree = {
   subActions: {
     agent: ["sessions", "rm"],
     saas: ["plans", "tenants", "tenant", "keys", "key", "audit", "usage", "billing"],
-    mcp: ["info", "tools", "call", "upstreams", "add", "rm"],
+    mcp: ["info", "tools", "call", "resources", "read", "prompts", "prompt", "upstreams", "add", "rm"],
     shortcuts: ["build"],
     // config: profile ops + the settable keys
     config: ["use", "profiles", "keystore", "gateway", "model", "provider", "apiKey", "saasAdminToken"],

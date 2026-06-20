@@ -14,7 +14,19 @@ import { GatewayClient, type UpstreamInput } from "../lib/client";
 import { loadConfig } from "../lib/config";
 import { resolveOutputCtx, formatTable, c, type OutputCtx } from "../lib/output";
 import { confirm } from "../lib/io";
-import { filterByGuard, formatToolSignature, toolDanger, argsFromPairs, renderToolResult, formatProgress, type McpTool } from "../lib/mcp";
+import {
+  filterByGuard,
+  formatToolSignature,
+  toolDanger,
+  argsFromPairs,
+  renderToolResult,
+  formatProgress,
+  renderResourceContents,
+  renderPromptMessages,
+  formatPromptSignature,
+  promptArgsFromPairs,
+  type McpTool,
+} from "../lib/mcp";
 
 const HELP = `ollamas mcp <action> — MCP client over the gateway choke-point
 
@@ -23,6 +35,10 @@ const HELP = `ollamas mcp <action> — MCP client over the gateway choke-point
   call <tool> [--params '{json}'] [--arg k=v …] [--yes] [--stream]
                                      invoke a tool (host/destructive tools prompt;
                                      --stream shows progress for long tools)
+  resources                          list resources the gateway exposes (uri, name)
+  read <uri>                         read a resource's contents
+  prompts [--sig]                    list prompt templates; --sig shows arg signatures
+  prompt <name> [--arg k=v …]        render a prompt's message chain
   upstreams                          list registered upstream MCP servers
   add --name <n> --transport http|stdio [--url <u>|--command <c> --args a,b] [--allow t1,t2]
   rm <id> [--yes]                    remove an upstream (prompts unless --yes)
@@ -73,6 +89,14 @@ export async function runMcp(argv: string[]): Promise<number> {
         return await showTools(client, allow, deny, !!values.sig, ctx);
       case "call":
         return await callTool(client, arg1, values, allow, deny, ctx);
+      case "resources":
+        return await showResources(client, ctx);
+      case "read":
+        return await readResource(client, arg1, ctx);
+      case "prompts":
+        return await showPrompts(client, !!values.sig, ctx);
+      case "prompt":
+        return await getPrompt(client, arg1, values, ctx);
       case "upstreams":
         return await showUpstreams(client, ctx);
       case "add":
@@ -161,6 +185,65 @@ async function callTool(client: GatewayClient, name: string | undefined, v: any,
     return 1;
   }
   process.stdout.write(text + (text.endsWith("\n") ? "" : "\n"));
+  return 0;
+}
+
+async function showResources(client: GatewayClient, ctx: OutputCtx): Promise<number> {
+  const resources = await client.mcpListResources();
+  if (ctx.json) return json(resources);
+  process.stdout.write(
+    formatTable(
+      ["uri", "name", "mime", "description"],
+      resources.map((r) => [r.uri, r.name ?? r.title ?? "", r.mimeType ?? "", trim(r.description)]),
+      ctx,
+    ) + "\n",
+  );
+  process.stdout.write(c("dim", `${resources.length} resource(s)`, ctx.color) + "\n");
+  return 0;
+}
+
+async function readResource(client: GatewayClient, uri: string | undefined, ctx: OutputCtx): Promise<number> {
+  if (!uri) {
+    process.stderr.write("mcp read: missing <uri>\n");
+    return 2;
+  }
+  const result = await client.mcpReadResource(uri);
+  if (ctx.json) return json(result);
+  const text = renderResourceContents(result);
+  process.stdout.write(text + (text.endsWith("\n") ? "" : "\n"));
+  return 0;
+}
+
+async function showPrompts(client: GatewayClient, sig: boolean, ctx: OutputCtx): Promise<number> {
+  const prompts = await client.mcpListPrompts();
+  if (ctx.json) return json(prompts);
+  if (sig) {
+    for (const p of prompts) {
+      process.stdout.write(formatPromptSignature(p, ctx) + "\n");
+      if (p.description) process.stdout.write(c("dim", `    ${p.description}`, ctx.color) + "\n");
+    }
+  } else {
+    process.stdout.write(
+      formatTable(
+        ["prompt", "args", "description"],
+        prompts.map((p) => [p.name, (p.arguments || []).map((a) => a.name).join(","), trim(p.description)]),
+        ctx,
+      ) + "\n",
+    );
+  }
+  process.stdout.write(c("dim", `${prompts.length} prompt(s)`, ctx.color) + "\n");
+  return 0;
+}
+
+async function getPrompt(client: GatewayClient, name: string | undefined, v: any, ctx: OutputCtx): Promise<number> {
+  if (!name) {
+    process.stderr.write("mcp prompt: missing <name>\n");
+    return 2;
+  }
+  const args = promptArgsFromPairs(Array.isArray(v.arg) ? v.arg : v.arg ? [v.arg] : []);
+  const result = await client.mcpGetPrompt(name, args);
+  if (ctx.json) return json(result);
+  process.stdout.write(renderPromptMessages(result) + "\n");
   return 0;
 }
 

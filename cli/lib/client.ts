@@ -2,7 +2,7 @@
 // ToolRegistry. Every tool side effect goes through the gateway's single
 // choke-point (AGENTS.md §4). This file holds no dispatch logic.
 import type { DoctorReport } from "./output";
-import type { McpTool, McpProgress } from "./mcp";
+import type { McpTool, McpProgress, McpResource, McpPrompt } from "./mcp";
 import { rpcEnvelope, parseRpcResponse } from "./mcp";
 
 export interface ChatMessage {
@@ -239,6 +239,38 @@ export class GatewayClient {
   // Invoke a tool via the gateway choke-point. Returns { content[], isError }.
   async mcpCallTool(name: string, args: Record<string, any>): Promise<{ content?: any[]; isError?: boolean }> {
     return this.mcpRpc("tools/call", { name, arguments: args });
+  }
+
+  // resources/prompts (v14) — the other half of the gateway's MCP surface, same
+  // stateless JSON-RPC + cursor pagination as tools.
+  async mcpListResources(): Promise<McpResource[]> {
+    const out: McpResource[] = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.mcpRpc("resources/list", cursor ? { cursor } : {});
+      out.push(...(res?.resources ?? []));
+      cursor = res?.nextCursor;
+    } while (cursor);
+    return out;
+  }
+
+  async mcpReadResource(uri: string): Promise<{ contents?: any[] }> {
+    return this.mcpRpc("resources/read", { uri });
+  }
+
+  async mcpListPrompts(): Promise<McpPrompt[]> {
+    const out: McpPrompt[] = [];
+    let cursor: string | undefined;
+    do {
+      const res = await this.mcpRpc("prompts/list", cursor ? { cursor } : {});
+      out.push(...(res?.prompts ?? []));
+      cursor = res?.nextCursor;
+    } while (cursor);
+    return out;
+  }
+
+  async mcpGetPrompt(name: string, args: Record<string, string>): Promise<{ messages?: any[]; description?: string }> {
+    return this.mcpRpc("prompts/get", { name, arguments: args });
   }
 
   // Streaming tools/call (v6): a long-running tool interleaves
