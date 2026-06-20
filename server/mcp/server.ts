@@ -13,12 +13,14 @@ import {
   ListResourcesRequestSchema, ReadResourceRequestSchema,
   ListPromptsRequestSchema, GetPromptRequestSchema, CompleteRequestSchema,
   SetLevelRequestSchema, ListRootsRequestSchema,
+  SubscribeRequestSchema, UnsubscribeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
 import { getFederatedRoots } from "./client";
+import { SubscriptionRegistry } from "./subscriptions";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
@@ -36,7 +38,7 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 // Advertise only what we implement (Faz 14A): tools/resources/prompts/
 // completions + structured logging. listChanged is false (stateless transport).
 export const MCP_CAPABILITIES = {
-  tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {}, roots: {},
+  tools: { listChanged: false }, resources: { subscribe: true }, prompts: {}, completions: {}, logging: {}, roots: {},
 } as const;
 
 // RFC 5424 severities, MCP logging order (low → high). A message is sent when its
@@ -50,6 +52,15 @@ export function buildServer(ctx: ToolCtx): Server {
     { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
     { capabilities: { ...MCP_CAPABILITIES } }
   );
+
+  // WHY here: stdio = persistent connection → sendResourceUpdated reaches the
+  // client. HTTP = stateless per-request → subscribe is accepted (spec compliant)
+  // but the channel closes with the response (best-effort); watchers disposed via
+  // onclose so no fd leak regardless of transport.
+  const subscriptions = new SubscriptionRegistry(ctx.workspaceRoot, (uri) => {
+    server.sendResourceUpdated({ uri }).catch(() => {});
+  });
+  server.onclose = () => subscriptions.dispose();
 
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
 
@@ -172,6 +183,17 @@ export function buildServer(ctx: ToolCtx): Server {
     try { text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel); }
     catch (e: any) { text = `Error reading resource: ${e?.message || e}`; }
     return { contents: [{ uri, mimeType: "text/plain", text }] };
+  });
+
+  server.setRequestHandler(SubscribeRequestSchema, async (req) => {
+    const uri = String(req.params.uri || "");
+    subscriptions.subscribe(uri);
+    return {};
+  });
+
+  server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
+    subscriptions.unsubscribe(String(req.params.uri || ""));
+    return {};
   });
 
   // --- prompts/list + prompts/get (3-stage pipeline as MCP prompts, Faz 11A) ---

@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -82,6 +83,52 @@ describe("MCP stdio EXPOSE (npx ollamas-mcp)", () => {
 
     await run("decline", "elicited-no.txt");
     expect(fs.existsSync(path.join(WS, "elicited-no.txt"))).toBe(false);
+  }, 40000);
+
+  // --- v1.20: resource subscriptions over persistent stdio transport ---
+  test("subscribe/unsubscribe delivers notifications/resources/updated on file change", async () => {
+    const filePath = path.join(WS, "subscribed.txt");
+    fs.writeFileSync(filePath, "initial");
+    // WHY relative URI: SubscriptionRegistry strips "file://" then resolves the
+    // remainder against workspaceRoot. An absolute-path URI would double the prefix
+    // (workspaceRoot + "/abs/path") and escape the workspace root guard.
+    const uri = `file://subscribed.txt`;
+
+    const c = new Client({ name: "sub-e2e", version: "0" }, { capabilities: {} });
+    const tr = new StdioClientTransport({
+      command: "npx", args: ["tsx", "bin/mcp-stdio.ts"], cwd: ROOT,
+      env: { ...process.env, OLLAMAS_WORKSPACE: WS } as Record<string, string>,
+    });
+
+    const received: string[] = [];
+    c.setNotificationHandler(
+      ResourceUpdatedNotificationSchema,
+      (n) => { received.push(String(n.params?.uri || "")); }
+    );
+
+    await c.connect(tr);
+
+    // Subscribe
+    await c.subscribeResource({ uri });
+
+    // Trigger a file change
+    fs.writeFileSync(filePath, "updated");
+
+    // Wait for the notification (debounce 150ms + fs latency)
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && !received.includes(uri)) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(received).toContain(uri);
+
+    // Unsubscribe then verify no further notifications
+    await c.unsubscribeResource({ uri });
+    const countAfterUnsub = received.filter((u) => u === uri).length;
+    fs.writeFileSync(filePath, "post-unsub");
+    await new Promise((r) => setTimeout(r, 500));
+    expect(received.filter((u) => u === uri).length).toBe(countAfterUnsub);
+
+    await c.close();
   }, 40000);
 
   // --- Faz 17D: cancellation over the bidirectional stdio transport ---
