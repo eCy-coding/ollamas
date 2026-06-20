@@ -309,3 +309,112 @@ test failed`), exit=1 gate. `role.ts` → 🩺 1🟢/1🔴/7⚪. Scope: orchestr
 
 **Next precomputed (→vO10):** Heartbeat/notification (idle-lane + takılı-tab); worker heartbeat.ts draftı var → konsolide.
 quality genişletme: live-eslint (frontend), coverage%, gh-api CI-status, turbo-affected-only roll-up.
+
+---
+
+## vO12 — Definition-of-Done + Concurrent-Task Detector (2026-06-20)
+
+**Bağlam:** Kullanıcı talimatı "yarım kodlama yapma, eksik kalmış mı tespit et, eş-zamanlı gerekenleri bul,
+tamamlamadan geçme" → deterministik DoD enforcer. Hiçbir araç loose-ends'i otomatik yakalamıyordu.
+
+**Yapıldı:** `bin/lib/dod.ts` (pure 7 denetçi: auditTests/auditUncommitted/auditMarkers/auditConcurrent/
+auditGovernance/auditRoadmapCoherence/scoreDoD) + `bin/dod.ts` CLI (6 kural → DOD.md/DOD.json conduct-uyumlu,
+--strict gate) + `tests/dod.test.ts` 14 case.
+
+**Kanıt:** dod 14/14; benim suite (dod+autofix+critic) 43/43. Canlı dod skor 8/100, **18 lapse gerçek**:
+2 yarım-iş (personas/shared — worker, backlog), 1 uncommitted (46 dosya), **10 eş-zamanlı-eksik** (tool'lar
+roadmap-row+SEYIR eksik), 3 governance. Self-referential dürüst (kendi commit'siz dosyasını bildirir).
+
+**Hata/loose-end (dürüst):** worker `horizon.test.ts` mid-dev (lib/horizon yok) full-suite'te RED — benim değil.
+personas/shared test'siz = worker backlog. ROADMAP vO11 mislabel ("critic" vO10 içeriği) — dod/critic yakaladı,
+autofix reconcile edebilir. Governance churn (worker errors_registry/ROADMAP/SEYIR sürekli yazıyor) → DOD.json
+ile MAKİNE-İZLENİR bıraktım (conduct COMPLETENESS besler) = tasarımsal kapanış.
+
+**Adopt (pattern, 0 dep):** danger.js DoD-rule + leasot marker + git co-change + native scan; critic/autofix/
+plan-next reuse. GPL yok.
+
+**Next precomputed (→vO13):** DOD.json + CRITIC.json → conduct COMPLETENESS tier füzyonu (critic+dod+autofix
+tek self-improving gate); personas/shared test backlog'u lane-prompt'a.
+
+---
+
+## vO13 — Unified Critical Requirements Fusion (2026-06-20)
+
+**Bağlam:** Kullanıcı "gereksiz iş yapma, CRITICAL tespit et, tüm gereksinimleri tespit et, kapsayıcı". Kritik gap:
+5 analizör JSON (conduct/critic/dod/quality) var ama conduct critic+dod TÜKETMİYOR (grep=0) → zero-touch
+motor kendi audit'ini görmüyor, self-improving loop AÇIK. Çözüm: yeni analiz DEĞİL, mevcut çıktıları tek
+critical-first requirement görünümüne FÜZYON.
+
+**Yapıldı:** `bin/lib/fuse.ts` (pure: tierToCriticality/normalizeFindings/qualityToReqs/dedupe[SARIF-fingerprint]/
+rankCritical/scoreReadiness/topCritical) + `bin/fuse.ts` CLI (conduct--json + CRITIC/DOD/QUALITY.json oku →
+dedupe+rank → tek REQUIREMENTS.md/json + readiness skoru + 🎯 en-kritik + optimal-prompt, --strict gate) +
+`tests/fuse.test.ts` 15 case. conduct.ts EDİT YOK (worker churn → standalone).
+
+**Kanıt:** fuse 15/15; full suite 32 dosya/379 green; canlı **REQUIREMENTS: hazırlık 0/100, 28 birleşik
+gereksinim, EN KRİTİK = backend test FAILED (CRITICAL, quality kaynağı)** — gerçek kritik doğru tespit edildi.
+GOTCHA: dedupe fingerprint tek-prefix soyuyordu (`dod:gate:backend`≠`backend`) → tüm öndeki prefix-zinciri soy fix.
+
+**Adopt (pattern, 0 dep):** SARIF result-merge + fingerprint-dedupe + CVSS-criticality + OSSF-readiness; native
+füzyon; critic/dod/quality/conduct/optimize reuse (sıfır yeni analiz = "gereksiz iş yapma"). GPL yok.
+
+**Kritik gerçek (proje):** backend (feat/v1.11) testLast=FAILED → QUALITY/fuse CRITICAL. ollamas için en-kritik
+gereksinim = backend kalite kapısını düzelt (lane sekmesi işi; conduct/fuse işaret etti, §3 backlog+prompt).
+
+**Next precomputed (→vO14):** REQUIREMENTS.json → conduct/heartbeat tüketimi (stabilde) + autofix REQUIREMENTS'tan
+güvenli reconcile; personas/shared test backlog'u; OPTIMAL→MODEL_SELECTION orphan temizlik.
+
+---
+
+## vO10-12 — Otonom Öz-Denetim Loop Konsolidasyonu (2026-06-20)
+
+**Tetik (Emre/T0):** "gereksiz işle uğraşma, CRITICAL tespit et, TÜM gereksinimleri, kapsayıcı+tamamlayıcı, YARIM YOK, eş zamanlı."
+
+**KAPSAMLI TESPİT:** Otonom mimari (autopilot→conduct→status→doctor) commit'liydi ama 5 untracked worker tool'u
+(heartbeat/critic/dod/autofix complete-green + horizon half) ORPHAN/yarım-teslim. Kritik boşluk: critic/dod
+CRITIC.json/DOD.json üretir ama conduct TÜKETMEZ + autopilot çağırmaz = JSON-üretir-kimse-okumaz = orphan.
+
+**Yapıldı (WIRING — yeni-tool YOK, gereksiz-iş elendi):**
+- `lib/conduct.ts` TIERS += `COMPLETENESS` (RED-sonrası, STALE-öncesi: yarım-iş acil ama kırık-gate-altı).
+- `conduct.ts main`: CRITIC.json+DOD.json findings'i (zaten Finding-şekilli) doğrula+merge → **31 COMPLETENESS finding**
+  conduct tek-eyleme girer (orphan-değil). conduct.test +COMPLETENESS-rank/prioritize.
+- `autopilot.ts` chain: benchprompt→**critic→dod**→conduct→status→doctor (CRITIC/DOD üret→conduct tüket). detailFor +skor.
+- `role.ts` → 🧭 öz-denetim satırı (completeness/DoD açık-iş) + test +2.
+- **DEFER horizon** (lib-green, bin-orphan=yarım → commit-DIŞI; vO13 planned dürüst).
+- ROADMAP vO10/11 worker-prematüre-DONE → gerçek tools+wiring'le truthful; vO12 (dod+wiring) + vO13 (horizon defer) eklendi.
+
+**Kanıt (uçtan-uca 0-touch self-policing):** vitest **390 yeşil**. `tsx autopilot.ts` → critic(completeness 60·12 açık)→
+dod(skor 7·19 yarım-iş)→conduct. `tsx conduct.ts --json` → tier dağılımı RED:1/SEC:1/ROADMAP:4/**COMPLETENESS:31**=37
+bulgu, TEK eylem=RED:backend (doğru: RED>COMPLETENESS; backend düzelince 19 yarım-iş yüzeye). `role.ts`→🧭 12/19.
+**dod = Emre'nin "yarım yok" kuralı loop'ta OTOMATİK.** conduct exit=1 = gate (crash-değil, stderr temiz).
+
+**RISK-ORCH-015:** orphan-tool-wiring (JSON-üreten tüketilmeli, üret+tüket eş-zamanlı); horizon-half-defer;
+worker-prematüre-DONE→truthful. Aktivasyon (hook+launchd) PRIVILEGED = tek manuel-artık (ajan yazamaz).
+
+**Next precomputed (→vO13):** Horizon — conduct-merge + ROADMAP_HORIZON→ROADMAP reconcile (auto-mutate-governance
+risk: autofix scope-lock deseni). Aktivasyon: kullanıcı 1-kez `.claude/settings.json` hook + `autopilot-install.sh load`.
+
+---
+
+## vO14 — Heartbeat→Fuse Wiring (loop kapanışı, 2026-06-20)
+
+**Bağlam:** Sistem 27 araçla doygun (yeni araç=gereksiz). Tek kalan boşluk: sürdürülebilir heartbeat
+conduct'u exec ediyordu (dar görüş), fuse birleşik-kritik'i (REQUIREMENTS) DEĞİL → loop son telde açık.
+
+**Yapıldı (yeni araç YOK, wiring):** `lib/heartbeat.ts` +reqToConductAction (fuse Requirement→ConductAction
+adapter, tickDecision değişmedi) +readinessAlert; TIER_ORDER'a CRITICAL+COMPLETENESS. `bin/heartbeat.ts`
+fuse-source DEFAULT (`--source conduct` geri-uyumlu) + readiness notify + state-hash'e readiness dahil.
+fuse.ts'e `--json` modu eklendi (eksikti). `heartbeat.test` +9 (adapter/readiness/collision).
+
+**Kanıt:** heartbeat 18→27 test; full suite 34 dosya/407 green. Canlı `[heartbeat:fuse] CRITICAL:backend
+readiness=0 NOTIFY` — sürdürülebilir loop artık BİRLEŞİK-KRİTİK üzerinden (backend test FAILED). conduct-source
+geri-uyumlu RED:backend. İdempotent korundu. GOTCHA: conduct RED'de exit-1 → execFileSync throw; execJson
+non-zero-exit'te stdout yakalar (gate-exit JSON yine geçerli).
+
+**Adopt (pattern, 0 dep):** k8s single-desired-state + GitOps tek-kaynak reconcile mental-model; fuse/claims/
+signal/tickDecision reuse (sıfır yeni external = gereksiz iş yapma). GPL yok. 27→27 araç.
+
+**Kritik gerçek (proje):** Sürdürülebilir loop artık en-kritik gereksinimi (backend feat/v1.11 test FAILED)
+otomatik bildiriyor — lane sekmesi düzeltmeli (§3 prompt/backlog).
+
+**Next precomputed (→vO15):** heartbeat plist fuse-source güncelle (zaten --once default fuse); conduct.ts
+stabilde REQUIREMENTS.json tüket (worker churn bitince); backend test-fix lane prompt önceliklendir.

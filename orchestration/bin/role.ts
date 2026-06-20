@@ -31,6 +31,7 @@ export interface RoleInputs {
   tools: { name: string; gist: string }[];
   optimal?: { model: string; tokS: number; chip: string } | null; // vO6 0-manuel optimal runtime (MODEL_SELECTION.json)
   health?: { green: number; red: number; unknown: number } | null;  // vO9 lane sağlık roll-up (QUALITY.json)
+  selfPolice?: { completeness: number; dod: number } | null;        // vO10-12 öz-denetim açık-iş (CRITIC/DOD.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -87,6 +88,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     `- İzlenen lane'ler (${i.lanes.length}): ${laneList}`,
     i.optimal ? `- 🏆 **Optimal runtime (0-manuel):** \`${i.optimal.model}\` @ ${i.optimal.chip} (${i.optimal.tokS} tok/s) — \`MODEL_PROMPT.md\`` : `- Optimal runtime: \`tsx bin/benchprompt.ts\` koş (henüz MODEL_SELECTION.json yok)`,
     i.health ? `- 🩺 **Lane health (vO9):** ${i.health.green}🟢 / ${i.health.red}🔴 / ${i.health.unknown}⚪ — \`QUALITY.md\` (tsc canlı + vitest cache)` : `- Lane health: \`tsx bin/quality.ts\` koş (henüz QUALITY.json yok)`,
+    i.selfPolice ? `- 🧭 **Öz-denetim (vO10-12):** completeness ${i.selfPolice.completeness} açık · DoD ${i.selfPolice.dod} yarım-iş — \`CRITIC.md\`/\`DOD.md\` (autopilot→conduct tüketir)` : `- Öz-denetim: \`tsx bin/critic.ts\` + \`tsx bin/dod.ts\` koş`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -185,6 +187,14 @@ async function main(): Promise<void> {
     }
   } catch { /* graceful */ }
 
+  // vO10-12 öz-denetim açık-iş (CRITIC.json + DOD.json varsa; graceful absent).
+  let selfPolice: RoleInputs["selfPolice"] = null;
+  try {
+    const c = existsSync(join(ORCH_DIR, "CRITIC.json")) ? JSON.parse(readFileSync(join(ORCH_DIR, "CRITIC.json"), "utf8")) : null;
+    const d = existsSync(join(ORCH_DIR, "DOD.json")) ? JSON.parse(readFileSync(join(ORCH_DIR, "DOD.json"), "utf8")) : null;
+    if (c || d) selfPolice = { completeness: (c?.findings ?? []).length, dod: (d?.findings ?? []).length };
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -194,6 +204,7 @@ async function main(): Promise<void> {
     tools: readTools(),
     optimal,
     health,
+    selfPolice,
   });
 
   console.log(answer);

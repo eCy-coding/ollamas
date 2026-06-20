@@ -100,6 +100,13 @@
       "severity": "med",
       "note": "vO9 quality-gate roll-up: tüm-lane sağlık matrisi 0-manuel. (a) tsc --noEmit CANLI koşulur — GÜVENLİ (stateless, dosya-yazmaz, DB-yok, lane-eşzamanlı-çakışmaz, ~2s); vitest CANLI KOŞULMAZ (pahalı+DB+UK-08 flaky) → yalnız `.last-run.json` cache TÜKET (status passed/failed, ts=dosya-mtime, isStale 2gün). Lane tsconfig/tsc-bin yoksa → skip (RED-değil, dürüst). (b) **BUG yakalandı (no-half kanıtı):** vO6 conduct ref-onarımı YARIM kalmıştı — `optimal.config.num_ctx` summary-satırı MODEL_SELECTION.json nested-shape'e güncellenmemişti (else-if düzeltilmiş ama bu satır kaçmış) → conduct.ts:109 CANLI TypeError crash. conduct.test mock-data ile geçtiği için yakalamadı; CANLI koşu (Phase-4/6 verify) yakaladı → optimal?.selection.config?.num_ctx guard. Prevention: ref-shape değiştiren refactor'da TÜM kullanımları grep'le (tek değil); CANLI koş (test-mock yetmez, gerçek-JSON-shape'le doğrula); 'yarım ref-onarımı' = bitmemiş iş, sonraki adıma geçme. (c) CONDUCT WIRING: QUALITY.json.redLanes → conduct ClassifyInput.redLanes (orphan-değil, uçtan-uca tüketildi: eylem=RED:backend). (d) ROADMAP vO9 'DONE' commit-ÖNCESİ işaretliydi (worker prematüre) → gerçek-impl commit'le DONE'ı doğru-yap (RISK-013 versiyon-drift ailesi).",
       "applies_version": "vO9"
+    },
+    {
+      "id": "RISK-ORCH-015",
+      "category": "orphan-wiring",
+      "severity": "med",
+      "note": "vO10-12 öz-denetim konsolidasyonu: 5 untracked worker tool'u (heartbeat/critic/dod/autofix complete-green + horizon half). KRİTİK TESPİT (kullanıcı 'gereksiz-iş + yarım-yok'): (a) ORPHAN-tool — critic/dod CRITIC.json/DOD.json üretir AMA conduct ClassifyInput'ta completeness alanı YOK + autopilot chain critic/dod çağırmaz → JSON-üretir-kimse-tüketmez = yarım. FIX: TIERS+COMPLETENESS (RED-sonrası/STALE-öncesi); conduct CRITIC/DOD findings'i (zaten Finding-şekilli) merge eder → 31 COMPLETENESS finding; autopilot benchprompt→critic→dod→conduct→status→doctor. Prevention: JSON-üreten-tool TÜKETİLMELİ (üret-et+tüket-et eş-zamanlı, yoksa orphan=yarım); 'tool yazdım test geçti' yetmez, loop'a bağla. (b) horizon HALF (lib-green ama bin-orphan, ROADMAP_HORIZON merge yok) → DEFER (yarım-commit-etme, vO13 planned dürüst). (c) ROADMAP vO10/11 commit-ÖNCESİ 'DONE' worker-prematüre (RISK-013 ailesi) → gerçek-impl commit'le truthful-yap. (d) dod=Emre'nin 'yarım-yok' kuralının loop-otomatik enforcer'ı: 19 yarım-iş conduct tek-eyleme girer (RED-altı önceliklenir). Aktivasyon (hook+launchd) PRIVILEGED → ajan settings.json/launchctl yazamaz (guardrail), tek manuel-artık.",
+      "applies_version": "vO10-12"
     }
   ],
   "errors": [

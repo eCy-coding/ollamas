@@ -14,7 +14,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collect, type CockpitSnapshot } from "./lib/collect";
 import {
-  classify, prioritize, reconcile, buildConductorReport,
+  classify, prioritize, reconcile, buildConductorReport, TIERS,
   type Finding, type ClassifyInput,
 } from "./lib/conduct";
 import {
@@ -73,7 +73,15 @@ async function main(): Promise<void> {
     benchRegressions: (bench?.regressions ?? []).map((r: any) => ({ model: r.model, dropPct: r.dropPct })),
     redLanes: Array.isArray(quality?.redLanes) ? quality.redLanes : [], // vO9: quality.ts roll-up (tsc-fail/test-failed) → RED-lane sinyali
   };
-  const findings: Finding[] = classify(ci);
+  const baseFindings: Finding[] = classify(ci);
+
+  // vO10-12 ÖZ-DENETİM wiring: critic (completeness audit) + dod (yarım-iş gate) çıktılarını TÜKET.
+  // CRITIC.json/DOD.json findings'i ZATEN Finding-şekilli (tier=COMPLETENESS) → doğrula+merge (orphan-değil).
+  const critic = readJson(join(ORCH_DIR, "CRITIC.json"));
+  const dod = readJson(join(ORCH_DIR, "DOD.json"));
+  const selfPolice: Finding[] = [...(critic?.findings ?? []), ...(dod?.findings ?? [])]
+    .filter((f: any) => f && typeof f.kind === "string" && typeof f.severity === "number" && (TIERS as readonly string[]).includes(f.tier));
+  const findings: Finding[] = [...baseFindings, ...selfPolice];
   const action = prioritize(findings);
 
   // 3) RECONCILE delta (idempotent).

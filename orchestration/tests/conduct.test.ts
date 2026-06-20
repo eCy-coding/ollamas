@@ -43,6 +43,20 @@ describe("classify — sinyal → Finding tier", () => {
   });
 });
 
+describe("COMPLETENESS tier — vO10-12 öz-denetim wiring (critic/dod merge)", () => {
+  it("COMPLETENESS TIERS'te: RED'den sonra, STALE'den önce (yarım-iş acil ama gate-altı)", () => {
+    expect(TIERS).toContain("COMPLETENESS");
+    expect(tierRank("RED")).toBeLessThan(tierRank("COMPLETENESS"));
+    expect(tierRank("COMPLETENESS")).toBeLessThan(tierRank("STALE"));
+  });
+  it("prioritize: RED COMPLETENESS'i yener; RED yoksa COMPLETENESS (yarım-iş) seçilir", () => {
+    const comp: Finding = { tier: "COMPLETENESS", lane: "orchestration", kind: "dod:code-without-test:x", detail: "x test'siz — yarım iş", action: "test ekle", severity: 65 };
+    const red: Finding = { tier: "RED", lane: "backend", kind: "red:backend", detail: "test failed", action: "düzelt", severity: 100 };
+    expect(prioritize([comp, red])?.tier).toBe("RED");
+    expect(prioritize([comp])?.kind).toBe("dod:code-without-test:x");
+  });
+});
+
 describe("prioritize — TEK eylem (0 manuel seçim)", () => {
   it("RED her şeyi ezer (ROADMAP varken bile)", () => {
     const f = classify(baseInput({

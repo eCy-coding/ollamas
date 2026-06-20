@@ -1,0 +1,114 @@
+{
+  "ts": "2026-06-20T12:11:26.021Z",
+  "score": 39,
+  "findings": [
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:code-without-test:shared.ts",
+      "detail": "shared.ts (4 export) test'te geçmiyor — yarım iş",
+      "action": "shared.ts için tests/shared.test.ts ekle",
+      "severity": 65,
+      "concurrent": false
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:uncommitted-green:44 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, CONDUCTOR.md, DOCTOR.md, DRIFT.md, MODEL_PROMPT.md…",
+      "action": "yeşil parçayı commit'le (per-file git add + conventional)",
+      "severity": 40,
+      "concurrent": false
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:done-without-governance:vO4.2",
+      "detail": "vO4.2 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
+      "action": "vO4.2 için SEYIR girdisi + errors_registry güncelle",
+      "severity": 40,
+      "concurrent": false
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:done-without-governance:vO4.1",
+      "detail": "vO4.1 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
+      "action": "vO4.1 için SEYIR girdisi + errors_registry güncelle",
+      "severity": 40,
+      "concurrent": false
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:adopt-gate",
+      "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
+      "action": "adopt-gate için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:claim",
+      "detail": "claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry",
+      "action": "claim için test + SEYIR-entry aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:driftguard",
+      "detail": "driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry",
+      "action": "driftguard için SEYIR-entry aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:fuse",
+      "detail": "fuse kısmen tamam — eksik eş-zamanlı: roadmap-row",
+      "action": "fuse için roadmap-row aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:scan",
+      "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
+      "action": "scan için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:shared",
+      "detail": "shared kısmen tamam — eksik eş-zamanlı: test",
+      "action": "shared için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:concurrent-task:status",
+      "detail": "status kısmen tamam — eksik eş-zamanlı: test",
+      "action": "status için test aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:roadmap-coherence:fuse",
+      "detail": "fuse aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
+      "action": "fuse'yi ilgili vO satırına ekle",
+      "severity": 15,
+      "concurrent": false
+    }
+  ]
+}

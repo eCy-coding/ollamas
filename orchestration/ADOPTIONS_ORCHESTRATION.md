@@ -107,3 +107,15 @@ vendor edilmedi; tok/s metodolojisi worker bench-core'da (MIT). RouteLLM/mlx-lm 
 **Karar (vO9):** quality.ts tamamen **kendi zero-dep impl**'i (tsc exit + .last-run.json parse). turbo/nx/reviewdog
 yalnız roll-up/affected **kavramı** (idea-only) — kod vendor YOK. **Ekleyebilecekler:** live-eslint (frontend lane),
 coverage% (vitest cache), gh-api CI-status (workflow conclusion), turbo-style affected-only (git-diff→etkilenen-lane).
+
+## vO10-12 — Otonom Öz-Denetim Loop (research)
+
+| # | Repo | ⭐ | Lisans | Karar | Ne |
+|---|------|-----|--------|-------|-----|
+| 17 | watchexec/watchexec | 11k | Apache-2.0 | idea-only | dosya-değişim→tick deseni (heartbeat); biz launchd WatchPaths + node, kod YOK |
+| 18 | danger/danger-js | 5k | MIT | idea-only | PR-policy/DoD-kural deseni (critic/dod); zero-dep TS yeniden, vendor YOK |
+| 19 | googleapis/release-please | 5k | Apache-2.0 | idea-only | conventional→otomatik-versiyon-flip deseni (autofix planned→DONE); scope-locked kendi impl |
+
+**Karar (vO10-12):** heartbeat/critic/dod/autofix tamamen **kendi zero-dep impl**'i. watchexec/danger/release-please
+yalnız **kavram** (idea-only) — kod vendor YOK. **Ekleyebilecekler:** horizon conduct-merge (vO13), loop-closure
+(conduct→lane-exec — §3 read-only gereği DEFER, lane sekmesi koşar), gh-api PR-status critic'e.

@@ -95,6 +95,18 @@ describe("buildRoleAnswer — vO9 lane health surface", () => {
   });
 });
 
+describe("buildRoleAnswer — vO10-12 öz-denetim surface", () => {
+  it("selfPolice VARSA 🧭 completeness + DoD satırı", () => {
+    const out = buildRoleAnswer({ ...BASE, selfPolice: { completeness: 3, dod: 2 } });
+    expect(out).toMatch(/🧭.*Öz-denetim/i);
+    expect(out).toMatch(/completeness 3/);
+    expect(out).toMatch(/DoD 2/);
+  });
+  it("selfPolice YOKSA critic/dod-koş fallback (graceful)", () => {
+    expect(buildRoleAnswer(BASE)).toMatch(/critic\.ts|dod\.ts/);
+  });
+});
+
 describe("isRoleQuestion — hook matcher", () => {
   it("kimlik/görev sorularını yakalar", () => {
     expect(isRoleQuestion("Bu terminal sekmesinde görevin nedir? Ne yaparsın?")).toBe(true);

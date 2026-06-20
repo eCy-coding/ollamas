@@ -1,0 +1,62 @@
+{
+  "ts": "2026-06-20T12:11:25.915Z",
+  "score": 60,
+  "findings": [
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:roadmap-drift:vO13",
+      "detail": "vO13 (Horizon auto roadmap (10 versiyon lookahead) lib hazır, cond) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+      "action": "vO13 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+      "severity": 70
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:coverage-gap:lib/collect.ts",
+      "detail": "lib/collect.ts: test'siz export → liveTabMap",
+      "action": "lib/collect.ts için test ekle (liveTabMap)",
+      "severity": 20
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:coverage-gap:lib/signal.ts",
+      "detail": "lib/signal.ts: test'siz export → notify",
+      "action": "lib/signal.ts için test ekle (notify)",
+      "severity": 20
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:autopilot.ts↔horizon.ts",
+      "detail": "autopilot.ts ve horizon.ts amaç-örtüşmesi yüksek (2 ortak kelime) — olası duplicate",
+      "action": "autopilot.ts/horizon.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:conduct.ts↔serve.ts",
+      "detail": "conduct.ts ve serve.ts amaç-örtüşmesi yüksek (2 ortak kelime) — olası duplicate",
+      "action": "conduct.ts/serve.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:doctor.ts↔model-hook.ts",
+      "detail": "doctor.ts ve model-hook.ts amaç-örtüşmesi yüksek (3 ortak kelime) — olası duplicate",
+      "action": "doctor.ts/model-hook.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:model-hook.ts↔role-hook.ts",
+      "detail": "model-hook.ts ve role-hook.ts amaç-örtüşmesi yüksek (5 ortak kelime) — olası duplicate",
+      "action": "model-hook.ts/role-hook.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    }
+  ]
+}

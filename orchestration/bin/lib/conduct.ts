@@ -8,7 +8,7 @@
  */
 
 // Tier sırası = öncelik (küçük rank = yüksek öncelik). Matematiksel/mantıksal bütünlük.
-export const TIERS = ["RED", "SECURITY", "CONTRACT", "DRIFT", "REGRESSION", "STALE", "ROADMAP"] as const;
+export const TIERS = ["RED", "SECURITY", "CONTRACT", "DRIFT", "REGRESSION", "COMPLETENESS", "STALE", "ROADMAP"] as const;
 export type Tier = (typeof TIERS)[number];
 export function tierRank(t: Tier): number { return TIERS.indexOf(t); }
 
