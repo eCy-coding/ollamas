@@ -6,6 +6,7 @@ Worktree: `ollamas-colab-wt` · Branch: `feat/colab-v1`
 |----------|--------|-------|
 | **vC0** | Colab `google.colab.ai` façade (`server/ai.ts` + `/api/ai/*` + `client/ai-client.ts`) — feat/v1.11'de commit'lendi (8d6d52d), lane temeli | ✅ DONE |
 | **vC1** | Detection harness (tsc+vitest+semgrep→Finding[]) + Gemini triage (adversarial verify) → `BUGFIX_REPORT.md` + **migration-drift crash fix** (gate'li, tek blocking) | ✅ DONE |
+| **vC1.5** | Triage-engine köprüsü → bağlı Colab runtime (key'siz Gemini): `bugfix/colab_exec.py` + `colab-bridge.ts` + triage wiring. Kod+unit-test DONE; canlı-e2e kullanıcı-gated (classifier kernel-write + egress guardrail → kullanıcı `Bash(python3:*)` izni veya `!`-self-run) | 🟡 KOD DONE / canlı-gated |
 | vC2 | Gate'li auto-fix apply (worktree-izole verify-or-revert) → TÜM doğrulanmış bug'lar tek tek | ⬜ NEXT |
 | vC3 | 0-manuel daemon + CI entegrasyonu (PR'a danger-tarzı yorum) | ⬜ |
 | vC4 | Benchmark-driven local-engine selectBest (orchestration optimize entegrasyonu) | ⬜ |

@@ -7,6 +7,7 @@
 import { generate, pickEngine, type AiProvider } from "../server/ai";
 import { detectAll, type Finding } from "./detect";
 export type { Finding } from "./detect";
+import { colabGen, colabRuntimeAvailable, COLAB_DEFAULT_MODEL } from "./colab-bridge";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -132,7 +133,7 @@ export async function triageAll(cwd: string, findings: Finding[], gen: GenFn, en
 
 const SEV_RANK: Record<Verdict["severity"], number> = { high: 0, medium: 1, low: 2 };
 
-export function renderReport(triaged: TriagedFinding[], engine?: EngineSel): string {
+export function renderReport(triaged: TriagedFinding[], engine?: { provider: string; model: string }): string {
   const kept = triaged.filter((t) => t.kept).sort((a, b) => SEV_RANK[a.verdict.severity] - SEV_RANK[b.verdict.severity]);
   const dropped = triaged.filter((t) => !t.kept);
   const L: string[] = [];
@@ -159,12 +160,17 @@ async function main() {
   const cwd = process.cwd();
   const arg = process.argv[2];
   const findings: Finding[] = arg && existsSync(arg) ? JSON.parse(readFileSync(arg, "utf8")) : detectAll(cwd);
-  const eng = await pickEngine("code");
-  console.error("[triage] engine:", eng.provider, eng.model, "| findings:", findings.length);
-  const gen: GenFn = (p, o) => generate(p, o);
+  // Prefer the connected Colab runtime (key-less Gemini); else local/gemini-key engine.
+  const useColab = colabRuntimeAvailable();
+  const eng: EngineSel = useColab
+    ? { provider: "gemini", model: COLAB_DEFAULT_MODEL } // colabGen ignores provider, uses model
+    : await pickEngine("code");
+  const gen: GenFn = useColab ? colabGen : (p, o) => generate(p, o);
+  const label = { provider: useColab ? "colab" : eng.provider, model: eng.model };
+  console.error("[triage] engine:", label.provider, label.model, "| findings:", findings.length);
   const triaged = await triageAll(cwd, findings, gen, eng);
   writeFileSync(join(cwd, "bugfix", "bugfix-findings.json"), JSON.stringify(triaged, null, 2) + "\n");
-  writeFileSync(join(cwd, "bugfix", "BUGFIX_REPORT.md"), renderReport(triaged, eng) + "\n");
+  writeFileSync(join(cwd, "bugfix", "BUGFIX_REPORT.md"), renderReport(triaged, label) + "\n");
   console.error("[triage] kept:", triaged.filter((t) => t.kept).length, "→ bugfix/BUGFIX_REPORT.md");
 }
 
