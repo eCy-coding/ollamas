@@ -283,3 +283,21 @@ exhausted-roadmap'i 10-versiyon olarak SIRALA/ÜRET**. Untracked worker dosyalar
 runtime okur); yalnız committed plan-next/shared/driftguard. **Scope §3:** yalnız okur + `ROADMAP_HORIZON.md`.
 Adopt idea/pattern (zero-dep): knip/ts-prune (gap→action), OpenSSF Scorecard (checklist→backlog), WSJF/RICE
 (severity×frekans önceliklendirme). Canlı kanıt: 43 sinyal → vO12-vO21, top=backend obs-gap (sev 80).
+
+---
+
+## §17. Staleness Self-Heal Protokolü (vO-AUTO.2 — sürdürülebilir 0-manuel taze seçim)
+
+§15 doctor bench-staleness'i TESPİT eder; bu protokol **otomatik DÜZELTİR**. autopilot `--heal`:
+bench bayat + server :3000 up + cooldown geçti ise `benchprompt --refresh` tetikler → "en-verimli
+model seçimi" elle müdahalesiz taze kalır (core-değer degrade'i kapanır).
+```
+tsx orchestration/bin/autopilot.ts --heal    # launchd kullanır (ağır-refresh uygun)
+# SessionStart hook --heal'siz → hızlı consume (sekme açılışı bloklanmaz)
+```
+**Mekanik:** `bin/lib/refresh.ts` PURE `shouldAutoRefresh({stale,serverUp,lastAttemptMs,nowMs,cooldownHours})`
+→ `stale && serverUp && cooled` ise go. `.autopilot-refresh.json` stamp = **debounce/cooldown** (COOLDOWN_H=12;
+ardışık ağır-bench thrash'i önlenir). Server kapalı → atla + **bench-lane'e devir** (§3: orchestration
+heavy-bench KOŞMAZ, yalnız mevcut benchprompt --refresh consume-path'ini tetikler). **Karar dalları:**
+taze→atla (gereksiz iş yok) · bayat+down→devir · bayat+up+cooldown→debounce · bayat+up+cooled→tazele.
+**Scope §3:** read-only + `.autopilot-refresh` stamp yazar. Adopt-pattern p-debounce/launchd-cooldown (zero-dep).
