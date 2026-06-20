@@ -16,6 +16,7 @@ import { VirtualController } from "./components/VirtualController";
 import { SaaSAdmin } from "./components/SaaSAdmin";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { LanguageToggle } from "./components/LanguageToggle";
+import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { useLingui } from "@lingui/react";
 import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
@@ -217,6 +218,7 @@ export default function App() {
           {activeTab === "telemetry" && (
             <div className="space-y-6 animate-fade-in">
               <TelemetryCockpit telemetry={telemetry} onRefresh={fetchTelemetry} />
+              <ObservabilityPanel />
               <SelfTestGates />
             </div>
           )}

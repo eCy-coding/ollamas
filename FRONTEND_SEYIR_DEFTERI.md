@@ -131,6 +131,20 @@ Kayda değer hatalar ayrıca aşağıdaki **Hata Sicili**'ne; çalışma-zamanı
 
 ---
 
+## Faz vF10 — Observability & Self-Heal (in-cockpit RUM) (DONE)
+- **Ne:** vF3 web-vitals + vF8 client-error event'leri ZATEN `/api/logbook`'a akıyordu ama görselleştirilmiyordu (gözlem boşluğu). vF10 cockpit-içi RUM paneli: p75 web-vitals + hata-oranı + zaman-serisi sparkline + sağlık-verdict (self-heal-lite). Sovereign/offline — harici RUM yok.
+- **Nasıl:**
+  - **Saf logic** (`src/lib/observability.ts`, DOM'suz→testli): `vitalsSummary` (her metrik count/latest/**p75 nearest-rank**/rating, resmi web-vitals eşikleri) + `categorizeError` (react/window/unhandled/api; `api_stream_reconnect`=geçici→hariç) + `errorCounts`/`errorBuckets` (zaman-kova) + `healthVerdict` (crash≥1 veya errs≥10→critical; errs≥3 veya poor-vital≥1→degraded).
+  - **Sparkline** (`Sparkline.tsx`): zero-dep SVG `<polyline>` (adopt **fnando/sparkline** MIT deseni, reimplement; `stroke=currentColor`→theme-aware; min/max normalize; boş/tek-nokta guard; `role=img`).
+  - **Hook** (`useLogbook.ts`): `api.get<LogbookResponse>('/api/logbook?limit=200',{retries:2})` choke-point; opsiyonel poll (`document.hidden` skip) + unmount-guard (FE-017).
+  - **Panel** (`ObservabilityPanel.tsx`): **theme-aware token** sınıfları (`bg-immersive-panel`, `text-immersive-*`, `border-immersive-border`) — verdict kartı (renk-kodlu+öneri+refetch) + 5 vital kartı (p75+rating renk) + hata kartı (kategori+Sparkline) + son 8 olay; loading→Skeleton (vF8), error→alert, boş→noData. i18n (`useLingui()._`, en+tr ~16 key). App `telemetry` tab'ına mount (yeni tab YOK).
+- **Niçin:** Üretilen telemetri kör noktaydı; operatör cockpit'te hata/perf sağlığını canlı görür. Pure-SVG = 0 bundle (bütçe). Logic saf = matematiksel doğruluk test edilebilir.
+- **Kanıt:** `npm run lint` 0 · `vitest` **124 pass/1 skip** (+10: 8 logic + 2 render) · React e2e **10 pass** (a11y dahil — panel WCAG AA temiz) · web e2e **5 pass** · `vite build` OK · size cockpit **114.38KB/140** (+2.24KB zero-dep) · `npm run tokens` sync.
+- **Açık iz (tracked):** `errorBuckets` `Date.now()` kullanır (app-kodu, Workflow-script-ban kapsamı DIŞI); render testi sabit `now` yerine boş-kova toleranslı. p75 tek-örneklemde = o örnek (RUM yorumu: az veri = düşük güven; `count`/n gösteriliyor). Derin component renk-sweep hâlâ açık (vF9'dan devir).
+- **Sonraki (önceden hesaplandı):** **vF11 Tenant-aware Cockpit** — tier-gated UI (safe/host/privileged görünürlük) + scope-gated butonlar. İlk adım: `/api/saas` veya health'ten tenant/tier oku → `useTier` hook + tier'a göre tab/aksiyon görünürlük gate (deny-by-default, backend yetkisini UI'da tekrar zorlamaz, yalnız yansıtır).
+
+---
+
 ## Hata Sicili (root cause → önleme kuralı)
 
 > Koda başlamadan ÖNCE oku. Aynı hatayı tekrar = ihlal (FRONTEND_AGENTS.md §6).
