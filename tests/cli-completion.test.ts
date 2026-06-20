@@ -35,10 +35,11 @@ describe("index wiring (completion + __complete)", () => {
     const { out } = await run(["__complete", "mcp"]);
     expect(out.split("\n")).toEqual(expect.arrayContaining(["info", "tools", "call", "upstreams", "add", "rm"]));
   });
-  it("__complete config → use/profiles", async () => {
+  it("__complete config → use/profiles/keystore", async () => {
     const { out } = await run(["__complete", "config"]);
     expect(out).toContain("use");
     expect(out).toContain("profiles");
+    expect(out).toContain("keystore"); // v11
   });
 });
 

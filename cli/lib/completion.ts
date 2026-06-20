@@ -39,12 +39,12 @@ export const COMMAND_TREE: CommandTree = {
     mcp: ["info", "tools", "call", "upstreams", "add", "rm"],
     shortcuts: ["build"],
     // config: profile ops + the settable keys
-    config: ["use", "profiles", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
+    config: ["use", "profiles", "keystore", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
     completion: ["bash", "zsh", "fish"],
     plugin: ["list", "install", "remove"],
     update: ["--check"],
   },
-  globalFlags: ["--gateway", "--profile", "--json", "--help"],
+  globalFlags: ["--gateway", "--profile", "--insecure-storage", "--json", "--help"],
 };
 
 // Candidate set for the position implied by `words` (the args BEFORE the cursor).

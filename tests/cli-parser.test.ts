@@ -41,6 +41,14 @@ describe("extractGlobalFlags (G10)", () => {
   it("leaves argv untouched without the flag", () => {
     expect(extractGlobalFlags(["chat", "hi"])).toEqual({ gateway: undefined, rest: ["chat", "hi"] });
   });
+  it("pulls --insecure-storage out as a boolean (v11)", () => {
+    const g = extractGlobalFlags(["--insecure-storage", "config", "keystore"]);
+    expect(g.insecureStorage).toBe(true);
+    expect(g.rest).toEqual(["config", "keystore"]);
+  });
+  it("leaves insecureStorage undefined when absent (toEqual back-compat)", () => {
+    expect(extractGlobalFlags(["config"]).insecureStorage).toBeUndefined();
+  });
 });
 
 describe("main dispatch (G9)", () => {

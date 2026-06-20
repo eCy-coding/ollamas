@@ -17,6 +17,7 @@ import { runPlugin } from "./commands/plugin";
 import { loadRegistry, findPlugin, verifyPluginFile, isValidPluginName } from "./lib/plugins";
 import { spawnSync } from "node:child_process";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
+import { describeKeystore, migrateKeySource } from "./lib/keystore";
 
 const VERSION = "10.0.0";
 
@@ -38,6 +39,7 @@ commands:
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
     config use <name>  switch active gateway profile (secrets sealed per profile)
     config profiles    list profiles
+    config keystore [keychain|file]  show/migrate the master-key store (macOS Keychain)
   completion <shell> print a shell completion script (bash|zsh|fish)
   update [--check]   self-update from a release manifest (sha256-verified)
   plugin <action>    manage external subcommands (list|install|remove)
@@ -53,6 +55,7 @@ global env:
 global flags:
   --gateway <url>    override gateway for this invocation
   --profile <name>   use a named gateway profile (config use <name> to set default)
+  --insecure-storage force the file keystore (skip the macOS Keychain) for this run
 common flags:
   --json             machine-readable output      --timeout <ms>  stream timeout
   -m, --model        override model               -p, --provider  override provider
@@ -60,10 +63,11 @@ run 'ollamas <command> --help' for per-command options.
 `;
 
 // Pull global flags (--gateway <url>, --profile <name>) out of argv. Pure → testable.
-export function extractGlobalFlags(argv: string[]): { gateway?: string; profile?: string; rest: string[] } {
+export function extractGlobalFlags(argv: string[]): { gateway?: string; profile?: string; insecureStorage?: boolean; rest: string[] } {
   const rest: string[] = [];
   let gateway: string | undefined;
   let profile: string | undefined;
+  let insecureStorage: boolean | undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--gateway" && i + 1 < argv.length) {
       gateway = argv[++i];
@@ -73,11 +77,13 @@ export function extractGlobalFlags(argv: string[]): { gateway?: string; profile?
       profile = argv[++i];
     } else if (argv[i].startsWith("--profile=")) {
       profile = argv[i].slice("--profile=".length);
+    } else if (argv[i] === "--insecure-storage") {
+      insecureStorage = true; // force the file keystore, skip the macOS Keychain
     } else {
       rest.push(argv[i]);
     }
   }
-  return { gateway, profile, rest };
+  return { gateway, profile, insecureStorage, rest };
 }
 
 // Split argv into the command and its remaining args. Pure → unit-testable.
@@ -116,6 +122,28 @@ function runConfig(rest: string[]): number {
       process.stdout.write(`${p.active ? "*" : " "} ${p.name.padEnd(14)} ${p.gateway.padEnd(28)} key:${p.hasKey ? "set" : "unset"}\n`);
     }
     return 0;
+  }
+
+  // config keystore [keychain|file] — show or migrate the master-key store (v11).
+  // Migration carries the SAME key bytes so sealed secrets stay openable.
+  if (key === "keystore") {
+    if (!value) {
+      const { source, detail } = describeKeystore();
+      process.stdout.write(`keystore: ${source}  (${detail})\n`);
+      return 0;
+    }
+    if (value !== "keychain" && value !== "file") {
+      process.stderr.write("config keystore: expected <keychain|file>\n");
+      return 2;
+    }
+    try {
+      const { from, to } = migrateKeySource(value);
+      process.stdout.write(`keystore: migrated ${from} → ${to} (same key bytes; sealed secrets intact)\n`);
+      return 0;
+    } catch (e: any) {
+      process.stderr.write(`config keystore: ${String(e?.message || e)}\n`);
+      return 2;
+    }
   }
 
   const activeProfile = listProfiles().find((p) => p.active)?.name ?? "default";
@@ -161,6 +189,7 @@ export async function main(argv: string[]): Promise<number> {
   const g = extractGlobalFlags(argv);
   if (g.gateway) process.env.OLLAMAS_GATEWAY = g.gateway; // env wins in loadConfig (G10)
   if (g.profile) process.env.OLLAMAS_PROFILE = g.profile; // --profile selects the active profile (v7)
+  if (g.insecureStorage) process.env.OLLAMAS_KEYSTORE = "file"; // opt out of the keychain (v11)
   const { command, rest } = route(g.rest);
   switch (command) {
     case "chat":

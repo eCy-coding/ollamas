@@ -9,12 +9,12 @@
 //      Zero friction. Defeats casual disclosure (accidental commit, backup, cat),
 //      NOT a local attacker who can read both the keyfile and the blob. See
 //      cli/SECRETS.md for the honest threat model.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { deriveKey } from "./secrets";
-import { keychainAvailable, readMasterKey, writeMasterKey } from "./keychain";
+import { keychainAvailable, readMasterKey, writeMasterKey, deleteMasterKey, SERVICE, ACCOUNT } from "./keychain";
 
 const KEY_BYTES = 32;
 const SALT_BYTES = 16;
@@ -122,4 +122,44 @@ export function loadMasterKey(env: NodeJS.ProcessEnv = process.env): Buffer {
     return key;
   }
   return loadOrCreateKeyfile();
+}
+
+// Human-readable current source + where the key lives (for `config keystore`).
+export function describeKeystore(env: NodeJS.ProcessEnv = process.env): { source: KeySource; detail: string } {
+  const source = resolveKeySource(env, existsSync(masterKeyPath()), keychainAvailable(), readMarker());
+  const detail =
+    source === "passphrase"
+      ? "OLLAMAS_PASSPHRASE — scrypt-derived, key never on disk"
+      : source === "keychain"
+        ? `macOS login keychain (service=${SERVICE}, account=${ACCOUNT})`
+        : masterKeyPath();
+  return { source, detail };
+}
+
+// Move the master key to a new source, carrying the SAME 32 bytes so every sealed
+// *Enc secret stays openable. Verify-before-destroy: on a keychain switch we read
+// the key back and only then remove the keyfile (N-021 discipline). Refuses while
+// OLLAMAS_PASSPHRASE is set (it always wins, so a switch would not take effect).
+export function migrateKeySource(
+  target: "keychain" | "file",
+  env: NodeJS.ProcessEnv = process.env,
+): { from: KeySource; to: KeySource } {
+  if (env.OLLAMAS_PASSPHRASE) {
+    throw new Error("OLLAMAS_PASSPHRASE is set and always takes precedence; unset it before switching keystore");
+  }
+  const from = resolveKeySource(env, existsSync(masterKeyPath()), keychainAvailable(), readMarker());
+  const key = loadMasterKey(env); // current 32-byte key, from whatever source
+  if (target === "keychain") {
+    if (!keychainAvailable()) throw new Error("the keychain backend is macOS-only");
+    if (!writeMasterKey(key)) throw new Error("keychain write failed (locked keychain or non-interactive session)");
+    const back = readMasterKey();
+    if (!back || !back.equals(key)) throw new Error("keychain read-back verification failed — keyfile left intact");
+    writeMarker("keychain");
+    if (existsSync(masterKeyPath())) rmSync(masterKeyPath()); // key now safely in the keychain
+  } else {
+    writeFileSync(masterKeyPath(), key, { mode: 0o600 });
+    writeMarker("file");
+    deleteMasterKey(); // drop the keychain copy so the move is clean
+  }
+  return { from, to: target };
 }
