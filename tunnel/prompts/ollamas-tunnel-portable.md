@@ -60,17 +60,18 @@ REVIEW+SECURE → GATE → SHIP → PRECOMPUTE-NEXT`.
 
 ## 5. CURRENT STATE (snapshot — re-confirm via §0 whoami)
 
-- **Shipped:** vT1 (WireGuard p2p) · vT2 (LAN-TLS) · vT3 (Headscale sovereign mesh) · vT4 (Autonomous Switch
-  Engine: scoring + circuit-breaker + hysteresis + autopilot; `tunnel auto [--watch]`) · **vT5 (Security:
-  private-host DNS-rebind guard + AES-256-GCM vault with auto-keyfile + age-based auto WG key-rotation
-  `tunnel rotate`; all ZERO-manual, mTLS deferred)**. Tests: 103/103, tsc 0.
-- **NEXT = vT6** — Observability (`tunnel status [--json|--watch]` from switch.decisions(); absorbs `whoami`;
-  secret-free decision-log JSONL feed for the orchestration cockpit). Pure, 0-manuel. (See ROADMAP vT6 todos.)
-- Roadmap horizon: vT7 benchmark → vT8 resilience (LaunchAgent daemon) → vT9 remote reverse-tunnel (FRP/Bore —
-  **deferred/parked**, needs manual VPS, breaks 0-manuel + sovereign-zero-account; only if user wants remote) →
-  vT10 ecosystem.
-- **0-manuel invariant:** `tunnel auto` self-selects + self-heals; `tunnel rotate` is age-based; secrets use an
-  auto-keyfile (no passphrase). Nothing prompts the user. Honest limit: auto-keyfile is co-located (RISK-014).
+- **Shipped:** vT1 (WireGuard) · vT2 (LAN-TLS) · vT3 (Headscale mesh) · vT4 (Autonomous Switch Engine;
+  `tunnel auto`) · vT5 (Security: DNS-rebind guard + AES-256-GCM vault + auto key-rotation `tunnel rotate`) ·
+  **vT6 (Observability: `tunnel status [--json|--watch]` = active + latency sparkline + breaker; secret-free
+  decision-log JSONL feed `keys/decisions.jsonl` for the orchestration cockpit)**. Tests: 112/112, tsc 0,
+  VERSION 6.0.0 (roadmap-aligned).
+- **NEXT = vT7** — Benchmark (per-transport latency/throughput sampling + p50/p90 + leaderboard reuse;
+  `tunnel bench [--json]`; aligns with scripts-lane bench-metrics format). Pure, 0-manuel. (See ROADMAP vT7.)
+- Roadmap horizon: vT8 resilience (LaunchAgent daemon + log-rotation) → vT9 remote reverse-tunnel (FRP/Bore —
+  **deferred/parked**, needs manual VPS, breaks 0-manuel + sovereign-zero-account) → vT10 ecosystem.
+- **0-manuel invariant:** `auto` self-selects + self-heals; `rotate` is age-based; `status` is read-only;
+  secrets use an auto-keyfile (no passphrase). Nothing prompts the user. Honest limit: auto-keyfile co-located
+  (RISK-014); JSONL feed read-capped, full rotation in vT8 (RISK-018).
 
 ## 6. SELF-REPORT
 

@@ -128,6 +128,20 @@
       "severity": "high",
       "note": "DNS-rebinding: zehirli DNS switch'i public/saldırgan IP'ye probe/seçim yaptırabilir. ÇÖZÜM vT5: guard.ts isPrivateHost + health.ts requirePrivateHost (3 transport probe true geçer) → yalnız loopback/RFC1918/CGNAT/.local hedef probe edilir; public host probe-öncesi reddedilir (fetch hiç çağrılmaz). opt-in default false=geri-uyum.",
       "applies_version": "vT5"
+    },
+    {
+      "id": "RISK-TUNNEL-017",
+      "category": "tooling",
+      "severity": "low",
+      "note": "`tunnel status --watch` alt-ekran (\\x1b[?1049h) açar; çıkışta restore edilmezse terminal bozuk kalır (CLI top N-016 dersi). ÇÖZÜM: SIGINT handler \\x1b[?1049l ile restore + process.exit. Render fn PURE, watch yalnız ince glue.",
+      "applies_version": "vT6"
+    },
+    {
+      "id": "RISK-TUNNEL-018",
+      "category": "tooling",
+      "severity": "low",
+      "note": "decision-log JSONL feed (keys/decisions.jsonl) append-only → sınırsız büyür. vT6 hafif çözüm: readDecisions({limit}) son-N geçerli kayıt okur (okuma-zamanı size-cap) + reçetede tail -n önerisi. Tam log-rotation (boyut/yaş tabanlı dosya döndürme) vT8 resilience'a ertelendi (belgelendi, gizli-cap değil).",
+      "applies_version": "vT6"
     }
   ],
   "errors": [

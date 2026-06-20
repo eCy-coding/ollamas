@@ -24,7 +24,7 @@ echo
 # --- shipped versions: ROADMAP rows marked ✅ DONE ---
 echo "shipped (TUNNEL_ROADMAP.md ✅ DONE):"
 grep -E '✅ DONE' TUNNEL_ROADMAP.md 2>/dev/null \
-  | sed -E 's/^\| \*\*(vT[0-9]+)\*\* \| ([^|]+).*/  \1 — \2/' | sed 's/[[:space:]]*$//'
+  | sed -E 's/^\| \*\*(vT[0-9]+)\*\* \| ([^|]+).*/  \1 — \2/' | sed 's/\*\*//g; s/[[:space:]]*$//'
 SHIPPED_LAST="$(grep -E '✅ DONE' TUNNEL_ROADMAP.md 2>/dev/null | grep -oE 'vT[0-9]+' | sort -V | tail -1)"
 echo "  → last shipped: ${SHIPPED_LAST:-none}"
 echo
@@ -35,15 +35,19 @@ NEXT_VER="$(grep -E '^## vT[0-9]+ .*NEXT' TUNNEL_ROADMAP.md 2>/dev/null | grep -
 echo "  version: ${NEXT_VER:-?}"
 if [ -n "${NEXT_VER:-}" ]; then
   grep -E "^\| ${NEXT_VER} \|" TUNNEL_ROADMAP.md 2>/dev/null \
-    | sed -E 's/^\| (vT[0-9]+) \| ([^|]+)\| ([^|]+).*/  tema: \2·\3/' | sed 's/[[:space:]]*$//'
+    | sed -E 's/^\| (vT[0-9]+) \| ([^|]+)\| ([^|]+).*/  tema: \2·\3/' | sed 's/\*\*//g; s/[[:space:]]*$//'
 fi
 echo
 
-# --- VERSION drift guard (file vs ROADMAP-derived truth) ---
+# --- VERSION drift guard: compare VERSION major vs last-shipped vT number (no hardcode) ---
 VERFILE="$(tr -d '[:space:]' < VERSION 2>/dev/null)"
 echo "VERSION file: ${VERFILE:-?}"
-if [ -n "${SHIPPED_LAST:-}" ] && [ "$VERFILE" = "1.0.0" ]; then
-  echo "  ⚠️  VERSION stale: dosya 1.0.0 ama ROADMAP son shipped=$SHIPPED_LAST → doğruluk=git/ROADMAP, VERSION değil"
+VER_MAJOR="${VERFILE%%.*}"
+SHIPPED_NUM="$(printf '%s' "${SHIPPED_LAST:-}" | grep -oE '[0-9]+')"
+if [ -n "$SHIPPED_NUM" ] && [ "$VER_MAJOR" != "$SHIPPED_NUM" ]; then
+  echo "  ⚠️  VERSION drift: dosya major=$VER_MAJOR ama ROADMAP son shipped=vT$SHIPPED_NUM → align et (doğruluk=git/ROADMAP)"
+else
+  echo "  ✓ VERSION aligned with last shipped (vT$SHIPPED_NUM)"
 fi
 echo
 

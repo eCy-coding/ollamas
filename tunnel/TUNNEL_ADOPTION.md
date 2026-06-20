@@ -23,6 +23,9 @@
 | DNS-rebind guard (GitHub Blog/Palo Alto/pfSense) | — | (reference) | vT5 | private-host exactMatch allowlist → guard.ts isPrivateHost | ✅ fikir-port |
 | AES-256-GCM gist (AndiDittrich/rjz) + Node crypto docs | — | MIT/pattern | vT5 | 12-byte IV + authTagLength:16 zarf → crypto.ts | ✅ pattern-port |
 | WG key-rotation (Pro Custodibus/defguard/WireGuard paper) | — | (reference) | vT5 | yaş-tabanlı + AllowedIPs-çakışmasız → rotate.ts | ✅ fikir-port |
+| `adrienv1520/node-sparkline` (elysiumphase) | ~0.1k | MIT | vT6 | zero-dep ▁▂▃▄▅▆▇█ → status.ts sparkline | ✅ pattern-port |
+| `lirantal/nodejs-cli-apps-best-practices` | ~9k | (reference) | vT6 | --json opt-out (renk/animasyon-suz makine çıktısı) | ✅ fikir-port |
+| Gatus / Burnd JSONL feed | — | (reference) | vT6 | secret-free decision-log JSONL → cockpit feed | ✅ fikir-port |
 | `fatedier/frp` | 107k | Apache-2.0 | vT6 | reverse TCP tunnel (kendi VPS) — ⚠️ ertelendi (VPS/manuel) | deferred |
 | `ekzhang/bore` | 11k | MIT | vT6 | minimal Rust tunnel (alt) | deferred |
 

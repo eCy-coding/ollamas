@@ -121,9 +121,27 @@
 - **Kanıt:** `node --test` → **103/103 green** (guard 7 + crypto 7 + keystore 5 + rotate 5 + health +4);
   `typecheck` 0; `node src/cli.ts rotate` → wg yoksa zarif "cannot rotate" (0-prompt). RISK-014/015/016.
 
+## Faz 8 — Observability + kaldığın-yer tamamlama (vT6) — 0 manuel
+
+- **Kaldığın yer:** vT5 kod tam+103/103 ama COMMIT'SİZ kalmıştı (önceki tur kesildi) → ilk iş vT5 ship
+  (be9124f). Sonra eksik-temizlik: VERSION 1.0.0→6.0.0 align (+ package.json), whoami.sh `**` strip +
+  drift-check düzgün (major-vs-vT, hardcode kaldırıldı).
+- **Karar (research):** node-sparkline (MIT zero-dep), CLI-best-practice (--json opt-out), JSONL feed
+  (Gatus/Burnd). Pure render + secret-free feed.
+- **Ne:** `status.ts` PURE (statusReport + sparkline + renderStatusTable + appendDecision/readDecisions
+  JSONL) · `cli.ts status [--json|--watch]` (alt-ekran+SIGINT-restore) · `auto/select/status`→decisions.jsonl
+  feed · `recipes/observability-feed.md` (orchestration cockpit cross-lane handoff, edit YOK).
+- **Nasıl:** render fn'leri PURE+deterministik (enjekte decisions) → unit-test, canlı yok. Feed secret-free
+  (RISK-013). readDecisions limit=son-N-geçerli + bozuk-satır-atla (RISK-018 hafif cap, tam rotation vT8).
+- **Niçin:** switch'in NE seçtiği/NEDEN'i görünür olsun (status) + orchestration canlı cockpit'i beslensin
+  (JSONL feed) — hepsi salt-okuma, kullanıcı eylemi yok.
+- **Kanıt:** `node --test` → **112/112 green** (status 9 yeni); `typecheck` 0; `node src/cli.ts status --json`
+  → transport yokken zarif active:null (0-prompt); whoami VERSION-drift uyarısı GİTTİ. RISK-017/018.
+
 ---
-**Toplam (vT1..vT5 kod):** 5 governance + 15 src modül (transport/switch/health/wireguard/caddy-tls/
-mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/cli) + 14 test dosya (103 test)
-+ 3 iOS reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account. tsc 0 + test 103/103.
-Gotcha ERR-TUNNEL-001 (strip param-property), ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-
-kanıtları Emre'de; vT4 (otonom switch) + vT5 (security) cihaz-kanıtı gerektirmez — 0 manuel.
+**Toplam (vT1..vT6 kod):** 5 governance + 16 src modül (transport/switch/health/wireguard/caddy-tls/
+mobileconfig/headscale/breaker/scoring/autopilot/guard/crypto/keystore/rotate/status/cli) + 15 test dosya
+(112 test) + 4 iOS/feed reçete + 1 taşınabilir prompt. Zero-dep (Node 24 strip + node:test), zero-account.
+tsc 0 + test 112/112. VERSION 6.0.0 (roadmap-aligned). Gotcha ERR-TUNNEL-001 (strip param-property),
+ERR-TUNNEL-002 (test glob → node --test). vT1/vT2/vT3 cihaz-kanıtları Emre'de; vT4/vT5/vT6 cihaz-kanıtı
+gerektirmez — 0 manuel.

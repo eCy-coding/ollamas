@@ -10,8 +10,8 @@
 | **vT3** | Sovereign mesh | Headscale self-host control-plane + embedded DERP + zero-account preauth; çok-cihaz + remote tek overlay (WG data-plane reuse) | Headscale(BSD,38k) binary-only | ✅ DONE |
 | **vT4** | **Otonom Switch Engine** | ölçülen-latency scoring + 3-durum circuit-breaker + hysteresis (anti-flap) + autopilot (capability-detect + auto-up + self-heal) + decision-log; **0 manuel seçim/işlem** | hysteresis/CB/multipath pattern (fikir/MIT) | ✅ DONE |
 | **vT5** | **Security hardening** | private-host DNS-rebind guard + AES-256-GCM vault (auto-keyfile, **0-manuel**) + age-based auto WG key-rotation; mTLS ertelendi (iPhone client-cert manuel) | guard/GCM/rotation pattern (fikir/MIT) | ✅ DONE |
-| vT6 | Observability | `tunnel status` endpoint/TUI, latency/throughput, switch decision-log → orchestration feed (pure, 0-manuel) | — | NEXT |
-| vT7 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | planned |
+| **vT6** | **Observability** | `tunnel status [--json\|--watch]` (active + latency sparkline + breaker) + secret-free decision-log JSONL feed → orchestration cockpit; pure, **0-manuel** | node-sparkline/CLI-best-practice/JSONL-feed (MIT/fikir) | ✅ DONE |
+| vT7 | Benchmark | MacBook↔iOS per-transport latency/throughput, en-verimli seçim, leaderboard (scripts bench-metrics reuse) | — | NEXT |
 | vT8 | Resilience | auto-reconnect, LaunchAgent daemon, NAT/captive-portal detect, IPv6, fallback-chain | — | planned |
 | vT9 | Remote reverse-tunnel | kendi VPS'te FRP/Bore server. **⚠️ ERTELENDİ (parked)**: VPS+dış-hesap+manuel → "0 manuel" + egemen-zero-account ihlali; yalnız kullanıcı açıkça remote-erişim isterse | FRP(Apache,107k)/Bore(MIT,11k) | deferred |
 | vT10 | Ecosystem | `ollamas tunnel up` one-command, QR onboarding, federation w/ integrations gateway, multi-tenant exposure policy | — | planned |
@@ -86,11 +86,26 @@
   co-location limiti, dürüst) / -015 (rotation AllowedIPs-overlap-yasak) / -016 (guard public-host-refuse).
 - **Kanıt:** `node --test` **103/103 GREEN**, tsc 0; `node src/cli.ts rotate` → wg yoksa zarif mesaj (0-prompt).
 
-## vT6 — NEXT (önceden-hesaplanmış ilk todo'lar) — Observability
+## vT6 — DONE (kanıt) — Observability (0 manuel)
 
-1. `src/status.ts` — PURE statusReport(switch.decisions() + transport endpoint'leri) → JSON özet
-   (aktif transport, latency'ler, breaker durumları, son karar). whoami.sh bunu absorbe eder.
-2. `cli.ts status [--json|--watch]` — canlı tablo/TUI (zero-dep, sparkline opsiyonel); 0-manuel okuma.
-3. decision-log → opsiyonel JSONL feed (`keys/decisions.jsonl`, secret-free RISK-013) orchestration lane tüketir.
-4. `recipes/` veya doc: orchestration cockpit'in tunnel-status feed'ini nasıl okuyacağı (cross-lane choke-point).
-5. errors_registry observability riskleri; ADOPTION sparkline/TUI pattern (MIT).
+- `src/status.ts` PURE: `statusReport(decisions)` (aktif/reason/transports/per-transport latency history) +
+  `sparkline(values)` (▁▂▃▄▅▆▇█, node-sparkline pattern) + `renderStatusTable` + `appendDecision`/
+  `readDecisions` JSONL (secret-free, limit=son-N-geçerli, bozuk-satır-atla). **9 test.**
+- `cli.ts status [--json|--watch]`: canlı probe → tablo/JSON; --watch alt-ekran + SIGINT-restore (N-016).
+  `auto`/`select`/`status` → `keys/decisions.jsonl` feed yazar (best-effort).
+- `recipes/observability-feed.md`: cross-lane handoff (orchestration cockpit feed'i tail/parse eder; iki taraf
+  birbirinin kodunu düzenlemez).
+- **Eksik-temizlik:** VERSION 1.0.0→6.0.0 (+ package.json) align; whoami.sh `**` strip + drift-check
+  hardcoded `=="1.0.0"` → major(VERSION) vs son-vT karşılaştır. **vT5 commit'lendi** (be9124f, kaldığın-yer).
+- RISK-TUNNEL-017 (watch terminal-restore) / -018 (JSONL büyüme→read-limit, tam rotation vT8).
+- **Kanıt:** `node --test` **112/112 GREEN**, tsc 0; `node src/cli.ts status --json` → transport yokken zarif
+  active:null (0-prompt); feed secret-free.
+
+## vT7 — NEXT (önceden-hesaplanmış ilk todo'lar) — Benchmark
+
+1. `src/bench.ts` — PURE per-transport latency/throughput örnekleme (selectAuto timed-probe serisini topla) +
+   p50/p90 özet (yaklaşık, CLI top N-018 deseni). Leaderboard skor reuse (scoring.ts).
+2. `cli.ts bench [--json]` — her transport'a N-örnek probe → tablo (tok/s değil, ms/throughput); 0-manuel.
+3. scripts lane `bench-metrics.mjs` çıktı-formatı ile uyumlu (cross-lane doküman, edit YOK).
+4. decision-log JSONL'den geçmiş latency → benchmark trend (status.ts history reuse).
+5. errors_registry bench riskleri; ADOPTION MinhNgyuen/llm-benchmark (MIT, ölçüm deseni).

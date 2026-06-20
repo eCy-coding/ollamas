@@ -7,6 +7,7 @@
 //   select   selectAuto: scored probe of all transports → best endpoint + decision (vT4)
 //   auto     autopilot: auto-detect capable transports, bring up the best, self-heal (--watch) (vT4)
 //   rotate   age-based auto WireGuard key rotation; old config sealed to vault; --force (vT5)
+//   status   observability: active transport + latency sparkline + breaker; --json|--watch (vT6)
 //
 // Keys/configs are written under tunnel/keys/ (gitignored) — never committed (RISK-TUNNEL-004).
 
@@ -53,7 +54,22 @@ import {
   type KeyMeta,
 } from "./rotate.ts";
 import { loadOrCreateKeyfile, openFromFile, sealToFile } from "./keystore.ts";
+import { appendDecision, readDecisions, renderStatusTable, statusReport } from "./status.ts";
 import { renderMobileConfig } from "./mobileconfig.ts";
+
+const DECISIONS_PATH = () => join(KEYS_DIR, "decisions.jsonl");
+
+/** Persist the switch's last decision to the secret-free JSONL feed (best-effort). */
+async function persistDecision(sw: TunnelSwitch): Promise<void> {
+  const d = sw.lastDecision();
+  if (!d) return;
+  try {
+    await mkdir(KEYS_DIR, { recursive: true });
+    appendDecision(DECISIONS_PATH(), d);
+  } catch {
+    // observability feed is best-effort; never block the command.
+  }
+}
 
 const KEYS_DIR = join(import.meta.dirname, "..", "keys");
 
@@ -267,6 +283,7 @@ function buildSwitch(): { sw: TunnelSwitch; transports: Transport[] } {
 async function cmdSelect(): Promise<void> {
   const { sw } = buildSwitch();
   const ep = await sw.selectAuto();
+  await persistDecision(sw);
   const d = sw.lastDecision();
   console.log(
     ep
@@ -283,14 +300,46 @@ async function cmdAuto(): Promise<void> {
   if (watch) {
     console.log("autopilot --watch: self-heal loop (Ctrl-C to stop)");
     await runLoop(sw, transports, {
-      onTick: (r, i) =>
-        console.log(JSON.stringify({ round: i, endpoint: r.endpoint, broughtUp: r.broughtUp, reason: r.reason })),
+      onTick: async (r, i) => {
+        await persistDecision(sw);
+        console.log(JSON.stringify({ round: i, endpoint: r.endpoint, broughtUp: r.broughtUp, reason: r.reason }));
+      },
     });
     return;
   }
   const r = await autoUp(sw, transports);
+  await persistDecision(sw);
   console.log(JSON.stringify({ ...r, decision: sw.lastDecision()?.reason, scores: sw.lastDecision()?.scores }, null, 2));
   process.exitCode = r.endpoint ? 0 : 1;
+}
+
+// Observability (vT6): read-only status. --json machine output; --watch live redraw. Zero prompt.
+async function cmdStatus(): Promise<void> {
+  const json = process.argv.includes("--json");
+  const watch = process.argv.includes("--watch");
+
+  const render = async (): Promise<string> => {
+    const { sw } = buildSwitch();
+    await sw.selectAuto(); // live probe round
+    await persistDecision(sw);
+    const persisted = readDecisions(DECISIONS_PATH(), { limit: 50 });
+    const report = statusReport([...persisted, ...sw.decisions()]);
+    return json ? JSON.stringify(report, null, 2) : renderStatusTable(report);
+  };
+
+  if (watch) {
+    process.stdout.write("\x1b[?1049h"); // alt screen
+    const restore = () => {
+      process.stdout.write("\x1b[?1049l"); // restore screen (N-016: never leave terminal broken)
+      process.exit(0);
+    };
+    process.on("SIGINT", restore);
+    for (;;) {
+      process.stdout.write(`\x1b[H\x1b[2J${await render()}\n\n(Ctrl-C to exit)`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  console.log(await render());
 }
 
 async function main(): Promise<void> {
@@ -314,8 +363,10 @@ async function main(): Promise<void> {
       return cmdAuto();
     case "rotate":
       return cmdRotate();
+    case "status":
+      return cmdStatus();
     default:
-      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto|rotate> [--watch|--force]");
+      console.log("usage: tunnel <config|up|down|tls|mesh|select|auto|rotate|status> [--watch|--json|--force]");
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "ollamas-tunnel",
-  "version": "1.0.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
   "description": "ollamas tunnel/switch lane — sovereign zero-account MacBook<->iOS e2e reachability",
