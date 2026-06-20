@@ -23,8 +23,8 @@ import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
 import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret } from "./server/store";
-import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent } from "./server/store";
+import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
@@ -88,6 +88,9 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
+// UKP inbound stage-events: raw body required for HMAC signature verification
+// (same reason as Stripe — must be registered before the global JSON parser).
+app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -1525,6 +1528,30 @@ content
       const out = await handleWebhook(req.body as Buffer, String(req.headers["stripe-signature"] || ""));
       res.json(out);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+
+  // UKP inbound stage-events webhook receiver. Public endpoint (no auth middleware)
+  // — security comes from HMAC signature verification (same Stripe-compatible scheme
+  // used for outbound webhooks). Requires UKP_WEBHOOK_SECRET env var to be set.
+  app.post("/api/ingest/stage-events", async (req, res) => {
+    try {
+      const secret = process.env.UKP_WEBHOOK_SECRET;
+      if (!secret) return res.status(503).json({ error: "ingest disabled" });
+
+      const raw = (req.body as Buffer).toString("utf8");
+      const sigHeader = String(req.headers["x-ukp-signature"] || "");
+      if (!verifyWebhook(secret, raw, sigHeader)) return res.status(401).json({ error: "invalid signature" });
+
+      const parsed = JSON.parse(raw) as { type?: string; ts?: number };
+      // Extract the timestamp from the signature header ("t={unix_sec},v1={hex}").
+      const tStr = sigHeader.split(",").find((p) => p.startsWith("t="))?.slice(2) ?? "0";
+      const id = crypto.createHash("sha256").update(`${tStr}.${raw}`).digest("hex");
+
+      const eventType = String(parsed.type ?? "");
+      const ts = Number(parsed.ts ?? 0);
+      const { recorded } = await recordStageEvent({ id, eventType, payload: raw, ts });
+      return res.json({ ok: true, recorded });
+    } catch (e: any) { return res.status(400).json({ error: e.message }); }
   });
   // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
   app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {

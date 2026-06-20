@@ -111,6 +111,22 @@ export const MIGRATIONS: Migration[] = [
       await db.exec("CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens(family_id)");
     },
   },
+  {
+    version: 5,
+    name: "ukp_stage_events",
+    // UKP inbound stage-event webhook receiver (feat/ukp-ingest-receiver). Stores
+    // every signed delivery exactly once — id is sha256(t.raw) so duplicate POSTs
+    // (retries, replays) are naturally deduplicated by the PRIMARY KEY conflict.
+    up: async (db) => {
+      await db.exec(`CREATE TABLE IF NOT EXISTS ukp_stage_events (
+        id TEXT PRIMARY KEY,
+        event_type TEXT,
+        payload TEXT,
+        ts INTEGER,
+        received_at TEXT
+      )`);
+    },
+  },
 ];
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:

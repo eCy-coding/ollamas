@@ -176,6 +176,13 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **Kanıt:** gerçek suite **177 passed/2 skipped** (+4: 3 sample unit + 1 sample-stdio e2e [sampling-capable client→callTool→client-LLM cevabı, bidirectional]); tsc temiz; conformance:stdio exit 0; vite+server+stdio bundle.
 - **Sonraki (önceden hesaplandı):** v1.15 — **resource subscriptions** (ERTELENDİ gerekçe: stateless Streamable-HTTP server per-request kuruluyor → subscription state kalıcı değil + güvenilir server→client teslimat yok [v1.5 dersi] + fs.watch infra; yarım kurmaktansa belgelendi). Alternatif aday: host-bridge token TTL/TLS.
 
+## Faz 24 — UKP stage-events ingest receiver (general-lane, branch feat/ukp-ingest-receiver, izole worktree, zero-dep)
+- **Ne:** uk-pipeline'ın EMIT ettiği stage-event webhook'larının ollamas-tarafı RECEIVER'ı. `3784c41`'in bıraktığı "ollamas-lane TODO" kapatıldı. Lane-ownership haritası: KRİTİK + SAHİPSİZ + çakışmasız tek kalem (MCP-core/tunnel-crypto/integrations dokunmuyor) — general-lane'in uk-pipeline karşılığı. **0 yeni dep.**
+- **Nasıl:** `migrations.ts` v5 `ukp_stage_events (id PK, event_type, payload, ts, received_at)`. `store/index.ts` `recordStageEvent` (`INSERT ... ON CONFLICT(id) DO NOTHING` → `{recorded}` idempotent). `server.ts` public route `POST /api/ingest/stage-events`: `express.raw` Stripe raw-parser'ın yanında (global JSON'dan önce); `UKP_WEBHOOK_SECRET` yoksa 503; HMAC `verifyWebhook` (mevcut Standard-Webhooks helper'ı, emit şemasıyla birebir) yanlışsa 401; idempotency `id=sha256(t.raw)`; 200 `{ok, recorded}`. Reuse: `webhooks/outbound.ts verifyWebhook/signWebhook` + Stripe receiver pattern — **vibe-kod yok, spec-impl**.
+- **Niçin:** Receiver yoktu → uk-pipeline event'leri sessizce düşüyordu (gözlemlenebilirlik/governance kaybı). Public+HMAC (api-key değil) çünkü emitter farklı süreç; safe-default: secret yoksa kapalı (Stripe gibi).
+- **Kanıt:** tam suite **185 passed/2 skipped** (+8: 4 direct-logic ukp-ingest + 4 **canlı-HTTP** ukp-ingest-http [gerçek boot, raw-body ordering + reachability + replay-idempotency kanıtı — yarım-test bırakılmadı]); tsc temiz; conformance 3/3; vite+server+stdio bundle. Route wiring Opus-review edildi (raw parser sırası, public mount, HMAC). İzole branch'te commit (merge operatöre); push yok.
+- **Sonraki (önceden hesaplandı):** ingest consumer — stage-event'leri livefeed/metrics'e yansıt + `GET /api/ingest/stage-events` liste; sonra re-audit ile bir sonraki kritik-sahipsiz kalem (plan.next.md §AUTO-SELECT).
+
 ---
 **Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

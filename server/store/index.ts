@@ -287,6 +287,17 @@ export async function stripeEventSeen(eventId: string): Promise<boolean> {
   return seen;
 }
 
+/** Insert a UKP stage-event exactly once. Returns recorded:true on first write,
+ *  recorded:false on a duplicate id (replay / retry dedup). */
+export async function recordStageEvent(e: { id: string; eventType: string; payload: string; ts: number }): Promise<{ recorded: boolean }> {
+  const r = await d().run(
+    "INSERT INTO ukp_stage_events (id, event_type, payload, ts, received_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+    [e.id, e.eventType, e.payload, e.ts, nowIso()]
+  );
+  // DbRun.changes: 1 on first insert, 0 when ON CONFLICT DO NOTHING fires.
+  return { recorded: r.changes > 0 };
+}
+
 // --- Per-tenant upstream MCP servers (Faz 9E) ---
 export interface UpstreamServer { id: string; tenant_id: string; name: string; transport: "stdio" | "http"; url?: string | null; command?: string | null; args?: string[]; allowed_tools?: string[]; }
 export async function addUpstreamServer(tenantId: string, s: Omit<UpstreamServer, "id" | "tenant_id">): Promise<{ id: string }> {
