@@ -301,3 +301,33 @@ ardışık ağır-bench thrash'i önlenir). Server kapalı → atla + **bench-la
 heavy-bench KOŞMAZ, yalnız mevcut benchprompt --refresh consume-path'ini tetikler). **Karar dalları:**
 taze→atla (gereksiz iş yok) · bayat+down→devir · bayat+up+cooldown→debounce · bayat+up+cooled→tazele.
 **Scope §3:** read-only + `.autopilot-refresh` stamp yazar. Adopt-pattern p-debounce/launchd-cooldown (zero-dep).
+
+---
+
+## §18. Aktivasyon Protokolü (vO-FND.2 — tek-komut 0-manuel canlı)
+
+Mekanizma (autopilot/model-hook/launchd) ajan tarafından AKTİVE EDİLEMEZ — `.claude/settings.json` yazımı +
+`launchctl` privileged (harness guardrail: ajan kendi başlangıç-config'ini açık-izinsiz değiştiremez).
+**Emre TEK komutla canlıya alır:**
+```
+bash orchestration/bin/activate.sh            # settings.json hook patch + launchd + doctor doğrula
+bash orchestration/bin/activate.sh --dry-run  # yazmadan önizle
+```
+`bin/lib/settings-patch.ts` PURE idempotent merge (SessionStart→autopilot + UserPromptSubmit→model-hook,
+**role-hook KORUNUR**, çift-ekleme yok). Ajan activate.sh'ı YAZAR, ÇALIŞTIRMAZ. Detay: `AUTOPILOT_SETUP.md`.
+
+---
+
+## §19. Cross-Lane Backlog Delivery Protokolü (vO15 — conductor critical-now teslim)
+
+Conductor cross-lane CRITICAL bulguları (driftguard HARD + quality RED + panel high) TESPİT eder; bu protokol
+onları sahibi lane'e **eyleme-hazır FIX-PROMPT** olarak TESLİM eder (conductor'ın §3/§4 "lane'e prompt+backlog
+üretir" mandate'i). `bin/backlog.ts` raporları (QUALITY.json/panel-report.json/driftguard --json) READ-ONLY
+tüketir → `bin/lib/backlog.ts` PURE `aggregateBacklog` (lane-grupla + severity-DESC + dedup) →
+`renderLaneBacklog` (yapıştır-hazır + çalışma-prensibi footer) → `CROSS_BACKLOG.md`.
+```
+tsx orchestration/bin/backlog.ts          # CROSS_BACKLOG.md (tüm lane)
+tsx orchestration/bin/backlog.ts <lane>   # yalnız o lane'in yapıştır-hazır prompt'u
+```
+**Scope §3:** conductor FIXLEMEZ — backlog/prompt üretir, sahibi lane uygular. Non-dup: plan-next=sonraki-versiyon /
+conduct=tek-aksiyon / backlog=**critical-NOW per-lane teslim**. Adopt-pattern github-issue-template/reviewdog-rdjson.
