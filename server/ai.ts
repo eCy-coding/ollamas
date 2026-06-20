@@ -6,13 +6,26 @@
 
 import { ProviderRouter, type GenerateConfig, type GenerateResult } from "./providers";
 
+export type AiProvider = "ollama-local" | "gemini";
+
 export interface AiOptions {
-  /** Override the auto-selected local model (e.g. "qwen3:8b"). */
+  /** Inference backend. Default "ollama-local" (Colab-faithful, zero-config). */
+  provider?: AiProvider;
+  /** Override the auto-selected model (e.g. "qwen3:8b" or "gemini-2.5-pro"). */
   model?: string;
   temperature?: number;
+  /** Optional system instruction, prepended as a system message. */
+  system?: string;
 }
 
 const ollamaHost = () => process.env.OLLAMA_HOST || "http://localhost:11434";
+
+// Gemini default — used when provider is "gemini" and no model is given. Matches
+// the ProviderRouter "gemini" case default (server/providers.ts).
+const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash";
+// Best local coder on M4 per orchestration vO6 benchmark — preferred local
+// fallback for code tasks when Gemini is unavailable.
+export const LOCAL_CODER_HINT = "coder";
 
 // Default-model resolution is cached briefly so back-to-back calls don't hammer
 // /api/tags on every request.
@@ -43,13 +56,28 @@ export async function resolveDefaultModel(): Promise<string> {
   return models[0];
 }
 
+/** Resolve {provider, model} from opts: explicit wins, else provider-aware default. */
+async function resolveTarget(opts: AiOptions): Promise<{ provider: AiProvider; model: string }> {
+  const provider = opts.provider ?? "ollama-local";
+  if (opts.model) return { provider, model: opts.model };
+  if (provider === "gemini") return { provider, model: GEMINI_DEFAULT_MODEL };
+  return { provider, model: await resolveDefaultModel() };
+}
+
+function buildMessages(prompt: string, system?: string): GenerateConfig["messages"] {
+  const messages: GenerateConfig["messages"] = [];
+  if (system) messages.push({ role: "system", content: system });
+  messages.push({ role: "user", content: prompt });
+  return messages;
+}
+
 /** Lower-level: full GenerateResult (text + source + tokensPerSec) for one prompt. */
 export async function generate(prompt: string, opts: AiOptions = {}): Promise<GenerateResult> {
-  const model = opts.model ?? (await resolveDefaultModel());
+  const { provider, model } = await resolveTarget(opts);
   const config: GenerateConfig = {
-    provider: "ollama-local",
+    provider,
     model,
-    messages: [{ role: "user", content: prompt }],
+    messages: buildMessages(prompt, opts.system),
     temperature: opts.temperature,
   };
   return ProviderRouter.generate(config);
@@ -67,11 +95,11 @@ export async function generateText(prompt: string, opts: AiOptions = {}): Promis
  * and re-throws any provider error.
  */
 export async function* generateTextStream(prompt: string, opts: AiOptions = {}): AsyncGenerator<string> {
-  const model = opts.model ?? (await resolveDefaultModel());
+  const { provider, model } = await resolveTarget(opts);
   const config: GenerateConfig = {
-    provider: "ollama-local",
+    provider,
     model,
-    messages: [{ role: "user", content: prompt }],
+    messages: buildMessages(prompt, opts.system),
     temperature: opts.temperature,
     stream: true,
   };
@@ -113,4 +141,31 @@ export async function* generateTextStream(prompt: string, opts: AiOptions = {}):
 
   await done;
   if (error) throw error;
+}
+
+// ── Engine selection (benchmark-driven) ──────────────────────────────────────
+
+/** True when a Gemini API key is configured (vault or GEMINI_API_KEY env). */
+export function hasGeminiKey(): boolean {
+  try {
+    return !!ProviderRouter.getDecryptedKey("gemini");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pick the best engine for a task class. Code analysis/triage prefers Gemini
+ * (stronger reasoning, zero local cost). Without a Gemini key it falls back to a
+ * local coder-tuned model (qwen3-coder per orchestration vO6 M4 benchmark) or the
+ * first installed model. Returned shape feeds straight into generate()/opts.
+ */
+export async function pickEngine(task: "code" | "chat" = "code"): Promise<{ provider: AiProvider; model: string }> {
+  if (task === "code" && hasGeminiKey()) {
+    return { provider: "gemini", model: GEMINI_DEFAULT_MODEL };
+  }
+  const models = await listModels();
+  if (!models.length) throw new Error("no local model and no Gemini key available");
+  const model = task === "code" ? (models.find((m) => m.includes(LOCAL_CODER_HINT)) ?? models[0]) : models[0];
+  return { provider: "ollama-local", model };
 }
