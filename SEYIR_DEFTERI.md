@@ -145,6 +145,16 @@ eylemleri ayrıca `~/.llm-mission-control/seyir-defteri.jsonl`'e otomatik düşe
 - **15C test + docs:** `tests/discovery.test.ts` (server.json required-field + reverse-DNS + manifest↔VERSION + mcpDiscovery capabilities==MCP_CAPABILITIES drift-guard); `tests/dcr.test.ts` (registerClient confidential/public/default-grant, getClient secret-sızdırmaz, migration v2 recorded+idempotent, AS-metadata, iki dialect); `tests/mcp-gateway.e2e.test.ts` +4 (mcp.json pre-auth, AS-metadata, /register 201, non-array 400). README v1.6 + AGENTS Faz 15 ✅ + `.env.example` MCP_PUBLIC_URL/DCR_INITIAL_ACCESS_TOKEN + `.github/workflows/registry-publish.yml` (validate-only, real push disabled).
 - **Kanıt:** tsc temiz; **sqlite 99/1** + **Postgres (yerel pg18) 99/1** (+18 test); vite build; 5-uçlu canlı self-boot turu (mcp.json 22 tool/3 prompt, AS metadata, protected-resource, DCR confidential+public). **SIFIR yeni dep.** **Sınır:** DCR yalnız client-metadata kaydı (token issuance = tam OAuth 2.1 AS, backlog); gerçek registry push dışa-dönük → ayrı onaylı adım.
 
+## Faz 17–19 — v1.7→v1.10 (özet; tam detay AGENTS.md §7 Yol Haritası)
+- Bu defter v1.6'da donmuştu; v1.7 (interceptor hardening) → v1.8 (bench/power tool) → v1.9 (sampling+elicitation) → v1.10 (OAuth 2.1 AS) faz logları **AGENTS.md §7**'de + commit history'de tutuldu (drift-not). İleriye tek-kaynak AGENTS roadmap.
+
+## Faz 20 — v1.11 (MCP Protocol Polish: Roots + Abort-to-Host, branch feat/v1.11-roots-abort, zero-dep)
+- **Ne:** İki MCP protokol-olgunluk eksiği kapatıldı. OSS e2e arandı → çalışan-kod adopte: SDK `ListRootsRequestSchema`/`callTool({signal})` (mevcut `@modelcontextprotocol/sdk`) + Node stdlib `AbortSignal.any`. **SIFIR yeni dep** (rubric 12/12; el-yazımı abort-wrapper + yeni iptal-kütüphanesi elendi).
+- **Nasıl:** 20A consume-side **roots** — Client `roots:{listChanged:false}` capability + `ListRootsRequest` handler (`server/mcp/client.ts`) workspace kökünü (`db.data.workspacePath`→`file://`) döner (boşsa `{roots:[]}`). 20B **abort-to-host** — `host-bridge.ts` `combineSignal` = `signal?AbortSignal.any([signal,timeout]):timeout`; `runOnHostTerminal`/`execOnHost`/`writeHostFile` + `ToolDeps` opsiyonel `signal?`; 10 uzun-süren host tool invoke'una `ctx.abortSignal` thread; upstream `callTool(...,{signal})`. Hızlı tool'lar + server.ts/mcp-stdio wiring değişmedi (opsiyonel param = geriye-uyum).
+- **Niçin:** Ürün kimliği = MCP gateway → spec yüzeyi (roots = upstream'e sandbox sinyali) + gerçek iptal (CancelledNotification artık host fetch'i keser, kendi timeout'una kadar sürmez = kaynak israfı yok).
+- **Kanıt:** tam suite **150 passed/2 skipped** (+6: 2 consume-roots + 3 abort-forward spy + 1 combineSignal); tsc temiz; vite+server+stdio bundle; `conformance:stdio` tools/list OK.
+- **Sonraki (önceden hesaplandı):** v1.12 — OAuth refresh + RFC 9700 rotation (migration v4) · client_credentials grant · expose-side roots (client root'larını okuyup FS-tool scope) · resource subscriptions.
+
 ---
-**Toplam:** 22 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
+**Toplam:** 30 agent tool, bridge 6 endpoint, warm-model kalibre, watchdog+self-heal,
 shellcheck-doğrulamalı, gözlemlenebilir (seyir defteri). Repo: `eCy-coding/ollamas`.

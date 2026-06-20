@@ -42,9 +42,9 @@ export type ToolTier = "safe" | "host" | "privileged" | "host_upstream";
 export interface ToolDeps {
   FilesystemManager: typeof FilesystemManager;
   TerminalManager: typeof TerminalManager;
-  runOnHostTerminal: (target: string | undefined, command: string) => Promise<any>;
-  writeHostFile: (filePath: string, content: string) => Promise<any>;
-  execOnHost: (command: string, timeoutMs?: number) => Promise<any>;
+  runOnHostTerminal: (target: string | undefined, command: string, timeoutMs?: number, signal?: AbortSignal) => Promise<any>;
+  writeHostFile: (filePath: string, content: string, signal?: AbortSignal) => Promise<any>;
+  execOnHost: (command: string, timeoutMs?: number, signal?: AbortSignal) => Promise<any>;
   HOST_TOOLS_DIR: string;
   shArg: (s: string) => string;
   db: { logSecurity: (cat: string, what: string, how: string, decision: string) => void };
@@ -233,9 +233,9 @@ const TOOLS: Record<string, ToolDef> = {
         required: ["command"],
       }
     ),
-    invoke: async (args, { deps }) => {
+    invoke: async (args, { deps, abortSignal }) => {
       if (!args.command) throw new Error("Missing 'command' argument.");
-      return await deps.runOnHostTerminal(args.target, args.command);
+      return await deps.runOnHostTerminal(args.target, args.command, undefined, abortSignal);
     },
   },
 
@@ -253,16 +253,16 @@ const TOOLS: Record<string, ToolDef> = {
         required: ["path", "content"],
       }
     ),
-    invoke: async (args, { deps }) => {
+    invoke: async (args, { deps, abortSignal }) => {
       if (!args.path || args.content === undefined) throw new Error("Missing 'path' or 'content'.");
-      return await deps.writeHostFile(args.path, args.content);
+      return await deps.writeHostFile(args.path, args.content, abortSignal);
     },
   },
 
   run_tests: {
     tier: "safe",
     schema: fn("run_tests", "Run the project's test suite (vitest unit tests in the container) and return pass/fail summary.", NO_ARGS),
-    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/run_tests.mjs`),
+    invoke: async (_args, { deps, abortSignal }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/run_tests.mjs`, undefined, abortSignal),
   },
 
   git_ops: {
@@ -294,7 +294,7 @@ const TOOLS: Record<string, ToolDef> = {
   lint_format: {
     tier: "safe",
     schema: fn("lint_format", "Typecheck the project (tsc --noEmit) and return whether it is clean plus any type errors.", NO_ARGS),
-    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/lint_format.mjs`, 250000),
+    invoke: async (_args, { deps, abortSignal }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/lint_format.mjs`, 250000, abortSignal),
   },
 
   git_commit: {
@@ -313,7 +313,7 @@ const TOOLS: Record<string, ToolDef> = {
   build_app: {
     tier: "host",
     schema: fn("build_app", "Rebuild and recreate the app container (docker compose build + up -d) and report whether it came back healthy.", NO_ARGS),
-    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/build_app.mjs`, 220000),
+    invoke: async (_args, { deps, abortSignal }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/build_app.mjs`, 220000, abortSignal),
   },
 
   kill_process: {
@@ -346,9 +346,9 @@ const TOOLS: Record<string, ToolDef> = {
       properties: { manager: { type: "string", enum: ["npm", "pip", "brew"] }, package: { type: "string" } },
       required: ["manager", "package"],
     }),
-    invoke: async (args, { deps }) => {
+    invoke: async (args, { deps, abortSignal }) => {
       if (!args.manager || !args.package) throw new Error("Missing 'manager' or 'package'.");
-      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/pkg_install.mjs ${deps.shArg(String(args.manager))} ${deps.shArg(String(args.package))}`, 150000);
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/pkg_install.mjs ${deps.shArg(String(args.manager))} ${deps.shArg(String(args.package))}`, 150000, abortSignal);
     },
   },
 
@@ -359,9 +359,9 @@ const TOOLS: Record<string, ToolDef> = {
       properties: { query: { type: "string" }, url: { type: "string", description: "If set, fetch this page's readable text instead of searching." } },
       required: [],
     }),
-    invoke: async (args, { deps }) => {
-      if (args.url) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs --fetch ${deps.shArg(String(args.url))}`);
-      if (args.query) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${deps.shArg(String(args.query))}`);
+    invoke: async (args, { deps, abortSignal }) => {
+      if (args.url) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs --fetch ${deps.shArg(String(args.url))}`, undefined, abortSignal);
+      if (args.query) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${deps.shArg(String(args.query))}`, undefined, abortSignal);
       throw new Error("Missing 'query' or 'url'.");
     },
   },
@@ -373,16 +373,16 @@ const TOOLS: Record<string, ToolDef> = {
       properties: { diff: { type: "string", description: "Unified diff text." } },
       required: ["diff"],
     }),
-    invoke: async (args, { deps }) => {
+    invoke: async (args, { deps, abortSignal }) => {
       if (!args.diff) throw new Error("Missing 'diff'.");
-      return deps.execOnHost(`printf '%s' ${deps.shArg(String(args.diff))} | node ${deps.HOST_TOOLS_DIR}/apply_patch.mjs`);
+      return deps.execOnHost(`printf '%s' ${deps.shArg(String(args.diff))} | node ${deps.HOST_TOOLS_DIR}/apply_patch.mjs`, undefined, abortSignal);
     },
   },
 
   tools_doctor: {
     tier: "safe",
     schema: fn("tools_doctor", "Self-test the whole bridge toolkit and return a health matrix (which tools pass/fail).", NO_ARGS),
-    invoke: async (_args, { deps }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000),
+    invoke: async (_args, { deps, abortSignal }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/tools_doctor.mjs`, 90000, abortSignal),
   },
 
   shell_check: {
@@ -392,9 +392,9 @@ const TOOLS: Record<string, ToolDef> = {
       "Lint a shell command/script for bugs and macOS/BSD portability issues (shellcheck + heuristics) BEFORE running it. Run this on any non-trivial command, fix what it reports, then use macos_terminal.",
       { type: "object", properties: { command: { type: "string", description: "The shell command/script to lint." } }, required: ["command"] }
     ),
-    invoke: async (args, { deps }) => {
+    invoke: async (args, { deps, abortSignal }) => {
       if (!args.command) throw new Error("Missing 'command'.");
-      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/shell_check.mjs ${deps.shArg(String(args.command))}`, 60000);
+      return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/shell_check.mjs ${deps.shArg(String(args.command))}`, 60000, abortSignal);
     },
   },
 

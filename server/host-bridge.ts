@@ -16,6 +16,17 @@ export const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cw
 // Single-quote-escape an argument for safe interpolation into a shell command.
 export function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 
+// Faz 20B (abort-to-host): combine the caller's cooperative-cancellation signal
+// (ctx.abortSignal — fired on an MCP CancelledNotification) with the per-call
+// timeout, so an aborted tool actually severs the host fetch instead of letting it
+// run to its own timeout. AbortSignal.any is Node stdlib (18+); no new dep.
+function combineSignal(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+/** Test hook (Faz 20B) — exercise signal combining without a live bridge. */
+export const combineSignalForTest = combineSignal;
+
 // Auth headers for a bridge call: HMAC-SHA256 request signing when a secret is set
 // (replay-protected), else the plain token (backward-compat, Faz 10E).
 export function bridgeHeaders(bridgePath: string, body: string): Record<string, string> {
@@ -26,13 +37,13 @@ export function bridgeHeaders(bridgePath: string, body: string): Record<string, 
   return HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {};
 }
 
-export async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000) {
+export async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000, signal?: AbortSignal) {
   const body = JSON.stringify({ target: target || "iterm2", command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/run", body) },
     body,
-    signal: AbortSignal.timeout(timeoutMs + 5000),
+    signal: combineSignal(signal, timeoutMs + 5000),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -43,13 +54,13 @@ export async function runOnHostTerminal(target: string | undefined, command: str
 
 // Run a command directly on the host via the bridge /exec (no terminal mutex).
 // Bridge tools execute on the HOST filesystem, so this must be the host path.
-export async function execOnHost(command: string, timeoutMs = 95000) {
+export async function execOnHost(command: string, timeoutMs = 95000, signal?: AbortSignal) {
   const body = JSON.stringify({ command, timeoutMs });
   const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/exec", body) },
     body,
-    signal: AbortSignal.timeout(timeoutMs + 5000),
+    signal: combineSignal(signal, timeoutMs + 5000),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -59,13 +70,13 @@ export async function execOnHost(command: string, timeoutMs = 95000) {
 }
 
 // Write a file directly to the macOS host filesystem via the bridge (base64).
-export async function writeHostFile(filePath: string, content: string) {
+export async function writeHostFile(filePath: string, content: string, signal?: AbortSignal) {
   const body = JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") });
   const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/write", body) },
     body,
-    signal: AbortSignal.timeout(20000),
+    signal: combineSignal(signal, 20000),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

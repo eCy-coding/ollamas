@@ -172,4 +172,39 @@ describe("ToolRegistry choke-point", () => {
     expect(r.ok).toBe(true);
     expect(r.output).toMatchObject({ a: 1 });
   });
+
+  // Faz 20B: abort-to-host. A long-running host tool must forward ctx.abortSignal
+  // into its host helper so an MCP CancelledNotification severs the real fetch.
+  describe("abort-to-host (Faz 20B)", () => {
+    test("run_tests forwards ctx.abortSignal to execOnHost (3rd arg)", async () => {
+      const execOnHost = vi.fn(async (..._a: any[]) => "exec");
+      const ac = new AbortController();
+      await ToolRegistry.execute("run_tests", {}, ctx({ deps: mkDeps({ execOnHost }), abortSignal: ac.signal }));
+      expect(execOnHost).toHaveBeenCalledTimes(1);
+      expect(execOnHost.mock.calls[0][2]).toBe(ac.signal);
+    });
+
+    test("macos_terminal forwards ctx.abortSignal to runOnHostTerminal (4th arg)", async () => {
+      const runOnHostTerminal = vi.fn(async (..._a: any[]) => "term");
+      const ac = new AbortController();
+      await ToolRegistry.execute("macos_terminal", { command: "ls" }, ctx({ deps: mkDeps({ runOnHostTerminal }), abortSignal: ac.signal }));
+      expect(runOnHostTerminal).toHaveBeenCalledTimes(1);
+      expect(runOnHostTerminal.mock.calls[0][3]).toBe(ac.signal);
+    });
+
+    test("write_host_file forwards ctx.abortSignal to writeHostFile (3rd arg)", async () => {
+      const writeHostFile = vi.fn(async (..._a: any[]) => "wrote");
+      const ac = new AbortController();
+      await ToolRegistry.execute("write_host_file", { path: "/tmp/x", content: "y" }, ctx({ deps: mkDeps({ writeHostFile }), abortSignal: ac.signal }));
+      expect(writeHostFile).toHaveBeenCalledTimes(1);
+      expect(writeHostFile.mock.calls[0][2]).toBe(ac.signal);
+    });
+
+    test("combineSignal: an already-aborted signal aborts the combined signal", async () => {
+      const { combineSignalForTest } = await import("../server/host-bridge");
+      const ac = new AbortController();
+      ac.abort();
+      expect(combineSignalForTest(ac.signal, 60000).aborted).toBe(true);
+    });
+  });
 });
