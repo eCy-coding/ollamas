@@ -7,4 +7,5 @@ coverage/
 .env*
 !.env.example
 .ephemeral-data/
+.colab-data/
 **/.master_key
