@@ -223,3 +223,24 @@ bağlı: planla → claim → kodla → done.
 
 **Scope §3:** claims yalnız `orchestration/seyir/` altına yazar; lane tree'ye 0 yazım.
 Adoption (idea/pattern, kopya yok): proper-lockfile (MIT) mkdir-lock+stale + append-only JSONL LWW + fencing token.
+
+---
+
+## §14. Drift-Guard Protokolü (vO8 — deterministik tutarlılık GATE, 0-manuel)
+
+§7 kalite-kapısındaki "branch versiyonu ≡ ROADMAP" satırını **mekanikleştirir**. `bin/driftguard.ts`
+girdisiz koşar, "declared ⇒ actual" diff üretir, drift varsa non-zero exit (manuel seçim YOK):
+```
+tsx orchestration/bin/driftguard.ts          # DRIFT.md + exit (HARD>0→1)
+tsx orchestration/bin/driftguard.ts --json   # makine
+```
+**3 eksen (HARD) + 1 (SOFT):** (1) **branch-lane** — worktree lane-id'si ≟ branch (ERR-ORCH-004 hijack guard);
+(2) **version-source** — ROADMAP current ≟ VERSION ≟ git-tag, major-bazlı single-source-of-truth (UK-07/UK-10);
+(3) **choke-point** — `plans/panel-report.json` REUSE (yasak ikinci-dispatch); (4) **branch-coherence** SOFT
+(branch sürüm-token ≠ ROADMAP, feature-branch meşru).
+
+**Mekanik (driftguard.ts):** pure `normVer`/`checkBranchLane`/`checkVersionSources`/`checkBranchCoherence`/
+`chokepointIntegrity`(detectors REUSE)/`buildDriftReport`/`exitCode`. REUSE: plan-next `parseVersions`+
+`currentAndNext`, shared `discoverWorktrees`. conduct.ts (worker autopilot) bunu **DRIFT-tier sinyali** olarak
+çağırabilir (ben gate'i yaparım, worker bağlar). **Scope §3:** yalnız okur + `DRIFT.md` yazar.
+Adoption (idea/pattern, zero-dep): release-please/changesets single-source-of-truth + Terraform-drift diff + lefthook gate.

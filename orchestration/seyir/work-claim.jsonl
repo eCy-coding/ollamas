@@ -1,3 +1,6 @@
 {"ts":1781952586000,"tab":"orch-main-18063","pid":18063,"lane":"orchestration","version":"vO7","status":"claimed","ttlMs":1200000,"fence":1}
 {"ts":1781952729802,"tab":"tab-other","pid":29261,"lane":"frontend","version":"vF9","status":"claimed","ttlMs":1200000,"fence":1}
 {"ts":1781952729963,"tab":"tab-other","pid":29273,"lane":"frontend","version":"vF9","status":"released","ttlMs":0,"fence":2}
+{"ts":1781953619831,"tab":"tab-28637","pid":28637,"lane":"orchestration","version":"vO8","status":"claimed","ttlMs":1200000,"fence":1}
+{"ts":1781953620717,"tab":"tab-28664","pid":28664,"lane":"orchestration","version":"vO-AUTO","status":"claimed","ttlMs":1200000,"fence":1}
+{"ts":1781954160549,"tab":"tab-28637","pid":91954,"lane":"orchestration","version":"vO8","status":"done","ttlMs":0,"fence":2}
