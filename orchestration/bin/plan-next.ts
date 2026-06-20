@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { discoverWorktrees, findFile, resolveLane, KNOWN_LANES, type Worktree } from "./shared";
+import { defaultStore, readClaims, detectCollision, acquireClaim, claimKey } from "./lib/claims";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -190,6 +191,30 @@ function findContract(wt: Worktree): string {
   return f || "(sözleşme bulunamadı)";
 }
 
+/**
+ * vO7 Work-Claim gate (additive, stderr-only — stdout taslağı değişmez): bu lane|version'ı BAŞKA
+ * canlı sekme tutuyor mu? Tutuyorsa uyar (duplikasyon önleme, ERR-ORCH-013). Boşsa bilgi ver;
+ * `--claim` ile bu sekme adına claim et (opt-in yan-etki, yalnız orchestration/seyir altına yazar).
+ */
+function claimGate(lane: string, version?: string): void {
+  if (!version) return;
+  const store = defaultStore(join(ORCH_DIR, "seyir"));
+  const tab = process.env.ORCH_TAB || `tab-${process.pid}`;
+  const events = readClaims(store);
+  const collision = detectCollision(events, lane, version, tab, Date.now());
+  if (collision) {
+    console.error(`\n⚠️⚠️ ÇAKIŞMA: ${claimKey(lane, version)} zaten ${collision.tab} (pid ${collision.pid}) tarafından claim edilmiş.`);
+    console.error(`   BAŞKA bir iş seç ya da o sekmeyle koordine ol → tsx orchestration/bin/claim.ts --list\n`);
+    return;
+  }
+  if (process.argv.includes("--claim")) {
+    const r = acquireClaim(store, { lane, version, tab, pid: process.pid });
+    console.error(r.ok ? `🔒 [plan-next] ${claimKey(lane, version)} claim edildi (${tab}).` : `⚠️ claim yarışı kaybedildi: ${r.collision?.tab}`);
+  } else {
+    console.error(`ℹ️ [plan-next] ${claimKey(lane, version)} boş. Claim: tsx orchestration/bin/claim.ts ${lane} ${version}  (veya plan-next --claim)`);
+  }
+}
+
 function main(): void {
   const arg = process.argv[2];
   const wts = discoverWorktrees();
@@ -211,6 +236,7 @@ function main(): void {
 
   const versions = parseVersions(md);
   const { current, next } = currentAndNext(versions);
+  claimGate(arg, next?.ver); // vO7: duplikasyon-önleme (başka sekme bu işi tutuyor mu?)
   const nextBlock = extractNextBlock(md, next?.ver);
   const draft = buildNextDraft({
     lane: arg, branch: wt.branch, wtPath: wt.path,

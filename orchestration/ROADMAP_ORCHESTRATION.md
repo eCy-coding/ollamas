@@ -16,10 +16,12 @@
 | **vO5** | ✅ DONE | Cross-lane bağımlılık grafiği — `graph.ts`/`depgraph.ts` API-gap (frontend↔backend route MISSING/UNUSED + scripts↔registry → mermaid) + `drift.ts` **cross-package version-drift** (aynı dep farklı lane farklı pin, syncpack deseni) → DEPGRAPH.md |
 | **vO-ID** | ✅ DONE | **Self-Identity protokolü** — "Bu sekmede görevin ne?" sorusuna canlı self-answer: `role.ts` (mission §0 + plan-next vO + ollamas server.json + **per-lane shipped→next collect REUSE** + araç envanteri) + `role-hook.ts` (UserPromptSubmit oto-enjeksiyon) + proje-local `.claude/settings.json` hook + `ROLE.md`. **3 paralel sekme impl'i → sentez** (collect-zengin jeneratör + oto-tetik hook; duplikat laneinfo/identity/whoami silindi). ORCHESTRATION_AGENTS §12. RISK-ORCH-012 |
 | vO6 | planned | Benchmark agregasyon (MacBook + iOS tok/s; MLX/Rapid-MLX bench adopt) |
-| vO7 | planned | Drift-guard otomasyon (branch≡roadmap, choke-point bütünlüğü) |
-| vO8 | planned | Quality-gate roll-up (tüm lane tsc/lint/test tek matriste) |
-| vO9 | planned | Heartbeat/notification (idle-lane + takılı-tab tespiti) |
-| vO10 | planned | Self-review + completeness critic (eksik koordinasyon ne?) |
+| **vO6.1** | ✅ DONE | **Benchmark → taşınabilir model-seçim PROMPT'u** — `benchprompt.ts` BENCH.json'ı (worker bench-core) read-only CONSUME + Tier-A routing (plan.md §1) füzyon → `MODEL_PROMPT.md` (global-standart sectioned, paste-anywhere; correctness-gate→tok/s; self-update). Adopt pattern: f/prompts.chat + structured-prompts; RouteLLM idea-only. Commit-izole (lokal tip, worker bench.ts'e bağımsız) |
+| **vO7** | ✅ DONE | **Work-Claim Ledger** (duplikasyon önleme) — `claims.ts` atomic `mkdirSync`-lock + append-only `seyir/work-claim.jsonl` LWW ledger (ts→fence→tab) + TTL/heartbeat **stale-takeover** + monoton **fencing** + `claim.ts` CLI (claim/--check/--list/--renew/--done/--release); `plan-next.ts` trigger collision-gate (--claim auto) + `status.ts` additive claim sinyali; **ORCHESTRATION_AGENTS §13**. Kök-fix: oturum-içi plan.md×2 + kimlik×2 duplikasyonu (ERR-ORCH-013). Adopt: proper-lockfile (MIT) + JSONL LWW + fencing token (idea, zero-dep). claims.test 15; full 248 |
+| vO8 | planned | Drift-guard otomasyon (branch≡roadmap, choke-point bütünlüğü) |
+| vO9 | planned | Quality-gate roll-up (tüm lane tsc/lint/test tek matriste) |
+| vO10 | planned | Heartbeat/notification (idle-lane + takılı-tab tespiti) |
+| vO11 | planned | Self-review + completeness critic (eksik koordinasyon ne?) |
 
 ---
 

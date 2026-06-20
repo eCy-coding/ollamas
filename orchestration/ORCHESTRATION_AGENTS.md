@@ -191,3 +191,35 @@ araç, yeni lane) yanıt otomatik güncellenir; elle bakım gerekmez (RISK-ORCH-
 **Daima-geliştirilebilir:** role.ts'i genişletmek serbest — yeni canlı sinyal ekle (örn dev-server
 durumu, son commit, test sayısı). Kaynak daima canlı dosyalar; yanıt onlarla birlikte gelişir.
 Manuel koşum: `tsx orchestration/bin/role.ts` → stdout + `ROLE.md`.
+
+**Model-seçim sorusu** ("en verimli model? hangi modelle çalışayım?") → bayat tahmin DEĞİL, canlı
+`tsx orchestration/bin/benchprompt.ts` → `MODEL_PROMPT.md`: BENCH.json (bench-core) + Tier-A routing
+füzyonu, taşınabilir/global-standart, correctness-gate→tok/s, nereye yapıştırılırsa en-verimli seçimle
+çalışmaya başlar. Self-update: bench data değişince prompt tazelenir (vO6.1).
+
+---
+
+## §13. Work-Claim Protokolü (vO7 — duplikasyon önleme)
+
+**Kök sorun:** Paralel sekmeler AYNI görevi bağımsız alabiliyor (bir oturumda plan.md ×2, kimlik ×2
+duplike edildi — ERR-ORCH-013). Conductor'ın bir numaralı boşluğu: "kim neyi yapıyor" claim'i yok.
+
+**Kural — check-claim-before-work:** Bir lane'de işe başlamadan ÖNCE ledger'ı kontrol et + claim al:
+```
+tsx orchestration/bin/claim.ts --check <lane> <version>   # çakışma var mı (exit 3=var, 0=boş)
+tsx orchestration/bin/claim.ts <lane> <version>           # claim et (çakışma varsa reddeder)
+tsx orchestration/bin/claim.ts --done <lane> <version>    # iş bitince kapat
+tsx orchestration/bin/claim.ts --list                     # canlı claim'ler
+```
+ÇAKIŞMA görürsen (başka canlı sekme tutuyorsa) → **BAŞKA iş seç** ya da o sekmeyle koordine ol.
+
+**Mekanik (claims.ts):** atomic `mkdirSync` lock (race yok) + append-only `seyir/work-claim.jsonl`
+LWW ledger (ts→fence→tab) + TTL/heartbeat **stale-takeover** (`ORCH_CLAIM_TTL_MIN`, default 20dk) +
+monoton **fencing** (diriltilen stale sekme clobber edemez). Sekme kimliği `$ORCH_TAB`.
+
+**Entegrasyon:** `plan-next.ts` "sıradaki versiyonu planla" çıktısında çakışmayı uyarır (`--claim` ile
+auto-claim). `status.ts`/cockpit aktif claim'leri gösterir (claim yoksa çıktı değişmez). §4 trigger ile
+bağlı: planla → claim → kodla → done.
+
+**Scope §3:** claims yalnız `orchestration/seyir/` altına yazar; lane tree'ye 0 yazım.
+Adoption (idea/pattern, kopya yok): proper-lockfile (MIT) mkdir-lock+stale + append-only JSONL LWW + fencing token.

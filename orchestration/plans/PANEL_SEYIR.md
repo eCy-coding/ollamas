@@ -81,3 +81,28 @@ Trend bölümü→jsonl append. noteKey (note.ts)+severityWeight (rank.ts) reuse
 - Worker collision yok: trend.ts YENİ + panel.ts MENİM; eşzamanlı vO6-bench worker (`bench.ts` untracked)
   dokunulmadı; explicit-path commit (worker dosyası İÇERMEZ).
 - GOTCHA (ders): note.ts `Severity`yi re-export ETMİYOR → trend.ts `Severity`yi detectors.ts'ten import etmeli (rank.ts deseni).
+
+---
+
+## vO7 — Work-Claim Ledger (duplikasyon önleme)
+
+Paralel sekmeler AYNI görevi alabiliyordu → `claims.ts` (atomic mkdirSync-lock + append-only
+`seyir/work-claim.jsonl` LWW + TTL/heartbeat stale-takeover + monoton fencing) + `claim.ts` CLI +
+`plan-next.ts` collision-gate + `status.ts` additive claim sinyali. Adopt (idea/pattern, zero-dep):
+proper-lockfile (MIT) mkdir-lock+stale, append-only JSONL LWW, fencing token.
+
+### ERR-ORCH-013 — kodlamadan önce worker-state taranmadı → duplikasyon
+- **category:** coordination · **severity:** high · **applies_version:** (oturum geneli) · **recurrence:** 3
+- **root cause:** Bir oturumda 3 iş (plan.md ×2, kimlik role.*/identity.* ×2) eşzamanlı worker tarafından
+  zaten yapılırken main-thread bağımsız başladı → emek israfı. Conductor'da "kim neyi yapıyor" claim'i yoktu.
+- **prevention_rule:** İşe başlamadan ÖNCE `claim.ts --check <lane> <version>` (exit 3=çakışma) + `git status`
+  ile worker untracked'leri tara; çakışma → BAŞKA iş. vO7 bu kuralı mekanikleştirir (check-claim-before-work).
+- **test:** `claims.test.ts` detectCollision (same→collision, expired/self/done→yok) 15 case; canlı `claim --check` exit 3.
+- **recurrence_count:** 3 → vO7 sonrası 0 hedef.
+
+### Kanıt (vO7 canlı)
+- `claim --check orchestration vO7` (farklı tab) → ÇAKIŞMA exit 3; boş lane → exit 0. `--list` 2 claim; `--release` çalışır.
+- `status.ts` → `🔒 Aktif claim (1): orchestration|vO7→…` (claim yokken STATUS.md regresyonsuz, satır eklenmez).
+- `plan-next orchestration` → collision-gate stderr uyarı/bilgi (stdout taslak değişmez).
+- Test: claims 15 yeni; **full 248/248**. tsc temiz (claims/claim/plan-next exit 0; status:22 signal.ts `.ts`-import pre-existing).
+- Worker collision yok: claims.ts/claim.ts/claims.test.ts YENİ; plan-next/status additive; vO6-bench (`bench.ts`) + vO-ID (`role.*`) dosyalarına DOKUNULMADI; redundant identity.* (benim) silindi. ROADMAP vO7 + §13 + drift-guard→vO8.

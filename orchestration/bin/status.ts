@@ -20,6 +20,7 @@ import {
   type Worktree as DWorktree, type ServerLane, type TabInfo,
 } from "./discover";
 import { nudge, notify } from "./lib/signal.ts";
+import { defaultStore, readClaims, activeClaims, claimKey } from "./lib/claims";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, ".."); // orchestration/
@@ -159,12 +160,16 @@ function main(): void {
   const tabLine = tabRes.available
     ? `Sekmeler: beklenen ${EXPECTED_TABS} vs canlı ${tabRes.tabs.length} (lane'e eşlenen ${mappedTabs}).`
     : `Sekme keşfi: ${tabRes.note}.`;
+  // vO7 Work-Claim: aktif claim'ler (additive — claim yoksa satır eklenmez, STATUS.md regresyon yok).
+  const claims = activeClaims(readClaims(defaultStore(join(ORCH_DIR, "seyir"))), Date.now());
+  const claimLine = `> 🔒 Aktif claim (${claims.length}): ${claims.map((c) => `${claimKey(c.lane, c.version)}→${c.tab}`).join(", ")}`;
   const md = [
     `# ollamas — Lane Durum Matrisi`,
     ``,
     `> READ-ONLY. \`tsx orchestration/bin/status.ts\` ile üretilir. ${wts.length} worktree, ${servers.length} canlı dev-server.`,
     `> ${tabLine}`,
     `> Ana-repo son commit: ${now}`,
+    ...(claims.length ? [claimLine] : []),
     ``,
     `| Lane (branch) | HEAD | Yaş | Dirty | ↑/↓ | DevSrv | Tab | Idle | Roadmap sinyali | Hatalar |`,
     `|---|---|---|---|---|---|---|---|---|---|`,

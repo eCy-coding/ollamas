@@ -1,0 +1,3 @@
+{"ts":1781952586000,"tab":"orch-main-18063","pid":18063,"lane":"orchestration","version":"vO7","status":"claimed","ttlMs":1200000,"fence":1}
+{"ts":1781952729802,"tab":"tab-other","pid":29261,"lane":"frontend","version":"vF9","status":"claimed","ttlMs":1200000,"fence":1}
+{"ts":1781952729963,"tab":"tab-other","pid":29273,"lane":"frontend","version":"vF9","status":"released","ttlMs":0,"fence":2}
