@@ -1,14 +1,5 @@
 {
-  "ts": "2026-06-20T12:37:01.132Z",
-  "score": 98,
-  "findings": [
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "crit:coverage-gap:lib/suppress.ts",
-      "detail": "lib/suppress.ts: test'siz export → loadSuppress",
-      "action": "lib/suppress.ts için test ekle (loadSuppress)",
-      "severity": 20
-    }
-  ]
+  "ts": "2026-06-20T13:07:44.760Z",
+  "score": 100,
+  "findings": []
 }

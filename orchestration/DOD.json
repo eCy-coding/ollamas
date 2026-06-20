@@ -1,31 +1,13 @@
 {
-  "ts": "2026-06-20T12:37:01.237Z",
-  "score": 60,
+  "ts": "2026-06-20T13:07:44.901Z",
+  "score": 64,
   "findings": [
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
-      "kind": "dod:uncommitted-green:34 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, CONDUCTOR.md, CRITIC.json, CRITIC.md, DOCTOR.md…",
+      "kind": "dod:uncommitted-green:28 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json…",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
-      "severity": 40,
-      "concurrent": false
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:done-without-governance:vO4.2",
-      "detail": "vO4.2 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
-      "action": "vO4.2 için SEYIR girdisi + errors_registry güncelle",
-      "severity": 40,
-      "concurrent": false
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:done-without-governance:vO4.1",
-      "detail": "vO4.1 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
-      "action": "vO4.1 için SEYIR girdisi + errors_registry güncelle",
       "severity": 40,
       "concurrent": false
     },
@@ -59,6 +41,15 @@
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
+      "kind": "dod:concurrent-task:ops",
+      "detail": "ops kısmen tamam — eksik eş-zamanlı: roadmap-row",
+      "action": "ops için roadmap-row aynı anda tamamla",
+      "severity": 40,
+      "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
       "kind": "dod:concurrent-task:scan",
       "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
       "action": "scan için test aynı anda tamamla",
@@ -73,6 +64,15 @@
       "action": "status için test aynı anda tamamla",
       "severity": 40,
       "concurrent": true
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "dod:roadmap-coherence:ops",
+      "detail": "ops aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
+      "action": "ops'yi ilgili vO satırına ekle",
+      "severity": 15,
+      "concurrent": false
     }
   ]
 }

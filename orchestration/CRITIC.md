@@ -1,7 +1,7 @@
 # CRITIC — Orchestration Öz-Denetim (completeness)
 
 > READ-ONLY `critic.ts` üretti. Sistem kendi açığını bulur (deterministik, self-improving).
-> **Kapsamlılık skoru: 98/100** · 1 gap (26 araç, 32 artefakt).
+> **Kapsamlılık skoru: 100/100** · 0 gap (28 araç, 34 artefakt).
 
 ### 🔴 Roadmap-vs-Gerçek Drift (0)
 - _temiz_
@@ -15,9 +15,8 @@
 ### Duplicate araç (0)
 - _temiz_
 
-### Test-coverage gap (1)
-- **[low]** lib/suppress.ts: lib/suppress.ts: test'siz export → loadSuppress
-  → lib/suppress.ts için test ekle (loadSuppress)
+### Test-coverage gap (0)
+- _temiz_
 
 ## ⏭️ Gerekçeli-istisna (suppressed: 5) — gizlenmedi, kabul-edildi
 - `crit:coverage-gap:lib/signal.ts` — notify = terminal-notifier IO-wrapper; signal.test 28-case zaten isAllowedCmd+mocked-nudge/notify kapsar

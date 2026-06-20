@@ -1,23 +1,15 @@
 {
-  "ts": "2026-06-20T12:37:06.386Z",
-  "readiness": 49,
+  "ts": "2026-06-20T13:07:50.328Z",
+  "readiness": 66,
   "top": {
-    "criticality": "SECURITY",
-    "source": "conduct",
-    "target": "lic:f/prompts.chat",
-    "detail": "Lisans ihlali: f/prompts.chat — copyleft: 'ADOPT' kod kopyalama ima eder — yalnız ref-only/idea-only/eval-only/future-ref izinli (RISK-ORCH-005)",
-    "action": "ADOPTIONS: f/prompts.chat kararını ref-only'ye çevir (RISK-ORCH-005)",
-    "score": 90
+    "criticality": "COMPLETENESS",
+    "source": "conduct+dod",
+    "target": "dod:concurrent-task:adopt-gate",
+    "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
+    "action": "adopt-gate için test aynı anda tamamla",
+    "score": 40
   },
   "requirements": [
-    {
-      "criticality": "SECURITY",
-      "source": "conduct",
-      "target": "lic:f/prompts.chat",
-      "detail": "Lisans ihlali: f/prompts.chat — copyleft: 'ADOPT' kod kopyalama ima eder — yalnız ref-only/idea-only/eval-only/future-ref izinli (RISK-ORCH-005)",
-      "action": "ADOPTIONS: f/prompts.chat kararını ref-only'ye çevir (RISK-ORCH-005)",
-      "score": 90
-    },
     {
       "criticality": "COMPLETENESS",
       "source": "conduct+dod",
@@ -45,6 +37,14 @@
     {
       "criticality": "COMPLETENESS",
       "source": "conduct+dod",
+      "target": "dod:concurrent-task:ops",
+      "detail": "ops kısmen tamam — eksik eş-zamanlı: roadmap-row",
+      "action": "ops için roadmap-row aynı anda tamamla",
+      "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
       "target": "dod:concurrent-task:scan",
       "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
       "action": "scan için test aynı anda tamamla",
@@ -61,24 +61,8 @@
     {
       "criticality": "COMPLETENESS",
       "source": "conduct+dod",
-      "target": "dod:done-without-governance:vO4.1",
-      "detail": "vO4.1 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
-      "action": "vO4.1 için SEYIR girdisi + errors_registry güncelle",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:done-without-governance:vO4.2",
-      "detail": "vO4.2 DONE ama SEYIR_DEFTERI'nde girdisi yok (kanıt eksik)",
-      "action": "vO4.2 için SEYIR girdisi + errors_registry güncelle",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:uncommitted-green:34 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, CONDUCTOR.md, CRITIC.json, CRITIC.md, DOCTOR.md…",
+      "target": "dod:uncommitted-green:28 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json…",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "score": 40
     },
@@ -93,25 +77,33 @@
     {
       "criticality": "COMPLETENESS",
       "source": "quality(stale)",
-      "target": "stale-test:backend",
-      "detail": "backend testLast=failed ama testTs 2220 dk bayat — güvenilmez (phantom-critical önlendi)",
-      "action": "backend: testi YENİDEN koş (taze sonuç al); gerçekten kırıksa CRITICAL olur",
+      "target": "stale:quality",
+      "detail": "quality verisi 74 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)",
+      "action": "quality.ts yeniden koş (taze quality üret)",
       "score": 35
     },
     {
       "criticality": "COMPLETENESS",
-      "source": "conduct+critic",
-      "target": "crit:coverage-gap:lib/suppress.ts",
-      "detail": "lib/suppress.ts: test'siz export → loadSuppress",
-      "action": "lib/suppress.ts için test ekle (loadSuppress)",
-      "score": 20
+      "source": "conduct+dod",
+      "target": "dod:roadmap-coherence:ops",
+      "detail": "ops aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)",
+      "action": "ops'yi ilgili vO satırına ekle",
+      "score": 15
     },
     {
       "criticality": "ROADMAP",
       "source": "conduct",
       "target": "next:cli",
-      "detail": "cli sıradaki: v15 TUI v2 / agent watch top multi pane (request",
+      "detail": "cli sıradaki: v16 TUI v2 / agent watch top multi pane (request",
       "action": "cli: \"sıradaki versiyonu planla cli\"",
+      "score": 10
+    },
+    {
+      "criticality": "ROADMAP",
+      "source": "conduct",
+      "target": "next:deploy",
+      "detail": "deploy sıradaki: ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF",
+      "action": "deploy: \"sıradaki versiyonu planla deploy\"",
       "score": 10
     },
     {

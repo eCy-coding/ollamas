@@ -497,3 +497,68 @@ gerçek-gap ASLA suppress; propagasyon dod/critic→fuse/conduct).
 
 **Next precomputed (→vO15):** suppress-expiry/audit (kabul-edilen-istisna sonradan-gerçek-gap-olursa stale-uyarı) +
 REQUIREMENTS→GitHub-issue export. Aktivasyon (hook+launchd) hâlâ PRIVILEGED tek-manuel-artık.
+
+---
+
+## vO18 — Operation Runner (ops.ts) — "çalıştır ve kullan" canlı operasyon (2026-06-20)
+
+**Bağlam:** Kullanıcı "ollamas'ı çalıştır + gerçek-zamanlı test/kullan". 17 versiyon inşa bitti (doygun) →
+OPERASYON moduna geçiş. Tek eksik: analizörler fuse'dan önce tazelenmiyordu → tek-komut taze-operasyon yok.
+
+**Yapıldı:** `lib/ops.ts` (RUN_ORDER dependency-sıralı 8 analizör + summarizeOps + parseToolStatus, pure) +
+`bin/ops.ts` CLI (spawnSync tek-koşu, exit-1 gate tolere → refresh-all → fuse → OPERATIONS.md, --watch
+sürdürülebilir, CRITICAL>0 exit-1 gate). `tests/ops.test.ts` 10. Yeni ANALİZ yok = orkestratör (gereksiz iş yok).
+
+**Kanıt (CANLI OPERASYON):** ops 10/10; full suite 39 dosya/461 green. `ops.ts --once` → **8/8 araç OK, ~21s,
+readiness 42/100, CRITICAL 0** (taze, phantom-free). OPERATIONS.md gerçek-zamanlı: 11 worktree + bench tok/s +
+fuse top=SECURITY:lic:f/prompts.chat (gerçek lisans bulgusu). conduct-RED phantom fuse'da CRITICAL'e dönmedi
+(vO16 guard canlı doğrulandı). ollama UP 0.30.10. Adopt: execJson/spawnSync + just-dep-order + tüm-araç reuse (0 dep). GPL yok.
+
+**Operasyon runbook:** `tsx orchestration/bin/ops.ts --once` (tek) / `--watch 600` (sürdürülebilir) / launchd / `/loop`.
+Detay: OPERATIONS.md + REQUIREMENTS.md. .gitignore OPERATIONS.md (generated).
+
+**Gerçek top-critical (proje):** SECURITY lic:f/prompts.chat — worker ADOPTIONS'ta GPL+ADOPT; fix worker governance
+(adopt.ts gate + ops surface etti, §3). Sistem operasyonel + sürdürülebilir.
+
+**Next:** sürekli operasyon (--watch/launchd) + gerçek top-critical'leri lane/worker'a route. Sistem inşa-tam, operasyon-canlı.
+
+---
+
+## vO4.1 — Panel Coverage Expansion (governance backfill, 2026-06-20)
+
+**Not (dod governance-gap kapatma):** vO4.1 = vO4-PANEL'in taktik alt-adımı (ROADMAP'te ayrı satır). 5 boş personaya
+gerçek detector + coverage-critic + `panel --refresh`. Ayrı-deliverable değil, panel-genişletme. Kanıt panel-set
+commit'inde (f87a9a9 ailesi). Ayrı SEYIR-faz gerekmedi; bu backfill izlenebilirlik içindir.
+
+## vO4.2 — Panel Trend & History (governance backfill, 2026-06-20)
+
+**Not:** vO4.2 = panel taktik alt-adımı — append-only `panel-history.jsonl` + run-to-run delta (SARIF baselineState) +
+`trend.ts`. Kanıt daefe19. Panel-substep, ayrı-faz değil; backfill izlenebilirlik.
+
+---
+
+## vO15 — Live Operation & Verdict Closure (2026-06-20)
+
+**Tetik (Emre/T0):** "ollamas'ı artık ÇALIŞTIR + gerçek-zamanlı işlemlerini TEST ET ve KULLAN." + gereksiz-iş yok, YARIM YOK, 0-manuel.
+
+**ÇALIŞTIR + KULLAN (canlı):** ollamas :3000 UP (Docker live) + ollama :11434 UP 17-model. `tsx autopilot.ts` full-chain
+CANLI koşuldu (benchprompt→critic→dod→conduct→fuse→status→doctor). Pipeline TEMİZ (conduct ✗=gate-exit, doctor ✗=privileged
+— ikisi BEKLENEN). Priority-engine 0-manuel TEK-EYLEM seçti.
+
+**VERDICT'E EYLEM (sistem ne dediyse onu kapat):**
+- **SECURITY #1 (top-kritik): `f/prompts.chat` lisans-ihlali** — KÖK: ADOPTIONS:90 `permissive`(literal, SPDX-değil)→
+  classifyLicense=unknown + ADOPT → ihlal. **MATRIX-TRUTH fix** (RISK-ORCH-005, suppress-değil): license→`CC0-1.0`
+  (gerçek, Awesome-ChatGPT-Prompts public-domain) + karar→`idea-only` (kod-değil-yapı). **RE-RUN: SECURITY=0** (convergence).
+- **critic coverage-gap:suppress** — `tests/suppress.test.ts` +loadSuppress (test=0→kapsandı). **critic 98→100/100.**
+- **governance vO4.1/4.2** — backfill SEYIR entry (yukarı; dod done-without-governance↓).
+
+**Kanıt (real-time convergence = "test/use"):** vitest yeşil (suppress 8). Baseline conduct SECURITY:1 → fix → RE-RUN
+**SECURITY:0**; critic 100/100; fuse-readiness. Loop kendi-verdict'ini KAPATTI, yakınsadı. Top artık RED:backend (LANE
+testi — backend sekmesi işi, §3 backlog) + COMPLETENESS (uncommitted-green=regenerate-output kovalanmaz; concurrent-task
+tests=lane/worker domain). **RISK-ORCH-017** (live-pipeline-verdict→matrix-truth-fix; permissive-literal≠SPDX→gerçek-SPDX-yaz).
+
+**PRIVILEGED RESIDUE (tek manuel, ajan-yazamaz guardrail):** DOCTOR NO-GO = `.claude/settings.json` hook + `autopilot-install.sh load`.
+Kullanıcı 1-kez → 0-manuel sürekli-operasyon AKTİF (launchd periyodik + SessionStart).
+
+**Next precomputed (→vO16):** ops-tool (worker WIP `ops.ts` RED — summarizeOps test) konsolide; sürekli-operasyon
+metrik-trend (AUTOPILOT.md run-to-run readiness delta); RED:backend gibi lane-bulgularını signal.ts ile lane'e route.

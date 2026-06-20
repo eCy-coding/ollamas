@@ -87,7 +87,7 @@ yazıldı (RISK-ORCH-005 korundu). GPL kod yok. Lisans-ihlali yok.
 
 | # | Repo | ⭐ | Lisans | Karar | Ne adopt edilir |
 |---|------|-----|--------|-------|-----------------|
-| 1 | f/prompts.chat | 164k | permissive | ADOPT-pattern | global-standart **role→constraints→evidence→examples→output** prompt yapısı (kod değil, yapı) |
+| 1 | f/prompts.chat | 164k | CC0-1.0 | idea-only | global-standart **role→constraints→evidence→examples→output** prompt yapısı (KOD DEĞİL, yalnız yapı/kavram — public-domain, vendor YOK) |
 | 2 | gszhangwei/structured-prompts-driven-development | düşük | MIT | ADOPT-pattern | XML-section şablon (`<role><task><constraints><evidence><output_format>`) paste-anywhere |
 | 3 | lm-sys/RouteLLM | 5k | Apache-2.0 | idea-only | benchmark-evidence ile model-routing **kavramı**; ML-classifier→bizim tok/s+correctness farklı, kod kopyası YOK |
 | 4 | LarHope/ollama-benchmark + aidatatools/ollama-benchmark | 164/372 | MIT | parity-ref | tok/s = eval_count/eval_duration·1e9 metodolojisi — worker bench-core'da zaten adopte |

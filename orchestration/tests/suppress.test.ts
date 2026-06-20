@@ -2,7 +2,21 @@
  * suppress.test.ts — vO14 detector precision: applySuppress (gerçek-koru, gürültü-ele, silent-değil).
  */
 import { describe, it, expect } from "vitest";
-import { applySuppress, suppressedBlock, type SuppressRule } from "../bin/lib/suppress";
+import { applySuppress, suppressedBlock, loadSuppress, type SuppressRule } from "../bin/lib/suppress";
+
+describe("loadSuppress — .policy-suppress.json oku + reason-zorunlu filtre", () => {
+  it("gerçek .policy-suppress.json → kurallar (her biri reason'lı)", () => {
+    const rules = loadSuppress("orchestration/.policy-suppress.json");
+    expect(rules.length).toBeGreaterThan(0);
+    for (const r of rules) {
+      expect(r.reason.trim().length).toBeGreaterThan(0); // gerekçesiz suppress yok
+      expect(["dod", "critic", "*"]).toContain(r.detector);
+    }
+  });
+  it("var-olmayan dosya → [] (graceful)", () => {
+    expect(loadSuppress("orchestration/.yok-xyz.json")).toEqual([]);
+  });
+});
 
 const f = (kind: string) => ({ kind });
 const RULES: SuppressRule[] = [
