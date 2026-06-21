@@ -10,6 +10,7 @@
 //
 // CONTRACT: in stdio mode stdout is RESERVED for the MCP JSON-RPC stream. Nothing
 // here may write to stdout — diagnostics go to stderr only.
+import "dotenv/config"; // load .env into process.env before any provider/key read (stdio MCP boot)
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { buildServer } from "../server/mcp/server";
 import { FilesystemManager } from "../server/files";

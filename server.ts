@@ -1,3 +1,4 @@
+import "dotenv/config"; // load .env into process.env before any provider/key read (getDecryptedKey fallback)
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
