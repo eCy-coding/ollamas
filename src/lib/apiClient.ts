@@ -45,7 +45,9 @@ function authHeaders(): Record<string, string> {
 // Best-effort observability → seyir defteri. MUST NOT throw into the UI path.
 export function logClientEvent(note: string, meta: Record<string, unknown> = {}): void {
   try {
-    const payload = JSON.stringify({ kind: 'note', source: 'frontend', note, ...meta });
+    // Backend POST /api/logbook requires `{ entry }` (it stores {kind:'note', entry});
+    // wrap the client event so telemetry isn't rejected with 400.
+    const payload = JSON.stringify({ entry: { source: 'frontend', note, ...meta } });
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
       navigator.sendBeacon('/api/logbook', new Blob([payload], { type: 'application/json' }));
       return;

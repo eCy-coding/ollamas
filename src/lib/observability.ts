@@ -44,8 +44,19 @@ export function ratingFor(metric: VitalMetric, value: number): Rating {
   return 'poor';
 }
 
+// The backend POST /api/logbook wraps the posted payload under `entry`
+// (stored as {ts, kind:'note', entry:{...}}), so flatten that before reading.
+// Falls through unchanged for already-flat entries (back-compat).
+function normalize(e: LogEntry): LogEntry {
+  const inner = e.entry;
+  if (inner && typeof inner === 'object') {
+    return { ts: e.ts, kind: e.kind, ...(inner as Record<string, unknown>) };
+  }
+  return e;
+}
+
 export function frontendEvents(entries: LogEntry[]): LogEntry[] {
-  return entries.filter((e) => e.source === 'frontend');
+  return entries.map(normalize).filter((e) => e.source === 'frontend');
 }
 
 // Nearest-rank percentile (p in 0..100). Empty → 0.

@@ -104,4 +104,17 @@ describe('observability — pure logic (vF10)', () => {
     const out = frontendEvents([ev('react_error'), { source: 'backend', note: 'x' }]);
     expect(out).toHaveLength(1);
   });
+
+  it('frontendEvents unwraps the backend {entry} wrapper (real /api/logbook shape)', () => {
+    // Backend stores POSTed client events as {ts, kind:'note', entry:{source,...}}.
+    const wrapped: LogEntry[] = [
+      { ts: '2026-06-20T00:00:00Z', kind: 'note', entry: { source: 'frontend', note: 'web-vital LCP', metric: 'LCP', value: 1899, rating: 'good' } },
+      { ts: '2026-06-20T00:00:01Z', kind: 'agent_step', tool: 'list_tree' }, // backend row → not frontend
+    ];
+    const fe = frontendEvents(wrapped);
+    expect(fe).toHaveLength(1);
+    expect(fe[0].metric).toBe('LCP');
+    expect(fe[0].value).toBe(1899);
+    expect(vitalsSummary(wrapped).find((s) => s.metric === 'LCP')!.p75).toBe(1899);
+  });
 });
