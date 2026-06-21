@@ -2,27 +2,33 @@ import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
-import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal } from "./server/metrics";
+import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, ukpStageEventsTotal } from "./server/metrics";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
-import { signRequest } from "./server/bridge-hmac";
 import os from "os";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { ProviderRouter } from "./server/providers";
+import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
+import { registerHostScripts } from "./bin/host-bridge/register-host-scripts.mjs"; // scripts lane v5 register-seam
 import { handleMcpRequest } from "./server/mcp/server";
-import { buildResourceMetadata, PROTECTED_RESOURCE_PATH } from "./server/mcp/oauth-metadata";
-import { connectAllUpstreams, connectUpstream, listUpstreams, type UpstreamConfig } from "./server/mcp/client";
-import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries } from "./server/store";
-import { startWebhookWorker, stopWebhookWorker } from "./server/webhooks/outbound";
+import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata, AUTH_SERVER_METADATA_PATH, REGISTRATION_PATH } from "./server/mcp/oauth-metadata";
+import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
+import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
+import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
+import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
+import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
+import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
@@ -41,78 +47,20 @@ function logSeyir(entry: Record<string, any>) {
   } catch { /* best-effort */ }
 }
 
-// Host-side macOS terminal bridge (drives real iTerm2 / Terminal.app).
-const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
-const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
-const HOST_BRIDGE_HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
-
-// Auth headers for a bridge call: HMAC-SHA256 request signing when a secret is set
-// (replay-protected), else the plain token (backward-compat, Faz 10E).
-function bridgeHeaders(bridgePath: string, body: string): Record<string, string> {
-  if (HOST_BRIDGE_HMAC_SECRET) {
-    const { signature, timestamp, nonce } = signRequest(HOST_BRIDGE_HMAC_SECRET, "POST", bridgePath, body);
-    return { "x-bridge-signature": signature, "x-bridge-timestamp": timestamp, "x-bridge-nonce": nonce };
-  }
-  return HOST_BRIDGE_TOKEN ? { "X-Bridge-Token": HOST_BRIDGE_TOKEN } : {};
-}
-
-async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000) {
-  const body = JSON.stringify({ target: target || "iterm2", command, timeoutMs });
-  const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...bridgeHeaders("/run", body) },
-    body,
-    signal: AbortSignal.timeout(timeoutMs + 5000),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Host terminal bridge error ${res.status}: ${err.error || ""}${err.hint ? " (" + err.hint + ")" : ""}`);
-  }
-  return res.json();
-}
-
-// Run a command directly on the host via the bridge /exec (no terminal mutex).
-// Bridge tools execute on the HOST filesystem, so this must be the host path.
-// In dev (tsx on host) process.cwd() is the repo; in Docker, set HOST_TOOLS_DIR
-// to the host repo's bin/host-bridge/tools (the container path would be wrong).
-const HOST_TOOLS_DIR = process.env.HOST_TOOLS_DIR || path.join(process.cwd(), "bin/host-bridge/tools");
-// Single-quote-escape an argument for safe interpolation into a shell command.
-function shArg(s: string): string { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
-async function execOnHost(command: string, timeoutMs = 95000) {
-  const body = JSON.stringify({ command, timeoutMs });
-  const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...bridgeHeaders("/exec", body) },
-    body,
-    signal: AbortSignal.timeout(timeoutMs + 5000),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Host exec bridge error ${res.status}: ${err.error || ""}`);
-  }
-  return res.json();
-}
-
-// Write a file directly to the macOS host filesystem via the bridge (base64).
-async function writeHostFile(filePath: string, content: string) {
-  const body = JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") });
-  const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...bridgeHeaders("/write", body) },
-    body,
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Host write bridge error ${res.status}: ${err.error || ""}`);
-  }
-  return res.json();
-}
+// Host-side macOS bridge client (iTerm2/Terminal.app, host exec, host writes).
+// Extracted to ./server/host-bridge (v1.8) so the stdio entry point shares it.
+import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } from "./server/host-bridge";
+import { discoverBinaries } from "./server/artifacts";
 
 // Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
 const TOOL_DEPS: ToolDeps = {
   FilesystemManager, TerminalManager, runOnHostTerminal, writeHostFile, execOnHost, HOST_TOOLS_DIR, shArg, db,
 };
+
+// scripts lane v5: manifest-driven host tool registration (scripts/inventory.json
+// -> ToolRegistry under the host_ namespace). Best-effort — a bad manifest must
+// not crash boot; the static built-in tools still serve.
+try { registerHostScripts(ToolRegistry, TOOL_DEPS); } catch (e) { console.error("registerHostScripts failed:", (e as Error)?.message); }
 
 // Security headers (helmet, Faz 9A). CSP/COEP disabled: the app serves a Vite
 // SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
@@ -150,10 +98,36 @@ app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
+// UKP inbound stage-events: raw body required for HMAC signature verification
+// (same reason as Stripe — must be registered before the global JSON parser).
+app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// SaaS fail-closed gate. The single-local-owner DASHBOARD surface (host terminal,
+// workspace files, multi-agent pipeline, backups, cluster control, raw inference,
+// ReAct agent) has NO per-tenant auth — it trusts the localhost owner. When
+// SAAS_ENFORCE=1 the server is a multi-tenant gateway exposed to untrusted callers,
+// so this surface MUST be unreachable (the SaaS product is /mcp + /api/saas/*).
+// Local mode (no enforce) passes through unchanged — single-owner UX preserved.
+// Registered before the routes so it runs first for these path prefixes.
+const localOwnerGuard = (_req: express.Request, res: express.Response, next: express.NextFunction): void => {
+  if (process.env.SAAS_ENFORCE === "1") {
+    res.status(403).json({ error: "endpoint not available in SaaS mode (local-owner only)" });
+    return;
+  }
+  next();
+};
+app.use(
+  [
+    "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
+    "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
+    "/api/agent", "/api/keys", "/api/models",
+  ],
+  localOwnerGuard,
+);
 
 /**
  * L1: Dynamic Environment Detection
@@ -213,6 +187,8 @@ async function initializeServer() {
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
   // Background outbound-webhook delivery worker (Faz 11B).
   startWebhookWorker();
+  // Periodic OAuth retention sweeper — delete expired codes/tokens (Faz 26).
+  startOAuthGc();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -221,16 +197,18 @@ async function initializeServer() {
   try {
     const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
     const upstreams: UpstreamConfig[] = reg.mcpServers || [];
-    if (upstreams.length) {
-      for (const r of await connectAllUpstreams(upstreams)) {
-        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-      }
+    // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
+    // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
+    // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
+    for (const cfg of upstreams) {
+      const r = await superviseUpstream(cfg);
+      console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
     }
-    // Per-tenant upstreams persisted in the SaaS store (Faz 9E), namespaced by tenant.
     for (const u of await allUpstreamServers()) {
-      const r = await connectUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools });
+      const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
+    startSupervisor(); // periodic health/reconnect (opt-in via MCP_HEALTH_INTERVAL_MS)
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
   }
@@ -300,6 +278,7 @@ async function initializeServer() {
       workspacePath: db.data.workspacePath,
       permissions: db.data.permissions,
       hasBackupEnabled: db.data.backup.enabled,
+      binaries: discoverBinaries(),
       db: dbUp ? "up" : "down",
     });
   });
@@ -531,7 +510,12 @@ async function initializeServer() {
    */
   app.post("/api/generate", async (req, res) => {
     const { provider, model, messages, temperature, stream } = req.body;
-    
+    // Raw endpoint contract: messages[] required. (For a single-string prompt use
+    // POST /api/ai/generate.) Reject malformed input with a clear 400, not a 500.
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages (non-empty array) required; use POST /api/ai/generate for a single prompt string" });
+    }
+
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -567,14 +551,72 @@ async function initializeServer() {
   });
 
   /**
+   * Colab-style ergonomic AI façade (v1.11) — single-string prompt, zero-config.
+   * Mirrors `google.colab.ai`: `GET /api/ai/models` + `POST /api/ai/generate`.
+   * Thin wrapper over server/ai.ts → ProviderRouter (ollama-local, auto default model).
+   */
+  app.get("/api/ai/models", async (_req, res) => {
+    try {
+      res.json(await aiListModels());
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "model listing failure" });
+    }
+  });
+
+  app.post("/api/ai/generate", async (req, res) => {
+    const { prompt, model, stream, temperature } = req.body;
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt (non-empty string) is required" });
+    }
+
+    if (stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      try {
+        for await (const chunk of aiGenerateTextStream(prompt, { model, temperature })) {
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ error: err?.message || "streaming failure" })}\n\n`);
+        res.end();
+      }
+    } else {
+      try {
+        const result = await aiGenerate(prompt, { model, temperature });
+        res.json({ text: result.text, model: result.modelUsed, source: result.source, tokensPerSec: result.tokensPerSec });
+      } catch (err: any) {
+        res.status(500).json({ error: err?.message || "generation failure" });
+      }
+    }
+  });
+
+  /**
    * ReAct Agent Specialist Loop APIs (AC-A1, AC-A3)
    */
   app.post("/api/agent/chat", async (req, res) => {
     const { provider, model, messages, autoApply, maxSteps = 8, sessionId } = req.body;
 
+    // Validate BEFORE switching to SSE: once event-stream headers are sent we can no
+    // longer return a clean status. A missing/empty messages[] would otherwise throw
+    // an unhandled "messages is not iterable" and abort the stream (mirrors /api/generate).
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages (non-empty array) required; use POST /api/ai/generate for a single prompt string" });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+
+    // Abort the ReAct loop only on a real client disconnect. `req` "close" fires as
+    // soon as the (already express.json-parsed) request body is consumed — wiring it
+    // to abort() cancelled the very first LLM fetch ("operation was aborted") and
+    // silently dropped the agent to demo fallback. `res` "close" is the correct
+    // disconnect signal for a streaming response; guard so a normal end never aborts.
+    const ac = new AbortController();
+    res.on("close", () => { if (!res.writableFinished) ac.abort(); });
 
     const sendEvent = (type: string, payload: any) => {
       res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
@@ -628,7 +670,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           messages: activeHistory,
           tools: AGENT_TOOLS,
           stream: false,
-        });
+        }, undefined, undefined, ac.signal);
 
         // Meter LLM output tokens (Faz 6D) — a billing dimension distinct from
         // per-tool-call usage, under the single-user "local" tenant.
@@ -661,6 +703,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
             const r = await ToolRegistry.execute(toolName, args, {
               isLive, workspaceRoot, autoApply, deps: TOOL_DEPS,
               tenantId: "local",
+              abortSignal: ac.signal,
               onUsage: (e) => {
                 recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
                 recordToolMetric(e.tool, e.tier, e.ok);
@@ -745,6 +788,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
       res.end();
     } catch (err: any) {
+      // Client disconnected — abort is expected, not an error.
+      if (err?.name === "AbortError" || ac.signal.aborted) {
+        res.end();
+        return;
+      }
       sendEvent("error", { message: err?.message || "Execution loop failure." });
       res.end();
     }
@@ -883,6 +931,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
   app.post("/api/workspace/file", (req, res) => {
     const { relativePath, content } = req.body;
+    // Validate types before fs write — a non-string content/path would throw deep in
+    // fs and surface as a 500; reject malformed input with a clean 400.
+    if (typeof relativePath !== "string" || !relativePath || typeof content !== "string") {
+      return res.status(400).json({ error: "relativePath (string) and content (string) are required" });
+    }
     const isLive = CURRENT_MODE !== "demo";
     try {
       FilesystemManager.writeFile(isLive, db.data.workspacePath, relativePath, content);
@@ -894,6 +947,9 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
   app.delete("/api/workspace/file", (req, res) => {
     const relativePath = req.query.relativePath as string;
+    if (typeof relativePath !== "string" || !relativePath) {
+      return res.status(400).json({ error: "relativePath query parameter (string) is required" });
+    }
     const isLive = CURRENT_MODE !== "demo";
     try {
       FilesystemManager.deleteFile(isLive, db.data.workspacePath, relativePath);
@@ -967,6 +1023,12 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       maxIterations,
       writePermissions,
     } = req.body;
+
+    // Validate BEFORE switching to SSE — once event-stream headers are sent we can
+    // no longer return a clean status; a missing prompt would stream `undefined`.
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt (non-empty string) is required" });
+    }
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -1295,11 +1357,122 @@ content
     };
   };
 
+  // Externally-reachable origin. MCP_PUBLIC_URL pins it behind a proxy/LB; else
+  // derive from the request. Used by all public discovery docs (Faz 15).
+  const reqBase = (req: import("express").Request) =>
+    process.env.MCP_PUBLIC_URL || `${req.protocol}://${req.get("host") || "localhost"}`;
+
   // RFC 9728 Protected Resource Metadata (public). MCP clients fetch this after a
   // 401's WWW-Authenticate to discover how to authenticate (AGENTS.md Faz 6A).
   app.get(PROTECTED_RESOURCE_PATH, (req, res) => {
-    res.json(buildResourceMetadata(`${req.protocol}://${req.get("host") || "localhost"}`));
+    res.json(buildResourceMetadata(reqBase(req)));
   });
+
+  // MCP HTTP discovery (Faz 15A): capabilities + transport + auth before connect.
+  app.get(MCP_DISCOVERY_PATH, (req, res) => {
+    res.json(mcpDiscovery(reqBase(req)));
+  });
+
+  // RFC 8414 Authorization Server Metadata (public) — advertises the DCR
+  // registration_endpoint so RFC 7591 clients can self-register (Faz 15B).
+  app.get(AUTH_SERVER_METADATA_PATH, (req, res) => {
+    res.json(buildAuthServerMetadata(reqBase(req)));
+  });
+
+  // RFC 7591 Dynamic Client Registration (public, pre-auth). Issues a client_id
+  // (+ secret for confidential clients) so MCP clients onboard without manual
+  // setup. Rate-limited; DCR_INITIAL_ACCESS_TOKEN (if set) gates open registration.
+  // NOTE: this records client metadata only — token issuance is a full OAuth 2.1
+  // authorization server (backlog); ollamas still authenticates via opaque API keys.
+  app.post(REGISTRATION_PATH, rateLimitMiddleware(), async (req, res) => {
+    const gate = process.env.DCR_INITIAL_ACCESS_TOKEN;
+    if (gate) {
+      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+      if (bearer !== gate) return res.status(401).json({ error: "invalid_token", error_description: "initial access token required" });
+    }
+    const body = req.body || {};
+    if (body.redirect_uris !== undefined && !Array.isArray(body.redirect_uris)) {
+      return res.status(400).json({ error: "invalid_client_metadata", error_description: "redirect_uris must be an array" });
+    }
+    // DCR-time tenant binding (Faz 19B): when the caller is tenant-authenticated,
+    // bind the new client to that tenant so the OAuth authorize() can auto-consent.
+    // Uses x-api-key, or the bearer token when no DCR initial-access gate is set
+    // (the gate already claims the Authorization header). Anonymous DCR → unbound.
+    let tenant_id: string | null = null;
+    const apiKey = String(req.headers["x-api-key"] || "") || (!gate ? (req.headers.authorization || "").replace(/^Bearer\s+/i, "") : "");
+    if (apiKey) { const rk = await resolveKey(apiKey); if (rk) tenant_id = rk.tenantId; }
+    try {
+      const r = await registerClient({
+        redirect_uris: body.redirect_uris, grant_types: body.grant_types,
+        token_endpoint_auth_method: body.token_endpoint_auth_method, client_name: body.client_name,
+        tenant_id,
+      });
+      const base = reqBase(req);
+      res.status(201).json({
+        client_id: r.client_id,
+        ...(r.client_secret ? { client_secret: r.client_secret } : {}),
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        ...(r.client_secret ? { client_secret_expires_at: 0 } : {}),
+        redirect_uris: r.redirect_uris,
+        grant_types: r.grant_types,
+        token_endpoint_auth_method: r.token_endpoint_auth_method,
+        registration_access_token: r.registration_access_token,
+        registration_client_uri: `${base}${REGISTRATION_PATH}/${r.client_id}`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "server_error", error_description: err?.message || "registration failed" });
+    }
+  });
+
+  // Faz 22 (v1.13): client_credentials grant (M2M). The SDK's /token handler
+  // rejects this grant (UnsupportedGrantTypeError), so we intercept it BEFORE
+  // mcpAuthRouter; every other grant_type falls through to the SDK unchanged.
+  // Confidential clients only (timing-safe secret verify), tenant-bound, and the
+  // grant must be in the client's registered grant_types. No refresh token (M2M).
+  const parseClientAuth = (req: express.Request): { clientId?: string; secret?: string } => {
+    const hdr = req.headers.authorization;
+    if (typeof hdr === "string" && /^Basic\s+/i.test(hdr)) {
+      const [id, sec] = Buffer.from(hdr.replace(/^Basic\s+/i, ""), "base64").toString("utf8").split(":");
+      return { clientId: id, secret: sec };
+    }
+    return { clientId: req.body?.client_id, secret: req.body?.client_secret };
+  };
+  app.post("/token", async (req, res, next) => {
+    if (req.body?.grant_type !== "client_credentials") return next(); // SDK handles the rest
+    try {
+      const { clientId, secret } = parseClientAuth(req);
+      if (!clientId || !secret || !(await verifyClientSecret(clientId, secret))) {
+        return res.status(401).json({ error: "invalid_client" });
+      }
+      const client = await getClient(clientId);
+      if (!client) return res.status(401).json({ error: "invalid_client" });
+      if (!client.grant_types.includes("client_credentials")) {
+        return res.status(400).json({ error: "unauthorized_client", error_description: "grant_type not allowed for this client" });
+      }
+      if (!client.tenant_id) {
+        return res.status(400).json({ error: "unauthorized_client", error_description: "client is not bound to a tenant" });
+      }
+      const scope = typeof req.body.scope === "string" ? req.body.scope : "";
+      const resource = typeof req.body.resource === "string" ? req.body.resource : null;
+      const access = await saveOAuthToken({ client_id: clientId, tenant_id: client.tenant_id, scopes: scope, resource, ttlSecs: 3600 });
+      return res.json({ access_token: access, token_type: "bearer", expires_in: 3600, scope: scope || undefined });
+    } catch (err: any) {
+      return res.status(500).json({ error: "server_error", error_description: err?.message });
+    }
+  });
+
+  // OAuth 2.1 Authorization Server (Faz 19, v1.10). The SDK router serves
+  // /authorize + /token + /revoke (authorization_code + PKCE S256) backed by our
+  // OllamasOAuthProvider. Mounted AFTER our AS-metadata + DCR /register routes, so
+  // those win for their paths (the router omits registration_endpoint since our
+  // clientsStore has no registerClient — DCR stays tenant-aware in ollamas).
+  const oauthIssuer = new URL(process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`);
+  app.use(mcpAuthRouter({
+    provider: new OllamasOAuthProvider(),
+    issuerUrl: oauthIssuer,
+    resourceServerUrl: new URL("/mcp", oauthIssuer),
+    scopesSupported: ["tools:safe", "tools:host", "tools:privileged"],
+  }));
 
   // Origin allowlist for /mcp — DNS-rebinding protection (MCP Transports spec).
   // Default localhost only; override with ALLOWED_ORIGINS (CSV). A request with no
@@ -1337,16 +1510,35 @@ content
   if (process.env.SAAS_ENFORCE === "1" && !process.env.SAAS_ADMIN_TOKEN) {
     console.warn("[SaaS] SAAS_ENFORCE=1 but SAAS_ADMIN_TOKEN unset — /api/saas + /api/billing admin routes are LOCKED (set SAAS_ADMIN_TOKEN).");
   }
+  // Per-IP brute-force throttle for the admin token. timingSafeEqual alone does not
+  // stop an attacker hammering guesses; lock an IP out for the window after N misses.
+  // In-memory (per-process) — adequate for the single admin surface; a multi-replica
+  // deploy would back this with the shared store/Redis.
+  const adminFailures = new Map<string, { count: number; until: number }>();
+  const ADMIN_MAX_FAILS = 5;
+  const ADMIN_LOCK_MS = 15 * 60_000;
   const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const required = process.env.SAAS_ADMIN_TOKEN;
     if (required) {
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      const now = Date.now();
+      const rec = adminFailures.get(ip);
+      if (rec && rec.count >= ADMIN_MAX_FAILS && now < rec.until) {
+        res.setHeader("Retry-After", Math.ceil((rec.until - now) / 1000));
+        return res.status(429).json({ error: "Too many bad admin attempts; try later" });
+      }
       // Timing-safe compare to avoid leaking the token via response timing.
       const got = String(req.headers["x-admin-token"] || "");
       const a = Buffer.from(got);
       const b = Buffer.from(required);
       if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        const r = adminFailures.get(ip) ?? { count: 0, until: 0 };
+        r.count += 1;
+        r.until = now + ADMIN_LOCK_MS;
+        adminFailures.set(ip, r);
         return res.status(401).json({ error: "Bad admin token" });
       }
+      adminFailures.delete(ip); // success → reset the counter
     } else if (process.env.SAAS_ENFORCE === "1") {
       // Enforcement on but no token configured → refuse rather than expose.
       return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
@@ -1394,7 +1586,8 @@ content
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
-      const connect = await connectUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools });
+      // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.
+      const connect = await superviseUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId);
       res.json({ id, connect });
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
@@ -1403,8 +1596,13 @@ content
     const up = (await listUpstreamServers(tId)).find(u => u.id === req.params.id);
     if (!up) return res.status(404).json({ error: "Not found" });
     await deleteUpstreamServer(tId, req.params.id);
-    const removed = ToolRegistry.unregisterByPrefix(`mcp__${tId}_${up.name}__`);
-    res.json({ deleted: req.params.id, toolsRemoved: removed });
+    await removeUpstream(`${tId}_${up.name}`); // unsupervise + unregister + disconnect (Faz 27)
+    res.json({ deleted: req.params.id });
+  });
+  app.get("/api/saas/upstreams/status", authMiddleware(true), async (req, res) => {
+    const tId = req.tenant!.tenantId;
+    // Surface only this tenant's supervised upstreams (names are `<tenantId>_<name>`).
+    res.json(getUpstreamStatus().filter((s) => s.name.startsWith(`${tId}_`)));
   });
 
   // --- Tenant SELF-SERVE (Faz 10B). Tenant's OWN API key + scope; no admin token. ---
@@ -1466,6 +1664,42 @@ content
       res.json(out);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
+
+  // UKP inbound stage-events webhook receiver. Public endpoint (no auth middleware)
+  // — security comes from HMAC signature verification (same Stripe-compatible scheme
+  // used for outbound webhooks). Requires UKP_WEBHOOK_SECRET env var to be set.
+  app.post("/api/ingest/stage-events", async (req, res) => {
+    try {
+      const secret = process.env.UKP_WEBHOOK_SECRET;
+      if (!secret) return res.status(503).json({ error: "ingest disabled" });
+
+      const raw = (req.body as Buffer).toString("utf8");
+      const sigHeader = String(req.headers["x-ukp-signature"] || "");
+      if (!verifyWebhook(secret, raw, sigHeader)) return res.status(401).json({ error: "invalid signature" });
+
+      const parsed = JSON.parse(raw) as { type?: string; ts?: number };
+      // Extract the timestamp from the signature header ("t={unix_sec},v1={hex}").
+      const tStr = sigHeader.split(",").find((p) => p.startsWith("t="))?.slice(2) ?? "0";
+      const id = crypto.createHash("sha256").update(`${tStr}.${raw}`).digest("hex");
+
+      const eventType = String(parsed.type ?? "");
+      const ts = Number(parsed.ts ?? 0);
+      const { recorded } = await recordStageEvent({ id, eventType, payload: raw, ts });
+      ukpStageEventsTotal.labels(eventType, String(recorded)).inc();
+      return res.json({ ok: true, recorded });
+    } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  });
+
+  // List received UKP stage-events. Admin-gated; supports ?limit (clamped 1-1000)
+  // and optional ?event_type filter (exact match, parameterized).
+  app.get("/api/ingest/stage-events", adminGuard, async (req, res) => {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 100;
+      const eventType = typeof req.query.event_type === "string" ? req.query.event_type : undefined;
+      res.json(await listStageEvents(limit, eventType));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Tenant self-service (Faz 9C). 501 when Stripe isn't configured (dry-run).
   app.post("/api/billing/portal", authMiddleware(true), async (req, res) => {
     try {
@@ -1810,6 +2044,8 @@ content
     force.unref?.();
     try {
       stopWebhookWorker();
+      stopOAuthGc();
+      stopSupervisor();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeStore();
       clearTimeout(force);

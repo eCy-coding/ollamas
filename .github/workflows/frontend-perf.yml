@@ -1,0 +1,34 @@
+name: Frontend Perf (vF3)
+
+# Frontend lane (vF3) — separate from ci.yml (backend-owned). Enforces the perf
+# budget on every PR: bundle size (size-limit) + Lighthouse CI (LCP/CLS/budget).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build client bundle
+        run: npm run build:client
+      - name: Bundle size budget
+        run: npm run size
+      - name: Lighthouse CI (perf budget)
+        run: npm run perf
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: .lighthouseci/
+          retention-days: 14

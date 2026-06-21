@@ -1,0 +1,32 @@
+{
+  "persona": "backend",
+  "count": 1,
+  "notes": [
+    {
+      "id": "backend-backend-1",
+      "persona": "backend",
+      "targetLane": "backend",
+      "targetPath": "server/metrics.ts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "prom-client bağlı (4 kullanım) ama tüketici/dashboard yok — observability boşluğu",
+      "evidence": [
+        {
+          "path": "server/metrics.ts",
+          "lineHint": "-",
+          "fact": "prom-client producer=4, consumer=0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    }
+  ]
+}

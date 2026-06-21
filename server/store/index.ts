@@ -223,8 +223,15 @@ export async function resolveKey(plaintext: string): Promise<ResolvedKey | null>
 }
 
 export async function recordUsage(e: UsageEvent): Promise<void> {
-  await d().run("INSERT INTO usage_events (tenant_id, tool, tier, ok, latency_ms, tokens, cost, month, ts) VALUES (?,?,?,?,?,?,?,?,?)",
-    [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, e.latencyMs, e.tokens ?? 0, e.cost ?? 0, monthKey(), nowIso()]);
+  // Best-effort telemetry: every caller fires this without await, so a DB failure
+  // must NOT surface as an unhandled rejection or silently drop into the void —
+  // swallow + log so the request path is unaffected and the gap is visible.
+  try {
+    await d().run("INSERT INTO usage_events (tenant_id, tool, tier, ok, latency_ms, tokens, cost, month, ts) VALUES (?,?,?,?,?,?,?,?,?)",
+      [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, e.latencyMs, e.tokens ?? 0, e.cost ?? 0, monthKey(), nowIso()]);
+  } catch (err) {
+    console.warn("[store] recordUsage failed:", (err as Error)?.message);
+  }
 }
 export async function usageTimeseries(tenantId: string, month = monthKey()): Promise<{ day: string; calls: number; tokens: number }[]> {
   const rows = (await d().query("SELECT substr(ts,1,10) AS day, COUNT(*) AS calls, SUM(tokens) AS tokens FROM usage_events WHERE tenant_id = ? AND month = ? GROUP BY substr(ts,1,10) ORDER BY day", [tenantId, month])).rows;
@@ -253,7 +260,12 @@ export async function aggregateUsage(month = monthKey()): Promise<UsageAgg[]> {
 
 export interface AuditEvent { tenantId: string; tool: string; tier: ToolTier; ok: boolean; }
 export async function recordAudit(e: AuditEvent): Promise<void> {
-  await d().run("INSERT INTO audit_events (tenant_id, tool, tier, ok, ts) VALUES (?,?,?,?,?)", [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, nowIso()]);
+  // Best-effort, fire-and-forget by all callers — swallow + log (see recordUsage).
+  try {
+    await d().run("INSERT INTO audit_events (tenant_id, tool, tier, ok, ts) VALUES (?,?,?,?,?)", [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, nowIso()]);
+  } catch (err) {
+    console.warn("[store] recordAudit failed:", (err as Error)?.message);
+  }
 }
 export async function listAudit(tenantId?: string, limit = 100): Promise<any[]> {
   const lim = Math.min(Math.max(1, limit), 1000);
@@ -287,6 +299,50 @@ export async function stripeEventSeen(eventId: string): Promise<boolean> {
   return seen;
 }
 
+/** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].
+ *  When eventType is a non-empty string, only rows with that event_type are returned. */
+export async function listStageEvents(limit = 100, eventType?: string): Promise<any[]> {
+  const lim = Math.min(Math.max(1, limit), 1000);
+  if (eventType && eventType.length > 0) {
+    return (await d().query(
+      "SELECT id, event_type, ts, received_at FROM ukp_stage_events WHERE event_type = ? ORDER BY ts DESC LIMIT ?",
+      [eventType, lim]
+    )).rows;
+  }
+  return (await d().query(
+    "SELECT id, event_type, ts, received_at FROM ukp_stage_events ORDER BY ts DESC LIMIT ?",
+    [lim]
+  )).rows;
+}
+
+/** Delete UKP stage-events older than `days` days. Returns the number of rows removed.
+ *  days <= 0 is a no-op (returns 0) — default env is 0 = retention disabled. */
+export async function pruneStageEvents(days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const cutoff = Math.floor(Date.now() / 1000) - days * 86400;
+  const r = await d().run("DELETE FROM ukp_stage_events WHERE ts < ?", [cutoff]);
+  return r.changes;
+}
+
+/** Insert a UKP stage-event exactly once. Returns recorded:true on first write,
+ *  recorded:false on a duplicate id (replay / retry dedup).
+ *  After a successful insert, opportunistically prunes events older than
+ *  UKP_RETENTION_DAYS (0 = disabled, default). Never fails the ingest. */
+export async function recordStageEvent(e: { id: string; eventType: string; payload: string; ts: number }): Promise<{ recorded: boolean }> {
+  const r = await d().run(
+    "INSERT INTO ukp_stage_events (id, event_type, payload, ts, received_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+    [e.id, e.eventType, e.payload, e.ts, nowIso()]
+  );
+  // DbRun.changes: 1 on first insert, 0 when ON CONFLICT DO NOTHING fires.
+  const recorded = r.changes > 0;
+  if (recorded) {
+    // Best-effort retention prune — env-gated, never throws (zero cost when days=0).
+    const days = Number(process.env.UKP_RETENTION_DAYS || 0);
+    if (days > 0) { try { await pruneStageEvents(days); } catch {} }
+  }
+  return { recorded };
+}
+
 // --- Per-tenant upstream MCP servers (Faz 9E) ---
 export interface UpstreamServer { id: string; tenant_id: string; name: string; transport: "stdio" | "http"; url?: string | null; command?: string | null; args?: string[]; allowed_tools?: string[]; }
 export async function addUpstreamServer(tenantId: string, s: Omit<UpstreamServer, "id" | "tenant_id">): Promise<{ id: string }> {
@@ -304,6 +360,170 @@ export async function allUpstreamServers(): Promise<UpstreamServer[]> {
 }
 export async function deleteUpstreamServer(tenantId: string, id: string): Promise<boolean> {
   return (await d().run("DELETE FROM upstream_servers WHERE id = ? AND tenant_id = ?", [id, tenantId])).changes > 0;
+}
+
+// --- OAuth 2.1 Dynamic Client Registration (RFC 7591, Faz 15B) ---
+export interface DcrRequest {
+  redirect_uris?: string[];
+  grant_types?: string[];
+  token_endpoint_auth_method?: string;
+  client_name?: string;
+  /** Owning tenant, bound at registration when the caller is tenant-authenticated
+   *  (Faz 19B). authorize() requires this for auto-consent; anonymous DCR = null. */
+  tenant_id?: string | null;
+}
+export interface DcrResult {
+  client_id: string;
+  client_secret?: string;
+  client_secret_hash: string | null;
+  redirect_uris: string[];
+  grant_types: string[];
+  token_endpoint_auth_method: string;
+  registration_access_token: string;
+}
+/** Register a DCR client. Secrets are returned in plaintext ONCE and stored only
+ *  as SHA-256 hashes (same one-way handling as api_keys). */
+export async function registerClient(req: DcrRequest): Promise<DcrResult> {
+  const clientId = `oc_${crypto.randomBytes(8).toString("hex")}`;
+  const authMethod = req.token_endpoint_auth_method || "client_secret_basic";
+  const redirectUris = req.redirect_uris ?? [];
+  const grantTypes = req.grant_types ?? ["authorization_code", "refresh_token"];
+  // Public clients (token_endpoint_auth_method=none) get no secret (RFC 7591).
+  const secret = authMethod === "none" ? undefined : `ocs_${crypto.randomBytes(24).toString("hex")}`;
+  const regToken = `rat_${crypto.randomBytes(24).toString("hex")}`;
+  await d().run(
+    "INSERT INTO oauth_clients (client_id, client_secret_hash, redirect_uris, grant_types, token_endpoint_auth_method, client_name, registration_access_token_hash, tenant_id, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+    [clientId, secret ? sha256(secret) : null, JSON.stringify(redirectUris), JSON.stringify(grantTypes), authMethod, req.client_name ?? null, sha256(regToken), req.tenant_id ?? null, nowIso()]
+  );
+  return {
+    client_id: clientId, client_secret: secret, client_secret_hash: secret ? sha256(secret) : null,
+    redirect_uris: redirectUris, grant_types: grantTypes, token_endpoint_auth_method: authMethod,
+    registration_access_token: regToken,
+  };
+}
+/** Lookup a registered client (test/introspection + OAuth provider). Never returns secrets. */
+export async function getClient(clientId: string): Promise<{ client_id: string; redirect_uris: string[]; grant_types: string[]; token_endpoint_auth_method: string; tenant_id: string | null; created_at: string } | null> {
+  const r = (await d().query("SELECT * FROM oauth_clients WHERE client_id = ?", [clientId])).rows[0];
+  return r ? { client_id: r.client_id, redirect_uris: JSON.parse(r.redirect_uris || "[]"), grant_types: JSON.parse(r.grant_types || "[]"), token_endpoint_auth_method: r.token_endpoint_auth_method, tenant_id: r.tenant_id ?? null, created_at: r.created_at } : null;
+}
+
+// --- OAuth 2.1 Authorization Server: codes + opaque tokens (Faz 19, v1.10) ---
+export interface AuthCode {
+  code: string; client_id: string; tenant_id: string; code_challenge: string;
+  redirect_uri: string; scopes: string; resource: string | null; expires_at: string;
+}
+export async function saveAuthCode(c: AuthCode): Promise<void> {
+  await d().run(
+    "INSERT INTO oauth_codes (code, client_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scopes, resource, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    [c.code, c.client_id, c.tenant_id, c.code_challenge, "S256", c.redirect_uri, c.scopes, c.resource, c.expires_at, nowIso()]
+  );
+}
+export async function getAuthCode(code: string): Promise<AuthCode | null> {
+  const r = (await d().query("SELECT * FROM oauth_codes WHERE code = ?", [code])).rows[0];
+  if (!r) return null;
+  return { code: r.code, client_id: r.client_id, tenant_id: r.tenant_id, code_challenge: r.code_challenge, redirect_uri: r.redirect_uri, scopes: r.scopes || "", resource: r.resource ?? null, expires_at: r.expires_at };
+}
+/** Atomically take a code: returns it once (then deletes), null if missing/expired. */
+export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
+  const c = await getAuthCode(code);
+  await d().run("DELETE FROM oauth_codes WHERE code = ?", [code]); // one-time use
+  if (!c) return null;
+  if (c.expires_at <= nowIso()) return null;
+  return c;
+}
+/** Issue an opaque access token, stored only as a SHA-256 hash. Returns plaintext once. */
+export async function saveOAuthToken(t: { client_id: string; tenant_id: string; scopes: string; resource: string | null; ttlSecs: number }): Promise<string> {
+  const token = `ot_${crypto.randomBytes(32).toString("hex")}`;
+  const expiresAt = new Date(Date.now() + t.ttlSecs * 1000).toISOString();
+  await d().run(
+    "INSERT INTO oauth_tokens (token_hash, client_id, tenant_id, scopes, resource, expires_at, revoked, created_at) VALUES (?,?,?,?,?,?,0,?)",
+    [sha256(token), t.client_id, t.tenant_id, t.scopes, t.resource, expiresAt, nowIso()]
+  );
+  return token;
+}
+export interface ResolvedToken { clientId: string; tenantId: string; scopes: string[]; resource: string | null; expiresAt: number; }
+export async function resolveOAuthToken(plaintext: string): Promise<ResolvedToken | null> {
+  const r = (await d().query("SELECT * FROM oauth_tokens WHERE token_hash = ? AND revoked = 0", [sha256(plaintext)])).rows[0];
+  if (!r) return null;
+  if (r.expires_at <= nowIso()) return null;
+  return {
+    clientId: r.client_id, tenantId: r.tenant_id, resource: r.resource ?? null,
+    scopes: String(r.scopes || "").split(/\s+/).filter(Boolean),
+    expiresAt: Math.floor(new Date(r.expires_at).getTime() / 1000),
+  };
+}
+export async function revokeOAuthToken(plaintext: string): Promise<void> {
+  await d().run("UPDATE oauth_tokens SET revoked = 1 WHERE token_hash = ?", [sha256(plaintext)]);
+}
+
+// --- OAuth refresh tokens with RFC 9700 rotation (Faz 22, v1.13) ---
+/** Issue an opaque refresh token in a family (new family if none given). Returns
+ *  the plaintext once; stored only as a SHA-256 hash. */
+export async function saveRefreshToken(t: { family_id?: string; client_id: string; tenant_id: string; scopes: string; resource: string | null; ttlSecs: number }): Promise<{ token: string; family_id: string }> {
+  const token = `rt_${crypto.randomBytes(32).toString("hex")}`;
+  const family_id = t.family_id || crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + t.ttlSecs * 1000).toISOString();
+  await d().run(
+    "INSERT INTO oauth_refresh_tokens (refresh_token_hash, family_id, client_id, tenant_id, scopes, resource, expires_at, used, created_at) VALUES (?,?,?,?,?,?,?,0,?)",
+    [sha256(token), family_id, t.client_id, t.tenant_id, t.scopes, t.resource, expiresAt, nowIso()]
+  );
+  return { token, family_id };
+}
+
+export type RefreshRotation =
+  | { status: "ok"; family_id: string; client_id: string; tenant_id: string; scopes: string; resource: string | null }
+  | { status: "reuse" }
+  | { status: "invalid" };
+
+/** RFC 9700 rotation. used=0 → consume (mark used) and return the grant. used=1 →
+ *  REUSE (replay of an already-rotated token): revoke the WHOLE family and signal
+ *  compromise. Missing/expired → invalid. */
+export async function rotateRefreshToken(plaintext: string): Promise<RefreshRotation> {
+  const hash = sha256(plaintext);
+  const r = (await d().query("SELECT * FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [hash])).rows[0];
+  if (!r) return { status: "invalid" };
+  if (Number(r.used) === 1) {
+    await revokeRefreshFamily(r.family_id); // family compromised → kill the chain
+    return { status: "reuse" };
+  }
+  // Mark consumed regardless of expiry (a token is single-use either way).
+  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ?", [hash]);
+  if (r.expires_at <= nowIso()) return { status: "invalid" };
+  return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
+}
+
+/** Revoke every refresh token in a family (reuse detection / explicit revoke). */
+export async function revokeRefreshFamily(family_id: string): Promise<void> {
+  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE family_id = ?", [family_id]);
+}
+
+/** The family a refresh token belongs to (lets revokeToken kill the whole chain). */
+export async function refreshFamilyOf(plaintext: string): Promise<string | null> {
+  const r = (await d().query("SELECT family_id FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [sha256(plaintext)])).rows[0];
+  return r ? r.family_id : null;
+}
+
+/** Timing-safe verify of a confidential client's secret against its stored SHA-256
+ *  hash. Public clients (no stored hash) and unknown clients → false. */
+export async function verifyClientSecret(clientId: string, secret: string): Promise<boolean> {
+  const r = (await d().query("SELECT client_secret_hash FROM oauth_clients WHERE client_id = ?", [clientId])).rows[0];
+  if (!r || !r.client_secret_hash) return false;
+  const a = Buffer.from(sha256(secret), "hex");
+  const b = Buffer.from(String(r.client_secret_hash), "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** Delete EXPIRED OAuth rows (codes, access + refresh tokens). Run periodically so
+ *  a busy authorization server does not accumulate dead rows (Faz 26). Only rows
+ *  whose `expires_at` is in the past are removed — a used-but-unexpired refresh
+ *  token is kept so RFC 9700 reuse detection still works within its TTL. ISO
+ *  timestamps compare lexicographically on both dialects (same as resolve*). */
+export async function purgeExpiredOAuth(): Promise<{ codes: number; tokens: number; refresh: number }> {
+  const now = nowIso();
+  const codes = (await d().run("DELETE FROM oauth_codes WHERE expires_at < ?", [now])).changes;
+  const tokens = (await d().run("DELETE FROM oauth_tokens WHERE expires_at < ?", [now])).changes;
+  const refresh = (await d().run("DELETE FROM oauth_refresh_tokens WHERE expires_at < ?", [now])).changes;
+  return { codes, tokens, refresh };
 }
 
 // --- Tenant webhooks (Faz 11B) ---

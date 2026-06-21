@@ -1,10 +1,20 @@
 node_modules/
 build/
 dist/
+# Canonical binary-folder architecture: artifacts/bin (native binaries) and
+# artifacts/manifest.json are build-generated (make build-all). Not committed.
+artifacts/
 coverage/
 .DS_Store
 *.log
 .env*
 !.env.example
 .ephemeral-data/
+.colab-data/
 **/.master_key
+test-results/
+playwright-report/
+.playwright/
+
+# vF3 lighthouse-ci local reports
+.lighthouseci/

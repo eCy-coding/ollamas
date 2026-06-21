@@ -58,4 +58,62 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
     const t = ToolRegistry.list().find((x) => x.name === "mcp__ukp__hesapla");
     expect(t?.tier).toBe("host_upstream"); // untrusted upstream → gated, not in default expose
   }, 30000);
+
+  // v12.14 LIVE E2E: drive the NEW uk-pipeline capabilities (v12.8 smart, v12.9/10 planla, v12.13 structured)
+  // through the REAL ollamas consume chain (spawn + choke-point), not just hesapla.
+  const ctx = { isLive: true, workspaceRoot: ".", autoApply: true, deps: {} as any };
+
+  test.skipIf(!HAVE_UKP)("LIVE: all 7 local-safe ukp tools reachable (smart/planla wired)", async () => {
+    const { connectUpstream } = await import("../server/mcp/client");
+    const { ToolRegistry } = await import("../server/tool-registry");
+    const r = await connectUpstream({
+      name: "ukp", transport: "stdio", command: "python3", args: [UKP, "--mcp-server"],
+      allowedTools: ["hesapla", "sorgu", "kume", "seyir", "selftest", "smart", "planla"],
+    });
+    expect(r.ok).toBe(true);
+    expect(ToolRegistry.has("mcp__ukp__smart")).toBe(true);
+    expect(ToolRegistry.has("mcp__ukp__planla")).toBe(true);
+  }, 30000);
+
+  test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__smart returns a portable prompt through choke-point", async () => {
+    const { connectUpstream } = await import("../server/mcp/client");
+    const { ToolRegistry } = await import("../server/tool-registry");
+    await connectUpstream({
+      name: "ukp", transport: "stdio", command: "python3", args: [UKP, "--mcp-server"],
+      allowedTools: ["smart"],
+    });
+    const out = await ToolRegistry.execute("mcp__ukp__smart", { gorev: "ollamas e2e test ekle" }, ctx);
+    expect(out.ok).toBe(true);
+    expect(String(out.output)).toContain("<task>"); // craft_smart portable prompt reached ollamas live
+  }, 30000);
+
+  test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__planla returns honest gap-analysis JSON", async () => {
+    const { connectUpstream } = await import("../server/mcp/client");
+    const { ToolRegistry } = await import("../server/tool-registry");
+    await connectUpstream({
+      name: "ukp", transport: "stdio", command: "python3", args: [UKP, "--mcp-server"],
+      allowedTools: ["planla"],
+    });
+    const out = await ToolRegistry.execute("mcp__ukp__planla", {}, ctx);
+    expect(out.ok).toBe(true);
+    const d = JSON.parse(String(out.output)); // honest self-optimizing gap → next version + build prompt
+    expect(d).toHaveProperty("next");
+    expect(d).toHaveProperty("gaps");
+    expect(d).toHaveProperty("prompt");
+  }, 30000);
+
+  test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__seyir returns structured logbook (stats/errors/tokens)", async () => {
+    const { connectUpstream } = await import("../server/mcp/client");
+    const { ToolRegistry } = await import("../server/tool-registry");
+    await connectUpstream({
+      name: "ukp", transport: "stdio", command: "python3", args: [UKP, "--mcp-server"],
+      allowedTools: ["seyir"],
+    });
+    const out = await ToolRegistry.execute("mcp__ukp__seyir", {}, ctx);
+    expect(out.ok).toBe(true);
+    const d = JSON.parse(String(out.output)); // structured tool output (outputSchema-declared)
+    expect(d).toHaveProperty("stats");
+    expect(d).toHaveProperty("errors");
+    expect(d).toHaveProperty("tokens");
+  }, 30000);
 });

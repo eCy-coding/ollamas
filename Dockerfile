@@ -20,6 +20,9 @@ FROM node:24-slim AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
+# Canonical binary-folder discovery root (server/artifacts.ts). Degrades
+# gracefully when artifacts/ is absent (native binaries are host-compiled).
+ENV ARTIFACTS_DIR=/app/artifacts
 
 # System Chromium for puppeteer (skips bundled download which fails on slim image)
 RUN apt-get update && apt-get install -y --no-install-recommends \

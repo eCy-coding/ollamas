@@ -1,0 +1,188 @@
+{
+  "persona": "project-architect",
+  "count": 7,
+  "notes": [
+    {
+      "id": "project-architect-repo-1",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "package.json",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "package.json \"name\" alanı placeholder (\"react-example\") — release/yayım kimliğiyle uyumsuz",
+      "evidence": [
+        {
+          "path": "package.json",
+          "lineHint": "\"name\"",
+          "fact": "name=\"react-example\""
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-2",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "package.json",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "package.json version=\"0.0.0\" — release-please ile senkron değil",
+      "evidence": [
+        {
+          "path": "package.json",
+          "lineHint": "\"version\"",
+          "fact": "version=\"0.0.0\""
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-3",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/contracts",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/contracts orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/contracts",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-4",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/daemon",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/daemon orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/daemon",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-5",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/mesh",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/mesh orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/mesh",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-6",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/orchestrator",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/orchestrator orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/orchestrator",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "project-architect-repo-7",
+      "persona": "project-architect",
+      "targetLane": "repo",
+      "targetPath": "backend/sandbox",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "backend/sandbox orphan — kaynak ağacında import yok (unused-code §7)",
+      "evidence": [
+        {
+          "path": "backend/sandbox",
+          "lineHint": "-",
+          "fact": "inbound import ref = 0"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    }
+  ]
+}

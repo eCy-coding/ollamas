@@ -12,11 +12,15 @@ import {
   CallToolRequestSchema, ListToolsRequestSchema,
   ListResourcesRequestSchema, ReadResourceRequestSchema,
   ListPromptsRequestSchema, GetPromptRequestSchema, CompleteRequestSchema,
-  SetLevelRequestSchema,
+  SetLevelRequestSchema, ListRootsRequestSchema,
+  SubscribeRequestSchema, UnsubscribeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
+import { getFederatedRoots } from "./client";
+import { SubscriptionRegistry } from "./subscriptions";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
@@ -25,19 +29,38 @@ const PAGE = 50;
 const encodeCursor = (n: number) => Buffer.from(String(n)).toString("base64");
 const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toString(), 10) || 0 : 0);
 
+// Single source of truth for the gateway's MCP identity. server.json, the
+// /.well-known/mcp.json discovery doc, and the live Server handshake all read
+// these — keeping them here prevents version/capability drift (Faz 15A).
+export const MCP_SERVER_NAME = "ollamas-gateway";
+export const MCP_SERVER_VERSION = "1.6.0";
+export const MCP_PROTOCOL_VERSION = "2025-06-18";
+// Advertise only what we implement (Faz 14A): tools/resources/prompts/
+// completions + structured logging. listChanged is false (stateless transport).
+export const MCP_CAPABILITIES = {
+  tools: { listChanged: false }, resources: { subscribe: true }, prompts: {}, completions: {}, logging: {}, roots: {},
+} as const;
+
 // RFC 5424 severities, MCP logging order (low → high). A message is sent when its
 // severity is at or above the connection's current level.
 const LOG_LEVELS = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"] as const;
 type LogLevel = (typeof LOG_LEVELS)[number];
 const rank = (l: string) => { const i = LOG_LEVELS.indexOf(l as LogLevel); return i < 0 ? 1 : i; };
 
-function buildServer(ctx: ToolCtx): Server {
+export function buildServer(ctx: ToolCtx): Server {
   const server = new Server(
-    { name: "ollamas-gateway", version: "1.5.0" },
-    // Advertise only what we implement (Faz 14A): tools/resources/prompts/
-    // completions + structured logging. listChanged is false (stateless transport).
-    { capabilities: { tools: { listChanged: false }, resources: {}, prompts: {}, completions: {}, logging: {} } }
+    { name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION },
+    { capabilities: { ...MCP_CAPABILITIES } }
   );
+
+  // WHY here: stdio = persistent connection → sendResourceUpdated reaches the
+  // client. HTTP = stateless per-request → subscribe is accepted (spec compliant)
+  // but the channel closes with the response (best-effort); watchers disposed via
+  // onclose so no fd leak regardless of transport.
+  const subscriptions = new SubscriptionRegistry(ctx.workspaceRoot, (uri) => {
+    server.sendResourceUpdated({ uri }).catch(() => {});
+  });
+  server.onclose = () => subscriptions.dispose();
 
   const allowed: ToolTier[] | undefined = ctx.allowedTiers;
 
@@ -54,6 +77,16 @@ function buildServer(ctx: ToolCtx): Server {
     const lvl = String(req.params?.level || "");
     if (LOG_LEVELS.includes(lvl as LogLevel)) logLevel = lvl as LogLevel;
     return {};
+  });
+
+  // --- roots/list (v1.11 Phase A): workspace root + federated upstream roots ---
+  server.setRequestHandler(ListRootsRequestSchema, async () => {
+    const workspacePath = (await import("../db")).db.data.workspacePath;
+    const workspace = workspacePath
+      ? [{ uri: pathToFileURL(workspacePath).href, name: "workspace" }]
+      : [];
+    const federated = getFederatedRoots();
+    return { roots: [...workspace, ...federated] };
   });
 
   // --- tools/list (per-tenant visibility + cursor pagination) ---
@@ -84,7 +117,10 @@ function buildServer(ctx: ToolCtx): Server {
   });
 
   // --- tools/call (progress + structured-log notifications around the call) ---
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  // `extra.signal` (Faz 17D) is the SDK-provided per-request AbortSignal: the SDK
+  // wires the MCP `notifications/cancelled` for this request to abort it. Threaded
+  // into the choke-point so an in-flight tool returns promptly as cancelled.
+  server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const { name, arguments: args } = req.params;
     const progressToken = (req.params?._meta as any)?.progressToken;
     const onProgress = progressToken
@@ -92,11 +128,27 @@ function buildServer(ctx: ToolCtx): Server {
           server.notification({ method: "notifications/progress", params: { progressToken, progress, total, message } }).catch(() => {})
       : undefined;
     const def = ToolRegistry.info(name);
+    // Faz 18: server→client elicitation/sampling, wired ONLY when the connected
+    // client advertises the matching capability (bidirectional stdio). Undefined
+    // otherwise → tools fall back (e.g. write_file halt) — no HTTP regression.
+    const caps = server.getClientCapabilities();
+    const onElicit = caps?.elicitation
+      ? async (message: string, requestedSchema: any) => {
+          const e = await server.elicitInput({ message, requestedSchema });
+          return { action: e.action, content: e.content };
+        }
+      : undefined;
+    const onSample = caps?.sampling
+      ? async (p: { messages: any[]; systemPrompt?: string; maxTokens?: number }) => {
+          const m = await server.createMessage({ messages: p.messages, systemPrompt: p.systemPrompt, maxTokens: p.maxTokens ?? 1024 });
+          return { text: (m.content as any)?.type === "text" ? String((m.content as any).text) : "" };
+        }
+      : undefined;
     // Surface host/privileged invocations at a higher severity (Faz 14A). Awaited
     // so the message is flushed on the response stream before the result.
     await emitLog(def && def.tier !== "safe" ? "notice" : "info", { msg: `tool.call ${name}`, tier: def?.tier, tenant: ctx.tenantId });
     onProgress?.(0, 1, `starting ${name}`);
-    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress });
+    const r = await ToolRegistry.execute(name, args || {}, { ...ctx, progressToken, onProgress, abortSignal: extra?.signal, onElicit, onSample });
     onProgress?.(1, 1, `done ${name}`);
     await emitLog(r.ok ? "info" : "error", { msg: `tool.done ${name}`, ok: r.ok });
     const text = typeof r.output === "string" ? r.output : JSON.stringify(r.output);
@@ -131,6 +183,17 @@ function buildServer(ctx: ToolCtx): Server {
     try { text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel); }
     catch (e: any) { text = `Error reading resource: ${e?.message || e}`; }
     return { contents: [{ uri, mimeType: "text/plain", text }] };
+  });
+
+  server.setRequestHandler(SubscribeRequestSchema, async (req) => {
+    const uri = String(req.params.uri || "");
+    subscriptions.subscribe(uri);
+    return {};
+  });
+
+  server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
+    subscriptions.unsubscribe(String(req.params.uri || ""));
+    return {};
   });
 
   // --- prompts/list + prompts/get (3-stage pipeline as MCP prompts, Faz 11A) ---

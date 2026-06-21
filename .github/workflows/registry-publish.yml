@@ -1,0 +1,36 @@
+# Publish server.json to the official MCP registry (Faz 15A).
+#
+# READY but the actual push step is DISABLED on purpose: publishing is an
+# outward-facing action (registers ollamas publicly under the io.github.eCy-coding
+# namespace) and must be a deliberate, authorized step — not an automatic one.
+#
+# To go live:
+#   1. Edit server.json `remotes[].url` to the public MCP endpoint.
+#   2. Uncomment the "publish" step below (it needs registry auth / namespace
+#      ownership verification per https://modelcontextprotocol.info/tools/registry/publishing/).
+#   3. Run this workflow from the Actions tab (workflow_dispatch).
+name: registry-publish
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Validate the manifest on every run (safe, no outward effect).
+      - name: Validate server.json
+        run: |
+          node -e "const m=require('./server.json'); if(!m['\$schema']||!m.name||!m.version) { console.error('server.json missing required fields'); process.exit(1); } console.log('server.json OK:', m.name, m.version);"
+
+      # DISABLED — real public push. Enable deliberately (see header).
+      # - name: Publish to MCP registry
+      #   run: npx @modelcontextprotocol/publisher publish server.json
+      - name: Publish (disabled)
+        run: echo "Real registry push is intentionally disabled. See workflow header to enable."

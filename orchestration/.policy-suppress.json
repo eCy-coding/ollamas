@@ -1,0 +1,11 @@
+{
+  "_doc": "vO14 detector precision — dod/critic için gerekçeli-istisna. Her kural reason ZORUNLU. SİLENT-değil: raporda gösterilir. Yalnız IO-wrapper + false-positive duplication; gerçek yarım-iş ASLA suppress edilmez.",
+  "rules": [
+    { "detector": "critic", "kindPattern": "coverage-gap:lib/collect.ts", "reason": "liveTabMap = osascript IO-wrapper (subprocess), lane-konvansiyonu gereği unit-test-dışı; pure-fn'ler (roadmapStruct/errorStruct/summarizeAdoptions/buildSnapshot) collect.test'te kapsanır" },
+    { "detector": "critic", "kindPattern": "coverage-gap:lib/signal.ts", "reason": "notify = terminal-notifier IO-wrapper; signal.test 28-case zaten isAllowedCmd+mocked-nudge/notify kapsar" },
+    { "detector": "critic", "kindPattern": "duplication:autopilot.ts↔horizon.ts", "reason": "false-positive: autopilot adımları KOŞAR, horizon roadmap ÜRETİR — farklı girdi/çıktı/amaç (shared-import heuristic gürültüsü)" },
+    { "detector": "critic", "kindPattern": "duplication:conduct.ts↔serve.ts", "reason": "false-positive: conduct lane-durumu ANALİZ eder, serve HTTP/SSE ile GÖSTERİR — farklı katman (analyzer vs UI)" },
+    { "detector": "critic", "kindPattern": "duplication:doctor.ts↔model-hook.ts", "reason": "false-positive: doctor readiness DENETLER, model-hook Claude-prompt'u YAKALAR — farklı scope" },
+    { "detector": "critic", "kindPattern": "duplication:model-hook.ts↔role-hook.ts", "reason": "false-positive: model-hook model-sorusuna MODEL_PROMPT enjekte, role-hook kimlik-sorusuna role-cevap — farklı tetik/payload, ikisi de UserPromptSubmit ama amaç-ayrı" }
+  ]
+}

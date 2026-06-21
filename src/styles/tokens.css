@@ -1,0 +1,31 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+:root {
+  --ollamas-color-bg-base: #050608;
+  --ollamas-color-bg-sidebar: #08090d;
+  --ollamas-color-bg-panel: #0a0b10;
+  --ollamas-color-bg-inset: #04050a;
+  --ollamas-color-border-subtle: rgba(255, 255, 255, 0.05);
+  --ollamas-color-border-strong: rgba(255, 255, 255, 0.10);
+  --ollamas-color-text-bright: #f8fafc;
+  --ollamas-color-text-muted: #94a3b8;
+  --ollamas-color-text-dim: #97a4b8;
+  --ollamas-color-accent-indigo: #6366f1;
+  --ollamas-color-accent-emerald: #10b981;
+  --ollamas-color-status-accent: #818cf8;
+  --ollamas-color-status-ok: #34d399;
+  --ollamas-color-status-warn: #fbbf24;
+  --ollamas-color-status-err: #fb7185;
+  --ollamas-color-status-info: #22d3ee;
+  --ollamas-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ollamas-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ollamas-radius-sm: 3px;
+  --ollamas-radius-md: 8px;
+  --ollamas-radius-lg: 12px;
+  --ollamas-space-1: 4px;
+  --ollamas-space-2: 8px;
+  --ollamas-space-3: 12px;
+  --ollamas-space-4: 16px;
+}

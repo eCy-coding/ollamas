@@ -40,4 +40,50 @@ describe("consume-side security (Faz 6B)", () => {
     const second = await stdio("sec3");
     expect(second.manifestChanged).toBe(false);
   });
+
+  // --- v1.9: optional upstream security-scan gate (opt-in via MCP_SCAN_CMD) ---
+  const SCANNER = path.join(HERE, "fixtures", "mini-scanner.mjs");
+
+  test("MCP_SCAN_CMD flags a tool → it is skipped, never registered", async () => {
+    process.env.MCP_SCAN_CMD = `node ${SCANNER} ping`;
+    try {
+      const r = await stdio("scan1");
+      expect(r.scanned).toBe(true);
+      expect(r.flagged).toContain("ping");
+      expect(r.tools).toBe(0);
+      expect(r.skipped?.some((s) => s.includes("ping"))).toBe(true);
+      expect(ToolRegistry.has("mcp__scan1__ping")).toBe(false);
+    } finally { delete process.env.MCP_SCAN_CMD; }
+  }, 20000);
+
+  test("MCP_SCAN_DRY_RUN reports flags but still registers (advisory)", async () => {
+    process.env.MCP_SCAN_CMD = `node ${SCANNER} ping`;
+    process.env.MCP_SCAN_DRY_RUN = "1";
+    try {
+      const r = await stdio("scan2");
+      expect(r.flagged).toContain("ping");
+      expect(r.tools).toBe(1);
+      expect(ToolRegistry.has("mcp__scan2__ping")).toBe(true);
+    } finally { delete process.env.MCP_SCAN_CMD; delete process.env.MCP_SCAN_DRY_RUN; }
+  }, 20000);
+
+  test("a clean scan (no flags) registers normally", async () => {
+    process.env.MCP_SCAN_CMD = `node ${SCANNER} not_a_tool`;
+    try {
+      const r = await stdio("scan3");
+      expect(r.scanned).toBe(true);
+      expect(r.flagged).toBeUndefined();
+      expect(r.tools).toBe(1);
+      expect(ToolRegistry.has("mcp__scan3__ping")).toBe(true);
+    } finally { delete process.env.MCP_SCAN_CMD; }
+  }, 20000);
+
+  test("a broken scanner fails open (best-effort gate atop manifest/tier defenses)", async () => {
+    process.env.MCP_SCAN_CMD = `node -e "process.exit(2)"`; // scanner errors, emits no verdict
+    try {
+      const r = await stdio("scan4");
+      expect(r.tools).toBe(1); // fail-open: scanner error does not block (host_upstream tier still gates)
+      expect(ToolRegistry.has("mcp__scan4__ping")).toBe(true);
+    } finally { delete process.env.MCP_SCAN_CMD; }
+  }, 20000);
 });

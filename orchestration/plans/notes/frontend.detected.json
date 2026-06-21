@@ -1,0 +1,396 @@
+{
+  "persona": "frontend",
+  "count": 15,
+  "notes": [
+    {
+      "id": "frontend-frontend-1",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/App.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/App.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/App.tsx",
+          "lineHint": "41",
+          "fact": "const res = await fetch(\"/api/health\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-2",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/BackupControl.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/BackupControl.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/BackupControl.tsx",
+          "lineHint": "22",
+          "fact": "const res = await fetch(\"/api/backup/config\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-3",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ClusterManager.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/ClusterManager.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/ClusterManager.tsx",
+          "lineHint": "24",
+          "fact": "fetch('/api/cluster/capabilities')"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-4",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/CommandLineTerminal.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/CommandLineTerminal.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/CommandLineTerminal.tsx",
+          "lineHint": "27",
+          "fact": "const res = await fetch(\"/api/terminal\", {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-5",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/GoogleDriveBrowser.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/GoogleDriveBrowser.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/GoogleDriveBrowser.tsx",
+          "lineHint": "22",
+          "fact": "const res = await fetch(\"https://www.googleapis.com/drive/v3/files?pageSize=50&f"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-6",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/KeyVault.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/KeyVault.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/KeyVault.tsx",
+          "lineHint": "26",
+          "fact": "const res = await fetch(\"/api/keys/mask\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-7",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/MultiAgentPipeline.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/MultiAgentPipeline.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/MultiAgentPipeline.tsx",
+          "lineHint": "82",
+          "fact": "const res = await fetch(`/api/models/${prov}`);"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-8",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ReactAgentTab.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/ReactAgentTab.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/ReactAgentTab.tsx",
+          "lineHint": "55",
+          "fact": "const res = await fetch(\"/api/agent/sessions\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-9",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SaaSAdmin.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SaaSAdmin.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SaaSAdmin.tsx",
+          "lineHint": "37",
+          "fact": "const r = await fetch(p, { ...init, headers: { ...thdr(), ...(init?.headers || {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-10",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SecurityPolicies.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SecurityPolicies.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SecurityPolicies.tsx",
+          "lineHint": "24",
+          "fact": "const res = await fetch(\"/api/security/log\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-11",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/SelfTestGates.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/SelfTestGates.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/SelfTestGates.tsx",
+          "lineHint": "12",
+          "fact": "const res = await fetch(\"/api/selftest\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-12",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/VirtualController.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/VirtualController.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/VirtualController.tsx",
+          "lineHint": "10",
+          "fact": "const res = await fetch('/api/cluster/execute', {"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-13",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/WorkspaceTree.tsx",
+      "severity": "med",
+      "confidence": "detected",
+      "finding": "src/components/WorkspaceTree.tsx choke-point bypass — raw fetch/axios (apiClient dışı çağrı)",
+      "evidence": [
+        {
+          "path": "src/components/WorkspaceTree.tsx",
+          "lineHint": "24",
+          "fact": "const res = await fetch(\"/api/workspace/tree\");"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-14",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/MultiAgentPipeline.tsx",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "src/components/MultiAgentPipeline.tsx oversized component (533 satır > 400) — böl/refactor",
+      "evidence": [
+        {
+          "path": "src/components/MultiAgentPipeline.tsx",
+          "lineHint": "-",
+          "fact": "533 satır"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    },
+    {
+      "id": "frontend-frontend-15",
+      "persona": "frontend",
+      "targetLane": "frontend",
+      "targetPath": "src/components/ReactAgentTab.tsx",
+      "severity": "low",
+      "confidence": "detected",
+      "finding": "src/components/ReactAgentTab.tsx oversized component (764 satır > 400) — böl/refactor",
+      "evidence": [
+        {
+          "path": "src/components/ReactAgentTab.tsx",
+          "lineHint": "-",
+          "fact": "764 satır"
+        }
+      ],
+      "minRefs": 2,
+      "status": "open",
+      "debate": {
+        "challenges": [],
+        "support": [],
+        "verdict": ""
+      },
+      "source": "detected",
+      "targetHash": "e7b8b6b",
+      "ts": "2026-06-20T07:58:05.401Z"
+    }
+  ]
+}

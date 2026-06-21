@@ -1,0 +1,60 @@
+# Scripts lane GA gate (v10). Runs the scripts-domain quality gate on a real
+# macOS runner — the platform the host bridge + iOS bridge actually target — and
+# lints the workflows themselves. Separate from the shared ci.yml (Ubuntu, app
+# build) so the two lanes never collide. Triggered only when scripts surface changes.
+name: scripts-ci
+
+on:
+  push:
+    paths:
+      - "scripts/**"
+      - "bin/host-bridge/**"
+      - "bin/ios-bridge/**"
+      - "bin/scripts/**"
+      - "Makefile"
+      - "*.sh"
+      - ".github/workflows/scripts-ci.yml"
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "bin/host-bridge/**"
+      - "bin/ios-bridge/**"
+      - "bin/scripts/**"
+      - "Makefile"
+      - "*.sh"
+      - ".github/workflows/scripts-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install deps
+        run: npm ci
+      - name: Shell hardening tools
+        run: brew install shellcheck shfmt bats-core
+      # ONE command = the whole gate (tsc + vitest + make harden + drift-check + swift
+      # build/test). Same runner the autonomous trigger chain uses locally — zero
+      # manual step-stitching, one source of gate truth (bin/host-bridge/gate.mjs).
+      - name: Gate (make gate)
+        run: make gate
+        env:
+          # Real-bridge e2e (spawns terminal-bridge headless: /exec + v14 security +
+          # fail-closed). Un-skips bridge-e2e.test.ts inside the gate's vitest run.
+          BRIDGE_E2E: "1"
+
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color

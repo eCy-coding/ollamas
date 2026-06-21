@@ -22,12 +22,24 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      volumes:
+        # /tmp writable scratch for tsx/Node.js runtime (required with readOnlyRootFilesystem).
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["tsx", "server.ts", "--migrate-only"]
+          # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
+          # readOnlyRootFilesystem is safe for --migrate-only: all writes go to Postgres
+          # via DATABASE_URL; /tmp covers any Node/tsx temp files.
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           envFrom:
             - configMapRef: { name: {{ .Release.Name }}-config }
             - secretRef: { name: {{ .Release.Name }}-secrets }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
 {{- end }}

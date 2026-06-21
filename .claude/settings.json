@@ -1,0 +1,16 @@
+{
+  "$comment": "ollamas orchestration lane — proje-local. Yalnız bu worktree'den açılan sekmede yüklenir (tek-sekme kapsamı). UserPromptSubmit hook: kimlik/görev sorusu → role.ts canlı durumu enjekte (self-updating, asla bayat). role-hook.ts eşleşmeyen prompt'ta sessiz exit 0.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas-orchestration-wt/orchestration/bin/role-hook.ts"
+          }
+        ]
+      }
+    ]
+  }
+}

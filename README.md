@@ -111,6 +111,20 @@ MCP spec yüzeyini derinleştir + multi-replica sistemin gözlemlenebilirliği:
 - **Tool `outputSchema` + structured content:** `ToolDef` opsiyonel `outputSchema`; ListTools ilan eder; CallTool obje çıktıda `structuredContent` döner (text bloğu geriye-uyumlu korunur).
 - **Observability depth (`/metrics`):** yeni Prometheus serileri — `ollamas_db_pool_connections{state}` (pg), `ollamas_migration_version`, `ollamas_webhook_queue_depth`, `ollamas_shutdown_total`. prom-client async `collect` ile store'dan pull. Zero-dep.
 
+### v1.6 (Faz 15 — MCP Ecosystem Interop + Auth Completeness, zero-dep)
+ollamas'ı dış dünyaya keşfedilebilir + standart auth-onboarding yapar. Proven spec/registry kodundan adopte (sıfırdan icat yok):
+- **Registry manifest:** repo-kökü `server.json` (resmi `modelcontextprotocol/registry` formatı, schema `2025-12-11`, reverse-DNS `io.github.eCy-coding/ollamas`, `remotes[streamable-http]`). Yayına hazır; gerçek public push manuel/onaylı adım (workflow disabled).
+- **HTTP discovery:** `GET /.well-known/mcp.json` — client'lar bağlanmadan önce capabilities + transport + auth gereksinimi + primitive özetini okur. Tek `MCP_SERVER_VERSION`/`MCP_CAPABILITIES` const'tan beslenir (drift-guard; canlı `/mcp` handshake ile birebir).
+- **OAuth 2.1 Dynamic Client Registration (RFC 7591):** public `POST /register` → `client_id` (+ confidential client için `client_secret`, public `none` için secretsiz) + `registration_access_token`. Rate-limited; `DCR_INITIAL_ACCESS_TOKEN` set ise Bearer gate. `GET /.well-known/oauth-authorization-server` (RFC 8414) `registration_endpoint`'i ilan eder; RFC 9728 metadata `authorization_servers`'ı kendine işaret ettirir → DCR varsayılan keşfedilebilir.
+- **Sınır:** DCR yalnız **client-metadata kaydı**. Token issuance (authorization/token endpoint) = tam OAuth 2.1 AS, backlog'da; ollamas hâlâ opaque API key (+ opsiyonel dış-AS JWT) ile auth eder.
+
+**Resmi registry'ye yayınlama (hazır, gerçek push manuel):**
+```
+# 1) server.json'daki remotes[].url'i public adresinle değiştir (veya MCP_PUBLIC_URL set)
+# 2) GitHub namespace sahipliğini doğrula + publish:
+npx @modelcontextprotocol/publisher publish server.json   # dışa-dönük; onayla
+```
+
 ### Güvenlik notu (§5)
 `macos_terminal` / `write_host_file` = tam host yetkisi (privileged tier, sandbox yok).
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.

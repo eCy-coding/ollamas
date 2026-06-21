@@ -10,6 +10,11 @@
 // https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
 
 export const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
+// RFC 8414 Authorization Server Metadata + RFC 7591 Dynamic Client Registration
+// (Faz 15B). RFC 7591 clients discover the registration_endpoint by reading the
+// AS metadata document, so we advertise both here.
+export const AUTH_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server";
+export const REGISTRATION_PATH = "/register";
 
 /** Absolute URL of the resource-metadata document, for the WWW-Authenticate hint. */
 export function resourceMetadataUrl(baseUrl: string): string {
@@ -18,15 +23,38 @@ export function resourceMetadataUrl(baseUrl: string): string {
 
 /** RFC 9728 metadata body. `baseUrl` is this server's externally-reachable origin. */
 export function buildResourceMetadata(baseUrl: string): Record<string, unknown> {
-  const resource = `${baseUrl.replace(/\/$/, "")}/mcp`;
+  const base = baseUrl.replace(/\/$/, "");
   const authServers = (process.env.OAUTH_AUTH_SERVERS || "")
     .split(",").map((s) => s.trim()).filter(Boolean);
+  // Point clients at this server's own AS metadata when no external AS is set, so
+  // RFC 7591 Dynamic Client Registration is discoverable out of the box.
+  if (!authServers.length) authServers.push(base);
   const body: Record<string, unknown> = {
-    resource,
+    resource: `${base}/mcp`,
     bearer_methods_supported: ["header"],
-    // ollamas issues opaque API keys (see /api/saas/keys); no token endpoint.
+    authorization_servers: authServers,
+    // ollamas issues opaque API keys (see /api/saas/keys); no token endpoint yet.
     "x-ollamas-token-type": "opaque-api-key",
   };
-  if (authServers.length) body.authorization_servers = authServers;
   return body;
+}
+
+/** RFC 8414 Authorization Server Metadata (Faz 19, v1.10). ollamas now runs a full
+ *  OAuth 2.1 AS: the SDK mcpAuthRouter serves /authorize + /token + /revoke
+ *  (authorization_code + PKCE S256); the tenant-aware DCR /register stays ours. We
+ *  serve this document ourselves (registered before the router) so it keeps
+ *  advertising registration_endpoint, which the router's own metadata omits. */
+export function buildAuthServerMetadata(baseUrl: string): Record<string, unknown> {
+  const base = baseUrl.replace(/\/$/, "");
+  return {
+    issuer: base,
+    authorization_endpoint: `${base}/authorize`,
+    token_endpoint: `${base}/token`,
+    revocation_endpoint: `${base}/revoke`,
+    registration_endpoint: `${base}${REGISTRATION_PATH}`,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],
+  };
 }

@@ -1,0 +1,26 @@
+{
+  "$comment": "Single source of truth for host-bridge tool registration (scripts lane, GA v10). registerHostScripts() reads this and registers each tool into ToolRegistry under the `host_` namespace. tier mirrors server/tool-registry.ts; schema validation is generated from bin/host-bridge/schema.mjs (zod -> zod-to-json-schema). Drift guard ENFORCED (v10): bin/host-bridge/drift-check.mjs asserts inventory names == schema.mjs keys == register BUILDERS == bin/host-bridge/tools/*.mjs files, and every entry file exists; run in CI (scripts-ci.yml). version follows the lane roadmap (vN -> N.0.0); 10.0.0 = GA.",
+  "version": "18.0.0",
+  "namespace": "host_",
+  "tools": [
+    { "name": "run_tests",    "tier": "safe",       "entry": "run_tests.mjs",    "description": "Run the project test suite on the host and return pass/fail." },
+    { "name": "git_ops",      "tier": "safe",       "entry": "git_ops.mjs",      "description": "Run a read-only git subcommand (status/log/diff/branch) on the host repo." },
+    { "name": "process_port", "tier": "safe",       "entry": "process_port.mjs", "description": "Report which process holds a TCP port on the host." },
+    { "name": "health_probe", "tier": "safe",       "entry": "health_probe.mjs", "description": "Check host bridge + app readiness." },
+    { "name": "lint_format",  "tier": "safe",       "entry": "lint_format.mjs",  "description": "Run typecheck/lint on the host workspace." },
+    { "name": "git_commit",   "tier": "host",       "entry": "git_commit.mjs",   "description": "Create a conventional commit on the host repo (optionally push)." },
+    { "name": "build_app",    "tier": "host",       "entry": "build_app.mjs",    "description": "Build the application on the host." },
+    { "name": "kill_process", "tier": "host",       "entry": "kill_process.mjs", "description": "Terminate a host process by pid or name (optional signal)." },
+    { "name": "log_stream",   "tier": "safe",       "entry": "log_stream.mjs",   "description": "Tail the last N lines of the host bridge log." },
+    { "name": "pkg_install",  "tier": "host",       "entry": "pkg_install.mjs",  "description": "Install a package via a host package manager." },
+    { "name": "web_search",   "tier": "safe",       "entry": "web_search.mjs",   "description": "Search the web or fetch a URL from the host." },
+    { "name": "apply_patch",  "tier": "host",       "entry": "apply_patch.mjs",  "description": "Apply a unified diff to the host workspace." },
+    { "name": "tools_doctor", "tier": "safe",       "entry": "tools_doctor.mjs", "description": "Self-test the host tool suite." },
+    { "name": "shell_check",  "tier": "safe",       "entry": "shell_check.mjs",  "description": "Syntax-check a shell command on the host." },
+    { "name": "logbook",      "tier": "safe",       "entry": "logbook.mjs",      "description": "Append to or tail the shared seyir defteri (ship's log)." },
+    { "name": "self_heal",    "tier": "host",       "entry": "self_heal.mjs",    "description": "Detect bridge failure and repair it (stale pid, hung 7345 node, restart/kickstart). DRY by default; pass apply=true to execute." },
+    { "name": "seyir_stats",  "tier": "host",       "entry": "seyir_stats.mjs",  "description": "Observability dashboard over the seyir event stream: error-rate, p50/p95/p99 latency, per-tool breakdown, SLO burn-rate. Exits non-zero on SLO alert. Host-operator tool (reads host-local ~/.llm-mission-control), not tenant-exposed." },
+    { "name": "usage",        "tier": "host",       "entry": "usage.mjs",        "description": "Scripts-as-SaaS metering over the seyir event stream: per-tool call counts, tier-weighted billable units, estimated cost, period rollup, budget gate (exits non-zero over budget). Host-local cost telemetry (tenant billing is server-side), not tenant-exposed." },
+    { "name": "model_select", "tier": "host",       "entry": "model_select.mjs", "description": "Recommend the most efficient local model from the cached benchmark.json (correct-first, then tok/s or latency, optional min-tok/s). Read-only host-operator tool; advisory (does not change the product's model), not tenant-exposed." }
+  ]
+}

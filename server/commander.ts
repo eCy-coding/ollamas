@@ -1,9 +1,13 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import util from 'util';
 import path from 'path';
 import fs from 'fs';
 
-const execPromise = util.promisify(exec);
+// execFile (no shell) — args are passed as an argv array, so shell metacharacters
+// in user-supplied args (`;`, `|`, `$()`, backticks) can NOT inject. The allowlist
+// only gates the binary; the previous `exec(\`${cmd} ${args.join(' ')}\`)` let args
+// reach /bin/sh and was a command-injection sink.
+const execFileP = util.promisify(execFile);
 
 export class DesktopCommander {
     private static ALLOWED_COMMANDS = [
@@ -38,7 +42,7 @@ export class DesktopCommander {
         }
         
         try {
-            const { stdout } = await execPromise(`${finalCommand} ${finalArgs.join(' ')}`);
+            const { stdout } = await execFileP(finalCommand, finalArgs);
             return stdout;
         } catch (e: any) {
             throw new Error(`Execution failed: ${e.message}`);

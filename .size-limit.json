@@ -1,0 +1,22 @@
+[
+  {
+    "name": "cockpit JS (gzip)",
+    "path": ["dist/assets/app-*.js", "dist/assets/web-vitals-*.js", "dist/assets/modulepreload-polyfill-*.js"],
+    "limit": "140 kB"
+  },
+  {
+    "name": "cockpit CSS (gzip)",
+    "path": "dist/assets/app-*.css",
+    "limit": "12 kB"
+  },
+  {
+    "name": "vanilla landing JS (gzip)",
+    "path": "dist/assets/landing-*.js",
+    "limit": "5 kB"
+  },
+  {
+    "name": "embed widget (gzip)",
+    "path": "dist/embed.js",
+    "limit": "15 kB"
+  }
+]

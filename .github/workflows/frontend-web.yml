@@ -1,0 +1,31 @@
+name: Frontend Web Lane (vF7)
+
+# Frontend lane (vF7) — vanilla landing + embed widget. Separate from ci.yml
+# (backend) and e2e.yml (React lane). Builds dist and e2e-tests the static
+# alt-lane via vite preview (playwright.web.config.ts).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium chromium-headless-shell
+      - name: Web e2e (landing + embed widget)
+        run: npm run test:e2e:web
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-playwright-report
+          path: playwright-report/
+          retention-days: 14

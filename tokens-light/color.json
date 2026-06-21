@@ -1,0 +1,30 @@
+{
+  "color": {
+    "bg": {
+      "base":    { "value": "#ffffff" },
+      "sidebar": { "value": "#f8fafc" },
+      "panel":   { "value": "#f1f5f9" },
+      "inset":   { "value": "#e2e8f0" }
+    },
+    "border": {
+      "subtle": { "value": "rgba(15, 23, 42, 0.08)" },
+      "strong": { "value": "rgba(15, 23, 42, 0.14)" }
+    },
+    "text": {
+      "bright": { "value": "#0f172a" },
+      "muted":  { "value": "#475569" },
+      "dim":    { "value": "#586477" }
+    },
+    "accent": {
+      "indigo":  { "value": "#4f46e5" },
+      "emerald": { "value": "#059669" }
+    },
+    "status": {
+      "accent": { "value": "#4f46e5" },
+      "ok":     { "value": "#047857" },
+      "warn":   { "value": "#92400e" },
+      "err":    { "value": "#be123c" },
+      "info":   { "value": "#155e75" }
+    }
+  }
+}

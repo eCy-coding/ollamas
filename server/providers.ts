@@ -23,6 +23,11 @@ export interface ToolCall {
   arguments: any;
 }
 
+// Tolerant JSON parse for model-emitted tool-call arguments: a truncated/malformed
+// arguments string must NOT throw — that would crash the whole tool_calls .map() and
+// silently drop the request to provider-fallback (→ demo). Returns {} on failure.
+function safeJsonObj(s: string): any { try { return JSON.parse(s); } catch { return {}; } }
+
 // Some local models (e.g. qwen3) emit tool calls as TEXT instead of the
 // structured tool_calls field — `<function=NAME>{json}</function>`,
 // `<tool_call>{"name":..,"arguments":..}</tool_call>`, or a fenced/bare JSON
@@ -71,6 +76,13 @@ interface LatencyEntry {
 }
 const latencyCache: Record<string, LatencyEntry> = {};
 
+// Compose caller-supplied cancellation with the 300s provider timeout.
+// When no caller signal is given the plain timeout is preserved unchanged.
+function buildSignal(callerSignal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(300000);
+  return callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
+}
+
 export class ProviderRouter {
   /**
    * Main route function with fallback and latency awareness
@@ -78,7 +90,8 @@ export class ProviderRouter {
   public static async generate(
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void,
-    onFallback?: (from: string, to: string, error: string) => void
+    onFallback?: (from: string, to: string, error: string) => void,
+    signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
     const providersToTry = this.getFallbackChain(config.provider);
@@ -92,7 +105,7 @@ export class ProviderRouter {
           continue;
         }
 
-        const result = await this.executeProvider(resolvedConfig, onStreamChunk);
+        const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
         
         // Track successfully executed provider's latency
         const elapsed = Date.now() - start;
@@ -182,10 +195,14 @@ export class ProviderRouter {
    */
   private static async executeProvider(
     config: GenerateConfig,
-    onStreamChunk?: (text: string) => void
+    onStreamChunk?: (text: string) => void,
+    signal?: AbortSignal
   ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; toolCalls?: ToolCall[] }> {
-    const systemMessage = config.messages.find((m) => m.role === "system")?.content || "";
-    const nonSystemMessages = config.messages.filter((m) => m.role !== "system");
+    // Defensive: a malformed call (no messages) must not crash the router with a
+    // TypeError — fall through to an empty conversation (provider/demo handles it).
+    const msgs = config.messages || [];
+    const systemMessage = msgs.find((m) => m.role === "system")?.content || "";
+    const nonSystemMessages = msgs.filter((m) => m.role !== "system");
 
     switch (config.provider) {
       case "ollama-local": {
@@ -214,7 +231,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
-          signal: AbortSignal.timeout(300000), // Massive timeout for slow-loading local models (L12)
+          signal: buildSignal(signal), // Compose caller cancellation with 300s timeout (L12)
         });
 
         if (!response.ok) {
@@ -273,7 +290,7 @@ export class ProviderRouter {
             toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
               id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
               name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+              arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
             }));
           }
           // Fallback: some models emit tool calls as text — recover them.
@@ -306,7 +323,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
-          signal: AbortSignal.timeout(300000),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -356,7 +373,7 @@ export class ProviderRouter {
             toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
               id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
               name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+              arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
             }));
           }
 
@@ -470,6 +487,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -510,7 +528,7 @@ export class ProviderRouter {
           const toolCalls = tcs?.map((tc: any) => ({
             id: tc.id,
             name: tc.function?.name,
-            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
           }));
 
           return {
@@ -546,6 +564,7 @@ export class ProviderRouter {
             stream: !!onStreamChunk,
             tools: config.tools,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {
@@ -586,7 +605,7 @@ export class ProviderRouter {
           const toolCalls = tcs?.map((tc: any) => ({
             id: tc.id,
             name: tc.function?.name,
-            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
           }));
 
           return {
@@ -623,6 +642,7 @@ export class ProviderRouter {
               input_schema: t.function.parameters
             })) : undefined,
           }),
+          signal: buildSignal(signal),
         });
 
         if (!response.ok) {

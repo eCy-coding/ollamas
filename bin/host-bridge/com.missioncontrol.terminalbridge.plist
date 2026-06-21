@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Optional launchd agent for uninterrupted bridge runtime.
-  Install:
-    cp bin/host-bridge/com.missioncontrol.terminalbridge.plist ~/Library/LaunchAgents/
-    launchctl load ~/Library/LaunchAgents/com.missioncontrol.terminalbridge.plist
-  Edit the node path / token below to match your machine before loading.
+  launchd agent TEMPLATE for uninterrupted bridge runtime (survives reboot).
+  Do NOT load directly: install-agent.sh (v16) renders the templated values
+  (repo path, bridge.token, node path via `command -v node`), writes 0600 to
+  ~/Library/LaunchAgents/, and runs launchctl bootstrap gui/$UID + kickstart.
+  Auto-invoked by install.sh; removed by uninstall.sh. Manual: make install-agent
+  (DRY_RUN=1 make install-agent to rehearse).
 -->
 <plist version="1.0">
 <dict>
@@ -25,8 +26,15 @@
   </dict>
   <key>RunAtLoad</key>
   <true/>
+  <!-- Self-healing: restart only on crash (non-zero exit), throttle restart
+       storms to >=10s apart. Pattern: tjluoma/launchd-keepalive (public domain). -->
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
   <key>StandardOutPath</key>
   <string>/tmp/llm-bridge/launchd.out.log</string>
   <key>StandardErrorPath</key>

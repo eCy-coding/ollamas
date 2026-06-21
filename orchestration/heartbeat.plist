@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ollamas orchestration heartbeat — macOS LaunchAgent (DOC ARTEFAKT).
+  YÜKLENMEZ varsayılan: launchctl load = system değişiklik = T0 (Emre) kararı.
+  StartInterval 600s (10dk): conduct + collision-safe karar + delta-notify, otonom.
+  Privacy: notify localhost/terminal-notifier — PPID=1 outbound-LAN bloğundan kaçınır (RISK-SCR-006).
+  Yükleme reçetesi: HEARTBEAT.md.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ollamas.orchestration.heartbeat</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/bin/heartbeat.ts</string>
+    <string>--once</string>
+    <string>--quiet</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt</string>
+  <key>StartInterval</key>
+  <integer>600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/heartbeat.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/heartbeat.err.log</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

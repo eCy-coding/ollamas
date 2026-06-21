@@ -1,0 +1,66 @@
+# DRAFT — builds per-arch ollamas CLI binaries + a latest.json manifest and
+# attaches them to the GitHub release on a vX.Y.Z tag. Wired, not auto-run: it
+# fires only when the maintainer pushes a tag (outward-facing, account-scoped).
+# Consumers then `ollamas update --manifest <release latest.json url>`.
+#
+# This draft builds via Bun (build:binary). The Node-SEA path (v12, `build:sea`) is
+# the canonical alternative — swap the `setup-bun` step for `actions/setup-node`
+# (>= 20) + `npm i -D postject` and run `npm run build:sea`; both emit the same
+# `dist/ollamas-<target>` name, so the checksum/upload steps are unchanged.
+name: release-binary
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # gh release upload
+
+jobs:
+  binary:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: ubuntu-latest
+            target: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13" # >= the 1.3.13 arm64 'Killed:9' fix
+      - run: npm run build:binary
+      - name: checksum
+        run: shasum -a 256 "dist/ollamas-${{ matrix.target }}" | awk '{print $1}' > "dist/ollamas-${{ matrix.target }}.sha256"
+      - name: upload binary + checksum
+        # ref_name + target go through env vars (not ${{ }} interpolation in the
+        # shell) so a crafted tag name can't inject shell commands here.
+        run: gh release upload "$REF" "dist/ollamas-$TARGET" "dist/ollamas-$TARGET.sha256" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+
+  manifest:
+    needs: binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build latest.json from uploaded checksums
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          ASSETS=""
+          for t in darwin-arm64 linux-x64; do
+            SHA="$(gh release download "${GITHUB_REF_NAME}" -p "ollamas-${t}.sha256" -O - 2>/dev/null || echo "")"
+            [ -n "$SHA" ] && ASSETS="${ASSETS}{\"target\":\"${t}\",\"url\":\"${BASE}/ollamas-${t}\",\"sha256\":\"${SHA}\"},"
+          done
+          printf '{"version":"%s","assets":[%s]}\n' "$VER" "${ASSETS%,}" > latest.json
+          cat latest.json
+          gh release upload "${GITHUB_REF_NAME}" latest.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

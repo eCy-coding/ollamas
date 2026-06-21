@@ -1,0 +1,198 @@
+{
+  "_schema": {
+    "description": "Orkestrasyon lane kalıcı hata DB. ORCHESTRATION_AGENTS.md §8: bir koordinasyon hatasını asla tekrarlama; tekrar = recurrence_count++ + prevention_rule güçlendir.",
+    "fields": {
+      "id": "ERR-ORCH-NNN",
+      "ts": "ISO 8601",
+      "version": "vON (ROADMAP_ORCHESTRATION)",
+      "file": "etkilenen dosya / bağlam",
+      "category": "coordination | drift | scope | token | adoption",
+      "severity": "CRITICAL | high | med",
+      "root_cause": "semptom değil kök neden",
+      "evidence": "komut + çıktı",
+      "fix": "uygulanan düzeltme",
+      "prevention_rule": "gelecekte aynı sınıfı engelleyen tek cümle",
+      "test_added": "regresyon testi / guard yolu",
+      "recurrence_count": 0
+    }
+  },
+  "known_risks_preloaded": [
+    {
+      "id": "RISK-ORCH-001",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "note": "Branch-hijack (ERR-SCR-001 mirası): paylaşılan ~/Desktop/ollamas ağacında eşzamanlı sekme git checkout yapınca branch altından kayar; yeşil iş yanlış branch'e düşer. Prevention: orkestrasyon yalnız ~/Desktop/ollamas-orchestration-wt izole worktree'de çalışır; oturum başı branch == feat/orchestration-* doğrula.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-002",
+      "category": "drift",
+      "severity": "high",
+      "note": "Stale memory/roadmap drift: memory'de yazan branch/versiyon gerçekle uyuşmayabilir (UK-07: branch adı ≠ roadmap versiyon). Prevention: status.ts ile canlı git'ten doğrula; karar öncesi memory'ye değil git'e güven.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-003",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "note": "Scope-creep: orkestrasyon sekmesinin lane feature kodunu (src/server/cli/scripts) düzenlemesi §3 ihlali. Prevention: lane'de kod gerekiyorsa backlog+prompt üret, asla kendin edit etme; her artefakt orchestration/ altında.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-004",
+      "category": "token",
+      "severity": "med",
+      "note": "Token israfı: tüm lane dosyalarını main thread'de re-read etmek bağlamı şişirir. Prevention: status.ts matrisini ve summary-only sub-agent okumalarını tercih et; context >%80 /compact.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-005",
+      "category": "adoption",
+      "severity": "high",
+      "note": "Lisans ihlali: GPL kod (iTerm2) kopyalamak. Prevention: MIT/Apache/BSD/ISC=kod+attribution; GPL=yalnız fikir/ref; lisanssız=fikir-only. Adoption matrisinde her satır lisans-flag taşır.",
+      "applies_version": "all"
+    },
+    {
+      "id": "RISK-ORCH-006",
+      "category": "coordination",
+      "severity": "med",
+      "note": "Lane port-probe yanlış pozitif: bir lane'in dev-server'ı başka lane'in portunu kullanabilir → yanlış 'çalışıyor' raporu. Prevention: port-probe'u branch/worktree ile eşle, yalnız sinyal say; gerçek durum için git+seyir birincil.",
+      "applies_version": "vO2"
+    },
+    {
+      "id": "RISK-ORCH-007",
+      "category": "scope",
+      "severity": "high",
+      "note": "Koordinasyon-sinyali kötüye kullanımı: §3.1 nudge ile lane sekmesine mutasyon/build/kod-üreten komut göndermek conductor'ı feature-yazıcıya dönüştürür (§3 ihlali). Prevention: signal.ts ALLOWLIST yalnız read-only teşhis (git status|log|branch|diff, echo, pwd) + injection guard (; && | ` $() >) + dry-run default; gerçek gönderim açık --nudge flag + seyir audit.",
+      "applies_version": "vO2"
+    },
+    {
+      "id": "RISK-ORCH-010",
+      "category": "adoption",
+      "severity": "med",
+      "note": "Lisans-gate false-allow: ADOPTIONS hücresi yanlış/belirsiz lisans etiketiyle (örn 'GPL→native API') gate'i kandırabilir veya gate dual-lisansı yanlış sınıflayabilir → copyleft kod yanlışlıkla 'code-ok' geçer. Prevention: adopt.ts classifyCell GPL içeren hücreyi STRICTEST copyleft sayar; lisans hücresi NE adopt edildiğini yansıtmalı (native scripting API → 'native', kaynak kopyası değil); --sbom ile GERÇEK runtime dep lisansı syft'ten çapraz-doğrula. NOT: RISK-ORCH-008/009 SEYIR'de cockpit (sync-freeze/test-convention) için kullanıldı; registry'de 008/009 backfill worker'a ait.",
+      "applies_version": "vO4"
+    },
+    {
+      "id": "RISK-ORCH-011",
+      "category": "drift",
+      "severity": "med",
+      "note": "Version-drift false-negative/positive: drift.ts range karşılaştırması SALT-STRING ('^18.0.0' ≠ '^18.2.0' farklı sayılır, '~5.4' vs '5.4.0' farklı). Semver-aware DEĞİL → kasıtlı (pin tutarlılığı tam-eşitlik politikası, syncpack varsayılanı) ama bir lane '^18' diğeri '^18.0.0' yazarsa yanlış-pozitif drift raporlar. Prevention: drift yalnız SİNYAL (soft-warn, exit 0); gerçek uyumsuzluk için lane sekmesi `npm ls`/semver-satisfies ile doğrular; orchestration fixlemez, backlog verir (§3). Ayrıca git-worktree'ler aynı repo'nun ise root package.json paylaşır → drift=0 beklenir (ayrı paket dizinleri olmadıkça).",
+      "applies_version": "vO5"
+    },
+    {
+      "id": "RISK-ORCH-012",
+      "category": "multi-worker-collision",
+      "severity": "med",
+      "note": "Tek 'self-answer' isteğine 3 paralel sekme aynı anda 3 ayrı impl yazdı (whoami/rolecard collect-tabanlı + identity/laneinfo duplikat + role/role-hook hook-tabanlı), hepsi untracked, suite RED (identity.test 1 fail). Çözüm T0-onaylı SENTEZ: oto-tetik hook (role-hook.ts) KORU + tek jeneratörü canonical collect.ts'e bağla (per-lane shipped→next fold) + plan-next doğru versiyon parser; duplikat sil (identity/laneinfo/whoami/rolecard+testleri). Prevention: aynı isteğe çok untracked impl → TEK sentezde birleştir (clobber etme, fikri fold et), kararı T0'a sun (deliverable şekli = kullanıcı kararı), commit-öncesi suite YEŞİL (kırık worker-test karantina/sil). LİMİT: per-lane tablo roadmapStruct (collect) gürültülü/truncated string verir (cockpit ile aynı) — bug değil, dürüst-canlı sinyal; lane ROADMAP body güncellenince düzelir; orchestration KENDİ current/next'i plan-next ile DOĞRU.",
+      "applies_version": "vO-ID"
+    },
+    {
+      "id": "RISK-ORCH-013",
+      "category": "multi-worker-collision",
+      "severity": "med",
+      "note": "vO6 '0-manuel optimal seçim'e 4 paralel sekme yazdı: bench.ts(istatistik) + optimize.ts(selectBest+buildWorkingPrompt→OPTIMAL_PROMPT.md) + benchprompt.ts(Tier-A routing→MODEL_PROMPT.md) + conduct.ts(vO8 zero-touch). İKİ portable-prompt artefaktı + cross-dep (conduct→optimize.buildWorkingPrompt+OPTIMAL.json). T0-onaylı FÜZYON: benchprompt.buildModelSelectionPrompt'a localSelection eklendi → optimize.selectBest(donanım-duyarlı)+optimalConfig(RAM-tier) Tier-A routing'le tek MODEL_PROMPT.md'de birleşti; bin/optimize.ts CLI + OPTIMAL_PROMPT.md + OPTIMAL.json silindi; machine-çıktı MODEL_SELECTION.json'a taşındı. optimize.ts LIB KORUNDU (conduct hâlâ buildWorkingPrompt kullanıyor — unused değil). conduct.ts ref-onarımı (OPTIMAL.json→MODEL_SELECTION.json, optimize.ts→benchprompt.ts) — silmemin yarattığı dangling-ref'i tamir, conduct vO8 commit-DIŞI. Prevention: silmeden önce cross-dep tara (grep import+JSON-read); başka feature'ın kullandığı export'u 'unused' sanıp silme; sildiğin dosyaya işaret eden sibling-ref'leri tamir et; deliverable-fork T0'a sun. LİMİT: bench verisi STALE (benchmark.json 6 gün) → isStale uyarır, --refresh opt-in (ağır bench bench-lane işi, conductor read-only §3); 0-manuel-SEÇİM tam (selectBest insan-girdisiz) ama sürekli-tazelik bench-lane/cron sorumluluğu. Versiyon-etiket drift: workers vO6/vO6.1/vO7/vO8 paralel etiketledi (optimize.ts header 'vO7' ≠ ROADMAP) — UK-07 ailesi, branch≡roadmap hedefi vO8 drift-guard'a kaldı.",
+      "applies_version": "vO6"
+    },
+    {
+      "id": "RISK-ORCH-014",
+      "category": "quality-gate",
+      "severity": "med",
+      "note": "vO9 quality-gate roll-up: tüm-lane sağlık matrisi 0-manuel. (a) tsc --noEmit CANLI koşulur — GÜVENLİ (stateless, dosya-yazmaz, DB-yok, lane-eşzamanlı-çakışmaz, ~2s); vitest CANLI KOŞULMAZ (pahalı+DB+UK-08 flaky) → yalnız `.last-run.json` cache TÜKET (status passed/failed, ts=dosya-mtime, isStale 2gün). Lane tsconfig/tsc-bin yoksa → skip (RED-değil, dürüst). (b) **BUG yakalandı (no-half kanıtı):** vO6 conduct ref-onarımı YARIM kalmıştı — `optimal.config.num_ctx` summary-satırı MODEL_SELECTION.json nested-shape'e güncellenmemişti (else-if düzeltilmiş ama bu satır kaçmış) → conduct.ts:109 CANLI TypeError crash. conduct.test mock-data ile geçtiği için yakalamadı; CANLI koşu (Phase-4/6 verify) yakaladı → optimal?.selection.config?.num_ctx guard. Prevention: ref-shape değiştiren refactor'da TÜM kullanımları grep'le (tek değil); CANLI koş (test-mock yetmez, gerçek-JSON-shape'le doğrula); 'yarım ref-onarımı' = bitmemiş iş, sonraki adıma geçme. (c) CONDUCT WIRING: QUALITY.json.redLanes → conduct ClassifyInput.redLanes (orphan-değil, uçtan-uca tüketildi: eylem=RED:backend). (d) ROADMAP vO9 'DONE' commit-ÖNCESİ işaretliydi (worker prematüre) → gerçek-impl commit'le DONE'ı doğru-yap (RISK-013 versiyon-drift ailesi).",
+      "applies_version": "vO9"
+    },
+    {
+      "id": "RISK-ORCH-015",
+      "category": "orphan-wiring",
+      "severity": "med",
+      "note": "vO10-12 öz-denetim konsolidasyonu: 5 untracked worker tool'u (heartbeat/critic/dod/autofix complete-green + horizon half). KRİTİK TESPİT (kullanıcı 'gereksiz-iş + yarım-yok'): (a) ORPHAN-tool — critic/dod CRITIC.json/DOD.json üretir AMA conduct ClassifyInput'ta completeness alanı YOK + autopilot chain critic/dod çağırmaz → JSON-üretir-kimse-tüketmez = yarım. FIX: TIERS+COMPLETENESS (RED-sonrası/STALE-öncesi); conduct CRITIC/DOD findings'i (zaten Finding-şekilli) merge eder → 31 COMPLETENESS finding; autopilot benchprompt→critic→dod→conduct→status→doctor. Prevention: JSON-üreten-tool TÜKETİLMELİ (üret-et+tüket-et eş-zamanlı, yoksa orphan=yarım); 'tool yazdım test geçti' yetmez, loop'a bağla. (b) horizon HALF (lib-green ama bin-orphan, ROADMAP_HORIZON merge yok) → DEFER (yarım-commit-etme, vO13 planned dürüst). (c) ROADMAP vO10/11 commit-ÖNCESİ 'DONE' worker-prematüre (RISK-013 ailesi) → gerçek-impl commit'le truthful-yap. (d) dod=Emre'nin 'yarım-yok' kuralının loop-otomatik enforcer'ı: 19 yarım-iş conduct tek-eyleme girer (RED-altı önceliklenir). Aktivasyon (hook+launchd) PRIVILEGED → ajan settings.json/launchctl yazamaz (guardrail), tek manuel-artık.",
+      "applies_version": "vO10-12"
+    },
+    {
+      "id": "RISK-ORCH-016",
+      "category": "detector-precision",
+      "severity": "med",
+      "note": "vO14: self-policing loop KENDİ bulgularını verdi (dod 12 + critic 7). KRİTİK AYRIM (kullanıcı 'gereksiz-iş + yarım-yok'): bulgular GERÇEK-vs-GÜRÜLTÜ. (a) GERÇEK yarım-iş (fix): shared.ts 4-export test-siz → tests/shared.test.ts. (b) GÜRÜLTÜ (fix-ETME, gereksiz-iş): liveTabMap/notify=IO-wrapper (osascript/subprocess, lane-konvansiyonu skip); 4 duplication=FALSE-POS (autopilot↔horizon/conduct↔serve/doctor↔model-hook/model-hook↔role-hook farklı-amaç, shared-import heuristic gürültüsü). KÖK-FIX: dod/critic'te SUPPRESS mekanizması yoktu → gürültü-flag autonomous-verdict-bozar (0-manuel conduct kararı güvenilmez). bin/lib/suppress.ts + .policy-suppress.json (gerekçeli-istisna, her kural reason-ZORUNLU) → applySuppress(detector-scoped, kind-substring) → dod/critic GÜRÜLTÜ-ele → critic 60→98 verdict precise. **SİLENT-DEĞİL** (suppressedBlock: sayı+reason raporda; gizleme değil gerekçeli-istisna, no-silent-cap ilkesi). Prevention: detector gürültü-flag'lerse verdict-değersizleşir → suppress AMA şeffaf-gerekçeli (IO-wrapper/false-pos≠yarım-iş; gerçek-gap ASLA suppress); suppress-propagasyon: dod/critic temiz→fuse/conduct OTOMATİK temiz (eş-zamanlı). (c) fuse=tüm-gate→REQUIREMENTS birleşik kritik-liste, autopilot-wire (orphan→non-orphan). LİMİT: suppress-stale (kabul-edilen-istisna sonradan-gerçek-gap-olursa) → suppress-expiry/audit vO-ileri.",
+      "applies_version": "vO14"
+    },
+    {
+      "id": "RISK-ORCH-017",
+      "category": "live-operation",
+      "severity": "med",
+      "note": "vO15 'ollamas'ı çalıştır + gerçek-zamanlı kullan': otonom pipeline ollamas :3000 UP + ollama 17-model ile CANLI koşuldu (autopilot full-chain). Pipeline TEMİZ (conduct ✗=gate-exit RED-bulgu, doctor ✗=privileged-aktivasyon — ikisi BEKLENEN, crash-değil). Priority-engine 0-manuel TEK-EYLEM seçti: SECURITY #1 f/prompts.chat lisans-ihlali. KÖK: ADOPTIONS hücre license='permissive' (literal KELIME, geçerli SPDX-id DEĞİL) → classifyLicense=unknown-kategori + karar=ADOPT → unknown+ADOPT=İHLAL (idea-only/ref-only/future-ref izinli). MATRIX-TRUTH fix (RISK-ORCH-005 ailesi, gate-suppress-DEĞİL): license→'CC0-1.0' (f/prompts.chat gerçek-lisans, Awesome-ChatGPT-Prompts public-domain) + karar→'idea-only' (Ne-kolonu='kod-değil-yapı'→idea adopt). RE-RUN: SECURITY=0 (convergence kanıt = test/use real-time; loop kendi-verdict'ini kapattı). Prevention: ADOPTIONS license hücresine GEÇERLI-SPDX-id yaz ('permissive'/'açık'/'free' gibi literal-kategori-kelimesi DEĞİL — classifyLicense SPDX-map'ten okur, kategori-kelimesi unknown'a düşer→ADOPT-ile-ihlal); pipeline live-verdict'i GERÇEK-eyleme dönüştür (priority-engine seçti→üzerine-git); convergence re-run-ile-doğrula (fix→re-run→finding-0). LİMİT: RED:backend=LANE testi (orchestration §3 read-only→backlog, lane-sekmesi fixler); uncommitted-green=pipeline-regenerate-output (kovalanmaz); aktivasyon hook+launchd PRIVILEGED=ajan-yazamaz tek-kullanıcı-residue.",
+      "applies_version": "vO15"
+    }
+  ],
+  "errors": [
+    {
+      "id": "ERR-ORCH-001",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/status.ts (vO1 portFor/probe)",
+      "category": "coordination",
+      "severity": "high",
+      "root_cause": "vO1 dev-server tespiti portFor() heuristic'i ile branch adından port tahmin ediyordu. Keşif kanıtladı: 6 worktree de aynı porta (3000, server.ts process.env.PORT||3000) bind. Port ile lane ayırt edilemez; :3000 probe'u her backend-vari lane'i '↑' raporladı + Docker'ın 3000'i lane sanıldı (RISK-ORCH-006 gerçekleşti).",
+      "evidence": "lsof -nP -iTCP -sTCP:LISTEN → 'com.docke 3973 ... TCP *:3000 (LISTEN)'; server.ts:31 PORT = process.env.PORT || 3000 (6 worktree özdeş).",
+      "fix": "Tespit lsof→pid→process cwd→cwd-prefix eşleşen worktree'ye çevrildi (discover.ts mapServersToWorktrees). Port değil cwd ile atanır; eşleşmeyen pid (Docker) elenir. portFor/probe silindi.",
+      "prevention_rule": "Çalışan süreci ASLA yalnız porta göre lane'e atama; daima process cwd çöz (lsof -p -d cwd) ve worktree path-prefix ile eşle.",
+      "test_added": "orchestration/tests/discover.test.ts ('6×port-3000 cwd disambiguation' — aynı port farklı cwd → farklı lane, Docker elenir)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-002",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/discover.ts:8 (JSDoc)",
+      "category": "coordination",
+      "severity": "med",
+      "root_cause": "JSDoc yorumunda 'parse*/match*' ifadesindeki `*/` dizisi blok yorumu erken kapattı; sonrası kod olarak ayrıştı → esbuild 'Unexpected )'.",
+      "evidence": "vitest transform: discover.ts:8:33 ERROR Unexpected ')' (vite:esbuild).",
+      "fix": "Yorum metni 'parse / match aileleri' olarak değiştirildi; `*/` dizisi kaldırıldı.",
+      "prevention_rule": "Blok yorum içinde asla `*/` literal dizisi yazma (glob/regex örneklerinde bile); kelimeyle ifade et.",
+      "test_added": "(transform-time; vitest suite yeşil = guard)",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-003",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "orchestration/bin/discover.ts (AppleScript sekme sorgusu)",
+      "category": "coordination",
+      "severity": "high",
+      "root_cause": "İKİ kombine bug: (1) `tell application \"iTerm\"/\"Terminal\"` bloğu içinde AppleScript `tab` SABİTİ uygulamanın `tab` CLASS'ı ile çakışır → ayraç olarak literal 'tab' metni basıldı. (2) AppleScript string literal \"\\t\" GERÇEK tab (0x09) DEĞİL, backslash+t'dir. Sonuç: tty/busy alanları ayrışmadı, canlı sekme keşfi bozuk (tty boş). Diğer sekmenin TAB_OSA'sı bug'ı taşıyordu; parseTabs testi JS-`\\t` fixture'ı kullandığı için yakalayamadı (test-gerçek uyuşmazlığı).",
+      "evidence": "osascript çıktısı `cat -A` → 'iterm2tab/dev/ttys008tab-zshtab0' (literal 'tab', 0x09 değil).",
+      "fix": "Ayraç tell-bloğu DIŞINDA `set D to (ASCII character 9)` ile tanımlanıp içeride değişken olarak kullanıldı; iTerm2 desteği eklendi (parseTabsTagged). Canlı doğrulama: 12 sekme tty+busy+cwd düzgün.",
+      "prevention_rule": "AppleScript'te sekme/satır ayracı için ASLA `tab` sabitine veya string-literal `\\t`'ye güvenme; `(ASCII character 9)`'u tell-bloğu DIŞINDA tanımla. AppleScript çıktı parser'larını JS-`\\t` değil GERÇEK osascript çıktısıyla test et.",
+      "test_added": "orchestration/tests/discover.test.ts ('parseTabsTagged delimiter-fix' + 'parseTmuxPanes' + 'isShellCmd')",
+      "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-004",
+      "ts": "2026-06-20",
+      "version": "vO2",
+      "file": "worktree branch (feat/orchestration-v1 → v3)",
+      "category": "scope",
+      "severity": "CRITICAL",
+      "root_cause": "RISK-ORCH-001 gerçekleşti: eşzamanlı sekme bu izole worktree'de `git checkout feat/orchestration-v3` çalıştırıp branch'i v1→v3 altımdan kaydırdı. HEAD base-main'de kaldığından vO2 green işi (iki sekme) HİÇ commit edilmemişti → her checkout'ta kayıp riski. memory 'vO1 DONE' diyordu ama git'te tümü untracked (RISK-ORCH-002 drift).",
+      "evidence": "git reflog → 'HEAD@{0}: checkout: moving from feat/orchestration-v1 to feat/orchestration-v3'; git status → tek '?? orchestration/' (untracked); HEAD c19a0b6 (base main).",
+      "fix": "Green iş HEMEN feat/orchestration-v3'te commit'lendi (lock-in; branch=v3/içerik=vO2 drift kabul). vO1+vO2 governance ilk kez kalıcılaştı.",
+      "prevention_rule": "İzole worktree'de bile her green parça koşusundan SONRA hemen commit et (uzun süre untracked bırakma); oturum-başı + commit-öncesi `git branch --show-current` doğrula; eşzamanlı lane'ler ayrı worktree+branch kullanmalı, asla aynı worktree'de paralel checkout.",
+      "test_added": "(süreç-kuralı; Phase 0 guard branch-doğrulaması)",
+      "recurrence_count": 1
+    },
+    {
+      "id": "ERR-ORCH-005",
+      "ts": "2026-06-20",
+      "version": "vO4",
+      "file": "orchestration/ADOPTIONS_ORCHESTRATION.md:76 (iTerm2 scripting property satırı)",
+      "category": "adoption",
+      "severity": "med",
+      "root_cause": "ADOPTIONS lisans hücresi 'GPL→native API' yazıyordu + karar 'ADOPT'. vO4 adopt-gate.ts ilk canlı koşuda bunu İHLAL yakaladı: hücre metni GPL içerdiği için copyleft sınıflandı, ADOPT=kod-kopyalama ima → RISK-ORCH-005 ihlali görünümü. Gerçekte adopt edilen iTerm2'nin GPL kaynağı DEĞİL, app'in native scripting property'si (is processing) — hücre yanlış etiketliydi.",
+      "evidence": "tsx orchestration/bin/adopt-gate.ts → '❌ 1 İHLAL: iTerm2 ... GPL→native API | ADOPT | copyleft: ADOPT kod kopyalama ima eder' exit 1.",
+      "fix": "Lisans hücresi 'GPL→native API' → 'native' (NATIVE→permissive); GPL-kaynak-değil notu 'Ne' kolonuna taşındı. Gate yeniden: ✅ temiz, exit 0. (Gate'i kandırmak DEĞİL — matrisi DÜRÜST yapmak: gerçekten GPL kod kopyalanmadı.)",
+      "prevention_rule": "ADOPTIONS lisans hücresi NE adopt edildiğini yansıtmalı: native scripting API/property → 'native' (kaynak kopyası değil), 'GPL→...' gibi karışık etiket yazma. Gate-ihlali çıkarsa önce niyeti doğrula; etiket yanlışsa düzelt, gate'i suppress etme.",
+      "test_added": "orchestration/tests/adopt.test.ts (gate GPL+ADOPT→ihlal) + canlı adopt-gate.ts temiz koşu",
+      "recurrence_count": 0
+    }
+  ]
+}
