@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ollamas system-monitor heartbeat (sustainable, deterministic, no LLM).
+  Runs scripts/system-monitor.mjs --heartbeat every 15 min; appends to the JSONL
+  learning ledger and (only on a change/FAIL) writes a delta + escalation command
+  to the log. "Silence = Success" → quiet most runs.
+
+  Install:  cp this to ~/Library/LaunchAgents/ then:
+            launchctl unload ~/Library/LaunchAgents/com.ecypro.ollamas-monitor.plist 2>/dev/null
+            launchctl load -w ~/Library/LaunchAgents/com.ecypro.ollamas-monitor.plist
+  Status:   launchctl list | grep ollamas-monitor
+  Log:      tail -f ~/.llm-mission-control/monitor-heartbeat.log
+  Ledger:   ~/.llm-mission-control/monitor-history.jsonl
+  Stop:     launchctl unload ~/Library/LaunchAgents/com.ecypro.ollamas-monitor.plist
+
+  NOTE: <string> node path is machine-specific (mise). Regenerate with `which node`
+  if it changes. This versioned copy documents intent; the live copy is in ~/Library/LaunchAgents.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ecypro.ollamas-monitor</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/.local/share/mise/installs/node/24.16.0/bin/node</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/scripts/system-monitor.mjs</string>
+    <string>--heartbeat</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/.llm-mission-control/monitor-heartbeat.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/.llm-mission-control/monitor-heartbeat.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/emrecnyngmail.com/.local/share/mise/installs/node/24.16.0/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/emrecnyngmail.com</string>
+  </dict>
+</dict>
+</plist>
