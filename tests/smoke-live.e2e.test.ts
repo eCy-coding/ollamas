@@ -85,11 +85,12 @@ describe("live deploy smoke (production scenario)", () => {
     expect(Array.isArray(await sup.json())).toBe(true);
   }, 30000);
 
-  test("real LLM dogfood via /api/ai/generate (gated on local ollama)", async () => {
-    const ollamaUp = await fetch("http://localhost:11434/api/tags").then((r) => r.ok).catch(() => false);
-    if (!ollamaUp) { expect(true).toBe(true); return; } // skip when ollama is not running
-    const r = await j(await fetch(`${BASE}/api/ai/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: "Reply with exactly one word: ALIVE" }) }));
-    expect(typeof r.text).toBe("string");
-    expect(r.text.length).toBeGreaterThan(0);
-  }, 90000);
+  test("local-owner dashboard façade is gated off in SaaS mode (security boundary)", async () => {
+    // /api/ai/generate is a single-local-owner dashboard endpoint (unmetered, no
+    // per-tenant auth). The production SaaS scenario (SAAS_ENFORCE=1) must refuse it
+    // with 403 — tenant inference goes through /mcp, not this façade. (Real ollama
+    // dogfood is exercised by the local-mode e2e + the agent path.)
+    const r = await fetch(`${BASE}/api/ai/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: "x" }) });
+    expect(r.status).toBe(403);
+  }, 30000);
 });

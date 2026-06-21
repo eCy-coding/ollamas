@@ -223,8 +223,15 @@ export async function resolveKey(plaintext: string): Promise<ResolvedKey | null>
 }
 
 export async function recordUsage(e: UsageEvent): Promise<void> {
-  await d().run("INSERT INTO usage_events (tenant_id, tool, tier, ok, latency_ms, tokens, cost, month, ts) VALUES (?,?,?,?,?,?,?,?,?)",
-    [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, e.latencyMs, e.tokens ?? 0, e.cost ?? 0, monthKey(), nowIso()]);
+  // Best-effort telemetry: every caller fires this without await, so a DB failure
+  // must NOT surface as an unhandled rejection or silently drop into the void —
+  // swallow + log so the request path is unaffected and the gap is visible.
+  try {
+    await d().run("INSERT INTO usage_events (tenant_id, tool, tier, ok, latency_ms, tokens, cost, month, ts) VALUES (?,?,?,?,?,?,?,?,?)",
+      [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, e.latencyMs, e.tokens ?? 0, e.cost ?? 0, monthKey(), nowIso()]);
+  } catch (err) {
+    console.warn("[store] recordUsage failed:", (err as Error)?.message);
+  }
 }
 export async function usageTimeseries(tenantId: string, month = monthKey()): Promise<{ day: string; calls: number; tokens: number }[]> {
   const rows = (await d().query("SELECT substr(ts,1,10) AS day, COUNT(*) AS calls, SUM(tokens) AS tokens FROM usage_events WHERE tenant_id = ? AND month = ? GROUP BY substr(ts,1,10) ORDER BY day", [tenantId, month])).rows;
@@ -253,7 +260,12 @@ export async function aggregateUsage(month = monthKey()): Promise<UsageAgg[]> {
 
 export interface AuditEvent { tenantId: string; tool: string; tier: ToolTier; ok: boolean; }
 export async function recordAudit(e: AuditEvent): Promise<void> {
-  await d().run("INSERT INTO audit_events (tenant_id, tool, tier, ok, ts) VALUES (?,?,?,?,?)", [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, nowIso()]);
+  // Best-effort, fire-and-forget by all callers — swallow + log (see recordUsage).
+  try {
+    await d().run("INSERT INTO audit_events (tenant_id, tool, tier, ok, ts) VALUES (?,?,?,?,?)", [e.tenantId, e.tool, e.tier, e.ok ? 1 : 0, nowIso()]);
+  } catch (err) {
+    console.warn("[store] recordAudit failed:", (err as Error)?.message);
+  }
 }
 export async function listAudit(tenantId?: string, limit = 100): Promise<any[]> {
   const lim = Math.min(Math.max(1, limit), 1000);

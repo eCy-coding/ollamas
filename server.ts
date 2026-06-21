@@ -106,6 +106,29 @@ app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// SaaS fail-closed gate. The single-local-owner DASHBOARD surface (host terminal,
+// workspace files, multi-agent pipeline, backups, cluster control, raw inference,
+// ReAct agent) has NO per-tenant auth — it trusts the localhost owner. When
+// SAAS_ENFORCE=1 the server is a multi-tenant gateway exposed to untrusted callers,
+// so this surface MUST be unreachable (the SaaS product is /mcp + /api/saas/*).
+// Local mode (no enforce) passes through unchanged — single-owner UX preserved.
+// Registered before the routes so it runs first for these path prefixes.
+const localOwnerGuard = (_req: express.Request, res: express.Response, next: express.NextFunction): void => {
+  if (process.env.SAAS_ENFORCE === "1") {
+    res.status(403).json({ error: "endpoint not available in SaaS mode (local-owner only)" });
+    return;
+  }
+  next();
+};
+app.use(
+  [
+    "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
+    "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
+    "/api/agent",
+  ],
+  localOwnerGuard,
+);
+
 /**
  * L1: Dynamic Environment Detection
  */
@@ -993,6 +1016,12 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       writePermissions,
     } = req.body;
 
+    // Validate BEFORE switching to SSE — once event-stream headers are sent we can
+    // no longer return a clean status; a missing prompt would stream `undefined`.
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt (non-empty string) is required" });
+    }
+
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -1473,16 +1502,35 @@ content
   if (process.env.SAAS_ENFORCE === "1" && !process.env.SAAS_ADMIN_TOKEN) {
     console.warn("[SaaS] SAAS_ENFORCE=1 but SAAS_ADMIN_TOKEN unset — /api/saas + /api/billing admin routes are LOCKED (set SAAS_ADMIN_TOKEN).");
   }
+  // Per-IP brute-force throttle for the admin token. timingSafeEqual alone does not
+  // stop an attacker hammering guesses; lock an IP out for the window after N misses.
+  // In-memory (per-process) — adequate for the single admin surface; a multi-replica
+  // deploy would back this with the shared store/Redis.
+  const adminFailures = new Map<string, { count: number; until: number }>();
+  const ADMIN_MAX_FAILS = 5;
+  const ADMIN_LOCK_MS = 15 * 60_000;
   const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const required = process.env.SAAS_ADMIN_TOKEN;
     if (required) {
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      const now = Date.now();
+      const rec = adminFailures.get(ip);
+      if (rec && rec.count >= ADMIN_MAX_FAILS && now < rec.until) {
+        res.setHeader("Retry-After", Math.ceil((rec.until - now) / 1000));
+        return res.status(429).json({ error: "Too many bad admin attempts; try later" });
+      }
       // Timing-safe compare to avoid leaking the token via response timing.
       const got = String(req.headers["x-admin-token"] || "");
       const a = Buffer.from(got);
       const b = Buffer.from(required);
       if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        const r = adminFailures.get(ip) ?? { count: 0, until: 0 };
+        r.count += 1;
+        r.until = now + ADMIN_LOCK_MS;
+        adminFailures.set(ip, r);
         return res.status(401).json({ error: "Bad admin token" });
       }
+      adminFailures.delete(ip); // success → reset the counter
     } else if (process.env.SAAS_ENFORCE === "1") {
       // Enforcement on but no token configured → refuse rather than expose.
       return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
