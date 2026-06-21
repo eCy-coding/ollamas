@@ -39,6 +39,7 @@ const STANDARDS = [
   "- Minimize steps. Do NOT call the same tool twice with the same args. No exploration the task does not require.",
   `- The ONLY writable root is ${ROOT} — write files there with absolute paths.`,
   "- For a fresh file: write_host_file it directly, then immediately macos_terminal to RUN it and show the exact stdout. Investigate existing code (read_file/grep_search) ONLY when the task references code that already exists.",
+  "- grep_search: pass ONE literal pattern, NO shell metacharacters (| & ; > < ` $ are blocked). For alternation run separate searches. If a tool is refused, change approach — do NOT retry the same call.",
   "- Evidence over assertion: never fabricate output — show the real macos_terminal stdout and confirm it matches the expected result.",
   "- If a tool errors, report the exact error and stop (do not retry blindly).",
   "- When the result is verified, STOP immediately and emit a final line exactly: VERDICT: DONE <one-line proof>   (or  VERDICT: BLOCKED <reason>).",
