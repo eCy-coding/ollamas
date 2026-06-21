@@ -340,6 +340,15 @@ async function initializeServer() {
     res.json(masks);
   });
 
+  // Key-pool health (counts only — NEVER values). Lets the system-monitor alert when a
+  // provider's user-supplied key pool is exhausted (all cooled) so a new key can be added.
+  app.get("/api/keys/pool", (_req, res) => {
+    const providers = ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"];
+    const pool: Record<string, { total: number; live: number }> = {};
+    for (const p of providers) pool[p] = ProviderRouter.keyPoolStatus(p);
+    res.json({ pool });
+  });
+
   app.post("/api/keys", (req, res) => {
     const { provider, key, customEndpoint } = req.body;
     if (!provider) return res.status(400).json({ error: "Provider name requested" });

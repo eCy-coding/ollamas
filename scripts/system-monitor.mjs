@@ -76,6 +76,17 @@ const CHECKS = [
     const pids = r.out.split("\n").filter(Boolean);
     return { status: pids.length <= 1 ? "PASS" : "FAIL", detail: `:8090 listeners=${pids.length} (${pids.join(",") || "none"}) — >1 = stale squat` }; } },
 
+  { name: "key_pool", sev: "MED", run: async () => {
+    // A provider with keys but ZERO live (all cooled/exhausted) needs a new user key.
+    try {
+      const r = await j(`${APP}/api/keys/pool`);
+      const pool = r.body?.pool || {};
+      const configured = Object.entries(pool).filter(([, v]) => (v.total || 0) > 0);
+      const exhausted = configured.filter(([, v]) => (v.live || 0) === 0).map(([p]) => p);
+      const summary = configured.map(([p, v]) => `${p}:${v.live}/${v.total}`).join(" ") || "no cloud keys configured";
+      return { status: exhausted.length ? "FAIL" : "PASS", detail: exhausted.length ? `EXHAUSTED: ${exhausted.join(",")} — add a new key to .env. (${summary})` : summary };
+    } catch (e) { return { status: "SKIP", detail: `pool endpoint unavailable: ${e.message}` }; } } },
+
   { name: "npm_audit.no_high", sev: "HIGH", run: async () => {
     const r = sh(`cd ${REPO} && npm audit --json`);
     try { const a = JSON.parse(r.out); const m = a.metadata?.vulnerabilities || {};

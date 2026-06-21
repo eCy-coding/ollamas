@@ -98,57 +98,72 @@ export class ProviderRouter {
     let lastError: Error | null = null;
 
     for (const prov of providersToTry) {
-      try {
-        const resolvedConfig = { ...config, provider: prov };
-        // A model name belongs to its provider: "gemini-2.0-flash" is meaningless to
-        // ollama (404 "model not found") and would cascade the whole chain to demo.
-        // When falling back to a DIFFERENT provider than the one requested, drop the
-        // requested model so each provider resolves its own default (case-local `||`).
-        if (prov !== config.provider) resolvedConfig.model = undefined;
-        // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
-        if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
-          continue;
-        }
+      const resolvedConfig = { ...config, provider: prov };
+      // A model name belongs to its provider: "gemini-2.0-flash" is meaningless to
+      // ollama (404 "model not found") and would cascade the whole chain to demo.
+      // When falling back to a DIFFERENT provider than the one requested, drop the
+      // requested model so each provider resolves its own default (case-local `||`).
+      if (prov !== config.provider) resolvedConfig.model = undefined;
+      // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
+      if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
+        continue;
+      }
 
-        const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
-        
-        // Track successfully executed provider's latency
-        const elapsed = Date.now() - start;
-        latencyCache[prov] = { latencyMs: elapsed, updatedAt: Date.now() };
-
-        return {
-          ...result,
-          latencyMs: elapsed,
-        };
-      } catch (err: any) {
-        console.warn(`[Router] Provider ${prov} failed: ${err?.message || err}. Retrying fallback...`);
-        lastError = err;
-
-        // Smart fallback check: stop falling back on authentication details (transient vs 401/403)
-        const lowercaseMsg = (err?.message || "").toLowerCase();
-        const isAuthError = 
-          lowercaseMsg.includes("401") || 
-          lowercaseMsg.includes("403") || 
-          lowercaseMsg.includes("unauthorized") || 
-          lowercaseMsg.includes("forbidden") || 
-          lowercaseMsg.includes("api key") || 
-          lowercaseMsg.includes("not set");
-        
-        // Only hard-fail on an auth error for the EXPLICITLY selected provider — so a
-        // bad/expired key surfaces clearly. A key failure on a *fallback* provider must
-        // NOT poison the chain (e.g. an invalid openai key killing the request before
-        // ollama-cloud/local is tried); skip it and keep falling back.
-        if (isAuthError && prov === config.provider) {
-          throw new Error(`Authentication failure: invalid or missing key for ${prov}. Error: ${err.message || err}`);
-        }
-
-        const nextIndex = providersToTry.indexOf(prov) + 1;
-        if (nextIndex < providersToTry.length) {
-          const nextProv = providersToTry[nextIndex];
-          if (onFallback) {
-            onFallback(prov, nextProv, err?.message || "Unknown error");
+      // Key-pool rotation: a provider may hold MULTIPLE user-supplied keys. On a
+      // quota (429) or auth (401) failure, cool the spent key and retry the SAME
+      // provider with the next live key before falling through the provider chain.
+      // (Rotation across user keys only — the system never auto-acquires new keys.)
+      const cloudKeyed = prov !== "ollama-local" && prov !== "demo";
+      const attempts = cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1;
+      let provErr: any = null;
+      let rotated = false;
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+          const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
+          const elapsed = Date.now() - start;
+          latencyCache[prov] = { latencyMs: elapsed, updatedAt: Date.now() };
+          return { ...result, latencyMs: elapsed };
+        } catch (err: any) {
+          provErr = err;
+          const m = (err?.message || "").toLowerCase();
+          const isQuota = m.includes("429") || m.includes("quota") || m.includes("rate limit") || m.includes("resource_exhausted") || m.includes("exceeded");
+          const isAuth = m.includes("401") || m.includes("403") || m.includes("unauthorized") || m.includes("forbidden") || m.includes("api key");
+          if (cloudKeyed && (isQuota || isAuth)) {
+            const spent = this.getDecryptedKey(prov);
+            // Cool the spent key: quota recovers (6h), an invalid key stays out longer (24h).
+            if (spent) this.markKeyCooldown(prov, spent, isQuota ? 6 * 3600_000 : 24 * 3600_000);
+            const live = this.liveKeyCount(prov);
+            // Token NAMES/positions ok to log; VALUES never.
+            console.warn(`[KeyPool] ${prov} key#${attempt + 1} ${isQuota ? "quota" : "auth"}-exhausted → ${live} live key(s) remain`);
+            if (live > 0 && attempt + 1 < attempts) { rotated = true; continue; } // retry same provider, next key
           }
+          break; // not a key error, or pool exhausted → fall through to provider chain
         }
+      }
+
+      // Provider exhausted (all its keys, or a non-key error). Decide fallback.
+      console.warn(`[Router] Provider ${prov} failed: ${provErr?.message || provErr}. Retrying fallback...`);
+      lastError = provErr;
+      const lowercaseMsg = (provErr?.message || "").toLowerCase();
+      const isQuotaErr = lowercaseMsg.includes("429") || lowercaseMsg.includes("quota") || lowercaseMsg.includes("resource_exhausted") || lowercaseMsg.includes("exceeded");
+      const isAuthError =
+        lowercaseMsg.includes("401") ||
+        lowercaseMsg.includes("403") ||
+        lowercaseMsg.includes("unauthorized") ||
+        lowercaseMsg.includes("forbidden") ||
+        lowercaseMsg.includes("api key") ||
+        lowercaseMsg.includes("not set");
+
+      // Hard-fail only when the EXPLICITLY selected provider has a genuinely invalid key
+      // (not mere quota, and only if rotation didn't already exhaust a real pool) — so a
+      // bad key surfaces clearly, while a fallback provider's bad key never poisons the chain.
+      if (isAuthError && !isQuotaErr && !rotated && prov === config.provider) {
+        throw new Error(`Authentication failure: invalid or missing key for ${prov}. Error: ${provErr?.message || provErr}`);
+      }
+
+      const nextIndex = providersToTry.indexOf(prov) + 1;
+      if (nextIndex < providersToTry.length && onFallback) {
+        onFallback(prov, providersToTry[nextIndex], provErr?.message || "Unknown error");
       }
     }
 
@@ -179,13 +194,53 @@ export class ProviderRouter {
     return typeof key === "string" && key.trim().length > 0;
   }
 
-  public static getDecryptedKey(provider: string): string {
-    const encryptedKey = db.data.keys[provider];
-    if (encryptedKey) {
-      const decrypted = db.decrypt(encryptedKey);
-      if (decrypted) return decrypted;
+  // --- API key pool + rotation (user-supplied keys only; never auto-acquired) ---
+  // Per-process cooldown: keyed by provider+key → expiry epoch ms. In-memory by design
+  // (simplest; resets on restart, by which time provider quotas have refilled).
+  private static keyCooldown = new Map<string, number>();
+  private static ckey(provider: string, key: string): string { return `${provider}::${key}`; }
+  public static markKeyCooldown(provider: string, key: string, ttlMs: number): void {
+    this.keyCooldown.set(this.ckey(provider, key), Date.now() + ttlMs);
+  }
+  private static isCooled(provider: string, key: string): boolean {
+    const exp = this.keyCooldown.get(this.ckey(provider, key));
+    if (!exp) return false;
+    if (Date.now() >= exp) { this.keyCooldown.delete(this.ckey(provider, key)); return false; } // recovered
+    return true;
+  }
+
+  // All candidate keys for a provider: vault key first, then env `NAME`, `NAME_1..9`,
+  // and comma-separated `NAMES`. Deduped, non-empty. Drop a new key into .env (e.g.
+  // GEMINI_API_KEY_2=... or GEMINI_API_KEYS=k1,k2) and it joins the pool on next boot.
+  public static keyPool(provider: string): string[] {
+    const keys: string[] = [];
+    const enc = db.data.keys?.[provider];
+    if (enc) { const d = db.decrypt(enc); if (d) keys.push(d); }
+    const base = this.getEnvKeyName(provider);
+    if (base) {
+      const push = (v?: string) => { if (v && v.trim()) keys.push(v.trim()); };
+      push(process.env[base]);
+      for (let i = 1; i <= 9; i++) push(process.env[`${base}_${i}`]);
+      const multi = process.env[`${base}S`];
+      if (multi) multi.split(",").forEach(push);
     }
-    return process.env[this.getEnvKeyName(provider)] || "";
+    return [...new Set(keys)];
+  }
+
+  public static liveKeyCount(provider: string): number {
+    return this.keyPool(provider).filter((k) => !this.isCooled(provider, k)).length;
+  }
+  // For the monitor: pool health without ever exposing values.
+  public static keyPoolStatus(provider: string): { total: number; live: number } {
+    const pool = this.keyPool(provider);
+    return { total: pool.length, live: pool.filter((k) => !this.isCooled(provider, k)).length };
+  }
+
+  public static getDecryptedKey(provider: string): string {
+    const pool = this.keyPool(provider);
+    if (pool.length === 0) return "";
+    // Prefer the first key not in cooldown; if all are cooled, best-effort the first.
+    return pool.find((k) => !this.isCooled(provider, k)) || pool[0];
   }
 
   private static getEnvKeyName(provider: string): string {
