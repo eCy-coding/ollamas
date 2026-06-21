@@ -4,6 +4,7 @@
 // a key everything runs in dry-run so the gateway works with zero billing config.
 
 import Stripe from "stripe";
+import crypto from "node:crypto";
 import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
@@ -45,7 +46,10 @@ export function sendMeterEventAsync(tenantId: string, value = 1): void {
   (async () => {
     const customer = (await getTenant(tenantId))?.stripe_customer_id;
     if (!customer) return;
-    const identifier = `${tenantId}:${Date.now()}:${Math.round(Math.random() * 1e9).toString(36)}`;
+    // Crypto-random suffix (not Math.random): two meter events for the same tenant in
+    // the same millisecond must not collide on `identifier`, or Stripe's 24h dedup
+    // would silently drop one → undercounted usage.
+    const identifier = `${tenantId}:${Date.now()}:${crypto.randomBytes(8).toString("hex")}`;
     await s.billing.meterEvents.create({
       event_name: METER_EVENT_NAME, identifier,
       payload: { stripe_customer_id: customer, value: String(value) },
