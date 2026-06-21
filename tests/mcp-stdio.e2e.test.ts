@@ -38,7 +38,7 @@ describe("MCP stdio EXPOSE (npx ollamas-mcp)", () => {
     await c.connect(tr);
     const { tools } = await c.listTools();
     await c.close();
-    expect(tools.length).toBe(17); // safe tier only by default (rag_search v1.13 + sample v1.14 → 17)
+    expect(tools.length).toBe(18); // safe tier only by default (+ count_tokens graft → 18)
     expect(tools.some((t) => t.name === "read_file")).toBe(true);
     expect(tools.some((t) => t.name === "git_commit")).toBe(false); // host tier excluded
   }, 40000);

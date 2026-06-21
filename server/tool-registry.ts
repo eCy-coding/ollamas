@@ -12,6 +12,7 @@ import { runPre, runPost } from "./tool-interceptors";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
+import { countTokens, estimateCost } from "./tokens";
 
 // outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
 // (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
@@ -678,6 +679,33 @@ const TOOLS: Record<string, ToolDef> = {
       if (!args.query) throw new Error("Missing 'query'.");
       const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
       return { results: await ragSearch(String(args.query), k) };
+    },
+  },
+
+  // Accurate token counting + cost estimate (js-tiktoken). Lets a cluster size a
+  // prompt and price a call before/after running it. Grafted from feat/v1.8-bench.
+  count_tokens: {
+    tier: "safe",
+    schema: fn(
+      "count_tokens",
+      "Count tokens in text with tiktoken and (optionally) estimate USD cost for a model. Useful for budgeting prompts before a call.",
+      {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Text to tokenize." },
+          model: { type: "string", description: "Model name for the encoding + cost table (default cl100k_base, free)." },
+          out_tokens: { type: "number", description: "Expected output tokens, for the cost estimate. Default 0." },
+        },
+        required: ["text"],
+      },
+      { type: "object", properties: { tokens: { type: "number" }, model: { type: "string" }, cost_usd: { type: "number" } }, required: ["tokens"] }
+    ),
+    invoke: async (args) => {
+      if (args.text === undefined) throw new Error("Missing 'text'.");
+      const model = args.model ? String(args.model) : undefined;
+      const tokens = countTokens(String(args.text), model);
+      const out = Number(args.out_tokens) > 0 ? Math.floor(Number(args.out_tokens)) : 0;
+      return { tokens, model: model || "cl100k_base", cost_usd: model ? estimateCost(model, tokens, out) : 0 };
     },
   },
 };

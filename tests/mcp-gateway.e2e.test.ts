@@ -78,7 +78,7 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const { tools } = await c.listTools();
     await c.close();
 
-    expect(tools.length).toBe(17); // free plan = safe tier only (rag_search v1.13 + sample v1.14 → 17)
+    expect(tools.length).toBe(18); // free plan = safe tier only (+ count_tokens graft → 18)
     expect(tools.some((x) => x.name === "git_commit")).toBe(false); // host tier filtered
     expect(tools.some((x) => x.name === "read_file")).toBe(true);
     expect(tools.some((x) => x.name === "rag_search")).toBe(true); // safe-tier RAG visible to free plan

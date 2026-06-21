@@ -63,7 +63,7 @@ describe("live deploy smoke (production scenario)", () => {
     const tr = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${k.key}` } } });
     await c.connect(tr);
     const { tools } = await c.listTools();
-    expect(tools.length).toBe(17); // free = safe tier (rag_search v1.13 + sample v1.14 → 17)
+    expect(tools.length).toBe(18); // free = safe tier (+ count_tokens graft → 18)
     expect(tools.some((x) => x.name === "sample")).toBe(true);
     const res: any = await c.callTool({ name: "list_tree", arguments: {} });
     await c.close();
