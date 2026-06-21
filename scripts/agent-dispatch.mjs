@@ -77,7 +77,7 @@ try {
       let ev; try { ev = JSON.parse(s.slice(5).trim()); } catch { continue; }
       if (ev.type === "step") {
         const out = typeof ev.result === "string" ? ev.result : JSON.stringify(ev.result);
-        report.steps.push({ n: ev.stepNum, tool: ev.tool, ok: ev.ok, out: (out || "").slice(0, 400) });
+        report.steps.push({ n: ev.stepNum, tool: ev.tool, ok: ev.ok, out: (out || "").slice(0, 2000) });
         if (ev.tool === "write_host_file" || ev.tool === "write_file") {
           const p = ev.args?.path; if (p) report.files.push(p);
         }
