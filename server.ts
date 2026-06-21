@@ -2014,7 +2014,9 @@ content
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      // Per-instance HMR ws port (derived from PORT) so multiple dev/test servers
+      // don't collide on Vite's default 24678 ("Port 24678 already in use").
+      server: { middlewareMode: true, hmr: { port: Number(PORT) + 20000 } },
       appType: "spa",
     });
     app.use(vite.middlewares);
