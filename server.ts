@@ -124,7 +124,7 @@ app.use(
   [
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
-    "/api/agent",
+    "/api/agent", "/api/keys", "/api/models",
   ],
   localOwnerGuard,
 );
