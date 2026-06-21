@@ -100,6 +100,11 @@ export class ProviderRouter {
     for (const prov of providersToTry) {
       try {
         const resolvedConfig = { ...config, provider: prov };
+        // A model name belongs to its provider: "gemini-2.0-flash" is meaningless to
+        // ollama (404 "model not found") and would cascade the whole chain to demo.
+        // When falling back to a DIFFERENT provider than the one requested, drop the
+        // requested model so each provider resolves its own default (case-local `||`).
+        if (prov !== config.provider) resolvedConfig.model = undefined;
         // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
         if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
           continue;
