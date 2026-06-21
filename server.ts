@@ -931,6 +931,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
   app.post("/api/workspace/file", (req, res) => {
     const { relativePath, content } = req.body;
+    // Validate types before fs write — a non-string content/path would throw deep in
+    // fs and surface as a 500; reject malformed input with a clean 400.
+    if (typeof relativePath !== "string" || !relativePath || typeof content !== "string") {
+      return res.status(400).json({ error: "relativePath (string) and content (string) are required" });
+    }
     const isLive = CURRENT_MODE !== "demo";
     try {
       FilesystemManager.writeFile(isLive, db.data.workspacePath, relativePath, content);
@@ -942,6 +947,9 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
   app.delete("/api/workspace/file", (req, res) => {
     const relativePath = req.query.relativePath as string;
+    if (typeof relativePath !== "string" || !relativePath) {
+      return res.status(400).json({ error: "relativePath query parameter (string) is required" });
+    }
     const isLive = CURRENT_MODE !== "demo";
     try {
       FilesystemManager.deleteFile(isLive, db.data.workspacePath, relativePath);
