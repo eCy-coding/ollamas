@@ -410,15 +410,19 @@ export class ProviderRouter {
         if (!apiKey) throw new Error("Ollama Cloud Key is not set");
         const ollamaHost = "https://ollama.com/api";
         const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
-        
+        // Direct ollama.com API serves cloud models by their BASE name (no "-cloud"
+        // suffix → that suffix is only for the local daemon's pulled cloud tags). A
+        // non-cloud default like qwen3:8b 404s here, so default to a real cloud model.
+        const cloudModel = (config.model || "gpt-oss:120b").replace(/-cloud$/, "");
+
         const response = await fetch(`${ollamaHost}/chat`, {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: config.model || "qwen3:8b",
+            model: cloudModel,
             messages: config.messages,
             options: {
               num_ctx: numCtx,
