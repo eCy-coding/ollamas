@@ -129,10 +129,14 @@ export class ProviderRouter {
           lowercaseMsg.includes("api key") || 
           lowercaseMsg.includes("not set");
         
-        if (isAuthError) {
+        // Only hard-fail on an auth error for the EXPLICITLY selected provider — so a
+        // bad/expired key surfaces clearly. A key failure on a *fallback* provider must
+        // NOT poison the chain (e.g. an invalid openai key killing the request before
+        // ollama-cloud/local is tried); skip it and keep falling back.
+        if (isAuthError && prov === config.provider) {
           throw new Error(`Authentication failure: invalid or missing key for ${prov}. Error: ${err.message || err}`);
         }
-        
+
         const nextIndex = providersToTry.indexOf(prov) + 1;
         if (nextIndex < providersToTry.length) {
           const nextProv = providersToTry[nextIndex];
@@ -190,6 +194,27 @@ export class ProviderRouter {
     }
   }
 
+  // Gemini's functionDeclarations accept only a subset of JSON Schema. Tool schemas
+  // authored for OpenAI/Ollama carry keywords Gemini rejects (e.g. `exclusiveMinimum`
+  // → HTTP 400 INVALID_ARGUMENT). Deep-strip the unsupported keywords so the shared
+  // ToolRegistry schemas pass through to Gemini unchanged elsewhere.
+  private static geminiParams(schema: any): any {
+    const DROP = new Set([
+      "exclusiveMinimum", "exclusiveMaximum", "$schema", "additionalProperties",
+      "const", "examples", "default", "$ref", "definitions", "$defs",
+    ]);
+    if (Array.isArray(schema)) return schema.map((s) => this.geminiParams(s));
+    if (schema && typeof schema === "object") {
+      const out: any = {};
+      for (const [k, v] of Object.entries(schema)) {
+        if (DROP.has(k)) continue;
+        out[k] = this.geminiParams(v);
+      }
+      return out;
+    }
+    return schema;
+  }
+
   /**
    * Individual execution adapter
    */
@@ -206,33 +231,53 @@ export class ProviderRouter {
 
     switch (config.provider) {
       case "ollama-local": {
-        const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
         const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
-        
-        // Dynamic fetch request directly to /api/chat
-        const response = await fetch(`${ollamaHost}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: config.model || "qwen3:8b",
-            messages: config.messages,
-            options: {
-              num_ctx: numCtx,
-              temperature: config.temperature ?? 0.7,
-              // Calibrated for Apple Silicon: pin threads to performance cores,
-              // keep all layers on the GPU. Env-driven (omitted if unset).
-              ...(process.env.OLLAMA_NUM_THREAD ? { num_thread: Number(process.env.OLLAMA_NUM_THREAD) } : {}),
-              ...(process.env.OLLAMA_NUM_GPU ? { num_gpu: Number(process.env.OLLAMA_NUM_GPU) } : {}),
-            },
-            // Keep the model warm in Metal VRAM so repeat calls skip the reload
-            // cost (stable low latency). Default 30m; "0" disables.
-            keep_alive: process.env.OLLAMA_KEEP_ALIVE || "30m",
-            think: false, // Prevent reasoning bloat output according to L6 Spec
-            stream: !!onStreamChunk,
-            tools: config.tools,
-          }),
-          signal: buildSignal(signal), // Compose caller cancellation with 300s timeout (L12)
+        const reqBody = JSON.stringify({
+          model: config.model || "qwen3:8b",
+          messages: config.messages,
+          options: {
+            num_ctx: numCtx,
+            temperature: config.temperature ?? 0.7,
+            // Calibrated for Apple Silicon: pin threads to performance cores,
+            // keep all layers on the GPU. Env-driven (omitted if unset).
+            ...(process.env.OLLAMA_NUM_THREAD ? { num_thread: Number(process.env.OLLAMA_NUM_THREAD) } : {}),
+            ...(process.env.OLLAMA_NUM_GPU ? { num_gpu: Number(process.env.OLLAMA_NUM_GPU) } : {}),
+          },
+          // Keep the model warm in Metal VRAM so repeat calls skip the reload
+          // cost (stable low latency). Default 30m; "0" disables.
+          keep_alive: process.env.OLLAMA_KEEP_ALIVE || "30m",
+          think: false, // Prevent reasoning bloat output according to L6 Spec
+          stream: !!onStreamChunk,
+          tools: config.tools,
         });
+
+        // Host resolution is environment-dependent: docker uses host.docker.internal,
+        // local dev uses localhost. Try the configured host first, then loopback —
+        // a connection-level failure (DNS/refused) advances to the next candidate so
+        // the SAME .env works in both docker and `npm run dev` (no manual edit).
+        const ollamaHosts = [...new Set([
+          process.env.OLLAMA_HOST || "http://localhost:11434",
+          "http://localhost:11434",
+          "http://127.0.0.1:11434",
+        ])];
+        let response: Response | undefined;
+        let connErr: any = null;
+        for (const host of ollamaHosts) {
+          try {
+            response = await fetch(`${host}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: reqBody,
+              signal: buildSignal(signal), // Compose caller cancellation with 300s timeout (L12)
+            });
+            break; // got an HTTP response (even an error status) — stop host probing
+          } catch (e) {
+            connErr = e; // connection-level failure → try next host candidate
+          }
+        }
+        if (!response) {
+          throw new Error(`Ollama Local unreachable on [${ollamaHosts.join(", ")}]: ${connErr?.message || connErr}`);
+        }
 
         if (!response.ok) {
           const errMsg = await response.text().catch(() => "");
@@ -417,7 +462,7 @@ export class ProviderRouter {
                   functionDeclarations: [{
                     name: t.function.name,
                     description: t.function.description,
-                    parameters: t.function.parameters
+                    parameters: this.geminiParams(t.function.parameters)
                   }]
                 }))
               } : {})
@@ -445,7 +490,7 @@ export class ProviderRouter {
                   functionDeclarations: [{
                     name: t.function.name,
                     description: t.function.description,
-                    parameters: t.function.parameters
+                    parameters: this.geminiParams(t.function.parameters)
                   }]
                 }))
               } : {})
