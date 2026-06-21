@@ -10,9 +10,16 @@
 //         [--bridge-url http://127.0.0.1:7345] [--ollama http://127.0.0.1:11434]
 
 import { execSync } from "node:child_process";
+import { appendFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 const opt = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 ? process.argv[i + 1] : d; };
 const JSON_OUT = process.argv.includes("--json");
+// --heartbeat: the SUSTAINABLE/self-improving mode. Appends each run to a JSONL ledger
+// (the persistent learning store), compares against the previous run to detect drift,
+// and follows "Silence = Success" — prints nothing when nothing changed (cron-cheap).
+const HEARTBEAT = process.argv.includes("--heartbeat");
+const LEDGER = opt("--ledger", `${process.env.HOME}/.llm-mission-control/monitor-history.jsonl`);
 const APP = opt("--app-url", "http://127.0.0.1:8090");
 const BRIDGE = opt("--bridge-url", "http://127.0.0.1:7345");
 const OLLAMA = opt("--ollama", "http://127.0.0.1:11434");
@@ -88,6 +95,50 @@ results.sort((a, b) => (ORDER[a.sev] - ORDER[b.sev]) || a.name.localeCompare(b.n
 const fails = results.filter((r) => r.status === "FAIL");
 const passes = results.filter((r) => r.status === "PASS");
 const skips = results.filter((r) => r.status === "SKIP");
+
+// ── Heartbeat: persistent learning store + drift detection (the "ML-like gain") ──
+if (HEARTBEAT) {
+  const stamp = new Date().toISOString();
+  const statusMap = Object.fromEntries(results.map((r) => [r.name, r.status]));
+  const record = { ts: stamp, pass: passes.length, fail: fails.length, skip: skips.length, checks: statusMap,
+    // keep one cheap numeric signal for drift (audit vuln counts), parsed from detail
+    audit: (results.find((r) => r.name === "npm_audit.no_high")?.detail || "") };
+
+  // Read the PREVIOUS record (the baseline) before appending the new one.
+  let prev = null;
+  try { if (existsSync(LEDGER)) { const lines = readFileSync(LEDGER, "utf8").trim().split("\n").filter(Boolean); if (lines.length) prev = JSON.parse(lines[lines.length - 1]); } } catch {}
+
+  // Compute deltas vs baseline: regression (→FAIL), recovery (FAIL→PASS), and any flip.
+  const deltas = [];
+  if (prev) {
+    for (const r of results) {
+      const was = prev.checks?.[r.name];
+      if (was && was !== r.status) {
+        const kind = r.status === "FAIL" ? "REGRESSION" : (was === "FAIL" ? "RECOVERY" : "CHANGE");
+        deltas.push({ name: r.name, from: was, to: r.status, kind });
+      }
+    }
+    if (prev.audit && record.audit && prev.audit !== record.audit) deltas.push({ name: "npm_audit.drift", from: prev.audit, to: record.audit, kind: "DRIFT" });
+  }
+
+  try { mkdirSync(dirname(LEDGER), { recursive: true }); appendFileSync(LEDGER, JSON.stringify(record) + "\n"); } catch (e) { console.error(`[heartbeat] ledger write failed: ${e.message}`); }
+
+  const runs = (() => { try { return readFileSync(LEDGER, "utf8").trim().split("\n").filter(Boolean).length; } catch { return 1; } })();
+  const escalate = fails.length > 0 || deltas.some((d) => d.kind === "REGRESSION" || d.kind === "DRIFT");
+
+  // "Silence = Success": nothing wrong AND nothing changed → stay quiet (cron-friendly).
+  if (!escalate && deltas.length === 0) {
+    if (!prev) console.log(`heartbeat: baseline established — ${passes.length} PASS / ${fails.length} FAIL (ledger run #${runs})`);
+    process.exit(0);
+  }
+
+  // Something changed or failed → report it (and how to escalate to a sub-agent).
+  console.log(`heartbeat: CHANGE DETECTED (ledger run #${runs}, baseline learned from ${runs - 1} prior run(s))`);
+  for (const d of deltas) console.log(`  Δ ${d.kind.padEnd(10)} ${d.name}  ${d.from} -> ${d.to}`);
+  for (const f of fails) console.log(`  ✗ FAIL [${f.sev}] ${f.name}: ${f.detail}`);
+  if (escalate) console.log(`  ↳ escalate: node scripts/agent-dispatch.mjs "Investigate failing system-monitor check(s): ${fails.map((f) => f.name).join(", ") || deltas.map((d) => d.name).join(", ")}. Run the relevant command, read output, report the real cause." --provider ollama-local --model qwen3:8b --steps 6`);
+  process.exit(escalate ? 1 : 0);
+}
 
 if (JSON_OUT) { console.log(JSON.stringify({ summary: { pass: passes.length, fail: fails.length, skip: skips.length }, results }, null, 2)); }
 else {
