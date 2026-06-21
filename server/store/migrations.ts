@@ -167,6 +167,17 @@ export const MIGRATIONS: Migration[] = [
   },
 ];
 
+// Fail fast at module load on a duplicate migration version. A typo'd duplicate
+// silently SKIPS on an existing DB (version already in schema_migrations) yet runs
+// twice on a fresh DB → divergent schema. Cheap invariant, caught at boot not prod.
+{
+  const seenVersions = new Set<number>();
+  for (const m of MIGRATIONS) {
+    if (seenVersions.has(m.version)) throw new Error(`Duplicate migration version ${m.version} (${m.name})`);
+    seenVersions.add(m.version);
+  }
+}
+
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:
  *  a second run (or a second replica) is a no-op once versions are recorded. */
 export async function runMigrations(db: DbClient): Promise<number[]> {

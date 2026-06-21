@@ -23,6 +23,11 @@ export interface ToolCall {
   arguments: any;
 }
 
+// Tolerant JSON parse for model-emitted tool-call arguments: a truncated/malformed
+// arguments string must NOT throw — that would crash the whole tool_calls .map() and
+// silently drop the request to provider-fallback (→ demo). Returns {} on failure.
+function safeJsonObj(s: string): any { try { return JSON.parse(s); } catch { return {}; } }
+
 // Some local models (e.g. qwen3) emit tool calls as TEXT instead of the
 // structured tool_calls field — `<function=NAME>{json}</function>`,
 // `<tool_call>{"name":..,"arguments":..}</tool_call>`, or a fenced/bare JSON
@@ -285,7 +290,7 @@ export class ProviderRouter {
             toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
               id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
               name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+              arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
             }));
           }
           // Fallback: some models emit tool calls as text — recover them.
@@ -368,7 +373,7 @@ export class ProviderRouter {
             toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
               id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
               name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+              arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
             }));
           }
 
@@ -523,7 +528,7 @@ export class ProviderRouter {
           const toolCalls = tcs?.map((tc: any) => ({
             id: tc.id,
             name: tc.function?.name,
-            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
           }));
 
           return {
@@ -600,7 +605,7 @@ export class ProviderRouter {
           const toolCalls = tcs?.map((tc: any) => ({
             id: tc.id,
             name: tc.function?.name,
-            arguments: typeof tc.function?.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function?.arguments
+            arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
           }));
 
           return {

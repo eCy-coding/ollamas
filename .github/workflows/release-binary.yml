@@ -37,9 +37,13 @@ jobs:
       - name: checksum
         run: shasum -a 256 "dist/ollamas-${{ matrix.target }}" | awk '{print $1}' > "dist/ollamas-${{ matrix.target }}.sha256"
       - name: upload binary + checksum
-        run: gh release upload "${{ github.ref_name }}" "dist/ollamas-${{ matrix.target }}" "dist/ollamas-${{ matrix.target }}.sha256" --clobber
+        # ref_name + target go through env vars (not ${{ }} interpolation in the
+        # shell) so a crafted tag name can't inject shell commands here.
+        run: gh release upload "$REF" "dist/ollamas-$TARGET" "dist/ollamas-$TARGET.sha256" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
 
   manifest:
     needs: binary
