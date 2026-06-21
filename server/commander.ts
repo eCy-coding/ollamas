@@ -29,6 +29,7 @@ export class DesktopCommander {
             if (!scriptName?.endsWith('.py')) {
                 throw new Error("Invalid Python script.");
             }
+            // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal — confined by the root-escape guard immediately below (resolved scriptPath must start with SCRIPTS_DIR + path.sep, else it throws); also .py-gated, existsSync-checked, and run via execFile (no shell).
             const scriptPath = path.join(this.SCRIPTS_DIR, scriptName);
             // Path-traversal guard: resolved path must stay under SCRIPTS_DIR.
             const root = path.resolve(this.SCRIPTS_DIR);

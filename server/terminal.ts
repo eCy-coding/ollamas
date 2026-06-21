@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { db } from "./db";
 
 // Allowed structural commands
@@ -115,18 +115,28 @@ export class TerminalManager {
       "allow"
     );
 
+    // Tokenize on whitespace and run WITHOUT a shell. Because BLOCKED_METACHARACTERS
+    // already forbids every shell operator (; & | ` $ > <), a permitted command is a
+    // plain `binary arg arg` form — no quoting/expansion is needed. execFile passes
+    // these tokens straight to execve as an argv array, so quote-breakout and
+    // argument/command injection (e.g. a tool that interpolates user text into the
+    // command string) are structurally impossible, not merely blocklisted.
+    const [binary, ...commandArgs] = words;
+
     return new Promise((resolve) => {
       // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
-      // Justified: `trimmed` passes a strict binary allowlist + shell-metachar block
-      // + permission gate + audit log above; not raw user shell.
-      exec(
-        trimmed,
+      // Justified: execFile (no shell) + strict binary allowlist + shell-metachar block
+      // + permission gate + audit log above; argv array, not raw user shell.
+      execFile(
+        binary,
+        commandArgs,
         {
           cwd: workspaceRoot || process.cwd(),
           timeout: 45000, // Safe 45s hard timeout for local test suites
+          shell: false,
         },
         (error, stdout, stderr) => {
-          const exitCode = error ? (error.code || 1) : 0;
+          const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number }).code as number || 1) : 0;
           resolve({
             stdout: stdout || "",
             stderr: stderr || "",

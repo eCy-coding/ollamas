@@ -28,8 +28,9 @@ export class FilesystemManager {
       throw new Error("Workspace root directory is not configured.");
     }
     const resolvedRoot = path.resolve(workspaceRoot);
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal — confined by the root-escape guard 4 lines below (resolvedTarget must equal resolvedRoot or start with resolvedRoot + path.sep, else it throws).
     const resolvedTarget = path.resolve(path.join(resolvedRoot, relativeTarget));
-    
+
     // Safety check: Does the target resolve under the workspace root?
     const rootWithSep = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
     if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(rootWithSep)) {
@@ -73,6 +74,7 @@ export class FilesystemManager {
         if (["node_modules", ".git", "dist", "__pycache__", ".ephemeral-data"].includes(file)) {
           continue;
         }
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal — `file` is a real on-disk entry from fs.readdirSync(dirPath), not user input; recursion only descends into actual directories under the workspace root, so no attacker-controlled traversal.
         const fullPath = path.join(dirPath, file);
         const relativePath = relativeDir ? `${relativeDir}/${file}` : file;
         const stat = fs.statSync(fullPath);
