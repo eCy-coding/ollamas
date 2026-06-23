@@ -10,7 +10,7 @@
 //         [--bridge-url http://127.0.0.1:7345] [--ollama http://127.0.0.1:11434]
 
 import { execSync } from "node:child_process";
-import { appendFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const opt = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 ? process.argv[i + 1] : d; };
@@ -93,6 +93,16 @@ const CHECKS = [
       const bad = (m.critical || 0) + (m.high || 0);
       return { status: bad === 0 ? "PASS" : "FAIL", detail: `crit=${m.critical||0} high=${m.high||0} mod=${m.moderate||0} low=${m.low||0}` }; }
     catch (e) { return { status: "SKIP", detail: `audit parse failed: ${e.message}` }; } } },
+
+  { name: "content_queue", sev: "MED", run: async () => {
+    const dir = `${process.env.HOME}/.llm-mission-control/content-queue`;
+    if (!existsSync(dir)) return { status: "SKIP", detail: "no content-queue yet (scripts/content-pipeline.mjs)" };
+    let ready = 0, total = 0;
+    for (const slug of readdirSync(dir)) {
+      const meta = `${dir}/${slug}/meta.json`; if (!existsSync(meta)) continue; total++;
+      try { if (JSON.parse(readFileSync(meta, "utf8")).status === "ready") ready++; } catch {}
+    }
+    return { status: "PASS", detail: `${ready}/${total} prepped bundle(s) awaiting authed-browser publish` }; } },
 ];
 
 const ORDER = { CRITICAL: 0, HIGH: 1, MED: 2 };
