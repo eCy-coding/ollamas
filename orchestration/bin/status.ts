@@ -63,7 +63,7 @@ function discoverWorktrees(): Worktree[] {
 }
 
 /** maxdepth 3, node_modules/.git atla; ad regex eşleşen ilk dosya yolu. */
-function findFile(root: string, re: RegExp, depth = 3): string | null {
+export function findFile(root: string, re: RegExp, depth = 3): string | null {
   if (depth < 0 || !existsSync(root)) return null;
   let entries: string[] = [];
   try { entries = readdirSync(root); } catch { return null; }
@@ -203,4 +203,5 @@ function main(): void {
   }
 }
 
-main();
+// Run main() only as a CLI (not when imported by tests — import would call process.exit).
+if (process.argv[1] && /status\.ts$/.test(process.argv[1])) main();

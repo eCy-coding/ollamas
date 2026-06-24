@@ -32,7 +32,7 @@ function sh(file: string, args: string[]): string {
 interface LaneAudit { lane: string; path: string; flagged: DepAudit[]; total: number; note: string; }
 
 /** Bir worktree'nin runtime dep'lerini syft SBOM ile denetle (syft yoksa note + boş). */
-function auditWorktree(path: string, branch: string, syftOk: boolean): LaneAudit {
+export function auditWorktree(path: string, branch: string, syftOk: boolean): LaneAudit {
   const pkgPath = findFile(path, /^package\.json$/, 1);
   if (!pkgPath) return { lane: branch, path, flagged: [], total: 0, note: "package.json yok" };
   const pkgText = readFileSync(pkgPath, "utf8");
@@ -92,4 +92,5 @@ function main(): void {
   process.exit(violations.length ? 1 : 0); // yalnız matris-ihlali hard fail
 }
 
-main();
+// Run main() only as a CLI (not when imported by tests — import would call process.exit).
+if (process.argv[1] && /adopt-gate\.ts$/.test(process.argv[1])) main();
