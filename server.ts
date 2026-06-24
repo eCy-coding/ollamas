@@ -628,10 +628,14 @@ async function initializeServer() {
 
   app.post("/api/agent/chat", async (req, res) => {
     const { messages, autoApply, maxSteps = 8, sessionId, verify } = req.body;
-    // Caller params win; otherwise default to the measured champion (implementer).
+    // Caller params win; default to the measured champion ONLY when the caller pinned
+    // NEITHER provider nor model. If the caller chose a provider (e.g. "gemini") we must
+    // NOT leak the implementer's cross-provider model name to it — let that provider
+    // resolve its own default (model=undefined).
     const _combo = loadAgentCombination();
-    const provider = req.body.provider ?? _combo.implementer?.provider;
-    const model = req.body.model ?? _combo.implementer?.model;
+    const _useCombo = req.body.provider === undefined && req.body.model === undefined && !!_combo.implementer;
+    const provider = req.body.provider ?? (_useCombo ? _combo.implementer!.provider : undefined);
+    const model = req.body.model ?? (_useCombo ? _combo.implementer!.model : undefined);
 
     // Validate BEFORE switching to SSE: once event-stream headers are sent we can no
     // longer return a clean status. A missing/empty messages[] would otherwise throw
@@ -660,7 +664,7 @@ async function initializeServer() {
     const workspaceRoot = db.data.workspacePath;
 
     // Surface which model the live agent runs (traceability: measured champion vs default).
-    sendEvent("model", { provider: provider ?? "(chain default)", model: model ?? "(provider default)", source: _combo.implementer ? "combination" : "default" });
+    sendEvent("model", { provider: provider ?? "(chain default)", model: model ?? "(provider default)", source: _useCombo ? "combination" : "caller" });
     let finalText = ""; // captured at loop end for the opt-in verifier gate
 
     // Tool schemas come from the single registry (AGENTS.md §4 choke-point).
