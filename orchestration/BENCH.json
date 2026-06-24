@@ -1,64 +1,7 @@
 {
   "chip": "Apple M4 Max",
-  "records": 4,
-  "aggs": [
-    {
-      "model": "qwen3-coder:30b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 119.7,
-      "p95": 119.7,
-      "mad": 0,
-      "min": 119.7,
-      "max": 119.7,
-      "correctRatio": 1
-    },
-    {
-      "model": "qwen3:4b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 111,
-      "p95": 111,
-      "mad": 0,
-      "min": 111,
-      "max": 111,
-      "correctRatio": 0
-    },
-    {
-      "model": "gpt-oss:20b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 88.9,
-      "p95": 88.9,
-      "mad": 0,
-      "min": 88.9,
-      "max": 88.9,
-      "correctRatio": 1
-    },
-    {
-      "model": "qwen3:8b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 81.4,
-      "p95": 81.4,
-      "mad": 0,
-      "min": 81.4,
-      "max": 81.4,
-      "correctRatio": 1
-    }
-  ],
-  "best": {
-    "mac": {
-      "model": "qwen3-coder:30b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 119.7,
-      "p95": 119.7,
-      "mad": 0,
-      "min": 119.7,
-      "max": 119.7,
-      "correctRatio": 1
-    }
-  },
+  "records": 0,
+  "aggs": [],
+  "best": {},
   "regressions": []
 }

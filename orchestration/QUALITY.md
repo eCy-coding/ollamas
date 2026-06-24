@@ -1,22 +1,20 @@
 # QUALITY — Tüm-Lane Sağlık Matrisi (vO9, 0-manuel)
 
-> READ-ONLY `quality.ts` üretti · 2026-06-20T11:41:46.254Z · tsc CANLI + vitest .last-run cache.
-> **🟢 1 green · 🔴 1 red · ⚪ 7 unknown** (toplam 9 lane).
+> READ-ONLY `quality.ts` üretti · 2026-06-24T08:39:50.000Z · tsc CANLI + vitest .last-run cache.
+> **🟢 0 green · 🔴 2 red · ⚪ 4 unknown** (toplam 6 lane).
 
 | Lane | tsc | test (son koşu) | dirty | Durum |
 |------|-----|------------------|-------|-------|
-| `backend` | ✓ | failed | 1△ | 🔴 RED |
-| `cli` | ✓ | unknown | 0△ | ⚪ unknown |
-| `frontend` | ✓ | passed | 3△ | 🟢 GREEN |
-| `general` | ✓ | unknown | 0△ | ⚪ unknown |
-| `gateway` | ✓ | unknown | 0△ | ⚪ unknown |
-| `orchestration` | — | unknown | 32△ | ⚪ unknown |
-| `scripts` | ✓ | unknown | 10△ | ⚪ unknown |
-| `tunnel` | — | unknown | 20△ | ⚪ unknown |
-| `v` | ✓ | unknown | 6△ | ⚪ unknown |
+| `backend` | ✓ | failed ⏳bayat | 23△ | 🔴 RED |
+| `verify/gwv2-all-lanes` | ✓ | unknown | 0△ | ⚪ unknown |
+| `integration/v17-core` | ✗ (18) | unknown | 35△ | 🔴 RED |
+| `fix/binary-architecture-calibration` | ✓ | unknown | 12△ | ⚪ unknown |
+| `claude/loving-varahamihira-77d4a9` | — | unknown | 1△ | ⚪ unknown |
+| `claude/naughty-kowalevski-2ccc35` | — | unknown | 540△ | ⚪ unknown |
 
 ## 🔴 RED lane'ler (conductor'a sinyal)
 - **backend**: test failed
+- **integration/v17-core**: tsc 18 hata
 
 ---
 _vitest CANLI koşulmaz (cache tüketilir); tsc stateless read-only. Gap'i conductor fixlemez → lane sekmesine backlog (§3)._

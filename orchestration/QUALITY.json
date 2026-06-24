@@ -1,106 +1,80 @@
 {
-  "ts": "2026-06-20T11:41:46.254Z",
+  "ts": "2026-06-24T08:39:50.000Z",
   "lanes": [
     {
       "lane": "backend",
-      "branch": "feat/v1.11-roots-abort",
+      "branch": "chore/p1-hardening",
       "tsc": "pass",
       "tscErrors": 0,
       "testLast": "failed",
-      "testTs": "2026-06-18T23:36:52.502Z",
+      "testTs": "2026-06-20T20:57:19.210Z",
+      "testStale": true,
+      "dirty": 23
+    },
+    {
+      "lane": "verify/gwv2-all-lanes",
+      "branch": "verify/gwv2-all-lanes",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
+    },
+    {
+      "lane": "integration/v17-core",
+      "branch": "integration/v17-core",
+      "tsc": "fail",
+      "tscErrors": 18,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 35
+    },
+    {
+      "lane": "fix/binary-architecture-calibration",
+      "branch": "fix/binary-architecture-calibration",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 12
+    },
+    {
+      "lane": "claude/loving-varahamihira-77d4a9",
+      "branch": "claude/loving-varahamihira-77d4a9",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
       "testStale": false,
       "dirty": 1
     },
     {
-      "lane": "cli",
-      "branch": "feat/cli-v2-clean",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 0
-    },
-    {
-      "lane": "frontend",
-      "branch": "feat/frontend-vf3",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "passed",
-      "testTs": "2026-06-20T11:17:07.691Z",
-      "testStale": false,
-      "dirty": 3
-    },
-    {
-      "lane": "general",
-      "branch": "feat/general-oauth-grants",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 0
-    },
-    {
-      "lane": "gateway",
-      "branch": "feat/gateway-v2",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 0
-    },
-    {
-      "lane": "orchestration",
-      "branch": "feat/orchestration-v3",
+      "lane": "claude/naughty-kowalevski-2ccc35",
+      "branch": "claude/naughty-kowalevski-2ccc35",
       "tsc": "skip",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
       "testStale": false,
-      "dirty": 32
-    },
-    {
-      "lane": "scripts",
-      "branch": "feat/scripts-v1",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 10
-    },
-    {
-      "lane": "tunnel",
-      "branch": "feat/tunnel-v1",
-      "tsc": "skip",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 20
-    },
-    {
-      "lane": "v",
-      "branch": "feat/v1.8-bench",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 6
+      "dirty": 540
     }
   ],
   "redLanes": [
     {
       "lane": "backend",
       "detail": "test failed"
+    },
+    {
+      "lane": "integration/v17-core",
+      "detail": "tsc 18 hata"
     }
   ],
   "totals": {
-    "green": 1,
-    "red": 1,
-    "unknown": 7
+    "green": 0,
+    "red": 2,
+    "unknown": 4
   }
 }

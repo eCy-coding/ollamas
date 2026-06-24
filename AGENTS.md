@@ -166,3 +166,21 @@ uzak tenant'a yalnız plan allowlist'i izin verirse açılır. `SAAS_ENFORCE=1` 
 Bu dosya yazıldıktan sonra ollamas üzerindeki her iş §1 rollerine + §2 prensiplerine +
 §3 kapısına göre yürür. Plan tek seferlik değil — sürekli, her işlemde bir adım ileri.
 Bir şeyi değiştirirken bu sözleşmeyi de güncel tut: kural değişiyorsa önce burada değişir.
+
+---
+
+## 9. Orchestration — Otonom Kondüktör (0-manuel, entegre)
+
+`orchestration/` dizini projenin **0-manuel otonom kondüktörüdür** (read-only meta-katman; lane
+kodu yazmaz, koordine eder). Operating-model'in birinci-sınıf parçası — bolted-on değil.
+
+- **Tek-komut pipeline:** `npx tsx orchestration/bin/autopilot.ts` → benchprompt(M4-optimal model
+  seçimi) → critic+dod(öz-denetim) → conduct(deterministik tek-eylem) → fuse(birleşik kritik
+  gereksinim `REQUIREMENTS.md`) → status → doctor(readiness GO/NO-GO). Artefaktlar: `orchestration/*.md`.
+- **Detector precision:** dod/critic gürültü-flag'i `.policy-suppress.json` (gerekçeli-istisna,
+  silent-değil) ile elenir → verdict güvenilir.
+- **Sürekli operasyon (bir-kerelik aktivasyon, PRIVILEGED):** `bash orchestration/bin/activate.sh`
+  → `.claude/settings.json` hook (SessionStart→autopilot + model-soru→benchmark-kanıtlı cevap) +
+  launchd agent (bench-değişim + 30dk periyodik). Path'ler script-konumundan dinamik (portable, vO16).
+- **Sözleşme:** `orchestration/ORCHESTRATION_AGENTS.md` (§0-§15+). Kanıt: `orchestration/SEYIR_DEFTERI_ORCHESTRATION.md`.
+- **Test:** `npx vitest run --config orchestration/vitest.config.ts` (root suite'ten izole, ERR-SCR-002).

@@ -1,61 +1,63 @@
 # REQUIREMENTS — Birleşik Kritik Gereksinimler (füzyon)
 
 > READ-ONLY `fuse.ts`: tüm analizör (conduct/critic/dod/quality) → tek critical-first liste.
-> **Proje hazırlık: 66/100** · 14 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
+> **Proje hazırlık: 40/100** · 14 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
 
 ## 🎯 EN KRİTİK GEREKSİNİM
-**Criticality:** COMPLETENESS · **Kaynak:** conduct+dod
+**Criticality:** CRITICAL · **Kaynak:** conduct
 
-**Gereksinim:** adopt-gate kısmen tamam — eksik eş-zamanlı: test
+**Gereksinim:** tsc 18 hata
 
-**Eylem:** adopt-gate için test aynı anda tamamla
+**Eylem:** integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
 
 ## Tüm gereksinimler (critical-first)
-### COMPLETENESS (10)
+### CRITICAL (1)
+- **red:integration/v17-core** [conduct]: tsc 18 hata
+  → integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
+
+### COMPLETENESS (9)
+- **crit:done-no-evidence:vO16** [conduct+critic]: vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok
+  → vO16 kanıtını doğrula ya da DONE'ı geri al
 - **dod:concurrent-task:adopt-gate** [conduct+dod]: adopt-gate kısmen tamam — eksik eş-zamanlı: test
   → adopt-gate için test aynı anda tamamla
 - **dod:concurrent-task:claim** [conduct+dod]: claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry
   → claim için test + SEYIR-entry aynı anda tamamla
 - **dod:concurrent-task:driftguard** [conduct+dod]: driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry
   → driftguard için SEYIR-entry aynı anda tamamla
-- **dod:concurrent-task:ops** [conduct+dod]: ops kısmen tamam — eksik eş-zamanlı: roadmap-row
-  → ops için roadmap-row aynı anda tamamla
 - **dod:concurrent-task:scan** [conduct+dod]: scan kısmen tamam — eksik eş-zamanlı: test
   → scan için test aynı anda tamamla
 - **dod:concurrent-task:status** [conduct+dod]: status kısmen tamam — eksik eş-zamanlı: test
   → status için test aynı anda tamamla
-- **dod:uncommitted-green:28 dosya** [conduct+dod]: Commit'siz yeşil iş (built-not-shipped): ADOPTIONS_ORCHESTRATION.md, AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json…
+- **dod:uncommitted-green:20 dosya** [conduct+dod]: Commit'siz yeşil iş (built-not-shipped): AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json, CRITIC.md…
   → yeşil parçayı commit'le (per-file git add + conventional)
-- **red:backend** [conduct+conduct(stale)]: test failed — testTs bayat, güvenilmez (phantom-critical önlendi)
+- **red:backend** [conduct(stale)]: test failed — testTs bayat, güvenilmez (phantom-critical önlendi)
   → backend: testi taze koş; gerçekten kırıksa CRITICAL olur
-- **stale:quality** [quality(stale)]: quality verisi 74 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)
+- **stale:quality** [quality(stale)]: quality verisi 124 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)
   → quality.ts yeniden koş (taze quality üret)
-- **dod:roadmap-coherence:ops** [conduct+dod]: ops aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)
-  → ops'yi ilgili vO satırına ekle
 
-### ROADMAP (4)
-- **next:cli** [conduct]: cli sıradaki: v16 TUI v2 / agent watch top multi pane (request
-  → cli: "sıradaki versiyonu planla cli"
-- **next:deploy** [conduct]: deploy sıradaki: ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
-  → deploy: "sıradaki versiyonu planla deploy"
-- **next:scripts** [conduct]: scripts sıradaki: Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. 
-  → scripts: "sıradaki versiyonu planla scripts"
-- **next:ukp** [conduct]: ukp sıradaki: ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
-  → ukp: "sıradaki versiyonu planla ukp"
+### STALE (4)
+- **stale:claude/loving-varahamihira-77d4a9** [conduct]: claude/loving-varahamihira-77d4a9 132s commitsiz (idle)
+  → claude/loving-varahamihira-77d4a9: sıradaki versiyonu planla (durağan)
+- **stale:claude/naughty-kowalevski-2ccc35** [conduct]: claude/naughty-kowalevski-2ccc35 87s commitsiz (idle)
+  → claude/naughty-kowalevski-2ccc35: sıradaki versiyonu planla (durağan)
+- **stale:fix/binary-architecture-calibration** [conduct]: fix/binary-architecture-calibration 74s commitsiz (idle)
+  → fix/binary-architecture-calibration: sıradaki versiyonu planla (durağan)
+- **stale:verify/gwv2-all-lanes** [conduct]: verify/gwv2-all-lanes 86s commitsiz (idle)
+  → verify/gwv2-all-lanes: sıradaki versiyonu planla (durağan)
 
 ## Kaynak tazelik (eşik 60dk)
 | Kaynak | ts | Durum |
 |---|---|---|
 | conduct | (canlı exec) | ✓ taze |
-| critic | 2026-06-20T13:07:44.760Z | ✓ taze |
-| dod | 2026-06-20T13:07:44.901Z | ✓ taze |
-| quality | 2026-06-20T11:53:27.489Z | ⚠️ BAYAT (füzyon-dışı) |
+| critic | 2026-06-24T10:43:10.592Z | ✓ taze |
+| dod | 2026-06-24T10:43:11.106Z | ✓ taze |
+| quality | 2026-06-24T08:39:50.000Z | ⚠️ BAYAT (füzyon-dışı) |
 
 ## Optimal working-prompt (en-kritik eyleme)
 _(bench verisi yok)_
 
 <next-action>
-adopt-gate için test aynı anda tamamla
+integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
 </next-action>
 
 ---

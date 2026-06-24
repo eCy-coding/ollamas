@@ -56,8 +56,10 @@ describe("discoverWorktrees (read-only)", () => {
       expect(w.head).toBeTruthy();
     }
   });
-  it("orchestration worktree'sini içerir", () => {
-    expect(wts.some((w) => /orchestration/.test(w.path) || /orchestration/.test(w.branch))).toBe(true);
+  it("ANCHOR'ı (orchestration'ın yaşadığı entegre tree) içerir", () => {
+    // vO16: lane-worktree'leri integration/all-lanes'e ENTEGRE edildi → ayrı orchestration-worktree YOK;
+    // orchestration artık ANCHOR (ana entegre tree) içinde yaşar. discoverWorktrees ANCHOR'ı içermeli.
+    expect(wts.some((w) => w.path === ANCHOR)).toBe(true);
   });
 });
 

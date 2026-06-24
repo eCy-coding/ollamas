@@ -1,13 +1,14 @@
 # CRITIC — Orchestration Öz-Denetim (completeness)
 
 > READ-ONLY `critic.ts` üretti. Sistem kendi açığını bulur (deterministik, self-improving).
-> **Kapsamlılık skoru: 100/100** · 0 gap (28 araç, 34 artefakt).
+> **Kapsamlılık skoru: 94/100** · 1 gap (27 araç, 32 artefakt).
 
 ### 🔴 Roadmap-vs-Gerçek Drift (0)
 - _temiz_
 
-### DONE ama kanıt-yok (0)
-- _temiz_
+### DONE ama kanıt-yok (1)
+- **[med]** vO16: vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok
+  → vO16 kanıtını doğrula ya da DONE'ı geri al
 
 ### Orphan artefakt (0)
 - _temiz_
