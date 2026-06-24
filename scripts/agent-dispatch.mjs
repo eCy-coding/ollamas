@@ -19,7 +19,10 @@ const opt = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[
 const has = (flag) => args.includes(flag);
 
 const URL = process.env.OLLAMAS_URL || "http://127.0.0.1:8090";
-const MODEL = opt("--model", ""); // empty → omit, let the provider pick its own default
+// ollama-local → bench-proven qwen3:8b default (docs/AGENT_TOPOLOGY.md: fastest correct on
+// coding; avoid qwen3:4b = demo-suspected). Override with --model or OLLAMAS_MODEL; other
+// providers keep their own default (empty → omitted). ready.mjs guarantees qwen3:8b is pulled.
+const MODEL = opt("--model", opt("--provider", "ollama-local") === "ollama-local" ? (process.env.OLLAMAS_MODEL || "qwen3:8b") : "");
 const PROVIDER = opt("--provider", "ollama-local");
 const STEPS = Number(opt("--steps", "10"));
 const TIMEOUT = Number(process.env.OLLAMAS_TIMEOUT_MS || "180000");

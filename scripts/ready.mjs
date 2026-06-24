@@ -77,6 +77,15 @@ if (ollamaUp) {
 const appUp = await httpOk(`http://127.0.0.1:${PORT}/api/health`);
 add("app-server", appUp ? "ok" : "start", appUp ? `:${PORT}` : "not running", appUp ? "" : "start it: `npm run dev`  (or full stack: `make up`)");
 
+// 5b) agent endpoint — what agent-dispatch.mjs actually posts to (OLLAMAS_URL/api/agent/chat,
+// default :8090). The SaaS gateway on :PORT is auth-guarded and is NOT the agent endpoint, so a
+// green app-server alone does not prove dispatch works. A non-error response (even 400 on an
+// empty body) = reachable; connection refused = down.
+const AGENT_URL = (process.env.OLLAMAS_URL || "http://127.0.0.1:8090").replace(/\/$/, "");
+let agentUp = false;
+try { await fetch(`${AGENT_URL}/api/agent/chat`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(2500) }); agentUp = true; } catch { /* unreachable */ }
+add("agent-endpoint", agentUp ? "ok" : "start", agentUp ? AGENT_URL : `unreachable ${AGENT_URL}`, agentUp ? "" : "start the agent server: `npm run dev`");
+
 // 6) authoritative deep audit — reuse doctor.mjs (do NOT re-implement its checks)
 let doctor = null;
 try {
@@ -98,6 +107,6 @@ for (const s of steps) console.log(`[${mark[s.status] || s.status}] ${s.name.pad
 if (doctor) console.log(`\ndoctor (deep audit): ${doctor.ok ? "all critical checks OK" : "warnings/criticals — run `make doctor` for detail"}`);
 
 console.log(ready
-  ? `\n✓ prerequisites ready.${appUp ? "  ollamas is up — dispatch: npm run agent -- \"<task>\"" : "  Now start it: npm run dev   (or make up)"}`
+  ? `\n✓ prerequisites ready.${agentUp ? "  agent endpoint up — dispatch: npm run agent -- \"<task>\"" : "  Now start the server: npm run dev   (or make up)"}`
   : `\n✗ ${blocking.length} blocking item(s) above — resolve them, then re-run \`npm run ready\`.`);
 process.exit(ready ? 0 : 1);
