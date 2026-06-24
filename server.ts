@@ -12,7 +12,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
-import { ProviderRouter } from "./server/providers";
+import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
@@ -697,6 +697,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     try {
       let stepNum = 1;
       let shouldHalt = false;
+      let repairBudget = 2; // CRITICAL-3: bounded Try-Rewrite-Retry on malformed tool-call args
 
       while (stepNum <= maxSteps && !shouldHalt) {
         sendEvent("thought", { text: `Thinking on Step ${stepNum}...` });
@@ -727,8 +728,25 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
           for (const tc of result.toolCalls) {
             const toolName = tc.name;
-            const args = tc.arguments || {};
             const toolCallId = tc.id;
+            // CRITICAL-3: normalize string-encapsulated args (fastmcp#932) then check the
+            // repair sentinel. Malformed args are NOT run with empty {} — feed the error
+            // back so the model re-emits valid JSON (Try-Rewrite-Retry, bounded budget).
+            let args = tc.arguments || {};
+            if (typeof args === "string") {
+              const p = repairJson(args);
+              args = p && typeof p === "object" ? p : { __toolArgError: "tool arguments were a non-JSON string" };
+            }
+            const argErr = getToolArgError(args);
+            if (argErr) {
+              const msg = repairBudget > 0
+                ? `ERROR: ${argErr}. Re-emit the "${toolName}" tool call with VALID JSON arguments — no code fences, no trailing commas, escape newlines/tabs inside strings.`
+                : `ERROR: ${argErr}. Tool-arg repair budget exhausted; skipping this call.`;
+              if (repairBudget > 0) repairBudget--;
+              sendEvent("repair", { stepNum, tool: toolName, error: argErr, budgetLeft: repairBudget });
+              activeHistory.push({ role: "tool" as any, name: toolName, tool_call_id: toolCallId, content: msg });
+              continue; // do not execute with bad args; model retries next step
+            }
             let output: any;
             let ok = true;
             let diff = "";
