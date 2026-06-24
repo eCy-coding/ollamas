@@ -129,7 +129,10 @@ async function main(): Promise<void> {
   appendFileSync(STATE, JSON.stringify({ ts: snap.ts, kinds: findings.map((f) => f.kind), action: action?.kind ?? null }) + "\n");
   console.error(`[conduct] ${findings.length} bulgu, eylem=${action ? action.tier + ":" + action.lane : "yok"}, delta +${delta.added.length}/-${delta.resolved.length}.`);
 
-  if (action?.tier === "RED") process.exit(1);
+  // RED gate: standalone/CI exits 1 on a RED action. --no-gate skips it (artifact already
+  // written above) so the autopilot's read-only refresh isn't mislabelled as a crash; a real
+  // crash still exits non-zero. The RED finding stays visible in CONDUCTOR.md regardless.
+  if (action?.tier === "RED" && !process.argv.includes("--no-gate")) process.exit(1);
 }
 
 main();

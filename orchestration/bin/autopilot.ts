@@ -128,7 +128,7 @@ function main(): void {
     runStep("benchprompt", "benchprompt.ts", []),
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
-    runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
+    runStep("conduct", "conduct.ts", ["--json", "--no-gate"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir; --no-gate: kasıtlı RED gate-exit'i refresh'te crash sayma (gerçek crash hâlâ ✗)
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("status", "status.ts", []),
     runDoctor(),
