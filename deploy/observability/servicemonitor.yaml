@@ -1,0 +1,26 @@
+# Prometheus Operator ServiceMonitor — scrapes the ollamas gateway /metrics endpoint.
+# /metrics is registered BEFORE auth in server.ts (unauthenticated by design), so no
+# bearer token is needed; restrict access at the network layer (ClusterIP + NetworkPolicy).
+# Requires: the kube-prometheus-stack / Prometheus Operator CRDs, and a Service with a
+# port NAMED "http" selecting app=ollamas (see deploy/k8s/ollamas.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ollamas
+  labels:
+    app: ollamas
+    # Match your Prometheus `serviceMonitorSelector` (kube-prometheus-stack default
+    # discovers by `release: <prometheus-release>`). Adjust to your install.
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ollamas
+  namespaceSelector:
+    any: true
+  endpoints:
+    - port: http            # the Service port name (targetPort 3000)
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true

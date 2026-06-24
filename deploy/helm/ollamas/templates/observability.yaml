@@ -1,0 +1,77 @@
+{{- if .Values.observability.serviceMonitor.enabled }}
+# Prometheus Operator ServiceMonitor — scrapes the unauthenticated /metrics endpoint.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    {{- with .Values.observability.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels: { app: {{ .Release.Name }} }
+  namespaceSelector:
+    matchNames: [{{ .Release.Namespace }}]
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.observability.serviceMonitor.interval }}
+      scrapeTimeout: 10s
+{{- end }}
+{{- if .Values.observability.prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    {{- with .Values.observability.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: ollamas.availability
+      rules:
+        - alert: OllamasTargetDown
+          expr: up{job=~".*{{ .Release.Name }}.*"} == 0
+          for: 5m
+          labels: { severity: critical, app: {{ .Release.Name }} }
+          annotations:
+            summary: "ollamas gateway target down"
+            description: "Prometheus cannot scrape an ollamas instance for 5m."
+    - name: ollamas.saturation
+      rules:
+        - alert: OllamasDbPoolExhausted
+          expr: (max(ollamas_db_pool_connections{state="idle"}) == 0) and (max(ollamas_db_pool_connections{state="waiting"}) > 0)
+          for: 5m
+          labels: { severity: warning, app: {{ .Release.Name }} }
+          annotations:
+            summary: "Postgres pool exhausted"
+            description: "0 idle connections with waiters for 5m — raise DB_POOL_SIZE or scale out."
+        - alert: OllamasWebhookQueueBacklog
+          expr: max(ollamas_webhook_queue_depth) > {{ .Values.observability.prometheusRule.webhookQueueThreshold }}
+          for: 10m
+          labels: { severity: warning, app: {{ .Release.Name }} }
+          annotations:
+            summary: "Webhook delivery backlog"
+            description: "{{`{{ $value }}`}} webhook deliveries pending for 10m."
+    - name: ollamas.errors
+      rules:
+        - alert: OllamasToolErrorRateHigh
+          expr: sum(rate(mcp_tool_calls_total{ok="false"}[5m])) / clamp_min(sum(rate(mcp_tool_calls_total[5m])), 1) > {{ .Values.observability.prometheusRule.toolErrorRatio }}
+          for: 10m
+          labels: { severity: warning, app: {{ .Release.Name }} }
+          annotations:
+            summary: "MCP tool-call error rate high"
+            description: "Tool failures exceed the configured ratio for 10m — inspect upstream MCP / provider health."
+        - alert: OllamasHttpP99LatencyHigh
+          expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_ms_bucket[5m]))) > {{ .Values.observability.prometheusRule.p99LatencyMs }}
+          for: 10m
+          labels: { severity: warning, app: {{ .Release.Name }} }
+          annotations:
+            summary: "HTTP p99 latency high"
+            description: "p99 request latency above the configured threshold for 10m."
+{{- end }}

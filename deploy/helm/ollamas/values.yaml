@@ -73,3 +73,19 @@ persistence:
   enabled: true
   size: 1Gi
   storageClass: ""   # "" = cluster default
+
+# Observability — scrape the /metrics endpoint (registered before auth in server.ts,
+# so unauthenticated; protect at the network layer). Grafana dashboard lives at
+# deploy/observability/grafana-dashboard.json.
+observability:
+  podAnnotations: true            # prometheus.io/scrape annotations (operator-less fallback)
+  serviceMonitor:
+    enabled: false                # requires the Prometheus Operator CRDs
+    interval: 30s
+  prometheusRule:
+    enabled: false                # requires the Prometheus Operator CRDs
+    webhookQueueThreshold: 100     # OllamasWebhookQueueBacklog: pending deliveries
+    toolErrorRatio: 0.05           # OllamasToolErrorRateHigh: 5% of tool calls
+    p99LatencyMs: 2000             # OllamasHttpP99LatencyHigh: p99 over 2s
+  # HPA on a custom Prometheus metric (e.g. webhook queue depth) needs prometheus-adapter
+  # installed; see deploy/observability/README.md. Default HPA stays CPU-only.

@@ -10,6 +10,13 @@ spec:
   template:
     metadata:
       labels: { app: {{ .Release.Name }} }
+      {{- if .Values.observability.podAnnotations }}
+      # Annotation-based scrape fallback (operator ServiceMonitor preferred when enabled).
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: {{ .Values.service.targetPort | quote }}
+      {{- end }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
@@ -33,7 +40,7 @@ spec:
         - name: ollamas
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports: [{ containerPort: {{ .Values.service.targetPort }} }]
+          ports: [{ name: http, containerPort: {{ .Values.service.targetPort }} }]
           # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
@@ -84,7 +91,8 @@ metadata:
 spec:
   selector: { app: {{ .Release.Name }} }
   ports:
-    - port: {{ .Values.service.port }}
+    - name: http          # named so the Prometheus ServiceMonitor can target it
+      port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
 {{- if .Values.autoscaling.enabled }}
 ---

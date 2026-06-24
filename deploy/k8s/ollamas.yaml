@@ -43,6 +43,12 @@ spec:
   template:
     metadata:
       labels: { app: ollamas }
+      # Annotation-based scrape fallback for clusters without the Prometheus Operator
+      # (the ServiceMonitor in deploy/observability is preferred where available).
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "3000"
     spec:
       # Give in-flight /mcp streams + webhook deliveries time to drain on SIGTERM
       # before the kubelet SIGKILLs (Faz 13A graceful shutdown).
@@ -64,7 +70,7 @@ spec:
       containers:
         - name: ollamas
           image: ghcr.io/ecy-coding/ollamas:latest
-          ports: [{ containerPort: 3000 }]
+          ports: [{ name: http, containerPort: 3000 }]
           # Container-level securityContext closes semgrep allow-privilege-escalation-no-securitycontext.
           # readOnlyRootFilesystem: true is safe here because /tmp and the data dir
           # are backed by emptyDir volumes declared above.
@@ -106,7 +112,8 @@ metadata:
 spec:
   selector: { app: ollamas }
   ports:
-    - port: 80
+    - name: http          # named so the Prometheus ServiceMonitor can target it
+      port: 80
       targetPort: 3000
 ---
 apiVersion: autoscaling/v2
