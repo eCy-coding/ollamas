@@ -9,21 +9,38 @@
 //
 // Usage:
 //   node scripts/agent-dispatch.mjs "<task>" [--model qwen3:8b] [--provider ollama-local]
-//                                            [--root <abs-write-root>] [--steps 10] [--json]
+//                              [--role coder|reviewer|architect] [--root <abs-write-root>] [--steps 10] [--json]
 //   echo "<task>" | node scripts/agent-dispatch.mjs --model qwen3-coder:30b
 //
 // Env: OLLAMAS_URL (default http://127.0.0.1:8090), OLLAMAS_TIMEOUT_MS (default 180000).
+
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
 const opt = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
 const has = (flag) => args.includes(flag);
 
 const URL = process.env.OLLAMAS_URL || "http://127.0.0.1:8090";
-// ollama-local → bench-proven qwen3:8b default (docs/AGENT_TOPOLOGY.md: fastest correct on
-// coding; avoid qwen3:4b = demo-suspected). Override with --model or OLLAMAS_MODEL; other
-// providers keep their own default (empty → omitted). ready.mjs guarantees qwen3:8b is pulled.
-const MODEL = opt("--model", opt("--provider", "ollama-local") === "ollama-local" ? (process.env.OLLAMAS_MODEL || "qwen3:8b") : "");
 const PROVIDER = opt("--provider", "ollama-local");
+const ROLE = opt("--role", "");
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+// Measured routing: --role maps to the conductor's combo-bench winner per role
+// (orchestration/MODEL_SELECTION.json → champions.combination.roles). Resolution order:
+//   --model > OLLAMAS_MODEL > role-model > qwen3:8b  (combo-bench "cheapest 100%" default;
+//   docs/AGENT_TOPOLOGY.md: avoid qwen3:4b = demo-suspected). Missing file/role → "".
+// …-cloud role models used ONLY when OLLAMAS_ALLOW_CLOUD is set (keep the $0 local default).
+function roleModel(role) {
+  if (!role) return "";
+  try {
+    const j = JSON.parse(readFileSync(join(REPO, "orchestration", "MODEL_SELECTION.json"), "utf8"));
+    const m = j?.champions?.combination?.roles?.[role]?.model || "";
+    return (m.endsWith("-cloud") && !process.env.OLLAMAS_ALLOW_CLOUD) ? "" : m;
+  } catch { return ""; }
+}
+const MODEL = opt("--model", "")
+  || (PROVIDER === "ollama-local" ? (process.env.OLLAMAS_MODEL || roleModel(ROLE) || "qwen3:8b") : "");
 const STEPS = Number(opt("--steps", "10"));
 const TIMEOUT = Number(process.env.OLLAMAS_TIMEOUT_MS || "180000");
 const ROOT = opt("--root", `${process.env.HOME}/.llm-mission-control/agent-work`);
@@ -32,7 +49,7 @@ const JSON_OUT = has("--json");
 // The task is the first non-flag arg, or stdin.
 const positional = args.filter((a, i) => !a.startsWith("--") && (i === 0 || !args[i - 1].startsWith("--")));
 let task = positional[0];
-if (!task && !process.stdin.isTTY) task = require("fs").readFileSync(0, "utf8").trim();
+if (!task && !process.stdin.isTTY) task = readFileSync(0, "utf8").trim();
 if (!task) { console.error("usage: agent-dispatch \"<task>\" [--model m] [--provider p] [--root dir] [--steps n] [--json]"); process.exit(2); }
 
 // eCyPro calibration: my standards, injected into the task so the sub-agent matches
