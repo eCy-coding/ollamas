@@ -5,7 +5,34 @@
 import path from "node:path";
 import { signRequest } from "./bridge-hmac";
 
-const HOST_BRIDGE_URL = process.env.HOST_BRIDGE_URL || "http://host.docker.internal:7345";
+// Bridge host resolution is environment-dependent: Docker reaches the host at
+// host.docker.internal, a local `tsx server.ts` reaches it at 127.0.0.1. The static
+// default (host.docker.internal) is unreachable from a local boot → every macos_terminal/
+// write_host_file got an instant "fetch failed". Mirror providers.ts ollama-host: try the
+// configured URL first, then loopback, and CACHE the first base that actually answers.
+const BRIDGE_CANDIDATES: string[] = [...new Set(
+  [process.env.HOST_BRIDGE_URL, "http://127.0.0.1:7345", "http://host.docker.internal:7345"].filter(Boolean) as string[],
+)];
+let resolvedBridgeBase: string | null = null;
+
+// Fetch a bridge path, trying each candidate base until one is reachable (a network/DNS
+// failure → next candidate; any HTTP response means reachable → cache it). The same init
+// (incl. signal) is reused across candidates; the timeout signal bounds the whole attempt.
+async function bridgeFetch(bridgePath: string, init: RequestInit): Promise<Response> {
+  const bases = resolvedBridgeBase
+    ? [resolvedBridgeBase, ...BRIDGE_CANDIDATES.filter((b) => b !== resolvedBridgeBase)]
+    : BRIDGE_CANDIDATES;
+  let lastErr: unknown;
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}${bridgePath}`, init);
+      resolvedBridgeBase = base; // answered (even non-2xx) → reachable; remember it
+      return res;
+    } catch (e) { lastErr = e; } // unreachable (DNS/connection) → try next candidate
+  }
+  throw lastErr ?? new Error("no reachable host bridge");
+}
+
 const HOST_BRIDGE_TOKEN = process.env.HOST_BRIDGE_TOKEN || "";
 const HOST_BRIDGE_HMAC_SECRET = process.env.HOST_BRIDGE_HMAC_SECRET || "";
 
@@ -39,7 +66,7 @@ export function bridgeHeaders(bridgePath: string, body: string): Record<string, 
 
 export async function runOnHostTerminal(target: string | undefined, command: string, timeoutMs = 45000, signal?: AbortSignal) {
   const body = JSON.stringify({ target: target || "iterm2", command, timeoutMs });
-  const res = await fetch(`${HOST_BRIDGE_URL}/run`, {
+  const res = await bridgeFetch("/run", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/run", body) },
     body,
@@ -56,7 +83,7 @@ export async function runOnHostTerminal(target: string | undefined, command: str
 // Bridge tools execute on the HOST filesystem, so this must be the host path.
 export async function execOnHost(command: string, timeoutMs = 95000, signal?: AbortSignal) {
   const body = JSON.stringify({ command, timeoutMs });
-  const res = await fetch(`${HOST_BRIDGE_URL}/exec`, {
+  const res = await bridgeFetch("/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/exec", body) },
     body,
@@ -72,7 +99,7 @@ export async function execOnHost(command: string, timeoutMs = 95000, signal?: Ab
 // Write a file directly to the macOS host filesystem via the bridge (base64).
 export async function writeHostFile(filePath: string, content: string, signal?: AbortSignal) {
   const body = JSON.stringify({ path: filePath, contentB64: Buffer.from(content || "", "utf8").toString("base64") });
-  const res = await fetch(`${HOST_BRIDGE_URL}/write`, {
+  const res = await bridgeFetch("/write", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...bridgeHeaders("/write", body) },
     body,
