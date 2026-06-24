@@ -9,6 +9,7 @@ import { WorkspaceTree } from "./components/WorkspaceTree";
 import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
+import { FileTransfer } from "./components/FileTransfer";
 import { SelfTestGates } from "./components/SelfTestGates";
 import { SecurityPolicies } from "./components/SecurityPolicies";
 import { ClusterManager } from "./components/ClusterManager";
@@ -320,7 +321,10 @@ export default function App() {
           {activeTab === "backup" && (
             <div className="animate-fade-in">
               <CapabilityGate need="fileWrite" fallback={<CapabilityDenied capKey="app.cap.fileWrite" onOpen={() => setActiveTab("security")} />}>
-                <BackupControl onNotify={notify} />
+                <div className="space-y-4">
+                  <BackupControl onNotify={notify} />
+                  <FileTransfer onNotify={notify} />
+                </div>
               </CapabilityGate>
             </div>
           )}

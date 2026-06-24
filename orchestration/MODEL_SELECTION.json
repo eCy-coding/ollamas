@@ -28,6 +28,42 @@
       "min": 119.7,
       "max": 119.7,
       "correctRatio": 1
+    },
+    "combination": {
+      "policy": "implementer-verifier",
+      "measuredBy": "scripts/combo-bench.mjs",
+      "measuredOn": "2026-06-24 (4 harder tasks: overflow.fib, float.round, dedupe.order, binsearch.miss)",
+      "rate": 1,
+      "singleBest": {
+        "model": "qwen3:8b",
+        "provider": "ollama-local",
+        "rate": 1,
+        "note": "cheapest 100%; qwen3-coder:480b-cloud also 100%"
+      },
+      "ensembleGain": "NONE on measured set — best single already 100%; best-of-N and majority-vote each cost 3x calls for 0 correctness gain. Reserve ensemble only for task classes where a single model scores <100% (e.g. gpt-oss:120b-cloud measured 50% — confident-wrong).",
+      "implementer": {
+        "provider": "ollama-local",
+        "model": "qwen3-coder:480b-cloud"
+      },
+      "verifier": {
+        "provider": "ollama-local",
+        "model": "qwen3:8b"
+      },
+      "roles": {
+        "architect": {
+          "provider": "ollama-local",
+          "model": "qwen3-coder:480b-cloud"
+        },
+        "coder": {
+          "provider": "ollama-local",
+          "model": "qwen3-coder:480b-cloud"
+        },
+        "reviewer": {
+          "provider": "ollama-local",
+          "model": "qwen3:8b"
+        }
+      },
+      "source": "~/.llm-mission-control/combo-bench.json"
     }
   },
   "regressions": []

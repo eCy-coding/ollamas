@@ -191,6 +191,47 @@ export class FilesystemManager {
   }
 
   /**
+   * Read raw bytes (binary-safe). readFile() decodes utf-8 which corrupts binary
+   * payloads (images, archives, executables) — download paths MUST use this.
+   */
+  public static readFileBuffer(isLive: boolean, workspaceRoot: string, relativePath: string): Buffer {
+    if (!isLive) {
+      const v = VIRTUAL_FILES[relativePath];
+      if (v === undefined) throw new Error("File not found in demo sandbox.");
+      return Buffer.from(v, "utf-8");
+    }
+    if (!db.data.permissions.fileRead) {
+      throw new Error("Local filesystem read permission is disabled.");
+    }
+    const safePath = this.resolveSafePath(workspaceRoot, relativePath);
+    if (!fs.existsSync(safePath)) {
+      throw new Error("Target file does not exist.");
+    }
+    return fs.readFileSync(safePath);
+  }
+
+  /**
+   * Write raw bytes (binary-safe). Creates parent dirs. Returns the resolved safe
+   * path. Upload paths MUST use this so any file type round-trips uncorrupted.
+   */
+  public static writeFileBuffer(isLive: boolean, workspaceRoot: string, relativePath: string, data: Buffer): string {
+    if (!isLive) {
+      VIRTUAL_FILES[relativePath] = data.toString("utf-8");
+      return relativePath;
+    }
+    if (!db.data.permissions.fileWrite) {
+      throw new Error("Local filesystem write permission is disabled.");
+    }
+    const safePath = this.resolveSafePath(workspaceRoot, relativePath);
+    const parentDir = path.dirname(safePath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+    fs.writeFileSync(safePath, data);
+    return safePath;
+  }
+
+  /**
    * Delete file/folder
    */
   public static deleteFile(isLive: boolean, workspaceRoot: string, relativePath: string): void {

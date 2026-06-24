@@ -271,6 +271,40 @@ const TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  download_file: {
+    tier: "safe",
+    schema: fn("download_file", "Download any workspace file as base64 (binary-safe — images, archives, binaries round-trip uncorrupted, unlike read_file which is utf-8).", {
+      type: "object",
+      properties: { path: { type: "string", description: "The workspace-relative path of the file to download." } },
+      required: ["path"],
+    }),
+    invoke: async (args, { isLive, workspaceRoot, deps }) => {
+      if (!args.path) throw new Error("Missing 'path' argument.");
+      const buf = deps.FilesystemManager.readFileBuffer(isLive, workspaceRoot, args.path);
+      deps.db.logSecurity("file_system", `Agent download_file: ${args.path}`, `Read ${buf.length} bytes as base64`, "allow");
+      return { path: args.path, bytes: buf.length, base64: buf.toString("base64") };
+    },
+  },
+
+  upload_file: {
+    tier: "safe",
+    schema: fn("upload_file", "Upload any file into the workspace from a base64 payload (binary-safe — write images, archives, binaries without corruption).", {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "The workspace-relative destination path." },
+        base64: { type: "string", description: "The file content, base64-encoded." },
+      },
+      required: ["path", "base64"],
+    }),
+    invoke: async (args, { isLive, workspaceRoot, deps }) => {
+      if (!args.path || typeof args.base64 !== "string") throw new Error("Missing 'path' or 'base64' argument.");
+      const buf = Buffer.from(args.base64, "base64");
+      deps.FilesystemManager.writeFileBuffer(isLive, workspaceRoot, args.path, buf);
+      deps.db.logSecurity("file_system", `Agent upload_file: ${args.path}`, `Wrote ${buf.length} bytes from base64`, "allow");
+      return { path: args.path, bytes: buf.length };
+    },
+  },
+
   run_command: {
     tier: "safe",
     schema: fn("run_command", "Execute a command against the safe shell terminal environment (e.g. pytest, git, ls, date). Restricted system operations are blocked.", {
