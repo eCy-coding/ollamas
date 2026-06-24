@@ -61,7 +61,7 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(res.status).toBe(401);
   });
 
-  test("free-plan key lists only the 17 safe-tier tools", async () => {
+  test("free-plan key lists only the 20 safe-tier tools", async () => {
     const j = (r: Response) => r.json() as any;
     const t = await j(await fetch(`${BASE}/api/saas/tenants`, {
       method: "POST", headers: { "content-type": "application/json", "x-admin-token": ADMIN },
@@ -78,7 +78,7 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     const { tools } = await c.listTools();
     await c.close();
 
-    expect(tools.length).toBe(18); // free plan = safe tier only (+ count_tokens graft → 18)
+    expect(tools.length).toBe(20); // free plan = safe tier only (+ count_tokens graft → 18, +upload_file/download_file → 20)
     expect(tools.some((x) => x.name === "git_commit")).toBe(false); // host tier filtered
     expect(tools.some((x) => x.name === "read_file")).toBe(true);
     expect(tools.some((x) => x.name === "rag_search")).toBe(true); // safe-tier RAG visible to free plan

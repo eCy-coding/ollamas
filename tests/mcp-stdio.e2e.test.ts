@@ -33,12 +33,12 @@ function connect(env: Record<string, string> = {}) {
 }
 
 describe("MCP stdio EXPOSE (npx ollamas-mcp)", () => {
-  test("default boot exposes the 17 safe-tier tools over stdio", async () => {
+  test("default boot exposes the 20 safe-tier tools over stdio", async () => {
     const { c, tr } = connect();
     await c.connect(tr);
     const { tools } = await c.listTools();
     await c.close();
-    expect(tools.length).toBe(18); // safe tier only by default (+ count_tokens graft → 18)
+    expect(tools.length).toBe(20); // safe tier only by default (+ count_tokens graft → 18, +upload_file/download_file → 20)
     expect(tools.some((t) => t.name === "read_file")).toBe(true);
     expect(tools.some((t) => t.name === "git_commit")).toBe(false); // host tier excluded
   }, 40000);

@@ -1083,16 +1083,36 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   /**
    * Complex Hierarchical Multi-Agent Pipeline Execution Engine (M3)
    */
+  // Load the measured correctness-maximizing role assignment (combo-bench →
+  // MODEL_SELECTION.json.champions.combination.roles). Graceful absent → {} so the
+  // pipeline keeps prior behavior (caller-specified, else provider defaults).
+  const loadCombinationRoles = (): Record<string, { provider?: string; model?: string }> => {
+    try {
+      const p = path.join(process.cwd(), "orchestration", "MODEL_SELECTION.json");
+      const j = JSON.parse(fs.readFileSync(p, "utf8"));
+      return j?.champions?.combination?.roles || {};
+    } catch { return {}; }
+  };
+
   app.post("/api/pipeline", async (req, res) => {
     const {
       prompt,
-      architectProvider, architectModel,
-      coderProvider, coderModel,
-      reviewerProvider, reviewerModel,
+      architectProvider: _aP, architectModel: _aM,
+      coderProvider: _cP, coderModel: _cM,
+      reviewerProvider: _rP, reviewerModel: _rM,
       enableSelfImprove,
       maxIterations,
       writePermissions,
     } = req.body;
+
+    // Caller params win; otherwise default each role to the measured best combination.
+    const _roles = loadCombinationRoles();
+    const architectProvider = _aP ?? _roles.architect?.provider;
+    const architectModel = _aM ?? _roles.architect?.model;
+    const coderProvider = _cP ?? _roles.coder?.provider;
+    const coderModel = _cM ?? _roles.coder?.model;
+    const reviewerProvider = _rP ?? _roles.reviewer?.provider;
+    const reviewerModel = _rM ?? _roles.reviewer?.model;
 
     // Validate BEFORE switching to SSE — once event-stream headers are sent we can
     // no longer return a clean status; a missing prompt would stream `undefined`.
