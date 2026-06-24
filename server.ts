@@ -610,8 +610,24 @@ async function initializeServer() {
   /**
    * ReAct Agent Specialist Loop APIs (AC-A1, AC-A3)
    */
+  // Measured best COMBINATION (combo-bench → champions.combination) wired into the
+  // LIVE ReAct agent: default the model to the implementer, expose the verifier for
+  // the opt-in final-answer gate. Graceful absent → {} (provider default = prior
+  // behavior). Runtime counterpart to /api/pipeline's loadCombinationRoles.
+  const loadAgentCombination = (): { implementer?: { provider?: string; model?: string }; verifier?: { provider?: string; model?: string } } => {
+    try {
+      const p = path.join(process.cwd(), "orchestration", "MODEL_SELECTION.json");
+      const c = JSON.parse(fs.readFileSync(p, "utf8"))?.champions?.combination || {};
+      return { implementer: c.implementer || c.overall || c.local, verifier: c.verifier };
+    } catch { return {}; }
+  };
+
   app.post("/api/agent/chat", async (req, res) => {
-    const { provider, model, messages, autoApply, maxSteps = 8, sessionId } = req.body;
+    const { messages, autoApply, maxSteps = 8, sessionId, verify } = req.body;
+    // Caller params win; otherwise default to the measured champion (implementer).
+    const _combo = loadAgentCombination();
+    const provider = req.body.provider ?? _combo.implementer?.provider;
+    const model = req.body.model ?? _combo.implementer?.model;
 
     // Validate BEFORE switching to SSE: once event-stream headers are sent we can no
     // longer return a clean status. A missing/empty messages[] would otherwise throw
@@ -638,6 +654,10 @@ async function initializeServer() {
 
     const isLive = CURRENT_MODE !== "demo";
     const workspaceRoot = db.data.workspacePath;
+
+    // Surface which model the live agent runs (traceability: measured champion vs default).
+    sendEvent("model", { provider: provider ?? "(chain default)", model: model ?? "(provider default)", source: _combo.implementer ? "combination" : "default" });
+    let finalText = ""; // captured at loop end for the opt-in verifier gate
 
     // Tool schemas come from the single registry (AGENTS.md §4 choke-point).
     const AGENT_TOOLS = ToolRegistry.schemas();
@@ -769,7 +789,8 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           }
         } else {
           // Final reply reached
-          sendEvent("done", { text: result.text || "", status: "complete" });
+          finalText = result.text || "";
+          sendEvent("done", { text: finalText, status: "complete" });
           break;
         }
 
@@ -778,6 +799,28 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
       if (stepNum > maxSteps && !shouldHalt) {
         sendEvent("done", { text: "ReAct loop complete. Reached step depth limit.", status: "limit" });
+      }
+
+      // Opt-in implementer≠verifier gate (combination policy): an INDEPENDENT verifier
+      // model reviews the agent's final answer. Additive (never alters the answer),
+      // default off (no latency/cost), best-effort (a verifier failure never breaks the
+      // response). Verifier model differs from the implementer (champions.combination).
+      if (verify && _combo.verifier?.model && finalText.trim() && !ac.signal.aborted) {
+        try {
+          const lastUser = [...messages].reverse().find((m: any) => m.role === "user");
+          const vr = await ProviderRouter.generate({
+            provider: _combo.verifier.provider,
+            model: _combo.verifier.model,
+            messages: [
+              { role: "system", content: "You are an independent verifier. Review the agent's final answer against the task for correctness and completeness. Reply with ONE line starting exactly 'VERDICT: PASS' or 'VERDICT: FAIL', then a brief reason." },
+              { role: "user", content: `TASK:\n${lastUser?.content || "(n/a)"}\n\nAGENT FINAL ANSWER:\n${finalText}\n\nYour verdict?` },
+            ],
+            stream: false,
+          }, undefined, undefined, ac.signal);
+          const vtext = (vr.text || "").trim();
+          const verdict = /VERDICT:\s*PASS/i.test(vtext) ? "PASS" : /VERDICT:\s*FAIL/i.test(vtext) ? "FAIL" : "UNCLEAR";
+          sendEvent("verify", { verdict, reason: vtext.slice(0, 400), model: _combo.verifier.model });
+        } catch { /* verifier is best-effort — never breaks the agent response */ }
       }
 
       if (sessionId) {
