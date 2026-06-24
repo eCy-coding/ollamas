@@ -14,12 +14,12 @@
   <key>ProgramArguments</key>
   <array>
     <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
-    <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/bin/autopilot.ts</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/bin/autopilot.ts</string>
     <string>--heal</string>
     <string>--quiet</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
   <key>WatchPaths</key>
   <array>
     <string>/Users/emrecnyngmail.com/.llm-mission-control</string>
@@ -31,8 +31,8 @@
   <key>ProcessType</key>
   <string>Background</string>
   <key>StandardOutPath</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/autopilot.out.log</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/autopilot.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/autopilot.err.log</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/autopilot.err.log</string>
 </dict>
 </plist>

@@ -103,9 +103,18 @@ async function main(): Promise<void> {
   const prompt = buildModelSelectionPrompt(input);
 
   writeFileSync(join(ORCH_DIR, "MODEL_PROMPT.md"), prompt.endsWith("\n") ? prompt : prompt + "\n");
+  // Preserve cross-cutting blocks benchprompt does NOT own: champions.combination
+  // (combo-bench correctness policy) and an existing agent-bench selection — otherwise
+  // an empty throughput-bench run would clobber a real selection to null and drop the
+  // combination policy that /api/pipeline reads. Merge instead of overwrite.
+  let prevSel: any = {};
+  try { prevSel = JSON.parse(readFileSync(join(ORCH_DIR, "MODEL_SELECTION.json"), "utf8")); } catch { /* first run */ }
+  const mergedChampions: Record<string, unknown> = { ...best };
+  if (prevSel?.champions?.combination) mergedChampions.combination = prevSel.champions.combination;
   writeFileSync(join(ORCH_DIR, "MODEL_SELECTION.json"), JSON.stringify({
     chip: sys.chip, ramGb: sys.ramGb, cores: sys.cores, ts, stale,
-    selection: localSelection ?? null, champions: best, regressions: regs,
+    selection: localSelection ?? prevSel?.selection ?? null,
+    champions: mergedChampions, regressions: regs,
   }, null, 2) + "\n");
 
   process.stdout.write(prompt + "\n");

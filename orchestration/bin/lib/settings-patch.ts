@@ -7,7 +7,7 @@
  */
 
 const TSX = "$HOME/Desktop/ollamas/node_modules/.bin/tsx";
-const BIN = "$HOME/Desktop/ollamas-orchestration-wt/orchestration/bin";
+const BIN = "$HOME/Desktop/ollamas/orchestration/bin";
 const AUTOPILOT_CMD = `${TSX} ${BIN}/autopilot.ts --quiet`;
 const MODELHOOK_CMD = `${TSX} ${BIN}/model-hook.ts`;
 

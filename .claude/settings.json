@@ -7,7 +7,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas-orchestration-wt/orchestration/bin/role-hook.ts"
+            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/role-hook.ts"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/model-hook.ts"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/autopilot.ts --quiet"
           }
         ]
       }

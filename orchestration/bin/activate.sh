@@ -6,10 +6,12 @@
 set -euo pipefail
 
 DRY=0; [ "${1:-}" = "--dry-run" ] && DRY=1
-WT="$HOME/Desktop/ollamas-orchestration-wt"
-ORCH="$WT/orchestration"
+# vO16: path script-konumundan DİNAMİK (entegre-tree veya worktree — portable; silinen-worktree-ref yok).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # .../orchestration/bin
+ORCH="$(dirname "$SCRIPT_DIR")"                              # .../orchestration
+WT="$(dirname "$ORCH")"                                      # entegre-tree kökü (= ANCHOR)
 SETTINGS="$WT/.claude/settings.json"
-TSX="$HOME/Desktop/ollamas/node_modules/.bin/tsx"
+TSX="$WT/node_modules/.bin/tsx"
 
 echo "== vO-FND.2 0-manuel aktivasyon (dry-run=$DRY) =="
 
