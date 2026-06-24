@@ -25,7 +25,7 @@ const SEYIR_DIR = join(HERE, "..", "seyir");
 const store = defaultStore(SEYIR_DIR);
 const TAB = process.env.ORCH_TAB || `tab-${process.pid}`;
 
-function fmtAge(ms: number): string {
+export function fmtAge(ms: number): string {
   const m = Math.floor(ms / 60_000);
   return m < 60 ? `${m}dk` : `${Math.floor(m / 60)}s${m % 60}dk`;
 }
@@ -88,4 +88,5 @@ function main(): void {
   console.log(`🔒 claim edildi: ${claimKey(lane, version)} → ${TAB} (fence ${r.claim!.fence}). İş bitince: --done ${lane} ${version}`);
 }
 
-main();
+// Run main() only as a CLI (not when imported by tests).
+if (process.argv[1] && /claim\.ts$/.test(process.argv[1])) main();

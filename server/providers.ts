@@ -23,10 +23,73 @@ export interface ToolCall {
   arguments: any;
 }
 
+// CRITICAL-3: cross-provider tool-call robustness. Sentinel returned when arguments
+// cannot be parsed even after repair — the ReAct loop checks it (getToolArgError) and
+// feeds the error back to the model (Try-Rewrite-Retry) instead of silently running the
+// tool with empty {} args. Refs: json-repair patterns; litellm#18667/goose#2892
+// (control chars), fastmcp#932 (string-wrapped args), CRITIC validator-feedback.
+export const TOOL_ARG_ERROR = "__toolArgError";
+export function getToolArgError(args: any): string | null {
+  return args && typeof args === "object" && typeof args[TOOL_ARG_ERROR] === "string" ? args[TOOL_ARG_ERROR] : null;
+}
+
+// Escape raw control chars (a frequent Claude/Bedrock tool-arg bug). JSON forbids
+// literal control chars anywhere outside strings, so escaping all of them is safe.
+function escapeBareControls(t: string): string {
+  return t.replace(/[\u0000-\u001F]/g, (c) => (({ "\n": "\\n", "\r": "\\r", "\t": "\\t" }) as Record<string, string>)[c] ?? " ");
+}
+// Append closers for unbalanced strings/brackets (truncated streaming output).
+function balanceBrackets(t: string): string {
+  let curly = 0, square = 0, inStr = false, esc = false;
+  for (const ch of t) {
+    if (esc) { esc = false; continue; }
+    if (ch === "\\") { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === "{") curly++; else if (ch === "}") curly--;
+    else if (ch === "[") square++; else if (ch === "]") square--;
+  }
+  let out = t;
+  if (inStr) out += '"';
+  while (square-- > 0) out += "]";
+  while (curly-- > 0) out += "}";
+  return out;
+}
+// Best-effort repair of model-emitted JSON, applied ONLY after a plain JSON.parse has
+// already failed (valid JSON is never touched). Returns the parsed value or null.
+export function repairJson(s: string): any | null {
+  if (typeof s !== "string") return null;
+  let t = s.trim().replace(/^```(?:json|tool_code)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  // Slice to the outermost object/array if wrapped in prose.
+  const starts = ["{", "["].map((c) => t.indexOf(c)).filter((i) => i >= 0);
+  if (starts.length) {
+    const first = Math.min(...starts);
+    const close = t[first] === "{" ? "}" : "]";
+    const last = t.lastIndexOf(close);
+    if (last > first) t = t.slice(first, last + 1);
+  }
+  const noTrailingComma = (x: string) => x.replace(/,\s*([}\]])/g, "$1");
+  for (const candidate of [
+    t,
+    noTrailingComma(t),
+    escapeBareControls(noTrailingComma(t)),
+    balanceBrackets(escapeBareControls(noTrailingComma(t))),
+  ]) {
+    try { return JSON.parse(candidate); } catch { /* try next */ }
+  }
+  return null;
+}
+
 // Tolerant JSON parse for model-emitted tool-call arguments: a truncated/malformed
-// arguments string must NOT throw — that would crash the whole tool_calls .map() and
-// silently drop the request to provider-fallback (→ demo). Returns {} on failure.
-function safeJsonObj(s: string): any { try { return JSON.parse(s); } catch { return {}; } }
+// arguments string must NOT throw (that would crash the tool_calls .map()). Tries
+// JSON.parse → repairJson → a sentinel (NOT silent {}) so the loop can ask the model
+// to re-emit valid args instead of running the tool with empty arguments.
+function safeJsonObj(s: string): any {
+  try { return JSON.parse(s); } catch { /* attempt repair */ }
+  const repaired = repairJson(s);
+  if (repaired !== null && typeof repaired === "object") return repaired;
+  return { [TOOL_ARG_ERROR]: "tool arguments were not valid JSON (unparseable after repair)", __rawPreview: String(s).slice(0, 120) };
+}
 
 // Some local models (e.g. qwen3) emit tool calls as TEXT instead of the
 // structured tool_calls field — `<function=NAME>{json}</function>`,
@@ -85,6 +148,26 @@ function buildSignal(callerSignal?: AbortSignal): AbortSignal {
 
 export class ProviderRouter {
   /**
+   * Whether the demo provider may be used as a CHAIN FALLBACK (when every real
+   * provider failed). Default true preserves prior behavior + all existing tests.
+   * server.ts sets it to `(CURRENT_MODE === "demo")` at boot: in LIVE/degraded-live
+   * mode it becomes false so an all-providers-down situation surfaces as an honest
+   * error instead of silently returning fabricated demo text to the live agent.
+   * An EXPLICIT `provider:"demo"` request always works (the guard only skips demo
+   * reached as a fallback).
+   */
+  public static demoFallbackAllowed = true;
+
+  /**
+   * True when the demo provider, reached as a CHAIN FALLBACK, must be skipped.
+   * Pure (given demoFallbackAllowed) → unit-testable. Explicit `provider:"demo"`
+   * is never skipped; only demo reached after real providers failed, in non-demo mode.
+   */
+  public static shouldSkipDemoFallback(prov: string, requestedProvider: string): boolean {
+    return prov === "demo" && requestedProvider !== "demo" && !ProviderRouter.demoFallbackAllowed;
+  }
+
+  /**
    * Main route function with fallback and latency awareness
    */
   public static async generate(
@@ -104,6 +187,13 @@ export class ProviderRouter {
       // When falling back to a DIFFERENT provider than the one requested, drop the
       // requested model so each provider resolves its own default (case-local `||`).
       if (prov !== config.provider) resolvedConfig.model = undefined;
+      // Demo honesty (CRITICAL-2): never silently return fabricated demo text to a LIVE
+      // caller. Demo is used ONLY when explicitly requested (config.provider === "demo")
+      // or when demoFallbackAllowed (demo mode). Otherwise skip it → the loop ends and
+      // throws an honest "all providers failed" error instead of mock output.
+      if (ProviderRouter.shouldSkipDemoFallback(prov, config.provider)) {
+        continue;
+      }
       // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
       if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
         continue;
