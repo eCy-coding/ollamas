@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "ollamas-mcp",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.22.1",
   "type": "module",
   "bin": {
     "ollamas-mcp": "dist/mcp-stdio.cjs"
@@ -46,7 +46,6 @@
     "@lingui/react": "^6.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
-    "@types/pg": "^8.20.0",
     "@vitejs/plugin-react": "^5.0.4",
     "ajv": "^8.20.0",
     "dotenv": "^17.2.3",
