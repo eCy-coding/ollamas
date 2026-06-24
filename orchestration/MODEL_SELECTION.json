@@ -2,32 +2,35 @@
   "chip": "Apple M4 Max",
   "ramGb": 52,
   "cores": 16,
-  "ts": "2026-06-14T16:04:46.189Z",
-  "stale": true,
+  "ts": "2026-06-24T10:00:00.000Z",
+  "stale": false,
   "selection": {
-    "model": "qwen3-coder:30b",
-    "score": 0.913,
-    "tokS": 119.7,
-    "reason": "correct 1 + tok 119.7/119.7 + vram-fit 0.57",
+    "model": "qwen3-coder:480b-cloud",
+    "provider": "ollama-local(cloud-proxy)",
+    "tokS": null,
     "config": {
-      "num_ctx": 8192,
-      "num_gpu": 999,
-      "num_thread": 12,
-      "keep_alive": "30m",
-      "quant": "Q4_K_M"
-    }
+      "num_ctx": null
+    },
+    "source": "agent-bench correctness-gated 2026-06-24",
+    "score": "3/3",
+    "fastestMs": 4000
   },
   "champions": {
-    "mac": {
-      "model": "qwen3-coder:30b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 119.7,
-      "p95": 119.7,
-      "mad": 0,
-      "min": 119.7,
-      "max": 119.7,
-      "correctRatio": 1
+    "overall": {
+      "model": "qwen3-coder:480b-cloud",
+      "score": "3/3",
+      "note": "fastest correct (fact 4s, monitor 6s)"
+    },
+    "local": {
+      "model": "qwen3:8b",
+      "score": "3/3",
+      "note": "best local; no cloud dep; combo-bench also 100%"
+    },
+    "coding": {
+      "model": "qwen3-coder:480b-cloud"
+    },
+    "monitor": {
+      "model": "qwen3-coder:480b-cloud"
     },
     "combination": {
       "policy": "implementer-verifier",
@@ -66,5 +69,14 @@
       "source": "~/.llm-mission-control/combo-bench.json"
     }
   },
-  "regressions": []
+  "regressions": [],
+  "agentBench": {
+    "source": "~/.llm-mission-control/agent-bench-2026-06-24.json",
+    "comboSource": "~/.llm-mission-control/combo-bench.json",
+    "deferred": [
+      "gpt-oss:20b",
+      "qwen3-coder:30b",
+      "qwen3:30b-a3b"
+    ]
+  }
 }
