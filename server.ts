@@ -102,6 +102,10 @@ app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 // UKP inbound stage-events: raw body required for HMAC signature verification
 // (same reason as Stripe — must be registered before the global JSON parser).
 app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
+// Binary file upload: capture the raw body (any content type) as a Buffer BEFORE the
+// 50mb JSON parser — otherwise express.json swallows the stream and the byte payload
+// is lost. 1gb cap; binary-safe round-trip via FilesystemManager.writeFileBuffer.
+app.use("/api/workspace/upload", express.raw({ type: "*/*", limit: "1gb" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -966,6 +970,62 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Binary upload: raw Buffer body (express.raw registered above) → writeFileBuffer.
+  // Path-confined by resolveSafePath inside writeFileBuffer; gated by localOwnerGuard.
+  app.post("/api/workspace/upload", (req, res) => {
+    const relativePath = req.query.relativePath as string;
+    if (typeof relativePath !== "string" || !relativePath) {
+      return res.status(400).json({ error: "relativePath query parameter (string) is required" });
+    }
+    const body = req.body;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      return res.status(400).json({ error: "binary request body required (send the file bytes; any Content-Type)" });
+    }
+    const isLive = CURRENT_MODE !== "demo";
+    try {
+      FilesystemManager.writeFileBuffer(isLive, db.data.workspacePath, relativePath, body);
+      db.logSecurity("file_system", `HTTP upload: ${relativePath}`, `Wrote ${body.length} bytes`, "allow");
+      res.json({ success: true, path: relativePath, bytes: body.length });
+    } catch (e: any) {
+      // Path-traversal block surfaces as a 400 (client error), other fs errors 500.
+      const traversal = /traversal/i.test(e.message);
+      res.status(traversal ? 400 : 500).json({ error: e.message });
+    }
+  });
+
+  // Binary download: stream the file out with Content-Disposition so the browser
+  // saves any file type uncorrupted (unlike GET /file which JSON-wraps utf-8 text).
+  app.get("/api/workspace/download", (req, res) => {
+    const relativePath = req.query.relativePath as string;
+    if (typeof relativePath !== "string" || !relativePath) {
+      return res.status(400).json({ error: "relativePath query parameter (string) is required" });
+    }
+    const isLive = CURRENT_MODE !== "demo";
+    const filename = path.basename(relativePath).replace(/["\r\n]/g, "");
+    try {
+      if (!isLive) {
+        const buf = FilesystemManager.readFileBuffer(isLive, db.data.workspacePath, relativePath);
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Type", "application/octet-stream");
+        return res.send(buf);
+      }
+      if (!db.data.permissions.fileRead) {
+        return res.status(403).json({ error: "Local filesystem read permission is disabled." });
+      }
+      const safePath = FilesystemManager.resolveSafePath(db.data.workspacePath, relativePath);
+      if (!fs.existsSync(safePath)) {
+        return res.status(404).json({ error: "Target file does not exist." });
+      }
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Type", "application/octet-stream");
+      fs.createReadStream(safePath).pipe(res);
+      db.logSecurity("file_system", `HTTP download: ${relativePath}`, "Streamed file", "allow");
+    } catch (e: any) {
+      const traversal = /traversal/i.test(e.message);
+      res.status(traversal ? 400 : 500).json({ error: e.message });
     }
   });
 

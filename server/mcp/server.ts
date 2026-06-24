@@ -179,10 +179,27 @@ export function buildServer(ctx: ToolCtx): Server {
   server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
     const uri = String(req.params.uri || "");
     const rel = uri.replace(/^file:\/\//, "");
-    let text = "";
-    try { text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel); }
-    catch (e: any) { text = `Error reading resource: ${e?.message || e}`; }
-    return { contents: [{ uri, mimeType: "text/plain", text }] };
+    // Binary-aware: known binary extensions return a base64 `blob` (MCP binary
+    // resource), so images/archives/binaries download uncorrupted. Text falls back
+    // to the utf-8 `text` field as before.
+    const ext = rel.slice(rel.lastIndexOf(".") + 1).toLowerCase();
+    const BIN: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+      webp: "image/webp", ico: "image/x-icon", pdf: "application/pdf", zip: "application/zip",
+      gz: "application/gzip", tar: "application/x-tar", wasm: "application/wasm",
+      mp3: "audio/mpeg", mp4: "video/mp4", woff: "font/woff", woff2: "font/woff2",
+      bin: "application/octet-stream", exe: "application/octet-stream",
+    };
+    try {
+      if (BIN[ext]) {
+        const buf = ctx.deps.FilesystemManager.readFileBuffer(ctx.isLive, ctx.workspaceRoot, rel);
+        return { contents: [{ uri, mimeType: BIN[ext], blob: buf.toString("base64") }] };
+      }
+      const text = ctx.deps.FilesystemManager.readFile(ctx.isLive, ctx.workspaceRoot, rel);
+      return { contents: [{ uri, mimeType: "text/plain", text }] };
+    } catch (e: any) {
+      return { contents: [{ uri, mimeType: "text/plain", text: `Error reading resource: ${e?.message || e}` }] };
+    }
   });
 
   server.setRequestHandler(SubscribeRequestSchema, async (req) => {

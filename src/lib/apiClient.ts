@@ -204,6 +204,43 @@ export const api = {
   del: <T = Json>(endpoint: string, opts?: RequestOpts) => request<T>(endpoint, { ...opts, method: 'DELETE' }),
   streamPost,
   request,
+
+  // Binary upload: stream the raw bytes (any file type) to the workspace. Unlike
+  // POST /api/workspace/file (utf-8 JSON), this preserves binary uncorrupted.
+  uploadFile: async (
+    relativePath: string,
+    data: Blob | ArrayBuffer | Uint8Array,
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ success: boolean; path: string; bytes: number }> => {
+    const ep = `/api/workspace/upload?relativePath=${encodeURIComponent(relativePath)}`;
+    const res = await fetch(ep, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', ...authHeaders() },
+      body: data as BodyInit,
+      signal: opts?.signal,
+    });
+    if (!res.ok) {
+      let body: unknown; try { body = await res.json(); } catch { /* no JSON body */ }
+      logClientEvent(`api_error ${res.status} ${ep}`, { status: res.status });
+      throw new ApiError(res.status, ep, `upload → ${res.status}`, body);
+    }
+    return res.json();
+  },
+
+  // Binary download: returns a Blob the caller can save (e.g. via an <a download>).
+  downloadFile: async (
+    relativePath: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<Blob> => {
+    const ep = `/api/workspace/download?relativePath=${encodeURIComponent(relativePath)}`;
+    const res = await fetch(ep, { headers: { ...authHeaders() }, signal: opts?.signal });
+    if (!res.ok) {
+      let body: unknown; try { body = await res.json(); } catch { /* no JSON body */ }
+      logClientEvent(`api_error ${res.status} ${ep}`, { status: res.status });
+      throw new ApiError(res.status, ep, `download → ${res.status}`, body);
+    }
+    return res.blob();
+  },
 };
 
 export default api;
