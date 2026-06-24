@@ -174,6 +174,10 @@ let CURRENT_MODE: "live" | "degraded-live" | "demo" = "demo";
 // Dynamic start wrapper
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
+  // Demo honesty (CRITICAL-2): allow the demo provider as a chain fallback ONLY in demo
+  // mode. In live/degraded-live, an all-providers-down situation must surface as an
+  // honest error — never fabricated demo text fed to the live agent as if real.
+  ProviderRouter.demoFallbackAllowed = CURRENT_MODE === "demo";
   console.log(`[Cockpit] Master system initialized in environment mode: ${CURRENT_MODE.toUpperCase()}`);
 
   // SaaS store. node:sqlite default, or Postgres when DATABASE_URL is set (Faz 12).

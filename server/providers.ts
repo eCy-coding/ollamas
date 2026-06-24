@@ -85,6 +85,26 @@ function buildSignal(callerSignal?: AbortSignal): AbortSignal {
 
 export class ProviderRouter {
   /**
+   * Whether the demo provider may be used as a CHAIN FALLBACK (when every real
+   * provider failed). Default true preserves prior behavior + all existing tests.
+   * server.ts sets it to `(CURRENT_MODE === "demo")` at boot: in LIVE/degraded-live
+   * mode it becomes false so an all-providers-down situation surfaces as an honest
+   * error instead of silently returning fabricated demo text to the live agent.
+   * An EXPLICIT `provider:"demo"` request always works (the guard only skips demo
+   * reached as a fallback).
+   */
+  public static demoFallbackAllowed = true;
+
+  /**
+   * True when the demo provider, reached as a CHAIN FALLBACK, must be skipped.
+   * Pure (given demoFallbackAllowed) → unit-testable. Explicit `provider:"demo"`
+   * is never skipped; only demo reached after real providers failed, in non-demo mode.
+   */
+  public static shouldSkipDemoFallback(prov: string, requestedProvider: string): boolean {
+    return prov === "demo" && requestedProvider !== "demo" && !ProviderRouter.demoFallbackAllowed;
+  }
+
+  /**
    * Main route function with fallback and latency awareness
    */
   public static async generate(
@@ -104,6 +124,13 @@ export class ProviderRouter {
       // When falling back to a DIFFERENT provider than the one requested, drop the
       // requested model so each provider resolves its own default (case-local `||`).
       if (prov !== config.provider) resolvedConfig.model = undefined;
+      // Demo honesty (CRITICAL-2): never silently return fabricated demo text to a LIVE
+      // caller. Demo is used ONLY when explicitly requested (config.provider === "demo")
+      // or when demoFallbackAllowed (demo mode). Otherwise skip it → the loop ends and
+      // throws an honest "all providers failed" error instead of mock output.
+      if (ProviderRouter.shouldSkipDemoFallback(prov, config.provider)) {
+        continue;
+      }
       // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
       if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
         continue;
