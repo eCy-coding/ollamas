@@ -43,9 +43,12 @@ export default [
     },
   },
   {
-    // apiClient is the choke-point; Google Drive hits an external API; SaaSAdmin
-    // keeps a local token-scoped wrapper — all may use raw fetch by design.
-    files: ['src/lib/apiClient.ts', 'src/components/GoogleDriveBrowser.tsx', 'src/components/SaaSAdmin.tsx'],
+    // apiClient is the choke-point; GoogleDriveBrowser hits an external Google API.
+    // SaaSAdmin is NO LONGER blanket-exempt: its two intentional token wrappers carry
+    // line-level eslint-disable, so any NEW raw fetch there is caught by the rule (the
+    // old blanket exemption had hidden a bare, unauthenticated fetch). Wrapper
+    // consolidation into apiClient is tracked for a later vF.
+    files: ['src/lib/apiClient.ts', 'src/components/GoogleDriveBrowser.tsx'],
     rules: { 'no-restricted-globals': 'off' },
   },
 ];
