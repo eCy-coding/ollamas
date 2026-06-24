@@ -34,7 +34,7 @@
     "size": "size-limit",
     "smoke": "vitest run tests/smoke-live.e2e.test.ts",
     "start": "node dist/server.cjs",
-    "test": "vitest run",
+    "test": "node scripts/test-signal.mjs",
     "test:e2e": "playwright test",
     "test:e2e:web": "playwright test -c playwright.web.config.ts",
     "tokens": "style-dictionary build --config style-dictionary.config.js && style-dictionary build --config style-dictionary.light.config.js"
