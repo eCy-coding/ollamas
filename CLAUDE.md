@@ -4,6 +4,8 @@
 > Bu sekmenin kalıcı kimliğidir. Davranışı kalıcı değiştirmek = bu dosyayı düzenle.
 > Cevaplar CANLI türetilir → proje ilerledikçe kendiliğinden güncellenir. Son revize: 2026-06-20.
 
+> **⚡ Instant-on (yeni oturum):** `npm run ready` (eksikleri tespit + güvenli auto-fix) → `npm run dev` / `make up` → slash komutlar: `/ready /agent /ops /verify /ship`. Tam 60-sn yol: **QUICKSTART.md**.
+
 ---
 
 ## ⟐ TETİK SÖZLEŞMESİ — "Bu terminal sekmesinde görevin nedir? Ne yaparsın?" (0 MANUEL)
