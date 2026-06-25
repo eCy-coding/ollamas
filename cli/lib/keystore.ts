@@ -118,8 +118,10 @@ export function loadMasterKey(env: NodeJS.ProcessEnv = process.env): Buffer {
       writeMarker("keychain");
       return key;
     }
-    writeFileSync(masterKeyPath(), key, { mode: 0o600 });
-    return key;
+    // keychain write failed (SSH / locked keychain / no GUI) → fall back to a STABLE
+    // keyfile key via load-or-create. Writing a fresh random here on each call would
+    // mint a DIFFERENT key every time and orphan secrets sealed with the earlier one.
+    return loadOrCreateKeyfile();
   }
   return loadOrCreateKeyfile();
 }

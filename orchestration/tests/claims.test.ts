@@ -45,6 +45,15 @@ describe("foldClaims (LWW)", () => {
     ]);
     expect(m.get("orchestration|vO7")!.tab).toBe("tabB");
   });
+  it("yüksek fence YENİ ts'i ezer (canlandırılmış stale tab clobber edemez)", () => {
+    // H11: fence monotonik clobber-guard'dır → ts'ten ÖNCE gelir. Yeni-ts ama eski-fence
+    // bir stale tab, yeni-fence aktif holder'ı EZMEMELİ.
+    const m = foldClaims([
+      ev({ ts: T0 + 100_000, fence: 3, tab: "stale" }),  // revived stale: yeni ts, ESKİ fence
+      ev({ ts: T0, fence: 5, tab: "active" }),            // aktif holder: eski ts, YENİ fence
+    ]);
+    expect(m.get("orchestration|vO7")!.tab).toBe("active"); // fence kazanır, ts değil
+  });
   it("idempotent — birebir aynı event tek sayılır", () => {
     const e = ev({});
     const m = foldClaims([e, { ...e }]);

@@ -54,10 +54,12 @@ export function parseClaims(jsonl: string): ClaimEvent[] {
   return out;
 }
 
-/** a, b'den "daha güncel" mi? LWW sıralaması: ts → fence → tab (deterministik). */
+/** a, b'den "daha güncel" mi? Sıralama: fence → ts → tab (deterministik). Fence
+ *  ÖNCE gelir (ts değil): fence monotonik clobber-guard — canlandırılmış stale bir tab
+ *  (yeni ts ama ESKİ fence) aktif holder'ı (yeni fence) EZEMEZ. Eşit fence'te LWW=ts. */
 function newer(a: ClaimEvent, b: ClaimEvent): boolean {
-  if (a.ts !== b.ts) return a.ts > b.ts;
   if (a.fence !== b.fence) return a.fence > b.fence;
+  if (a.ts !== b.ts) return a.ts > b.ts;
   return a.tab > b.tab;
 }
 
