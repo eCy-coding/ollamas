@@ -13,6 +13,7 @@ import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
 import { countTokens, estimateCost } from "./tokens";
+import { runTestgen, runAudit, generateStorefront } from "./revenue";
 
 // outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
 // (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
@@ -377,6 +378,46 @@ const TOOLS: Record<string, ToolDef> = {
     tier: "safe",
     schema: fn("run_tests", "Run the project's test suite (vitest unit tests in the container) and return pass/fail summary.", NO_ARGS),
     invoke: async (_args, { deps, abortSignal }) => deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/run_tests.mjs`, undefined, abortSignal),
+  },
+
+  test_generate: {
+    tier: "host",
+    schema: fn("test_generate", "Revenue Ops: generate a unit test for an exported function ($0 local qwen3:8b), auto-run it via vitest, and report pass/fail — only a passing test is shippable.", {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Path to the source file." },
+        fn: { type: "string", description: "Exported function name to test." },
+        model: { type: "string", description: "Model (default qwen3:8b, $0)." },
+      },
+      required: ["file", "fn"],
+    }),
+    invoke: async (args) => runTestgen({ file: String(args.file), fn: String(args.fn), model: args.model }),
+  },
+
+  code_audit: {
+    tier: "host",
+    schema: fn("code_audit", "Revenue Ops: run a bug audit on a repo path. Default model qwen3-coder:480b-cloud (higher yield than $0 on open-ended audit). Returns finding count + report path.", {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "Repo directory path to audit." },
+        model: { type: "string", description: "Model (default qwen3-coder:480b-cloud)." },
+        maxUnits: { type: "number", description: "Cap number of units (cost/time)." },
+      },
+      required: ["repo"],
+    }),
+    invoke: async (args) => runAudit({ repo: String(args.repo), model: args.model, maxUnits: args.maxUnits }),
+  },
+
+  storefront_generate: {
+    tier: "host",
+    schema: fn("storefront_generate", "Revenue Ops: fill the storefront landing-page template from config (brand/email/paymentLink) → local HTML artifact. No deploy, no money movement.", {
+      type: "object",
+      properties: {
+        brand: { type: "string" }, email: { type: "string" }, paymentLink: { type: "string" }, out: { type: "string" },
+      },
+      required: [],
+    }),
+    invoke: async (args) => generateStorefront({ brand: args.brand, email: args.email, paymentLink: args.paymentLink, out: args.out }),
   },
 
   git_ops: {

@@ -2,6 +2,7 @@
 // `i18n._('app.tab.telemetry')` returns the string; missing → returns the id.
 export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Cockpit Dashboard',
+  'app.tab.revenue': 'Revenue / Personal Ops',
   'app.tab.swarm': 'P2P Computing Swarm',
   'app.tab.saas': 'SaaS Gateway',
   'app.tab.pipeline': 'Pipeline Agent',

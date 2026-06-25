@@ -60,6 +60,8 @@ export interface DBConfig {
   sessions: ChatSession[];
   securityLog: SecurityEvent[];
   cluster: ClusterConfig;
+  /** Revenue Ops (Faz19) — personal income tooling config (local-owner only). */
+  revenue?: { model?: string; brand?: string; email?: string; paymentLink?: string };
 }
 
 const DEFAULT_CONFIG: DBConfig = {

@@ -14,6 +14,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
+import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
@@ -129,10 +130,24 @@ app.use(
   [
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
-    "/api/agent", "/api/keys", "/api/models",
+    "/api/agent", "/api/keys", "/api/models", "/api/revenue",
   ],
   localOwnerGuard,
 );
+
+// Revenue Ops (Faz19) — local-owner-only personal income tooling (gated above). Produces
+// LOCAL artifacts only (test-gen / audit / storefront); no money movement, no outreach.
+app.get("/api/revenue/config", (_req, res) => res.json(getRevenueConfig()));
+app.post("/api/revenue/config", (req, res) => res.json(setRevenueConfig(req.body || {})));
+app.post("/api/revenue/testgen", async (req, res) => {
+  try { res.json(await runTestgen(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+});
+app.post("/api/revenue/audit", async (req, res) => {
+  try { res.json(await runAudit(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+});
+app.post("/api/revenue/storefront", (req, res) => {
+  try { res.json(generateStorefront(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+});
 
 /**
  * L1: Dynamic Environment Detection

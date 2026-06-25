@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verified Test-Pack & Code Audit — guaranteed-green tests for your repo</title>
+<meta name="description" content="I add tests that are guaranteed to pass against your code, and verified bug audits with fix-PRs. Fixed price, fast turnaround." />
+<style>
+  :root{--bg:#0b0d10;--card:#14181d;--fg:#e8edf2;--mut:#9aa7b2;--acc:#4f9cff;--ok:#33d17a;--line:#222a31}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:0 20px}
+  header{padding:64px 0 32px;text-align:center}
+  h1{font-size:2.1rem;line-height:1.2;margin:0 0 12px} h1 .g{color:var(--acc)}
+  .sub{color:var(--mut);font-size:1.15rem;max-width:640px;margin:0 auto}
+  .cta{display:inline-block;margin:24px 8px 0;padding:14px 28px;border-radius:10px;background:var(--acc);color:#fff;text-decoration:none;font-weight:600}
+  .cta.alt{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  section{padding:36px 0;border-top:1px solid var(--line)}
+  h2{font-size:1.4rem;margin:0 0 16px}
+  .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr} @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:1.1rem} .price{color:var(--acc);font-weight:700;font-size:1.25rem}
+  .mut{color:var(--mut)} .ok{color:var(--ok)} code{background:#0f1419;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.9em}
+  table{width:100%;border-collapse:collapse;font-size:.92rem} th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)} th{color:var(--mut);font-weight:600}
+  .proof{background:#0f1419;border-left:3px solid var(--ok);border-radius:8px;padding:14px 16px;margin:10px 0;font-size:.95rem}
+  footer{padding:48px 0;color:var(--mut);text-align:center;font-size:.9rem}
+  .pill{display:inline-block;background:#0f1419;border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.82rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="pill">for TS · JS · Python · Go repos</span>
+  <h1>Tests that are <span class="g">guaranteed to pass</span> against your code.<br/>Verified audits with fix-PRs.</h1>
+  <p class="sub">I raise your test coverage with tests that actually run green, and deliver reproducible bug audits — fixed price, fast, zero false alarms.</p>
+  <!-- ⬇️ ÖDEME: kendi Gumroad/Stripe/Lemonsqueezy linkini ya da IBAN/iletişim sayfanı buraya koy -->
+  <a class="cta" href="{{PAYMENT_OR_BOOKING_LINK}}">Get a free scan →</a>
+  <a class="cta alt" href="mailto:{{YOUR_EMAIL}}">Email me</a>
+</header>
+
+<section>
+  <h2>Why it's different</h2>
+  <p>The cheap PR-bots ($12/mo) skim each pull request. I deliver <b>whole-repo</b>, <b>auto-verified</b> work:
+  every test I ship is <b>run against your code first</b> and only shipped if it passes; every audit bug is
+  <b>reproduced</b> — no false positives.</p>
+  <div class="proof">
+    ✅ <b>Auto-verify gate (real):</b> on a sample function the generator produced a test → ran it → <b>6/6 passed → shipped</b>.
+    On a harder function it produced a wrong test → <b>auto-rejected, never shipped</b>. You only ever get green.
+  </div>
+</section>
+
+<section>
+  <h2>Packages</h2>
+  <div class="grid">
+    <div class="card"><h3>Verified Test-Pack</h3><div class="price">$150–400</div>
+      <p class="mut">N guaranteed-passing tests for your uncovered functions. Coverage-% lift, fixed price.</p></div>
+    <div class="card"><h3>Coverage Subscription</h3><div class="price">$150–400 / mo</div>
+      <p class="mut">Weekly test-gen on new/changed code, wired to your CI. Build once, stay green.</p></div>
+    <div class="card"><h3>Verified Bug Audit</h3><div class="price">$300–600</div>
+      <p class="mut">Whole-repo audit, every bug reproduced (no false positives) + severity-ranked report.</p></div>
+    <div class="card"><h3>Fix-PRs</h3><div class="price">$40–80 / bug</div>
+      <p class="mut">Merge-ready pull requests with tests for confirmed bugs.</p></div>
+  </div>
+  <p class="mut" style="margin-top:14px">Free scan first — you see the value before you pay.</p>
+</section>
+
+<section>
+  <h2>Sample finding (real audit, ~50k-LOC project)</h2>
+  <table>
+    <tr><th>severity</th><th>what breaks</th><th>fix</th></tr>
+    <tr><td class="ok">high (sec)</td><td>write-confinement uses path.resolve (no symlink resolution) → symlink escapes the sandbox</td><td>realpath the parent before the check</td></tr>
+    <tr><td>high</td><td>search tool wraps the query in quotes that become literal argv → every query returns wrong results</td><td>pass the query as one argv element</td></tr>
+    <tr><td>CRITICAL</td><td>collision-avoidance read a ledger path that never existed → silent no-op</td><td>point at the real ledger path</td></tr>
+  </table>
+  <p class="mut">Full sample report available on request.</p>
+</section>
+
+<section>
+  <h2>How it works</h2>
+  <p>1. You send a repo link → 2. free scan shows candidate value → 3. you pick a package & pay →
+  4. I deliver the verified tests / audit / fix-PRs. Turnaround: 24–72h.</p>
+  <a class="cta" href="{{PAYMENT_OR_BOOKING_LINK}}">Start with a free scan →</a>
+</section>
+
+<footer>
+  <!-- buraya kendi adın/marka + ödeme/iletişim -->
+  {{YOUR_NAME_OR_BRAND}} · {{YOUR_EMAIL}} · powered by an automated, auto-verified pipeline.
+</footer>
+
+</div>
+</body>
+</html>

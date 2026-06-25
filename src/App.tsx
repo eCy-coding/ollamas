@@ -12,6 +12,7 @@ import { BackupControl } from "./components/BackupControl";
 import { FileTransfer } from "./components/FileTransfer";
 import { SelfTestGates } from "./components/SelfTestGates";
 import { SecurityPolicies } from "./components/SecurityPolicies";
+import { RevenueOps } from "./components/RevenueOps";
 import { ClusterManager } from "./components/ClusterManager";
 import { VirtualController } from "./components/VirtualController";
 import { SaaSAdmin } from "./components/SaaSAdmin";
@@ -28,7 +29,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock
+  MousePointer2, Building2, Lock, DollarSign,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -98,6 +99,7 @@ export default function App() {
     { id: "backup", icon: <CloudLightning className="w-4 h-4 text-amber-400" /> },
     { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
     { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
+    { id: "revenue", icon: <DollarSign className="w-4 h-4 text-green-400" /> },
   ];
 
   // Map header status badge
@@ -353,6 +355,11 @@ export default function App() {
           {activeTab === "selftest" && (
             <div className="animate-fade-in">
               <SelfTestGates />
+            </div>
+          )}
+          {activeTab === "revenue" && (
+            <div className="animate-fade-in">
+              <RevenueOps onNotify={notify} />
             </div>
           )}
         </div>
