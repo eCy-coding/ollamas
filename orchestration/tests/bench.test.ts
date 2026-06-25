@@ -104,3 +104,16 @@ describe("aggregate / rank / regression", () => {
     expect(baseOk).toHaveLength(0);
   });
 });
+
+describe("rankEfficient — champion gate (Faz11B: rounded-ratio diskalifiye regresyonu)", () => {
+  it("11/12 doğru (0.9166) model champion seçilir — round'lanıp 0.9'a düşüp dışlanmamalı", () => {
+    const recs = [];
+    for (let i = 0; i < 12; i++) {
+      recs.push({ device: "mac", model: "good:8b", tokS: 100, latencyMs: 0, correct: i < 11, ts: "", source: "" });
+    }
+    // tek rakip: %100 doğru ama YAVAŞ → good:8b (0.9166, hızlı) champion olmalı
+    recs.push({ device: "mac", model: "perfect:70b", tokS: 50, latencyMs: 0, correct: true, ts: "", source: "" });
+    const best = rankEfficient(aggregate(recs));
+    expect(best.get("mac")?.model).toBe("good:8b");
+  });
+});
