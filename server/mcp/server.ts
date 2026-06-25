@@ -21,6 +21,7 @@ import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
 import { getFederatedRoots } from "./client";
 import { SubscriptionRegistry } from "./subscriptions";
+import { flattenTreeFiles } from "../files";
 
 /** Builds a per-request ToolCtx (tenant, deps, allowlist, metering). */
 export type CtxFactory = (req: Request) => ToolCtx;
@@ -165,8 +166,9 @@ export function buildServer(ctx: ToolCtx): Server {
     let files: string[] = [];
     try {
       const tree = await ctx.deps.FilesystemManager.getTree(ctx.isLive, ctx.workspaceRoot);
-      // getTree returns a printed tree string; extract file-ish lines conservatively.
-      files = String(tree.tree || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.endsWith("/")).slice(0, 200);
+      // getTree returns a FileItem[] tree (NOT a string) — flatten to file relative paths.
+      // (Was String(tree.tree).split("\n") → "[object Object]" garbage resources.)
+      files = flattenTreeFiles(tree.tree || []).slice(0, 200);
     } catch { /* best-effort */ }
     const start = decodeCursor(req.params?.cursor);
     const page = files.slice(start, start + PAGE);

@@ -148,6 +148,49 @@ export class TerminalManager {
   }
 
   /**
+   * Run an allowlisted binary with a PRE-SPLIT argv (no shell, no whitespace tokenization).
+   * For tools that must pass a single argument containing spaces or regex metachars (e.g.
+   * grep_search's query) — execute()'s split(/\s+/) + metachar-block would corrupt or reject
+   * those (a quoted `"a b"` became literal argv tokens incl. the quotes). Same gates as
+   * execute(): commandExec permission + binary allowlist + audit; execFile (shell:false) makes
+   * quote-breakout / injection structurally impossible, so the metachar blocklist isn't needed.
+   */
+  public static async executeArgv(
+    isLive: boolean,
+    workspaceRoot: string,
+    binary: string,
+    args: string[]
+  ): Promise<ExecResult> {
+    const display = `${binary} ${args.join(" ")}`;
+    if (!isLive) return this.simulateDemoCommand(display);
+
+    if (!db.data.permissions.commandExec) {
+      db.logSecurity("command_exec", display, "Command refused: local console execution is globally deactivated in settings.", "deny");
+      return { stdout: "", stderr: "Security block: Terminal execution is deactivated in security panels.", exitCode: 126 };
+    }
+    if (!ALLOWED_BINARIES.includes(binary)) {
+      db.logSecurity("command_exec", display, `Command refused: binary '${binary}' is not in the allowed console suite.`, "deny");
+      return { stdout: "", stderr: `Security block: Command '${binary}' is outside the permissible developer panel tools.\nAllowed toolsuite: ${ALLOWED_BINARIES.join(", ")}`, exitCode: 126 };
+    }
+    db.logSecurity("command_exec", display, `Executing (argv) in safe cwd: ${workspaceRoot}`, "allow");
+
+    return new Promise((resolve) => {
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
+      // Justified: execFile (no shell) + strict binary allowlist + permission gate + audit;
+      // argv array straight to execve — not a shell string, so injection is impossible.
+      execFile(
+        binary,
+        args,
+        { cwd: workspaceRoot || process.cwd(), timeout: 45000, shell: false },
+        (error, stdout, stderr) => {
+          const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number }).code as number || 1) : 0;
+          resolve({ stdout: stdout || "", stderr: stderr || "", exitCode });
+        }
+      );
+    });
+  }
+
+  /**
    * Dummy high-fidelity shell response for cloud run demo targets
    */
   private static simulateDemoCommand(command: string): ExecResult {

@@ -64,6 +64,18 @@ describe("ai façade — listModels / default model", () => {
     vi.spyOn(global, "fetch").mockResolvedValue(tagsResponse([]));
     await expect(ai.resolveDefaultModel()).rejects.toThrow(/no local ollama model available/);
   });
+
+  test("listModels: ilk base erişilemez → sonraki base'den döner (Faz11C T1-001)", async () => {
+    let calls = 0;
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      calls++;
+      if (calls === 1) throw new Error("ECONNREFUSED"); // docker host unreachable on local boot
+      expect(String(url)).toContain("/api/tags");
+      return tagsResponse(["qwen3:8b"]);
+    });
+    expect(await ai.listModels()).toEqual(["qwen3:8b"]);
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("ai façade — generateText", () => {

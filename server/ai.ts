@@ -39,10 +39,19 @@ export function _resetDefaultModelCache(): void {
 
 /** Flat list of available local ollama model names (Colab `list_models()`). */
 export async function listModels(): Promise<string[]> {
-  const res = await fetch(`${ollamaHost()}/api/tags`);
-  if (!res.ok) return [];
-  const data: any = await res.json();
-  return (data.models || []).map((m: any) => m.name);
+  // .env OLLAMA_HOST is often a docker value (host.docker.internal:11434) unreachable
+  // from a local boot — probe [configured, 127.0.0.1, localhost] like ProviderRouter's
+  // ollama-local case (providers.ts) so /api/ai/models works in docker AND local.
+  const bases = [...new Set([ollamaHost(), "http://127.0.0.1:11434", "http://localhost:11434"])];
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/api/tags`);
+      if (!res.ok) continue;
+      const data: any = await res.json();
+      return (data.models || []).map((m: any) => m.name);
+    } catch { /* unreachable base — try next */ }
+  }
+  return [];
 }
 
 /** Prefer a coder-tuned local model (qwen3-coder per orchestration vO6 M4 benchmark). */

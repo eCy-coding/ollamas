@@ -11,6 +11,20 @@ export interface FileItem {
   children?: FileItem[];
 }
 
+/** Flatten a FileItem tree to non-directory relative paths (MCP resources/list).
+ *  getTree() returns FileItem[] — String(tree).split("\n") would yield "[object Object]". */
+export function flattenTreeFiles(items: FileItem[]): string[] {
+  const out: string[] = [];
+  const walk = (nodes: FileItem[]): void => {
+    for (const n of nodes || []) {
+      if (n.isDirectory) walk(n.children || []);
+      else out.push(n.relativePath);
+    }
+  };
+  walk(items || []);
+  return out;
+}
+
 // Emulated virtual in-memory files for DEMO mode
 const VIRTUAL_FILES: Record<string, string> = {
   "index.py": `def hello_world():\n    print("Hello from LLM Mission Control demo workspace!")\n\nif __name__ == "__main__":\n    hello_world()`,
