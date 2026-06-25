@@ -106,7 +106,10 @@ export function aggregate(records: BenchRecord[]): Agg[] {
     out.push({
       model, device, n: rs.length,
       medianTokS: round(median(toks)), p95: round(percentile(toks, 95)), mad: round(mad(toks)),
-      min: round(Math.min(...toks)), max: round(Math.max(...toks)), correctRatio: round(corr / rs.length),
+      // correctRatio RAW (yuvarlama YOK): rankEfficient `<=0.9` ve optimize `<0.7` gate'leri
+      // ham oranda çalışsın — eskiden round(*10)/10 ile %85-94.9 doğru modeller 0.9'a düşüp
+      // champion'dan diskalifiye oluyordu. Display zaten Math.round(*100) yapıyor.
+      min: round(Math.min(...toks)), max: round(Math.max(...toks)), correctRatio: corr / rs.length,
     });
   }
   return out.sort((a, b) => b.medianTokS - a.medianTokS);

@@ -113,7 +113,7 @@ const LOCK_STALE_MS = 10_000; // proper-lockfile deseni: 10s sonra lock stale �
 export interface ClaimStore { ledgerPath: string; lockDir: string; }
 
 /** Atomic lock: mkdir EEXIST = başkası tutuyor. Stale (mtime>10s) → takeover. */
-function withLock<T>(lockDir: string, fn: () => T): T {
+export function withLock<T>(lockDir: string, fn: () => T): T {
   let held = false;
   for (let i = 0; i < 50 && !held; i++) {
     try {
@@ -132,10 +132,13 @@ function withLock<T>(lockDir: string, fn: () => T): T {
       while (Date.now() < until) { /* spin */ }
     }
   }
+  // Lock alınamadıysa fn()'i KOŞULSUZ çalıştırma (eski hata: held=false olsa bile yazardı
+  // → başka writer lock'tayken duplicate claim). Lock olmadan yazma = ERR-ORCH-013 riski.
+  if (!held) throw new Error("claim lock not acquired (lockDir held by another writer) — aborting to prevent duplicate claim");
   try {
     return fn();
   } finally {
-    if (held) { try { rmdirSync(lockDir); } catch { /* zaten gitti */ } }
+    try { rmdirSync(lockDir); } catch { /* zaten gitti */ }
   }
 }
 
