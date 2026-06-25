@@ -19,6 +19,25 @@ const VIRTUAL_FILES: Record<string, string> = {
   "requirements.txt": `pytest>=7.0.0\nruff>=0.1.0`,
 };
 
+/**
+ * Flatten a FileItem tree to the relative paths of its FILES (directories skipped,
+ * recursing into their children). Used by MCP resources/list, which previously did
+ * String(tree) on a FileItem[] — yielding "[object Object],..." and never any real file.
+ */
+export function flattenTree(items: FileItem[]): string[] {
+  if (!Array.isArray(items)) return [];
+  const out: string[] = [];
+  const walk = (list: FileItem[]) => {
+    if (!Array.isArray(list)) return;
+    for (const it of list) {
+      if (it.isDirectory) walk(it.children || []);
+      else if (it.relativePath) out.push(it.relativePath);
+    }
+  };
+  walk(items);
+  return out;
+}
+
 export class FilesystemManager {
   /**
    * Universal path sanitation and escape guard

@@ -611,6 +611,7 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              abortSignal: buildSignal(signal), // compose caller cancellation with 300s timeout (parity with other providers)
               ...(config.tools ? {
                 tools: config.tools.map((t: any) => ({
                   functionDeclarations: [{
@@ -639,6 +640,7 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              abortSignal: buildSignal(signal), // compose caller cancellation with 300s timeout (parity with other providers)
               ...(config.tools ? {
                 tools: config.tools.map((t: any) => ({
                   functionDeclarations: [{

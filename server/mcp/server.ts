@@ -18,6 +18,7 @@ import {
 import { pathToFileURL } from "node:url";
 import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
+import { flattenTree } from "../files";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
 import { getFederatedRoots } from "./client";
 import { SubscriptionRegistry } from "./subscriptions";
@@ -165,8 +166,9 @@ export function buildServer(ctx: ToolCtx): Server {
     let files: string[] = [];
     try {
       const tree = await ctx.deps.FilesystemManager.getTree(ctx.isLive, ctx.workspaceRoot);
-      // getTree returns a printed tree string; extract file-ish lines conservatively.
-      files = String(tree.tree || "").split("\n").map((l) => l.trim()).filter((l) => l && !l.endsWith("/")).slice(0, 200);
+      // getTree returns a FileItem[] tree — flatten it to real file paths (the old
+      // String(tree.tree) yielded "[object Object],..." and never any actual file).
+      files = flattenTree(tree.tree).slice(0, 200);
     } catch { /* best-effort */ }
     const start = decodeCursor(req.params?.cursor);
     const page = files.slice(start, start + PAGE);
