@@ -3,6 +3,7 @@
 //   node web_search.mjs <query...>       -> top DuckDuckGo results
 //   node web_search.mjs --fetch <url>    -> readable text of a page
 import { main, emit } from "./lib/bridge-client.mjs";
+import { assertPublicUrl } from "../lib/ssrf-guard.mjs";
 
 async function search(q) {
   const res = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), {
@@ -24,7 +25,10 @@ async function search(q) {
 }
 
 async function fetchPage(url) {
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000) });
+  // SSRF guard: this is a `safe`-tier tool (default-allowed), so a tenant/LLM-supplied
+  // url must not reach internal/loopback/metadata services.
+  await assertPublicUrl(url);
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000), redirect: "manual" });
   const html = await res.text();
   const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").trim();
   const text = html

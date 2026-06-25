@@ -27,7 +27,12 @@ function driftRows(): any {
   try {
     const out = execFileSync(TSX, [join(HERE, "driftguard.ts"), "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000, cwd: ORCH_DIR });
     return JSON.parse(out);
-  } catch { return { rows: [] }; }
+  } catch (e: any) {
+    // driftguard exits NON-ZERO whenever a HARD drift row exists (its gate) — but the
+    // valid JSON is already on stdout. Recover it (like fuse.ts/heartbeat.ts) so the
+    // most important findings aren't silently dropped from the CRITICAL backlog.
+    try { return JSON.parse(typeof e?.stdout === "string" ? e.stdout : ""); } catch { return { rows: [] }; }
+  }
 }
 
 function main(): void {

