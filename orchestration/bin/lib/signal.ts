@@ -73,18 +73,22 @@ function buildPlan(tab: NudgeTarget, cmd: string): { file: string; args: string[
       human: `tmux send-keys -t ${target} "${cmd}" Enter`,
     };
   }
-  // iTerm2 / Terminal.app: tty üzerinden ilgili session'a write text (özgün, GPL ref-only)
+  // iTerm2 / Terminal.app: tty üzerinden ilgili session'a write text (özgün, GPL ref-only).
+  // cmd, çift-tırnaklı AppleScript string'ine giriyor → isAllowedCmd shell-metachar süzer
+  // ama `"` süzmez; AppleScript-escape et (önce backslash, sonra çift-tırnak) yoksa cmd
+  // string'i erken kapatıp keyfi AppleScript enjekte edilebilir.
+  const asCmd = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const script = tab.app === "iterm2"
     ? `tell application "iTerm" to repeat with w in windows
          repeat with t in tabs of w
            repeat with s in sessions of t
-             if (tty of s) is "${tab.tty}" then tell s to write text "${cmd}"
+             if (tty of s) is "${tab.tty}" then tell s to write text "${asCmd}"
            end repeat
          end repeat
        end repeat`
     : `tell application "Terminal" to repeat with w in windows
          repeat with t in tabs of w
-           if (tty of t) is "${tab.tty}" then do script "${cmd}" in t
+           if (tty of t) is "${tab.tty}" then do script "${asCmd}" in t
          end repeat
        end repeat`;
   return { file: "osascript", args: ["-e", script], human: `osascript write "${cmd}" → ${tab.app} ${tab.tty}` };

@@ -58,6 +58,9 @@ main(async () => {
   const macos = HEURISTICS.filter(([re]) => re.test(script)).map(([, msg]) => msg);
   const sc = await shellcheck(script);
   const errors = sc.filter((c) => c.level === "error");
-  const ok = macos.length === 0 && errors.length === 0;
-  emit({ ok, clean: ok, shellcheck: sc, macos, severity: errors.length ? "error" : macos.length ? "warning" : "clean" });
+  const available = !sc.some((c) => c.code === "SHELLCHECK_UNAVAILABLE");
+  // FAIL-CLOSED: a preventive safety gate must NOT report 'clean' just because shellcheck
+  // could not run (docker/image missing). Surface available:false so the caller knows.
+  const ok = available && macos.length === 0 && errors.length === 0;
+  emit({ ok, clean: ok, available, shellcheck: sc, macos, severity: !available ? "unavailable" : errors.length ? "error" : macos.length ? "warning" : "clean" });
 });

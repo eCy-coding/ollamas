@@ -279,7 +279,10 @@ const server = http.createServer(async (req, res) => {
       });
       return send(res, 200, { ok: true, exitCode: 0, output: (stdout || "") + (stderr || "") });
     } catch (e) {
-      return send(res, 200, { ok: false, exitCode: e.code ?? 1, output: ((e.stdout || "") + (e.stderr || "")) || String(e.message || e) });
+      // A watchdog timeout rejects with e.killed + e.signal — mark it so the caller can
+      // distinguish "ran and failed" from "killed at the time limit" (was an ordinary exit).
+      const timedOut = e.killed === true && !!e.signal;
+      return send(res, 200, { ok: false, timedOut, exitCode: e.code ?? (timedOut ? 124 : 1), output: ((e.stdout || "") + (e.stderr || "")) || String(e.message || e) });
     }
   }
 

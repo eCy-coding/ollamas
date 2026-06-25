@@ -25,7 +25,10 @@ function arg(name, def) {
 const JSON_OUT = process.argv.includes("--json");
 const MONTH = arg("--month", null);
 const RATE = Number(arg("--rate", 0));
-const BUDGET = process.argv.includes("--budget") ? Number(arg("--budget", 0)) : null;
+// `--budget` with no/garbage value (e.g. `--budget` as the last token, or `--budget --json`)
+// must DISABLE the gate explicitly, not silently via a NaN that compares false everywhere.
+const _budget = process.argv.includes("--budget") ? Number(arg("--budget", 0)) : null;
+const BUDGET = Number.isFinite(_budget) ? _budget : null;
 
 // tool -> tier map from the manifest (single source of truth).
 function toolTierMap() {

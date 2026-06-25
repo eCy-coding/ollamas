@@ -156,9 +156,23 @@ function unsealOrWarn(disk: DiskConfig, env: NodeJS.ProcessEnv): { fileData: Par
       `ollamas: cannot decrypt a stored secret (${why}). Ignoring it — set OLLAMAS_API_KEY, ` +
         `run 'ollamas config apiKey <key>' to reset, or restore a cli.json.bak.* backup.\n`,
     );
+    // Recover each sealed secret INDEPENDENTLY: a corrupt apiKey must not discard a still
+    // readable saasAdminToken (the next saveConfig would persist that loss irreversibly).
+    let key: Buffer | null = null;
+    try { key = needKey ? loadMasterKey(env) : null; } catch { key = null; }
+    const recovered: Partial<CliConfig> = {};
+    for (const [encField, plainField] of [["apiKeyEnc", "apiKey"], ["saasAdminTokenEnc", "saasAdminToken"]] as const) {
+      const enc = (disk as any)[encField];
+      if (!enc) continue;
+      try {
+        const one = unsealDisk({ [encField]: enc } as any, key);
+        const v = (one.fileData as any)[plainField];
+        if (v != null) (recovered as any)[plainField] = v;
+      } catch { /* this one is genuinely unreadable → drop only it */ }
+    }
     const { apiKeyEnc, saasAdminTokenEnc, apiKey, saasAdminToken, ...rest } = disk;
     void apiKeyEnc; void saasAdminTokenEnc; void apiKey; void saasAdminToken;
-    return { fileData: { ...rest }, legacy: false };
+    return { fileData: { ...rest, ...recovered }, legacy: false };
   }
 }
 
