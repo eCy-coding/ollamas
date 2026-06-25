@@ -1,5 +1,5 @@
 {
-  "$comment": "A2A (Agent2Agent) v1.0 Agent Card — agent discovery. Statik; mevcut ollamas server endpointlerine (http://127.0.0.1:8090) işaret eder. Dışa-publish = operatör kararı. Şema: agent2agent.info/docs/concepts/agentcard.",
+  "$comment": "A2A (Agent2Agent) v1.0 Agent Card — agent discovery. Statik; mevcut ollamas server endpointlerine (http://127.0.0.1:8090) işaret eder. Dışa-publish = operatör kararı (önce 'version' alanını gerçek cli VERSION'a bağla + url'i public domain yap; 127.0.0.1 dış-keşfedilemez). Şema: agent2agent.info/docs/concepts/agentcard.",
   "protocolVersion": "0.3.0",
   "name": "ollamas",
   "description": "Zero-dep TypeScript CLI + local-LLM coding agent. ReAct host-tool agent, project-wide bug audit, test generation, $0 cloud-model fleet (ollama-cloud/openrouter).",

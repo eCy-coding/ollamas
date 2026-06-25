@@ -4,11 +4,12 @@ description: Harness sağlık raporu — hooks/agents/statusline/permissions/lau
 
 Bu projenin Claude Code harness'ını denetle ve tek tablo bas. SADECE read-only komutlar çalıştır:
 
-1. `node .claude/merge-settings.mjs` (dry-run) → settings.json'da permissions/statusLine/PreToolUse var mı ("would add: nothing" = tam aktif).
-2. Her güvenlik hook'unu sahte payload'la test et: `redact-tokens` (secret→exit2), `block-destructive` (rm-rf/→exit2), `gate-before-commit` (add -A→exit2); pass-path (ls→exit0).
+1. `node .claude/validate-settings.mjs` → tüm top-level key'ler geçerli mi (uydurma-key yok); sonra `node .claude/merge-settings.mjs` (dry-run) → drift var mı ("would add: nothing/-..." = tam aktif; allow+/enabledMcp+ çıkarsa re-apply gerek).
+2. Tüm hook suite'i koş: `bash .claude/hooks/test-hooks.sh` → 22/22 bekle. (Blocker'lar `permissionDecision:"deny"` JSON + exit 0 kullanır — exit2 DEĞİL; lifecycle hookları exit 0.)
 3. `.claude/statusline.mjs`'i örnek session JSON ile render et.
 4. `ls .claude/agents/` → cli-coder, cli-verifier, harness-reviewer var mı.
 5. `launchctl list | grep ollamas.orchestration.autopilot` → launchd yüklü mü.
-6. `git config core.hooksPath` + `.git/hooks/pre-commit` var mı → ağır gate kurulu mu.
+6. `.git/hooks/pre-commit` var mı + içinde `validate-settings`/`test-hooks` çağrısı → ağır gate + self-koruma kurulu mu.
+7. `cat .mcp.json` → ollamas/context7/deepwiki; canlı settings `enabledMcpjsonServers` ile eşleşiyor mu (eşleşmezse re-apply).
 
 Çıktı: her boyut için OK/MISSING + eksikler için tek-satır fix (apply-harness.sh çalıştır / Terminal.app'ten launchd load). Kanıt-önce: gerçek exit kodlarını göster.

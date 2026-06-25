@@ -25,7 +25,7 @@ node -e '
   const fs=require("fs"); const m=JSON.parse(fs.readFileSync("/tmp/_merged.json","utf8"));
   const root="${CLAUDE_PLUGIN_ROOT}";
   const fix=(arr)=>JSON.parse(JSON.stringify(arr).replace(/node [^"]*\/\.claude\/hooks\//g, `node ${root}/hooks/`));
-  const hooks={}; for(const k of ["PreToolUse","PostToolUse","PreCompact","Stop","PostToolUseFailure"]) if(m.hooks[k]) hooks[k]=fix(m.hooks[k]);
+  const hooks={}; for(const k of ["PreToolUse","PostToolUse","PreCompact","Stop","PostToolUseFailure","SubagentStop","SessionEnd","Notification"]) if(m.hooks[k]) hooks[k]=fix(m.hooks[k]);
   fs.writeFileSync(process.argv[1], JSON.stringify({hooks},null,2)+"\n");
 ' "$OUT/hooks/hooks.json"
 
