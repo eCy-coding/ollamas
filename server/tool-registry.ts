@@ -327,7 +327,9 @@ const TOOLS: Record<string, ToolDef> = {
     }),
     invoke: async (args, { isLive, workspaceRoot, deps }) => {
       if (!args.query) throw new Error("Missing 'query' parameter.");
-      return await deps.TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${args.query}" .`);
+      // argv form: the query is ONE element (no shell, no quoting) so multi-word and
+      // regex-metachar patterns search correctly — execute()'s quoted string corrupted them.
+      return await deps.TerminalManager.executeArgv(isLive, workspaceRoot, "grep", ["-rnI", String(args.query), "."]);
     },
   },
 
