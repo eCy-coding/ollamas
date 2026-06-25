@@ -3,6 +3,8 @@
 // missed (ERR-SCR-006/007, RISK-SCR-019).
 import { describe, test, expect } from "vitest";
 import path from "node:path";
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { safeWritePath, withinLimit, bindRequiresAuth, defaultWriteRoots } from "../../bin/host-bridge/lib/bridge-guard.mjs";
 
 const ROOT = "/tmp/llm-bridge-test-root";
@@ -54,5 +56,18 @@ describe("bridge security guards", () => {
     process.env.BRIDGE_WRITE_ROOTS = "/a:/b/c";
     expect(defaultWriteRoots()).toEqual([path.resolve("/a"), path.resolve("/b/c")]);
     if (prev === undefined) delete process.env.BRIDGE_WRITE_ROOTS; else process.env.BRIDGE_WRITE_ROOTS = prev;
+  });
+
+  test("safeWritePath blocks a symlink escaping the root (Faz13 P2-004)", () => {
+    const base = mkdtempSync(path.join(tmpdir(), "br-sym-"));
+    const root = path.join(base, "root");
+    const outside = path.join(base, "outside");
+    mkdirSync(path.join(root, "sub"), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, path.join(root, "sub", "evil")); // <root>/sub/evil -> <base>/outside (escape)
+    expect(safeWritePath([root], path.join(root, "sub", "evil", "payload.txt")).ok).toBe(false);
+    // control: a real (non-symlink) path inside the root still allowed
+    expect(safeWritePath([root], path.join(root, "sub", "ok.txt")).ok).toBe(true);
+    rmSync(base, { recursive: true, force: true });
   });
 });

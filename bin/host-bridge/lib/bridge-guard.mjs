@@ -5,6 +5,7 @@
 // server/commander.ts:31): resolve() + startsWith(root + sep).
 import os from "node:os";
 import path from "node:path";
+import fs from "node:fs";
 
 // Roots /write may target. Legit host authoring = the workspace + bridge scratch +
 // the mission-control data dir. Anything else is an escape (RISK: ERR-SCR-001 family).
@@ -18,15 +19,34 @@ export function defaultWriteRoots() {
   ].map((p) => path.resolve(p));
 }
 
-// Confine a write target to an allowed root. Returns {ok:true,resolved} only when
-// the canonical path is inside one of allowedRoots; traversal / absolute escape /
-// outside-scope → {ok:false}. (resolve() collapses ../, so "<root>/../etc" escapes.)
+// Canonicalize via the deepest EXISTING ancestor: realpathSync resolves SYMLINKS that
+// path.resolve does NOT, then re-append the not-yet-created tail. Without this, a symlink
+// inside an allowed root (<root>/sub -> /etc) passes the prefix check and escapes the
+// write confinement (BRIDGE_WRITE_ROOTS bypass).
+function realParent(p) {
+  const tail = [];
+  let cur = p;
+  for (let i = 0; i < 64; i++) {
+    try { return tail.length ? path.join(fs.realpathSync(cur), ...tail) : fs.realpathSync(cur); }
+    catch { /* doesn't exist yet — walk up */ }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    tail.unshift(path.basename(cur));
+    cur = parent;
+  }
+  return p;
+}
+
+// Confine a write target to an allowed root. Returns {ok:true,resolved} only when the
+// CANONICAL (symlink-resolved) path is inside one of allowedRoots; traversal / absolute
+// escape / symlink-escape / outside-scope → {ok:false}.
 export function safeWritePath(allowedRoots, target) {
   if (typeof target !== "string" || !target) return { ok: false, error: "empty path" };
-  const resolved = path.resolve(target);
+  const resolved = path.resolve(target);          // returned as-is (display/compat)
+  const canonical = realParent(resolved);          // symlink-resolved — used for the check
   for (const root of allowedRoots) {
-    const r = path.resolve(root);
-    if (resolved === r || resolved.startsWith(r + path.sep)) return { ok: true, resolved };
+    const r = realParent(path.resolve(root));
+    if (canonical === r || canonical.startsWith(r + path.sep)) return { ok: true, resolved };
   }
   return { ok: false, error: "path outside allowed roots", resolved };
 }
