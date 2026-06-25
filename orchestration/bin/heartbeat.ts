@@ -19,7 +19,10 @@ import { stateHash, shouldNotify, staleLanes, tickDecision, reqToConductAction, 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const STATE = join(ORCH_DIR, "heartbeat-state.jsonl");
-const CLAIMS = join(ORCH_DIR, "claims.jsonl");
+// The work-claim ledger lives at seyir/work-claim.jsonl (lib/claims defaultStore) — NOT
+// orchestration/claims.jsonl (which never existed) → readActiveClaims always returned []
+// → collision-avoidance was a silent no-op. Point at the real ledger.
+export const CLAIMS = join(ORCH_DIR, "seyir", "work-claim.jsonl");
 const IDLE_H = Number(process.env.ORCH_IDLE_HOURS || 6);
 
 const argv = new Set(process.argv.slice(2));
@@ -88,9 +91,9 @@ function prevHash(): string {
   try { return lines.length ? JSON.parse(lines[lines.length - 1]).hash || "" : ""; } catch { return ""; }
 }
 
-function readActiveClaims(now: number): ClaimEvent[] {
-  if (!existsSync(CLAIMS)) return [];
-  try { return activeClaims(parseClaims(readFileSync(CLAIMS, "utf8")), now); } catch { return []; }
+export function readActiveClaims(now: number, claimsPath: string = CLAIMS): ClaimEvent[] {
+  if (!existsSync(claimsPath)) return [];
+  try { return activeClaims(parseClaims(readFileSync(claimsPath, "utf8")), now); } catch { return []; }
 }
 
 function tick(now: number): boolean {
@@ -134,4 +137,6 @@ function main(): void {
   }
 }
 
-main();
+// CLI-guard: run only when invoked directly (tsx heartbeat.ts), NOT on import — so the
+// exported CLAIMS/readActiveClaims are import-safe for tests/tools (no side-effect tick).
+if (process.argv[1] && /heartbeat\.ts$/.test(process.argv[1])) main();
