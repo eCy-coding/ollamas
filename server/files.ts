@@ -40,6 +40,31 @@ export class FilesystemManager {
   }
 
   /**
+   * Resolve a path for download: confine to the workspace, then require it to
+   * exist AND be a regular file. Rejecting directories is a crash-safety guard:
+   * fs.createReadStream on a directory succeeds synchronously, then emits an async
+   * EISDIR 'error' — unhandled, that becomes an uncaughtException and kills the
+   * whole gateway process. Typed `code` lets the caller map to 404/400.
+   */
+  public static resolveReadableFile(workspaceRoot: string, relativeTarget: string): string {
+    const safePath = FilesystemManager.resolveSafePath(workspaceRoot, relativeTarget);
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(safePath);
+    } catch {
+      const err: any = new Error("Target file does not exist.");
+      err.code = "ENOENT_DOWNLOAD";
+      throw err;
+    }
+    if (stat.isDirectory()) {
+      const err: any = new Error("Target is a directory, not a downloadable file.");
+      err.code = "EISDIR_DOWNLOAD";
+      throw err;
+    }
+    return safePath;
+  }
+
+  /**
    * Get virtual or actual filesystem tree
    */
   public static async getTree(isLive: boolean, workspaceRoot: string): Promise<{ tree: FileItem[]; workspaceRoot: string }> {

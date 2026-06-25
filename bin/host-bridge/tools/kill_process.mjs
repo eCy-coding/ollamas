@@ -2,14 +2,10 @@
 // kill_process — kill a PID, or all listeners on a port (':<port>').
 // Optional signal: --sig TERM|KILL|INT (default TERM).
 import { bridgeRun, emit, main } from "./lib/bridge-client.mjs";
-
-const SIGNALS = { TERM: "TERM", KILL: "KILL", INT: "INT", HUP: "HUP" };
+import { parseKillArgs } from "./lib/kill-args.mjs";
 
 main(async () => {
-  const args = process.argv.slice(2);
-  const sigIdx = args.indexOf("--sig");
-  const sig = sigIdx >= 0 ? (SIGNALS[(args[sigIdx + 1] || "").toUpperCase()] || "TERM") : "TERM";
-  const target = args.filter((a, i) => a !== "--sig" && i !== sigIdx + 1)[0];
+  const { target, sig } = parseKillArgs(process.argv.slice(2));
   if (!target) throw new Error("target required: a PID or ':<port>'");
 
   const command = target.startsWith(":")

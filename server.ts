@@ -1084,13 +1084,24 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       if (!db.data.permissions.fileRead) {
         return res.status(403).json({ error: "Local filesystem read permission is disabled." });
       }
-      const safePath = FilesystemManager.resolveSafePath(db.data.workspacePath, relativePath);
-      if (!fs.existsSync(safePath)) {
-        return res.status(404).json({ error: "Target file does not exist." });
+      let safePath: string;
+      try {
+        safePath = FilesystemManager.resolveReadableFile(db.data.workspacePath, relativePath);
+      } catch (e: any) {
+        if (e?.code === "ENOENT_DOWNLOAD") return res.status(404).json({ error: e.message });
+        if (e?.code === "EISDIR_DOWNLOAD") return res.status(400).json({ error: e.message });
+        throw e; // traversal etc. → outer catch
       }
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/octet-stream");
-      fs.createReadStream(safePath).pipe(res);
+      // Stream errors (mid-read I/O failure, TOCTOU) fire asynchronously — an
+      // unhandled stream 'error' would crash the process, so handle it explicitly.
+      const rs = fs.createReadStream(safePath);
+      rs.on("error", (err: Error) => {
+        if (!res.headersSent) res.status(500).json({ error: err.message });
+        else res.destroy(err);
+      });
+      rs.pipe(res);
       db.logSecurity("file_system", `HTTP download: ${relativePath}`, "Streamed file", "allow");
     } catch (e: any) {
       const traversal = /traversal/i.test(e.message);
