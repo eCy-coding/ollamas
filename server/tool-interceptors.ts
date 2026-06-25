@@ -123,7 +123,10 @@ function cache(): LRUCache<string, ToolResult> {
 function cacheTtl(): number { const n = Number(process.env.MCP_CACHE_TTL_MS); return Number.isFinite(n) && n > 0 ? n : 0; }
 function cacheKey(tool: string, args: any, ctx: ToolCtx): string {
   const h = crypto.createHash("sha256").update(JSON.stringify(args ?? {})).digest("hex");
-  return `${ctx.tenantId || "_"}:${tool}:${h}`;
+  // Include workspaceRoot + live/demo mode: the same relative path under a different
+  // workspace or after a mode flip must NOT collide (would serve another workspace's or
+  // the demo sandbox's content for the cache TTL).
+  return `${ctx.tenantId || "_"}:${ctx.isLive ? "L" : "D"}:${ctx.workspaceRoot || "_"}:${tool}:${h}`;
 }
 const clone = (r: ToolResult): ToolResult => structuredClone(r);
 

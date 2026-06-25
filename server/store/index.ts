@@ -293,18 +293,22 @@ export async function getBillingConfig(key: string): Promise<string | null> {
 export async function setBillingConfig(key: string, value: string): Promise<void> {
   await d().run("INSERT INTO billing_config (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", [key, value]);
 }
-/** Has this Stripe event already been PROCESSED? Check-only (no side effect) so the
- *  caller can mark it seen AFTER successfully handling — see markStripeEventProcessed. */
+/** Has this Stripe event already been claimed/processed? Read-only (no side effect) —
+ *  the atomic claim is claimStripeEvent; this is for state inspection. */
 export async function stripeEventSeen(eventId: string): Promise<boolean> {
   return !!(await d().query("SELECT 1 AS x FROM stripe_events WHERE id = ?", [eventId])).rows[0];
 }
-/** Record a Stripe event as processed (idempotent). Call only after the handler
- *  succeeds, so a handler failure leaves the event un-consumed and Stripe can retry. */
-export async function markStripeEventProcessed(eventId: string): Promise<void> {
-  // Atomic + idempotent: ON CONFLICT avoids the check-then-insert race (two replicas
-  // delivering the same event would otherwise throw a PRIMARY KEY violation → 500 to
-  // Stripe for work that already succeeded).
-  await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?) ON CONFLICT(id) DO NOTHING", [eventId, nowIso()]);
+/** Atomically CLAIM a Stripe event: returns true only if THIS call inserted the row.
+ *  Concurrent deliveries (Stripe retries / multiple replicas) race here — exactly one
+ *  wins (changes>0) and may run the side effects; the rest get false and must no-op. */
+export async function claimStripeEvent(eventId: string): Promise<boolean> {
+  const r = await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?) ON CONFLICT(id) DO NOTHING", [eventId, nowIso()]);
+  return (r.changes ?? 0) > 0;
+}
+/** Release a previously-claimed event so Stripe can redeliver it (used when the handler
+ *  hit a TRANSIENT failure — the event must not stay consumed). */
+export async function releaseStripeEvent(eventId: string): Promise<void> {
+  await d().run("DELETE FROM stripe_events WHERE id = ?", [eventId]);
 }
 
 /** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].

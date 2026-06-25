@@ -173,7 +173,14 @@ function runConfig(rest: string[]): number {
     return 2;
   }
   if (value === undefined) {
-    process.stdout.write(String((loadConfig() as any)[key] ?? "") + "\n");
+    const raw = (loadConfig() as any)[key];
+    // Secret keys are sealed at rest + masked in the full-config view — never print the
+    // decrypted value on a single-key read either (would leak it to stdout/pipes/logs).
+    if (key === "apiKey" || key === "saasAdminToken") {
+      process.stdout.write((raw ? "***set***" : "***unset***") + "\n");
+    } else {
+      process.stdout.write(String(raw ?? "") + "\n");
+    }
     return 0;
   }
   saveConfig({ [key]: value } as Partial<CliConfig>);

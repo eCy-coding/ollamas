@@ -134,11 +134,11 @@ describe("store: usage + billing idempotency", () => {
   test("billing_config roundtrip + stripe event dedup (Faz 9C)", async () => {
     await store.setBillingConfig("meter_id", "mtr_123");
     expect(await store.getBillingConfig("meter_id")).toBe("mtr_123");
-    // Check-only now (no side effect); the processed-marker is written separately so
-    // a webhook handler can mark seen AFTER it succeeds (H6).
+    // stripeEventSeen is read-only; claimStripeEvent is the atomic dedup (first wins).
     expect(await store.stripeEventSeen("evt_1")).toBe(false);
-    await store.markStripeEventProcessed("evt_1");
+    expect(await store.claimStripeEvent("evt_1")).toBe(true);  // this call claims it
     expect(await store.stripeEventSeen("evt_1")).toBe(true);
+    expect(await store.claimStripeEvent("evt_1")).toBe(false); // already claimed → loser no-ops
   });
 });
 

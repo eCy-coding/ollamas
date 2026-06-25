@@ -5,7 +5,7 @@
 
 import Stripe from "stripe";
 import crypto from "node:crypto";
-import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, markStripeEventProcessed, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
+import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, claimStripeEvent, releaseStripeEvent, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 const METER_EVENT_NAME = "ollamas_tool_calls";
@@ -157,41 +157,51 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
   if (!s || !secret) throw new Error("Stripe not configured (STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET)");
   const event = s.webhooks.constructEvent(rawBody, signature, secret);
 
-  // Idempotency: skip events already PROCESSED. The processed-marker is written only
-  // after a handler succeeds (markStripeEventProcessed) — so a handler that throws
-  // leaves the event un-consumed and Stripe's retry can reprocess it (previously the
-  // event was marked seen up-front and a swallowed handler failure lost it forever).
-  if (await stripeEventSeen(event.id)) return { type: event.type, handled: false };
+  // Idempotency: atomically CLAIM the event up-front. Only the winner of a concurrent
+  // race (Stripe at-least-once retries / multiple replicas) gets true and runs the side
+  // effects; a duplicate gets false and no-ops — so setTenantPlan + queueWebhookEvent
+  // never double-fire. A TRANSIENT handler failure RELEASES the claim (Stripe retries);
+  // a structurally-unprocessable event (unknown plan) stays claimed so it is not
+  // redelivered forever.
+  if (!(await claimStripeEvent(event.id))) return { type: event.type, handled: false };
 
   const tenantFromSub = async (sub: Stripe.Subscription) =>
     (sub.metadata?.tenantId as string) || (await getTenantByStripeCustomer(String(sub.customer)))?.id || "";
 
-  switch (event.type) {
-    case "customer.subscription.created":
-    case "customer.subscription.updated": {
-      const sub = event.data.object as Stripe.Subscription;
-      const planId = (sub.metadata?.planId as string) || "";
-      const tenantId = await tenantFromSub(sub);
-      if (tenantId && planId && (await getTenant(tenantId))) {
-        try { await setTenantPlan(tenantId, planId); await queueWebhookEvent(tenantId, "subscription.updated", { planId }); await markStripeEventProcessed(event.id); return { type: event.type, handled: true }; } catch { /* unknown plan / transient → leave un-consumed so Stripe retries */ }
+  try {
+    switch (event.type) {
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = event.data.object as Stripe.Subscription;
+        const planId = (sub.metadata?.planId as string) || "";
+        const tenantId = await tenantFromSub(sub);
+        if (tenantId && planId && (await getTenant(tenantId))) {
+          await setTenantPlan(tenantId, planId);
+          await queueWebhookEvent(tenantId, "subscription.updated", { planId });
+          return { type: event.type, handled: true };
+        }
+        return { type: event.type, handled: false }; // not actionable (no tenant/plan) → stays claimed, no retry storm
       }
-      break;
-    }
-    case "customer.subscription.deleted": {
-      // Subscription ended → drop the tenant to the free plan (revoke paid tiers).
-      const sub = event.data.object as Stripe.Subscription;
-      const tenantId = await tenantFromSub(sub);
-      if (tenantId && (await getTenant(tenantId))) {
-        try { await setTenantPlan(tenantId, "free"); await markStripeEventProcessed(event.id); return { type: event.type, handled: true }; } catch { /* leave un-consumed → retry */ }
+      case "customer.subscription.deleted": {
+        // Subscription ended → drop the tenant to the free plan (revoke paid tiers).
+        const sub = event.data.object as Stripe.Subscription;
+        const tenantId = await tenantFromSub(sub);
+        if (tenantId && (await getTenant(tenantId))) {
+          await setTenantPlan(tenantId, "free");
+          return { type: event.type, handled: true };
+        }
+        return { type: event.type, handled: false };
       }
-      break;
+      case "invoice.paid":
+      case "invoice.payment_failed":
+        return { type: event.type, handled: true }; // acknowledge payment lifecycle
     }
-    case "invoice.paid":
-    case "invoice.payment_failed": {
-      // Acknowledge payment lifecycle; access gating could hook here.
-      await markStripeEventProcessed(event.id);
-      return { type: event.type, handled: true };
-    }
+    return { type: event.type, handled: false };
+  } catch (e: any) {
+    // "Unknown plan" can never succeed → keep the event claimed (no infinite retries).
+    // Any other (transient) error → release so Stripe redelivers.
+    if (/unknown plan/i.test(String(e?.message || ""))) return { type: event.type, handled: false };
+    await releaseStripeEvent(event.id);
+    throw e;
   }
-  return { type: event.type, handled: false };
 }

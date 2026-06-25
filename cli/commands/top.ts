@@ -315,7 +315,10 @@ export async function runTop(argv: string[]): Promise<number> {
     process.stdout.write(cleanupSequence()); // show cursor + leave alt-screen
   };
 
+  let ticking = false;
   const tick = async () => {
+    if (ticking) return; // skip overlapping ticks: a slow gateway poll (> interval) would
+    ticking = true;      // otherwise interleave prev/history writes + tear the frame.
     try {
       const now = Date.now();
       const text = await client.getMetrics();
@@ -331,6 +334,8 @@ export async function runTop(argv: string[]): Promise<number> {
       process.stdout.write(CURSOR_HOME + CLEAR + renderDashboard(snap, ctx, process.stdout.columns ?? 0) + "\n");
     } catch (e: any) {
       process.stdout.write(CURSOR_HOME + CLEAR + c("red", `top: ${String(e?.message || e)}`, ctx.color) + "\n");
+    } finally {
+      ticking = false;
     }
   };
 
