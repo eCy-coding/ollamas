@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { mkdirSync, rmdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   parseClaims, foldClaims, isActive, isStale, activeClaims,
-  detectCollision, nextFence, claimKey, type ClaimEvent,
+  detectCollision, nextFence, claimKey, withLock, type ClaimEvent,
 } from "../bin/lib/claims";
 
 const T0 = 1_700_000_000_000; // sabit epoch (deterministik)
@@ -107,5 +110,19 @@ describe("nextFence (monoton)", () => {
   });
   it("hiç claim yok → 1", () => {
     expect(nextFence([], "frontend", "vF9")).toBe(1);
+  });
+});
+
+describe("withLock — lock alınamazsa fn() çalışmaz (Faz11B ERR-ORCH-013)", () => {
+  it("lockDir başkasınca tutuluyorken (non-stale) throw eder, fn ÇAĞRILMAZ", () => {
+    const lockDir = join(tmpdir(), `claims-lock-test-${process.pid}-${T0}`);
+    mkdirSync(lockDir); // taze mtime=now → non-stale → "başkası tutuyor" simülasyonu
+    let called = false;
+    try {
+      expect(() => withLock(lockDir, () => { called = true; return 1; })).toThrow();
+    } finally {
+      try { rmdirSync(lockDir); } catch { /* zaten gitti */ }
+    }
+    expect(called).toBe(false); // BUG: held=false olsa bile fn çağrılırdı
   });
 });
