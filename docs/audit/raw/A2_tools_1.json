@@ -1,0 +1,21 @@
+{
+  "ok": false,
+  "unit": "A2-tools#1",
+  "group": "A2-tools",
+  "files": [
+    "server/tool-interceptors.ts",
+    "server/tool-registry.ts",
+    "server/tools/search_browser.ts"
+  ],
+  "loc": 1083,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 43245,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

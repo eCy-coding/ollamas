@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#5",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/tests/hmac-parity.test.ts",
+    "scripts/tests/ios-hmac-vectors.test.ts",
+    "scripts/tests/metering.test.ts",
+    "scripts/tests/mock-bridge.test.ts",
+    "scripts/tests/model-select.test.ts",
+    "scripts/tests/register-hooks.test.ts",
+    "scripts/tests/remediation.test.ts"
+  ],
+  "loc": 515,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 46504,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

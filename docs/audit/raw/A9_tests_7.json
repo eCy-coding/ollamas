@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#7",
+  "group": "A9-tests",
+  "files": [
+    "tests/consume-sampling.test.ts",
+    "tests/consume-security.test.ts",
+    "tests/dcr.test.ts",
+    "tests/discovery.test.ts",
+    "tests/e2e-web/embed.spec.ts",
+    "tests/e2e-web/landing.spec.ts",
+    "tests/e2e/a11y.spec.ts"
+  ],
+  "loc": 413,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 51217,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

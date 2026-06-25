@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#6",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/bin/lib/refresh.ts",
+    "orchestration/bin/lib/sbom.ts",
+    "orchestration/bin/lib/settings-patch.ts",
+    "orchestration/bin/lib/signal.test.ts",
+    "orchestration/bin/lib/signal.ts",
+    "orchestration/bin/lib/suppress.ts",
+    "orchestration/bin/lib/trend.ts"
+  ],
+  "loc": 503,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 75314,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

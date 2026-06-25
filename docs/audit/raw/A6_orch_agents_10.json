@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#10",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/tests/conduct.test.ts",
+    "orchestration/tests/coverage-closure.test.ts",
+    "orchestration/tests/critic.test.ts",
+    "orchestration/tests/depgraph.test.ts",
+    "orchestration/tests/detectors.test.ts",
+    "orchestration/tests/detectors2.test.ts",
+    "orchestration/tests/discover.test.ts"
+  ],
+  "loc": 793,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 145497,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

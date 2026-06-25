@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#6",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/tests/render-plist.test.ts",
+    "scripts/tests/repo-path.test.ts",
+    "scripts/tests/scaffold.test.ts",
+    "scripts/tests/self-heal.test.ts",
+    "scripts/tests/seyir_stats.test.ts",
+    "scripts/tests/sh-hardening.test.ts",
+    "scripts/tests/stats.test.ts"
+  ],
+  "loc": 340,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 73498,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

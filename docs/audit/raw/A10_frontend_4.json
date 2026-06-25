@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#4",
+  "group": "A10-frontend",
+  "files": [
+    "src/components/SecurityPolicies.tsx",
+    "src/components/SelfTestGates.tsx",
+    "src/components/Skeleton.tsx",
+    "src/components/Sparkline.tsx",
+    "src/components/TelemetryCockpit.tsx",
+    "src/components/ThemeToggle.tsx",
+    "src/components/UsageMeter.tsx"
+  ],
+  "loc": 587,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 105993,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

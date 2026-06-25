@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#4",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/bin/lib/detectors.ts",
+    "orchestration/bin/lib/doctor.ts",
+    "orchestration/bin/lib/dod.ts",
+    "orchestration/bin/lib/drift.ts",
+    "orchestration/bin/lib/fuse.ts",
+    "orchestration/bin/lib/graph.ts",
+    "orchestration/bin/lib/heartbeat.ts"
+  ],
+  "loc": 856,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 116367,
+  "steps": 5,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

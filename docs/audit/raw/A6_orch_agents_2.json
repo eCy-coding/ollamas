@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#2",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/bin/critic.ts",
+    "orchestration/bin/depgraph.ts",
+    "orchestration/bin/discover.ts",
+    "orchestration/bin/dod.ts",
+    "orchestration/bin/driftguard.ts",
+    "orchestration/bin/horizon.ts",
+    "orchestration/bin/lib/autofix.ts"
+  ],
+  "loc": 831,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 218085,
+  "steps": 5,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

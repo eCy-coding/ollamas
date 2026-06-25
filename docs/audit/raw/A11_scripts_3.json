@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#3",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/substack-digest.mjs",
+    "scripts/substack.mjs",
+    "scripts/system-monitor.mjs",
+    "scripts/tests/benchmark.test.ts",
+    "scripts/tests/bridge-e2e.test.ts",
+    "scripts/tests/bridge-security.test.ts",
+    "scripts/tests/commit-guard.test.ts"
+  ],
+  "loc": 609,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 78093,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

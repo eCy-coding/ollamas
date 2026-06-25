@@ -1,0 +1,880 @@
+{
+  "generatedFor": "Faz11 bug audit",
+  "totals": {
+    "files": 392,
+    "loc": 39906,
+    "units": 66,
+    "groups": 13
+  },
+  "groupLoc": {
+    "A12-bridges": 2717,
+    "A6-orch-agents": 9683,
+    "A8-orch-fuse": 626,
+    "A7-orch-bench": 603,
+    "A13-misc": 193,
+    "A11-scripts": 3182,
+    "A1-core": 3167,
+    "A5-server-rest": 2139,
+    "A4-store": 1105,
+    "A3-mcp": 1084,
+    "A2-tools": 1083,
+    "A10-frontend": 5460,
+    "A9-tests": 8864
+  },
+  "units": [
+    {
+      "id": "A12-bridges#1",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/bench-metrics.mjs",
+        "bin/host-bridge/benchmark.mjs",
+        "bin/host-bridge/doctor.mjs",
+        "bin/host-bridge/drift-check.mjs",
+        "bin/host-bridge/gate.mjs",
+        "bin/host-bridge/hmac.mjs",
+        "bin/host-bridge/lib/bridge-guard.mjs"
+      ],
+      "loc": 618
+    },
+    {
+      "id": "A12-bridges#2",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/lib/commit.mjs",
+        "bin/host-bridge/lib/doctor.mjs",
+        "bin/host-bridge/lib/events.mjs",
+        "bin/host-bridge/lib/metering.mjs",
+        "bin/host-bridge/lib/model-select.mjs",
+        "bin/host-bridge/lib/remediation.mjs",
+        "bin/host-bridge/lib/stats.mjs"
+      ],
+      "loc": 423
+    },
+    {
+      "id": "A12-bridges#3",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/lib/watch.mjs",
+        "bin/host-bridge/register-host-scripts.mjs",
+        "bin/host-bridge/render-plist.mjs",
+        "bin/host-bridge/scaffold.mjs",
+        "bin/host-bridge/schema.mjs",
+        "bin/host-bridge/terminal-bridge.mjs",
+        "bin/host-bridge/test-bridge.mjs"
+      ],
+      "loc": 713
+    },
+    {
+      "id": "A12-bridges#4",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/tools/apply_patch.mjs",
+        "bin/host-bridge/tools/build_app.mjs",
+        "bin/host-bridge/tools/git_commit.mjs",
+        "bin/host-bridge/tools/git_ops.mjs",
+        "bin/host-bridge/tools/health_probe.mjs",
+        "bin/host-bridge/tools/kill_process.mjs",
+        "bin/host-bridge/tools/lib/bridge-client.mjs"
+      ],
+      "loc": 215
+    },
+    {
+      "id": "A12-bridges#5",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/tools/lint_format.mjs",
+        "bin/host-bridge/tools/log_stream.mjs",
+        "bin/host-bridge/tools/logbook.mjs",
+        "bin/host-bridge/tools/model_select.mjs",
+        "bin/host-bridge/tools/pkg_install.mjs",
+        "bin/host-bridge/tools/process_port.mjs",
+        "bin/host-bridge/tools/run_tests.mjs"
+      ],
+      "loc": 160
+    },
+    {
+      "id": "A12-bridges#6",
+      "group": "A12-bridges",
+      "files": [
+        "bin/host-bridge/tools/self_heal.mjs",
+        "bin/host-bridge/tools/seyir_stats.mjs",
+        "bin/host-bridge/tools/shell_check.mjs",
+        "bin/host-bridge/tools/tools_doctor.mjs",
+        "bin/host-bridge/tools/usage.mjs",
+        "bin/host-bridge/tools/web_search.mjs",
+        "bin/ios-bridge/gen-vectors.mjs"
+      ],
+      "loc": 523
+    },
+    {
+      "id": "A12-bridges#7",
+      "group": "A12-bridges",
+      "files": [
+        "bin/mcp-stdio.ts"
+      ],
+      "loc": 65
+    },
+    {
+      "id": "A6-orch-agents#1",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/adopt-gate.ts",
+        "orchestration/bin/adopt.ts",
+        "orchestration/bin/autofix.ts",
+        "orchestration/bin/backlog.ts",
+        "orchestration/bin/bench.ts",
+        "orchestration/bin/benchprompt.ts",
+        "orchestration/bin/claim.ts"
+      ],
+      "loc": 752
+    },
+    {
+      "id": "A6-orch-agents#2",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/critic.ts",
+        "orchestration/bin/depgraph.ts",
+        "orchestration/bin/discover.ts",
+        "orchestration/bin/dod.ts",
+        "orchestration/bin/driftguard.ts",
+        "orchestration/bin/horizon.ts",
+        "orchestration/bin/lib/autofix.ts"
+      ],
+      "loc": 831
+    },
+    {
+      "id": "A6-orch-agents#3",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/lib/autopilot.ts",
+        "orchestration/bin/lib/backlog.ts",
+        "orchestration/bin/lib/claims.ts",
+        "orchestration/bin/lib/collect.ts",
+        "orchestration/bin/lib/conduct.ts",
+        "orchestration/bin/lib/critic.ts"
+      ],
+      "loc": 901
+    },
+    {
+      "id": "A6-orch-agents#4",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/lib/detectors.ts",
+        "orchestration/bin/lib/doctor.ts",
+        "orchestration/bin/lib/dod.ts",
+        "orchestration/bin/lib/drift.ts",
+        "orchestration/bin/lib/fuse.ts",
+        "orchestration/bin/lib/graph.ts",
+        "orchestration/bin/lib/heartbeat.ts"
+      ],
+      "loc": 856
+    },
+    {
+      "id": "A6-orch-agents#5",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/lib/horizon.ts",
+        "orchestration/bin/lib/licenses.ts",
+        "orchestration/bin/lib/metrics.ts",
+        "orchestration/bin/lib/note.ts",
+        "orchestration/bin/lib/personas.ts",
+        "orchestration/bin/lib/quality.ts",
+        "orchestration/bin/lib/rank.ts"
+      ],
+      "loc": 727
+    },
+    {
+      "id": "A6-orch-agents#6",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/lib/refresh.ts",
+        "orchestration/bin/lib/sbom.ts",
+        "orchestration/bin/lib/settings-patch.ts",
+        "orchestration/bin/lib/signal.test.ts",
+        "orchestration/bin/lib/signal.ts",
+        "orchestration/bin/lib/suppress.ts",
+        "orchestration/bin/lib/trend.ts"
+      ],
+      "loc": 503
+    },
+    {
+      "id": "A6-orch-agents#7",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/model-hook.ts",
+        "orchestration/bin/panel.ts",
+        "orchestration/bin/plan-next.ts",
+        "orchestration/bin/quality.ts",
+        "orchestration/bin/role-hook.ts",
+        "orchestration/bin/role.ts"
+      ],
+      "loc": 879
+    },
+    {
+      "id": "A6-orch-agents#8",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/bin/scan.ts",
+        "orchestration/bin/serve.ts",
+        "orchestration/bin/shared.ts",
+        "orchestration/bin/status.ts",
+        "orchestration/tests/adopt-gate.test.ts",
+        "orchestration/tests/adopt.test.ts",
+        "orchestration/tests/autofix.test.ts"
+      ],
+      "loc": 870
+    },
+    {
+      "id": "A6-orch-agents#9",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/autopilot.test.ts",
+        "orchestration/tests/backlog.test.ts",
+        "orchestration/tests/bench.test.ts",
+        "orchestration/tests/benchprompt.test.ts",
+        "orchestration/tests/claim.test.ts",
+        "orchestration/tests/claims.test.ts",
+        "orchestration/tests/collect.test.ts"
+      ],
+      "loc": 528
+    },
+    {
+      "id": "A6-orch-agents#10",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/conduct.test.ts",
+        "orchestration/tests/coverage-closure.test.ts",
+        "orchestration/tests/critic.test.ts",
+        "orchestration/tests/depgraph.test.ts",
+        "orchestration/tests/detectors.test.ts",
+        "orchestration/tests/detectors2.test.ts",
+        "orchestration/tests/discover.test.ts"
+      ],
+      "loc": 793
+    },
+    {
+      "id": "A6-orch-agents#11",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/doctor.test.ts",
+        "orchestration/tests/dod.test.ts",
+        "orchestration/tests/drift.test.ts",
+        "orchestration/tests/driftguard.test.ts",
+        "orchestration/tests/fuse.test.ts",
+        "orchestration/tests/heartbeat.test.ts",
+        "orchestration/tests/horizon.test.ts"
+      ],
+      "loc": 693
+    },
+    {
+      "id": "A6-orch-agents#12",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/metrics.test.ts",
+        "orchestration/tests/model-hook.test.ts",
+        "orchestration/tests/note.test.ts",
+        "orchestration/tests/optimize.test.ts",
+        "orchestration/tests/panel.test.ts",
+        "orchestration/tests/plan-next.test.ts",
+        "orchestration/tests/quality.test.ts"
+      ],
+      "loc": 585
+    },
+    {
+      "id": "A6-orch-agents#13",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/rank.test.ts",
+        "orchestration/tests/refresh.test.ts",
+        "orchestration/tests/role.test.ts",
+        "orchestration/tests/sbom.test.ts",
+        "orchestration/tests/scan.test.ts",
+        "orchestration/tests/serve.test.ts",
+        "orchestration/tests/settings-patch.test.ts"
+      ],
+      "loc": 464
+    },
+    {
+      "id": "A6-orch-agents#14",
+      "group": "A6-orch-agents",
+      "files": [
+        "orchestration/tests/shared.test.ts",
+        "orchestration/tests/status.test.ts",
+        "orchestration/tests/suppress.test.ts",
+        "orchestration/tests/trend.test.ts",
+        "orchestration/vitest.config.ts"
+      ],
+      "loc": 301
+    },
+    {
+      "id": "A8-orch-fuse#1",
+      "group": "A8-orch-fuse",
+      "files": [
+        "orchestration/bin/autopilot.ts",
+        "orchestration/bin/conduct.ts",
+        "orchestration/bin/doctor.ts",
+        "orchestration/bin/fuse.ts",
+        "orchestration/bin/heartbeat.ts"
+      ],
+      "loc": 626
+    },
+    {
+      "id": "A7-orch-bench#1",
+      "group": "A7-orch-bench",
+      "files": [
+        "orchestration/bin/lib/bench.ts",
+        "orchestration/bin/lib/benchprompt.ts",
+        "orchestration/bin/lib/driftguard.ts",
+        "orchestration/bin/lib/optimize.ts"
+      ],
+      "loc": 603
+    },
+    {
+      "id": "A13-misc#1",
+      "group": "A13-misc",
+      "files": [
+        "public/embed.js",
+        "web/landing.js"
+      ],
+      "loc": 193
+    },
+    {
+      "id": "A11-scripts#1",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/agent-bench.mjs",
+        "scripts/agent-dispatch.mjs",
+        "scripts/agent-fleet.mjs",
+        "scripts/audit-partition.mjs",
+        "scripts/bench-audit.mjs",
+        "scripts/combo-bench.mjs",
+        "scripts/content-pipeline.mjs"
+      ],
+      "loc": 703
+    },
+    {
+      "id": "A11-scripts#2",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/cover-gen.mjs",
+        "scripts/e2e_verify.ts",
+        "scripts/firecrawl.mjs",
+        "scripts/gen-manifest.mjs",
+        "scripts/master_e2e_workflow.ts",
+        "scripts/ops.mjs",
+        "scripts/ready.mjs"
+      ],
+      "loc": 504
+    },
+    {
+      "id": "A11-scripts#3",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/substack-digest.mjs",
+        "scripts/substack.mjs",
+        "scripts/system-monitor.mjs",
+        "scripts/tests/benchmark.test.ts",
+        "scripts/tests/bridge-e2e.test.ts",
+        "scripts/tests/bridge-security.test.ts",
+        "scripts/tests/commit-guard.test.ts"
+      ],
+      "loc": 609
+    },
+    {
+      "id": "A11-scripts#4",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/tests/doctor.test.ts",
+        "scripts/tests/drift-check.test.ts",
+        "scripts/tests/dryrun.test.ts",
+        "scripts/tests/events.test.ts",
+        "scripts/tests/gate-runner.test.ts",
+        "scripts/tests/helpers/mock-bridge.mjs",
+        "scripts/tests/helpers/real-bridge.mjs"
+      ],
+      "loc": 397
+    },
+    {
+      "id": "A11-scripts#5",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/tests/hmac-parity.test.ts",
+        "scripts/tests/ios-hmac-vectors.test.ts",
+        "scripts/tests/metering.test.ts",
+        "scripts/tests/mock-bridge.test.ts",
+        "scripts/tests/model-select.test.ts",
+        "scripts/tests/register-hooks.test.ts",
+        "scripts/tests/remediation.test.ts"
+      ],
+      "loc": 515
+    },
+    {
+      "id": "A11-scripts#6",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/tests/render-plist.test.ts",
+        "scripts/tests/repo-path.test.ts",
+        "scripts/tests/scaffold.test.ts",
+        "scripts/tests/self-heal.test.ts",
+        "scripts/tests/seyir_stats.test.ts",
+        "scripts/tests/sh-hardening.test.ts",
+        "scripts/tests/stats.test.ts"
+      ],
+      "loc": 340
+    },
+    {
+      "id": "A11-scripts#7",
+      "group": "A11-scripts",
+      "files": [
+        "scripts/tests/tools-golden.test.ts",
+        "scripts/tests/watch-debounce.test.ts"
+      ],
+      "loc": 114
+    },
+    {
+      "id": "A1-core#1",
+      "group": "A1-core",
+      "files": [
+        "server.ts"
+      ],
+      "loc": 2227
+    },
+    {
+      "id": "A1-core#2",
+      "group": "A1-core",
+      "files": [
+        "server/providers.ts"
+      ],
+      "loc": 940
+    },
+    {
+      "id": "A5-server-rest#1",
+      "group": "A5-server-rest",
+      "files": [
+        "server/ai.ts",
+        "server/analyzer.ts",
+        "server/artifacts.ts",
+        "server/backup.ts",
+        "server/billing/stripe.ts",
+        "server/bridge-hmac.ts",
+        "server/commander.ts"
+      ],
+      "loc": 738
+    },
+    {
+      "id": "A5-server-rest#2",
+      "group": "A5-server-rest",
+      "files": [
+        "server/diagnostic.ts",
+        "server/files.ts",
+        "server/host-bridge.ts",
+        "server/logger.ts",
+        "server/metrics.ts",
+        "server/middleware/auth.ts",
+        "server/middleware/rate-limit.ts"
+      ],
+      "loc": 732
+    },
+    {
+      "id": "A5-server-rest#3",
+      "group": "A5-server-rest",
+      "files": [
+        "server/oauth-gc.ts",
+        "server/openapi.ts",
+        "server/orchestrator.ts",
+        "server/rag.ts",
+        "server/terminal.ts",
+        "server/tokens.ts",
+        "server/webhooks/outbound.ts"
+      ],
+      "loc": 669
+    },
+    {
+      "id": "A4-store#1",
+      "group": "A4-store",
+      "files": [
+        "server/db.ts",
+        "server/store/db-adapter.ts",
+        "server/store/index.ts"
+      ],
+      "loc": 901
+    },
+    {
+      "id": "A4-store#2",
+      "group": "A4-store",
+      "files": [
+        "server/store/migrations.ts"
+      ],
+      "loc": 204
+    },
+    {
+      "id": "A3-mcp#1",
+      "group": "A3-mcp",
+      "files": [
+        "server/mcp/client.ts",
+        "server/mcp/discovery.ts",
+        "server/mcp/oauth-metadata.ts",
+        "server/mcp/oauth-provider.ts",
+        "server/mcp/prompts.ts",
+        "server/mcp/server.ts",
+        "server/mcp/subscriptions.ts"
+      ],
+      "loc": 914
+    },
+    {
+      "id": "A3-mcp#2",
+      "group": "A3-mcp",
+      "files": [
+        "server/mcp/supervisor.ts"
+      ],
+      "loc": 170
+    },
+    {
+      "id": "A2-tools#1",
+      "group": "A2-tools",
+      "files": [
+        "server/tool-interceptors.ts",
+        "server/tool-registry.ts",
+        "server/tools/search_browser.ts"
+      ],
+      "loc": 1083
+    },
+    {
+      "id": "A10-frontend#1",
+      "group": "A10-frontend",
+      "files": [
+        "src/App.tsx",
+        "src/components/BackupControl.tsx",
+        "src/components/CapabilityGate.tsx",
+        "src/components/ClusterManager.tsx",
+        "src/components/CommandLineTerminal.tsx",
+        "src/components/ErrorFallback.tsx",
+        "src/components/FileTransfer.tsx"
+      ],
+      "loc": 1026
+    },
+    {
+      "id": "A10-frontend#2",
+      "group": "A10-frontend",
+      "files": [
+        "src/components/GoogleDriveBrowser.tsx",
+        "src/components/KeyVault.tsx",
+        "src/components/LanguageToggle.tsx",
+        "src/components/MultiAgentPipeline.tsx",
+        "src/components/ObservabilityPanel.tsx",
+        "src/components/OfflineBadge.tsx"
+      ],
+      "loc": 1100
+    },
+    {
+      "id": "A10-frontend#3",
+      "group": "A10-frontend",
+      "files": [
+        "src/components/ReactAgentTab.tsx",
+        "src/components/SaaSAdmin.tsx"
+      ],
+      "loc": 1065
+    },
+    {
+      "id": "A10-frontend#4",
+      "group": "A10-frontend",
+      "files": [
+        "src/components/SecurityPolicies.tsx",
+        "src/components/SelfTestGates.tsx",
+        "src/components/Skeleton.tsx",
+        "src/components/Sparkline.tsx",
+        "src/components/TelemetryCockpit.tsx",
+        "src/components/ThemeToggle.tsx",
+        "src/components/UsageMeter.tsx"
+      ],
+      "loc": 587
+    },
+    {
+      "id": "A10-frontend#5",
+      "group": "A10-frontend",
+      "files": [
+        "src/components/UsagePanel.tsx",
+        "src/components/VirtualController.tsx",
+        "src/components/WorkspaceTree.tsx",
+        "src/hooks/useAuth.ts",
+        "src/hooks/useLogbook.ts",
+        "src/hooks/useOnline.ts",
+        "src/hooks/useUsage.ts"
+      ],
+      "loc": 664
+    },
+    {
+      "id": "A10-frontend#6",
+      "group": "A10-frontend",
+      "files": [
+        "src/lib/apiClient.ts",
+        "src/lib/capabilities.ts",
+        "src/lib/firebase.ts",
+        "src/lib/i18n.ts",
+        "src/lib/observability.ts",
+        "src/lib/theme.tsx",
+        "src/lib/usage.ts"
+      ],
+      "loc": 677
+    },
+    {
+      "id": "A10-frontend#7",
+      "group": "A10-frontend",
+      "files": [
+        "src/lib/vitals.ts",
+        "src/locales/en.ts",
+        "src/locales/tr.ts",
+        "src/main.tsx",
+        "src/types.ts"
+      ],
+      "loc": 341
+    },
+    {
+      "id": "A9-tests#1",
+      "group": "A9-tests",
+      "files": [
+        "tests/ai-engine.test.ts",
+        "tests/ai.test.ts",
+        "tests/bench-tool.e2e.test.ts",
+        "tests/bridge-hmac.test.ts",
+        "tests/bugfix-colab-bridge.test.ts",
+        "tests/bugfix-detect.test.ts",
+        "tests/bugfix-triage.test.ts"
+      ],
+      "loc": 536
+    },
+    {
+      "id": "A9-tests#2",
+      "group": "A9-tests",
+      "files": [
+        "tests/cli-agent.test.ts",
+        "tests/cli-backup.test.ts",
+        "tests/cli-bench.test.ts",
+        "tests/cli-bridge-mcp.test.ts",
+        "tests/cli-chat.test.ts",
+        "tests/cli-completion-dynamic.test.ts",
+        "tests/cli-completion.test.ts"
+      ],
+      "loc": 638
+    },
+    {
+      "id": "A9-tests#3",
+      "group": "A9-tests",
+      "files": [
+        "tests/cli-config-secrets.test.ts",
+        "tests/cli-keychain-live.test.ts",
+        "tests/cli-keychain.test.ts",
+        "tests/cli-keystore-source.test.ts",
+        "tests/cli-man.test.ts",
+        "tests/cli-manifest.test.ts",
+        "tests/cli-mcp-resources.test.ts"
+      ],
+      "loc": 476
+    },
+    {
+      "id": "A9-tests#4",
+      "group": "A9-tests",
+      "files": [
+        "tests/cli-mcp-stream.test.ts",
+        "tests/cli-mcp.test.ts",
+        "tests/cli-metrics.test.ts",
+        "tests/cli-modelcache.test.ts",
+        "tests/cli-output.test.ts",
+        "tests/cli-panes.test.ts",
+        "tests/cli-parser.test.ts"
+      ],
+      "loc": 697
+    },
+    {
+      "id": "A9-tests#5",
+      "group": "A9-tests",
+      "files": [
+        "tests/cli-plugins.test.ts",
+        "tests/cli-profiles.test.ts",
+        "tests/cli-role-hook.test.ts",
+        "tests/cli-role.test.ts",
+        "tests/cli-saas.test.ts",
+        "tests/cli-sea.test.ts",
+        "tests/cli-secrets.test.ts"
+      ],
+      "loc": 434
+    },
+    {
+      "id": "A9-tests#6",
+      "group": "A9-tests",
+      "files": [
+        "tests/cli-shortcuts-cmd.test.ts",
+        "tests/cli-shortcuts.test.ts",
+        "tests/cli-top.test.ts",
+        "tests/cli-update.test.ts",
+        "tests/ClusterE2ELive.test.ts",
+        "tests/conformance.e2e.test.ts",
+        "tests/consume-roots.test.ts"
+      ],
+      "loc": 549
+    },
+    {
+      "id": "A9-tests#7",
+      "group": "A9-tests",
+      "files": [
+        "tests/consume-sampling.test.ts",
+        "tests/consume-security.test.ts",
+        "tests/dcr.test.ts",
+        "tests/discovery.test.ts",
+        "tests/e2e-web/embed.spec.ts",
+        "tests/e2e-web/landing.spec.ts",
+        "tests/e2e/a11y.spec.ts"
+      ],
+      "loc": 413
+    },
+    {
+      "id": "A9-tests#8",
+      "group": "A9-tests",
+      "files": [
+        "tests/e2e/agent-chat.spec.ts",
+        "tests/e2e/keyboard.spec.ts",
+        "tests/e2e/saas.spec.ts",
+        "tests/e2e/smoke.spec.ts",
+        "tests/e2e/workspace.spec.ts",
+        "tests/eval-tool.e2e.test.ts",
+        "tests/expose-roots.test.ts"
+      ],
+      "loc": 282
+    },
+    {
+      "id": "A9-tests#9",
+      "group": "A9-tests",
+      "files": [
+        "tests/federated-roots.test.ts",
+        "tests/file-transfer.test.ts",
+        "tests/fixtures/mini-cluster.mjs",
+        "tests/fixtures/mini-mcp.mjs",
+        "tests/fixtures/mini-memory.mjs",
+        "tests/fixtures/mini-scanner.mjs",
+        "tests/fixtures/roots-mcp.mjs"
+      ],
+      "loc": 166
+    },
+    {
+      "id": "A9-tests#10",
+      "group": "A9-tests",
+      "files": [
+        "tests/fixtures/roots-server-mcp.mjs",
+        "tests/fixtures/sampling-mcp.mjs",
+        "tests/fs-upstream.e2e.test.ts",
+        "tests/lifecycle.test.ts",
+        "tests/litellm-provider.e2e.test.ts",
+        "tests/mac-power.e2e.test.ts",
+        "tests/mcp-gateway.e2e.test.ts"
+      ],
+      "loc": 701
+    },
+    {
+      "id": "A9-tests#11",
+      "group": "A9-tests",
+      "files": [
+        "tests/mcp-stdio.e2e.test.ts",
+        "tests/migration-drift.test.ts",
+        "tests/MissionControl.test.ts",
+        "tests/oauth-client-credentials.test.ts",
+        "tests/oauth-gc.test.ts",
+        "tests/oauth-refresh.test.ts",
+        "tests/oauth-resource-binding.test.ts"
+      ],
+      "loc": 678
+    },
+    {
+      "id": "A9-tests#12",
+      "group": "A9-tests",
+      "files": [
+        "tests/observability.test.ts",
+        "tests/provider-abort.test.ts",
+        "tests/provider-demo-fallback.test.ts",
+        "tests/providers-guard.test.ts",
+        "tests/rag.e2e.test.ts",
+        "tests/reference-upstreams.e2e.test.ts",
+        "tests/resource-subscribe.test.ts"
+      ],
+      "loc": 548
+    },
+    {
+      "id": "A9-tests#13",
+      "group": "A9-tests",
+      "files": [
+        "tests/saas-store.test.ts",
+        "tests/sample-stdio.e2e.test.ts",
+        "tests/sample-tool.test.ts",
+        "tests/security-hardening.test.ts",
+        "tests/smoke-live.e2e.test.ts",
+        "tests/tool-call-repair.test.ts",
+        "tests/tool-interceptors.test.ts"
+      ],
+      "loc": 680
+    },
+    {
+      "id": "A9-tests#14",
+      "group": "A9-tests",
+      "files": [
+        "tests/tool-registry.test.ts",
+        "tests/ui/a11y.test.tsx",
+        "tests/ui/apiClient.test.ts",
+        "tests/ui/App.test.tsx",
+        "tests/ui/capabilities.test.ts",
+        "tests/ui/capabilities.test.tsx",
+        "tests/ui/components.smoke.test.tsx"
+      ],
+      "loc": 585
+    },
+    {
+      "id": "A9-tests#15",
+      "group": "A9-tests",
+      "files": [
+        "tests/ui/errorBoundary.test.tsx",
+        "tests/ui/GoogleDriveBrowser.test.tsx",
+        "tests/ui/helpers.tsx",
+        "tests/ui/i18n.test.tsx",
+        "tests/ui/observability.test.ts",
+        "tests/ui/observability.test.tsx",
+        "tests/ui/offlineBadge.test.tsx"
+      ],
+      "loc": 317
+    },
+    {
+      "id": "A9-tests#16",
+      "group": "A9-tests",
+      "files": [
+        "tests/ui/pwa.test.ts",
+        "tests/ui/setup.ts",
+        "tests/ui/skeleton.test.tsx",
+        "tests/ui/TelemetryCockpit.test.tsx",
+        "tests/ui/theme.test.tsx",
+        "tests/ui/tokens.test.ts",
+        "tests/ui/usage.test.ts"
+      ],
+      "loc": 260
+    },
+    {
+      "id": "A9-tests#17",
+      "group": "A9-tests",
+      "files": [
+        "tests/ui/usage.test.tsx",
+        "tests/ui/useOnline.test.tsx",
+        "tests/ui/VirtualController.test.tsx",
+        "tests/ukp-ingest-http.test.ts",
+        "tests/ukp-ingest.test.ts",
+        "tests/ukp-upstream.e2e.test.ts",
+        "tests/upstream-isolation.test.ts"
+      ],
+      "loc": 728
+    },
+    {
+      "id": "A9-tests#18",
+      "group": "A9-tests",
+      "files": [
+        "tests/upstream-supervisor.test.ts",
+        "tests/webhooks.test.ts"
+      ],
+      "loc": 176
+    }
+  ]
+}

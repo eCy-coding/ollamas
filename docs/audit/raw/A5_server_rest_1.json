@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A5-server-rest#1",
+  "group": "A5-server-rest",
+  "files": [
+    "server/ai.ts",
+    "server/analyzer.ts",
+    "server/artifacts.ts",
+    "server/backup.ts",
+    "server/billing/stripe.ts",
+    "server/bridge-hmac.ts",
+    "server/commander.ts"
+  ],
+  "loc": 738,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 33738,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

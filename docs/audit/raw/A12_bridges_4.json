@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "unit": "A12-bridges#4",
+  "group": "A12-bridges",
+  "files": [
+    "bin/host-bridge/tools/apply_patch.mjs",
+    "bin/host-bridge/tools/build_app.mjs",
+    "bin/host-bridge/tools/git_commit.mjs",
+    "bin/host-bridge/tools/git_ops.mjs",
+    "bin/host-bridge/tools/health_probe.mjs",
+    "bin/host-bridge/tools/kill_process.mjs",
+    "bin/host-bridge/tools/lib/bridge-client.mjs"
+  ],
+  "loc": 215,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 219778,
+  "steps": 4,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]\n..."
+}

@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#9",
+  "group": "A9-tests",
+  "files": [
+    "tests/federated-roots.test.ts",
+    "tests/file-transfer.test.ts",
+    "tests/fixtures/mini-cluster.mjs",
+    "tests/fixtures/mini-mcp.mjs",
+    "tests/fixtures/mini-memory.mjs",
+    "tests/fixtures/mini-scanner.mjs",
+    "tests/fixtures/roots-mcp.mjs"
+  ],
+  "loc": 166,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 47085,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

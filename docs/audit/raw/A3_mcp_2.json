@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "unit": "A3-mcp#2",
+  "group": "A3-mcp",
+  "files": [
+    "server/mcp/supervisor.ts"
+  ],
+  "loc": 170,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 50844,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

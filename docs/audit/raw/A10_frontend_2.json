@@ -1,0 +1,24 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#2",
+  "group": "A10-frontend",
+  "files": [
+    "src/components/GoogleDriveBrowser.tsx",
+    "src/components/KeyVault.tsx",
+    "src/components/LanguageToggle.tsx",
+    "src/components/MultiAgentPipeline.tsx",
+    "src/components/ObservabilityPanel.tsx",
+    "src/components/OfflineBadge.tsx"
+  ],
+  "loc": 1100,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 84472,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#10",
+  "group": "A9-tests",
+  "files": [
+    "tests/fixtures/roots-server-mcp.mjs",
+    "tests/fixtures/sampling-mcp.mjs",
+    "tests/fs-upstream.e2e.test.ts",
+    "tests/lifecycle.test.ts",
+    "tests/litellm-provider.e2e.test.ts",
+    "tests/mac-power.e2e.test.ts",
+    "tests/mcp-gateway.e2e.test.ts"
+  ],
+  "loc": 701,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 46787,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

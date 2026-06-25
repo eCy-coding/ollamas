@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "unit": "A6-orch-agents#1",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/bin/adopt-gate.ts",
+    "orchestration/bin/adopt.ts",
+    "orchestration/bin/autofix.ts",
+    "orchestration/bin/backlog.ts",
+    "orchestration/bin/bench.ts",
+    "orchestration/bin/benchprompt.ts",
+    "orchestration/bin/claim.ts"
+  ],
+  "loc": 752,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 54967,
+  "steps": 1,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]\nFinal: []\nNo faulty functions detected in the listed files. All functions appear to be working correctly."
+}

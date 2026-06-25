@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "unit": "A12-bridges#3",
+  "group": "A12-bridges",
+  "files": [
+    "bin/host-bridge/lib/watch.mjs",
+    "bin/host-bridge/register-host-scripts.mjs",
+    "bin/host-bridge/render-plist.mjs",
+    "bin/host-bridge/scaffold.mjs",
+    "bin/host-bridge/schema.mjs",
+    "bin/host-bridge/terminal-bridge.mjs",
+    "bin/host-bridge/test-bridge.mjs"
+  ],
+  "loc": 713,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 70327,
+  "steps": 1,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]"
+}

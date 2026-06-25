@@ -1,0 +1,23 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#14",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/tests/shared.test.ts",
+    "orchestration/tests/status.test.ts",
+    "orchestration/tests/suppress.test.ts",
+    "orchestration/tests/trend.test.ts",
+    "orchestration/vitest.config.ts"
+  ],
+  "loc": 301,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 81994,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#5",
+  "group": "A10-frontend",
+  "files": [
+    "src/components/UsagePanel.tsx",
+    "src/components/VirtualController.tsx",
+    "src/components/WorkspaceTree.tsx",
+    "src/hooks/useAuth.ts",
+    "src/hooks/useLogbook.ts",
+    "src/hooks/useOnline.ts",
+    "src/hooks/useUsage.ts"
+  ],
+  "loc": 664,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 72567,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

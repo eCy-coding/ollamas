@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A12-bridges#1",
+  "group": "A12-bridges",
+  "files": [
+    "bin/host-bridge/bench-metrics.mjs",
+    "bin/host-bridge/benchmark.mjs",
+    "bin/host-bridge/doctor.mjs",
+    "bin/host-bridge/drift-check.mjs",
+    "bin/host-bridge/gate.mjs",
+    "bin/host-bridge/hmac.mjs",
+    "bin/host-bridge/lib/bridge-guard.mjs"
+  ],
+  "loc": 618,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 222848,
+  "steps": 5,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

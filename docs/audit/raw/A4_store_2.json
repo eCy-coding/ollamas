@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "unit": "A4-store#2",
+  "group": "A4-store",
+  "files": [
+    "server/store/migrations.ts"
+  ],
+  "loc": 204,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 1,
+  "ms": 109689,
+  "steps": 3,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "```json\n[]\n```"
+}

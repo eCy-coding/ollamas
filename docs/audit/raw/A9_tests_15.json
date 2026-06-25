@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#15",
+  "group": "A9-tests",
+  "files": [
+    "tests/ui/errorBoundary.test.tsx",
+    "tests/ui/GoogleDriveBrowser.test.tsx",
+    "tests/ui/helpers.tsx",
+    "tests/ui/i18n.test.tsx",
+    "tests/ui/observability.test.ts",
+    "tests/ui/observability.test.tsx",
+    "tests/ui/offlineBadge.test.tsx"
+  ],
+  "loc": 317,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 37669,
+  "steps": 5,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

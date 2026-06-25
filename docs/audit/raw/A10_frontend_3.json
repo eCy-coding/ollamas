@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#3",
+  "group": "A10-frontend",
+  "files": [
+    "src/components/ReactAgentTab.tsx",
+    "src/components/SaaSAdmin.tsx"
+  ],
+  "loc": 1065,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 61665,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

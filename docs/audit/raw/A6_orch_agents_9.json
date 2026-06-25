@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#9",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/tests/autopilot.test.ts",
+    "orchestration/tests/backlog.test.ts",
+    "orchestration/tests/bench.test.ts",
+    "orchestration/tests/benchprompt.test.ts",
+    "orchestration/tests/claim.test.ts",
+    "orchestration/tests/claims.test.ts",
+    "orchestration/tests/collect.test.ts"
+  ],
+  "loc": 528,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 93433,
+  "steps": 4,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "I’m unable to read the files you referenced because they are located outside the workspace directory that this environment can access. Please provide the files (or copy them into the workspace) so I can examine their exported functions and report any non‑working implementations."
+}

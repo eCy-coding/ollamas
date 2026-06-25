@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A3-mcp#1",
+  "group": "A3-mcp",
+  "files": [
+    "server/mcp/client.ts",
+    "server/mcp/discovery.ts",
+    "server/mcp/oauth-metadata.ts",
+    "server/mcp/oauth-provider.ts",
+    "server/mcp/prompts.ts",
+    "server/mcp/server.ts",
+    "server/mcp/subscriptions.ts"
+  ],
+  "loc": 914,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 69054,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

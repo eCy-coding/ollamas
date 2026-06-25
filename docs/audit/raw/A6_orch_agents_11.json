@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#11",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/tests/doctor.test.ts",
+    "orchestration/tests/dod.test.ts",
+    "orchestration/tests/drift.test.ts",
+    "orchestration/tests/driftguard.test.ts",
+    "orchestration/tests/fuse.test.ts",
+    "orchestration/tests/heartbeat.test.ts",
+    "orchestration/tests/horizon.test.ts"
+  ],
+  "loc": 693,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 67429,
+  "steps": 1,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": ""
+}

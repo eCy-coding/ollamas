@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "unit": "A12-bridges#7",
+  "group": "A12-bridges",
+  "files": [
+    "bin/mcp-stdio.ts"
+  ],
+  "loc": 65,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 1,
+  "ms": 111799,
+  "steps": 2,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]"
+}

@@ -1,0 +1,11 @@
+{
+  "file": "docs/audit/fixtures/bench-fixture.ts",
+  "buggy": {
+    "sumArray": "off-by-one: i <= arr.length reads arr[arr.length] (undefined) -> NaN",
+    "isEven": "wrong operator: n % 2 === 1 returns true for ODD numbers",
+    "getFirstId": "unhandled empty: arr[0].id crashes on [] (cannot read id of undefined)",
+    "fetchUserName": "missing await: returns Promise.name (undefined) instead of awaited value",
+    "parsePort": "wrong default: parseInt returns NaN not null, ?? never fires -> NaN port"
+  },
+  "clean": ["clamp", "slugify", "dedupe", "safeDivide", "capitalize"]
+}

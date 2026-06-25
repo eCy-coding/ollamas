@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#4",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/tests/doctor.test.ts",
+    "scripts/tests/drift-check.test.ts",
+    "scripts/tests/dryrun.test.ts",
+    "scripts/tests/events.test.ts",
+    "scripts/tests/gate-runner.test.ts",
+    "scripts/tests/helpers/mock-bridge.mjs",
+    "scripts/tests/helpers/real-bridge.mjs"
+  ],
+  "loc": 397,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 69859,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

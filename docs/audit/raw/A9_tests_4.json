@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#4",
+  "group": "A9-tests",
+  "files": [
+    "tests/cli-mcp-stream.test.ts",
+    "tests/cli-mcp.test.ts",
+    "tests/cli-metrics.test.ts",
+    "tests/cli-modelcache.test.ts",
+    "tests/cli-output.test.ts",
+    "tests/cli-panes.test.ts",
+    "tests/cli-parser.test.ts"
+  ],
+  "loc": 697,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 100950,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#1",
+  "group": "A10-frontend",
+  "files": [
+    "src/App.tsx",
+    "src/components/BackupControl.tsx",
+    "src/components/CapabilityGate.tsx",
+    "src/components/ClusterManager.tsx",
+    "src/components/CommandLineTerminal.tsx",
+    "src/components/ErrorFallback.tsx",
+    "src/components/FileTransfer.tsx"
+  ],
+  "loc": 1026,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 51504,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

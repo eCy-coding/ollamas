@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#11",
+  "group": "A9-tests",
+  "files": [
+    "tests/mcp-stdio.e2e.test.ts",
+    "tests/migration-drift.test.ts",
+    "tests/MissionControl.test.ts",
+    "tests/oauth-client-credentials.test.ts",
+    "tests/oauth-gc.test.ts",
+    "tests/oauth-refresh.test.ts",
+    "tests/oauth-resource-binding.test.ts"
+  ],
+  "loc": 678,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 40788,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

@@ -1,0 +1,23 @@
+{
+  "source": "Tier-1 deterministic (endpoint smoke + code read) — independent of agent fleet",
+  "method": "exercised live :8099 endpoints + traced root cause in source (evidence-first, reproduced)",
+  "endpointSmoke": {
+    "ok200": ["/api/health", "/api/ready", "/metrics", "/api/openapi.json", "/api/models", "/api/keys/pool", "/api/keys/mask", "/api/security/log", "/api/agent/sessions", "/api/backup/status", "/api/workspace/tree", "/api/logbook", "/api/cluster/status", "/api/cluster/capabilities", "/api/mcp/upstreams", "/api/selftest", "/api/billing/preview", "/api/ingest/stage-events"],
+    "error": ["/api/ai/models -> 500 fetch failed"]
+  },
+  "findings": [
+    {
+      "id": "T1-001",
+      "model": "Tier-1 (deterministic smoke + code read)",
+      "severity": "high",
+      "file": "server/ai.ts",
+      "line": 21,
+      "name": "ollamaHost / listModels / resolveLocalCoder / resolveDefaultModel / aiGenerate",
+      "symptom": "ollamaHost() returns process.env.OLLAMA_HOST (set to the docker value host.docker.internal:11434 in .env). On any local/non-docker boot that host is unreachable, so listModels() fetch(`${ollamaHost()}/api/tags`) (ai.ts:42) throws 'fetch failed' -> GET /api/ai/models returns 500, and resolveLocalCoder/resolveDefaultModel/aiGenerate (the whole colab-mirror /api/ai/* surface) break. server/providers.ts:409-411 already has the [OLLAMA_HOST, localhost, 127.0.0.1] reachability fallback; ai.ts does NOT mirror it.",
+      "evidence": "GET http://127.0.0.1:8099/api/ai/models -> 500 {\"error\":\"fetch failed\"} (live, reproduced). Code: ai.ts:21 ollamaHost def; ai.ts:42 unguarded fetch; providers.ts:409-411 the fallback it should mirror.",
+      "fix": "Extract a shared resolveOllamaBase() that tries [process.env.OLLAMA_HOST, http://127.0.0.1:11434, http://localhost:11434] and caches the first reachable base (same pattern as providers.ts:409-411 and Faz10 host-bridge bridgeFetch). Use it in ai.ts listModels/generate/stream. Same .env then works in docker AND local.",
+      "verdict": "CONFIRMED",
+      "envDependent": "broken when OLLAMA_HOST=docker value + running outside docker; works inside docker — but still a real graceful-degradation/consistency bug vs providers.ts"
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "task": "audit-capability (bug-detection) benchmark",
+  "fixture": "docs/audit/fixtures/bench-fixture.ts",
+  "groundTruth": {
+    "buggy": [
+      "sumArray",
+      "isEven",
+      "getFirstId",
+      "fetchUserName",
+      "parsePort"
+    ],
+    "clean": [
+      "clamp",
+      "slugify",
+      "dedupe",
+      "safeDivide",
+      "capitalize"
+    ]
+  },
+  "scoredAt": "2026-06-25",
+  "results": [
+    {
+      "label": "qwen3-coder:480b-cloud",
+      "modelResolved": "ollama-local/qwen3-coder:480b-cloud",
+      "ms": 10344,
+      "steps": 1,
+      "ranTerminal": true,
+      "demo": false,
+      "flagged": [
+        "sumArray",
+        "isEven",
+        "getFirstId",
+        "fetchUserName",
+        "parsePort"
+      ],
+      "tp": 5,
+      "fp": 0,
+      "recall": 1,
+      "precision": 1,
+      "composite": 1,
+      "answerPreview": "```json\n[\n  {\"name\":\"sumArray\",\"reason\":\"off-by-one error, reads arr[arr.length] which is undefined\"},\n  {\"name\":\"isEven\",\"reason\":\"wrong operator, returns true for odd numbers\"},\n  {\"name\":\"getFirstI"
+    },
+    {
+      "label": "gemini",
+      "modelResolved": "gemini/(provider default)",
+      "ms": 120005,
+      "steps": 3,
+      "ranTerminal": true,
+      "demo": false,
+      "flagged": [],
+      "tp": 0,
+      "fp": 0,
+      "recall": 0,
+      "precision": 0,
+      "composite": 0,
+      "answerPreview": ""
+    },
+    {
+      "label": "qwen3:8b",
+      "modelResolved": "ollama-local/qwen3:8b",
+      "ms": 53143,
+      "steps": 2,
+      "ranTerminal": true,
+      "demo": false,
+      "flagged": [
+        "sumArray",
+        "isEven",
+        "getFirstId",
+        "fetchUserName",
+        "parsePort"
+      ],
+      "tp": 5,
+      "fp": 0,
+      "recall": 1,
+      "precision": 1,
+      "composite": 1,
+      "answerPreview": "```json\n[\n  {\"name\":\"sumArray\",\"reason\":\"off-by-one, reads arr[arr.length] (undefined) → NaN\"},\n  {\"name\":\"isEven\",\"reason\":\"wrong operator, returns true for ODD numbers\"},\n  {\"name\":\"getFirstId\",\"rea"
+    }
+  ],
+  "ranked": [
+    {
+      "label": "qwen3-coder:480b-cloud",
+      "composite": 1,
+      "recall": 1,
+      "precision": 1,
+      "ms": 10344
+    },
+    {
+      "label": "qwen3:8b",
+      "composite": 1,
+      "recall": 1,
+      "precision": 1,
+      "ms": 53143
+    },
+    {
+      "label": "gemini",
+      "composite": 0,
+      "recall": 0,
+      "precision": 0,
+      "ms": 120005
+    }
+  ],
+  "winner": "qwen3-coder:480b-cloud"
+}

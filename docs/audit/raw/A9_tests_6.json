@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#6",
+  "group": "A9-tests",
+  "files": [
+    "tests/cli-shortcuts-cmd.test.ts",
+    "tests/cli-shortcuts.test.ts",
+    "tests/cli-top.test.ts",
+    "tests/cli-update.test.ts",
+    "tests/ClusterE2ELive.test.ts",
+    "tests/conformance.e2e.test.ts",
+    "tests/consume-roots.test.ts"
+  ],
+  "loc": 549,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 45788,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

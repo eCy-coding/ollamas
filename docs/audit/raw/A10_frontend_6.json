@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A10-frontend#6",
+  "group": "A10-frontend",
+  "files": [
+    "src/lib/apiClient.ts",
+    "src/lib/capabilities.ts",
+    "src/lib/firebase.ts",
+    "src/lib/i18n.ts",
+    "src/lib/observability.ts",
+    "src/lib/theme.tsx",
+    "src/lib/usage.ts"
+  ],
+  "loc": 677,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 56769,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

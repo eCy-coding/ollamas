@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#7",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/tests/tools-golden.test.ts",
+    "scripts/tests/watch-debounce.test.ts"
+  ],
+  "loc": 114,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 71370,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

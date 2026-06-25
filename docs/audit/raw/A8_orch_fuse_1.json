@@ -1,0 +1,23 @@
+{
+  "ok": false,
+  "unit": "A8-orch-fuse#1",
+  "group": "A8-orch-fuse",
+  "files": [
+    "orchestration/bin/autopilot.ts",
+    "orchestration/bin/conduct.ts",
+    "orchestration/bin/doctor.ts",
+    "orchestration/bin/fuse.ts",
+    "orchestration/bin/heartbeat.ts"
+  ],
+  "loc": 626,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 76953,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

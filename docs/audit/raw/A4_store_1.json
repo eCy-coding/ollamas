@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "unit": "A4-store#1",
+  "group": "A4-store",
+  "files": [
+    "server/db.ts",
+    "server/store/db-adapter.ts",
+    "server/store/index.ts"
+  ],
+  "loc": 901,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 1,
+  "ms": 59683,
+  "steps": 3,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]"
+}

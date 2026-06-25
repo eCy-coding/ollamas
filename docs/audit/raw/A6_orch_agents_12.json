@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A6-orch-agents#12",
+  "group": "A6-orch-agents",
+  "files": [
+    "orchestration/tests/metrics.test.ts",
+    "orchestration/tests/model-hook.test.ts",
+    "orchestration/tests/note.test.ts",
+    "orchestration/tests/optimize.test.ts",
+    "orchestration/tests/panel.test.ts",
+    "orchestration/tests/plan-next.test.ts",
+    "orchestration/tests/quality.test.ts"
+  ],
+  "loc": 585,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 36198,
+  "steps": 0,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": ""
+}

@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#2",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/cover-gen.mjs",
+    "scripts/e2e_verify.ts",
+    "scripts/firecrawl.mjs",
+    "scripts/gen-manifest.mjs",
+    "scripts/master_e2e_workflow.ts",
+    "scripts/ops.mjs",
+    "scripts/ready.mjs"
+  ],
+  "loc": 504,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 61802,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

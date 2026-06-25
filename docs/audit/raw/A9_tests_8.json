@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A9-tests#8",
+  "group": "A9-tests",
+  "files": [
+    "tests/e2e/agent-chat.spec.ts",
+    "tests/e2e/keyboard.spec.ts",
+    "tests/e2e/saas.spec.ts",
+    "tests/e2e/smoke.spec.ts",
+    "tests/e2e/workspace.spec.ts",
+    "tests/eval-tool.e2e.test.ts",
+    "tests/expose-roots.test.ts"
+  ],
+  "loc": 282,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 40838,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

@@ -1,0 +1,19 @@
+{
+  "ok": false,
+  "unit": "A1-core#1",
+  "group": "A1-core",
+  "files": [
+    "server.ts"
+  ],
+  "loc": 2227,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 29571,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

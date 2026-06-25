@@ -1,0 +1,25 @@
+{
+  "ok": false,
+  "unit": "A11-scripts#1",
+  "group": "A11-scripts",
+  "files": [
+    "scripts/agent-bench.mjs",
+    "scripts/agent-dispatch.mjs",
+    "scripts/agent-fleet.mjs",
+    "scripts/audit-partition.mjs",
+    "scripts/bench-audit.mjs",
+    "scripts/combo-bench.mjs",
+    "scripts/content-pipeline.mjs"
+  ],
+  "loc": 703,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 2,
+  "ms": 49457,
+  "steps": 5,
+  "ranTerminal": false,
+  "demo": false,
+  "parsed": false,
+  "error": null,
+  "findings": [],
+  "answerPreview": "ReAct loop complete. Reached step depth limit."
+}

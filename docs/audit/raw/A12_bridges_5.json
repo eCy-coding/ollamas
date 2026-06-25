@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "unit": "A12-bridges#5",
+  "group": "A12-bridges",
+  "files": [
+    "bin/host-bridge/tools/lint_format.mjs",
+    "bin/host-bridge/tools/log_stream.mjs",
+    "bin/host-bridge/tools/logbook.mjs",
+    "bin/host-bridge/tools/model_select.mjs",
+    "bin/host-bridge/tools/pkg_install.mjs",
+    "bin/host-bridge/tools/process_port.mjs",
+    "bin/host-bridge/tools/run_tests.mjs"
+  ],
+  "loc": 160,
+  "model": "ollama-local/qwen3-coder:480b-cloud",
+  "attempt": 1,
+  "ms": 62210,
+  "steps": 1,
+  "ranTerminal": true,
+  "demo": false,
+  "parsed": true,
+  "error": null,
+  "findings": [],
+  "answerPreview": "[]\nMacOS terminalde çoklu dosya okuma işlemi zaman aşımına uğradı. Bu nedenle dosyaların içeriği kontrol edilemedi. Lütfen tekrar deneyin veya dosyaları tek tek incelemek için farklı bir yaklaşım kullanın."
+}
