@@ -724,6 +724,13 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         // Collect LLM reply text
         if (result.text && result.text.trim()) {
           sendEvent("message", { text: result.text, step: stepNum });
+        }
+        // Push the model turn. When it emitted tool calls, the assistant message MUST carry
+        // tool_calls — OpenAI/Anthropic reject a tool result not preceded by the matching
+        // assistant tool_calls/tool_use (multi-step 400). Empty text is fine for a tool-only turn.
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          activeHistory.push({ role: "assistant", content: result.text || "", tool_calls: result.toolCalls });
+        } else if (result.text && result.text.trim()) {
           activeHistory.push({ role: "assistant", content: result.text });
         }
 

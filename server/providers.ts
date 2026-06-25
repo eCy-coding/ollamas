@@ -3,8 +3,11 @@ import { db } from "./db";
 
 // Types
 export interface ProviderMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
+  tool_calls?: ToolCall[];   // assistant turn that emitted tool calls (D-003)
+  tool_call_id?: string;     // role:"tool" result — which call it answers
+  name?: string;             // role:"tool" — the tool name (gemini functionResponse)
 }
 
 export interface GenerateConfig {
@@ -21,6 +24,74 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: any;
+}
+
+// ── Cross-provider message mapping (D-003) ─────────────────────────────────────
+// The ReAct history carries assistant turns with `tool_calls` + `role:"tool"` results.
+// Each provider must serialize that into ITS tool shape — a tool result not preceded by
+// the matching assistant tool_calls/tool_use is rejected (400 on OpenAI/Anthropic).
+// Pure (testable) — no I/O.
+
+/** OpenAI / OpenRouter / custom-openai chat messages. `stringifyArgs`: OpenAI wants
+ *  function.arguments as a JSON STRING; ollama wants it as an OBJECT (its native shape),
+ *  so the ollama cases pass false. */
+export function toOpenAiMessages(msgs: ProviderMessage[], stringifyArgs = true): any[] {
+  return (msgs || []).map((m) => {
+    if (m.role === "assistant" && m.tool_calls?.length) {
+      return {
+        role: "assistant",
+        content: m.content || "",
+        tool_calls: m.tool_calls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: {
+            name: tc.name,
+            arguments: stringifyArgs
+              ? (typeof tc.arguments === "string" ? tc.arguments : JSON.stringify(tc.arguments ?? {}))
+              : (typeof tc.arguments === "string" ? safeJsonObj(tc.arguments) : (tc.arguments ?? {})),
+          },
+        })),
+      };
+    }
+    if (m.role === "tool") return { role: "tool", tool_call_id: m.tool_call_id, content: String(m.content ?? "") };
+    return { role: m.role, content: m.content };
+  });
+}
+
+/** Anthropic Messages API: tool calls/results become tool_use/tool_result content blocks. */
+export function toAnthropicMessages(msgs: ProviderMessage[]): any[] {
+  return (msgs || []).map((m) => {
+    if (m.role === "assistant" && m.tool_calls?.length) {
+      const blocks: any[] = [];
+      if (m.content) blocks.push({ type: "text", text: m.content });
+      for (const tc of m.tool_calls) blocks.push({ type: "tool_use", id: tc.id, name: tc.name, input: tc.arguments ?? {} });
+      return { role: "assistant", content: blocks };
+    }
+    if (m.role === "tool") {
+      return { role: "user", content: [{ type: "tool_result", tool_use_id: m.tool_call_id, content: String(m.content ?? "") }] };
+    }
+    return { role: m.role === "assistant" ? "assistant" : "user", content: m.content };
+  });
+}
+
+/** Gemini generateContent contents: functionCall / functionResponse parts (never empty parts). */
+export function toGeminiContents(msgs: ProviderMessage[]): any[] {
+  const out: any[] = [];
+  for (const m of msgs || []) {
+    if (m.role === "assistant" && m.tool_calls?.length) {
+      const parts: any[] = [];
+      if (m.content) parts.push({ text: m.content });
+      for (const tc of m.tool_calls) parts.push({ functionCall: { name: tc.name, args: tc.arguments ?? {} } });
+      out.push({ role: "model", parts });
+      continue;
+    }
+    if (m.role === "tool") {
+      out.push({ role: "user", parts: [{ functionResponse: { name: m.name || "tool", response: { result: String(m.content ?? "") } } }] });
+      continue;
+    }
+    out.push({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content || " " }] });
+  }
+  return out;
 }
 
 // CRITICAL-3: cross-provider tool-call robustness. Sentinel returned when arguments
@@ -384,7 +455,7 @@ export class ProviderRouter {
         const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
         const reqBody = JSON.stringify({
           model: config.model || "qwen3:8b",
-          messages: config.messages,
+          messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args, not stringified
           options: {
             num_ctx: numCtx,
             temperature: config.temperature ?? 0.7,
@@ -513,7 +584,7 @@ export class ProviderRouter {
           },
           body: JSON.stringify({
             model: cloudModel,
-            messages: config.messages,
+            messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args
             options: {
               num_ctx: numCtx,
               temperature: config.temperature ?? 0.7,
@@ -599,10 +670,8 @@ export class ProviderRouter {
 
         // Map messages into Gemini SDK format
         // System instruction is placed in the config
-        const formattedContents = nonSystemMessages.map((m) => ({
-          role: m.role === "assistant" ? "model" as const : "user" as const,
-          parts: [{ text: m.content }],
-        }));
+        // D-003: map tool_calls/tool results to Gemini functionCall/functionResponse parts.
+        const formattedContents = toGeminiContents(nonSystemMessages);
 
         if (onStreamChunk) {
           const responseStream = await ai.models.generateContentStream({
@@ -681,7 +750,7 @@ export class ProviderRouter {
           },
           body: JSON.stringify({
             model: config.model || "google/gemini-2.5-flash-lite:free",
-            messages: config.messages,
+            messages: toOpenAiMessages(config.messages),
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
             tools: config.tools,
@@ -758,7 +827,7 @@ export class ProviderRouter {
           },
           body: JSON.stringify({
             model: config.model || (isCustom ? "" : "gpt-4o-mini"),
-            messages: config.messages,
+            messages: toOpenAiMessages(config.messages),
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
             tools: config.tools,
@@ -831,7 +900,7 @@ export class ProviderRouter {
           body: JSON.stringify({
             model: config.model || "claude-3-5-sonnet-latest",
             system: systemMessage,
-            messages: nonSystemMessages,
+            messages: toAnthropicMessages(nonSystemMessages),
             max_tokens: 4096,
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
