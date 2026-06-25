@@ -24,7 +24,7 @@ export function loadSuppress(path: string): SuppressRule[] {
     const j = JSON.parse(readFileSync(path, "utf8"));
     const rules = Array.isArray(j?.rules) ? j.rules : [];
     return rules.filter((r: any) =>
-      r && typeof r.kindPattern === "string" && typeof r.reason === "string" && r.reason.trim().length > 0 &&
+      r && typeof r.kindPattern === "string" && r.kindPattern.trim().length > 0 && typeof r.reason === "string" && r.reason.trim().length > 0 &&
       (r.detector === "dod" || r.detector === "critic" || r.detector === "*"));
   } catch { return []; }
 }
