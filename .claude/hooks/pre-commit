@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Full quality gate — git pre-commit hook (the heavy gate the 30s PreToolUse hook can't run).
+# Installed into .git/hooks/pre-commit by .claude/apply-harness.sh.
+# Blocks the commit unless typecheck + lint + test all pass on the CURRENT tree.
+# Emergency bypass: GATE_SKIP=1 git commit ...   (use only when you mean it.)
+set -uo pipefail
+
+if [ "${GATE_SKIP:-}" = "1" ]; then
+  echo "⚠ pre-commit gate SKIPPED (GATE_SKIP=1)"; exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Harness self-protection (root, cross-cutting): block commit if harness hooks regressed or
+# settings.json has an invalid/hallucinated key. Cheap; runs before the heavy gate.
+if [ -f .claude/validate-settings.mjs ]; then
+  node .claude/validate-settings.mjs || { echo "Commit blocked: settings.json invalid (see above)."; exit 1; }
+fi
+if [ -f .claude/hooks/test-hooks.sh ]; then
+  bash .claude/hooks/test-hooks.sh >/tmp/gate-hooks.log 2>&1 || { echo "Commit blocked: harness hook suite failed:"; tail -8 /tmp/gate-hooks.log; exit 1; }
+fi
+
+echo "▶ pre-commit gate: typecheck → lint → test"
+
+run() { # name, cmd...
+  local name="$1"; shift
+  printf '  %-10s ' "$name"
+  if "$@" >/tmp/gate-$name.log 2>&1; then echo "✓"; else
+    echo "✗"; echo "── $name FAILED (last 20 lines) ──"; tail -20 /tmp/gate-$name.log
+    echo "Commit blocked. Fix $name or bypass with GATE_SKIP=1 (discouraged)."; exit 1
+  fi
+}
+
+# Prefer package.json scripts; fall back to direct tools. Each is best-effort-detected.
+HAS() { node -e 'const s=require("./package.json").scripts||{};process.exit(s[process.argv[1]]?0:1)' "$1" 2>/dev/null; }
+
+if HAS typecheck; then run typecheck npm run -s typecheck; else run typecheck npx -y tsc --noEmit; fi
+if HAS lint;      then run lint npm run -s lint; else echo "  lint       – (no lint script, skipped)"; fi
+if HAS test;      then run test npm run -s test; else run test npx -y vitest run; fi
+
+echo "✓ gate PASS — commit allowed"
+exit 0

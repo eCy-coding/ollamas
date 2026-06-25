@@ -1,0 +1,8 @@
+{
+  "name": "ollamas-harness",
+  "version": "0.1.0",
+  "description": "ollamas projesi için master-seviye Claude Code harness: güvenlik hookları, lifecycle hookları, effort-tuned sub-agentlar, statusline, MCP, LSP.",
+  "author": { "name": "Emre", "email": "emrecnyn@gmail.com" },
+  "license": "MIT",
+  "keywords": ["harness", "hooks", "safety", "orchestration", "ollamas"]
+}

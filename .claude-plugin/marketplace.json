@@ -1,0 +1,12 @@
+{
+  "name": "ollamas-marketplace",
+  "owner": { "name": "Emre", "email": "emrecnyn@gmail.com" },
+  "plugins": [
+    {
+      "name": "ollamas-harness",
+      "source": "../dist-plugin/ollamas-harness",
+      "description": "Master-seviye harness bundle (hooks/agents/commands/mcp/lsp). build-plugin.sh ile .claude/'tan üretilir.",
+      "version": "0.1.0"
+    }
+  ]
+}

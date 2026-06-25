@@ -1,0 +1,9 @@
+{
+  "$comment": "ollamas projesinin KENDİ MCP server'ı (HTTP Streamable transport). Choke-point yasası (N-012): yalnız HTTP /mcp + /api/* — tool-registry import YOK. Araçlar mcp__ollamas__* olarak görünür. Auto-onay: settings.json enabledMcpjsonServers:[\"ollamas\"].",
+  "mcpServers": {
+    "ollamas": {
+      "type": "http",
+      "url": "http://127.0.0.1:8090/mcp"
+    }
+  }
+}

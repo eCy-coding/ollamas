@@ -18,3 +18,11 @@ playwright-report/
 
 # vF3 lighthouse-ci local reports
 .lighthouseci/
+
+# generated harness plugin bundle (built from .claude/ via build-plugin.sh)
+dist-plugin/
+.claude/last-context-snapshot.md
+.claude/last-turn.md
+.claude/settings.json.bak
+.claude/subagent-audit.log
+.claude/notifications.log

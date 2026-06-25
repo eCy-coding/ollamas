@@ -1,0 +1,21 @@
+name: harness-test
+# Root regression guard for the .claude/ harness: settings schema + hook golden suite.
+# No secrets needed — pure local checks.
+on:
+  push:
+    paths: [".claude/**", ".github/workflows/harness-test.yml"]
+  pull_request:
+    paths: [".claude/**"]
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate settings schema
+        run: node .claude/validate-settings.mjs
+      - name: Hook golden suite
+        run: bash .claude/hooks/test-hooks.sh

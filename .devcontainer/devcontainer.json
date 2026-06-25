@@ -1,0 +1,16 @@
+{
+  "$comment": "Izole, tekrarlanabilir otonom Claude Code ortamı. Build = operatör (Docker). ~/.claude named volume ile auth/memory korunur. NET_ADMIN firewall ile güvenli --dangerously-skip-permissions mümkün.",
+  "name": "ollamas-dev",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=claude-config,target=/home/node/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "postCreateCommand": "npm ci || npm install",
+  "remoteUser": "node"
+}

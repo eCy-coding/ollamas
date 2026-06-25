@@ -1,0 +1,16 @@
+{
+  "$comment": "TypeScript LSP → inline diagnostics her edit sonrası context'e push (tsc koşmadan tip hatası görüş). Binary AYRI kurulmalı: npm i -g typescript-language-server typescript (apply-harness.sh hatırlatır).",
+  "typescript": {
+    "command": "typescript-language-server",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".tsx": "typescriptreact",
+      ".mts": "typescript",
+      ".cts": "typescript",
+      ".js": "javascript",
+      ".mjs": "javascript"
+    },
+    "diagnostics": true
+  }
+}

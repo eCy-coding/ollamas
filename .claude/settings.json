@@ -7,11 +7,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/role-hook.ts"
+            "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/role-hook.ts"
           },
           {
             "type": "command",
-            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/model-hook.ts"
+            "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/model-hook.ts"
           }
         ]
       }
@@ -22,10 +22,160 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas/orchestration/bin/autopilot.ts --quiet"
+            "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/autopilot.ts --quiet"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/redact-tokens.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/block-destructive.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-before-commit.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.mjs"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/preserve-context.mjs"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-stop.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-tool-failure.mjs"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-subagent-stop.mjs"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-session-end.mjs"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/on-notification.mjs"
           }
         ]
       }
     ]
+  },
+  "permissions": {
+    "defaultMode": "default",
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(node scripts/:*)",
+      "Bash(npx tsx orchestration/bin/:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm publish:*)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node ${CLAUDE_PROJECT_DIR}/.claude/statusline.mjs"
+  },
+  "effortLevel": "high",
+  "alwaysThinkingEnabled": true,
+  "autoCompactEnabled": true,
+  "autoMemoryEnabled": true,
+  "fileCheckpointingEnabled": true,
+  "enabledMcpjsonServers": [
+    "ollamas"
+  ],
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": false,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowUnixSockets": false
+    }
+  },
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "node ${CLAUDE_PROJECT_DIR}/.claude/statusline.mjs"
+  },
+  "env": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
   }
 }
