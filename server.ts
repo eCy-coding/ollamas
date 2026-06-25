@@ -1744,6 +1744,10 @@ content
       const tId = req.tenant!.tenantId;
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
+      // SECURITY (RCE defense): tenant-supplied stdio transport would spawn an
+      // arbitrary command on the gateway host. Only remote (HTTP/SSE) transports
+      // are allowed for tenant upstreams; stdio is reserved for trusted local config.
+      if (transport === "stdio") return res.status(400).json({ error: "Transport 'stdio' is not allowed for tenant upstreams" });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
       // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.
       const connect = await superviseUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId);

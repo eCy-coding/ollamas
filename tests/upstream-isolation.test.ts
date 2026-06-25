@@ -2,7 +2,7 @@
 // must be invisible to and un-invokable by any other tenant (deny-by-default at the
 // choke-point), while ownerless (global tools.json) upstreams stay shared. Closes
 // the cross-tenant invoke hole (visibility filtering alone did not gate execute()).
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MINI = path.join(HERE, "fixtures", "mini-mcp.mjs");
 
 const ctx = (tenantId?: string) => ({ isLive: true, workspaceRoot: "/ws", autoApply: true, deps: {} as any, tenantId });
+
+// This suite uses a trusted local stdio fixture (mini-mcp.mjs) as a tenant upstream
+// to exercise isolation logic. The RCE guard blocks tenant-scoped stdio by default,
+// so — acting as the trusted self-hoster — opt in for the duration of the suite.
+let prevStdioOptIn: string | undefined;
+beforeAll(() => { prevStdioOptIn = process.env.ALLOW_TENANT_STDIO_UPSTREAM; process.env.ALLOW_TENANT_STDIO_UPSTREAM = "1"; });
+afterAll(() => { if (prevStdioOptIn === undefined) delete process.env.ALLOW_TENANT_STDIO_UPSTREAM; else process.env.ALLOW_TENANT_STDIO_UPSTREAM = prevStdioOptIn; });
 
 describe("per-tenant upstream tool isolation (Faz 24)", () => {
   test("owned tool is visible to its owner only; cross-tenant invoke is denied", async () => {

@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { verifyHmacHeaders } from "./hmac.mjs";
+import { verifyHmacHeaders, authDecision } from "./hmac.mjs";
 import { safeWritePath, withinLimit, bindRequiresAuth, defaultWriteRoots } from "./lib/bridge-guard.mjs";
 
 const execFileP = promisify(execFile);
@@ -218,10 +218,18 @@ function readBody(req) {
   });
 }
 // Accept a valid HMAC signature (server) OR the plain token (host tools / dev).
+// Fail-CLOSED: with HMAC configured, an unsigned request can NEVER reach the
+// "open" fallback (the old bug) — see authDecision in ./hmac.mjs.
 function authed(req, raw = "", bridgePath = "") {
-  if (HMAC_SECRET && req.headers["x-bridge-signature"]) return verifyHmac(req, raw, bridgePath);
-  if (!TOKEN) return true; // no token configured => open (dev)
-  return req.headers["x-bridge-token"] === TOKEN;
+  const hasSignature = !!req.headers["x-bridge-signature"];
+  const signatureValid = hasSignature && !!HMAC_SECRET ? verifyHmac(req, raw, bridgePath) : false;
+  return authDecision({
+    hmacConfigured: !!HMAC_SECRET,
+    hasSignature,
+    signatureValid,
+    tokenConfigured: !!TOKEN,
+    tokenMatches: req.headers["x-bridge-token"] === TOKEN,
+  });
 }
 
 // ---- HTTP server ----

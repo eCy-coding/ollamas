@@ -29,6 +29,20 @@ export function computeSignature(secret, method, path, body, timestamp, nonce) {
 }
 
 /**
+ * Pure authorization decision for the host bridge (fail-CLOSED). The bug it fixes:
+ * when HMAC signing is configured but no token is, an UNSIGNED request used to
+ * fall through to "open". Rule: a present signature must be valid; otherwise a
+ * configured token must match; and if HMAC is configured we NEVER fall through to
+ * open. Only a fully-unconfigured bridge stays dev-open.
+ */
+export function authDecision({ hmacConfigured, hasSignature, signatureValid, tokenConfigured, tokenMatches }) {
+  if (hasSignature) return hmacConfigured ? !!signatureValid : false;
+  if (tokenConfigured) return !!tokenMatches;
+  if (hmacConfigured) return false; // configured but unsigned + no token => fail-closed
+  return true; // nothing configured at all => dev-open
+}
+
+/**
  * Verify a signed request from its header fields. `seenNonces` (caller-owned
  * Set) blocks replays. Returns true only on fresh, untampered, non-replayed
  * signatures. Constant-time signature comparison.

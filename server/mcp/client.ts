@@ -165,6 +165,16 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     if (samplingOn) registerSamplingHandler(client);
     registerRootsHandler(client); // Faz 20A: advertise our workspace root to upstreams
 
+    // SECURITY (RCE defense): a tenant-scoped upstream (owner set) must NEVER spawn
+    // an arbitrary host process. stdio transport runs `command` on the gateway host,
+    // so it is refused for tenant upstreams unless a trusted self-hoster explicitly
+    // opts in. Global/boot upstreams (owner undefined, from trusted tools.json) are
+    // unaffected. This also closes boot-replay of any stdio upstream a tenant stored
+    // before the route-level guard existed.
+    if (cfg.transport === "stdio" && owner && process.env.ALLOW_TENANT_STDIO_UPSTREAM !== "1") {
+      return { name: cfg.name, ok: false, tools: 0, error: "stdio transport not permitted for tenant-scoped upstream" };
+    }
+
     const transport =
       cfg.transport === "stdio"
         ? new StdioClientTransport({ command: cfg.command!, args: cfg.args || [], env: cfg.env })
