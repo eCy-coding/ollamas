@@ -14,6 +14,11 @@ Restart sonrası: `mcp__context7__*`, `mcp__deepwiki__*` erişilebilir.
 ## Free CLI (permissions.allow — read-only/analysis, lokal kurulu)
 `gh search/pr-view/issue-list/run-list`, `semgrep`, `trivy fs/repo`, `gitleaks`, `jq`, `fd`, `deno check`, `bun test`, `rg`, `grep`, `find`, `ls`.
 
+### Auth DURUM (2026-06-26) — operatör ek-iş gerekmiyor
+- ✅ **gh**: auth'lu (eCy-coding, scopes: repo/gist/read:org). Hazır.
+- ✅ **semgrep / trivy / gitleaks**: keyless (lokal, API yok). Hazır.
+- Slash komutlar: `/security-scan` (semgrep+trivy+gitleaks), `/deps-audit` (trivy+npm audit), `/lib-docs` (context7), `/repo-explain` (deepwiki). Restart sonrası MCP komutları canlı.
+
 ## Side-effectful CLI (permissions.ask — insan onayı)
 `gh pr create/merge/release`, `vercel`, `wrangler deploy`, `supabase db push`, `git commit/push`, `npm publish`.
 
