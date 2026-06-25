@@ -1,0 +1,25 @@
+# ollamas
+
+> Zero-dependency TypeScript CLI + local-LLM coding agent. A unified `ollamas` CLI (POSIX bridge + Apple Shortcuts), an HTTP server exposing `/api/*` + `/mcp`, a ReAct host-tool agent, project-wide bug-audit / test-gen, and a $0 cloud-model fleet (ollama-cloud / openrouter). Lanes are isolated by scope (cli / server / scripts / orchestration).
+
+## Entry points
+- [CLI](cli/): unified `ollamas` CLI — zero-dep (node built-ins only), pure-core + thin-IO, TTY-aware. Contract in [cli/CLI_AGENTS.md](cli/CLI_AGENTS.md).
+- [server.ts](server.ts): HTTP server — `/api/*` (agent chat, keys pool, models, workspace, revenue) + `/mcp` (MCP Streamable-HTTP) + `/api/openapi.json` (OpenAPI spec).
+- [scripts/](scripts/): agent fleet + benchmarks — `agent-dispatch.mjs` (one ReAct worker), `agent-fleet.mjs` (3-tier fan-out), `combo-bench.mjs` (model combination benchmark), `audit-*` (bug-audit pipeline).
+- [orchestration/](orchestration/): 0-manuel autopilot — `bin/autopilot.ts`, conductor, doctor, model-selection; hooks (`role-hook.ts`, `model-hook.ts`).
+
+## Protocols
+- MCP: server `/mcp` + project [.mcp.json](.mcp.json) (ollamas / context7 / deepwiki).
+- OpenAPI: [/api/openapi.json](server.ts) (machine discovery of `/api/*`).
+- A2A: [.well-known/agent-card.json](.well-known/agent-card.json) (agent discovery).
+- LSP: [.lsp.json](.lsp.json) (TypeScript inline diagnostics).
+- ACP (editor↔agent, Zed/Neovim): see [.claude/PROTOCOLS.md](.claude/PROTOCOLS.md).
+
+## Harness
+- [.claude/README.md](.claude/README.md): master Claude Code harness (safety + lifecycle hooks, sub-agents, sandbox, statusline, self-validation).
+- [.claude/FREE-SERVICES.md](.claude/FREE-SERVICES.md): $0 / generous-free service registry + inference routing.
+
+## Conventions
+- Scope law: each lane edits only its directory. Choke-point: CLI talks to the server only over HTTP `/api/*` + `/mcp` (never imports server internals).
+- Quality gate before commit: typecheck → lint → test (fresh). Per-file `git add`, conventional commits.
+- Evidence-first: a "works" claim means running the command and showing real output.

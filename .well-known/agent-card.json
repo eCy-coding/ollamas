@@ -1,0 +1,47 @@
+{
+  "$comment": "A2A (Agent2Agent) v1.0 Agent Card — agent discovery. Statik; mevcut ollamas server endpointlerine (http://127.0.0.1:8090) işaret eder. Dışa-publish = operatör kararı. Şema: agent2agent.info/docs/concepts/agentcard.",
+  "protocolVersion": "0.3.0",
+  "name": "ollamas",
+  "description": "Zero-dep TypeScript CLI + local-LLM coding agent. ReAct host-tool agent, project-wide bug audit, test generation, $0 cloud-model fleet (ollama-cloud/openrouter).",
+  "url": "http://127.0.0.1:8090",
+  "preferredTransport": "JSONRPC",
+  "version": "0.0.0",
+  "provider": {
+    "organization": "ollamas",
+    "url": "http://127.0.0.1:8090"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "additionalInterfaces": [
+    { "transport": "HTTP+SSE", "url": "http://127.0.0.1:8090/api/agent/chat" },
+    { "transport": "MCP", "url": "http://127.0.0.1:8090/mcp" }
+  ],
+  "skills": [
+    {
+      "id": "coding-agent",
+      "name": "ReAct coding agent",
+      "description": "Multi-step host-tool agent: write_host_file + macos_terminal + safe tools; demo-rejecting, evidence-first.",
+      "tags": ["code", "react", "agent", "host-tools"],
+      "examples": ["Write and run a fib(50) script and show stdout"]
+    },
+    {
+      "id": "bug-audit",
+      "name": "Project bug audit",
+      "description": "Multi-agent non-working-function audit producing a verified bug ledger.",
+      "tags": ["audit", "security", "quality"],
+      "examples": ["Audit this repo for non-working functions"]
+    },
+    {
+      "id": "testgen",
+      "name": "Test generation",
+      "description": "Generate unit/integration tests for a target file or module.",
+      "tags": ["test", "tdd"],
+      "examples": ["Generate vitest tests for cli/lib/parse.ts"]
+    }
+  ]
+}
