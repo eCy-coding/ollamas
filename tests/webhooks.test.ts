@@ -12,9 +12,14 @@ let outbound: typeof import("../server/webhooks/outbound");
 let received: { body: string; sig: string }[] = [];
 let receiver: http.Server;
 let receiverUrl = "";
+let prevAllowPrivate: string | undefined;
 
 beforeAll(async () => {
   process.env.SAAS_DB_PATH = DB;
+  // The receiver is a trusted local fixture on 127.0.0.1; the SSRF guard blocks
+  // private/loopback targets by default, so opt in (as a trusted operator would).
+  prevAllowPrivate = process.env.WEBHOOK_ALLOW_PRIVATE;
+  process.env.WEBHOOK_ALLOW_PRIVATE = "1";
   store = await import("../server/store/index");
   outbound = await import("../server/webhooks/outbound");
   await store.initStore();
@@ -28,6 +33,8 @@ beforeAll(async () => {
 });
 afterAll(() => {
   receiver?.close();
+  if (prevAllowPrivate === undefined) delete process.env.WEBHOOK_ALLOW_PRIVATE;
+  else process.env.WEBHOOK_ALLOW_PRIVATE = prevAllowPrivate;
   for (const f of [DB, `${DB}-wal`, `${DB}-shm`]) try { fs.unlinkSync(f); } catch {}
 });
 

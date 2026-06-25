@@ -263,6 +263,14 @@ describe("MCP gateway EXPOSE (self-booted, SAAS_ENFORCE=1)", () => {
     expect(body).toContain("ollamas_webhook_queue_depth");
     expect(body).toContain("ollamas_shutdown_total");
   });
+
+  // --- Security (H3): local-owner introspection must be unreachable in SaaS mode ---
+  test("/api/mcp/upstreams + /api/selftest are 403 in SaaS mode (no cross-tenant leak)", async () => {
+    const up = await fetch(`${BASE}/api/mcp/upstreams`);
+    expect(up.status).toBe(403); // previously leaked every tenant's id + upstream names
+    const st = await fetch(`${BASE}/api/selftest`);
+    expect(st.status).toBe(403);
+  });
 });
 
 describe("MCP ecosystem interop + DCR (Faz 15, public pre-auth)", () => {

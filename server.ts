@@ -130,6 +130,10 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models",
+    // Local-owner introspection surfaces — NOT part of the SaaS product (/mcp +
+    // /api/saas/*). Unguarded, /api/mcp/upstreams leaked every tenant's id+upstream
+    // names and /api/selftest exposed diagnostics to anonymous callers.
+    "/api/mcp", "/api/selftest",
   ],
   localOwnerGuard,
 );

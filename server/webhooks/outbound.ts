@@ -4,7 +4,52 @@
 // tenants can verify with standard libraries. Zero deps (node:crypto + fetch).
 
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
+import net from "node:net";
 import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl } from "../store";
+
+/** True for IPv4/IPv6 literals in private, loopback, link-local (incl. cloud
+ *  metadata 169.254.169.254), unspecified, CGNAT, or IPv6 ULA ranges. */
+export function isPrivateAddress(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true; // link-local + cloud metadata
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64/10
+    return false;
+  }
+  if (net.isIPv6(ip)) {
+    const x = ip.toLowerCase();
+    if (x === "::1" || x === "::") return true;
+    if (x.startsWith("fe80") || x.startsWith("fc") || x.startsWith("fd")) return true; // link-local / ULA
+    const m = x.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/); // IPv4-mapped
+    if (m) return isPrivateAddress(m[1]);
+    return false;
+  }
+  return false;
+}
+
+/** SSRF guard: reject non-http(s) schemes and any webhook target that resolves to
+ *  a private/loopback/link-local/metadata address. Hostnames are DNS-resolved so a
+ *  public name pointing at an internal IP is still blocked. WEBHOOK_ALLOW_PRIVATE=1
+ *  opts trusted self-hosters out (e.g. internal-only deployments). */
+export async function assertPublicWebhookUrl(rawUrl: string): Promise<void> {
+  if (process.env.WEBHOOK_ALLOW_PRIVATE === "1") return;
+  let u: URL;
+  try { u = new URL(rawUrl); } catch { throw new Error("webhook url is invalid"); }
+  if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error(`webhook url scheme not allowed: ${u.protocol}`);
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost")) throw new Error("webhook url targets localhost");
+  let addrs: string[];
+  if (net.isIP(host)) addrs = [host];
+  else {
+    try { addrs = (await dns.lookup(host, { all: true })).map((a) => a.address); }
+    catch { throw new Error(`webhook url host does not resolve: ${host}`); }
+  }
+  for (const ip of addrs) if (isPrivateAddress(ip)) throw new Error(`webhook url resolves to a non-public address: ${ip}`);
+}
 
 const MAX_ATTEMPTS = Number(process.env.WEBHOOK_RETRY_MAX_ATTEMPTS || 5);
 const TIMEOUT_MS = Number(process.env.WEBHOOK_REQUEST_TIMEOUT_MS || 15000);
@@ -35,6 +80,14 @@ async function deliverOne(row: any): Promise<void> {
   const attempt = row.attempt + 1;
   if (!secret || !url) { await markDelivery(row.id, "dead_letter", attempt, null); return; }
   const body = row.payload as string;
+  // SSRF guard: never POST to internal/loopback/metadata targets. A blocked URL is
+  // a config/abuse problem, not a transient failure → dead-letter (no retry).
+  try {
+    await assertPublicWebhookUrl(url);
+  } catch {
+    await markDelivery(row.id, "dead_letter", attempt, null);
+    return;
+  }
   try {
     const res = await fetch(url, {
       method: "POST",
