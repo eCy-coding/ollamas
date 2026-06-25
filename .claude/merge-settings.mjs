@@ -25,9 +25,19 @@ const HARNESS = {
       "Bash(npm run test:*)", "Bash(npm run lint:*)", "Bash(npx tsc --noEmit)",
       "Bash(node scripts/:*)", "Bash(npx tsx orchestration/bin/:*)",
       "Bash(grep:*)", "Bash(rg:*)", "Bash(ls:*)", "Bash(find:*)",
+      // $0 free CLIs — read-only / analysis only (no side effects). All locally installed.
+      "Bash(gh search:*)", "Bash(gh pr view:*)", "Bash(gh pr list:*)", "Bash(gh issue list:*)",
+      "Bash(gh run list:*)", "Bash(gh run view:*)", "Bash(gh repo view:*)",
+      "Bash(semgrep:*)", "Bash(trivy fs:*)", "Bash(trivy repo:*)", "Bash(gitleaks:*)",
+      "Bash(jq:*)", "Bash(fd:*)", "Bash(deno check:*)", "Bash(bun test:*)",
     ],
     deny: ["Read(./.env)", "Bash(rm -rf:*)", "Bash(git push --force:*)"],
-    ask: ["Bash(git commit:*)", "Bash(git push:*)", "Bash(npm publish:*)"],
+    ask: [
+      "Bash(git commit:*)", "Bash(git push:*)", "Bash(npm publish:*)",
+      // side-effectful free CLIs — outward/mutating, need human confirm.
+      "Bash(gh pr create:*)", "Bash(gh pr merge:*)", "Bash(gh release:*)",
+      "Bash(vercel:*)", "Bash(wrangler deploy:*)", "Bash(supabase db push:*)",
+    ],
   },
   statusLine: { type: "command", command: `node ${PROJ}/.claude/statusline.mjs` },
   subagentStatusLine: { type: "command", command: `node ${PROJ}/.claude/statusline.mjs` },
@@ -45,8 +55,8 @@ const HARNESS = {
   thinking: { effortLevel: "high", alwaysThinkingEnabled: true },
   // Context resilience (master-level): survive long sessions + enable /rewind.
   resilience: { autoCompactEnabled: true, autoMemoryEnabled: true, fileCheckpointingEnabled: true },
-  // Auto-approve the project's own MCP server declared in .mcp.json.
-  enabledMcpjsonServers: ["ollamas"],
+  // Auto-approve the project's own + $0 no-auth MCP servers declared in .mcp.json.
+  enabledMcpjsonServers: ["ollamas", "context7", "deepwiki"],
   preToolUse: [
     { matcher: "Write|Edit", hooks: [{ type: "command", command: H("redact-tokens.mjs") }] },
     { matcher: "Bash", hooks: [
@@ -86,10 +96,24 @@ catch (e) { console.error(`cannot read/parse ${FILE}: ${e.message}`); process.ex
 
 const changes = [];
 for (const k of PRUNE) { if (k in cfg) { delete cfg[k]; changes.push(`-${k}`); } }
+
+// Union missing entries from src[] into dst[] (idempotent; preserves order, no dup).
+const union = (dst, src, label) => {
+  const arr = Array.isArray(dst) ? dst : [];
+  const add = src.filter((x) => !arr.includes(x));
+  if (add.length) { arr.push(...add); changes.push(`${label}+${add.length}`); }
+  return arr;
+};
+
 if (!cfg.permissions) { cfg.permissions = HARNESS.permissions; changes.push("permissions"); }
+else {
+  cfg.permissions.defaultMode = cfg.permissions.defaultMode || HARNESS.permissions.defaultMode;
+  cfg.permissions.allow = union(cfg.permissions.allow, HARNESS.permissions.allow, "allow");
+  cfg.permissions.deny = union(cfg.permissions.deny, HARNESS.permissions.deny, "deny");
+  cfg.permissions.ask = union(cfg.permissions.ask, HARNESS.permissions.ask, "ask");
+}
 if (!cfg.subagentStatusLine) { cfg.subagentStatusLine = HARNESS.subagentStatusLine; changes.push("subagentStatusLine"); }
 if (!cfg.env) { cfg.env = HARNESS.env; changes.push("env"); }
-else if (!cfg.permissions.ask) { cfg.permissions.ask = HARNESS.permissions.ask; changes.push("permissions.ask"); }
 if (!cfg.statusLine)  { cfg.statusLine = HARNESS.statusLine; changes.push("statusLine"); }
 for (const [k, v] of Object.entries(HARNESS.thinking)) {
   if (cfg[k] === undefined) { cfg[k] = v; changes.push(k); }
@@ -98,6 +122,7 @@ for (const [k, v] of Object.entries(HARNESS.resilience)) {
   if (cfg[k] === undefined) { cfg[k] = v; changes.push(k); }
 }
 if (!cfg.enabledMcpjsonServers) { cfg.enabledMcpjsonServers = HARNESS.enabledMcpjsonServers; changes.push("enabledMcpjsonServers"); }
+else cfg.enabledMcpjsonServers = union(cfg.enabledMcpjsonServers, HARNESS.enabledMcpjsonServers, "enabledMcp");
 if (!cfg.sandbox) { cfg.sandbox = HARNESS.sandbox; changes.push("sandbox"); }
 cfg.hooks = cfg.hooks || {};
 if (!cfg.hooks.PreToolUse) { cfg.hooks.PreToolUse = HARNESS.preToolUse; changes.push("hooks.PreToolUse"); }

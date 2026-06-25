@@ -1,9 +1,17 @@
 {
-  "$comment": "ollamas projesinin KENDİ MCP server'ı (HTTP Streamable transport). Choke-point yasası (N-012): yalnız HTTP /mcp + /api/* — tool-registry import YOK. Araçlar mcp__ollamas__* olarak görünür. Auto-onay: settings.json enabledMcpjsonServers:[\"ollamas\"].",
+  "$comment": "Proje MCP serverları. ollamas = kendi server'ı (N-012 choke-point: yalnız HTTP /mcp + /api/*, tool-registry import YOK). context7/deepwiki = $0 no-auth harici (lib docs + repo wiki). Auto-onay: settings.json enabledMcpjsonServers.",
   "mcpServers": {
     "ollamas": {
       "type": "http",
       "url": "http://127.0.0.1:8090/mcp"
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
     }
   }
 }
