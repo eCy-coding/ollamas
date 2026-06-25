@@ -259,13 +259,15 @@ async function initializeServer() {
 
     if (CURRENT_MODE !== "demo") {
       try {
-        const verRes = await fetch(`${ollamaHost}/api/version`);
+        // Bound these probes — an unresponsive Ollama host must not hang the health
+        // endpoint (mirrors detectMode's 2s budget).
+        const verRes = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(2000) });
         if (verRes.ok) {
           const verJson = await verRes.json();
           ollamaVersion = verJson?.version || "unknown";
         }
 
-        const psRes = await fetch(`${ollamaHost}/api/ps`);
+        const psRes = await fetch(`${ollamaHost}/api/ps`, { signal: AbortSignal.timeout(2000) });
         if (psRes.ok) {
           const psJson = await psRes.json();
           loadedModels = psJson?.models || [];

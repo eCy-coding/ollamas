@@ -37,15 +37,18 @@ async function run(script, args = []) {
 
 // --- Tier-1 step 1: deterministic ground truth (FAST, no LLM) + ledger (learning) ---
 const mon = await run("system-monitor.mjs", ["--heartbeat", "--json"]).then(() => run("system-monitor.mjs", ["--json"]));
-let monitor; try { monitor = JSON.parse(mon.out); } catch { monitor = { summary: { pass: 0, fail: -1, skip: 0 }, results: [] }; }
+let monitor, monitorParseOk = true;
+try { monitor = JSON.parse(mon.out); } catch { monitor = { summary: { pass: 0, fail: -1, skip: 0 }, results: [] }; monitorParseOk = false; }
 const fails = (monitor.results || []).filter((r) => r.status === "FAIL");
-const healthy = fails.length === 0;
+// FAIL-CLOSED: an unparseable monitor (crashed/truncated) is NOT health — the ground-truth
+// gate must not pass just because results[] defaulted to empty.
+const healthy = monitorParseOk && fails.length === 0;
 
 // --- Tier-1 step 2: escalate to the fleet only when needed (or forced with --deep) ---
-let fleet = null;
+let fleet = null, fleetParseOk = true;
 if (!healthy || DEEP) {
   const f = await run("agent-fleet.mjs", ["--json"]);
-  try { fleet = JSON.parse(f.out); } catch { fleet = { workers: [] }; }
+  try { fleet = JSON.parse(f.out); } catch { fleet = { workers: [] }; fleetParseOk = false; }
   // Cross-check: a worker is trustworthy only if it reported verified evidence (pass).
   // (agent-fleet already gates pass on a ground-truth regex appearing in real tool output.)
 }
@@ -58,7 +61,9 @@ const report = {
   failing: fails.map((f) => ({ name: f.name, sev: f.sev, detail: f.detail })),
   fleet: fleet ? { ran: true, workers: fleet.workers.map((w) => ({ slice: w.id, worker: `${w.provider}/${w.model}`, verified: w.pass, evidence: w.evidence })) } : { ran: false, reason: "healthy fast-path — no LLM needed" },
 };
-const fleetOk = !fleet || fleet.workers.every((w) => w.pass);
+// FAIL-CLOSED: a fleet that ran but produced unparseable or empty output is NOT a pass
+// (every() over an empty array is vacuously true → it used to pass open).
+const fleetOk = !fleet || (fleetParseOk && fleet.workers.length > 0 && fleet.workers.every((w) => w.pass));
 const exit = healthy ? (fleetOk ? 0 : 1) : 1;
 
 if (JSON_OUT) { console.log(JSON.stringify({ ...report, exit }, null, 2)); process.exit(exit); }

@@ -12,7 +12,7 @@ import type { OAuthServerProvider, AuthorizationParams } from "@modelcontextprot
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import type { OAuthClientInformationFull, OAuthTokens, OAuthTokenRevocationRequest } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { getClient, saveAuthCode, getAuthCode, consumeAuthCode, saveOAuthToken, resolveOAuthToken, revokeOAuthToken, saveRefreshToken, rotateRefreshToken, refreshFamilyOf, revokeRefreshFamily } from "../store";
+import { getClient, saveAuthCode, getAuthCode, consumeAuthCode, saveOAuthToken, resolveOAuthToken, revokeOAuthToken, saveRefreshToken, rotateRefreshToken, refreshTokenClientId, refreshFamilyOf, revokeRefreshFamily } from "../store";
 
 const ACCESS_TTL_SECS = 3600;
 const REFRESH_TTL_SECS = 14 * 24 * 3600; // 14 days; rotated on every use (Faz 22, RFC 9700)
@@ -93,6 +93,13 @@ export class OllamasOAuthProvider implements OAuthServerProvider {
     client: OAuthClientInformationFull, refreshToken: string,
     scopes?: string[], resource?: URL
   ): Promise<OAuthTokens> {
+    // Validate the client binding BEFORE consuming. rotateRefreshToken atomically marks
+    // the token used, so a wrong-client presentation must NOT reach it — otherwise an
+    // attacker who presents a victim's refresh token (with a different client) consumes
+    // it, and the victim's next legitimate use is flagged as reuse → family revoked (DoS).
+    const boundClient = await refreshTokenClientId(refreshToken);
+    if (boundClient !== null && boundClient !== client.client_id) throw new Error("invalid_grant: client mismatch");
+
     const rot = await rotateRefreshToken(refreshToken);
     if (rot.status === "reuse") throw new Error("invalid_grant: refresh token reuse detected — family revoked");
     if (rot.status === "invalid") throw new Error("invalid_grant: refresh token invalid or expired");

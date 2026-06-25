@@ -506,6 +506,14 @@ export async function rotateRefreshToken(plaintext: string): Promise<RefreshRota
   return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
 }
 
+/** The client_id a refresh token is bound to — WITHOUT consuming it. Lets the caller
+ *  reject a wrong-client presentation before rotateRefreshToken marks the token used
+ *  (otherwise a wrong-client replay would consume the victim's token → false reuse). */
+export async function refreshTokenClientId(plaintext: string): Promise<string | null> {
+  const r = (await d().query("SELECT client_id FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [sha256(plaintext)])).rows[0];
+  return r ? r.client_id : null;
+}
+
 /** Revoke every refresh token in a family (reuse detection / explicit revoke). */
 export async function revokeRefreshFamily(family_id: string): Promise<void> {
   await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE family_id = ?", [family_id]);
