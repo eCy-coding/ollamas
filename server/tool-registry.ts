@@ -327,7 +327,10 @@ const TOOLS: Record<string, ToolDef> = {
     }),
     invoke: async (args, { isLive, workspaceRoot, deps }) => {
       if (!args.query) throw new Error("Missing 'query' parameter.");
-      return await deps.TerminalManager.execute(isLive, workspaceRoot, `grep -rnI "${args.query}" .`);
+      // Shell-escape the query (deps.shArg) and use -F (literal match) + `--` so a
+      // query with quotes, shell metacharacters, regex, or a leading dash can neither
+      // break the command (the old raw "${query}" did) nor inject into the shell.
+      return await deps.TerminalManager.execute(isLive, workspaceRoot, `grep -rnIF -- ${deps.shArg(args.query)} .`);
     },
   },
 

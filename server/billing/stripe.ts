@@ -137,24 +137,12 @@ export async function computeRun(period = monthKey()): Promise<BillingRun> {
  */
 export async function runBilling(period = monthKey()): Promise<BillingRun> {
   const run = await computeRun(period);
-  const s = getStripe();
   for (const line of run.lines) {
-    // Idempotent: a second run for the same (tenant, period) won't re-bill.
-    const inv = await recordInvoice(line.tenantId, period, line.amount);
-    if (!inv.created) continue;
-    if (s) {
-      // Stripe needs the real customer id, not our internal tnt_ id.
-      const customerId = (await getTenant(line.tenantId))?.stripe_customer_id;
-      if (!customerId) {
-        console.warn(`[Billing] tenant ${line.tenantId} has no stripe_customer_id — skipping Stripe push.`);
-        continue;
-      }
-      await s.billing.meterEvents.create({
-        event_name: "ollamas_tool_calls",
-        identifier: `${line.tenantId}-${period}`, // idempotency key on Stripe's side
-        payload: { stripe_customer_id: customerId, value: String(line.calls) },
-      });
-    }
+    // Record OUR invoice ledger row (idempotent per tenant+period). Usage is already
+    // reported to Stripe's meter in REAL TIME per call via sendMeterEventAsync — so
+    // runBilling must NOT also push the period total to the same meter, or every tool
+    // call is metered twice (sum aggregation → double-billed). The ledger row stays.
+    await recordInvoice(line.tenantId, period, line.amount);
   }
   return run;
 }

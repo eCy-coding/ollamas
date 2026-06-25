@@ -482,12 +482,15 @@ export async function rotateRefreshToken(plaintext: string): Promise<RefreshRota
   const hash = sha256(plaintext);
   const r = (await d().query("SELECT * FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [hash])).rows[0];
   if (!r) return { status: "invalid" };
-  if (Number(r.used) === 1) {
-    await revokeRefreshFamily(r.family_id); // family compromised → kill the chain
+  // Atomic single-use consume (RFC 9700): flip used 0→1 in ONE statement so two
+  // concurrent rotations of the same token cannot BOTH succeed (the old SELECT-then-
+  // UPDATE let both read used=0 and mint two valid grants). The loser — whether a
+  // genuine replay or a race — changes 0 rows and is treated as reuse: revoke the family.
+  const upd = await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ? AND used = 0", [hash]);
+  if ((upd.changes ?? 0) === 0) {
+    await revokeRefreshFamily(r.family_id); // already consumed → compromise → kill the chain
     return { status: "reuse" };
   }
-  // Mark consumed regardless of expiry (a token is single-use either way).
-  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ?", [hash]);
   if (r.expires_at <= nowIso()) return { status: "invalid" };
   return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
 }
