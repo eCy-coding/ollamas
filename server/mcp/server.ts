@@ -28,7 +28,11 @@ export type CtxFactory = (req: Request) => ToolCtx;
 
 const PAGE = 50;
 const encodeCursor = (n: number) => Buffer.from(String(n)).toString("base64");
-const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toString(), 10) || 0 : 0);
+const decodeCursor = (c?: string) => {
+  if (!c) return 0;
+  const n = parseInt(Buffer.from(c, "base64").toString(), 10);
+  return Number.isFinite(n) && n >= 0 ? n : 0; // reject negative/NaN cursors → no wrong/duplicated pages
+};
 
 // Single source of truth for the gateway's MCP identity. server.json, the
 // /.well-known/mcp.json discovery doc, and the live Server handshake all read

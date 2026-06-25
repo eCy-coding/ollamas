@@ -1485,8 +1485,8 @@ content
     // Generate valid random peer keys if missing to satisfy cryptographic integrity
     if (!db.data.cluster.peerId) {
       db.data.cluster.peerId = "Qm" + crypto.randomBytes(16).toString("hex");
+      db.save(); // persist only when a new peerId was generated (was: a full fs write on EVERY GET)
     }
-    db.save();
 
     const orchestratorReport = OrchestratorCoordinator.getCapabilities();
 
