@@ -1,37 +1,37 @@
-import { describe, test, expect, vi } from "vitest";
-import { ToolRegistry, type ToolCtx, type ToolDeps } from "../server/tool-registry";
+import { describe, test, expect, beforeAll } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { TerminalManager } from "../server/terminal";
+import { db } from "../server/db";
 
-// H5: grep_search interpolated the query raw into `grep -rnI "${query}" .`, so a query
-// with a double-quote broke the command (no matches in LIVE mode) and shell metachars
-// could inject. The fix shArg-quotes the query + uses -F (literal) + `--`.
-const shArg = (s: string) => `'${String(s).replace(/'/g, `'\\''`)}'`;
-function depsCapturing(sink: { cmd: string }): ToolDeps {
-  return {
-    FilesystemManager: {} as any,
-    TerminalManager: { execute: async (_l: boolean, _w: string, c: string) => { sink.cmd = c; return "ok"; } },
-    runOnHostTerminal: async () => "term",
-    writeHostFile: async () => "wrote",
-    execOnHost: async () => "exec",
-    HOST_TOOLS_DIR: "/tmp/tools",
-    shArg,
-    db: { logSecurity: vi.fn() },
-  } as unknown as ToolDeps;
-}
-const ctx = (deps: ToolDeps): ToolCtx => ({ isLive: true, workspaceRoot: "/ws", autoApply: false, allowedTiers: ["safe"], deps } as any);
-
-describe("grep_search shell-safety (H5)", () => {
-  test("query is shArg-escaped + -F literal + -- guarded (no injection)", async () => {
-    const sink = { cmd: "" };
-    const r = await ToolRegistry.execute("grep_search", { query: `foo"; rm -rf / #` }, ctx(depsCapturing(sink)));
-    expect(r.ok).toBe(true);
-    expect(sink.cmd).toContain("-rnIF -- "); // -F literal match + `--` end-of-options
-    expect(sink.cmd).toContain(`'foo"; rm -rf / #'`); // single-quoted → shell-inert
-    expect(sink.cmd).not.toContain(`"foo`); // no raw double-quote interpolation remains
+// H5 (and its broken first fix): grep_search must search literal text in LIVE mode.
+// The first fix shell-quoted the query (shArg) into a command STRING, but TerminalManager
+// runs execFile(shell:false) after splitting on whitespace — so the quotes reached grep
+// LITERALLY and it matched nothing (re-introducing the original bug). The real fix passes
+// the query as a discrete argv token via executeArgv. These tests drive the REAL executor
+// (the prior test used a string-capturing stub, so it could not catch this).
+describe("grep_search real-executor behavior (H5)", () => {
+  let ws: string;
+  beforeAll(() => {
+    ws = fs.mkdtempSync(path.join(os.tmpdir(), "grep-ws-"));
+    fs.writeFileSync(path.join(ws, "a.txt"), "hello foo world\nsecond line\n");
+    db.data.permissions.commandExec = true; // executeArgv requires the exec permission
   });
 
-  test("a single-quote in the query is POSIX-escaped, not a break-out", async () => {
-    const sink = { cmd: "" };
-    await ToolRegistry.execute("grep_search", { query: `it's` }, ctx(depsCapturing(sink)));
-    expect(sink.cmd).toContain(`'it'\\''s'`);
+  test("executeArgv passes the query as one argv token and finds the literal", async () => {
+    const r = await TerminalManager.executeArgv(true, ws, "grep", ["-rnIF", "--", "foo", "."]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("hello foo world");
+  });
+
+  test("multi-word queries match (whitespace no longer splits the pattern)", async () => {
+    const r = await TerminalManager.executeArgv(true, ws, "grep", ["-rnIF", "--", "foo world", "."]);
+    expect(r.stdout).toContain("hello foo world");
+  });
+
+  test("the OLD shell-quoted string form does NOT match — proves the fix was needed", async () => {
+    const bad = await TerminalManager.execute(true, ws, `grep -rnIF -- 'foo' .`);
+    expect(bad.stdout).not.toContain("hello foo world"); // quotes are passed to grep literally
   });
 });

@@ -30,8 +30,11 @@ describe("assertPublicWebhookUrl (H1 SSRF guard)", () => {
     await expect(assertPublicWebhookUrl("gopher://10.0.0.1/x")).rejects.toThrow();
   });
 
-  it("isPrivateAddress classifies ranges correctly", () => {
-    for (const ip of ["10.1.2.3", "127.0.0.1", "192.168.0.1", "172.20.0.1", "169.254.169.254", "::1", "fd00::1", "100.64.0.1"]) {
+  it("isPrivateAddress classifies ranges correctly (incl. hex-compressed IPv4-mapped IPv6)", () => {
+    for (const ip of [
+      "10.1.2.3", "127.0.0.1", "192.168.0.1", "172.20.0.1", "169.254.169.254", "::1", "fd00::1", "100.64.0.1",
+      "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:a9fe:a9fe", // dotted + hex-mapped loopback/metadata — the bypass
+    ]) {
       expect(isPrivateAddress(ip)).toBe(true);
     }
     for (const ip of ["1.1.1.1", "8.8.8.8", "172.32.0.1", "192.169.0.1", "2606:4700:4700::1111"]) {

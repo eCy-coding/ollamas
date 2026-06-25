@@ -327,10 +327,11 @@ const TOOLS: Record<string, ToolDef> = {
     }),
     invoke: async (args, { isLive, workspaceRoot, deps }) => {
       if (!args.query) throw new Error("Missing 'query' parameter.");
-      // Shell-escape the query (deps.shArg) and use -F (literal match) + `--` so a
-      // query with quotes, shell metacharacters, regex, or a leading dash can neither
-      // break the command (the old raw "${query}" did) nor inject into the shell.
-      return await deps.TerminalManager.execute(isLive, workspaceRoot, `grep -rnIF -- ${deps.shArg(args.query)} .`);
+      // Pass the query as a DISCRETE argv token via executeArgv (execFile, no shell).
+      // Shell-quoting was wrong here: TerminalManager.execute splits on whitespace and runs
+      // execFile(shell:false), so single quotes reached grep literally and it matched nothing
+      // (re-introducing the original bug). -F = literal match, -- = end of options.
+      return await deps.TerminalManager.executeArgv(isLive, workspaceRoot, "grep", ["-rnIF", "--", args.query, "."]);
     },
   },
 

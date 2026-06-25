@@ -148,6 +148,36 @@ export class TerminalManager {
   }
 
   /**
+   * Run a binary with a DISCRETE argv array (execFile, no shell) — for tools that must
+   * pass UNTRUSTED text as a single argument (e.g. grep_search's query). Shell-quoting is
+   * wrong for this executor (execute() splits on whitespace + shell:false), so a quoted
+   * arg reaches the binary literally; argv tokens avoid that entirely. Keeps the same
+   * permission gate + binary denylist + audit log; the shell-metachar block is irrelevant
+   * (there is no shell), so an arg may safely contain any character.
+   */
+  public static async executeArgv(isLive: boolean, workspaceRoot: string, binary: string, args: string[]): Promise<ExecResult> {
+    if (!isLive) return this.simulateDemoCommand([binary, ...args].join(" "));
+    if (!db.data.permissions.commandExec) {
+      db.logSecurity("command_exec", binary, "Command refused: local console execution is globally deactivated in settings.", "deny");
+      return { stdout: "", stderr: "Security block: Terminal execution is deactivated in security panels.", exitCode: 126 };
+    }
+    if (BLOCKED_TOKENS.includes(binary)) {
+      db.logSecurity("command_exec", binary, `Command refused: contains restricted binary/operation '${binary}'.`, "deny");
+      return { stdout: "", stderr: `Security block: restricted binary '${binary}' refused.`, exitCode: 126 };
+    }
+    db.logSecurity("command_exec", `${binary} ${args.join(" ")}`, `Executing (argv) in safe cwd: ${workspaceRoot}`, "allow");
+    return new Promise((resolve) => {
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
+      // Justified: execFile (no shell) + binary denylist + permission gate + audit log;
+      // args is a structural argv array (no quote/expansion), not a shell string.
+      execFile(binary, args, { cwd: workspaceRoot || process.cwd(), timeout: 45000, shell: false }, (error, stdout, stderr) => {
+        const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number }).code as number || 1) : 0;
+        resolve({ stdout: stdout || "", stderr: stderr || "", exitCode });
+      });
+    });
+  }
+
+  /**
    * Dummy high-fidelity shell response for cloud run demo targets
    */
   private static simulateDemoCommand(command: string): ExecResult {
