@@ -53,4 +53,11 @@ describe("stripe webhook idempotency (H6)", () => {
     const r2 = await billing.handleWebhook(evt("evt_ok", "pro", t.id), "sig");
     expect(r2.handled).toBe(false); // second delivery skipped
   });
+
+  test("markStripeEventProcessed is atomic-idempotent (concurrent calls don't throw on PK)", async () => {
+    // Round-5 low: ON CONFLICT DO NOTHING — two replicas marking the same event must not
+    // throw a primary-key violation (which would 500 Stripe for already-done work).
+    await Promise.all([store.markStripeEventProcessed("evt_dup"), store.markStripeEventProcessed("evt_dup")]);
+    expect(await store.stripeEventSeen("evt_dup")).toBe(true);
+  });
 });

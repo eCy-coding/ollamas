@@ -178,11 +178,17 @@ export function acquireClaim(
   });
 }
 
-/** Heartbeat: kendi claim'inin ts'ini tazele (TTL'i uzat). */
+/** Heartbeat: kendi claim'inin ts'ini tazele (TTL'i uzat). Çakışma korumalı:
+ *  başka CANLI sekme bu lane|version'ı devraldıysa renew REDDEDİLİR (mevcut holder
+ *  döner) — diriltilen stale sekme clobber EDEMEZ. (Eski hâl koşulsuz append ediyordu;
+ *  nextFence GLOBAL max+1 döndürdüğü için stale sekme taze en-üst fence basıp fold'u
+ *  kazanıyordu — fence-primary tiebreak tek başına bunu engellemez.) */
 export function renewClaim(store: ClaimStore, opts: { lane: string; version: string; tab: string; pid: number; ttlMs?: number; now?: number }): ClaimEvent {
   const now = opts.now ?? Date.now();
   return withLock(store.lockDir, () => {
     const events = readClaims(store);
+    const collision = detectCollision(events, opts.lane, opts.version, opts.tab, now);
+    if (collision) return collision; // başka canlı sekme tutuyor → clobber-event ekleme, mevcut holder'ı dön
     const claim: ClaimEvent = {
       ts: now, tab: opts.tab, pid: opts.pid, lane: opts.lane, version: opts.version,
       status: "claimed", ttlMs: opts.ttlMs ?? DEFAULT_TTL_MS, fence: nextFence(events, opts.lane, opts.version),

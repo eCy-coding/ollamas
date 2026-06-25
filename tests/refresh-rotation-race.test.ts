@@ -35,4 +35,12 @@ describe("refresh-token rotation race (H4)", () => {
     expect((await store.rotateRefreshToken(token)).status).toBe("ok");
     expect((await store.rotateRefreshToken(token)).status).toBe("reuse"); // second use = replay
   });
+
+  test("an EXPIRED token → invalid, and re-presenting it does NOT trigger a false reuse/family-revoke", async () => {
+    // Round-5 low: expiry must be checked BEFORE consuming, else the expired token is
+    // marked used and a later presentation looks like a genuine reuse.
+    const { token } = await store.saveRefreshToken({ client_id: "oc_exp", tenant_id: "local", scopes: "tools:safe", resource: null, ttlSecs: -10 });
+    expect((await store.rotateRefreshToken(token)).status).toBe("invalid");
+    expect((await store.rotateRefreshToken(token)).status).toBe("invalid"); // pre-fix: "reuse"
+  });
 });

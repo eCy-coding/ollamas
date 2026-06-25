@@ -96,10 +96,25 @@ async function verifyJwt(token: string, audience: string): Promise<ResolvedKey |
  *   (default), a missing credential is allowed (single-user path) but a *present*
  *   invalid one is still rejected.
  */
+/**
+ * The RFC 8707 audience a credential is validated against. Prefer an EXPLICITLY
+ * configured resource identity (OAUTH_AUDIENCE / MCP_PUBLIC_URL) so the audience is NOT
+ * the attacker-controllable Host header — a token bound to another resource is then NOT
+ * replayable here by spoofing Host. Multi-tenant deployments SHOULD set one of these for
+ * strict cross-resource binding. Falls back to the request origin otherwise (single-owner
+ * / self-issued ot_ tokens, whose resource was bound under the same origin at issuance).
+ */
+export function expectedAudience(base: string, env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env.OAUTH_AUDIENCE
+    || (env.MCP_PUBLIC_URL ? `${env.MCP_PUBLIC_URL.replace(/\/+$/, "")}/mcp` : "");
+  return configured || `${base}/mcp`;
+}
+
 export function authMiddleware(required = false) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const host = (typeof req.get === "function" ? req.get("host") : (req.headers?.host as string)) || "localhost";
     const base = `${req.protocol || "http"}://${host}`;
+    const audience = expectedAudience(base);
     const unauthorized = (msg: string) => {
       res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl(base)}"`);
       return res.status(401).json({ error: msg });
@@ -112,8 +127,8 @@ export function authMiddleware(required = false) {
       const resolved = key.startsWith("olm_")
         ? await resolveKey(key)
         : key.startsWith("ot_")
-          ? await resolveOAuth(key, process.env.OAUTH_AUDIENCE || `${base}/mcp`)
-          : await verifyJwt(key, `${base}/mcp`);
+          ? await resolveOAuth(key, audience)
+          : await verifyJwt(key, audience);
       if (!resolved) return unauthorized("Invalid, expired, or unverifiable credential");
       req.tenant = resolved;
     } else if (required) {

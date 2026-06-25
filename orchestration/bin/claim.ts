@@ -62,6 +62,10 @@ function main(): void {
   if (flag === "--renew") {
     if (!lane || !version) { console.error("kullanım: --renew <lane> <version>"); process.exit(2); }
     const c = renewClaim(store, { lane, version, tab: TAB, pid: process.pid });
+    if (c.tab !== TAB) { // başka sekme devraldı → yenileme reddedildi (clobber engellendi)
+      console.error(`⚠️ ÇAKIŞMA: ${claimKey(lane, version)} artık ${c.tab} (pid ${c.pid}) tarafından tutuluyor — yenileme reddedildi.`);
+      process.exit(3);
+    }
     console.log(`♻️ yenilendi: ${claimKey(lane, version)} (${TAB}, fence ${c.fence})`);
     return;
   }

@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { defaultStore, readClaims, acquireClaim, renewClaim, closeClaim } from "../bin/lib/claims";
+import { defaultStore, readClaims, acquireClaim, renewClaim, closeClaim, detectCollision } from "../bin/lib/claims";
 import { declaredVersion, checkBranchCoherence } from "../bin/lib/driftguard";
 import { parseHistory, lastSnapshot } from "../bin/lib/trend";
 import { stddev } from "../bin/lib/bench";
@@ -31,6 +31,21 @@ describe("claims I/O (tmp store round-trip)", () => {
 
     const c = acquireClaim(store, { lane: "x", version: "v1", tab: "B", pid: 2 });
     expect(c.ok).toBe(true);                   // A done → B alabilir
+  });
+
+  it("revived stale tab cannot clobber the active holder via renewClaim (H11 real path)", () => {
+    const store = defaultStore(mkdtempSync(join(tmpdir(), "ccov-h11-")));
+    const T0 = 1_700_000_000_000;
+    acquireClaim(store, { lane: "x", version: "v", tab: "A", pid: 1, ttlMs: 50, now: T0 });
+    // A's claim goes stale (ttl 50ms); B legitimately takes over much later.
+    const b = acquireClaim(store, { lane: "x", version: "v", tab: "B", pid: 2, now: T0 + 100_000 });
+    expect(b.ok).toBe(true);
+    // A revives and tries to renew — must be REJECTED (B holds it now); no clobber event.
+    const r = renewClaim(store, { lane: "x", version: "v", tab: "A", pid: 1, now: T0 + 100_001 });
+    expect(r.tab).toBe("B"); // renew returned the current holder; A did NOT win (pre-fix: A clobbered)
+    // B remains the sole active holder in the folded ledger.
+    expect(detectCollision(readClaims(store), "x", "v", "B", T0 + 100_002)).toBeNull();
+    expect(detectCollision(readClaims(store), "x", "v", "A", T0 + 100_002)?.tab).toBe("B");
   });
 });
 

@@ -1102,8 +1102,13 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       // unhandled stream 'error' would crash the process, so handle it explicitly.
       const rs = fs.createReadStream(safePath);
       rs.on("error", (err: Error) => {
-        if (!res.headersSent) res.status(500).json({ error: err.message });
-        else res.destroy(err);
+        if (!res.headersSent) {
+          // Drop the attachment headers set above, or the JSON error body would be
+          // delivered as a downloadable file (browser saves the error as a file).
+          res.removeHeader("Content-Disposition");
+          res.removeHeader("Content-Type");
+          res.status(500).json({ error: err.message });
+        } else res.destroy(err);
       });
       rs.pipe(res);
       db.logSecurity("file_system", `HTTP download: ${relativePath}`, "Streamed file", "allow");

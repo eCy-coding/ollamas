@@ -301,7 +301,10 @@ export async function stripeEventSeen(eventId: string): Promise<boolean> {
 /** Record a Stripe event as processed (idempotent). Call only after the handler
  *  succeeds, so a handler failure leaves the event un-consumed and Stripe can retry. */
 export async function markStripeEventProcessed(eventId: string): Promise<void> {
-  if (!(await stripeEventSeen(eventId))) await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?)", [eventId, nowIso()]);
+  // Atomic + idempotent: ON CONFLICT avoids the check-then-insert race (two replicas
+  // delivering the same event would otherwise throw a PRIMARY KEY violation → 500 to
+  // Stripe for work that already succeeded).
+  await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?) ON CONFLICT(id) DO NOTHING", [eventId, nowIso()]);
 }
 
 /** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].
@@ -487,6 +490,10 @@ export async function rotateRefreshToken(plaintext: string): Promise<RefreshRota
   const hash = sha256(plaintext);
   const r = (await d().query("SELECT * FROM oauth_refresh_tokens WHERE refresh_token_hash = ?", [hash])).rows[0];
   if (!r) return { status: "invalid" };
+  // Expiry is a property of the token, not a consume event — check it BEFORE consuming.
+  // Marking an expired (never-used) token used=1 would make a later presentation look
+  // like a genuine reuse and wrongly revoke the whole family.
+  if (r.expires_at <= nowIso()) return { status: "invalid" };
   // Atomic single-use consume (RFC 9700): flip used 0→1 in ONE statement so two
   // concurrent rotations of the same token cannot BOTH succeed (the old SELECT-then-
   // UPDATE let both read used=0 and mint two valid grants). The loser — whether a
@@ -496,7 +503,6 @@ export async function rotateRefreshToken(plaintext: string): Promise<RefreshRota
     await revokeRefreshFamily(r.family_id); // already consumed → compromise → kill the chain
     return { status: "reuse" };
   }
-  if (r.expires_at <= nowIso()) return { status: "invalid" };
   return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
 }
 
