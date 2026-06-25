@@ -4,6 +4,10 @@ import {
   type ConductAction, type LaneAge,
 } from "../bin/lib/heartbeat";
 import type { ClaimEvent } from "../bin/lib/claims";
+import { CLAIMS, readActiveClaims } from "../bin/heartbeat";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const action = (tier: string, lane: string, sev = 50): ConductAction =>
   ({ tier, lane, kind: `${tier.toLowerCase()}:${lane}`, detail: `${lane} detail`, action: `${lane}: do`, severity: sev });
@@ -107,5 +111,21 @@ describe("vO14 collision-safe — fuse action ile tickDecision (CRITICAL backend
     const r = tickDecision(top, [top, next], [claim("backend")], []);
     expect(r.claimedElsewhere).toBe(true);
     expect(r.action?.lane).toBe("frontend");
+  });
+});
+
+describe("readActiveClaims — claim ledger path (Faz13 P2-001)", () => {
+  it("CLAIMS → seyir/work-claim.jsonl (eski orchestration/claims.jsonl DEĞİL)", () => {
+    expect(CLAIMS.endsWith(join("seyir", "work-claim.jsonl"))).toBe(true);
+  });
+  it("verilen ledger'dan aktif claim okur", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hb-claims-"));
+    const f = join(dir, "wc.jsonl");
+    const now = 1_700_000_000_000;
+    writeFileSync(f, JSON.stringify({ ts: now, tab: "t", pid: 1, lane: "orchestration", version: "vO7", status: "claimed", ttlMs: 1_200_000, fence: 1 }) + "\n");
+    const active = readActiveClaims(now + 1000, f);
+    expect(active.length).toBe(1);
+    expect(active[0].lane).toBe("orchestration");
+    rmSync(dir, { recursive: true, force: true });
   });
 });

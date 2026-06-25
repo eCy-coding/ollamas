@@ -2,6 +2,9 @@
  * suppress.test.ts — vO14 detector precision: applySuppress (gerçek-koru, gürültü-ele, silent-değil).
  */
 import { describe, it, expect } from "vitest";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { applySuppress, suppressedBlock, loadSuppress, type SuppressRule } from "../bin/lib/suppress";
 
 describe("loadSuppress — .policy-suppress.json oku + reason-zorunlu filtre", () => {
@@ -61,5 +64,23 @@ describe("suppressedBlock — şeffaflık (gizleme-değil)", () => {
   });
   it("boş → boş string", () => {
     expect(suppressedBlock([])).toBe("");
+  });
+});
+
+describe("loadSuppress — boş kindPattern tümünü-bastırmayı engeller (Faz13 P2-008)", () => {
+  it("kindPattern:'' (reason'lı) ELENİR; geçerli kural kalır; applySuppress tümünü bastırmaz", () => {
+    const dir = mkdtempSync(join(tmpdir(), "supp-"));
+    const f = join(dir, "p.json");
+    writeFileSync(f, JSON.stringify({ rules: [
+      { detector: "*", kindPattern: "", reason: "x" },          // boş-pattern → includes('')=true → eskiden TÜMÜNÜ bastırırdı
+      { detector: "dod", kindPattern: "osascript", reason: "io-wrapper" },
+    ] }));
+    const rules = loadSuppress(f);
+    expect(rules.length).toBe(1);
+    expect(rules[0].kindPattern).toBe("osascript");
+    const { kept, suppressed } = applySuppress([{ kind: "real-bug" }, { kind: "osascript-noise" }], rules, "dod");
+    expect(kept.map((k) => k.kind)).toEqual(["real-bug"]);
+    expect(suppressed.length).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
