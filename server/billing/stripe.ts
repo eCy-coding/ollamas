@@ -5,7 +5,7 @@
 
 import Stripe from "stripe";
 import crypto from "node:crypto";
-import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
+import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, markStripeEventProcessed, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 const METER_EVENT_NAME = "ollamas_tool_calls";
@@ -157,7 +157,10 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
   if (!s || !secret) throw new Error("Stripe not configured (STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET)");
   const event = s.webhooks.constructEvent(rawBody, signature, secret);
 
-  // Idempotency: skip events already processed (Stripe retries deliver duplicates).
+  // Idempotency: skip events already PROCESSED. The processed-marker is written only
+  // after a handler succeeds (markStripeEventProcessed) — so a handler that throws
+  // leaves the event un-consumed and Stripe's retry can reprocess it (previously the
+  // event was marked seen up-front and a swallowed handler failure lost it forever).
   if (await stripeEventSeen(event.id)) return { type: event.type, handled: false };
 
   const tenantFromSub = async (sub: Stripe.Subscription) =>
@@ -170,7 +173,7 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
       const planId = (sub.metadata?.planId as string) || "";
       const tenantId = await tenantFromSub(sub);
       if (tenantId && planId && (await getTenant(tenantId))) {
-        try { await setTenantPlan(tenantId, planId); await queueWebhookEvent(tenantId, "subscription.updated", { planId }); return { type: event.type, handled: true }; } catch { /* unknown plan */ }
+        try { await setTenantPlan(tenantId, planId); await queueWebhookEvent(tenantId, "subscription.updated", { planId }); await markStripeEventProcessed(event.id); return { type: event.type, handled: true }; } catch { /* unknown plan / transient → leave un-consumed so Stripe retries */ }
       }
       break;
     }
@@ -179,13 +182,14 @@ export async function handleWebhook(rawBody: Buffer, signature: string): Promise
       const sub = event.data.object as Stripe.Subscription;
       const tenantId = await tenantFromSub(sub);
       if (tenantId && (await getTenant(tenantId))) {
-        try { await setTenantPlan(tenantId, "free"); return { type: event.type, handled: true }; } catch { /* */ }
+        try { await setTenantPlan(tenantId, "free"); await markStripeEventProcessed(event.id); return { type: event.type, handled: true }; } catch { /* leave un-consumed → retry */ }
       }
       break;
     }
     case "invoice.paid":
     case "invoice.payment_failed": {
       // Acknowledge payment lifecycle; access gating could hook here.
+      await markStripeEventProcessed(event.id);
       return { type: event.type, handled: true };
     }
   }

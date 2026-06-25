@@ -293,10 +293,15 @@ export async function getBillingConfig(key: string): Promise<string | null> {
 export async function setBillingConfig(key: string, value: string): Promise<void> {
   await d().run("INSERT INTO billing_config (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", [key, value]);
 }
+/** Has this Stripe event already been PROCESSED? Check-only (no side effect) so the
+ *  caller can mark it seen AFTER successfully handling — see markStripeEventProcessed. */
 export async function stripeEventSeen(eventId: string): Promise<boolean> {
-  const seen = !!(await d().query("SELECT 1 AS x FROM stripe_events WHERE id = ?", [eventId])).rows[0];
-  if (!seen) await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?)", [eventId, nowIso()]);
-  return seen;
+  return !!(await d().query("SELECT 1 AS x FROM stripe_events WHERE id = ?", [eventId])).rows[0];
+}
+/** Record a Stripe event as processed (idempotent). Call only after the handler
+ *  succeeds, so a handler failure leaves the event un-consumed and Stripe can retry. */
+export async function markStripeEventProcessed(eventId: string): Promise<void> {
+  if (!(await stripeEventSeen(eventId))) await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?)", [eventId, nowIso()]);
 }
 
 /** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].

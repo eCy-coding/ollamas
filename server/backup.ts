@@ -4,6 +4,27 @@ import crypto from "crypto";
 import zlib from "zlib";
 import { db } from "./db";
 
+export type BackupMode = "s3" | "webdav" | "dryrun";
+
+/**
+ * Resolve the backup target from config. A REMOTE target (s3/webdav) that is missing
+ * its required fields THROWS — so a misconfigured remote backup surfaces an error
+ * instead of silently returning a fake success (the user must never be told an upload
+ * succeeded when nothing was uploaded). Only a non-remote config maps to the local
+ * dry-run simulator.
+ */
+export function resolveBackupMode(config: { type?: string; endpoint?: string; bucket?: string }): BackupMode {
+  if (config?.type === "s3") {
+    if (!config.endpoint || !config.bucket) throw new Error("S3 backup misconfigured: 'endpoint' and 'bucket' are required.");
+    return "s3";
+  }
+  if (config?.type === "webdav") {
+    if (!config.endpoint) throw new Error("WebDAV backup misconfigured: 'endpoint' is required.");
+    return "webdav";
+  }
+  return "dryrun";
+}
+
 export class BackupService {
   private static isBackingUp = false;
 
@@ -85,6 +106,9 @@ export class BackupService {
     try {
       const { cipherText, backupTime } = this.performBackup();
       const config = db.data.backup;
+      // Throws on a misconfigured remote target (no silent fake-success); only a
+      // non-remote config falls through to the local dry-run simulator below.
+      const mode = resolveBackupMode(config);
       const cleanTime = backupTime.replace(/[:.]/g, "-");
       const filename = `backup-mission-control-${cleanTime}.enc`;
 
@@ -98,7 +122,7 @@ export class BackupService {
       // Low energy throttling delay to map back energy limits and throttle bandwidth
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      if (config.type === "s3" && config.endpoint && config.bucket) {
+      if (mode === "s3") {
         // Build direct PUT request to match S3 REST upload API
         // Modified: To avoid complex AWS Signature V4 logic locally, 
         // this supports pre-signed URLs provided in the endpoint field,
@@ -145,7 +169,7 @@ export class BackupService {
         return { success: true, url: uploadUrl, size: cipherText.length };
       }
 
-      if (config.type === "webdav" && config.endpoint) {
+      if (mode === "webdav") {
         // WebDAV REST API is executed via direct WebDAV PUT request
         const davUrl = `${config.endpoint.replace(/\/$/, "")}/${filename}`;
         const basicAuth = Buffer.from(`${config.accessKey}:${config.secretKey}`).toString("base64");
