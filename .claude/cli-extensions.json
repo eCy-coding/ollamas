@@ -1,0 +1,7 @@
+{
+  "$comment": "Kullanıcı-eklenen CLI permission'ları. add-cli.mjs buraya yazar; merge-settings.mjs allow/ask'a UNION eder. Base 26 CLI merge-settings HARNESS'te. Yapısal — elle de düzenlenebilir (Bash(cli sub:*) pattern).",
+  "allow": [
+    "Bash(shellcheck:*)"
+  ],
+  "ask": []
+}

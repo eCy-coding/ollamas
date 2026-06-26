@@ -115,6 +115,13 @@ else {
   cfg.permissions.deny = union(cfg.permissions.deny, HARNESS.permissions.deny, "deny");
   cfg.permissions.ask = union(cfg.permissions.ask, HARNESS.permissions.ask, "ask");
 }
+// User-added CLIs (add-cli.mjs writes cli-extensions.json) → union into permissions. Optional/back-compat.
+try {
+  const ext = JSON.parse(readFileSync(new URL("./cli-extensions.json", import.meta.url).pathname, "utf8"));
+  cfg.permissions = cfg.permissions || { allow: [], deny: [], ask: [] };
+  if (Array.isArray(ext.allow) && ext.allow.length) cfg.permissions.allow = union(cfg.permissions.allow, ext.allow, "ext-allow");
+  if (Array.isArray(ext.ask) && ext.ask.length) cfg.permissions.ask = union(cfg.permissions.ask, ext.ask, "ext-ask");
+} catch { /* no extensions file → skip */ }
 if (!cfg.env) { cfg.env = HARNESS.env; changes.push("env"); }
 if (!cfg.statusLine)  { cfg.statusLine = HARNESS.statusLine; changes.push("statusLine"); }
 for (const [k, v] of Object.entries(HARNESS.thinking)) {
