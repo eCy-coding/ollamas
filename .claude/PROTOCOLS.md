@@ -5,7 +5,7 @@ Harness'in konuştuğu/keşfedilebilir olduğu protokoller. Durum + entegrasyon 
 ## Aktif (entegre)
 | protokol | ne | nerede | durum |
 |---|---|---|---|
-| **MCP** (Model Context Protocol) | tool/context server | `.mcp.json` (ollamas/context7/deepwiki) + server `/mcp` | ✓ canlı |
+| **MCP** (Model Context Protocol) | tool/context server | `.mcp.json` (ollamas/context7/deepwiki) + server `/mcp` | ✓ e2e doğrulandı (2026-06-27): http `/mcp` 200 + stdio `dist/mcp-stdio.cjs` **20 tool** (list_tree/read_file/write_file/run_command/grep_search/run_tests/git_ops/web_search/rag_search…), mcp-inspector --cli tools/list geçer |
 | **OpenAPI** | `/api/*` makine-keşfi | `server.ts` → `/api/openapi.json` | ✓ (server lane) |
 | **LSP** | inline TS tanı | `.lsp.json` | ✓ (binary: npm i -g typescript-language-server) |
 | **A2A** (Agent2Agent) | agent discovery | `.well-known/agent-card.json` (v0.3.0 Agent Card) | ✓ statik (lokal url) |
