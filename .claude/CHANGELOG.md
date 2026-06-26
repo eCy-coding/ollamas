@@ -1,5 +1,12 @@
 # harness CHANGELOG
 
+## 2026-06-27 — gate live-verified
+- Quality gate measured GREEN: `tsc --noEmit` 0 errors (3s) · `vitest run` 864 passed / 0 failed / 13 skipped (15s).
+- pre-commit fix: removed redundant double `tsc` run (lint script IS `tsc --noEmit` → typecheck step skipped when lint covers it).
+- This commit runs the gate LIVE (no GATE_SKIP) — first end-to-end proof the installed pre-commit (validate-settings + test-hooks + tsc + vitest) passes on a real commit.
+- $0 slash-commands: /security-scan /deps-audit /lib-docs /repo-explain. MCP: +context7 +deepwiki. Protocols: A2A agent-card + llms.txt + PROTOCOLS.md.
+
+
 ## 2026-06-26 — master harness v1
 - Güvenlik hookları: redact-tokens, block-destructive, gate-before-commit (permissionDecision deny JSON).
 - Lifecycle: PostToolUse(format), PreCompact, Stop, PostToolUseFailure, SubagentStop, SessionEnd, Notification.

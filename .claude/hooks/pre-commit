@@ -33,8 +33,13 @@ run() { # name, cmd...
 
 # Prefer package.json scripts; fall back to direct tools. Each is best-effort-detected.
 HAS() { node -e 'const s=require("./package.json").scripts||{};process.exit(s[process.argv[1]]?0:1)' "$1" 2>/dev/null; }
+SCRIPT() { node -e 'const s=require("./package.json").scripts||{};process.stdout.write(s[process.argv[1]]||"")' "$1" 2>/dev/null; }
 
-if HAS typecheck; then run typecheck npm run -s typecheck; else run typecheck npx -y tsc --noEmit; fi
+# Typecheck: skip if a dedicated typecheck script is absent AND lint is already `tsc` (avoid running tsc twice).
+LINT_CMD="$(SCRIPT lint)"
+if HAS typecheck; then run typecheck npm run -s typecheck
+elif [ -z "$LINT_CMD" ] || ! printf '%s' "$LINT_CMD" | grep -q "tsc"; then run typecheck npx -y tsc --noEmit
+else echo "  typecheck  – (covered by lint=tsc, not duplicated)"; fi
 if HAS lint;      then run lint npm run -s lint; else echo "  lint       – (no lint script, skipped)"; fi
 if HAS test;      then run test npm run -s test; else run test npx -y vitest run; fi
 
