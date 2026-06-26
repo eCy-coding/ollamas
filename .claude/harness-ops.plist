@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- launchd agent — autonomous READ-ONLY harness health (hourly). Install: bash .claude/harness-ops-install.sh load (Terminal.app GUI session). NEVER mutates — report only. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ollamas.harness.ops</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>HARNESS_OPS_PATH</string>
+  </array>
+  <key>WorkingDirectory</key><string>HARNESS_ROOT</string>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>HARNESS_ROOT/.claude/harness-ops.out.log</string>
+  <key>StandardErrorPath</key><string>HARNESS_ROOT/.claude/harness-ops.err.log</string>
+</dict>
+</plist>

@@ -26,3 +26,7 @@ dist-plugin/
 .claude/settings.json.bak
 .claude/subagent-audit.log
 .claude/notifications.log
+.claude/harness-ops-report.md
+.claude/harness-ops.out.log
+.claude/harness-ops.err.log
+.claude/.harness-ops-state

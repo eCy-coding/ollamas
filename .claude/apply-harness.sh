@@ -47,5 +47,11 @@ else echo "  ✗ hook suite FAILED:"; tail -6 /tmp/hook-suite.log; fi
 echo '{"model":{"display_name":"Opus 4.8"},"workspace":{"current_dir":"'"$(pwd)"'"}}' | node "$CL/statusline.mjs" >/dev/null 2>&1 \
   && echo "  ✓ statusline renders" || echo "  ✗ statusline error"
 
+# 6) autonomous harness-ops (hourly READ-ONLY health) — operator opt-in
+echo "▶ autonomous harness-ops"
+if launchctl list 2>/dev/null | grep -q com.ollamas.harness.ops; then echo "  ✓ harness-ops agent loaded"; else
+  echo "  ⚠ not loaded — for hourly autonomous health run: bash .claude/harness-ops-install.sh load (Terminal.app)"; fi
+
 echo "═══ done — restart this Claude tab (or /clear) so new settings load ═══"
 echo "   optional: bash .claude/build-plugin.sh  → portable plugin bundle"
+echo "   optional: bash .claude/harness-ops-install.sh load  → hourly autonomous health"
