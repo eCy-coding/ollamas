@@ -95,3 +95,7 @@ bat · delta · duf · procs · gum · glow · lazygit · lazydocker · btop · 
 | 2026-06-26 | mandoc | allow | v13 man -Tlint | `Bash(mandoc:*)` |
 | 2026-06-26 | hf | allow | HF model/adoption research | `Bash(hf:*)` |
 | 2026-06-26 | depcheck | allow | zero-dep unused audit | `Bash(depcheck:*)` |
+| 2026-06-26 | minisign | ask | v18 artifact signing (Ed25519) | `Bash(minisign:*)` |
+| 2026-06-26 | syft | allow | SBOM (CycloneDX/SPDX) | `Bash(syft:*)` |
+| 2026-06-26 | grype | allow | SBOM vuln scan (Trivy cross-check) | `Bash(grype:*)` |
+| 2026-06-26 | git-cliff | ask | conventional changelog → gh release | `Bash(git-cliff:*)` |

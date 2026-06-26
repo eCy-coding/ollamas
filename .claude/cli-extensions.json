@@ -8,12 +8,16 @@
     "Bash(hyperfine:*)",
     "Bash(mandoc:*)",
     "Bash(hf:*)",
-    "Bash(depcheck:*)"
+    "Bash(depcheck:*)",
+    "Bash(syft:*)",
+    "Bash(grype:*)"
   ],
   "ask": [
     "Bash(http:*)",
     "Bash(just:*)",
     "Bash(watchexec:*)",
-    "Bash(shortcuts:*)"
+    "Bash(shortcuts:*)",
+    "Bash(minisign:*)",
+    "Bash(git-cliff:*)"
   ]
 }

@@ -10,8 +10,8 @@ Projenin gerçek ihtiyaçlarına göre (zero-dep TS CLI + /api+/mcp server + Nod
 | `hf` | allow | adoption-research / HF model keşif |
 | `depcheck` | allow | zero-dep unused-dep audit (CLAUDE.md "unused = sil") |
 
-## B) KURULMAMIŞ + roadmap-imminent → operatör kurar, sonra /add-cli
-Tek komut: `brew install minisign syft grype git-cliff`
+## B) ✅ KURULDU + ENTEGRE (brew + add-cli, 2026-06-27)
+`brew install minisign syft grype git-cliff` ✓ → add-cli ile: minisign(ask) syft(allow) grype(allow) git-cliff(ask). Smoke: minisign 0.12, syft 1.46 (cli/ SBOM=0 comp = zero-dep ✓), grype 0.115, git-cliff 2.13.
 | CLI | öncelik | proje-bağ | tier (eklenince) |
 |---|---|---|---|
 | `minisign` | HIGH | **v18 imza** — SEA binary + npm tarball + brew (Ed25519, $0, tek-dev; cosign overkill) | ask |
