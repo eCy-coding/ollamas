@@ -57,10 +57,19 @@ Hepsi 2026-06-27 itibarıyla kurulu + ücretsiz. perm: **allow**=otomatik, **ask
 | gcloud | ask* | nadir; gerekince |
 | aws | ask* | nadir |
 
-## Coverage açıkları (permission'da eksik — opsiyonel ekleme)
-- `cloudflared`, `docker` → şu an hiçbir tier'da; Colab-offload kullanıyor → `permissions.ask`'a eklenebilir.
-- `gcloud`, `aws` → nadir; gerekince `ask`.
-- Düzeltme istenirse: merge-settings.mjs HARNESS.permissions.ask += bunlar (union otomatik katar).
+## Coverage — KAPANDI (2026-06-27)
+- `cloudflared`, `docker`, `gcloud`, `aws` → `permissions.ask`'a eklendi (merge-settings union).
+- `npx tsx` → `permissions.allow`'a eklendi (TS hook/script runner).
+- Apply re-run sonrası canlı.
+
+## Smoke-test (canlı kanıt, 2026-06-27)
+Versiyon (26/26): node v24.16 · git 2.53 · tsc 5.8.3 · mise 2026.5 · semgrep 1.157 · trivy 0.69.1 · gitleaks 8.30 · rg 15.1 · fd 10.4 · jq 1.8 · vercel 54.6 · wrangler 4.93 · supabase 2.101 · cloudflared 2026.2 · docker 29.5 · gcloud 562 · aws 2.34 · tsls 5.3.
+**Gerçek API/fonksiyonel:**
+- gh → `gh api user` = **eCy-coding** (canlı auth ✓)
+- ollama → `/api/tags` = **18 model** (canlı ✓)
+- gitleaks → **578 commit tarandı, 5 leak bulundu** ⚠️ (git geçmişi — docs/örnek mi gerçek mi ayrı incele)
+- jq → gerçek parse ✓ · trivy → cli/ misconfig clean ✓ · semgrep → cli/ 1 bulgu ✓
+- gate → tsc 0 + vitest 864/0 (önceki tur)
 
 ## Özet
 - **Zorunlu (T0-T1):** 12 CLI — hepsi kurulu + $0. Harness + gate bunlara dayanır.

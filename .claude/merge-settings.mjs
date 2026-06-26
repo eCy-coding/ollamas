@@ -30,6 +30,7 @@ const HARNESS = {
       "Bash(gh run list:*)", "Bash(gh run view:*)", "Bash(gh repo view:*)",
       "Bash(semgrep:*)", "Bash(trivy fs:*)", "Bash(trivy repo:*)", "Bash(gitleaks:*)",
       "Bash(jq:*)", "Bash(fd:*)", "Bash(deno check:*)", "Bash(bun test:*)",
+      "Bash(npx tsx:*)",
     ],
     deny: ["Read(./.env)", "Bash(rm -rf:*)", "Bash(git push --force:*)"],
     ask: [
@@ -37,6 +38,7 @@ const HARNESS = {
       // side-effectful free CLIs — outward/mutating, need human confirm.
       "Bash(gh pr create:*)", "Bash(gh pr merge:*)", "Bash(gh release:*)",
       "Bash(vercel:*)", "Bash(wrangler deploy:*)", "Bash(supabase db push:*)",
+      "Bash(cloudflared:*)", "Bash(docker:*)", "Bash(gcloud:*)", "Bash(aws:*)",
     ],
   },
   statusLine: { type: "command", command: `node ${PROJ}/.claude/statusline.mjs` },
