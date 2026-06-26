@@ -10,7 +10,12 @@
     "Bash(hf:*)",
     "Bash(depcheck:*)",
     "Bash(syft:*)",
-    "Bash(grype:*)"
+    "Bash(grype:*)",
+    "Bash(npx @stoplight/spectral-cli:*)",
+    "Bash(npx knip:*)",
+    "Bash(npx license-checker:*)",
+    "Bash(npx mcp-inspector:*)",
+    "Bash(npm run conformance:stdio)"
   ],
   "ask": [
     "Bash(http:*)",

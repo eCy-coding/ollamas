@@ -19,13 +19,14 @@ Projenin gerçek ihtiyaçlarına göre (zero-dep TS CLI + /api+/mcp server + Nod
 | `grype` | HIGH | SBOM vuln tarama — Trivy ile çapraz-doğrulama | allow |
 | `git-cliff` | HIGH | conventional changelog → `gh release` (proje conventional commit kullanıyor) | ask |
 
-## C) npx-tabanlı (KURULUM YOK — gerekince çağır)
-| araç | öncelik | proje-bağ |
+## C) ✅ npx-tabanlı OPERASYONEL (allow + slash, 2026-06-27)
+Smoke ✓: spectral 6.16, knip 6.21, license-checker 25, mcp-inspector (local devDep). Permission allow + slash komutları kuruldu.
+| araç | slash | proje-bağ |
 |---|---|---|
-| `@stoplight/spectral-cli` | HIGH | OpenAPI lint — `/api/openapi.json` kalite |
-| `@modelcontextprotocol/inspector` | HIGH | `/mcp` conformance (zaten `conformance:stdio` script'inde) |
-| `knip` | MED | ölü-kod/export avı — zero-dep enforcer |
-| `license-checker` | MED | audit-service müşteri lisans raporu |
+| `@stoplight/spectral-cli` | `/openapi-lint` | OpenAPI lint `/api/openapi.json` |
+| `mcp-inspector` (local devDep, `--cli`) | `/mcp-conform` | `/mcp` conformance (UI değil --cli!) |
+| `knip` | `/deadcode` | ölü-kod/export (zero-dep enforcer) |
+| `license-checker` | `/license-report` | audit-service lisans raporu |
 
 ## D) $0 DEĞİL / sistem (Emre kararı)
 - macOS **notarize** → Apple Developer **$99/yıl** gerektirir. `codesign`/`xcrun`/`notarytool` sistem-ücretsiz ama notarize hesap ister.
