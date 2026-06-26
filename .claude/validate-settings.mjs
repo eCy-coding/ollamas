@@ -10,18 +10,30 @@
 import { readFileSync } from "node:fs";
 
 const VALID_TOP_LEVEL = new Set([
+  // Authoritative — synced from live schemastore.org/claude-code-settings.json (2026-06-27, Chrome-verified).
   "$schema", "$comment",
-  "permissions", "hooks", "env", "model", "fallbackModel", "availableModels",
-  "statusLine", "subagentStatusLine", "outputStyle", "effortLevel",
-  "alwaysThinkingEnabled", "autoCompactEnabled", "autoMemoryEnabled", "autoMemoryDirectory",
-  "fileCheckpointingEnabled", "sandbox", "enabledMcpjsonServers", "disabledMcpjsonServers",
-  "enableAllProjectMcpServers", "cleanupPeriodDays", "includeCoAuthoredBy", "attribution",
-  "apiKeyHelper", "forceLoginMethod", "disableAllHooks", "allowManagedHooksOnly",
-  "additionalDirectories", "telemetry", "ultracode",
+  "apiKeyHelper", "autoMemoryEnabled", "autoUpdatesChannel", "awsCredentialExport", "awsAuthRefresh",
+  "claudeMdExcludes", "cleanupPeriodDays", "env", "attribution", "includeGitInstructions",
+  "includeCoAuthoredBy", "plansDirectory", "respectGitignore", "permissions", "language",
+  "model", "availableModels", "modelOverrides", "effortLevel", "fastMode", "fastModePerSessionOptIn",
+  "feedbackSurveyRate", "enableAllProjectMcpServers", "enabledMcpjsonServers", "disabledMcpjsonServers",
+  "allowedMcpServers", "deniedMcpServers", "httpHookAllowedEnvVars", "hooks", "disableAllHooks",
+  "allowedChannelPlugins", "allowedHttpHookUrls", "allowManagedHooksOnly", "allowManagedPermissionRulesOnly",
+  "statusLine", "fileSuggestion", "enabledPlugins", "extraKnownMarketplaces", "strictKnownMarketplaces",
+  "skippedMarketplaces", "skippedPlugins", "forceLoginMethod", "forceLoginOrgUUID", "otelHeadersHelper",
+  "outputStyle", "skipWebFetchPreflight", "sandbox", "spinnerVerbs", "spinnerTipsEnabled",
+  "spinnerTipsOverride", "terminalProgressBarEnabled", "showTurnDuration", "skillOverrides",
+  "prefersReducedMotion", "prUrlTemplate", "alwaysThinkingEnabled", "companyAnnouncements",
 ]);
 
-// Keys proven WRONG (hallucinated / silently-ignored) — flag explicitly with the fix.
-const KNOWN_BAD = { showThinkingSummaries: "not a real key — remove (thinking is via alwaysThinkingEnabled)" };
+// Keys proven WRONG (hallucinated / silently-ignored by Claude Code) — flag + auto-prune.
+// Verified absent in live schema (Chrome, 2026-06-27).
+const KNOWN_BAD = {
+  showThinkingSummaries: "not a real key — thinking is via alwaysThinkingEnabled",
+  autoCompactEnabled: "not in schema — auto-compact is always-on default, no settings key",
+  fileCheckpointingEnabled: "not in schema — checkpointing/rewind is default, no settings key",
+  subagentStatusLine: "not in schema — only statusLine exists",
+};
 
 const FILE = new URL("./settings.json", import.meta.url).pathname;
 let cfg;

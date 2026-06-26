@@ -42,7 +42,6 @@ const HARNESS = {
     ],
   },
   statusLine: { type: "command", command: `node ${PROJ}/.claude/statusline.mjs` },
-  subagentStatusLine: { type: "command", command: `node ${PROJ}/.claude/statusline.mjs` },
   // Safe, reproducible env for all Bash + hooks. Telemetry/OTel is OPT-IN (see .claude/README.md):
   // enabling CLAUDE_CODE_ENABLE_TELEMETRY without a running OTLP collector spams errors — left off.
   env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
@@ -55,8 +54,10 @@ const HARNESS = {
   // sub-agents (verify/review) override to "xhigh" in their own frontmatter. max/ultracode are
   // session-only and NOT accepted here. MAX_THINKING_TOKENS is intentionally NOT set (no-op on adaptive).
   thinking: { effortLevel: "high", alwaysThinkingEnabled: true },
-  // Context resilience (master-level): survive long sessions + enable /rewind.
-  resilience: { autoCompactEnabled: true, autoMemoryEnabled: true, fileCheckpointingEnabled: true },
+  // Context resilience: only autoMemoryEnabled is a REAL schema key (Chrome-verified 2026-06-27).
+  // autoCompactEnabled / fileCheckpointingEnabled are NOT schema keys (auto-compact + checkpointing
+  // are always-on defaults) → removed (were silently ignored).
+  resilience: { autoMemoryEnabled: true },
   // Auto-approve the project's own + $0 no-auth MCP servers declared in .mcp.json.
   enabledMcpjsonServers: ["ollamas", "context7", "deepwiki"],
   preToolUse: [
@@ -90,7 +91,7 @@ const HARNESS = {
 };
 
 // Prune known-bad keys (hallucinated / silently-ignored) from an existing config.
-const PRUNE = ["showThinkingSummaries"];
+const PRUNE = ["showThinkingSummaries", "autoCompactEnabled", "fileCheckpointingEnabled", "subagentStatusLine"];
 
 let cfg = {};
 try { cfg = JSON.parse(readFileSync(FILE, "utf8")); }
@@ -114,7 +115,6 @@ else {
   cfg.permissions.deny = union(cfg.permissions.deny, HARNESS.permissions.deny, "deny");
   cfg.permissions.ask = union(cfg.permissions.ask, HARNESS.permissions.ask, "ask");
 }
-if (!cfg.subagentStatusLine) { cfg.subagentStatusLine = HARNESS.subagentStatusLine; changes.push("subagentStatusLine"); }
 if (!cfg.env) { cfg.env = HARNESS.env; changes.push("env"); }
 if (!cfg.statusLine)  { cfg.statusLine = HARNESS.statusLine; changes.push("statusLine"); }
 for (const [k, v] of Object.entries(HARNESS.thinking)) {

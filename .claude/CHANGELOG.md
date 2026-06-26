@@ -1,5 +1,13 @@
 # harness CHANGELOG
 
+## 2026-06-27 — Chrome live-verification: 3 more hallucinated keys caught
+- Verified settings.json + hook events against LIVE schemastore.org/claude-code-settings.json (Chrome MCP).
+- Caught 3 invalid top-level keys (silently ignored): `autoCompactEnabled`, `fileCheckpointingEnabled`, `subagentStatusLine` → NOT in schema (auto-compact/checkpointing are always-on defaults; only statusLine exists). Added to PRUNE + KNOWN_BAD.
+- validate-settings VALID_TOP_LEVEL rebuilt from authoritative schema (57 real keys; was wrong — accepted the 3 bad + missed ~40 real like fastMode/modelOverrides/respectGitignore/allowedMcpServers).
+- Hook events all confirmed valid (PreToolUse/PostToolUse/PostToolUseFailure/PreCompact/Stop/SubagentStop/SessionEnd/Notification/UserPromptSubmit/SessionStart).
+- Operator: apply re-run prunes the 3 live → validate then green.
+
+
 ## 2026-06-27 — gate live-verified
 - Quality gate measured GREEN: `tsc --noEmit` 0 errors (3s) · `vitest run` 864 passed / 0 failed / 13 skipped (15s).
 - pre-commit fix: removed redundant double `tsc` run (lint script IS `tsc --noEmit` → typecheck step skipped when lint covers it).
