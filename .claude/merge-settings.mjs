@@ -121,7 +121,18 @@ try {
   cfg.permissions = cfg.permissions || { allow: [], deny: [], ask: [] };
   if (Array.isArray(ext.allow) && ext.allow.length) cfg.permissions.allow = union(cfg.permissions.allow, ext.allow, "ext-allow");
   if (Array.isArray(ext.ask) && ext.ask.length) cfg.permissions.ask = union(cfg.permissions.ask, ext.ask, "ext-ask");
-} catch { /* no extensions file → skip */ }
+} catch (e) {
+  // Distinguish "no file" (fine) from "malformed file" (silently dropping perms = dangerous → warn).
+  if (existsSync(new URL("./cli-extensions.json", import.meta.url).pathname))
+    console.error(`⚠ cli-extensions.json malformed — extensions NOT applied: ${e.message}`);
+}
+// Safety: deny ALWAYS wins — drop any allow rule that exactly matches a deny rule (prevents add-cli
+// or hand-edit from granting a denied/destructive command).
+if (cfg.permissions?.allow && cfg.permissions?.deny) {
+  const before = cfg.permissions.allow.length;
+  cfg.permissions.allow = cfg.permissions.allow.filter((r) => !cfg.permissions.deny.includes(r));
+  if (cfg.permissions.allow.length !== before) changes.push("deny-filtered-allow");
+}
 if (!cfg.env) { cfg.env = HARNESS.env; changes.push("env"); }
 if (!cfg.statusLine)  { cfg.statusLine = HARNESS.statusLine; changes.push("statusLine"); }
 for (const [k, v] of Object.entries(HARNESS.thinking)) {

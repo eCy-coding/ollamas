@@ -18,6 +18,11 @@ cp .claude/agents/*.md "$OUT/agents/" 2>/dev/null
 cp .claude/commands/*.md "$OUT/commands/" 2>/dev/null
 [ -f .mcp.json ] && cp .mcp.json "$OUT/.mcp.json"
 [ -f .lsp.json ] && cp .lsp.json "$OUT/.lsp.json"
+# harness tooling + docs (so the bundle is self-contained for re-apply elsewhere)
+for f in add-cli.mjs merge-settings.mjs validate-settings.mjs cli-extensions.json statusline.mjs \
+         README.md CHANGELOG.md FREE-SERVICES.md PROTOCOLS.md CLI-REGISTRY.md HOWTO-ADD-CLI.md apply-harness.sh; do
+  [ -f ".claude/$f" ] && cp ".claude/$f" "$OUT/$f"
+done
 
 # Generate plugin hooks.json (paths relative to ${CLAUDE_PLUGIN_ROOT}).
 node .claude/merge-settings.mjs >/tmp/_merged.json 2>/dev/null

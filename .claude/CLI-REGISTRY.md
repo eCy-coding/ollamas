@@ -77,4 +77,7 @@ Versiyon (26/26): node v24.16 · git 2.53 · tsc 5.8.3 · mise 2026.5 · semgrep
 - **Outward (T5-T6):** deploy/cloud — ask-tier (insan onayı), $0/free-tier.
 - Auth gereken tek şey gh (✅ yapılmış). Geri kalanı keyless/local. Opsiyonel hız: Groq/Cerebras free-key (FREE-SERVICES.md).
 
-<!-- added 2026-06-26 --> | shellcheck | allow | test-integration | Bash(shellcheck:*) |
+## Eklenenler (add-cli)
+| eklendi | CLI | tier | kullanım | rule |
+|---|---|---|---|---|
+| 2026-06-26 | shellcheck | allow | shell lint | `Bash(shellcheck:*)` |

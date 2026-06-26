@@ -46,6 +46,21 @@ for (const k of Object.keys(cfg)) {
   else if (!VALID_TOP_LEVEL.has(k)) { console.error(`✗ UNKNOWN key "${k}" — not in schema; likely silently ignored. Verify against schemastore.`); bad++; }
 }
 
+// cli-extensions.json (add-cli output) — validate shape if present (malformed = silently-dropped perms).
+import { existsSync } from "node:fs";
+const EXT = new URL("./cli-extensions.json", import.meta.url).pathname;
+if (existsSync(EXT)) {
+  try {
+    const ext = JSON.parse(readFileSync(EXT, "utf8"));
+    for (const tier of ["allow", "ask"]) {
+      if (ext[tier] !== undefined) {
+        if (!Array.isArray(ext[tier])) { console.error(`✗ cli-extensions.${tier} must be an array`); bad++; }
+        else for (const r of ext[tier]) if (typeof r !== "string" || !r.startsWith("Bash(")) { console.error(`✗ cli-extensions.${tier} bad rule (must be "Bash(...)"): ${JSON.stringify(r)}`); bad++; }
+      }
+    }
+  } catch (e) { console.error(`✗ cli-extensions.json malformed: ${e.message}`); bad++; }
+}
+
 if (bad) { console.error(`settings validation FAILED: ${bad} bad key(s).`); process.exit(1); }
 console.error(`✓ settings.json: ${Object.keys(cfg).length} top-level keys all valid.`);
 process.exit(0);

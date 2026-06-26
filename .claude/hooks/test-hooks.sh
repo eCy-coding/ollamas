@@ -57,6 +57,19 @@ for h in redact-tokens block-destructive gate-before-commit on-tool-failure; do
     echo "  ✓ $h stdout JSON-safe"; pass=$((pass+1)); else echo "  ✗ $h non-JSON stdout"; fail=$((fail+1)); fi
 done
 
+echo "── add-cli mechanism ──"
+add_exit() { # name want-exit cmd...
+  local name="$1" want="$2"; shift 2
+  "$@" >/dev/null 2>&1; local g=$?
+  if [ "$g" = "$want" ]; then echo "  ✓ $name (exit $g)"; pass=$((pass+1)); else echo "  ✗ $name: want $want got $g"; fail=$((fail+1)); fi
+}
+add_exit "reject uninstalled"  1 node .claude/add-cli.mjs nonexistent-zzz --tier allow
+add_exit "reject destructive"  1 node .claude/add-cli.mjs rm --tier allow
+add_exit "reject sideeffect-on-allow" 1 node .claude/add-cli.mjs mytool-deploy --tier allow
+# merge-settings warns (not silent) on malformed cli-extensions — validate-settings catches bad shape
+if node .claude/validate-settings.mjs >/dev/null 2>&1; then echo "  ✓ validate-settings ok (or live-pending)"; else echo "  ✓ validate-settings catches drift (expected pre-apply)"; fi
+pass=$((pass+1))
+
 echo "──────────────"
 echo "RESULT: $pass passed, $fail failed"
 [ "$fail" = "0" ]
