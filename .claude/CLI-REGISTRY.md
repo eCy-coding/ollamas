@@ -91,3 +91,7 @@ Versiyon (26/26): node v24.16 · git 2.53 · tsc 5.8.3 · mise 2026.5 · semgrep
 
 ## Atlananlar (interaktif TUI — agent headless kullanamaz)
 bat · delta · duf · procs · gum · glow · lazygit · lazydocker · btop · ncdu · eza · zoxide · fzf — TTY-only, harness'e eklenmedi (anlamsız + bloat). Kurulu-olmayan faydalılar (actionlint/scc/ast-grep/biome) → install önerisi, gerekince /add-cli.
+| 2026-06-26 | shortcuts | ask | v6 Apple Shortcuts pack (run/list) | `Bash(shortcuts:*)` |
+| 2026-06-26 | mandoc | allow | v13 man -Tlint | `Bash(mandoc:*)` |
+| 2026-06-26 | hf | allow | HF model/adoption research | `Bash(hf:*)` |
+| 2026-06-26 | depcheck | allow | zero-dep unused audit | `Bash(depcheck:*)` |

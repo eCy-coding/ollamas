@@ -5,11 +5,15 @@
     "Bash(yq:*)",
     "Bash(shfmt:*)",
     "Bash(hadolint:*)",
-    "Bash(hyperfine:*)"
+    "Bash(hyperfine:*)",
+    "Bash(mandoc:*)",
+    "Bash(hf:*)",
+    "Bash(depcheck:*)"
   ],
   "ask": [
     "Bash(http:*)",
     "Bash(just:*)",
-    "Bash(watchexec:*)"
+    "Bash(watchexec:*)",
+    "Bash(shortcuts:*)"
   ]
 }
