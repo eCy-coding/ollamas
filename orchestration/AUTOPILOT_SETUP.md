@@ -24,13 +24,13 @@ Manuel istersen aşağıdaki 2 adımı kendin yap:
   "hooks": {
     "SessionStart": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas-orchestration-wt/orchestration/bin/autopilot.ts --quiet" }
+        { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/autopilot.ts --quiet" }
       ]}
     ],
     "UserPromptSubmit": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas-orchestration-wt/orchestration/bin/role-hook.ts" },
-        { "type": "command", "command": "$HOME/Desktop/ollamas/node_modules/.bin/tsx $HOME/Desktop/ollamas-orchestration-wt/orchestration/bin/model-hook.ts" }
+        { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/role-hook.ts" },
+        { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/node_modules/.bin/tsx ${CLAUDE_PROJECT_DIR}/orchestration/bin/model-hook.ts" }
       ]}
     ]
   }

@@ -447,6 +447,9 @@ conduct-RED'i de testTs-doğrula.
 
 ---
 
+## vO16 — VERDICT (kanıt doğrulandı, 2026-06-27)
+**CRITIC `crit:done-no-evidence:vO16` = FALSE-POSITIVE.** Kanıt GERÇEK + doğrulandı: commit `f9ed527` VAR (activation-portable: settings-patch/autopilot-install/activate dynamic-path), `AGENTS.md §9 Orchestration` VAR (satır 172), tüm suite **864 test yeşil**. vO16 bir TOOL değil INTEGRATION/portable-activation milestone'u — critic heuristic tool-artifact aradığı için yanlış flag'liyor. DONE haklı. NOT: ROADMAP_ORCHESTRATION.md:28 ("E2E Integration") ile aşağıdaki SEYIR başlığı ("Fuse Conduct-Ingestion") label-divergence — orchestration lane uzlaştırmalı; durable fix = critic.ts'e integration-milestone tanıma (ayrı). Portable-path doc (AUTOPILOT_SETUP.md) bu turda ${CLAUDE_PROJECT_DIR}'e çevrildi.
+
 ## vO16 — Fuse Conduct-Ingestion Integrity (vO15 residual kapat, 2026-06-20)
 
 **Bağlam:** vO15 fuse phantom'larını temizledi ama bilerek conduct-path residual bıraktım. Doğruladım: GERÇEK

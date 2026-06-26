@@ -13,9 +13,9 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// Kimlik/görev sorusu deseni (TR varyantları).
+// Kimlik/görev sorusu deseni (TR + EN varyantları).
 export const ROLE_QUESTION_RE =
-  /görev(in|im)?\s*(nedir|ne)|ne\s*yapars[ıi]n|bu\s*(terminal\s*)?sekme.*görev|sekmede\s*görev|rol(ün|un)\s*nedir/i;
+  /görev(in|im)?\s*(nedir|ne)|ne\s*yapars[ıi]n|bu\s*(terminal\s*)?sekme.*görev|sekmede\s*görev|rol(ün|un)\s*nedir|what('?s| is| do)\s+(your|you|this)\s+(role|task|do|tab)|what\s+(do|can)\s+you\s+do|who\s+are\s+you|what('?s| is)\s+this\s+(tab|session)/i;
 
 export function isRoleQuestion(prompt: string): boolean {
   return ROLE_QUESTION_RE.test(prompt || "");
