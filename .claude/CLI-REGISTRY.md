@@ -81,3 +81,13 @@ Versiyon (26/26): node v24.16 · git 2.53 · tsc 5.8.3 · mise 2026.5 · semgrep
 | eklendi | CLI | tier | kullanım | rule |
 |---|---|---|---|---|
 | 2026-06-26 | shellcheck | allow | shell lint | `Bash(shellcheck:*)` |
+| 2026-06-26 | yq | allow | YAML/JSON query | `Bash(yq:*)` |
+| 2026-06-26 | shfmt | allow | shell format/lint | `Bash(shfmt:*)` |
+| 2026-06-26 | hadolint | allow | Dockerfile lint | `Bash(hadolint:*)` |
+| 2026-06-26 | hyperfine | allow | command benchmark | `Bash(hyperfine:*)` |
+| 2026-06-26 | http | ask | httpie HTTP client (api test) | `Bash(http:*)` |
+| 2026-06-26 | just | ask | task runner | `Bash(just:*)` |
+| 2026-06-26 | watchexec | ask | run-on-change | `Bash(watchexec:*)` |
+
+## Atlananlar (interaktif TUI — agent headless kullanamaz)
+bat · delta · duf · procs · gum · glow · lazygit · lazydocker · btop · ncdu · eza · zoxide · fzf — TTY-only, harness'e eklenmedi (anlamsız + bloat). Kurulu-olmayan faydalılar (actionlint/scc/ast-grep/biome) → install önerisi, gerekince /add-cli.
