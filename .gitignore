@@ -19,6 +19,11 @@ playwright-report/
 # vF3 lighthouse-ci local reports
 .lighthouseci/
 
+# generated/scratch (detection 2026-06-27): audit output, sync cache, stderr dumps
+audit-out/
+.sync/
+*.err
+
 # generated harness plugin bundle (built from .claude/ via build-plugin.sh)
 dist-plugin/
 .claude/last-context-snapshot.md
