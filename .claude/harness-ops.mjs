@@ -33,7 +33,7 @@ rows.push(["git-dirty", "•", `${dirty} files`]);
 rows.push(["git-head", "•", sh("git log -1 --oneline").slice(0, 60)]);
 
 const leaks = sh("gitleaks detect --no-banner --redact 2>&1", 60000);
-const leakN = (leaks.match(/leaks found: (\d+)/) || [, "?"])[1];
+const leakN = /no leaks found/.test(leaks) ? "0" : (leaks.match(/leaks found: (\d+)/) || [, "?"])[1];
 rows.push(["gitleaks", leakN === "0" ? "✓" : "⚠", `${leakN} leaks (history)`]);
 
 const lc = sh("launchctl list 2>/dev/null | grep -c ollamas.orchestration.autopilot").trim();

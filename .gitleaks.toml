@@ -1,0 +1,20 @@
+# gitleaks config — allowlist for verified false-positives (2026-06-27 review).
+# All 5 prior findings were non-secrets: test fixtures (project's own detector tests),
+# a doc placeholder, and a Firebase WEB API key (public-by-design client config).
+# NO real secret leaked → no rotation/history-rewrite. See .claude/plans/HARNESS-NOTES.md.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Verified false-positives — test fixtures, doc placeholders, Firebase web client key"
+paths = [
+  '''.*\.test\.ts$''',           # all test files (intentional fake-secret fixtures)
+  '''tests/''',
+  '''orchestration/tests/''',
+  '''deploy/litellm/README\.md''',   # doc example: Bearer sk-ollamas-litellm-local (local placeholder)
+  '''firebase-applet-config\.json''', # Firebase WEB API key — public client config (restrict in GCP, not a secret)
+]
+regexes = [
+  '''sk-ollamas-litellm-local''',     # explicit local placeholder token
+  '''xK9pQ2rL7mN4tV8wZ''',            # detector-test fixture string
+]
