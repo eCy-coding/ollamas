@@ -1,6 +1,147 @@
-// Pure-core logic for `ollamas remote check`. Zero IO — fully unit-testable.
+// Pure-core logic for `ollamas remote check` + fleet pool. Zero IO — fully unit-testable.
 import { c } from "./output";
 import type { OutputCtx } from "./output";
+
+// ---------------------------------------------------------------------------
+// Fleet pool types + pure functions
+// ---------------------------------------------------------------------------
+
+export interface Backend {
+  name: string;
+  url: string;
+  priority: number; // ascending — 1 is tried first
+}
+
+export interface BackendProbe {
+  url: string;
+  reachable: boolean;
+  mode?: string;
+  models: string[];
+}
+
+// Validate, coerce, sort ascending by priority, dedupe by url.
+export function parseBackendPool(raw: any): Backend[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const valid: Backend[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const name = typeof item.name === "string" && item.name ? item.name : null;
+    const url = typeof item.url === "string" && item.url ? item.url : null;
+    if (!name || !url) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const priority = typeof item.priority === "number" && isFinite(item.priority) ? item.priority : 50;
+    valid.push({ name, url, priority });
+  }
+  return valid.sort((a, b) => a.priority - b.priority);
+}
+
+// FAILOVER CORE: lowest-priority reachable backend that serves all required models.
+// Default required: ["qwen3:8b"]. Returns null if none qualify.
+export function selectBackend(
+  pool: Backend[],
+  probes: BackendProbe[],
+  opts?: { required?: string[] },
+): Backend | null {
+  const required = opts?.required ?? ["qwen3:8b"];
+  const probeMap = new Map<string, BackendProbe>(probes.map((p) => [p.url, p]));
+  for (const backend of pool) {
+    const probe = probeMap.get(backend.url);
+    if (!probe?.reachable) continue;
+    if (required.every((m) => probe.models.includes(m))) return backend;
+  }
+  return null;
+}
+
+// DISCOVERY CORE: parse `tailscale status --json` output.
+// Includes Self + online Peers. Strips trailing dot from DNSName. Takes first IPv4.
+export function parseTailscalePeers(
+  statusJson: any,
+): { host: string; ip: string; online: boolean }[] {
+  if (!statusJson || typeof statusJson !== "object") return [];
+
+  const peers: { host: string; ip: string; online: boolean }[] = [];
+
+  const extractPeer = (entry: any): { host: string; ip: string; online: boolean } | null => {
+    if (!entry || typeof entry !== "object") return null;
+    const rawHost = typeof entry.DNSName === "string" ? entry.DNSName : "";
+    const host = rawHost.replace(/\.$/, "");
+    if (!host) return null;
+    // Pick first IPv4 address from the list
+    const ips: string[] = Array.isArray(entry.TailscaleIPs) ? entry.TailscaleIPs : [];
+    const ip = ips.find((a) => /^\d+\.\d+\.\d+\.\d+$/.test(a)) ?? "";
+    const online = entry.Online === true;
+    return { host, ip, online };
+  };
+
+  // Include Self
+  const self = extractPeer(statusJson.Self);
+  if (self?.online) peers.push(self);
+
+  // Include online Peers
+  if (statusJson.Peer && typeof statusJson.Peer === "object") {
+    for (const peer of Object.values(statusJson.Peer)) {
+      const p = extractPeer(peer);
+      if (p?.online) peers.push(p);
+    }
+  }
+
+  return peers;
+}
+
+// TTY-aware pool table: name, priority, url, reachable, model count, qwen3:8b.
+// selected (active) backend is marked with *.
+export function formatPool(
+  pool: Backend[],
+  probes: BackendProbe[],
+  ctx: OutputCtx,
+  selectedUrl?: string,
+): string {
+  const probeMap = new Map<string, BackendProbe>(probes.map((p) => [p.url, p]));
+
+  if (ctx.json) {
+    const rows = pool.map((b) => {
+      const probe = probeMap.get(b.url);
+      return {
+        name: b.name,
+        priority: b.priority,
+        url: b.url,
+        reachable: probe?.reachable ?? false,
+        modelCount: probe?.models.length ?? 0,
+        hasQwen: probe?.models.includes("qwen3:8b") ?? false,
+        active: b.url === selectedUrl,
+      };
+    });
+    return JSON.stringify(rows, null, 2);
+  }
+
+  const header = ["", "NAME", "PRI", "URL", "REACH", "MODELS", "QWEN3:8B"];
+  const rows = pool.map((b) => {
+    const probe = probeMap.get(b.url);
+    const reach = probe?.reachable ?? false;
+    const hasQwen = probe?.models.includes("qwen3:8b") ?? false;
+    const active = b.url === selectedUrl ? "*" : " ";
+    return [
+      active,
+      b.name,
+      String(b.priority),
+      b.url,
+      reach ? c("green", "✓", ctx.color) : c("red", "✗", ctx.color),
+      String(probe?.models.length ?? 0),
+      hasQwen ? c("green", "✓", ctx.color) : c("red", "✗", ctx.color),
+    ];
+  });
+
+  // Simple fixed-width table (no formatTable import to avoid circular)
+  const COL_WIDTHS = header.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => r[i].replace(/\x1b\[[0-9;]*m/g, "").length)),
+  );
+  const pad = (cells: string[]) =>
+    cells.map((v, i) => v.padEnd(COL_WIDTHS[i] + (v.match(/\x1b\[/) ? v.length - v.replace(/\x1b\[[0-9;]*m/g, "").length : 0))).join("  ").trimEnd();
+
+  return [c("dim", pad(header), ctx.color), ...rows.map(pad)].join("\n");
+}
 
 export interface RemoteCheckReport {
   mode: string;

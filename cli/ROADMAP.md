@@ -174,3 +174,9 @@
 - `ollamas remote check` (cli/** IN-SCOPE, zero-dep): `cli/lib/remote.ts` SAF + `cli/commands/remote.ts` thin-IO (gateway `/api/health` mode + `/api/models/ollama-local` reuse). pass=live+required-modeller; `--required`/`--json`; exit 0/1/2. Runbook `cli/REMOTE_GPU.md` + `.env.example` örnek + `.stignore.example`.
 - **Kanıt**: tsc 0 · 13 yeni test · canlı smoke exit 0/1/2 doğru · cli-verifier APPROVED · choke-point korunur. Detay+gotcha (N-030 docker-compose-hardcode, N-031 dotenv-artık-yüklü): CLI_SEYIR_DEFTERI.md.
 - **Operatör-residual** (Claude Windows'a dokunamaz): Tailscale/Ollama/Syncthing/OpenSSH Windows-kurulum + hesap-login.
+
+## Feature — 3-makine filosu (1 Mac + 2 Windows) failover — DONE (kanıt) (2026-06-28)
+- **İstek** (kullanıcı-istekli, remote-GPU genişlemesi): 3 bilgisayar minimum-manuel tek-sistem. Mac=kontrol, 2 Windows=GPU worker; öncelik-sıralı failover; CLI+bootstrap (server değişmez).
+- `ollamas remote` pool+failover (cli/** zero-dep): `cli/lib/remote.ts` (+`selectBackend`/`parseTailscalePeers`/pool) + `cli/lib/fleet.ts` (`decideTransition` thrash-guard) + commands discover/add/rm/ls/check --all/pick/up --watch (supervisor relaunch-failover). Bootstrap `scripts/fleet-join.ps1` (Win) + `scripts/fleet-up.sh` (Mac) + runbook `cli/FLEET.md`.
+- **Minimum-manuel**: Tailscale auto-discovery (elle-IP-yok) + tek-komut/makine. **Kanıt**: tsc 0 · 39 yeni test · cli-verifier APPROVED (injection-safe, child-lifecycle) · canlı discover Mac'i tailnet'te buldu. Gotcha N-032 (failover=relaunch), N-033 (execFile-no-shell), N-034 (thrash-guard): CLI_SEYIR_DEFTERI.md.
+- **Operatör-residual**: 2 Windows'ta `fleet-join.ps1` + `tailscale up` (hesap-login).
