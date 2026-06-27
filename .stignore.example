@@ -1,0 +1,39 @@
+// Syncthing ignore template for the ollamas project folder.
+// Copy to `.stignore` inside the SHARED folder on BOTH machines (Mac + Windows).
+// Without this, Syncthing tries to mirror node_modules/.git/build artifacts and
+// thrashes. Mirrors the repo .gitignore (do not sync generated/heavy/secret paths).
+// Docs: cli/REMOTE_GPU.md "File sync".
+
+// Dependencies + build output (re-created per machine via npm install / build)
+node_modules
+build
+dist
+dist-plugin
+coverage
+artifacts
+
+// Test + tooling output
+test-results
+playwright-report
+.playwright
+.lighthouseci
+
+// Secrets + local state — NEVER sync across machines
+.env
+.env.*
+**/.master_key
+**/.llm-mission-control
+
+// Generated / scratch / ephemeral
+.ephemeral-data
+.colab-data
+.sync
+audit-out
+*.log
+*.err
+.DS_Store
+
+// Git internals — let each machine manage its own .git (use `git pull` for code,
+// Syncthing for working-tree files). Remove this line if you want a single shared
+// .git, but that risks index corruption on concurrent edits.
+.git

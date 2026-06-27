@@ -168,3 +168,9 @@
 2. `agent --watch <id>`: oturum canlı-tail (alt-screen, v8 SIGINT-restore N-016 + renderPanes reuse); non-TTY→tek-snapshot.
 3. İlk check = endpoint-var→canlı-tail / yok→plugin-SDK pivot kararı.
 4. Testler: tail-render saf; watch-loop cleanup.
+
+## Feature — Remote GPU backend (Windows/Tailscale) — DONE (kanıt) (2026-06-28)
+- **İstek** (numaralı-versiyon değil, kullanıcı-istekli): ikinci bilgisayarı (Windows GPU) ollamas'a backend bağla, "tek makine gibi" kullan. Mac=kontrol düzlemi, Windows=`ollama serve` inference worker; bağlantı=Tailscale ($0 sabit-hostname), dosya=Syncthing/git, shell=OpenSSH.
+- `ollamas remote check` (cli/** IN-SCOPE, zero-dep): `cli/lib/remote.ts` SAF + `cli/commands/remote.ts` thin-IO (gateway `/api/health` mode + `/api/models/ollama-local` reuse). pass=live+required-modeller; `--required`/`--json`; exit 0/1/2. Runbook `cli/REMOTE_GPU.md` + `.env.example` örnek + `.stignore.example`.
+- **Kanıt**: tsc 0 · 13 yeni test · canlı smoke exit 0/1/2 doğru · cli-verifier APPROVED · choke-point korunur. Detay+gotcha (N-030 docker-compose-hardcode, N-031 dotenv-artık-yüklü): CLI_SEYIR_DEFTERI.md.
+- **Operatör-residual** (Claude Windows'a dokunamaz): Tailscale/Ollama/Syncthing/OpenSSH Windows-kurulum + hesap-login.

@@ -26,6 +26,7 @@ export const COMMAND_TREE: CommandTree = {
     "bench",
     "top",
     "shortcuts",
+    "remote",
     "doctor",
     "config",
     "completion",
@@ -43,6 +44,7 @@ export const COMMAND_TREE: CommandTree = {
     shortcuts: ["build"],
     // config: profile ops + the settable keys
     config: ["use", "profiles", "keystore", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
+    remote: ["check"],
     completion: ["bash", "zsh", "fish"],
     plugin: ["list", "install", "remove"],
     update: ["--check"],

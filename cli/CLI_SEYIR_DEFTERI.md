@@ -334,3 +334,15 @@
 - **N-028 (a11y)**: light-tema contrast'ı dark'tan bağımsız test et; sabit-bg (indigo bubble) üstünde tema-flip eden `text-bright` token'ı kırılır → sabit `text-white`.
 - **N-029 (i18n)**: yeni component'i baştan `_()` ile yaz; en+tr parity zorunlu (Lingui), grep ile hardcoded-string = 0 gate.
 **Precompute (→v20)**: enterprise/GA — RBAC/multi-tenant CLI yüzeyi, audit-export, SLA/SLO komutları; ilk todo: capability-audit (en kritik non-redundant gap).
+
+## Feature — Remote GPU backend (Windows/Tailscale) (2026-06-28)
+**İstek**: ikinci bilgisayarı (Windows GPU) ollamas'a bağla, "tek makine gibi" kullan (GPU inference + dosya senkron + SSH). Numaralı-versiyon değil; kullanıcı-istekli feature + operatör-infra.
+**Mimari**: Mac=kontrol düzlemi (gateway/CLI/agent), Windows=inference worker (`ollama serve` 0.0.0.0:11434). Bağlantı=**Tailscale** (sabit MagicDNS hostname → OLLAMA_HOST IP-churn'siz; LAN-only seçilse de önerilir, $0). Dosya=Syncthing (`.stignore` şart) veya git. Shell=OpenSSH.
+**Phase/todo (tamamlandı):**
+1. `ollamas remote check` CLI — `cli/lib/remote.ts` SAF (`buildRemoteCheck`+`formatRemoteCheck`, IO-sıfır) + `cli/commands/remote.ts` thin-IO (gateway `/api/health` mode + `/api/models/ollama-local` reuse, `--required <csv>`, `--json`). pass = mode==="live" && required-modeller-var. exit 0/1/2. TDD: tests/cli-remote.test.ts (13).
+2. Runbook `cli/REMOTE_GPU.md` (REMOTE_EXPOSURE.md kardeşi) + `.env.example` remote örnek + `.stignore.example`.
+3. gate + cli-verifier APPROVED.
+**Kanıt**: tsc 0 · 13 yeni test (886/882 full pass, 4-5 pre-existing infra-fail unrelated) · canlı smoke: `remote check`→PASS=0/FAIL=1/usage=2 doğru, `--json` makine-okunur · choke-point korunur (`grep tool-registry cli/`=0) · zero-dep (node:fetch).
+**Rakip/SWOD**: Ollama remote-host + Tailscale mesh = 2026-standart $0 dağıtık-inference; ayırt edici = gateway-proxied + `remote check` binding-doğrulayıcı (colab manuel-verify'ını kodladı). Colab T4'ten üstün: sahipli/kalıcı/hızlı GPU, ephemeral-tunnel-URL churn yok.
+- **N-030 (footgun, kanıt)**: `docker-compose.yml:17` `OLLAMA_HOST=host.docker.internal:11434` env_file'ı EZER → remote backend için Docker yolu Mac-local'e kilitli. Çözüm: **node yolu** (`npm start`, .env okur) veya `docker-compose.override.yml`. Docker'la remote = sessiz-yanlış-backend.
+- **N-031 (stale-düzeltme)**: `colab-gpu-offload` hafızasındaki "server.ts dotenv yüklemez → .env yok sayılır" gotcha'sı STALE — `server.ts:1` artık `import "dotenv/config"`. `.env`'e OLLAMA_HOST yazmak `npm start`/`npm run dev`'de çalışır (inline-pass artık şart değil). Binding-proof hâlâ `/api/models/ollama-local` (remote'un modelleri Mac-local ~17'den ayrı).

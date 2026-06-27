@@ -12,6 +12,7 @@ import { runMcp } from "./commands/mcp";
 import { runBackup } from "./commands/backup";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
+import { runRemote } from "./commands/remote";
 import { complete, completionScript, COMMAND_TREE, type DynamicValues } from "./lib/completion";
 import { PROVIDERS } from "./lib/providers";
 import { cachedModels } from "./lib/modelcache";
@@ -41,6 +42,7 @@ commands:
   bench              benchmark models (tok/s, TTFB) and pick the fastest
   top [--watch]      live metrics dashboard (requests, latency, tool calls)
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
+  remote check       verify gateway is bound to a remote ollama GPU backend
   doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
     config use <name>  switch active gateway profile (secrets sealed per profile)
@@ -202,6 +204,7 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   bench: "benchmark models (tok/s, TTFB) and pick the fastest",
   top: "live metrics dashboard (requests, latency, tool calls)",
   shortcuts: "generate an Apple Shortcuts pack",
+  remote: "verify gateway is bound to a remote ollama GPU backend",
   doctor: "health of gateway, ollama, bridge, ready and agent",
   config: "show config or set a key; manage profiles and the keystore",
   completion: "print a shell completion script (bash, zsh, fish)",
@@ -308,6 +311,8 @@ export async function main(argv: string[]): Promise<number> {
       if (cands.length) process.stdout.write(cands.join("\n") + "\n");
       return 0;
     }
+    case "remote":
+      return runRemote(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":
