@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Sparkles, Play, ToggleLeft, ToggleRight, Check, X, 
-  Terminal, ShieldCheck, History, RefreshCw, AlertCircle, 
+import { useLingui } from "@lingui/react";
+import {
+  Sparkles, Play, ToggleLeft, ToggleRight, Check, X,
+  Terminal, ShieldCheck, History, RefreshCw, AlertCircle,
   FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft
 } from "lucide-react";
 import { ChatSession } from "../types";
@@ -28,16 +29,17 @@ interface ReactAgentTabProps {
 }
 
 export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
+  const { _ } = useLingui();
   const [provider, setProvider] = useState<string>("gemini");
   const [model, setModel] = useState<string>("gemini-3.5-flash");
   const [modelsList, setModelsList] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState<boolean>(false);
 
   const [inputMessage, setInputMessage] = useState<string>("");
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(() => [
     {
       role: "assistant",
-      content: "Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely."
+      content: _("react-agent.greeting.welcome")
     }
   ]);
 
@@ -66,7 +68,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     } catch (e) {
       // non-ok previously returned [] silently; only surface non-ApiError (network) failures
       if (!(e instanceof ApiError)) {
-        onNotify("Failed to fetch past sessions config list.", "error");
+        onNotify(_("react-agent.notify.fetchSessionsFailed"), "error");
       }
     } finally {
       setLoadingSessions(false);
@@ -84,16 +86,16 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       setMessages(data.messages.length > 0 ? data.messages : [
         {
           role: "assistant",
-          content: "Welcome back! How can I help you proceed with this ReAct session?"
+          content: _("react-agent.greeting.back")
         }
       ]);
       setTraceSteps([]);
       setPendingApproval(null);
     } catch (e) {
       if (e instanceof ApiError) {
-        onNotify("Failed to load chosen agent session context.", "error");
+        onNotify(_("react-agent.notify.loadSessionFailed"), "error");
       } else {
-        onNotify("Error restoring active session state.", "error");
+        onNotify(_("react-agent.notify.restoreSessionError"), "error");
       }
     } finally {
       setIsLoading(false);
@@ -104,7 +106,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     setIsLoading(true);
     try {
       const newSess: any = await api.post("/api/agent/sessions", {
-        title: "New ReAct Session",
+        title: _("react-agent.session.defaultTitle"),
         providerId: provider,
         modelId: model
       });
@@ -112,7 +114,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       setMessages([
         {
           role: "assistant",
-          content: "Session initialized successfully. Provide a software goal, and we can inspect local code files, make edits, and verify changes."
+          content: _("react-agent.greeting.initialized")
         }
       ]);
       setTraceSteps([]);
@@ -121,7 +123,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     } catch (e) {
       // non-ok previously fell through silently; only surface non-ApiError (network) failures
       if (!(e instanceof ApiError)) {
-        onNotify("Could not create persistent agent session.", "error");
+        onNotify(_("react-agent.notify.createSessionFailed"), "error");
       }
     } finally {
       setIsLoading(false);
@@ -130,16 +132,16 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
   const deleteSession = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this conversation session?")) return;
+    if (!window.confirm(_("react-agent.confirm.delete"))) return;
     try {
       await api.del(`/api/agent/sessions/${id}`);
-      onNotify("Session deleted.", "success");
+      onNotify(_("react-agent.notify.sessionDeleted"), "success");
       if (activeSessionId === id) {
         setActiveSessionId(null);
         setMessages([
           {
             role: "assistant",
-            content: "Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely."
+            content: _("react-agent.greeting.welcome")
           }
         ]);
         setTraceSteps([]);
@@ -149,7 +151,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     } catch (e) {
       // non-ok previously fell through silently; only surface non-ApiError (network) failures
       if (!(e instanceof ApiError)) {
-        onNotify("Failed to delete the chosen session.", "error");
+        onNotify(_("react-agent.notify.deleteSessionFailed"), "error");
       }
     }
   };
@@ -190,7 +192,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       if (e instanceof ApiError) {
         setModelsList([]);
       } else {
-        onNotify("Failed to fetch live model list. Using static presets.", "error");
+        onNotify(_("react-agent.notify.fetchModelsFailed"), "error");
         setModelsList(["gemini-3.5-flash", "gemini-3.1-pro-preview"]);
       }
     } finally {
@@ -233,7 +235,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
     setIsLoading(true);
     setTraceSteps([]);
-    setCurrentStepInfo("Spinning up local ReAct engine context...");
+    setCurrentStepInfo(_("react-agent.step.spinningUp"));
 
     let currentSessionId = activeSessionId;
     if (!currentSessionId) {
@@ -326,18 +328,18 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                       diff: parsed.diff,
                       stepIndex: parsed.stepNum
                     });
-                    onNotify("Write operation halted - awaiting manual approval.", "info");
+                    onNotify(_("react-agent.notify.writeHalted"), "info");
                   }
                 }
                 else if (parsed.type === "paused") {
-                  setCurrentStepInfo("Paused. Manual file authorization requested.");
+                  setCurrentStepInfo(_("react-agent.step.paused"));
                 }
                 else if (parsed.type === "done") {
-                  setCurrentStepInfo("Reasoning loop successfully finalized.");
+                  setCurrentStepInfo(_("react-agent.step.done"));
                 }
                 else if (parsed.type === "error") {
-                  onNotify(`Agent Reasoner: ${parsed.message}`, "error");
-                  setCurrentStepInfo("Error context occurred.");
+                  onNotify(`${_("react-agent.notify.agentReasoner")} ${parsed.message}`, "error");
+                  setCurrentStepInfo(_("react-agent.step.errorContext"));
                 }
               } catch (e) {
                 console.warn("Could not parse SSE message", e);
@@ -349,8 +351,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     } catch (err: any) {
       // Aborts (unmount / new run) are intentional — don't surface them as errors.
       if (ctrl.signal.aborted) return;
-      onNotify(`Agent runtime failed: ${err.message}`, "error");
-      setCurrentStepInfo("Agent pipeline disrupted.");
+      onNotify(`${_("react-agent.notify.runtimeFailed")} ${err.message}`, "error");
+      setCurrentStepInfo(_("react-agent.step.disrupted"));
     } finally {
       if (mountedRef.current && !ctrl.signal.aborted) {
         setIsLoading(false);
@@ -368,11 +370,11 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         content: pendingApproval.content
       });
 
-      onNotify(`Successfully applied file updates to ${pendingApproval.path}`, "success");
+      onNotify(`${_("react-agent.notify.applied")} ${pendingApproval.path}`, "success");
       // Update trace status in the list
       setTraceSteps((prev) =>
         prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file"
-          ? { ...s, applied: true, result: "File successfully written following manual validation." }
+          ? { ...s, applied: true, result: _("react-agent.result.writtenManual") }
           : s
         )
       );
@@ -381,14 +383,14 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       // Let assistant know user approved
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `Approved write for: \`${pendingApproval.path}\`. Proving files update sequence completed.` }
+        { role: "assistant", content: `${_("react-agent.msg.approvedWrite.prefix")} \`${pendingApproval.path}\`. ${_("react-agent.msg.approvedWrite.suffix")}` }
       ]);
     } catch (err: any) {
       // non-ok responses previously parsed the JSON body for an error message
       const msg = err instanceof ApiError
-        ? ((err.body as any)?.error || "Failed write command.")
+        ? ((err.body as any)?.error || _("react-agent.notify.writeFailed"))
         : err.message;
-      onNotify(`Rejected approval write: ${msg}`, "error");
+      onNotify(`${_("react-agent.notify.approveError")} ${msg}`, "error");
     } finally {
       setApproving(false);
     }
@@ -396,10 +398,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
   const cancelWrite = () => {
     if (!pendingApproval) return;
-    onNotify("Write operation rejected. Changes were deleted from the queue.", "info");
-    setTraceSteps((prev) => 
-      prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file" 
-        ? { ...s, result: "File update cancelled by system administrator." }
+    onNotify(_("react-agent.notify.writeRejected"), "info");
+    setTraceSteps((prev) =>
+      prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file"
+        ? { ...s, result: _("react-agent.result.cancelled") }
         : s
       )
     );
@@ -414,7 +416,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         
         {/* Provider Choice */}
         <div className="space-y-1.5Col">
-          <label htmlFor="react-agent-provider" className="text-[10px] font-mono text-immersive-text-dim uppercase tracking-wider font-bold">Select Agent Provider</label>
+          <label htmlFor="react-agent-provider" className="text-[10px] font-mono text-immersive-text-dim uppercase tracking-wider font-bold">{_("react-agent.provider.label")}</label>
           <div className="relative">
             <select
               id="react-agent-provider"
@@ -433,7 +435,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
         {/* Dynamic Model Dropdown */}
         <div className="space-y-1.5">
-          <label htmlFor="react-agent-model" className="text-[10px] font-mono text-immersive-text-dim uppercase tracking-wider font-bold">Active LLM Model</label>
+          <label htmlFor="react-agent-model" className="text-[10px] font-mono text-immersive-text-dim uppercase tracking-wider font-bold">{_("react-agent.model.label")}</label>
           <div className="relative">
             <select
               id="react-agent-model"
@@ -443,9 +445,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               className="w-full bg-immersive-panel border border-immersive-border-strong rounded px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/50 disabled:opacity-50"
             >
               {loadingModels ? (
-                <option>Loading live models from provider...</option>
+                <option>{_("react-agent.model.loading")}</option>
               ) : modelsList.length === 0 ? (
-                <option>No models available. Check credential key vault.</option>
+                <option>{_("react-agent.model.empty")}</option>
               ) : (
                 modelsList.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -460,15 +462,15 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded p-1 px-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-status-ok" />
-              <span className="text-[11px] font-mono text-immersive-text-muted">Auto-Apply Writes</span>
+              <span className="text-[11px] font-mono text-immersive-text-muted">{_("react-agent.autoApply.label")}</span>
             </div>
-            <button 
+            <button
               onClick={() => {
                 setAutoApply(!autoApply);
-                onNotify(autoApply ? "Auto-apply writes disabled. Changes will require manual approval." : "Auto-apply enabled. Writes will execute instantly.", "info");
+                onNotify(autoApply ? _("react-agent.notify.autoApplyOff") : _("react-agent.notify.autoApplyOn"), "info");
               }}
               className="text-immersive-text-muted hover:text-immersive-text-bright transition"
-              title="When enabled, file updates are instantly written to the workspace. When disabled, the agent displays file diffs and awaits manual authorization."
+              title={_("react-agent.autoApply.title")}
             >
               {autoApply ? (
                 <ToggleRight className="w-8 h-8 text-status-accent" />
@@ -488,22 +490,22 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           <div className="flex items-center justify-between pb-2 border-b border-immersive-border">
             <div className="flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-immersive-text-muted" />
-              <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-immersive-text-muted">ReAct Sessions</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-immersive-text-muted">{_("react-agent.sessions.title")}</span>
             </div>
             <button
               onClick={startNewSession}
               disabled={isLoading}
               className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none"
             >
-              + NEW
+              {_("react-agent.sessions.new")}
             </button>
           </div>
 
           <div className="space-y-1.5 flex-1 overflow-y-auto scrollbar-thin pr-1">
             {loadingSessions && sessions.length === 0 ? (
-              <div className="text-[10px] font-mono text-immersive-text-dim text-center py-4">Loading sessions...</div>
+              <div className="text-[10px] font-mono text-immersive-text-dim text-center py-4">{_("react-agent.sessions.loading")}</div>
             ) : sessions.length === 0 ? (
-              <div className="text-[10px] font-mono text-immersive-text-dim text-center py-4">No active sessions located. Click "+ NEW" to begin.</div>
+              <div className="text-[10px] font-mono text-immersive-text-dim text-center py-4">{_("react-agent.sessions.empty")}</div>
             ) : (
               sessions.map((sess) => {
                 const isActive = sess.id === activeSessionId;
@@ -511,29 +513,31 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 return (
                   <div
                     key={sess.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => !isLoading && selectSession(sess.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        if (!isLoading) selectSession(sess.id);
-                      }
-                    }}
-                    className={`group w-full text-left p-2 rounded cursor-pointer transition flex items-center justify-between border ${
-                      isActive 
+                    className={`group relative w-full p-2 rounded transition flex items-center justify-between border ${
+                      isActive
                         ? "bg-indigo-500/10 border-indigo-500/30 text-status-accent"
                         : "bg-immersive-panel/30 border-immersive-border hover:bg-immersive-panel/60 text-immersive-text-muted hover:text-immersive-text-bright"
                     }`}
                   >
+                    {/* Stretched-link: a single real button covers the whole row for
+                        select; the delete button sits above it via z-index. Avoids
+                        nested-interactive (FE a11y) while keeping native keyboard. */}
+                    <button
+                      type="button"
+                      onClick={() => !isLoading && selectSession(sess.id)}
+                      disabled={isLoading}
+                      aria-label={`${_("react-agent.sessions.load")} ${sess.title}`}
+                      className="absolute inset-0 w-full rounded cursor-pointer text-left disabled:cursor-default"
+                    />
                     <div className="flex flex-col min-w-0 pr-1 truncate">
                       <span className="text-xs font-mono font-medium truncate leading-tight group-hover:text-immersive-text-bright">{sess.title}</span>
                       <span className="text-[9px] text-immersive-text-dim font-mono mt-0.5">{formattedDate} • {sess.modelId.split("/").pop()}</span>
                     </div>
                     <button
                       onClick={(e) => deleteSession(e, sess.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-immersive-text-dim hover:text-status-err hover:bg-rose-500/10 rounded transition shrink-0"
-                      title="Delete Session"
+                      className="relative z-10 opacity-0 group-hover:opacity-100 p-1 text-immersive-text-dim hover:text-status-err hover:bg-rose-500/10 rounded transition shrink-0"
+                      title={_("react-agent.sessions.delete")}
+                      aria-label={`${_("react-agent.sessions.delete")} ${sess.title}`}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -570,8 +574,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
                 {/* Content Bubble */}
                 <div className={`p-3 rounded-lg text-xs leading-relaxed ${
-                  m.role === "user" 
-                    ? "bg-indigo-600 text-immersive-text-bright font-medium" 
+                  m.role === "user"
+                    ? "bg-indigo-600 text-white font-medium"
                     : "bg-immersive-panel border border-immersive-border text-immersive-text-muted font-mono whitespace-pre-wrap"
                 }`}>
                   {m.content}
@@ -587,7 +591,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
                 <div className="px-3.5 py-2.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-xs font-mono text-immersive-text-muted flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
-                  <span>{currentStepInfo || "Reasoning step execution..."}</span>
+                  <span>{currentStepInfo || _("react-agent.status.thinking")}</span>
                 </div>
               </div>
             )}
@@ -600,7 +604,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               type="text" 
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Inject a prompt to trigger the ReAct Specialist agent (e.g. 'Read readme.md and list bugs')..."
+              placeholder={_("react-agent.input.placeholder")}
               disabled={isLoading}
               className="flex-1 bg-immersive-panel border border-immersive-border-strong rounded-lg px-4 py-3 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20"
             />
@@ -610,7 +614,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
             >
               <CornerDownLeft className="w-4 h-4" />
-              <span>EXECUTE</span>
+              <span>{_("react-agent.execute")}</span>
             </button>
           </form>
         </div>
@@ -622,7 +626,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-immersive-border">
               <Hammer className="w-4 h-4 text-status-accent" />
-              <h3 className="text-[10px] font-mono tracking-wider font-bold uppercase text-immersive-text-muted">WORKSPACE TOOL BINDINGS</h3>
+              <h3 className="text-[10px] font-mono tracking-wider font-bold uppercase text-immersive-text-muted">{_("react-agent.tools.title")}</h3>
             </div>
             
             <div className="grid grid-cols-1 gap-2.5">
@@ -630,7 +634,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <FolderGit className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">list_tree</h4>
-                  <p className="text-[9px] text-immersive-text-dim font-mono">Iterate the entire project space files layout recursively.</p>
+                  <p className="text-[9px] text-immersive-text-dim font-mono">{_("react-agent.tools.listTree.desc")}</p>
                 </div>
               </div>
 
@@ -638,7 +642,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <FileText className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">read_file</h4>
-                  <p className="text-[9px] text-immersive-text-dim font-mono">Load absolute context and code content parameters synchronously.</p>
+                  <p className="text-[9px] text-immersive-text-dim font-mono">{_("react-agent.tools.readFile.desc")}</p>
                 </div>
               </div>
 
@@ -646,7 +650,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <Braces className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">write_file</h4>
-                  <p className="text-[9px] text-immersive-text-dim font-mono">Apply secure developer code updates with native validation diff safety.</p>
+                  <p className="text-[9px] text-immersive-text-dim font-mono">{_("react-agent.tools.writeFile.desc")}</p>
                 </div>
               </div>
 
@@ -654,7 +658,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <Terminal className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">run_command</h4>
-                  <p className="text-[9px] text-immersive-text-dim font-mono">Execute testing allowlist commands (pytest, cargo, npm, ruff, black).</p>
+                  <p className="text-[9px] text-immersive-text-dim font-mono">{_("react-agent.tools.runCommand.desc")}</p>
                 </div>
               </div>
 
@@ -662,7 +666,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <Search className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">grep_search</h4>
-                  <p className="text-[9px] text-immersive-text-dim font-mono">Execute recursive keyword search queries across text layers.</p>
+                  <p className="text-[9px] text-immersive-text-dim font-mono">{_("react-agent.tools.grepSearch.desc")}</p>
                 </div>
               </div>
             </div>
@@ -673,10 +677,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-status-warn shrink-0" />
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-status-warn">AUTHORIZATION REQUIRED</h4>
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-status-warn">{_("react-agent.approval.title")}</h4>
               </div>
               <p className="text-[11px] font-mono text-immersive-text-muted leading-relaxed">
-                The agent proposes updates to: <code className="bg-immersive-panel border border-immersive-border-strong px-1.5 py-0.5 rounded text-immersive-text-bright text-[10px]">{pendingApproval.path}</code>
+                {_("react-agent.approval.proposes")} <code className="bg-immersive-panel border border-immersive-border-strong px-1.5 py-0.5 rounded text-immersive-text-bright text-[10px]">{pendingApproval.path}</code>
               </p>
 
               {/* Diff Viewer Card */}
@@ -691,14 +695,14 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-45 text-immersive-text-bright py-2 rounded text-[10px] font-bold font-mono transition flex items-center justify-center gap-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{approving ? "WRITE..." : "APPROVE WRITE"}</span>
+                  <span>{approving ? _("react-agent.approval.writing") : _("react-agent.approval.approve")}</span>
                 </button>
                 <button
                   onClick={cancelWrite}
                   disabled={approving}
                   className="flex-1 bg-rose-950/40 hover:bg-rose-950 border border-rose-500/20 text-status-err py-2 rounded text-[10px] font-bold font-mono transition"
                 >
-                  REJECT
+                  {_("react-agent.approval.reject")}
                 </button>
               </div>
             </div>
@@ -712,25 +716,25 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 space-y-4">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-purple-400" />
-            <h3 className="text-[11px] font-mono tracking-widest font-bold uppercase text-immersive-text-muted">REACT AGENT ACTIONS TRACE ENGINE</h3>
+            <h3 className="text-[11px] font-mono tracking-widest font-bold uppercase text-immersive-text-muted">{_("react-agent.trace.title")}</h3>
           </div>
 
           <div className="overflow-x-auto border border-immersive-border rounded-md">
             <table className="w-full text-left font-mono text-immersive-text-muted border-collapse">
               <thead>
                 <tr className="bg-immersive-panel/50 border-b border-immersive-border text-[10px] uppercase text-immersive-text-muted text-left">
-                  <th className="px-4 py-3 font-semibold">Step</th>
-                  <th className="px-4 py-3 font-semibold">Activated Tool</th>
-                  <th className="px-4 py-3 font-semibold">Passed Arguments</th>
-                  <th className="px-4 py-3 font-semibold">Latency</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 font-semibold">Result Log</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.step")}</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.tool")}</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.args")}</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.latency")}</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.status")}</th>
+                  <th className="px-4 py-3 font-semibold">{_("react-agent.trace.result")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-xs">
                 {traceSteps.map((s, idx) => (
                   <tr key={idx} className="hover:bg-white/[0.01] transition duration-200">
-                    <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap">STEP {s.stepNum}</td>
+                    <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap uppercase">{_("react-agent.trace.step")} {s.stepNum}</td>
                     <td className="px-4 py-3 font-semibold whitespace-nowrap text-purple-300 flex items-center gap-1.5 mt-0.5">
                       <Terminal className="w-3.5 h-3.5 text-status-info shrink-0" />
                       <span>{s.tool}</span>
@@ -742,11 +746,11 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     <td className="px-4 py-3 whitespace-nowrap">
                       {s.ok ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-status-ok">
-                          SUCCESS
+                          {_("react-agent.trace.success")}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 border border-rose-500/20 text-status-err">
-                          FAILED
+                          {_("react-agent.trace.failed")}
                         </span>
                       )}
                     </td>

@@ -322,3 +322,15 @@
 - **N-025 (kanıt)**: minisign 0.12 her zaman hashed-mod (ED/blake2b512) üretir; node:crypto `blake2b512`+Ed25519 SPKI-wrap ile saf doğrular → user'da binary gereksiz (zero-dep yasası korunur).
 - **N-026 (footgun)**: imza-doğrulama default-ON, env-bypass YASAK; pinned-key varsa unsigned/bad-sig asset = fail-closed ABORT (downgrade/MITM savunması).
 **Precompute (→v19)**: i18n/a11y — Playwright wcag412 (light-theme "ReAct Specialist" name/role/value) ilk todo; tab-ARIA + i18n string-extraction.
+
+## v19 — i18n/a11y completeness (2026-06-28)
+**Phase/todo (tamamlandı):**
+1. a11y (ReactAgentTab.tsx, Playwright axe gate): **nested-interactive** → stretched-link (kart `<div>` pasif, içte `absolute inset-0` select-`<button>` + delete `<button class="relative z-10">`; tek-stop klavye); **color-contrast** → gerçek suçlu chat-bubble `bg-indigo-600 text-immersive-text-bright` light'ta 2.76:1 → `text-white` 6.46:1 (muted/dim token'ları zaten AA-geçer'di — pinpoint düzeltildi).
+2. i18n: ~40 hardcoded string → 65 `react-agent.*` key, en.ts+tr.ts **PARITY**; `useLingui()._()`; 0 hardcoded.
+3. gate + adversarial verify.
+**Kanıt**: Playwright axe **8/8** (4 tab × 2 tema, 0 serious) · tsc 0 · 873 unit test · en/tr key-parity diff-empty · verifier APPROVED.
+**Master-planlama dersi**: precompute "wcag412" YANLIŞTI — gerçek color-contrast+nested-interactive; i18n greenfield SANILMIŞTI ama Lingui+en/tr ZATEN VARDI (yalnız ReactAgentTab i18n-dışıydı). Plan-öncesi derin-okuma scope'u doğru daralttı.
+- **N-027 (a11y)**: "tıklanabilir kart + iç buton" = nested-interactive; çözüm stretched-link (dış pasif, iç tek-buton stretched + sibling z-10), iç-içe interaktif ASLA.
+- **N-028 (a11y)**: light-tema contrast'ı dark'tan bağımsız test et; sabit-bg (indigo bubble) üstünde tema-flip eden `text-bright` token'ı kırılır → sabit `text-white`.
+- **N-029 (i18n)**: yeni component'i baştan `_()` ile yaz; en+tr parity zorunlu (Lingui), grep ile hardcoded-string = 0 gate.
+**Precompute (→v20)**: enterprise/GA — RBAC/multi-tenant CLI yüzeyi, audit-export, SLA/SLO komutları; ilk todo: capability-audit (en kritik non-redundant gap).
