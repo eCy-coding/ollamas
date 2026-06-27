@@ -196,6 +196,50 @@ export class GatewayClient {
     if (!r.ok) throw new Error(`gateway DELETE /api/agent/sessions → ${r.status}`);
   }
 
+  // Tail live session events via SSE. Calls onEvent for each message frame;
+  // stops when event:done is received or the AbortSignal fires (DETACH, not kill).
+  // Caller is responsible for reconnect + backoff (see cli/lib/watch.ts).
+  async watchSession(
+    id: string,
+    opts: { after?: number },
+    onEvent: (ev: { id: number; data: any }) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const after = opts.after ?? -1;
+    const url = `${this.baseUrl}/api/agent/sessions/${encodeURIComponent(id)}/events?after=${after}`;
+    const r = await fetch(url, {
+      headers: this.headers({ Accept: "text/event-stream" }),
+      signal,
+    });
+    if (!r.ok || !r.body) throw new Error(`gateway /api/agent/sessions/:id/events → ${r.status}`);
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // Parse SSE frames inline — import pure fn would add a circular dep risk;
+      // replicate the logic here so client.ts stays self-contained.
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        let evId = -1;
+        let isEventDone = false;
+        let dataStr = "";
+        for (const line of part.split("\n")) {
+          if (line.startsWith("id:")) evId = parseInt(line.slice(3).trim(), 10);
+          else if (line.startsWith("event:") && line.slice(6).trim() === "done") isEventDone = true;
+          else if (line.startsWith("data:")) dataStr = line.slice(5).trim();
+        }
+        if (isEventDone) return; // stream complete — stop without killing the run
+        if (!dataStr) continue;
+        try { onEvent({ id: evId, data: JSON.parse(dataStr) }); } catch { /* malformed */ }
+      }
+    }
+  }
+
   private async getJson(path: string): Promise<any> {
     const r = await fetch(`${this.baseUrl}${path}`, {
       headers: this.headers(),

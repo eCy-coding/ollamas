@@ -21,8 +21,8 @@
 | **v14** | MCP client completeness | `mcp resources\|read\|prompts\|prompt` — gateway'in resources/prompts/completion yüzeyine erişim (v5'te eksikti); aynı stateless JSON-RPC + cursor; canlı architect/coder/reviewer prompt render | ✅ DONE |
 | **v15** | Backup CLI | `ollamas backup config\|trigger\|download\|restore` — gateway `/api/backup/*` (CLI'da erişilemezdi); binary-safe download/hex-restore round-trip + restore-HIL + 0600 | ✅ DONE |
 | **v16** | TUI v2 live cockpit | `top` multi-pane (requests/latency/tools/sessions yan-yana box, genişlik-otomatik ≥100col, dar→dikey-fallback) + `renderPanes` saf ANSI-aware layout; dogfood canlı | ✅ DONE |
-| **v17** | agent --watch (canlı oturum tail) | ÖN-KOŞUL server `GET /api/agent/sessions/:id/events` (cross-lane); yoksa plugin-SDK'ye geç | ▶ NEXT |
-| **v17+** | Ufuk (önceden-hesap) | v18 imza(minisign/cosign) · v19 i18n/a11y · v20 enterprise/GA · (cluster-CLI/webhooks-CLI/billing-portal düşük-öncelik gap) | |
+| **v17** | agent watch (canlı oturum tail) | server SSE `GET /api/agent/sessions/:id/events` (poll-tabanlı, ?after replay, 15s ping, done-close, run'a sinyal YOK) + `ollamas agent watch [id]` (picker/--follow/--since/--replay/--json; Ctrl-C=DETACH≠KILL; nextBackoff reconnect). server/agent-events.ts + cli/lib/watch.ts saf-fn; 34 test; tsc 0; verifier APPROVED | ✅ DONE |
+| **v17+** | Ufuk (önceden-hesap) | **v18 imza** (minisign KURULU+entegre → SEA binary/npm/brew sign-verify, Ed25519, `agent`-dışı) · v19 i18n/a11y (Playwright wcag412 bulgusu) · v20 enterprise/GA | |
 | **CLI-ID** | Sekme kimliği otomasyonu (tooling, binary-dışı) | `cli/lib/role.ts` canlı kimlik üretici + `cli/bin/role-hook.ts` UserPromptSubmit auto-inject + `.claude/settings.json` (operatör onayı); 0-manuel self-update. VERSION değişmez | ✅ DONE (settings.json operatör onayına bağlı) |
 
 ## v1 — DONE (kanıt)

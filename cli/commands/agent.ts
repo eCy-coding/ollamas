@@ -3,19 +3,23 @@
 //   ollamas agent --yolo "..."                    auto-apply writes, no prompts
 //   ollamas agent sessions                        list persisted sessions
 //   ollamas agent rm <id>                         delete a session
+//   ollamas agent watch [id]                      live-tail a running session (Ctrl-C = detach)
 // The agent runs entirely server-side through the single choke-point; this
 // command only streams events and relays write approvals.
 import { parseArgs } from "node:util";
+import { createInterface } from "node:readline";
 import { GatewayClient, type ChatMessage, type AgentEvent, type AgentOpts } from "../lib/client";
 import { loadConfig } from "../lib/config";
 import { resolveOutputCtx, streamFooter, formatStep, formatDiff, c, type OutputCtx } from "../lib/output";
 import { readStdin, confirm } from "../lib/io";
+import { nextBackoff, renderWatchEvent, buildPickerPrompt } from "../lib/watch";
 
 const HELP = `ollamas agent [task] — drive the ReAct agent loop
 
   ollamas agent "fix the failing test and re-run it"
   echo "task" | ollamas agent
   ollamas agent sessions | rm <id>
+  ollamas agent watch [id]              live-tail a session (Ctrl-C = detach, NOT kill)
 
 options:
   -m, --model <m>      override model           -p, --provider <p>  override provider
@@ -25,7 +29,13 @@ options:
       --safe           prompt before each write (default)
       --timeout <ms>   per-round stream timeout (default 300000)
       --json           emit events as JSON lines
-      --help           this message`;
+      --help           this message
+
+watch options:
+      --follow         keep tailing after catching up (default true)
+      --since <idx>    start from event index (default: all)
+      --replay         replay from beginning (after=-1)
+      --json           emit raw JSON lines per event (no drop/coalesce)`;
 
 const MAX_APPROVAL_ROUNDS = 12;
 
@@ -44,6 +54,9 @@ export async function runAgent(argv: string[]): Promise<number> {
       timeout: { type: "string" },
       json: { type: "boolean" },
       help: { type: "boolean" },
+      follow: { type: "boolean" },
+      since: { type: "string" },
+      replay: { type: "boolean" },
     },
   });
 
@@ -57,10 +70,11 @@ export async function runAgent(argv: string[]): Promise<number> {
   const json = !!values.json;
   const ctx = resolveOutputCtx(process.env, !!process.stdout.isTTY, json);
 
-  // Sub-actions: `agent sessions`, `agent rm <id>`.
+  // Sub-actions: `agent sessions`, `agent rm <id>`, `agent watch [id]`.
   const sub = positionals[0];
   if (sub === "sessions") return listSessions(client, ctx);
   if (sub === "rm") return removeSession(client, positionals[1], ctx);
+  if (sub === "watch") return watchSession(client, positionals[1], values, ctx);
 
   // Otherwise: run a task. Prompt from positionals or piped stdin (G2).
   let prompt = positionals.join(" ").trim();
@@ -181,4 +195,93 @@ async function removeSession(client: GatewayClient, id: string | undefined, ctx:
   await client.deleteSession(id);
   process.stdout.write(c("green", `deleted session ${id}`, ctx.color) + "\n");
   return 0;
+}
+
+async function watchSession(
+  client: GatewayClient,
+  id: string | undefined,
+  flags: Record<string, any>,
+  ctx: OutputCtx,
+): Promise<number> {
+  // Resolve session id — picker when omitted and TTY available.
+  let sessionId = id;
+  if (!sessionId) {
+    const sessions = await client.listSessions();
+    if (!sessions.length) {
+      process.stderr.write("watch: no sessions found\n");
+      return 1;
+    }
+    if (sessions.length === 1) {
+      sessionId = sessions[0].id;
+    } else if (process.stdin.isTTY) {
+      // Numbered picker via readline
+      process.stdout.write(buildPickerPrompt(sessions) + "\n");
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const ans = await new Promise<string>((res) => rl.question("select session [1]: ", res));
+      rl.close();
+      const idx = (parseInt(ans.trim() || "1", 10) || 1) - 1;
+      if (idx < 0 || idx >= sessions.length) {
+        process.stderr.write("watch: invalid selection\n");
+        return 2;
+      }
+      sessionId = sessions[idx].id;
+    } else {
+      process.stderr.write("watch: specify a session id\n");
+      return 2;
+    }
+  }
+
+  const follow = flags.follow !== false; // default true (--no-follow to disable)
+  const replay = !!flags.replay;
+  const sinceFlag = flags.since !== undefined ? parseInt(flags.since, 10) : undefined;
+  // --replay → after=-1 (all), --since N → after=N, else start from -1 (all by default)
+  let after = replay ? -1 : (sinceFlag ?? -1);
+
+  // Ctrl-C → detach (SIGINT). AbortController signals the fetch; the server run
+  // continues uninterrupted. DETACH ≠ KILL is the critical invariant.
+  const ac = new AbortController();
+  process.once("SIGINT", () => {
+    process.stdout.write(c("dim", "\ndetached (session still running)", ctx.color) + "\n");
+    ac.abort();
+  });
+
+  if (!ctx.json) {
+    process.stdout.write(c("dim", `watching session ${sessionId} (Ctrl-C to detach)`, ctx.color) + "\n");
+  }
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      await client.watchSession(
+        sessionId,
+        { after },
+        (ev) => {
+          // Track last-seen id for reconnect resume
+          if (ev.id >= 0) after = ev.id;
+          if (ctx.json) {
+            process.stdout.write(JSON.stringify(ev.data) + "\n");
+          } else {
+            const line = renderWatchEvent(ev.data);
+            if (line) process.stdout.write(line + "\n");
+          }
+        },
+        ac.signal,
+      );
+      // Stream ended cleanly (event:done)
+      if (!ctx.json) process.stdout.write(c("dim", "session complete", ctx.color) + "\n");
+      return 0;
+    } catch (e: any) {
+      if (ac.signal.aborted) return 0; // user detached
+      if (!follow) {
+        process.stderr.write(c("red", `watch error: ${e?.message}`, ctx.color) + "\n");
+        return 1;
+      }
+      // Reconnect with exponential backoff using last-seen after idx
+      const delay = nextBackoff(attempt++, { base: 500, cap: 15_000 });
+      if (!ctx.json) {
+        process.stderr.write(c("dim", `disconnected — reconnecting in ${delay}ms (attempt ${attempt})`, ctx.color) + "\n");
+      }
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
 }

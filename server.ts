@@ -12,6 +12,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
+import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
@@ -952,6 +953,88 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to load agent session" });
     }
+  });
+
+  /**
+   * Live-tail a running agent session over SSE (v17 Phase 1).
+   * Replays prior steps (?after=<id>, default -1 = all), then polls the in-memory
+   * session and pushes newly-appended steps until the session completes or the
+   * client disconnects. Read-only: never signals/kills the underlying ReAct run.
+   * Auth: covered by the `/api/agent` localOwnerGuard middleware (same as neighbors).
+   */
+  app.get("/api/agent/sessions/:id/events", (req, res) => {
+    const { id } = req.params;
+    const session = (db.data.sessions || []).find(s => s.id === id);
+    if (!session) {
+      return res.status(404).json({ error: "Agent session not found" });
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const afterRaw = Number((req.query.after as string) ?? "-1");
+    const afterId = Number.isFinite(afterRaw) ? afterRaw : -1;
+
+    // Replay everything the client hasn't seen yet; advance the high-water mark.
+    let cursor = afterId;
+    for (const ev of sessionEventsSince(session, afterId)) {
+      res.write(formatSseEvent(ev.id, ev.data));
+      cursor = ev.id;
+    }
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearInterval(poll);
+      clearInterval(ping);
+      clearTimeout(cap);
+    };
+
+    // If the run already completed before we attached, emit done and end now.
+    if (isSessionDone(session)) {
+      res.write(formatSseDone({ steps: sessionStepCount(session), reason: "complete" }));
+      finish();
+      return res.end();
+    }
+
+    // Poll the in-memory session for newly-appended steps (id-monotonic).
+    const poll = setInterval(() => {
+      // Re-resolve: db.data.sessions may be reassigned (e.g. on delete).
+      const live = (db.data.sessions || []).find(s => s.id === id);
+      if (!live) { // session deleted out from under us — close cleanly.
+        res.write(formatSseDone({ steps: cursor + 1, reason: "gone" }));
+        finish();
+        return res.end();
+      }
+      for (const ev of sessionEventsSince(live, cursor)) {
+        res.write(formatSseEvent(ev.id, ev.data));
+        cursor = ev.id;
+      }
+      if (isSessionDone(live)) {
+        res.write(formatSseDone({ steps: sessionStepCount(live), reason: "complete" }));
+        finish();
+        res.end();
+      }
+    }, 500);
+
+    // Keep-alive comment so proxies/clients don't drop an idle stream.
+    const ping = setInterval(() => { if (!res.writableEnded) res.write(":\n\n"); }, 15000);
+
+    // Hard cap to avoid leaking a poller if a session never reports done.
+    const cap = setTimeout(() => {
+      if (!res.writableEnded) {
+        res.write(formatSseDone({ steps: sessionStepCount(session), reason: "timeout" }));
+        res.end();
+      }
+      finish();
+    }, 10 * 60 * 1000);
+    cap.unref?.();
+
+    // Client disconnect: tear down timers; NEVER touch the underlying run.
+    req.on("close", () => { finish(); });
   });
 
   app.post("/api/agent/sessions", (req, res) => {
