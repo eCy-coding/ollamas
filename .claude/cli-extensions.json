@@ -15,7 +15,10 @@
     "Bash(npx knip:*)",
     "Bash(npx license-checker:*)",
     "Bash(npx mcp-inspector:*)",
-    "Bash(npm run conformance:stdio)"
+    "Bash(npm run conformance:stdio)",
+    "Bash(npx playwright:*)",
+    "Bash(npm run test:e2e:*)",
+    "Bash(npm run test:e2e)"
   ],
   "ask": [
     "Bash(http:*)",
