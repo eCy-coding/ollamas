@@ -299,3 +299,26 @@
 ### N-023 (choke-point ayrımı) · release download tool-call DEĞİL
 - **Gözlem**: `update` manifest+asset'i standalone `fetch` ile çeker, `GatewayClient` üzerinden değil. Bu choke-point ihlali DEĞİL — release indirme bir tool çağrısı değil (gateway `/mcp` rate-limit/registry ile ilgisiz).
 - **ÖNLEME KURALI**: choke-point yasası **tool yan-etkileri** içindir (`/mcp`→ToolRegistry.execute). Sürüm/asset indirme gibi non-tool ağ erişimi serbest; ama bunu kodda+doc'ta açıkça ayır ki ihlal sanılmasın.
+
+---
+
+## v17 — agent watch (canlı oturum tail) (2026-06-27)
+**Phase/todo (tamamlandı):**
+1. server SSE endpoint `GET /api/agent/sessions/:id/events` — `server/agent-events.ts` saf-fn (sessionEventsSince/isSessionDone/formatSseEvent); poll-tabanlı (messages[]), ?after replay, 15s keep-alive ping, event:done close, req.close teardown. **Run'a SİNYAL YOK.**
+2. cli `ollamas agent watch [id]` — `cli/lib/watch.ts` saf-fn (nextBackoff/renderWatchEvent/parseWatchSSEBuffer/buildPickerPrompt) + client.watchSession + agent.ts router. picker/--follow/--since/--replay/--json(no-drop). Ctrl-C=DETACH (AbortController.abort, kill YOK). nextBackoff(exp+jitter+cap)+after-resume reconnect.
+3. gate + cli-verifier APPROVED.
+**Kanıt**: tsc 0 · 34 test (11 server + 23 cli) · DETACH≠KILL doğrulandı · commit 5562b36.
+**Rakip/SWOD**: Claude Code/OpenHands/goose/opencode live-tail standart; ayırt edici attach-without-kill+multi-session+resume → kapatıldı.
+- **N-024 (footgun)**: live-tail detach ASLA run'ı öldürmemeli — Ctrl-C yalnız fetch abort, server'a sinyal yok.
+
+## v18 — minisign imza (authenticity) (2026-06-28)
+**Phase/todo (tamamlandı):**
+1. `cli/lib/minisign-verify.ts` — SAF zero-dep doğrulama (node:crypto blake2b512+Ed25519). **minisign-binary user'da GEREKMEZ.** file-sig + global/trusted-comment dual-guard; keyId-match; bad-input→{ok:false} (throw yok).
+2. update entegrasyon — manifest minisig/keyId; `pubkey.ts` PINNED_PUBKEYS (TOFU/rotasyon); `decideSigGate` **fail-closed** (pinned+sig-fail→ABORT, pinned+unsigned→ABORT, env-bypass YOK); minisig-verify→sha256→atomic-replace.
+3. release — `cli/sign-release.sh` (minisign -Sm, key-yoksa abort) + release-binary.yml secret-gated step (MINISIGN_SECKEY absent→graceful no-op) + UPDATE.md.
+4. gate + cli-verifier APPROVED + ROADMAP/SEYIR persist.
+**Kanıt**: tsc 0 · 14 test · dual-sig tamper-guard TDD-proven · zero-dep · secret-committed-yok · node:crypto minisign-POC TRUE.
+**Rakip/SWOD**: tek-dev sistem-aracı = minisign+pinned-pubkey (caddy/zig/age); cosign ağır, npm-provenance CI-only. Gap [CRITICAL]: sadece sha256(integrity)→authenticity eklendi.
+- **N-025 (kanıt)**: minisign 0.12 her zaman hashed-mod (ED/blake2b512) üretir; node:crypto `blake2b512`+Ed25519 SPKI-wrap ile saf doğrular → user'da binary gereksiz (zero-dep yasası korunur).
+- **N-026 (footgun)**: imza-doğrulama default-ON, env-bypass YASAK; pinned-key varsa unsigned/bad-sig asset = fail-closed ABORT (downgrade/MITM savunması).
+**Precompute (→v19)**: i18n/a11y — Playwright wcag412 (light-theme "ReAct Specialist" name/role/value) ilk todo; tab-ARIA + i18n string-extraction.

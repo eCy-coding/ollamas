@@ -9,6 +9,8 @@ export interface Asset {
   target: string; // e.g. "darwin-arm64"
   url: string;
   sha256: string; // lowercase hex, 64 chars
+  minisig?: string; // .minisig text body OR a URL to fetch it (optional; absent = unsigned asset)
+  keyId?: string;   // informational key id hint (optional)
 }
 export interface Manifest {
   version: string;
@@ -30,7 +32,13 @@ export function parseManifest(json: string): Manifest {
     if (!a || typeof a.target !== "string" || typeof a.url !== "string" || typeof a.sha256 !== "string") {
       throw new Error(`asset[${i}] must have { target, url, sha256 }`);
     }
-    return { target: a.target, url: a.url, sha256: a.sha256.toLowerCase() };
+    return {
+      target: a.target,
+      url: a.url,
+      sha256: a.sha256.toLowerCase(),
+      ...(typeof a.minisig === "string" ? { minisig: a.minisig } : {}),
+      ...(typeof a.keyId === "string" ? { keyId: a.keyId } : {}),
+    };
   });
   return { version: raw.version, assets, notes: typeof raw.notes === "string" ? raw.notes : undefined };
 }

@@ -17,6 +17,8 @@ import { execFileSync } from "node:child_process";
 import { resolveOutputCtx, c, type OutputCtx } from "../lib/output";
 import { confirm } from "../lib/io";
 import { parseManifest, selectAsset, isNewer, currentTarget, sha256Hex, type Manifest, type Asset } from "../lib/manifest";
+import { verifyMinisign } from "../lib/minisign-verify";
+import { PINNED_PUBKEYS, hasPinnedKey } from "../lib/pubkey";
 
 const HELP = `ollamas update — self-update from a release manifest
 
@@ -30,6 +32,28 @@ The downloaded asset is sha256-verified against the manifest before it replaces
 the running binary; a mismatch aborts without touching it.`;
 
 export type UpdateAction = "up-to-date" | "update" | "no-asset";
+
+// PURE: fail-closed signature gate policy.
+// - pinned key(s) present + asset has sig + sig ok  → proceed
+// - pinned key(s) present + asset has sig + sig bad → abort (tampered)
+// - pinned key(s) present + asset has NO sig        → abort (unsigned asset refused)
+// - no pinned keys (bootstrap)                      → warn-proceed (sha256-only)
+export function decideSigGate(opts: {
+  hasPinned: boolean;
+  hasMinisig: boolean;
+  verifyOk: boolean;
+}): { proceed: boolean; reason: string } {
+  if (!opts.hasPinned) {
+    return { proceed: true, reason: "no pinned key — bootstrap mode (sha256-only)" };
+  }
+  if (!opts.hasMinisig) {
+    return { proceed: false, reason: "unsigned asset, refusing (PINNED_PUBKEYS configured)" };
+  }
+  if (!opts.verifyOk) {
+    return { proceed: false, reason: "signature verification failed" };
+  }
+  return { proceed: true, reason: "signature ok" };
+}
 
 // PURE: decide what an update would do, given the manifest + current version +
 // this machine's target. No I/O.
@@ -128,12 +152,50 @@ export async function runUpdate(argv: string[], currentVersion: string): Promise
   }
 }
 
-// Download → sha256-verify → atomic replace. THROWS (leaving the live binary
-// untouched) if the hash doesn't match.
+// Download → minisign-verify (if pinned) → sha256-verify → atomic replace.
+// THROWS on any verification failure, leaving the live binary untouched.
 async function applyUpdate(asset: Asset, target: string, ctx: OutputCtx): Promise<void> {
   const r = await fetch(asset.url, { signal: AbortSignal.timeout(120_000) });
   if (!r.ok) throw new Error(`asset ${asset.url} → ${r.status}`);
   const buf = Buffer.from(await r.arrayBuffer());
+
+  // --- Signature gate (fail-closed) ---
+  const pinned = hasPinnedKey();
+  let minisigText: string | undefined;
+
+  if (asset.minisig) {
+    // minisig field is either the .minisig body or a URL to fetch it
+    if (asset.minisig.startsWith("http://") || asset.minisig.startsWith("https://")) {
+      const sr = await fetch(asset.minisig, { signal: AbortSignal.timeout(20_000) });
+      if (!sr.ok) throw new Error(`minisig fetch ${asset.minisig} → ${sr.status}`);
+      minisigText = await sr.text();
+    } else {
+      minisigText = asset.minisig;
+    }
+  }
+
+  if (!pinned) {
+    // Bootstrap: no key configured yet — warn loudly and proceed sha256-only.
+    process.stderr.write(
+      c("yellow", "update: WARNING — PINNED_PUBKEYS not configured; skipping signature check (sha256-only bootstrap mode). Set keys in cli/lib/pubkey.ts before shipping.", ctx.color) + "\n",
+    );
+  } else {
+    // Pinned keys present: verify against each key; first ok wins.
+    let verifyOk = false;
+    let lastReason = "no keys tried";
+    if (minisigText) {
+      for (const pubkey of PINNED_PUBKEYS) {
+        const result = verifyMinisign(buf, minisigText, pubkey);
+        if (result.ok) { verifyOk = true; break; }
+        lastReason = result.reason ?? "verification failed";
+      }
+    }
+    const gate = decideSigGate({ hasPinned: true, hasMinisig: !!minisigText, verifyOk });
+    if (!gate.proceed) {
+      throw new Error(`update: ${gate.reason}${!verifyOk && minisigText ? ` (${lastReason})` : ""}`);
+    }
+  }
+  // --- End signature gate ---
 
   const got = sha256Hex(buf);
   if (got !== asset.sha256) {

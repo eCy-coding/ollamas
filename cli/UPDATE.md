@@ -36,8 +36,55 @@ OLLAMAS_UPDATE_MANIFEST=https://…/latest.json ollamas update
 HTTPS (a GitHub release asset is fine). `.github/workflows/release-binary.yml`
 (draft) builds per-arch binaries + checksums + this manifest on a `vX.Y.Z` tag.
 
-> Integrity tier: v10 verifies sha256-over-HTTPS (zero-dep). Detached signatures
-> (minisign/cosign) are planned for v18 hardening.
+> Integrity tier: v10 verifies sha256-over-HTTPS (zero-dep). **v18** adds detached
+> **minisign** signatures verified against a compile-time pinned public key — see below.
+
+## Detached signatures (minisign, v18)
+
+Each release asset can carry a detached minisign signature. When a pinned public key
+exists (`cli/lib/pubkey.ts` `PINNED_PUBKEYS`) and the manifest asset has a `minisig`,
+`ollamas update` verifies the Ed25519 signature against the pinned key **before** the
+binary touches disk (in addition to sha256). Verification is pure + zero-dep
+(`cli/lib/minisign-verify.ts`). With no pinned key the CLI runs in bootstrap mode
+(sha256-only + a loud warning); a pinned key + present `minisig` is a hard gate.
+
+In the manifest, `minisig` is either the signature text body **or** a URL to the
+`.minisig` file; `keyId` is the informational 16-hex key id:
+
+```json
+{
+  "target": "darwin-arm64",
+  "url": "https://…/ollamas-darwin-arm64",
+  "sha256": "<64-hex>",
+  "minisig": "https://…/ollamas-darwin-arm64.minisig",
+  "keyId": "E839E6F0EF25E6B7"
+}
+```
+
+### Sign + verify flow
+
+1. **Operator keygen (one-time, OUTSIDE CI — never commit the `.key`):**
+   ```sh
+   minisign -G -s ~/.minisign/ollamas.key -p ~/.minisign/ollamas.pub
+   ```
+   Paste the `.pub`'s **two lines** into `cli/lib/pubkey.ts` `PINNED_PUBKEYS`, e.g.
+   `"untrusted comment: minisign public key …\nRWS…<base64>",` — ship that build.
+
+2. **CI secret:** generate an **unencrypted** CI key with `minisign -G -W`, then store
+   the whole key-file contents as the repo secret **`MINISIGN_SECKEY`**. The
+   `release-binary` workflow writes it to a temp keyfile, runs `cli/sign-release.sh`,
+   uploads `<binary>.minisig`, and embeds `minisig`/`keyId` in `latest.json`. The
+   signing step **no-ops gracefully** if the secret is absent (forks build unsigned).
+   No real key is ever committed.
+
+3. **User (automatic):** `ollamas update` fetches the manifest, verifies sha256 + the
+   minisign signature against the pinned key, and only then installs. Tamper or a
+   wrong key → refused.
+
+Local manual signing mirrors CI:
+```sh
+MINISIGN_SECKEY=~/.minisign/ollamas.key cli/sign-release.sh dist/ollamas-darwin-arm64
+```
 
 ## `ollamas plugin` — external subcommands
 
