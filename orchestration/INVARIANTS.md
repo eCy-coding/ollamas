@@ -27,5 +27,13 @@
 - **I13 LWW permutation-invariance (precondition: strict total order):** if no two distinct events share `(ts, fence, tab)`, then `foldClaims(σ(events))` ≡ `foldClaims(events)` for any permutation σ. The last-writer-wins order is `ts → fence → tab`.
   - **Caveat (proven by PBT):** on a TIE — two events with equal `(ts, fence, tab)` but differing other fields — `newer` returns false, so the FIRST-seen wins → order-dependent. The real ledger avoids ties by construction (epoch-ms `ts` + per-key monotonic `fence`). Callers MUST preserve this uniqueness. The property test enforces the precondition (de-dupes the order-key) before asserting invariance.
 
+## `reconcile(desired, actual, attempt)` / `nextBackoff` — `bin/lib/reconcile.ts` (vO23)
+Level-based reconcile (Kubernetes-operator pattern): the single next action to converge actual → desired.
+- **I14 Totality:** ∀ (desired, actual, attempt) → exactly one `ReconcileAction.kind ∈ {dispatch, remediate, rebench, backoff}` (never throws).
+- **I15 Determinism:** `reconcile(x)` ≡ `reconcile(x)`.
+- **I16 Convergence:** `dispatch ⟺ (actual.anyReachable ∧ desired.variant ≠ null ∧ go(desired.mode))`. When reachable ∧ variant≠null ∧ ¬go → action = `remediate` (a fixable gap, never `dispatch`). Ordered precedence: ¬anyReachable → `backoff`; else variant=null → `rebench`; else go → `dispatch`; else → `remediate`.
+- **I17 Idempotence:** same input → same action (stable fixpoint; the converged steady-state is `dispatch`).
+- **I18 Backoff monotonicity + boundedness:** `nextBackoff(a) = min(MAX, BASE·2^a)`, non-decreasing in `a`, and `0 < nextBackoff(a) ≤ BACKOFF_MAX_MS (30000)` for ALL inputs incl. negative/non-finite (total).
+
 ---
-*Generated for vO22. Update this spec + its property tests together whenever a core's contract changes — the spec is the source of truth the cli lane is verified against (spec-to-code-compliance).*
+*Generated for vO22, extended vO23. Update this spec + its property tests together whenever a core's contract changes — the spec is the source of truth the cli lane is verified against (spec-to-code-compliance).*
