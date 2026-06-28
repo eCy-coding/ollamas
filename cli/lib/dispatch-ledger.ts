@@ -117,20 +117,20 @@ export function assignWorker(
 
   if (!eligible.length) {
     return { worker: null, reason: task.kind === "host-tool"
-      ? "host-tool görevi yalnız mac'te koşar, mac down → atanamaz"
-      : "hiçbir sağlıklı worker yok → atanamaz" };
+      ? "host-tool runs only on mac; mac down → unassignable"
+      : "no healthy worker → unassignable" };
   }
 
   // Thrash-guard: keep the current worker if it is still eligible & healthy.
   if (opts?.current && eligible.some((w) => w.name === opts.current)) {
-    return { worker: opts.current, reason: "thrash-guard: mevcut worker hâlâ uygun → değiştirme" };
+    return { worker: opts.current, reason: "thrash-guard: current worker still eligible → keep" };
   }
 
   const pick = eligible[0];
   const reason = task.kind === "host-tool"
-    ? "host-tool → mac kontrol düzlemi"
+    ? "host-tool → mac control plane"
     : pick.kind === "remote"
-      ? `GPU-ağır ${task.kind} → remote ${pick.name} (${pick.tokS ?? "?"} tok/s)`
-      : `remote yok → mac substrate failover (${task.kind})`;
+      ? `GPU-heavy ${task.kind} → remote ${pick.name} (${pick.tokS ?? "?"} tok/s)`
+      : `no remote → mac substrate failover (${task.kind})`;
   return { worker: pick.name, reason };
 }

@@ -232,10 +232,12 @@ export class RemoteAgentClient {
 // Split a backend url (http://host:port or host:port) into host + numeric port.
 // Defaults port to 8090 (the ollamas server default) when absent.
 export function parseBackendUrl(url: string): { host: string; port: number } {
-  const stripped = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const stripped = (url || "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const idx = stripped.lastIndexOf(":");
-  if (idx === -1) return { host: stripped, port: 8090 };
-  const host = stripped.slice(0, idx);
+  const host = idx === -1 ? stripped : stripped.slice(0, idx);
+  // Reject empty/malformed input early — an empty host would build `http://:8090` (invalid).
+  if (!host) throw new Error(`invalid backend url (no host): ${JSON.stringify(url)}`);
+  if (idx === -1) return { host, port: 8090 };
   const port = Number(stripped.slice(idx + 1));
   return { host, port: Number.isFinite(port) && port > 0 ? port : 8090 };
 }

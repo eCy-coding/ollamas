@@ -593,7 +593,7 @@ async function runDispatch(args: string[]): Promise<number> {
     options: {
       epic: { type: "string" }, root: { type: "string" }, "max-steps": { type: "string" },
       provider: { type: "string" }, model: { type: "string" }, port: { type: "string" },
-      json: { type: "boolean" }, help: { type: "boolean" },
+      "timeout-ms": { type: "string" }, json: { type: "boolean" }, help: { type: "boolean" },
     },
   });
   if (values.help) { process.stdout.write(USAGE); return 0; }
@@ -615,6 +615,7 @@ async function runDispatch(args: string[]): Promise<number> {
   const root = (values.root as string) || `${homedir()}/.llm-mission-control/agent-work`;
   const maxSteps = Number(values["max-steps"] ?? "10");
   const port = Number(values.port ?? "8090");
+  const timeoutMs = values["timeout-ms"] ? Number(values["timeout-ms"]) : undefined;
   const provider = values.provider as string | undefined;
   const model = values.model as string | undefined;
 
@@ -628,7 +629,7 @@ async function runDispatch(args: string[]): Promise<number> {
   for (const rt of rawTasks) {
     const kind = inferTaskKind(rt.prompt);
     const ltask: LedgerTask = { id: rt.id, kind };
-    const remoteTask: RemoteTask = { prompt: rt.prompt, root: `${root}/${rt.id}`, provider, model, maxSteps };
+    const remoteTask: RemoteTask = { prompt: rt.prompt, root: `${root}/${rt.id}`, provider, model, maxSteps, timeoutMs };
     let workers = baseWorkers;
     let assignment = assignWorker(ltask, workers);
     let report: DispatchReport | null = null;
