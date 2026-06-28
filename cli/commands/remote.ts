@@ -21,6 +21,8 @@ import {
 import type { Backend, BackendProbe } from "../lib/remote";
 import { decideTransition } from "../lib/fleet";
 import type { FleetState } from "../lib/fleet";
+import { assignWorker, type LedgerEvent, type FleetWorker, type TaskKind, type DispatchTask as LedgerTask } from "../lib/dispatch-ledger";
+import { RemoteAgentClient, type DispatchTask as RemoteTask, type DispatchReport } from "../lib/remote-agent";
 
 const execFileP = promisify(execFile);
 
@@ -101,6 +103,9 @@ subcommands:
   rm <name>               remove a backend from the pool
   ls                      list pool + probe all backends
   pick                    print the best backend URL (for scripting)
+  dispatch <task>...      split an epic → assign each task to a fleet worker → dispatch over
+    [--epic <file|->]     /api/agent/chat (remote or mac) → failover remote-down→mac → merge report
+    [--root dir] [--max-steps n] [--json]
   up [--watch]            launch gateway against best backend; optionally supervise
     [--exec <cmd>]        gateway command (default: npm start)
     [--interval <ms>]     probe interval when watching (default: 5000)
@@ -467,6 +472,135 @@ async function runUp(args: string[]): Promise<number> {
 // Router
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// dispatch — split an epic into sub-agent tasks, assign each to a fleet worker
+// (assignWorker), dispatch over HTTP /api/agent/chat (RemoteAgentClient), failover
+// remote-down → mac substrate, merge into one epic report. N-012: HTTP only, no ToolRegistry.
+// Reproduces the DISPATCH_SIM golden trace: host-tool→mac, codegen→remote, remote-down→mac.
+// ---------------------------------------------------------------------------
+
+interface DispatchResult { taskId: string; worker: string | null; report: DispatchReport | null; failedOver: boolean; }
+export interface EpicReport {
+  tasks: { taskId: string; worker: string | null; verdict: string; failedOver: boolean }[];
+  files: string[]; errors: string[]; allOk: boolean; verdict: "DONE" | "INCOMPLETE";
+}
+
+/** Epic text → one task per non-empty, non-`#` line. Pure. */
+export function parseEpic(text: string): { id: string; prompt: string }[] {
+  return text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"))
+    .map((prompt, i) => ({ id: `t${i + 1}`, prompt }));
+}
+
+/** Heuristic kind: terminal/shell work = host-tool (mac only); analyse = analysis; else codegen. Pure. */
+export function inferTaskKind(prompt: string): TaskKind {
+  if (/\b(terminal|shell|iterm|run it|execute|open app|macos)\b/i.test(prompt)) return "host-tool";
+  if (/\b(analy|review|explain|investigate|audit)\b/i.test(prompt)) return "analysis";
+  return "codegen";
+}
+
+/** Fleet workers = pool backends (remote) + the mac control plane. Pure. */
+export function buildWorkers(pool: Backend[], macHealthy = true): FleetWorker[] {
+  const remotes: FleetWorker[] = pool.map((b) => ({ name: b.name, kind: "remote", healthy: true }));
+  return [...remotes, { name: "mac", kind: "mac", healthy: macHealthy }];
+}
+
+/** Merge per-task results → one epic report (allOk = every task DONE/OK && none demo). Pure. */
+export function mergeEpicReport(results: DispatchResult[]): EpicReport {
+  const files = new Set<string>(); const errors: string[] = [];
+  const tasks: EpicReport["tasks"] = [];
+  let allOk = results.length > 0;
+  for (const r of results) {
+    const v = r.report?.verdict ?? "INCOMPLETE";
+    if (r.report) { for (const f of r.report.files) files.add(f); errors.push(...r.report.errors); }
+    const ok = (v === "DONE" || v === "OK") && !r.report?.demoSuspected;
+    if (!ok) allOk = false;
+    tasks.push({ taskId: r.taskId, worker: r.worker, verdict: v, failedOver: r.failedOver });
+  }
+  return { tasks, files: [...files], errors, allOk, verdict: allOk ? "DONE" : "INCOMPLETE" };
+}
+
+async function runDispatch(args: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args, allowPositionals: true, strict: false,
+    options: {
+      epic: { type: "string" }, root: { type: "string" }, "max-steps": { type: "string" },
+      provider: { type: "string" }, model: { type: "string" }, port: { type: "string" },
+      json: { type: "boolean" }, help: { type: "boolean" },
+    },
+  });
+  if (values.help) { process.stdout.write(USAGE); return 0; }
+
+  // Epic source: --epic <file|-> | positionals | stdin.
+  let epicText = "";
+  const epicArg = values.epic as string | undefined;
+  if (epicArg && epicArg !== "-") {
+    try { epicText = readFileSync(epicArg, "utf8"); }
+    catch { process.stderr.write(`ollamas remote dispatch: cannot read epic '${epicArg}'\n`); return 2; }
+  } else if (positionals.length) {
+    epicText = positionals.join("\n");
+  } else if (!process.stdin.isTTY) {
+    epicText = readFileSync(0, "utf8");
+  }
+  const rawTasks = parseEpic(epicText);
+  if (!rawTasks.length) { process.stderr.write('usage: ollamas remote dispatch "<task>"... | --epic <file|-> [--root dir] [--json]\n'); return 2; }
+
+  const root = (values.root as string) || `${homedir()}/.llm-mission-control/agent-work`;
+  const maxSteps = Number(values["max-steps"] ?? "10");
+  const port = Number(values.port ?? "8090");
+  const provider = values.provider as string | undefined;
+  const model = values.model as string | undefined;
+
+  const pool = loadPool();
+  const baseWorkers = buildWorkers(pool);
+  const client = new RemoteAgentClient();
+  let fence = 1;
+  const ledger: LedgerEvent[] = [];
+  const results: DispatchResult[] = [];
+
+  for (const rt of rawTasks) {
+    const kind = inferTaskKind(rt.prompt);
+    const ltask: LedgerTask = { id: rt.id, kind };
+    const remoteTask: RemoteTask = { prompt: rt.prompt, root: `${root}/${rt.id}`, provider, model, maxSteps };
+    let workers = baseWorkers;
+    let assignment = assignWorker(ltask, workers);
+    let report: DispatchReport | null = null;
+    let failedOver = false;
+
+    // Up to 2 hops: initial assignment, then failover to the mac substrate on failure.
+    for (let hop = 0; hop < 2 && assignment.worker; hop++) {
+      const wname = assignment.worker;
+      ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "claimed", ttlMs: 1_200_000, fence: fence++ });
+      try {
+        if (wname === "mac") report = await client.dispatch("127.0.0.1", port, remoteTask);
+        else {
+          const b = pool.find((p) => p.name === wname);
+          report = b ? await client.dispatchToBackend(b, remoteTask) : await client.dispatch(wname, port, remoteTask);
+        }
+      } catch { report = null; }
+      const ok = !!report && (report.verdict === "DONE" || report.verdict === "OK") && !report.demoSuspected && report.errors.length === 0;
+      if (ok) { ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "done", ttlMs: 0, fence: fence++ }); break; }
+      // Failover: mark the failed worker unhealthy → re-assign (assignWorker yields mac substrate).
+      ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "failed", ttlMs: 0, fence: fence++ });
+      workers = workers.map((w) => (w.name === wname ? { ...w, healthy: false } : w));
+      const next = assignWorker(ltask, workers);
+      if (!next.worker || next.worker === wname) { assignment = next; break; }
+      assignment = next; failedOver = true;
+    }
+    results.push({ taskId: rt.id, worker: assignment.worker, report, failedOver });
+  }
+
+  const epic = mergeEpicReport(results);
+  if (values.json) { process.stdout.write(JSON.stringify(epic, null, 2) + "\n"); return epic.allOk ? 0 : 1; }
+  const okCount = epic.tasks.filter((t) => t.verdict === "DONE" || t.verdict === "OK").length;
+  const L: string[] = [`── ollamas remote dispatch ──  ${results.length} task`];
+  for (const t of epic.tasks) L.push(`  ${t.taskId}  → ${t.worker ?? "—"}  ${t.verdict}${t.failedOver ? " (failed-over)" : ""}`);
+  if (epic.files.length) L.push(`  files: ${epic.files.join(", ")}`);
+  if (epic.errors.length) L.push(`  errors: ${epic.errors.slice(0, 5).join(" | ").slice(0, 300)}`);
+  L.push(`  VERDICT: ${epic.verdict}  (${okCount}/${epic.tasks.length} ok)`);
+  process.stdout.write(L.join("\n") + "\n");
+  return epic.allOk ? 0 : 1;
+}
+
 export async function runRemote(argv: string[]): Promise<number> {
   const [sub, ...rest] = argv;
 
@@ -496,6 +630,8 @@ export async function runRemote(argv: string[]): Promise<number> {
       return runPick(rest);
     case "up":
       return runUp(rest);
+    case "dispatch":
+      return runDispatch(rest);
     default:
       process.stderr.write(`ollamas remote: unknown subcommand '${sub}'\n${USAGE}`);
       return 2;
