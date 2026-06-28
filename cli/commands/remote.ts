@@ -405,6 +405,7 @@ async function runUp(args: string[]): Promise<number> {
 
   // Watch loop
   return new Promise<number>((resolve) => {
+    let pendingTick: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
       if (shuttingDown) return;
       probes = await probeAll(pool);
@@ -412,12 +413,12 @@ async function runUp(args: string[]): Promise<number> {
       const transition = decideTransition(state, pool, probes, nowMs, { required: requiredOpt, minDwellMs });
 
       if (transition.action === "stay") {
-        setTimeout(tick, intervalMs);
+        schedule(intervalMs);
         return;
       }
 
       if (transition.action === "wait") {
-        setTimeout(tick, Math.min(transition.delayMs, intervalMs));
+        schedule(Math.min(transition.delayMs, intervalMs));
         return;
       }
 
@@ -435,16 +436,22 @@ async function runUp(args: string[]): Promise<number> {
         child.once("exit", (code) => {
           if (!shuttingDown) {
             process.stderr.write(`[fleet] child exited (${code}); restarting tick\n`);
-            setTimeout(tick, intervalMs);
+            schedule(intervalMs);
           } else {
             resolve(code ?? 0);
           }
         });
       }
 
-      if (transition.action !== "switch") {
-        setTimeout(tick, intervalMs);
-      }
+      // Keep probing after a switch too, so a recovered higher-priority backend
+      // triggers failback (was: only the child-exit path re-ticked -> one-shot).
+      schedule(intervalMs);
+    };
+
+    const schedule = (ms: number) => {
+      if (shuttingDown) return;
+      if (pendingTick) clearTimeout(pendingTick);
+      pendingTick = setTimeout(tick, ms);
     };
 
     child.once("exit", (code) => {
@@ -452,7 +459,7 @@ async function runUp(args: string[]): Promise<number> {
     });
 
     // First tick after intervalMs
-    setTimeout(tick, intervalMs);
+    schedule(intervalMs);
   });
 }
 
