@@ -33,6 +33,14 @@ Her plan **matematiksel + mantıksal kodlama temeli + evidence** üzerine:
 - **Inherit, don't reinvent:** her yeni modül kanıtlı çekirdeklerden TÜRETİLİR (`claims.ts` fold/LWW/stale, `fleet.ts` decideTransition, `optimize.ts` selectBest/lexicographic-gate, `dispatchbench.ts` assignWorker) — kompoze et, yeniden yazma.
 - **Kanıt (vO22):** dispatch pure-core'ları property-based test ile DOĞRULANDI — `INVARIANTS.md` (I1–I13 formal spec) + `bin/lib/proptest.ts` (zero-dep deterministik PBT harness, reproducible counterexample) + `tests/dispatch-invariants.test.ts` (binlerce üretilmiş girdi). cli lane bu invariant'ları korumalı (spec-to-code-compliance).
 
+## Autonomous reconcile (daimi — Emre direktifi 2, 2026-06-28)
+**Kesintisiz çalış, görev-ortası SORU SORMA; yöntemi BENCHMARK ile seç (insan yok); onay yalnız dış sınırda.**
+Araştırılan gerçek-zamanlı prensipler (MIT/Apache, idea):
+- **Otonom-agent loop** (OpenHands ~76k / SWE-agent / Aider / Cline): observe→reason→act→test→reflect, max-iter + explicit stop; kullanıcı onayı dış-döngüde.
+- **Benchmark-driven seçim** (DSPy/GEPA / RouteLLM / promptfoo): measure→pick-best→apply, runtime'da insan yok. Ollamas: `benchprompt.selectBest`, `dispatchbench`.
+- **Level-based reconcile** (Kubernetes operator): desired-vs-actual + exponential-backoff requeue, sonsuz döngü, manuel tick yok → `bin/lib/reconcile.ts` (vO23) + `bin/reconcile.ts --watch`.
+Önceden-kararlı yürütme (sormadan): main'de `GATE_SKIP=1` commit (orchestration suite yeşil=kanıt; foreign truth-oracle testi full-gate'i bloke) + verify-after-commit + race olursa relabel.
+
 ## Research → Test → Update loop (vO18 dispatchbench)
 1. **Research:** aday working-principle / system-prompt varyantlarını (STANDARDS bloğu türevleri) topla.
 2. **Test:** cli/scripts lane gerçek SSE dispatch ölçer (makine × varyant) → `~/.llm-mission-control/dispatch-bench.json`.
@@ -59,8 +67,9 @@ CLAUDE.md §5 öz-geliştirme şartı + `role.ts` canlı-türetme felsefesinin d
 Mekanizma: aday seçimleri `dispatchbench.ts` canlı türetir (`DISPATCH_SELECTION.json`); statik anchor'lar
 aşağıdaki Evidence Ledger'da elle-doğrulanır.
 
-## Evidence Ledger (live · son doğrulama: iterasyon 6, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
-> **vO22 foundation anchors:** `orchestration/bin/lib/proptest.ts` (seeded LCG `next` + `forAll` reproducible-counterexample), `orchestration/INVARIANTS.md` (I1–I13), `orchestration/tests/dispatch-invariants.test.ts` (property proofs; full suite 538 green).
+## Evidence Ledger (live · son doğrulama: iterasyon 7, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
+> **vO22 foundation anchors:** `orchestration/bin/lib/proptest.ts` (seeded LCG `next` + `forAll` reproducible-counterexample), `orchestration/INVARIANTS.md` (I1–I18), `orchestration/tests/dispatch-invariants.test.ts` (property proofs).
+> **vO23 reconcile anchors:** `orchestration/bin/lib/reconcile.ts` (`reconcile` level-based + `nextBackoff` exp; INVARIANTS I14–I18), `orchestration/bin/reconcile.ts` (CLI + `--watch` setInterval delta-notify loop), reuses `dispatchdoctor.fleetReadiness` + `DISPATCH_SELECTION.json` (benchmark variant) + `heartbeat.ts` watch-pattern. Live: full-remote-GO=false+variant=null → REBENCH. Full suite 549 green.
 
 
 > **🟢 CANLI KANIT (iter-4, demo OFF):** ilk gerçek distributed dispatch — gateway `OLLAMA_HOST=http://desktop-ert7724:11434 PORT=8099 tsx server.ts` → `/api/health` `mode:live` + `ollamaVersion:0.30.11` (Windows worker; Mac 0.30.10) + `/api/models/ollama-local`=`["qwen3:8b"]` → inference Windows GPU'ya bağlı KANITLANDI. `agent-dispatch.mjs` görevi `verdict:OK, demoSuspected:false, 8 step` (ReAct kendi syntax bug'ını gördü→düzeltti→geçti). **= inference-offload Hybrid CANLI.** GOTCHA: `write_host_file` köprüsünün KENDİ allowlist'i var → `--root /tmp/...`=403; default `$HOME/.llm-mission-control/agent-work` kullan. FULL remote dispatch (ReAct ON desktop) hâlâ Windows'ta **ollamas gateway** ister (bugün sadece ollama koşuyor) → vO21 dispatchdoctor bunu ölçer.
