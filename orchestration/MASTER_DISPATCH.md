@@ -51,7 +51,7 @@ CLAUDE.md §5 öz-geliştirme şartı + `role.ts` canlı-türetme felsefesinin d
 Mekanizma: aday seçimleri `dispatchbench.ts` canlı türetir (`DISPATCH_SELECTION.json`); statik anchor'lar
 aşağıdaki Evidence Ledger'da elle-doğrulanır.
 
-## Evidence Ledger (live · son doğrulama: iterasyon 2, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
+## Evidence Ledger (live · son doğrulama: iterasyon 3, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
 Dağıtık-dispatch'in dayandığı **kanıtlanmış** kod çapaları (lane kodu — bu sekme okur, yazmaz):
 - **Dispatch HTTP yüzeyi:** `server.ts:653` `app.post("/api/agent/chat")`; SSE event'leri — `message` `:750`,
   `step` `:812`, `done` `:850/:858` (ReAct loop maxSteps depth-limit). cli `RemoteAgentClient` bu event-şeklini parse eder.
@@ -62,6 +62,9 @@ Dağıtık-dispatch'in dayandığı **kanıtlanmış** kod çapaları (lane kodu
   `:59` `parseTailscalePeers` (`desktop-ert7724` FQDN keşfi), `:97` `assignDiscoveredPriorities` (worker 10/20…,
   Self 99); `cli/lib/fleet.ts:30` `decideTransition` (stay/switch/wait + thrash-guard `minDwellMs` + backoff).
 - **Ledger motoru:** `orchestration/bin/lib/claims.ts` — atomic `mkdirSync`-lock + append-only JSONL + LWW
-  (`ts→fence→tab`) + TTL/heartbeat **stale-takeover** + monoton **fencing**. cli lane `(taskId)` için reimplement eder.
-- **Bu sekmenin türettiği:** `orchestration/bin/lib/dispatchbench.ts` `assignWorker` (saf routing, `fleet.ts:30` deseni)
-  + `selectBestForMachine` (ordered gate, `optimize.ts:82` `selectBest` paritesi).
+  (`ts→fence→tab`) + TTL/heartbeat **stale-takeover** + monoton **fencing**. Saf çekirdek `:65 foldClaims`
+  (key→son durum LWW), `:76 isActive` (claimed+TTL-içi), `:81 isStale` (TTL aşıldı→takeover). cli lane `(taskId)` için reimplement eder;
+  `bin/lib/dispatchsim.ts` (vO20) bu fold/stale mantığını sanal-saatle aynalar.
+- **Bu sekmenin türettiği:** `orchestration/bin/lib/dispatchbench.ts:176` `assignWorker` (saf routing, `fleet.ts:30` deseni)
+  + `selectBestForMachine` (ordered gate, `optimize.ts:82` `selectBest` paritesi); `bin/lib/dispatchsim.ts:simulateDispatch`
+  (vO20: split→assign→claim→heartbeat→failover→merge akışını canlı-makinesiz deterministik DOĞRULAR = cli executable-spec/oracle).
