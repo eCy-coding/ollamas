@@ -65,7 +65,9 @@ const CHECKS = [
       const r = await j(`${APP}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) });
       let tools = r.body?.result?.tools;
-      if (!tools && typeof r.body === "string") { const m = r.body.match(/"tools":\s*\[/); if (m) { try { tools = JSON.parse(r.body.slice(r.body.indexOf("{"))).result?.tools; } catch {} } }
+      if (!tools && typeof r.body === "string") { // SSE: parse the `data:` line's JSON, not from the first `{` (which mis-slices multi-event streams)
+        const dataLine = r.body.split("\n").find((l) => l.startsWith("data:") && l.includes('"tools"'));
+        if (dataLine) { try { tools = JSON.parse(dataLine.slice(5).trim()).result?.tools; } catch {} } }
       if (Array.isArray(tools)) { const builtin = tools.filter((t) => !t.name.startsWith("mcp__")).length;
         return { status: builtin >= 29 ? "PASS" : "FAIL", detail: `tools/list builtin=${builtin} (expect >=29)` }; }
       return { status: "SKIP", detail: `MCP tools/list not directly callable (status ${r.status}); covered by test suite` };

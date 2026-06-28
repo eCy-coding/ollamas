@@ -9,7 +9,9 @@ main(async () => {
   const args = process.argv.slice(2);
   const sigIdx = args.indexOf("--sig");
   const sig = sigIdx >= 0 ? (SIGNALS[(args[sigIdx + 1] || "").toUpperCase()] || "TERM") : "TERM";
-  const target = args.filter((a, i) => a !== "--sig" && i !== sigIdx + 1)[0];
+  // With no --sig, sigIdx is -1 so `i !== sigIdx + 1` (i !== 0) would drop index 0
+  // — the target itself. Only skip the signal-value slot when --sig is present.
+  const target = args.filter((a, i) => a !== "--sig" && (sigIdx < 0 || i !== sigIdx + 1))[0];
   if (!target) throw new Error("target required: a PID or ':<port>'");
 
   const command = target.startsWith(":")

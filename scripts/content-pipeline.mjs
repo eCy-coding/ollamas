@@ -66,13 +66,14 @@ async function draft(topic, angle, sources) {
     const j = await r.json();
     const obj = JSON.parse(j.message?.content || "{}");
     if (!obj.body_markdown) throw new Error("no body");
-    return { ...obj, _source: `ollama:${MODEL}` };
+    // Default the title so a reply omitting it never yields a "# undefined" header.
+    return { ...obj, title: obj.title || topic, _source: `ollama:${MODEL}` };
   } catch (e) {
     // graceful skeleton so a bundle is ALWAYS produced
     return {
       title: topic, subtitle: "Evidence-first — every claim sourced.",
       seo_title: topic.slice(0, 60), seo_description: `${topic} — evidence-first human rights analysis, sourced to Amnesty, HRW & the UN.`.slice(0, 160),
-      body_markdown: `**TL;DR.** [DRAFT — Ollama was unreachable; enrich this from the research below.]\n\n## Overview\n${topic}.\n\n## What the sources say\n${sources.map((s) => `- ${s.title}: ${s.snippet} (${s.url})`).join("\n") || "- [add sourced facts]"}\n\n## Sources\n${[...new Set(sources.map((s) => new URL(s.url).hostname))].join(", ") || "Amnesty International, Human Rights Watch, UN/OHCHR"}`,
+      body_markdown: `**TL;DR.** [DRAFT — Ollama was unreachable; enrich this from the research below.]\n\n## Overview\n${topic}.\n\n## What the sources say\n${sources.map((s) => `- ${s.title}: ${s.snippet} (${s.url})`).join("\n") || "- [add sourced facts]"}\n\n## Sources\n${[...new Set(sources.map((s) => { try { return new URL(s.url).hostname; } catch { return null; } }).filter(Boolean))].join(", ") || "Amnesty International, Human Rights Watch, UN/OHCHR"}`,
       image_prompt: `abstract symbolic editorial cover about ${topic}, no faces, no graphic content, muted documentary palette`,
       _source: "skeleton(ollama-down)",
     };

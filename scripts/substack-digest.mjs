@@ -36,7 +36,7 @@ items = (items || []).filter((m) => m && m.sender && !/verification code|sign in
 
 // Top senders = frequency (how often they reach the inbox = engagement/cadence proxy).
 const bySender = {};
-for (const m of items) { const s = (m.sender || "").replace(/\+.*@/, "@"); bySender[s] = (bySender[s] || 0) + 1; }
+for (const m of items) { const s = (m.sender || "").replace(/\+[^@]*@/, "@"); bySender[s] = (bySender[s] || 0) + 1; }
 const topSenders = Object.entries(bySender).sort((a, b) => b[1] - a[1]);
 
 // Trending topics = keyword hits across all subjects/snippets.
