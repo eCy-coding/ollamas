@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLingui } from "@lingui/react";
 import {
-  Sparkles, Play, ToggleLeft, ToggleRight, Check, X,
-  Terminal, ShieldCheck, History, RefreshCw, AlertCircle,
+  ToggleLeft, ToggleRight, Check, X,
+  Terminal, ShieldCheck, History, AlertCircle,
   FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft
 } from "lucide-react";
 import { ChatSession } from "../types";
@@ -11,10 +11,10 @@ import { api, ApiError } from "../lib/apiClient";
 interface TraceStep {
   stepNum: number;
   tool: string;
-  args: any;
+  args: unknown;
   ok: boolean;
   latency: number;
-  result: any;
+  result: unknown;
   diff?: string;
   applied?: boolean;
 }
@@ -62,7 +62,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const loadSessions = async () => {
     setLoadingSessions(true);
     try {
-      const data: any = await api.get("/api/agent/sessions");
+      const data = await api.get<ChatSession[]>("/api/agent/sessions");
       setSessions(data);
       return data;
     } catch (e) {
@@ -79,11 +79,12 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const selectSession = async (id: string) => {
     setIsLoading(true);
     try {
-      const data: any = await api.get(`/api/agent/sessions/${id}`);
+      const data = await api.get<ChatSession>(`/api/agent/sessions/${id}`);
       setActiveSessionId(data.id);
       setProvider(data.providerId || "gemini");
       setModel(data.modelId || "gemini-3.5-flash");
-      setMessages((data.messages || []).length > 0 ? data.messages : [
+      const restored: Message[] = (data.messages || []).map((m) => ({ role: m.role as Message["role"], content: m.content }));
+      setMessages(restored.length > 0 ? restored : [
         {
           role: "assistant",
           content: _("react-agent.greeting.back")
@@ -105,7 +106,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const startNewSession = async () => {
     setIsLoading(true);
     try {
-      const newSess: any = await api.post("/api/agent/sessions", {
+      const newSess = await api.post<ChatSession>("/api/agent/sessions", {
         title: _("react-agent.session.defaultTitle"),
         providerId: provider,
         modelId: model
@@ -166,7 +167,19 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
   const [approving, setApproving] = useState<boolean>(false);
 
+  // Which trace row is expanded to show full args/result/diff (null = none).
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Abort an in-flight run from the UI. The stream's catch/finally already treat an
+  // abort as intentional (signal.aborted guards) → state stays consistent.
+  const stopRun = () => {
+    abortRef.current?.abort();
+    setIsLoading(false);
+    setCurrentStepInfo("");
+    onNotify(_("react-agent.notify.stopped"), "info");
+  };
 
   const providers = [
     { id: "gemini", label: "Google Gemini Core", icon: "🌌" },
@@ -181,7 +194,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const fetchModels = async (prov: string) => {
     setLoadingModels(true);
     try {
-      const list: any = await api.get(`/api/models/${prov}`);
+      const list = await api.get<string[]>(`/api/models/${prov}`);
       setModelsList(list);
       if (list.length > 0) {
         // Filter out error placeholder elements for initial selection
@@ -240,7 +253,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     let currentSessionId = activeSessionId;
     if (!currentSessionId) {
       try {
-        const newSess: any = await api.post("/api/agent/sessions", {
+        const newSess = await api.post<ChatSession>("/api/agent/sessions", {
           title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
           providerId: provider,
           modelId: model
@@ -255,7 +268,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       }
     }
 
-    const newMessages = [...messages, { role: "user", content: userText } as any];
+    const newMessages: Message[] = [...messages, { role: "user", content: userText }];
     setMessages(newMessages);
 
     // Cancel any prior run, start a fresh abortable one.
@@ -601,24 +614,45 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Interactive Chat Form */}
-          <form onSubmit={handleSendMessage} className="flex gap-2.5">
-            <input 
-              type="text" 
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={_("react-agent.input.placeholder")}
-              disabled={isLoading}
-              className="flex-1 bg-immersive-panel border border-immersive-border-strong rounded-lg px-4 py-3 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20"
-            />
-            <button 
-              type="submit"
-              disabled={isLoading || !inputMessage.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
-            >
-              <CornerDownLeft className="w-4 h-4" />
-              <span>{_("react-agent.execute")}</span>
-            </button>
+          {/* Interactive Chat Form — multi-line prompt: Enter runs, Shift+Enter = newline */}
+          <form onSubmit={handleSendMessage} className="space-y-1">
+            <div className="flex gap-2.5 items-stretch">
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={_("react-agent.input.placeholder")}
+                disabled={isLoading}
+                rows={1}
+                aria-label={_("react-agent.input.placeholder")}
+                className="flex-1 resize-none bg-immersive-panel border border-immersive-border-strong rounded-lg px-4 py-3 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 max-h-32"
+              />
+              {isLoading ? (
+                <button
+                  type="button"
+                  onClick={stopRun}
+                  className="bg-rose-600 hover:bg-rose-500 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
+                >
+                  <X className="w-4 h-4" />
+                  <span>{_("react-agent.stop")}</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!inputMessage.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
+                >
+                  <CornerDownLeft className="w-4 h-4" />
+                  <span>{_("react-agent.execute")}</span>
+                </button>
+              )}
+            </div>
+            <p className="text-[9px] font-mono text-immersive-text-dim px-1">{_("react-agent.input.hint")}</p>
           </form>
         </div>
 
@@ -735,9 +769,27 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-xs">
-                {traceSteps.map((s, idx) => (
-                  <tr key={idx} className="hover:bg-white/[0.01] transition duration-200">
-                    <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap uppercase">{_("react-agent.trace.step")} {s.stepNum}</td>
+                {traceSteps.map((s, idx) => {
+                  const isExpanded = expandedStep === s.stepNum;
+                  const resultText = typeof s.result === "string" ? s.result : JSON.stringify(s.result);
+                  return (
+                  <React.Fragment key={idx}>
+                  <tr
+                    className="hover:bg-white/[0.01] transition duration-200 cursor-pointer"
+                    onClick={() => setExpandedStep(isExpanded ? null : s.stepNum)}
+                  >
+                    <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap uppercase">
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? _("react-agent.trace.collapse") : _("react-agent.trace.expand")}
+                        onClick={(e) => { e.stopPropagation(); setExpandedStep(isExpanded ? null : s.stepNum); }}
+                        className="flex items-center gap-1.5"
+                      >
+                        <ArrowRight className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                        <span>{_("react-agent.trace.step")} {s.stepNum}</span>
+                      </button>
+                    </td>
                     <td className="px-4 py-3 font-semibold whitespace-nowrap text-purple-300 flex items-center gap-1.5 mt-0.5">
                       <Terminal className="w-3.5 h-3.5 text-status-info shrink-0" />
                       <span>{s.tool}</span>
@@ -757,11 +809,33 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 max-w-sm truncate whitespace-pre text-[10px] text-immersive-text-muted" title={typeof s.result === "string" ? s.result : JSON.stringify(s.result)}>
-                      {typeof s.result === "string" ? s.result : JSON.stringify(s.result)}
+                    <td className="px-4 py-3 max-w-sm truncate whitespace-pre text-[10px] text-immersive-text-muted" title={resultText}>
+                      {resultText}
                     </td>
                   </tr>
-                ))}
+                  {isExpanded && (
+                    <tr className="bg-immersive-bg/60">
+                      <td colSpan={6} className="px-4 py-3 space-y-3">
+                        <div>
+                          <div className="text-[9px] font-mono uppercase tracking-wider text-immersive-text-dim mb-1">{_("react-agent.trace.detailArgs")}</div>
+                          <pre className="bg-immersive-panel border border-immersive-border rounded p-2.5 text-[10px] text-immersive-text-muted whitespace-pre-wrap overflow-x-auto scrollbar-thin">{JSON.stringify(s.args, null, 2)}</pre>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-mono uppercase tracking-wider text-immersive-text-dim mb-1">{_("react-agent.trace.detailResult")}</div>
+                          <pre className="bg-immersive-panel border border-immersive-border rounded p-2.5 text-[10px] text-immersive-text-muted whitespace-pre-wrap overflow-x-auto scrollbar-thin">{typeof s.result === "string" ? s.result : JSON.stringify(s.result, null, 2)}</pre>
+                        </div>
+                        {s.diff && (
+                          <div>
+                            <div className="text-[9px] font-mono uppercase tracking-wider text-immersive-text-dim mb-1">{_("react-agent.trace.detailDiff")}</div>
+                            <pre className="bg-immersive-bg border border-immersive-border rounded p-2.5 text-[10px] text-immersive-text-muted whitespace-pre overflow-x-auto scrollbar-thin">{s.diff}</pre>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
