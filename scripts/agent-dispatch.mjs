@@ -16,8 +16,8 @@
 // Env: OLLAMAS_URL (default http://127.0.0.1:8090), OLLAMAS_TIMEOUT_MS (default 180000).
 
 const args = process.argv.slice(2);
-const opt = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
-const has = (flag) => args.includes(flag);
+const opt = (/** @type {string} */ flag, /** @type {any} */ def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
+const has = (/** @type {string} */ flag) => args.includes(flag);
 
 // Target host: --remote <host>[:--port] overrides OLLAMAS_URL (fleet dispatch — drive the ReAct
 // loop ON a remote worker; body/SSE/report/exit semantics stay identical). Default = local.
@@ -101,7 +101,7 @@ try {
       }
     }
   }
-} catch (e) {
+} catch (/** @type {any} */ e) {
   report.errors.push(ac.signal.aborted ? `timeout after ${TIMEOUT}ms` : (e?.message || String(e)));
 } finally {
   clearTimeout(timer);
