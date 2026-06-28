@@ -1,5 +1,20 @@
 # ollamas — Proje-Geneli "Çalışmayan Fonksiyon" Denetimi (Faz 11)
 
+> ## ⚠️ RE-VERIFICATION 2026-06-29 (vFinal) — bu snapshot BAYAT
+> Aşağıdaki Faz-11 tablosu **2026-06-25 anlık görüntüsü**; çoğu satır o tarihten beri **ZATEN DÜZELTİLDİ** (claims withLock, ai.ts localhost, ReAct tool_calls history, providers streaming, mcp resources, bridge-guard realpath, content-pipeline/diagnostic try-catch, vb.). **Fix etmeden önce CANLI kodu doğrula** — kör-fix çalışan kodu bozar.
+>
+> **vFinal adversarial bug-hunt** (43-agent Workflow: 4 finder → 3-skeptic refute, ≥2/3 = CONFIRMED) → **5 yeni gerçek bug bulundu + DÜZELTİLDİ** (a970133/65f6abc), 8 false-positive reddedildi:
+> | id | site | sev | fix |
+> |---|---|---|---|
+> | consumeAuthCode | server/store/index.ts | CRIT-sec | DELETE-changes arbiter (concurrent OAuth code replay) |
+> | rotateRefreshToken | server/store/index.ts | HIGH-sec | conditional UPDATE used=0 (RFC 9700 reuse detect) |
+> | recordInvoice | server/store/index.ts | CRIT-bill | atomic insert-if-absent (duplicate invoice) |
+> | /api/keys/test | server.ts:418 | MED | missing provider → 400 (was corrupt store) |
+> | /api/workspace/file | server.ts:1124 | HIGH | missing relativePath → 400 (was path.join 500) |
+> | webhook reclaimStale | server/store+webhooks | — | runtime requeue of crash-stranded deliveries |
+>
+> Reddedilen (RE-FIX ETME): server.ts:1224/2008, MultiAgentPipeline:88, ReactAgentTab:214, GoogleDriveBrowser:30, SaaSAdmin:60, store:296/206. Canlı doğrulama: selftest 0-FAIL · CLS 0.000/SAĞLIKLI · İstemci Hataları 0 · 46/46 store/oauth/webhook test green · tsc 0.
+
 _Tarih: 2026-06-25 · branch chore/p1-hardening · READ-ONLY audit (kod değişmedi)_
 
 ## Özet
