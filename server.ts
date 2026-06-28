@@ -82,7 +82,14 @@ app.use((req, res, next) => {
   next();
 });
 // Prometheus scrape endpoint.
-app.get("/metrics", async (_req, res) => {
+app.get("/metrics", async (req, res) => {
+  // Opt-in auth: if METRICS_TOKEN is set, require it (Bearer or ?token=). Unset => open (back-compat).
+  const _mtok = process.env.METRICS_TOKEN;
+  if (_mtok) {
+    const _a = (req.headers.authorization || "");
+    const _p = _a.startsWith("Bearer ") ? _a.slice(7) : (((req.query.token as string) || ""));
+    if (_p !== _mtok) { res.status(401).end("unauthorized"); return; }
+  }
   res.set("Content-Type", metricsRegister.contentType);
   res.end(await metricsRegister.metrics());
 });
@@ -225,10 +232,11 @@ async function initializeServer() {
     // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
     // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
     // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
-    for (const cfg of upstreams) {
+    // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
+    await Promise.all(upstreams.map(async (cfg) => {
       const r = await superviseUpstream(cfg);
       console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-    }
+    }));
     for (const u of await allUpstreamServers()) {
       const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
