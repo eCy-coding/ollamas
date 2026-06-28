@@ -485,6 +485,7 @@ export class ProviderRouter {
           "http://localhost:11434",
           "http://127.0.0.1:11434",
         ])];
+        const genStart = Date.now(); // wall-clock fallback for tok/s when ollama omits eval_duration
         let response: Response | undefined;
         let connErr: any = null;
         for (const host of ollamaHosts) {
@@ -553,7 +554,7 @@ export class ProviderRouter {
                   return {
                     text: fullText, source: "ollama_local", modelUsed: usedModel,
                     tokens: parsed.eval_count,
-                    tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : undefined,
+                    tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : parsed.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000),
                     toolCalls: mapStreamCalls(),
                   };
                 }
@@ -571,9 +572,13 @@ export class ProviderRouter {
           if (!reply && resultJson?.message?.thinking) {
             reply = resultJson.message.thinking;
           }
+          // tok/s: prefer ollama's eval timing; fall back to wall-clock effective rate when
+          // eval_duration is absent (so the dispatch bench never under-reports tok/s as 0).
           let tokensPerSec: number | undefined;
-          if (resultJson.eval_count && resultJson.eval_duration) {
-             tokensPerSec = resultJson.eval_count / (resultJson.eval_duration / 1e9);
+          if (resultJson.eval_count) {
+            tokensPerSec = resultJson.eval_duration
+              ? resultJson.eval_count / (resultJson.eval_duration / 1e9)
+              : resultJson.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000);
           }
 
           let toolCalls: ToolCall[] | undefined;

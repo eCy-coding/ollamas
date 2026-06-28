@@ -279,13 +279,13 @@ async function initializeServer() {
 
     if (CURRENT_MODE !== "demo") {
       try {
-        const verRes = await fetch(`${ollamaHost}/api/version`);
+        const verRes = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(3000) });
         if (verRes.ok) {
           const verJson = await verRes.json();
           ollamaVersion = verJson?.version || "unknown";
         }
 
-        const psRes = await fetch(`${ollamaHost}/api/ps`);
+        const psRes = await fetch(`${ollamaHost}/api/ps`, { signal: AbortSignal.timeout(3000) });
         if (psRes.ok) {
           const psJson = await psRes.json();
           loadedModels = psJson?.models || [];
@@ -446,7 +446,7 @@ async function initializeServer() {
             "qwen3:8b", "qwen3:4b", "qwen3-coder:30b", "deepseek-r1:32b", "llama3.3:70b"
           ]);
         }
-        const response = await fetch(`${ollamaHost}/api/tags`);
+        const response = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3000) });
         if (response.ok) {
           const list = await response.json();
           const names = (list.models || []).map((m: any) => m.name);
@@ -468,7 +468,7 @@ async function initializeServer() {
         if (!key) {
           return res.json(["API key not set for OpenRouter - please configure it in the Vault"]);
         }
-        const response = await fetch("https://openrouter.ai/api/v1/models");
+        const response = await fetch("https://openrouter.ai/api/v1/models", { signal: AbortSignal.timeout(5000) });
         if (response.ok) {
           const list = await response.json();
           let names = (list.data || []).map((m: any) => m.id);
@@ -486,7 +486,7 @@ async function initializeServer() {
           return res.json(["API key not set for Gemini - please configure it in the Vault"]);
         }
         try {
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, { signal: AbortSignal.timeout(5000) });
           if (response.ok) {
             const list = await response.json();
             const names = (list.models || [])
@@ -508,7 +508,8 @@ async function initializeServer() {
             headers: {
               "x-api-key": key,
               "anthropic-version": "2023-06-01"
-            }
+            },
+            signal: AbortSignal.timeout(5000)
           });
           if (response.ok) {
             const list = await response.json();
@@ -528,7 +529,8 @@ async function initializeServer() {
           const response = await fetch("https://api.openai.com/v1/models", {
             headers: {
               "Authorization": `Bearer ${key}`
-            }
+            },
+            signal: AbortSignal.timeout(5000)
           });
           if (response.ok) {
             const list = await response.json();
