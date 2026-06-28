@@ -43,7 +43,24 @@ beforeEach(() => {
   postMock.mockResolvedValue(session);
   delMock.mockResolvedValue({});
   streamPostMock.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: vi.fn() }, configurable: true, writable: true,
+  });
 });
+
+// Build a streamPost mock that pushes the given SSE frames through onChunk.
+function streamWith(frames: Array<Record<string, unknown>>) {
+  return async (_url: string, _body: unknown, opts: { onChunk: (s: string) => void }) => {
+    await act(async () => {
+      for (const f of frames) opts.onChunk(`data: ${JSON.stringify(f)}\n\n`);
+    });
+  };
+}
+
+async function send(text: string) {
+  await typePrompt(text);
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', shiftKey: false });
+}
 
 async function typePrompt(text: string) {
   const box = screen.getByRole('textbox');
@@ -112,5 +129,85 @@ describe('ReactAgentTab — ReAct Specialist', () => {
     // Expanded detail shows the pretty-printed args path.
     await waitFor(() => expect(screen.getAllByText(/readme\.md/).length).toBeGreaterThan(0));
     expect(screen.getByRole('button', { name: /Collapse step detail/i })).toBeInTheDocument();
+  });
+
+  it('surfaces an error SSE frame as an error notification', async () => {
+    streamPostMock.mockImplementation(streamWith([{ type: 'error', message: 'boom' }]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('boom'), 'error'));
+  });
+
+  it('surfaces the verifier verdict (previously dropped verify event)', async () => {
+    streamPostMock.mockImplementation(streamWith([{ type: 'verify', verdict: 'PASS', reason: 'looks correct' }]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('PASS'), 'success'));
+  });
+
+  it('opens the approval wizard on a write_file step and POSTs the approved content', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'write_file', ok: true, latency: 4, args: { path: 'a.ts', content: 'X' }, diff: '+X', applied: false },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('write it');
+
+    const approve = await screen.findByRole('button', { name: /APPROVE WRITE/i });
+    fireEvent.click(approve);
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith('/api/agent/approve-write', { path: 'a.ts', content: 'X' }),
+    );
+  });
+
+  it('renders fenced code from an assistant message as a <pre> block', async () => {
+    streamPostMock.mockImplementation(streamWith([{ type: 'message', text: 'Here:\n```js\nconst x = 1\n```' }]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('show code');
+    const code = await screen.findByText(/const x = 1/);
+    expect(code.closest('pre')).not.toBeNull();
+  });
+
+  it('copy button writes the message to the clipboard', async () => {
+    streamPostMock.mockImplementation(streamWith([{ type: 'message', text: 'hello world' }]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('hi');
+    await screen.findByText('hello world');
+    fireEvent.click(screen.getAllByRole('button', { name: /Copy/i })[0]);
+    expect((navigator.clipboard.writeText as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect(onNotify).toHaveBeenCalledWith(expect.any(String), 'info');
+  });
+
+  it('upserts a re-emitted step (applied flip) instead of duplicating it', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'read_file', ok: true, latency: 1, args: { p: 1 }, result: 'first' },
+      { type: 'step', stepNum: 1, tool: 'read_file', ok: true, latency: 2, args: { p: 1 }, result: 'second' },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('read');
+    // Exactly one trace row (no duplicate), and it shows the UPDATED result.
+    const expanders = await screen.findAllByRole('button', { name: /Expand step detail/i });
+    expect(expanders).toHaveLength(1);
+    fireEvent.click(expanders[0]);
+    await waitFor(() => expect(screen.getAllByText(/second/).length).toBeGreaterThan(0));
+  });
+
+  it('deletes a session and clears active state', async () => {
+    getMock.mockImplementation((url: string) => {
+      if (url.includes('/api/models/')) return Promise.resolve(['gemini-3.5-flash']);
+      if (url.includes('/api/agent/sessions/')) return Promise.resolve(session);
+      if (url.includes('/api/agent/sessions')) return Promise.resolve([session]);
+      return Promise.resolve({});
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(screen.getByText('T')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Delete.*T/i }));
+    await waitFor(() => expect(delMock).toHaveBeenCalledWith('/api/agent/sessions/s1'));
   });
 });
