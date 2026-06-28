@@ -692,6 +692,7 @@ async function initializeServer() {
     // Surface which model the live agent runs (traceability: measured champion vs default).
     sendEvent("model", { provider: provider ?? "(chain default)", model: model ?? "(provider default)", source: _useCombo ? "combination" : "caller" });
     let finalText = ""; // captured at loop end for the opt-in verifier gate
+    let bestTokS = 0;   // best per-step generation throughput — the final-reply turn is often empty (qwen3 think:false), so track every step
 
     // Tool schemas come from the single registry (AGENTS.md §4 choke-point).
     const AGENT_TOOLS = ToolRegistry.schemas();
@@ -746,6 +747,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         if (result.tokens && result.tokens > 0) {
           recordUsage({ tenantId: "local", tool: "__llm__", tier: "safe", ok: true, latencyMs: result.latencyMs || 0, tokens: result.tokens });
         }
+        if (typeof result.tokensPerSec === "number" && result.tokensPerSec > bestTokS) bestTokS = result.tokensPerSec;
 
         // Collect LLM reply text
         if (result.text && result.text.trim()) {
@@ -851,7 +853,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           finalText = result.text || "";
           // Surface the final generation's throughput so dispatch benchmarking can measure
           // tok/s per run without a server round-trip (additive; clients ignore unknown fields).
-          sendEvent("done", { text: finalText, status: "complete", tokensPerSec: result.tokensPerSec ?? 0 });
+          sendEvent("done", { text: finalText, status: "complete", tokensPerSec: bestTokS || (result.tokensPerSec ?? 0) });
           break;
         }
 
@@ -859,7 +861,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       }
 
       if (stepNum > maxSteps && !shouldHalt) {
-        sendEvent("done", { text: "ReAct loop complete. Reached step depth limit.", status: "limit" });
+        sendEvent("done", { text: "ReAct loop complete. Reached step depth limit.", status: "limit", tokensPerSec: bestTokS });
       }
 
       // Opt-in implementer≠verifier gate (combination policy): an INDEPENDENT verifier
