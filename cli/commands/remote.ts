@@ -17,6 +17,7 @@ import {
   parseTailscalePeers,
   assignDiscoveredPriorities,
   formatPool,
+  shouldVerify,
 } from "../lib/remote";
 import type { Backend, BackendProbe } from "../lib/remote";
 import { decideTransition } from "../lib/fleet";
@@ -85,6 +86,53 @@ async function probeBackend(url: string): Promise<BackendProbe> {
 
 async function probeAll(pool: Backend[]): Promise<BackendProbe[]> {
   return Promise.all(pool.map((b) => probeBackend(b.url)));
+}
+
+// Inference liveness probe: a backend can be reachable (/api/tags OK) yet hung on
+// /api/generate (the desktop-ert7724 incident). A tiny 1-token generate under a
+// bounded timeout distinguishes "serving" from "reachable-but-dead". 12s > a warm
+// first-token / cold-load, < a true hang (100s+).
+async function probeResponsive(url: string, model: string, timeoutMs = 12_000): Promise<boolean> {
+  const base = url.replace(/\/+$/, "");
+  try {
+    const res = await fetch(`${base}/api/generate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model,
+        prompt: "hi",
+        stream: false,
+        keep_alive: "30m",
+        options: { num_predict: 1, num_ctx: 256 },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false; // timeout (hang) or connection error → not serving
+  }
+}
+
+// Generate-verify candidates in PRIORITY order, stopping at the first responsive one.
+// Mutates `probes[i].responsive` and the persistent `cache` so a hung backend is
+// skipped by selectBackend and a recovered one is re-admitted. Bounded by pool size.
+async function verifyCandidates(
+  pool: Backend[],
+  probes: BackendProbe[],
+  required: string[] | undefined,
+  cache: Map<string, boolean>,
+): Promise<void> {
+  const req = required ?? ["qwen3:8b"];
+  const model = req[0] ?? "qwen3:8b";
+  for (const backend of pool) {
+    const p = probes.find((x) => x.url === backend.url);
+    if (!p || !p.reachable) continue;
+    if (!req.every((m) => p.models.includes(m))) continue;
+    const ok = await probeResponsive(backend.url, model);
+    cache.set(backend.url, ok);
+    p.responsive = ok;
+    if (ok) return; // highest-priority responsive backend found — stop probing the rest
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,11 +409,16 @@ async function runUp(args: string[]): Promise<number> {
   const execCmd = (values.exec as string | undefined) ?? "npm start";
   const [execBin, ...execArgv] = execCmd.split(/\s+/).filter(Boolean);
 
-  // Initial probe
+  // Persistent inference-liveness cache across watch ticks (url → responsive).
+  const responsiveByUrl = new Map<string, boolean>();
+
+  // Initial probe — reachability, then generate-verify candidates in priority order
+  // so we never spawn the gateway on a reachable-but-hung backend.
   let probes = await probeAll(pool);
+  await verifyCandidates(pool, probes, requiredOpt, responsiveByUrl);
   const best = selectBackend(pool, probes, { required: requiredOpt });
   if (!best) {
-    process.stderr.write("ollamas remote up: no reachable backend found\n");
+    process.stderr.write("ollamas remote up: no reachable + responsive backend found\n");
     return 1;
   }
 
@@ -411,9 +464,20 @@ async function runUp(args: string[]): Promise<number> {
   // Watch loop
   return new Promise<number>((resolve) => {
     let pendingTick: ReturnType<typeof setTimeout> | undefined;
+    let tickCount = 0;
     const tick = async () => {
       if (shuttingDown) return;
+      tickCount++;
       probes = await probeAll(pool);
+      // forget liveness for backends that went unreachable (force a fresh verify on return)
+      for (const p of probes) if (!p.reachable) responsiveByUrl.delete(p.url);
+      // re-apply cached liveness (probeAll resets responsive to undefined each tick)
+      for (const p of probes) { const c = responsiveByUrl.get(p.url); if (c !== undefined) p.responsive = c; }
+      // throttled generate-verify (~every 30s): catches a mid-run hang of the active
+      // backend AND a hung higher-priority backend recovering — bounded, no per-tick storm.
+      if (shouldVerify(tickCount, intervalMs)) {
+        await verifyCandidates(pool, probes, requiredOpt, responsiveByUrl);
+      }
       const nowMs = Date.now();
       const transition = decideTransition(state, pool, probes, nowMs, { required: requiredOpt, minDwellMs });
 

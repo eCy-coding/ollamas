@@ -6,6 +6,7 @@ import {
   parseTailscalePeers,
   assignDiscoveredPriorities,
   formatPool,
+  shouldVerify,
 } from "../cli/lib/remote";
 import type { Backend, BackendProbe } from "../cli/lib/remote";
 import { decideTransition } from "../cli/lib/fleet";
@@ -114,6 +115,61 @@ describe("selectBackend", () => {
 
   it("returns null when pool is empty", () => {
     expect(selectBackend([], [])).toBeNull();
+  });
+
+  // generate-responsiveness: a backend that is reachable + has the model but whose
+  // inference is proven dead (responsive===false) must be skipped (the desktop-ert7724
+  // hang: /api/tags OK, /api/generate hung). Self-healing failover.
+  it("skips a reachable+model backend proven non-responsive, picks next", () => {
+    const pool = [mkBackend("a", 10), mkBackend("b", 20)];
+    const probes = [
+      { ...mkProbe("http://a:11434", true), responsive: false },
+      { ...mkProbe("http://b:11434", true), responsive: true },
+    ];
+    expect(selectBackend(pool, probes)?.name).toBe("b");
+  });
+
+  it("picks a responsive===true backend", () => {
+    const pool = [mkBackend("a", 10)];
+    const probes = [{ ...mkProbe("http://a:11434", true), responsive: true }];
+    expect(selectBackend(pool, probes)?.name).toBe("a");
+  });
+
+  it("treats responsive===undefined as eligible (back-compat: not yet generate-tested)", () => {
+    const pool = [mkBackend("a", 10)];
+    const probes = [mkProbe("http://a:11434", true)]; // no responsive field
+    expect(selectBackend(pool, probes)?.name).toBe("a");
+  });
+
+  it("returns null when the only reachable backend is non-responsive", () => {
+    const pool = [mkBackend("a", 10)];
+    const probes = [{ ...mkProbe("http://a:11434", true), responsive: false }];
+    expect(selectBackend(pool, probes)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shouldVerify — throttle for the periodic generate-probe of the active backend
+// ---------------------------------------------------------------------------
+describe("shouldVerify", () => {
+  it("verifies on the first tick (0)", () => {
+    expect(shouldVerify(0, 5_000)).toBe(true);
+  });
+
+  it("does not verify between the throttle boundaries", () => {
+    // 5s interval, 30s throttle → ticks 1..5 skip
+    expect(shouldVerify(1, 5_000)).toBe(false);
+    expect(shouldVerify(5, 5_000)).toBe(false);
+  });
+
+  it("verifies again at the ~30s boundary", () => {
+    // tick 6 * 5_000ms = 30_000ms ≥ everyMs → verify
+    expect(shouldVerify(6, 5_000)).toBe(true);
+  });
+
+  it("respects a custom everyMs", () => {
+    expect(shouldVerify(2, 5_000, 10_000)).toBe(true); // 2*5000=10000 ≥ 10000
+    expect(shouldVerify(1, 5_000, 10_000)).toBe(false);
   });
 });
 

@@ -17,6 +17,10 @@ export interface BackendProbe {
   reachable: boolean;
   mode?: string;
   models: string[];
+  // Inference liveness: undefined = not yet generate-tested (eligible);
+  // false = /api/generate proven dead/hung (skip — the desktop-ert7724 case:
+  // /api/tags OK but generate hangs); true = generate verified responsive.
+  responsive?: boolean;
 }
 
 // Validate, coerce, sort ascending by priority, dedupe by url.
@@ -49,9 +53,21 @@ export function selectBackend(
   for (const backend of pool) {
     const probe = probeMap.get(backend.url);
     if (!probe?.reachable) continue;
+    if (probe.responsive === false) continue; // reachable but inference proven dead → skip
     if (required.every((m) => probe.models.includes(m))) return backend;
   }
   return null;
+}
+
+// Throttle for the periodic generate-probe of the ACTIVE backend in the watch
+// loop. Returns true on the first tick (0) and whenever the elapsed wall-time
+// (tickCount * intervalMs) crosses an `everyMs` boundary — so a backend that goes
+// hung mid-run is detected within ~everyMs without generate-probing every tick.
+export function shouldVerify(tickCount: number, intervalMs: number, everyMs = 30_000): boolean {
+  if (tickCount <= 0) return true;
+  if (intervalMs <= 0 || everyMs <= 0) return true;
+  // fire once per everyMs window, robust to intervals that don't divide everyMs evenly
+  return Math.floor((tickCount * intervalMs) / everyMs) > Math.floor(((tickCount - 1) * intervalMs) / everyMs);
 }
 
 // DISCOVERY CORE: parse `tailscale status --json` output.
