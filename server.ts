@@ -2040,6 +2040,13 @@ content
     const isLive = CURRENT_MODE === "live";
     const report: Record<string, { status: "PASS" | "FAIL" | "WARN"; details: string }> = {};
 
+    // Health gates must stay responsive: bound each live LLM probe so a slow/cold
+    // model FAILs the gate fast instead of hanging the whole /api/selftest request.
+    // (The dashboard polls this endpoint; an un-bounded generate left it permanently
+    // "pending" → the selftest UI looked broken.)
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} exceeded ${ms}ms`)), ms))]);
+
     // G1: Mode Detect
     report["G1_Mode"] = {
       status: CURRENT_MODE !== "demo" ? "PASS" : "WARN",
@@ -2051,12 +2058,12 @@ content
     // G2: Ollama Probes
     if (CURRENT_MODE !== "demo") {
       try {
-        const pingResult = await ProviderRouter.generate({
+        const pingResult = await withTimeout(ProviderRouter.generate({
           provider: "ollama-local",
           model: "qwen3:8b", // Standard low weight local target
           messages: [{ role: "user", content: "ping" }],
           numCtx: 512,
-        });
+        }), 4000, "ollama ping");
         report["G2_OllamaHealth"] = {
           status: pingResult.text ? "PASS" : "WARN",
           details: `Reachable and responded: ${pingResult.text.substring(0, 40)}`,
@@ -2076,11 +2083,11 @@ content
 
     // G3: Sequential Pipeline Fallback Check
     try {
-      const pipelineResult = await ProviderRouter.generate({
+      const pipelineResult = await withTimeout(ProviderRouter.generate({
         provider: CURRENT_MODE === "live" ? "ollama-local" : "demo",
         model: CURRENT_MODE === "live" ? "qwen3:8b" : "simulation",
         messages: [{ role: "user", content: "test design target" }],
-      });
+      }), 4000, "pipeline router");
       const expectedSource = CURRENT_MODE === "live" ? "ollama_local" : "demo";
       report["G3_PipelineFallback"] = {
         status: pipelineResult.source === expectedSource ? "PASS" : "WARN",
@@ -2193,7 +2200,7 @@ content
           }
         ];
         // Execute a quick, low-cost tool test against the local provider
-        const toolResult = await ProviderRouter.generate({
+        const toolResult = await withTimeout(ProviderRouter.generate({
           provider: "ollama-local",
           model: "qwen3:8b",
           messages: [
@@ -2202,7 +2209,7 @@ content
           ],
           tools: TEST_TOOLS,
           numCtx: 1024,
-        });
+        }), 6000, "agent tool-loop");
 
         const hasToolCall = !!(toolResult.toolCalls && toolResult.toolCalls.some(tc => tc.name === "list_tree"));
         const wasOllamaLocal = toolResult.source === "ollama_local";

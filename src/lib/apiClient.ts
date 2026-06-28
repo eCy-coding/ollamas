@@ -99,7 +99,10 @@ async function request<T = Json>(endpoint: string, opts: RequestOpts = {}): Prom
         } catch {
           body = await res.text().catch(() => undefined);
         }
-        if (res.status === 401 || res.status === 403 || isTransient(res.status)) {
+        // 401/403 are first-class auth states (callers like useUsage treat them as
+        // "unauthorized", not failures) — logging them as client errors falsely
+        // inflated the RUM error counter. Only transient (429/5xx) faults are errors.
+        if (isTransient(res.status)) {
           logClientEvent(`api_error ${res.status} ${method} ${endpoint}`, { status: res.status });
         }
         if (isTransient(res.status) && attempt < retries) {
