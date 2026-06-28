@@ -1,5 +1,15 @@
 # LANE_PROMPTS_DISPATCH — yapıştır-hazır görev prompt'ları (vO19 teslimat)
 
+> **✅ IMPLEMENTED 2026-06-29 (ultracode Workflow + skill-routed integration, scope-override):** the cli/scripts/e2e
+> deliverables below are BUILT + committed on `chore/p1-hardening` — `c2c998a` feat(cli) (RemoteAgentClient +
+> taskId ledger + assignWorker + `ollamas remote dispatch` subcommand + failover), `18d4ee5` feat(scripts)
+> (agent-dispatch `--remote` + dispatch-merge + ready `--remote` + ESM crash fix), `66861b6` test (27 pure routing/
+> ledger cases green + dispatch.e2e skip-with-warn). Verified vs the oracle: whole-repo `tsc` 0, N-012 clean,
+> reproduces DISPATCH_SIM golden trace, satisfies INVARIANTS I1-I5+I13. **Env-gated (the one physical step):**
+> full-remote LIVE dispatch needs the ollamas gateway running ON desktop-ert7724 (Windows) + a live dispatch-bench
+> run to populate `DISPATCH_SELECTION.json` → then `reconcile.ts` advances REBENCH→DISPATCH. fleet-join.ps1 gateway
+> bring-up = the remaining Windows-physical script (ready.mjs `--remote` probes its readiness).
+
 > Orchestration lane üretti (`SPEC_DISPATCH.md`'den). Her blok **sahibi lane sekmesine** yapıştırılır;
 > o lane uygular (Scope §3 — bu sekme kod yazmaz). Sıra: a→b→c→d (cli), s.1→s.2 (scripts), e.1 (e2e).
 > Ortak çalışma prensibi (her görev): root-cause → TDD (test önce) → evidence-first (komut+çıktı) →
