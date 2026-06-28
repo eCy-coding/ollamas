@@ -83,7 +83,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       setActiveSessionId(data.id);
       setProvider(data.providerId || "gemini");
       setModel(data.modelId || "gemini-3.5-flash");
-      setMessages(data.messages.length > 0 ? data.messages : [
+      setMessages((data.messages || []).length > 0 ? data.messages : [
         {
           role: "assistant",
           content: _("react-agent.greeting.back")

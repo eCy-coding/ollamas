@@ -17,7 +17,7 @@ export function RevenueOps({ onNotify }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<unknown>(null);
 
-  useEffect(() => { api.get<Cfg>("/api/revenue/config").then(setCfg).catch(() => undefined); }, []);
+  useEffect(() => { api.get<Cfg>("/api/revenue/config").then(setCfg).catch((e) => onNotify((e as Error)?.message || "revenue config load failed", "error")); }, []);
 
   const err = (e: unknown) => onNotify((e as Error)?.message || "error", "error");
 

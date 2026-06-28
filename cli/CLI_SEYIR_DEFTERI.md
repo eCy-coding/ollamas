@@ -5,6 +5,12 @@
 
 ---
 
+## N-046 · eşzamanlı committer (karargah opensource-loop) → izole worktree şart (E-003 tekrarı, 2026-06-28)
+- **Semptom**: `chore/p1-hardening`'e yapılan manuel commit'ler bozuldu — server batch'i başka bir commit'e (`a68bb0b`) karıştı, staged index `git add`'den sonra commit'ten önce takas oldu (yanlış dosya seti commit'lendi).
+- **Kök neden**: `com.karargah1.opensource-loop` LaunchAgent → `~/Desktop/karargah1/sbin/opensource-loop --once` → **headless Claude Code session** (`claude --output-format stream-json`) ollamas repo'sunu otonom geliştirip (vO17-20, dispatchsim/doctor, MASTER_DISPATCH iter) paylaşılan branch'e **birkaç dakikada bir commit ediyor**. Tek paylaşılan working-tree index'i yarışıyor. **E-003'ün birebir tekrarı.**
+- **Fix**: **izole git worktree** (`EnterWorktree` native, `.claude/worktrees/audit-cont`, HEAD-base `fix/audit-cont`, node_modules ana-repo symlink). Ayrı git-dir/index → loop ana-checkout'a commit ederken benim staging'ime dokunamaz. Bitince `fix/audit-cont` → `chore/p1-hardening` merge.
+- **ÖNLEME KURALI**: bu repo'da (loop aktifken) İŞİ DAİMA izole worktree'de yap (CLAUDE.md §2 + E-003). Concurrent worker'ı durdurmaya çalışma — izole ol. Faz-başı hemen commit.
+
 ## v20 — enterprise/GA · `saas audit export` (2026-06-28)
 
 ### N-043 · audit export ≤1000-satır server-cap, cursor YOK
