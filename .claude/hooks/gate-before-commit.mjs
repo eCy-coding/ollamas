@@ -34,10 +34,16 @@ process.stdin.on("data", (c) => (raw += c)).on("end", () => {
 
   // --amend is legitimate with nothing newly staged → skip the staged-empty check.
   if (isCommit && !/--amend/.test(cmd)) {
+    // Worktree-aware: if the command `cd`s into a dir first, check THAT repo/worktree's index
+    // (the hook runs in CLAUDE_PROJECT_DIR = main repo; without this, worktree commits wrongly
+    // report "nothing staged" because the main index is empty).
+    const cds = [...cmd.matchAll(/(?:^|;|&&)\s*cd\s+("[^"]+"|'[^']+'|\S+)/g)];
+    const last = cds[cds.length - 1]; // effective cwd = the LAST cd in the chain
+    const cwd = last ? last[1].replace(/^['"]|['"]$/g, "") : undefined;
     try {
-      execSync("git diff --cached --quiet", { stdio: "ignore" }); // exit 0 = nothing staged
+      execSync("git diff --cached --quiet", { stdio: "ignore", ...(cwd ? { cwd } : {}) }); // exit 0 = nothing staged
       deny("nothing staged — `git add <file>` the intended changes before committing.");
-    } catch { /* non-zero = staged changes exist → OK */ }
+    } catch { /* non-zero = staged changes exist (or cwd unresolvable → let git surface it) → OK */ }
   }
   process.exit(0);
 });
