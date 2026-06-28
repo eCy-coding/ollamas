@@ -107,9 +107,13 @@ async function probeResponsive(url: string, model: string, timeoutMs = 12_000): 
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    return res.ok;
+    // ANY HTTP response (incl. 503 "server busy" / transient 5xx) proves the backend
+    // is ALIVE and not hung — the failure we guard against is NO response within the
+    // timeout. Marking a momentarily-busy backend dead would thrash the supervisor.
+    res.body?.cancel().catch(() => {});
+    return true;
   } catch {
-    return false; // timeout (hang) or connection error → not serving
+    return false; // AbortError (timeout = hung) or connection error (offline) → not serving
   }
 }
 
