@@ -94,8 +94,9 @@ export function optimalConfig(ramGb: number, cores: number, model: string): OptC
   else if (ramGb >= 24) num_ctx = 8192;
   else if (ramGb >= 16) num_ctx = 4096;
   else num_ctx = 2048;
-  // Büyük model + büyük ctx aynı anda → ctx'i bir tık düşür (VRAM baskısı).
-  if (modelVramGb(model) >= 18 && num_ctx > 8192) num_ctx = 8192;
+  // (Dead `num_ctx > 8192` cap removed: num_ctx never exceeds 8192, so the branch
+  // was unreachable. On Apple-Silicon unified memory a model that passes vramFit has
+  // room for an 8192 context anyway — the RAM-tier logic above is authoritative.)
   return { num_ctx, num_gpu: 999, num_thread: numThread, keep_alive: "30m", quant: "Q4_K_M" };
 }
 

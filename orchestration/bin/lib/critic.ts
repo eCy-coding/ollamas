@@ -85,10 +85,12 @@ export function auditDuplication(tools: { name: string; purpose: string }[]): Ga
   for (let i = 0; i < tools.length; i++) {
     for (let j = i + 1; j < tools.length; j++) {
       const a = new Set(keywords(tools[i].purpose).filter(distinctive));
-      const b = keywords(tools[j].purpose).filter(distinctive);
-      if (!a.size || !b.length) continue;
-      const overlap = b.filter((k) => a.has(k)).length;
-      const ratio = overlap / Math.min(a.size, b.length);
+      // Dedupe b too (a is a Set): a repeated keyword in b's purpose used to
+      // inflate the overlap count above the true distinct-keyword overlap.
+      const b = new Set(keywords(tools[j].purpose).filter(distinctive));
+      if (!a.size || !b.size) continue;
+      const overlap = [...b].filter((k) => a.has(k)).length;
+      const ratio = overlap / Math.min(a.size, b.size);
       if (overlap >= 2 && ratio >= 0.5) {
         out.push({ kind: "duplication", severity: "med", target: `${tools[i].name}↔${tools[j].name}`, detail: `${tools[i].name} ve ${tools[j].name} ayırt-edici amaç-örtüşmesi (${overlap} distinktif kelime) — olası duplicate`, action: `${tools[i].name}/${tools[j].name} dedup ya da rol ayrımını netleştir` });
       }

@@ -51,7 +51,12 @@ function detailFor(step: string): string {
   if (step === "conduct") {
     const f = join(ORCH_DIR, "CONDUCTOR.md");
     if (existsSync(f)) {
-      const line = readFileSync(f, "utf8").split("\n").find((l) => /next|sonraki|aksiyon|action|→/i.test(l) && l.trim().length > 8);
+      // Skip the markdown table HEADER (e.g. "| Lane | Şu an | → Sıradaki |", which
+      // matches "→") and separator rows; return the first real data row. A header is
+      // a row immediately followed by a "|---|" separator.
+      const ls = readFileSync(f, "utf8").split("\n");
+      const isSep = (l: string) => /^\s*\|?[\s:|-]+\|?\s*$/.test(l) && l.includes("-");
+      const line = ls.find((l, i) => /next|sonraki|aksiyon|action|→/i.test(l) && l.trim().length > 8 && !isSep(l) && !isSep(ls[i + 1] || ""));
       if (line) return line.replace(/[#>*`|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
     }
     return "karar tazelendi";
@@ -96,7 +101,7 @@ function runDoctor(): StepResult {
 
 /** server :3000 read-only probe (refresh path şart). */
 function serverUp(): boolean {
-  try { execFileSync("curl", ["-s", "-m", "2", "-o", "/dev/null", "http://localhost:3000/api/health"], { stdio: ["ignore", "ignore", "ignore"] }); return true; }
+  try { execFileSync("curl", ["-sf", "-m", "2", "-o", "/dev/null", "http://localhost:3000/api/health"], { stdio: ["ignore", "ignore", "ignore"] }); return true; } // -f: HTTP >=400 → non-zero exit → not "up"
   catch { return false; }
 }
 
