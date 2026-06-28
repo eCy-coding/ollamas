@@ -45,4 +45,27 @@ describe("foldMetrics — verdict/correct/steps/tokS from SSE events", () => {
     expect(() => foldMetrics(null as any)).not.toThrow();
     expect(foldMetrics([null, 42, "x"] as any).steps).toBe(0);
   });
+  it("server tokS=0 + latency → wall-clock ESTIMATE, flagged tokSEstimated", () => {
+    const events = [
+      { type: "step", tool: "write_host_file", args: { path: "/x/factorial.py" }, ok: true },
+      { type: "done", text: "VERDICT: DONE saw 120", tokensPerSec: 0 },
+    ];
+    // genChars = "write_host_file"(15) + JSON({path})(~22) + "VERDICT: DONE saw 120"(21) ≈ 58 → /4 ≈ 14.5 tok over 2s
+    const m = foldMetrics(events, 2000);
+    expect(m.tokSEstimated).toBe(true);
+    expect(m.tokS).toBeGreaterThan(0);
+  });
+  it("server tokS present → ground-truth wins, NOT estimated", () => {
+    const events = [
+      { type: "step", tool: "macos_terminal", args: { cmd: "python3 f" }, ok: true },
+      { type: "done", text: "VERDICT: DONE", tokensPerSec: 31.5 },
+    ];
+    const m = foldMetrics(events, 2000);
+    expect(m.tokS).toBe(31.5);
+    expect(m.tokSEstimated).toBe(false);
+  });
+  it("estimate is deterministic for fixed inputs", () => {
+    const events = [{ type: "done", text: "VERDICT: DONE 120", tokensPerSec: 0 }];
+    expect(foldMetrics(events, 1000).tokS).toBe(foldMetrics(events, 1000).tokS);
+  });
 });

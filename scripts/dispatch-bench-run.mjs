@@ -93,16 +93,22 @@ function canonArgs(args) {
   return JSON.stringify(v);
 }
 
-export function foldMetrics(events) {
+// latencyMs enables a wall-clock tok/s estimate when the server omits a real rate (degraded
+// ollama → done.tokensPerSec=0). Estimate = model-generated chars / 4 (≈tokens) ÷ seconds.
+export function foldMetrics(events, latencyMs = 0) {
   const steps = [];
   const messages = [];
   const errors = [];
   let tokS = 0;
+  let genChars = 0; // model-generated text: assistant messages + tool-call args it emitted
   for (const ev of Array.isArray(events) ? events : []) {
     if (!ev || typeof ev !== "object") continue;
-    if (ev.type === "step") steps.push({ tool: ev.tool, args: JSON.stringify(ev.args ?? null), ok: ev.ok });
-    else if (ev.type === "message") { if (ev.text) messages.push(ev.text); }
-    else if (ev.type === "done") { if (ev.text) messages.push(ev.text); if (typeof ev.tokensPerSec === "number") tokS = ev.tokensPerSec; }
+    if (ev.type === "step") {
+      steps.push({ tool: ev.tool, args: JSON.stringify(ev.args ?? null), ok: ev.ok });
+      genChars += (ev.tool ? String(ev.tool).length : 0) + JSON.stringify(ev.args ?? "").length;
+    }
+    else if (ev.type === "message") { if (ev.text) { messages.push(ev.text); genChars += ev.text.length; } }
+    else if (ev.type === "done") { if (ev.text) { messages.push(ev.text); genChars += ev.text.length; } if (typeof ev.tokensPerSec === "number") tokS = ev.tokensPerSec; }
     else if (ev.type === "error") errors.push(ev.message || "err");
   }
   const demoSuspected = steps.length === 0 && messages.length > 0 && errors.length === 0;
@@ -110,7 +116,13 @@ export function foldMetrics(events) {
   const verdict = /VERDICT:\s*DONE/i.test(final) ? "DONE" : /VERDICT:\s*BLOCKED/i.test(final) ? "BLOCKED"
     : (steps.length > 0 && steps.every((s) => s.ok) && errors.length === 0 && !demoSuspected) ? "OK" : "INCOMPLETE";
   const correct = (verdict === "DONE" || verdict === "OK") && !demoSuspected;
-  return { steps: steps.length, dupTools: countDupTools(steps), correct, tokS, verdict };
+  // Server value is ground-truth; estimate only fills the 0 gap (honestly flagged).
+  let tokSEstimated = false;
+  if (!(tokS > 0) && latencyMs > 0 && genChars > 0) {
+    tokS = Math.round(((genChars / 4) / (latencyMs / 1000)) * 10) / 10;
+    tokSEstimated = true;
+  }
+  return { steps: steps.length, dupTools: countDupTools(steps), correct, tokS, tokSEstimated, verdict };
 }
 
 // ── thin IO: one dispatch → events ───────────────────────────────────────────────────
@@ -157,9 +169,9 @@ async function main() {
         const t0 = Date.now();
         const events = await dispatchOnce(m.url, content);
         const latencyMs = Date.now() - t0;
-        const met = foldMetrics(events);
-        records.push({ variant, machine: m.name, correct: met.correct, steps: met.steps, dupTools: met.dupTools, latencyMs, tokS: met.tokS });
-        console.error(`[dispatch-bench] ${variant} × ${m.name} run ${r + 1}/${RUNS}: ${met.verdict} · ${met.steps} steps · ${met.dupTools} dup · ${latencyMs}ms · ${met.tokS} tok/s`);
+        const met = foldMetrics(events, latencyMs);
+        records.push({ variant, machine: m.name, correct: met.correct, steps: met.steps, dupTools: met.dupTools, latencyMs, tokS: met.tokS, tokSEstimated: met.tokSEstimated });
+        console.error(`[dispatch-bench] ${variant} × ${m.name} run ${r + 1}/${RUNS}: ${met.verdict} · ${met.steps} steps · ${met.dupTools} dup · ${latencyMs}ms · ${met.tokS}${met.tokSEstimated ? "~" : ""} tok/s`);
       }
     }
   }
