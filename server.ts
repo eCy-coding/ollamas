@@ -1252,6 +1252,18 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     res.json({ ok: true });
   });
 
+  // Reset RUM telemetry. The dashboard's web-vitals p75 + client-error counts are
+  // derived from this append-only file; without a reset, a one-time bad metric
+  // (e.g. a since-fixed CLS regression) lingers in the p75 window indefinitely.
+  app.delete("/api/logbook", (_req, res) => {
+    try {
+      if (fs.existsSync(SEYIR_FILE)) fs.writeFileSync(SEYIR_FILE, "");
+      res.json({ ok: true, cleared: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   /**
    * Real macOS terminal (iTerm2 / Terminal.app) via host-side bridge.
    * Runs commands in a visible window in real time — full host privileges.
