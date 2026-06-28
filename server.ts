@@ -2124,8 +2124,13 @@ content
 
     // G5: Safe Terminal Exec Sandbox
     try {
-      const blockedTest1 = await TerminalManager.execute(isLive, "/root", "rm -rf /");
-      const blockedTest2 = await TerminalManager.execute(isLive, "/root", "cat /etc/passwd; ls");
+      // Force the LIVE blocking path (isLive=true) so the gate verifies the real
+      // sandbox, not the demo simulator. Safe: a blocked token ('rm') / metacharacter
+      // (';') returns 126 at steps 2-3, before any child_process ever spawns — the
+      // dangerous command is intercepted, never executed. (In degraded-live isLive is
+      // false → execute() simulates → exitCode≠126 → the gate falsely FAILed.)
+      const blockedTest1 = await TerminalManager.execute(true, "/root", "rm -rf /");
+      const blockedTest2 = await TerminalManager.execute(true, "/root", "cat /etc/passwd; ls");
       if (blockedTest1.exitCode === 126 && blockedTest2.exitCode === 126) {
         report["G5_TerminalSandbox"] = {
           status: "PASS",
