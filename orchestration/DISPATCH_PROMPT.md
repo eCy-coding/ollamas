@@ -8,7 +8,7 @@
 | Makine | Variant | correct | adım | latency | tok/s | gerekçe |
 |--------|---------|--------:|-----:|--------:|------:|---------|
 | desktop-ert7724 | — | 0 | 0 | 0ms | 0 | veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir) |
-| mac | ecypro-base | 1 | 3 | 75518ms | 0 | correct 1 ≥ 0.7 · 3 adım · 0 dup · 75518ms · 0 tok/s |
+| mac | ecypro-strict | 1 | 4 | 43702ms | 0 | correct 1 ≥ 0.7 · 4 adım · 0 dup · 43702ms · 0 tok/s |
 </selected-variants>
 
 <routing>  (assignWorker — pure, fleet.ts decideTransition deseni)

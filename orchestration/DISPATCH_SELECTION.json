@@ -1,5 +1,5 @@
 {
-  "ts": "2026-06-28T21:41:04.481Z",
+  "ts": "2026-06-28T22:20:34.354Z",
   "stale": false,
   "machines": [
     {
@@ -13,12 +13,12 @@
     },
     {
       "machine": "mac",
-      "variant": "ecypro-base",
+      "variant": "ecypro-strict",
       "correctRatio": 1,
-      "medianSteps": 3,
-      "medianLatencyMs": 75518,
+      "medianSteps": 4,
+      "medianLatencyMs": 43702,
       "medianTokS": 0,
-      "reason": "correct 1 ≥ 0.7 · 3 adım · 0 dup · 75518ms · 0 tok/s"
+      "reason": "correct 1 ≥ 0.7 · 4 adım · 0 dup · 43702ms · 0 tok/s"
     }
   ],
   "gate": 0.7
