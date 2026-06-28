@@ -14,7 +14,7 @@ export const VirtualController = () => {
             });
             setAction(`Done: ${JSON.stringify(data)}`);
         } catch (e) {
-            setAction('Error sending input event');
+            setAction(`Error sending input event: ${(e as Error)?.message || "unknown"}`);
         }
     };
 

@@ -62,7 +62,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({ onNotify, activePa
     try {
       const data: any = await api.get(`/api/workspace/file?relativePath=${encodeURIComponent(relativePath)}`);
       setEditingFile(relativePath);
-      setEditorContent(data.content);
+      setEditorContent(data?.content ?? ""); // empty/missing content → blank editor, not "undefined"
       onNotify(`Loaded: ${relativePath}`, "info");
     } catch (e: any) {
       if (e instanceof ApiError) {

@@ -48,10 +48,10 @@ export const SecurityPolicies: React.FC<PoliciesProps> = ({ onNotify, permission
       onPermissionsChange();
       fetchLogs();
     } catch (e: any) {
-      // non-ok previously fell through silently; only surface non-ApiError (network) failures
-      if (!(e instanceof ApiError)) {
-        onNotify(e.message, "error");
-      }
+      // Surface ALL failures: a server rejection (ApiError) was silently swallowed, so a
+      // denied toggle showed false success. Notify + re-fetch perms to revert the UI.
+      onNotify(e instanceof ApiError ? `Permission update rejected (${e.status})` : (e?.message || "error"), "error");
+      onPermissionsChange();
     }
   };
 

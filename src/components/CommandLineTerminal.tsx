@@ -25,7 +25,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
     setLogs((prev) => [...prev, `$ ${cmdStr}`]);
 
     try {
-      const data: any = await api.post("/api/terminal", { command: cmdStr });
+      const data: any = (await api.post("/api/terminal", { command: cmdStr })) ?? {}; // never deref null on an empty body
 
       if (data.stderr) {
         setLogs((prev) => [...prev, `[FAIL] (exit: ${data.exitCode || 1}): ${data.stderr}`]);

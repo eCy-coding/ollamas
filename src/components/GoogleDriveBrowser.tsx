@@ -44,6 +44,7 @@ export function GoogleDriveBrowser() {
   const handleDelete = async (fileId: string, fileName: string) => {
     const confirmed = window.confirm(`Are you sure you want to delete '${fileName}'? This action cannot be undone.`);
     if (!confirmed) return;
+    if (!token) { alert("Not authenticated with Google Drive — sign in first."); return; } // avoid a 'Bearer null' request
 
     try {
       // external Google API — not ollamas choke-point (FRONTEND_AGENTS.md §1)
