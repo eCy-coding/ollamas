@@ -15,6 +15,7 @@ import {
   parseBackendPool,
   selectBackend,
   parseTailscalePeers,
+  assignDiscoveredPriorities,
   formatPool,
 } from "../lib/remote";
 import type { Backend, BackendProbe } from "../lib/remote";
@@ -194,17 +195,12 @@ async function runDiscover(args: string[]): Promise<number> {
   }
 
   // Build backends: peers excluding Self get priority 10, 20, …; Self gets 99
-  // (Mac-local is the control plane, less preferred for GPU work)
+  // (Mac-local is the control plane, less preferred for GPU work). Pure-fn so the
+  // priority arithmetic is unit-tested (workers must stay below Self's 99).
   const selfHost =
     statusJson?.Self?.DNSName?.replace(/\.$/, "") ?? "";
 
-  let workerPriority = 10;
-  const discovered: Backend[] = peers.map((p) => {
-    const isSelf = p.host === selfHost;
-    const priority = isSelf ? 99 : workerPriority++ * 10;
-    const url = `http://${p.ip || p.host}:11434`;
-    return { name: p.host.split(".")[0], url, priority };
-  });
+  const discovered: Backend[] = assignDiscoveredPriorities(peers, selfHost);
 
   // Probe all
   const probes = await probeAll(discovered);

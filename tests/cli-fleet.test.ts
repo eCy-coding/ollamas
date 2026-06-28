@@ -4,6 +4,7 @@ import {
   parseBackendPool,
   selectBackend,
   parseTailscalePeers,
+  assignDiscoveredPriorities,
   formatPool,
 } from "../cli/lib/remote";
 import type { Backend, BackendProbe } from "../cli/lib/remote";
@@ -169,6 +170,46 @@ describe("parseTailscalePeers", () => {
     const peers = parseTailscalePeers(status);
     expect(peers).toHaveLength(1);
     expect(peers[0].host).toBe("macbook.tailnet.ts.net");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignDiscoveredPriorities — workers most-preferred (10,20,30…), Self last (99)
+// ---------------------------------------------------------------------------
+describe("assignDiscoveredPriorities", () => {
+  const peers = [
+    { host: "mac.tailnet.ts.net", ip: "100.64.0.1" },
+    { host: "win1.tailnet.ts.net", ip: "100.64.0.2" },
+    { host: "win2.tailnet.ts.net", ip: "100.64.0.3" },
+  ];
+
+  it("gives workers ascending 10,20,30 and Self 99 (workers preferred over control plane)", () => {
+    const got = assignDiscoveredPriorities(peers, "mac.tailnet.ts.net");
+    const byName = Object.fromEntries(got.map((b) => [b.name, b.priority]));
+    expect(byName.win1).toBe(10);
+    expect(byName.win2).toBe(20);
+    expect(byName.mac).toBe(99); // control plane is last-resort fallback, NOT 100/110
+  });
+
+  it("worker priorities stay below Self(99) regardless of peer order", () => {
+    const got = assignDiscoveredPriorities(peers, "mac.tailnet.ts.net");
+    const workers = got.filter((b) => b.name !== "mac");
+    expect(workers.every((b) => b.priority < 99)).toBe(true);
+  });
+
+  it("uses IP for url when present, short name from host", () => {
+    const got = assignDiscoveredPriorities(peers, "mac.tailnet.ts.net");
+    const win1 = got.find((b) => b.name === "win1")!;
+    expect(win1.url).toBe("http://100.64.0.2:11434");
+    expect(win1.name).toBe("win1");
+  });
+
+  it("falls back to host in url when ip is empty", () => {
+    const got = assignDiscoveredPriorities(
+      [{ host: "win.tailnet.ts.net", ip: "" }],
+      "mac.tailnet.ts.net",
+    );
+    expect(got[0].url).toBe("http://win.tailnet.ts.net:11434");
   });
 });
 

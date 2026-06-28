@@ -90,6 +90,23 @@ export function parseTailscalePeers(
   return peers;
 }
 
+// DISCOVERY CORE: turn discovered tailnet peers into a fleet pool.
+// GPU workers get ascending 10, 20, 30… (most-preferred first); Self (the control
+// plane) gets 99 — a last-resort fallback, less preferred than any real worker.
+// (Self stays below 100 so `selectBackend` never picks the Mac over a live worker.)
+export function assignDiscoveredPriorities(
+  peers: { host: string; ip?: string }[],
+  selfHost: string,
+): Backend[] {
+  let workerIndex = 1;
+  return peers.map((p) => {
+    const isSelf = p.host === selfHost;
+    const priority = isSelf ? 99 : workerIndex++ * 10;
+    const url = `http://${p.ip || p.host}:11434`;
+    return { name: p.host.split(".")[0], url, priority };
+  });
+}
+
 // TTY-aware pool table: name, priority, url, reachable, model count, qwen3:8b.
 // selected (active) backend is marked with *.
 export function formatPool(
