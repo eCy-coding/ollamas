@@ -66,6 +66,17 @@ function gatherSignals(): HorizonSignal[] {
     }
   }
   sigs.push(...normalizeDrift(driftRows));
+
+  // 5. dispatch-selection gap (vO19): bir makine için variant=null (ölçüm yok / aday gate geçmedi)
+  // → o makinede dispatch-bench koşulması gereken bir cli-lane backlog sinyali (normalizeBacklog REUSE).
+  const dispatch = readJson<{ machines?: { machine?: string; variant?: string | null }[] }>(
+    join(ORCH_DIR, "DISPATCH_SELECTION.json"), {});
+  for (const m of dispatch.machines || []) {
+    if (m && m.machine && (m.variant === null || m.variant === undefined)) {
+      backlog.push({ lane: "cli", next: `dispatch-bench needed for ${m.machine} (variant unselected)` });
+    }
+  }
+
   sigs.push(...normalizeBacklog(backlog));
   return sigs;
 }

@@ -453,8 +453,12 @@ export class ProviderRouter {
     switch (config.provider) {
       case "ollama-local": {
         const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
+        // The model actually used. After a provider fallback config.model is nulled
+        // so each provider self-defaults; reporting config.model in the returns would
+        // surface modelUsed:undefined — resolve it once here and reuse everywhere.
+        const usedModel = config.model || "qwen3:8b";
         const reqBody = JSON.stringify({
-          model: config.model || "qwen3:8b",
+          model: usedModel,
           messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args, not stringified
           options: {
             num_ctx: numCtx,
@@ -510,12 +514,25 @@ export class ProviderRouter {
           const decoder = new TextDecoder();
           let accumulated = "";
           let fullText = "";
+          let streamToolCalls: any[] | undefined;
+          // Map accumulated ollama tool_calls into the ToolCall shape (mirrors the
+          // non-stream branch); fall back to text-embedded tool calls. The streaming
+          // branch used to forward only content and silently drop tool_calls.
+          const mapStreamCalls = (): ToolCall[] | undefined => {
+            let tc = streamToolCalls?.map((t: any) => ({
+              id: t.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
+              name: t.function?.name,
+              arguments: typeof t.function?.arguments === "string" ? safeJsonObj(t.function.arguments) : t.function?.arguments,
+            }));
+            if (!tc || tc.length === 0) tc = extractTextToolCalls(fullText) ?? tc;
+            return tc;
+          };
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
-            
+
             // Ollama streams JSON line-by-line
             const lines = accumulated.split("\n");
             accumulated = lines.pop() || "";
@@ -524,6 +541,7 @@ export class ProviderRouter {
               if (!line.trim()) continue;
               try {
                 const parsed = JSON.parse(line);
+                if (parsed?.message?.tool_calls?.length) streamToolCalls = parsed.message.tool_calls;
                 const chunkText = parsed?.message?.content || "";
                 if (chunkText) {
                   onStreamChunk(chunkText);
@@ -533,9 +551,10 @@ export class ProviderRouter {
                   // Capture the token count even when the done chunk omits eval_duration
                   // (compute tps only when we can) so the billing meter never under-counts.
                   return {
-                    text: fullText, source: "ollama_local", modelUsed: config.model,
+                    text: fullText, source: "ollama_local", modelUsed: usedModel,
                     tokens: parsed.eval_count,
                     tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : undefined,
+                    toolCalls: mapStreamCalls(),
                   };
                 }
               } catch (e) {
@@ -543,7 +562,7 @@ export class ProviderRouter {
               }
             }
           }
-          return { text: fullText, source: "ollama_local", modelUsed: config.model };
+          return { text: fullText, source: "ollama_local", modelUsed: usedModel, toolCalls: mapStreamCalls() };
         } else {
           const resultJson = await response.json();
           let reply = resultJson?.message?.content || "";
@@ -568,7 +587,7 @@ export class ProviderRouter {
           // Fallback: some models emit tool calls as text — recover them.
           if (!toolCalls || toolCalls.length === 0) toolCalls = extractTextToolCalls(reply) ?? toolCalls;
 
-          return { text: reply, source: "ollama_local", modelUsed: config.model, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
+          return { text: reply, source: "ollama_local", modelUsed: usedModel, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
         }
       }
 

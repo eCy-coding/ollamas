@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import { DesktopCommander } from './commander';
@@ -15,7 +16,7 @@ export class OrchestratorCoordinator {
     private static JOB_STORE = new Map<string, { status: 'running' | 'completed' | 'failed', result?: any }>();
 
     public static async submitJob(toolName: string, payload: any): Promise<string> {
-        const jobId = Math.random().toString(36).substring(7);
+        const jobId = crypto.randomUUID();
         this.JOB_STORE.set(jobId, { status: 'running' });
         
         this.executeTool(toolName, payload).then(result => {
@@ -33,23 +34,25 @@ export class OrchestratorCoordinator {
 
     public static async executeTool(name: string, payload: any) {
         const tool = this.REGISTRY[name.toLowerCase()];
-        if (!tool) {
+        // self_analyzer is a built-in local capability not present in tools.json;
+        // it must bypass the registry guard or it would be permanently unreachable.
+        if (!tool && name.toLowerCase() !== 'self_analyzer') {
             console.error(`[CRITICAL] Registration failure: ${name}`);
             return { success: false, error: 'Registration not found' };
         }
 
-        console.log(`[OBSERVABILITY][${new Date().toISOString()}] Orchestrating: ${name} | Capability: ${tool.capability}`);
-        
+        console.log(`[OBSERVABILITY][${new Date().toISOString()}] Orchestrating: ${name} | Capability: ${tool?.capability ?? 'LOCAL'}`);
+
         const startTime = Date.now();
-        const maxRetries = tool.selfHealing ? 3 : 0;
+        const maxRetries = tool?.selfHealing ? 3 : 0;
         let retryCount = 0;
 
         while (true) {
             try {
                 let result;
-                if (tool.capability === 'MCP') {
+                if (tool?.capability === 'MCP') {
                     result = await this.invokeMCP(tool, payload);
-                } else if (tool.capability === 'API') {
+                } else if (tool?.capability === 'API') {
                     result = await this.invokeAPI(tool, payload);
                 } else if (name.toLowerCase() === 'input_bridge') {
                     result = await this.sendInputEvent(payload.type, payload);

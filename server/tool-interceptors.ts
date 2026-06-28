@@ -123,7 +123,9 @@ function cache(): LRUCache<string, ToolResult> {
 function cacheTtl(): number { const n = Number(process.env.MCP_CACHE_TTL_MS); return Number.isFinite(n) && n > 0 ? n : 0; }
 function cacheKey(tool: string, args: any, ctx: ToolCtx): string {
   const h = crypto.createHash("sha256").update(JSON.stringify(args ?? {})).digest("hex");
-  return `${ctx.tenantId || "_"}:${tool}:${h}`;
+  // Include workspaceRoot: the same tenant+tool+args against a different workspace
+  // must NOT collide (read_file/list_tree/grep are workspace-relative).
+  return `${ctx.tenantId || "_"}:${ctx.workspaceRoot || "_"}:${tool}:${h}`;
 }
 const clone = (r: ToolResult): ToolResult => structuredClone(r);
 

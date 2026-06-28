@@ -893,7 +893,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           }));
           sess.updatedAt = new Date().toISOString();
           const firstUserMsg = activeHistory.find(m => m.role === "user");
-          if (firstUserMsg && sess.title === "New ReAct Session") {
+          if (firstUserMsg && typeof firstUserMsg.content === "string" && sess.title === "New ReAct Session") {
             sess.title = firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : "");
           }
           db.save();

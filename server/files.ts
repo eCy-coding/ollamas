@@ -13,6 +13,26 @@ export interface FileItem {
 
 /** Flatten a FileItem tree to non-directory relative paths (MCP resources/list).
  *  getTree() returns FileItem[] — String(tree).split("\n") would yield "[object Object]". */
+// Parse `git status --porcelain` into path→status. The XY pair is two columns:
+// X = index/staged, Y = worktree. The old `substring(0,2).trim()` collapsed them
+// (e.g. "A " staged-add → "A" → misread as untracked; "M " staged → modified;
+// the literal "Staged" branch never matched any porcelain code). Read X and Y
+// separately: ?? = untracked, any non-space X = staged, else non-space Y = modified.
+export function parseGitPorcelain(output: string): Record<string, NonNullable<FileItem["gitStatus"]>> {
+  const map: Record<string, NonNullable<FileItem["gitStatus"]>> = {};
+  for (const line of output.split("\n")) {
+    if (line.length < 3) continue;
+    const x = line[0], y = line[1];
+    const filePath = line.substring(3).replace(/"/g, "").trim();
+    let status: NonNullable<FileItem["gitStatus"]> = "none";
+    if (x === "?" && y === "?") status = "untracked";
+    else if (x !== " ") status = "staged";   // index has a staged change
+    else if (y !== " ") status = "modified"; // worktree-only change
+    if (status !== "none" && filePath) map[filePath] = status;
+  }
+  return map;
+}
+
 export function flattenTreeFiles(items: FileItem[]): string[] {
   const out: string[] = [];
   const walk = (nodes: FileItem[]): void => {
@@ -122,22 +142,7 @@ export class FilesystemManager {
       try {
         const { execSync } = require("child_process");
         const statusOutput = execSync("git status --porcelain", { cwd: workspaceRoot, encoding: "utf8" });
-        const gitMap: Record<string, FileItem["gitStatus"]> = {};
-        
-        statusOutput.split("\n").forEach((line: string) => {
-          if (line.length < 3) return;
-          const flag = line.substring(0, 2).trim();
-          const filePath = line.substring(3).replace(/\"/g, "").trim();
-          
-          let status: FileItem["gitStatus"] = "none";
-          if (flag === "??" || flag === "A") status = "untracked";
-          else if (flag === "M" || flag === "MM") status = "modified";
-          else if (flag === "Staged") status = "staged";
-          
-          if (status !== "none") {
-            gitMap[filePath] = status;
-          }
-        });
+        const gitMap = parseGitPorcelain(statusOutput);
 
         // Overlay status mapping on the tree
         const overlayStatus = (list: FileItem[]) => {
