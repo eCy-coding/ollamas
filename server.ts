@@ -2310,9 +2310,14 @@ content
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      // Per-instance HMR ws port (derived from PORT) so multiple dev/test servers
-      // don't collide on Vite's default 24678 ("Port 24678 already in use").
-      server: { middlewareMode: true, hmr: { port: Number(PORT) + 20000 } },
+      // HMR off by default: the fleet serves this for USE, and the derived-port HMR
+      // WebSocket (PORT+20000) flaps in middleware mode → the Vite client reload-loops
+      // the page every few seconds while idle. `VITE_HMR=true` re-enables it (per-instance
+      // ws port avoids Vite's default 24678 collision) for active frontend dev.
+      server: {
+        middlewareMode: true,
+        hmr: process.env.VITE_HMR === "true" ? { port: Number(PORT) + 20000 } : false,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
