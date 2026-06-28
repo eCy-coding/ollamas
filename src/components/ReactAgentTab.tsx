@@ -3,10 +3,11 @@ import { useLingui } from "@lingui/react";
 import {
   ToggleLeft, ToggleRight, Check, X,
   Terminal, ShieldCheck, History, AlertCircle,
-  FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft
+  FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft, Copy
 } from "lucide-react";
 import { ChatSession } from "../types";
 import { api, ApiError } from "../lib/apiClient";
+import { AgentMessage } from "./AgentMessage";
 
 interface TraceStep {
   stepNum: number;
@@ -57,6 +58,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   // updates after unmount (the stream out-lives the component otherwise).
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  // Synchronous in-flight guard: the `isLoading` STATE flag has a one-tick race (two
+  // submits in the same tick both read isLoading=false). A ref flips immediately.
+  const runningRef = useRef(false);
   useEffect(() => () => { mountedRef.current = false; abortRef.current?.abort(); }, []);
 
   const loadSessions = async () => {
@@ -171,11 +175,19 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const traceEndRef = useRef<HTMLDivElement>(null);
+
+  // Copy to clipboard (reuses the app-wide pattern) → user feedback via onNotify.
+  const copyText = (s: string) => {
+    navigator.clipboard?.writeText(s);
+    onNotify(_("react-agent.notify.copied"), "info");
+  };
 
   // Abort an in-flight run from the UI. The stream's catch/finally already treat an
   // abort as intentional (signal.aborted guards) → state stays consistent.
   const stopRun = () => {
     abortRef.current?.abort();
+    runningRef.current = false;
     setIsLoading(false);
     setCurrentStepInfo("");
     onNotify(_("react-agent.notify.stopped"), "info");
@@ -237,10 +249,16 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Keep the streaming trace in view as steps arrive (decoupled from the chat scroll).
+  useEffect(() => {
+    if (traceSteps.length) traceEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [traceSteps]);
+
   // Handle standard ReAct agent submit
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputMessage.trim() || isLoading) return;
+    if (!inputMessage.trim() || isLoading || runningRef.current) return;
+    runningRef.current = true;
 
     const userText = inputMessage.trim();
     setInputMessage("");
@@ -316,21 +334,25 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   });
                 }
                 else if (parsed.type === "step") {
+                  const incoming: TraceStep = {
+                    stepNum: parsed.stepNum,
+                    tool: parsed.tool,
+                    args: parsed.args,
+                    ok: parsed.ok,
+                    latency: parsed.latency,
+                    result: parsed.result,
+                    diff: parsed.diff,
+                    applied: parsed.applied
+                  };
                   setTraceSteps((prev) => {
-                    // De-duplicate trace steps by stepNum and tool
-                    if (prev.some(s => s.stepNum === parsed.stepNum && s.tool === parsed.tool)) {
-                      return prev;
-                    }
-                    return [...prev, {
-                      stepNum: parsed.stepNum,
-                      tool: parsed.tool,
-                      args: parsed.args,
-                      ok: parsed.ok,
-                      latency: parsed.latency,
-                      result: parsed.result,
-                      diff: parsed.diff,
-                      applied: parsed.applied
-                    }];
+                    // Upsert by (stepNum, tool): a re-emit (e.g. applied flips true) UPDATES the
+                    // existing row instead of being dropped as a dup — otherwise an approved write
+                    // would show applied:false forever.
+                    const i = prev.findIndex((s) => s.stepNum === incoming.stepNum && s.tool === incoming.tool);
+                    if (i === -1) return [...prev, incoming];
+                    const next = prev.slice();
+                    next[i] = { ...next[i], ...incoming };
+                    return next;
                   });
 
                   // If a write tool is called with auto-apply turned OFF, lock the visual approval wizard
@@ -340,7 +362,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   if (parsed.tool === "write_file" && !parsed.applied && parsed.diff && parsed.args?.path) {
                     setPendingApproval({
                       path: parsed.args.path,
-                      content: parsed.args.content,
+                      content: parsed.args?.content ?? "",
                       diff: parsed.diff,
                       stepIndex: parsed.stepNum
                     });
@@ -349,6 +371,18 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 }
                 else if (parsed.type === "paused") {
                   setCurrentStepInfo(_("react-agent.step.paused"));
+                }
+                else if (parsed.type === "model") {
+                  // Which provider/model the chain actually resolved to (server.ts model event).
+                  setCurrentStepInfo(`${_("react-agent.notify.modelRunning")} ${parsed.provider}/${parsed.model}`);
+                }
+                else if (parsed.type === "repair") {
+                  // The agent is auto-repairing malformed tool args (server.ts repair event).
+                  setCurrentStepInfo(`${_("react-agent.notify.repairing")} ${parsed.tool}`);
+                }
+                else if (parsed.type === "verify") {
+                  // Verifier gate verdict — important agent feedback, was previously dropped.
+                  onNotify(`${_("react-agent.notify.verifier")} ${parsed.verdict}${parsed.reason ? ` — ${String(parsed.reason).slice(0, 120)}` : ""}`, parsed.verdict === "PASS" ? "success" : "info");
                 }
                 else if (parsed.type === "done") {
                   setCurrentStepInfo(_("react-agent.step.done"));
@@ -370,6 +404,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       onNotify(`${_("react-agent.notify.runtimeFailed")} ${err.message}`, "error");
       setCurrentStepInfo(_("react-agent.step.disrupted"));
     } finally {
+      runningRef.current = false;
       if (mountedRef.current && !ctrl.signal.aborted) {
         setIsLoading(false);
         loadSessions();
@@ -525,7 +560,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             ) : (
               sessions.map((sess) => {
                 const isActive = sess.id === activeSessionId;
-                const formattedDate = new Date(sess.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // Guard a missing/invalid updatedAt → no "Invalid Date" in the list.
+                const when = new Date(sess.updatedAt ?? 0);
+                const formattedDate = isNaN(when.getTime()) ? "—" : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const shortModel = (sess.modelId ?? "—").split("/").pop();
                 return (
                   <div
                     key={sess.id}
@@ -547,7 +585,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     />
                     <div className="flex flex-col min-w-0 pr-1 truncate">
                       <span className="text-xs font-mono font-medium truncate leading-tight group-hover:text-immersive-text-bright">{sess.title}</span>
-                      <span className="text-[9px] text-immersive-text-dim font-mono mt-0.5">{formattedDate} • {sess.modelId.split("/").pop()}</span>
+                      <span className="text-[9px] text-immersive-text-dim font-mono mt-0.5">{formattedDate} • {shortModel}</span>
                     </div>
                     <button
                       onClick={(e) => deleteSession(e, sess.id)}
@@ -570,8 +608,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           {/* Left Hand: High Fidelity Chats */}
           <div className="lg:col-span-2 space-y-4 flex flex-col min-h-[500px]">
             
-            {/* Chat Bubble Console */}
-            <div className="flex-1 bg-immersive-sidebar border border-immersive-border rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin">
+            {/* Chat Bubble Console — aria-live so streaming output is announced to AT */}
+            <div
+              role="log"
+              aria-live="polite"
+              aria-label={_("react-agent.log.label")}
+              className="flex-1 bg-immersive-sidebar border border-immersive-border rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin"
+            >
               {messages.filter(m => m.role === "user" || m.role === "assistant").map((m, idx) => (
               <div 
                 key={idx}
@@ -588,13 +631,24 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   {m.role === "user" ? "U" : "A"}
                 </div>
 
-                {/* Content Bubble */}
-                <div className={`p-3 rounded-lg text-xs leading-relaxed ${
+                {/* Content Bubble — assistant renders markdown/code; both copyable */}
+                <div className={`group/msg relative p-3 rounded-lg text-xs leading-relaxed ${
                   m.role === "user"
-                    ? "bg-indigo-600 text-white font-medium"
-                    : "bg-immersive-panel border border-immersive-border text-immersive-text-muted font-mono whitespace-pre-wrap"
+                    ? "bg-indigo-600 text-white font-medium whitespace-pre-wrap"
+                    : "bg-immersive-panel border border-immersive-border text-immersive-text-muted font-mono"
                 }`}>
-                  {m.content}
+                  <button
+                    type="button"
+                    onClick={() => copyText(m.content)}
+                    aria-label={_("react-agent.copy")}
+                    title={_("react-agent.copy")}
+                    className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 p-1 rounded text-current/70 hover:text-current transition"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                  {m.role === "assistant"
+                    ? <AgentMessage content={m.content} copyLabel={_("react-agent.copy")} onCopy={copyText} />
+                    : m.content}
                 </div>
               </div>
             ))}
@@ -821,7 +875,18 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                           <pre className="bg-immersive-panel border border-immersive-border rounded p-2.5 text-[10px] text-immersive-text-muted whitespace-pre-wrap overflow-x-auto scrollbar-thin">{JSON.stringify(s.args, null, 2)}</pre>
                         </div>
                         <div>
-                          <div className="text-[9px] font-mono uppercase tracking-wider text-immersive-text-dim mb-1">{_("react-agent.trace.detailResult")}</div>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-[9px] font-mono uppercase tracking-wider text-immersive-text-dim">{_("react-agent.trace.detailResult")}</div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); copyText(typeof s.result === "string" ? s.result : JSON.stringify(s.result, null, 2)); }}
+                              aria-label={_("react-agent.copy")}
+                              title={_("react-agent.copy")}
+                              className="p-0.5 rounded text-immersive-text-dim hover:text-immersive-text-bright transition"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
                           <pre className="bg-immersive-panel border border-immersive-border rounded p-2.5 text-[10px] text-immersive-text-muted whitespace-pre-wrap overflow-x-auto scrollbar-thin">{typeof s.result === "string" ? s.result : JSON.stringify(s.result, null, 2)}</pre>
                         </div>
                         {s.diff && (
@@ -839,6 +904,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               </tbody>
             </table>
           </div>
+          <div ref={traceEndRef} />
         </div>
       )}
     </div>
