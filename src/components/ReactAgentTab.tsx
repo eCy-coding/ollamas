@@ -321,7 +321,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   });
 
                   // If a write tool is called with auto-apply turned OFF, lock the visual approval wizard
-                  if (parsed.tool === "write_file" && !parsed.applied && parsed.diff) {
+                  // Guard parsed.args: a partial/errored trace can omit it; reading
+                  // .path on null would throw inside the SSE loop and silently drop
+                  // the write (caught as "Could not parse SSE", wizard never opens).
+                  if (parsed.tool === "write_file" && !parsed.applied && parsed.diff && parsed.args?.path) {
                     setPendingApproval({
                       path: parsed.args.path,
                       content: parsed.args.content,

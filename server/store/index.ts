@@ -583,6 +583,15 @@ export async function claimDeliveries(limit = 50): Promise<Delivery[]> {
   await d().run("UPDATE webhook_deliveries SET status=? WHERE id IN (SELECT id FROM webhook_deliveries WHERE status='pending' AND next_retry_at <= ? ORDER BY next_retry_at LIMIT ?)", [tok, now, limit]);
   return (await d().query("SELECT * FROM webhook_deliveries WHERE status=? ORDER BY next_retry_at", [tok])).rows;
 }
+// Requeue claims orphaned by a worker crash. claimDeliveries() tags rows
+// 'claimed'/'claimed_<tok>' but only markDelivery() clears that; a crash between
+// the two strands the row forever (no requeue exists anywhere). Run at worker
+// startup: a fresh process has nothing in flight, so every claimed row is an
+// orphan — safe to reset without a claimed_at timestamp. (Multi-replica pg with
+// concurrent live workers would instead need a claimed_at column + stale-window.)
+export async function reclaimStranded(): Promise<number> {
+  return (await d().run("UPDATE webhook_deliveries SET status='pending' WHERE status LIKE 'claimed%'")).changes;
+}
 export async function markDelivery(id: string, status: string, attempt: number, nextRetryAt: string | null, code?: number): Promise<void> {
   await d().run("UPDATE webhook_deliveries SET status = ?, attempt = ?, next_retry_at = ?, last_code = ? WHERE id = ?", [status, attempt, nextRetryAt ?? nowIso(), code ?? null, id]);
 }

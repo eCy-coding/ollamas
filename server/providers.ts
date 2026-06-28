@@ -529,8 +529,14 @@ export class ProviderRouter {
                   onStreamChunk(chunkText);
                   fullText += chunkText;
                 }
-                if (parsed.done && parsed.eval_count && parsed.eval_duration) {
-                  return { text: fullText, source: "ollama_local", modelUsed: config.model, tokensPerSec: parsed.eval_count / (parsed.eval_duration / 1e9) };
+                if (parsed.done && parsed.eval_count) {
+                  // Capture the token count even when the done chunk omits eval_duration
+                  // (compute tps only when we can) so the billing meter never under-counts.
+                  return {
+                    text: fullText, source: "ollama_local", modelUsed: config.model,
+                    tokens: parsed.eval_count,
+                    tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : undefined,
+                  };
                 }
               } catch (e) {
                 // Keep moving on parse anomalies

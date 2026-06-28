@@ -4,7 +4,7 @@
 // tenants can verify with standard libraries. Zero deps (node:crypto + fetch).
 
 import crypto from "node:crypto";
-import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl } from "../store";
+import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl, reclaimStranded } from "../store";
 
 const MAX_ATTEMPTS = Number(process.env.WEBHOOK_RETRY_MAX_ATTEMPTS || 5);
 const TIMEOUT_MS = Number(process.env.WEBHOOK_REQUEST_TIMEOUT_MS || 15000);
@@ -59,7 +59,15 @@ async function scheduleRetry(id: string, attempt: number, code: number) {
 /** Claim + process due deliveries (multi-replica safe). */
 export async function processDeliveries(): Promise<number> {
   const rows = await claimDeliveries();
-  for (const r of rows) await deliverOne(r);
+  // Per-row isolation: one deliverOne throw must not abort the rest of the batch
+  // (the batch-level .catch in startWebhookWorker would otherwise strand them).
+  for (const r of rows) {
+    try {
+      await deliverOne(r);
+    } catch (e) {
+      console.warn("[webhook] deliverOne failed", r.id, (e as Error)?.message);
+    }
+  }
   return rows.length;
 }
 
@@ -68,6 +76,8 @@ let timer: ReturnType<typeof setInterval> | null = null;
 export function startWebhookWorker(): void {
   if (timer) return;
   const interval = Number(process.env.WEBHOOK_WORKER_INTERVAL_MS || 30000);
+  // Recover deliveries left 'claimed' by a previous crash before we start fresh.
+  reclaimStranded().catch(() => {});
   timer = setInterval(() => { processDeliveries().catch(() => {}); }, interval);
   timer.unref?.();
 }

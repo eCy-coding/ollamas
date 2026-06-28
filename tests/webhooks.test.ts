@@ -73,4 +73,23 @@ describe("webhook delivery pipeline (Faz 11B/12C)", () => {
     expect(ids.size).toBe(3); // each delivered exactly once
     expect(mine.length).toBe(3);
   });
+
+  // B1 (audit fix): a claim orphaned by a worker crash must be reclaimed, not stranded forever.
+  test("reclaimStranded recovers claims orphaned by a crash", async () => {
+    received.length = 0;
+    const t = await store.createTenant("whkstrand", "pro");
+    await store.addWebhook(t.id, receiverUrl, ["key.created"]);
+    await store.queueWebhookEvent(t.id, "key.created", { keyId: "strand_1" });
+    // Simulate crash: claim the row (status → claimed_*) but never deliver/mark it.
+    const claimed = await store.claimDeliveries();
+    expect(claimed.some((r: any) => JSON.parse(r.payload).data.keyId === "strand_1")).toBe(true);
+    // Repro: a normal cycle only claims 'pending' rows → the claimed one stays undelivered.
+    await outbound.processDeliveries();
+    expect(received.some((r) => r.body.includes("strand_1"))).toBe(false);
+    // Fix: reclaim resets claimed → pending → the next cycle delivers it.
+    const n = await store.reclaimStranded();
+    expect(n).toBeGreaterThanOrEqual(1);
+    await outbound.processDeliveries();
+    expect(received.some((r) => r.body.includes("strand_1"))).toBe(true);
+  });
 });
