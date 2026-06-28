@@ -1,6 +1,6 @@
 {
-  "ts": "no-dispatch-bench",
-  "stale": true,
+  "ts": "2026-06-28T21:41:04.481Z",
+  "stale": false,
   "machines": [
     {
       "machine": "desktop-ert7724",
@@ -13,12 +13,12 @@
     },
     {
       "machine": "mac",
-      "variant": null,
-      "correctRatio": 0,
-      "medianSteps": 0,
-      "medianLatencyMs": 0,
+      "variant": "ecypro-base",
+      "correctRatio": 1,
+      "medianSteps": 3,
+      "medianLatencyMs": 75518,
       "medianTokS": 0,
-      "reason": "veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir)"
+      "reason": "correct 1 ≥ 0.7 · 3 adım · 0 dup · 75518ms · 0 tok/s"
     }
   ],
   "gate": 0.7

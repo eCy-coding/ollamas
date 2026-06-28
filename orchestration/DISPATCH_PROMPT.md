@@ -2,13 +2,13 @@
 
 > Mac ↔ desktop-ert7724 dağıtık alt-agent işbirliği. `dispatchbench.ts` üretti — ölçüme-dayalı, deterministik.
 > Veri (`dispatch-bench.json`) değişince makine-başı en-iyi working-principle seçimi OTOMATİK güncellenir.
-> ⚠️ **STALE / veri yok** — seçim son ölçüme dayanır. Taze ölçüm için cli/scripts lane'de dispatch-bench koş, `~/.llm-mission-control/dispatch-bench.json` güncellensin.
+> ✅ Taze ölçüme dayalı seçim.
 
 <selected-variants>  (makine → en-iyi working-principle varyantı, ordered gate: correct → adım/dup → latency → tok/s)
 | Makine | Variant | correct | adım | latency | tok/s | gerekçe |
 |--------|---------|--------:|-----:|--------:|------:|---------|
 | desktop-ert7724 | — | 0 | 0 | 0ms | 0 | veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir) |
-| mac | — | 0 | 0 | 0ms | 0 | veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir) |
+| mac | ecypro-base | 1 | 3 | 75518ms | 0 | correct 1 ≥ 0.7 · 3 adım · 0 dup · 75518ms · 0 tok/s |
 </selected-variants>
 
 <routing>  (assignWorker — pure, fleet.ts decideTransition deseni)
