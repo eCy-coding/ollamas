@@ -51,7 +51,10 @@ CLAUDE.md §5 öz-geliştirme şartı + `role.ts` canlı-türetme felsefesinin d
 Mekanizma: aday seçimleri `dispatchbench.ts` canlı türetir (`DISPATCH_SELECTION.json`); statik anchor'lar
 aşağıdaki Evidence Ledger'da elle-doğrulanır.
 
-## Evidence Ledger (live · son doğrulama: iterasyon 3, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
+## Evidence Ledger (live · son doğrulama: iterasyon 4, 2026-06-28 · kullanmadan önce yeniden grep-doğrula)
+
+> **🟢 CANLI KANIT (iter-4, demo OFF):** ilk gerçek distributed dispatch — gateway `OLLAMA_HOST=http://desktop-ert7724:11434 PORT=8099 tsx server.ts` → `/api/health` `mode:live` + `ollamaVersion:0.30.11` (Windows worker; Mac 0.30.10) + `/api/models/ollama-local`=`["qwen3:8b"]` → inference Windows GPU'ya bağlı KANITLANDI. `agent-dispatch.mjs` görevi `verdict:OK, demoSuspected:false, 8 step` (ReAct kendi syntax bug'ını gördü→düzeltti→geçti). **= inference-offload Hybrid CANLI.** GOTCHA: `write_host_file` köprüsünün KENDİ allowlist'i var → `--root /tmp/...`=403; default `$HOME/.llm-mission-control/agent-work` kullan. FULL remote dispatch (ReAct ON desktop) hâlâ Windows'ta **ollamas gateway** ister (bugün sadece ollama koşuyor) → vO21 dispatchdoctor bunu ölçer.
+
 Dağıtık-dispatch'in dayandığı **kanıtlanmış** kod çapaları (lane kodu — bu sekme okur, yazmaz):
 - **Dispatch HTTP yüzeyi:** `server.ts:653` `app.post("/api/agent/chat")`; SSE event'leri — `message` `:750`,
   `step` `:812`, `done` `:850/:858` (ReAct loop maxSteps depth-limit). cli `RemoteAgentClient` bu event-şeklini parse eder.
@@ -68,3 +71,7 @@ Dağıtık-dispatch'in dayandığı **kanıtlanmış** kod çapaları (lane kodu
 - **Bu sekmenin türettiği:** `orchestration/bin/lib/dispatchbench.ts:176` `assignWorker` (saf routing, `fleet.ts:30` deseni)
   + `selectBestForMachine` (ordered gate, `optimize.ts:82` `selectBest` paritesi); `bin/lib/dispatchsim.ts:simulateDispatch`
   (vO20: split→assign→claim→heartbeat→failover→merge akışını canlı-makinesiz deterministik DOĞRULAR = cli executable-spec/oracle).
+- **Readiness probe (vO21):** worker yetenek sınıflandırması — ollamas **gateway** marker = `/api/health` (`server.ts:262`,
+  düz ollama'da YOK); `orchestration/bin/lib/metrics.ts:29 parseHealth` (`mode`/`loaded[].name` ayıklar) REUSE; GO/NO-GO
+  verdict deseni `orchestration/bin/lib/doctor.ts:88 verdict`; pool şekli `cli/lib/remote.ts:9 Backend` (`~/.ollamas/backends.json`).
+  `bin/lib/dispatchdoctor.ts:classifyWorker`+`fleetReadiness` her Hybrid mod (inference-offload / full-remote) için precondition gate.
