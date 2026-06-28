@@ -28,13 +28,16 @@ function runStep(step: string, script: string, args: string[]): StepResult {
   const t0 = process.hrtime.bigint();
   try {
     execFileSync(TSX, [join(HERE, script), ...args], {
-      stdio: ["ignore", "ignore", "ignore"], timeout: 60_000, cwd: ORCH_DIR,
+      stdio: ["ignore", "ignore", "pipe"], timeout: 60_000, cwd: ORCH_DIR,
     });
     const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
     return { step, ok: true, ms, detail: detailFor(step) };
   } catch (e: any) {
     const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
-    return { step, ok: false, ms, detail: (e?.message ?? "hata").slice(0, 80) };
+    // Captured stderr (last non-empty line) is the real reason; fall back to the exec message.
+    // Avoids the truncated "Command failed: …/tsx /" noise when a step genuinely errors.
+    const err = (e?.stderr?.toString().trim().split("\n").filter(Boolean).pop() || e?.message || "hata");
+    return { step, ok: false, ms, detail: err.slice(0, 80) };
   }
 }
 
