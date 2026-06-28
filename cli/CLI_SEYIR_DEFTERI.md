@@ -5,6 +5,25 @@
 
 ---
 
+## v20 — enterprise/GA · `saas audit export` (2026-06-28)
+
+### N-043 · audit export ≤1000-satır server-cap, cursor YOK
+- **Gözlem**: `GET /api/saas/audit` → `listAudit(tenantId, limit)` (store/index.ts:270) `Math.min(limit,1000)` ile tavanlı, `ORDER BY id DESC`, offset/cursor YOK. Export bu yüzden ≤1000 en-yeni event kapsar.
+- **Fix/sınır**: CLI tarafı dürüstçe dokümante eder (HELP + ROADMAP); >1000 gerçek bulk-export = **cross-lane** server değişikliği (cursor/offset endpoint) — CLI-only yapılamaz, uydurulmaz. Date-range filtresi client-side (`filterByDate`) çekilen pencerede uygulanır.
+- **ÖNLEME KURALI**: server-cap'i CLI'da gizleme — kullanıcı "tüm audit"i aldığını sanmasın. Sınırı görünür kıl; gerçek çözüm doğru lane'de.
+
+### N-044 · CSV yapısal-escaping VAR ama Excel-formula content-injection YOK
+- **Gözlem**: `csvField` RFC-4180 yapısal injection'ı (virgül/tırnak/CRLF → kolon-kayması) çözer; ama `=SUM()`/`+`/`-`/`@` ile başlayan içerik Excel'de formül olarak çalışabilir (content-injection).
+- **Karar**: alanlar pratikte enum/hex/ISO (tool=kontrollü MCP-registry adı, tenant=`tnt_<hex>`, ts=ISO, tier=safe/host) → risk teorik; veri-fidelity için ham bırakıldı. Gold-plate edilmedi (§rule 7). cli-verifier non-blocking dokümante-sınır olarak APPROVED.
+- **ÖNLEME KURALI**: audit CSV'leri Excel'de açılacaksa formula-guard (`'` prefix `= + - @`) düşün — ama veri-fidelity trade-off'unu operatöre bırak, sessizce mutasyon yapma.
+
+### N-045 · export `--format` authoritative, global `--json` yok sayılır
+- **Gözlem**: `saas audit export` format'ı `--format` belirler; mevcut `saas audit` (tablo) ise `ctx.json`'a uyar.
+- **Fix**: export `--format` (default csv) authoritative; `--json` export'ta yok sayılır. Mevcut `saas audit` tablo davranışı dokunulmadı (back-compat).
+- **ÖNLEME KURALI**: yeni alt-komut bir flag semantiğini değiştirdiğinde eskisini AYNEN bırak (regresyon-yok), yeni semantiği dokümante et.
+
+---
+
 ## v16 — TUI-v2 live cockpit (2026-06-20)
 
 ### N-040 · multi-pane hizalama → ANSI-aware `visibleLen` + width-enjekte saf

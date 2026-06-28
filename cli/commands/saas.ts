@@ -7,11 +7,14 @@
 //   ollamas saas key revoke <keyId>
 //   ollamas saas usage [--period YYYY-MM]
 //   ollamas saas billing [--period YYYY-MM] [--run]
+//   ollamas saas audit export [--tenant <id>] [--format csv|jsonl|json] [--since <d>] [--until <d>] [-o <file>]
 import { parseArgs } from "node:util";
+import { writeFileSync } from "node:fs";
 import { GatewayClient } from "../lib/client";
 import { loadConfig } from "../lib/config";
 import { resolveOutputCtx, formatTable, c, type OutputCtx } from "../lib/output";
 import { confirm } from "../lib/io";
+import { formatAudit, filterByDate, isAuditFormat } from "../lib/audit";
 
 const HELP = `ollamas saas <action> — manage the gateway SaaS layer (admin)
 
@@ -22,6 +25,7 @@ const HELP = `ollamas saas <action> — manage the gateway SaaS layer (admin)
   key new --tenant <id> [--label <l>] [--ttl-days <n>] [--scopes <s>]
   key revoke <keyId> [--yes]         revoke a key (prompts unless --yes/--json)
   audit [--tenant <id>] [--limit <n>]
+  audit export [--tenant <id>] [--format csv|jsonl|json] [--since <d>] [--until <d>] [--limit <n>] [-o <file>]
   usage [--period YYYY-MM]           per-tenant call/token aggregate
   billing [--period YYYY-MM] [--run] preview (default) or run billing
 
@@ -43,6 +47,10 @@ export async function runSaas(argv: string[]): Promise<number> {
       scopes: { type: "string" },
       period: { type: "string" },
       limit: { type: "string" },
+      format: { type: "string" },
+      since: { type: "string" },
+      until: { type: "string" },
+      out: { type: "string", short: "o" },
       run: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       json: { type: "boolean" },
@@ -76,6 +84,7 @@ export async function runSaas(argv: string[]): Promise<number> {
         if (arg1 === "revoke") return await revokeKey(client, positionals[2], values, ctx);
         break;
       case "audit":
+        if (arg1 === "export") return await exportAudit(client, values, ctx);
         return await showAudit(client, values, ctx);
       case "usage":
         return await showUsage(client, values.period as string, ctx);
@@ -193,6 +202,30 @@ async function showAudit(client: GatewayClient, v: any, ctx: OutputCtx): Promise
       ctx,
     ) + "\n",
   );
+  return 0;
+}
+
+// `saas audit export` — pull audit events and emit them as CSV/JSONL/JSON for
+// compliance log-shipping (SIEM/S3). The --format flag is authoritative (not the
+// global --json). Note: the gateway caps listAudit at 1000 rows with no cursor,
+// so an export covers the ≤1000 most-recent events; a true bulk/cursor export
+// needs a future server-side change (cross-lane).
+async function exportAudit(client: GatewayClient, v: any, ctx: OutputCtx): Promise<number> {
+  const fmt = (v.format as string) || "csv";
+  if (!isAuditFormat(fmt)) {
+    process.stderr.write(`saas audit export: unknown --format '${fmt}' (use csv|jsonl|json)\n`);
+    return 2;
+  }
+  const limit = v.limit ? Number(v.limit) : 1000;
+  const all = await client.listAudit({ tenantId: v.tenant, limit });
+  const events = filterByDate(all, v.since, v.until);
+  const body = formatAudit(events, fmt);
+  if (v.out) {
+    writeFileSync(v.out, body, { mode: 0o600 }); // owner-only — audit trail hygiene
+    process.stdout.write(c("green", `wrote ${events.length} audit event(s) → ${v.out}`, ctx.color) + "\n");
+    return 0;
+  }
+  process.stdout.write(body);
   return 0;
 }
 
