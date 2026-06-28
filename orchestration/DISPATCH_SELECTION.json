@@ -1,0 +1,25 @@
+{
+  "ts": "no-dispatch-bench",
+  "stale": true,
+  "machines": [
+    {
+      "machine": "desktop-ert7724",
+      "variant": null,
+      "correctRatio": 0,
+      "medianSteps": 0,
+      "medianLatencyMs": 0,
+      "medianTokS": 0,
+      "reason": "veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir)"
+    },
+    {
+      "machine": "mac",
+      "variant": null,
+      "correctRatio": 0,
+      "medianSteps": 0,
+      "medianLatencyMs": 0,
+      "medianTokS": 0,
+      "reason": "veri yok — bu makinede dispatch-bench koşulmadı (cli/scripts lane üretir)"
+    }
+  ],
+  "gate": 0.7
+}
