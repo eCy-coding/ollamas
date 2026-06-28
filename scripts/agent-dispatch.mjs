@@ -61,6 +61,7 @@ const STANDARDS = [
 const body = JSON.stringify({ provider: PROVIDER, ...(MODEL ? { model: MODEL } : {}), autoApply: true, maxSteps: STEPS,
   messages: [{ role: "user", content: STANDARDS }] });
 
+/** @type {{url:string,provider:string,model:string,root:string,steps:{n:number,tool:string,ok:boolean,out:string}[],messages:string[],files:string[],errors:string[],demoSuspected:boolean}} */
 const report = { url: URL, provider: PROVIDER, model: MODEL || "(provider default)", root: ROOT, steps: [], messages: [], files: [], errors: [], demoSuspected: false };
 
 const ac = new AbortController();
@@ -70,7 +71,7 @@ try {
   const res = await fetch(`${URL}/api/agent/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body, signal: ac.signal,
   });
-  if (!res.ok) { console.error(`dispatch failed: HTTP ${res.status}`); process.exit(1); }
+  if (!res.ok || !res.body) { console.error(`dispatch failed: HTTP ${res.status}`); process.exit(1); }
 
   const reader = res.body.getReader();
   const dec = new TextDecoder();

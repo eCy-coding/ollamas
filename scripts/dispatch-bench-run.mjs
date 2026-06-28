@@ -74,12 +74,23 @@ export function countDupTools(steps) {
   const seen = new Map();
   let dup = 0;
   for (const s of steps) {
-    const key = `${s.tool}|${s.args}`;
+    const key = `${s.tool}|${canonArgs(s.args)}`;
     const n = (seen.get(key) || 0) + 1;
     seen.set(key, n);
     if (n > 1) dup++;
   }
   return dup;
+}
+
+// Canonicalize args (sort object keys) so two semantically-equal calls with reordered
+// fields produce the SAME key — otherwise countDupTools under-counts duplicates.
+function canonArgs(args) {
+  let v;
+  try { v = typeof args === "string" ? JSON.parse(args) : args; } catch { return String(args); }
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    return JSON.stringify(Object.keys(v).sort().reduce((o, k) => { o[k] = v[k]; return o; }, {}));
+  }
+  return JSON.stringify(v);
 }
 
 export function foldMetrics(events) {
