@@ -73,6 +73,14 @@ function detailFor(step: string): string {
     const r = readJson(join(ORCH_DIR, "REQUIREMENTS.json"));
     return r ? `hazırlık ${r.readiness ?? "?"}/100 · top ${r.top ? r.top.criticality + ":" + r.top.target : "yok"}` : "gereksinim füzyonu tazelendi";
   }
+  if (step === "dispatch") {
+    const f = join(ORCH_DIR, "RECONCILE.md");
+    if (existsSync(f)) {
+      const line = readFileSync(f, "utf8").split("\n").find((l) => l.includes("▶"));
+      if (line) return line.replace(/[#>*`|]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+    }
+    return "fleet reconcile tazelendi";
+  }
   if (step === "status") return "lane matrisi tazelendi";
   return "ok";
 }
@@ -136,6 +144,7 @@ function main(): void {
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("status", "status.ts", []),
+    runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),
   ];
   const md = summarizeAutopilot(results, ts);

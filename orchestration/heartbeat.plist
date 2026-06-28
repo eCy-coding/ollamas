@@ -14,20 +14,20 @@
   <key>ProgramArguments</key>
   <array>
     <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
-    <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/bin/heartbeat.ts</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/bin/heartbeat.ts</string>
     <string>--once</string>
     <string>--quiet</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
   <key>StartInterval</key>
   <integer>600</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/heartbeat.out.log</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/heartbeat.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/emrecnyngmail.com/Desktop/ollamas-orchestration-wt/orchestration/heartbeat.err.log</string>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/heartbeat.err.log</string>
   <key>ProcessType</key>
   <string>Background</string>
 </dict>

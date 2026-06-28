@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ollamas fleet reconcile daemon — macOS LaunchAgent (DOC ARTEFAKT).
+  YÜKLENMEZ varsayılan: launchctl load = system değişiklik = T0 (Emre) kararı.
+  vO27: bin/reconcile.ts --watch = K8s-operator level-based reconcile (desired-vs-actual
+  + exponential-backoff requeue), "runs forever without manual ticks" otonom döngü.
+  Her tick: dispatchdoctor probe → reconcile → RECONCILE.md; delta-notify yalnız aksiyon değişince.
+  Autopilot (SessionStart) zaten 0-manuel reconcile koşar; bu plist = SÜREKLİ daemon varyantı.
+  Privacy: notify localhost/terminal-notifier — PPID=1 outbound-LAN bloğundan kaçınır (RISK-SCR-006).
+  Yükleme reçetesi: AUTOPILOT_SETUP.md.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ollamas.orchestration.reconcile</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/bin/reconcile.ts</string>
+    <string>--watch</string>
+    <string>--quiet</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/reconcile.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/reconcile.err.log</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
