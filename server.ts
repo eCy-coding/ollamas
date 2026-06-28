@@ -847,7 +847,9 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         } else {
           // Final reply reached
           finalText = result.text || "";
-          sendEvent("done", { text: finalText, status: "complete" });
+          // Surface the final generation's throughput so dispatch benchmarking can measure
+          // tok/s per run without a server round-trip (additive; clients ignore unknown fields).
+          sendEvent("done", { text: finalText, status: "complete", tokensPerSec: result.tokensPerSec ?? 0 });
           break;
         }
 
