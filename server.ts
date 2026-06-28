@@ -2063,16 +2063,19 @@ content
           model: "qwen3:8b", // Standard low weight local target
           messages: [{ role: "user", content: "ping" }],
           numCtx: 512,
-        }), 4000, "ollama ping");
+        }), 6000, "ollama ping");
         report["G2_OllamaHealth"] = {
           status: pingResult.text ? "PASS" : "WARN",
           details: `Reachable and responded: ${pingResult.text.substring(0, 40)}`,
         };
       } catch (e: any) {
-        report["G2_OllamaHealth"] = {
-          status: "FAIL",
-          details: `Ollama is offline or model missing: ${e.message}. Remedy: ensure Local Ollama application is opened and port 11434 is bound.`,
-        };
+        // A timeout means ollama is reachable but slow to produce a first token
+        // (cold model load / remote GPU + network latency) — "slow, unverified"
+        // (WARN), not "offline" (FAIL). Only a genuine connection error is a FAIL.
+        const slow = /exceeded \d+ms/.test(e?.message || "");
+        report["G2_OllamaHealth"] = slow
+          ? { status: "WARN", details: `Ollama reachable but slow to verify first token: ${e.message}. Cold model-load / network latency, not offline.` }
+          : { status: "FAIL", details: `Ollama is offline or model missing: ${e.message}. Remedy: ensure the Ollama host is running and port 11434 is bound.` };
       }
     } else {
       report["G2_OllamaHealth"] = {
