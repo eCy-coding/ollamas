@@ -82,6 +82,9 @@ export const messages: Record<string, string> = {
   'react-agent.input.placeholder':
     "ReAct Uzmanı ajanını tetiklemek için bir komut gir (ör. 'readme.md oku ve hataları listele')...",
   'react-agent.execute': 'ÇALIŞTIR',
+  'react-agent.stop': 'DURDUR',
+  'react-agent.input.hint': 'Çalıştırmak için Enter · yeni satır için Shift+Enter',
+  'react-agent.notify.stopped': 'Ajan çalışması durduruldu.',
   'react-agent.tools.title': 'ÇALIŞMA ALANI ARAÇ BAĞLANTILARI',
   'react-agent.tools.listTree.desc': 'Tüm proje dosya düzenini özyinelemeli olarak gez.',
   'react-agent.tools.readFile.desc': 'Mutlak bağlamı ve kod içeriği parametrelerini eşzamanlı yükle.',
@@ -102,6 +105,11 @@ export const messages: Record<string, string> = {
   'react-agent.trace.result': 'Sonuç Günlüğü',
   'react-agent.trace.success': 'BAŞARILI',
   'react-agent.trace.failed': 'BAŞARISIZ',
+  'react-agent.trace.expand': 'Adım detayını genişlet',
+  'react-agent.trace.collapse': 'Adım detayını daralt',
+  'react-agent.trace.detailArgs': 'Argümanlar',
+  'react-agent.trace.detailResult': 'Sonuç',
+  'react-agent.trace.detailDiff': 'Fark',
   // Karşılama / selamlama mesajları
   'react-agent.greeting.welcome':
     'Merhaba! Ben ReAct uzmanı ajanınım. Yüksek doğrulukta yerel çalışma alanı araç bağlantılarım var. Bir yazılım görevi tarif et; depoyu incelememi, kodu yazmamı ve testleri sırayla çalıştırarak görevi güvenle yürütmemi izle.',

@@ -83,6 +83,9 @@ export const messages: Record<string, string> = {
   'react-agent.input.placeholder':
     "Inject a prompt to trigger the ReAct Specialist agent (e.g. 'Read readme.md and list bugs')...",
   'react-agent.execute': 'EXECUTE',
+  'react-agent.stop': 'STOP',
+  'react-agent.input.hint': 'Enter to run · Shift+Enter for newline',
+  'react-agent.notify.stopped': 'Agent run stopped.',
   'react-agent.tools.title': 'WORKSPACE TOOL BINDINGS',
   'react-agent.tools.listTree.desc': 'Iterate the entire project space files layout recursively.',
   'react-agent.tools.readFile.desc': 'Load absolute context and code content parameters synchronously.',
@@ -103,6 +106,11 @@ export const messages: Record<string, string> = {
   'react-agent.trace.result': 'Result Log',
   'react-agent.trace.success': 'SUCCESS',
   'react-agent.trace.failed': 'FAILED',
+  'react-agent.trace.expand': 'Expand step detail',
+  'react-agent.trace.collapse': 'Collapse step detail',
+  'react-agent.trace.detailArgs': 'Arguments',
+  'react-agent.trace.detailResult': 'Result',
+  'react-agent.trace.detailDiff': 'Diff',
   // Welcome / greeting messages
   'react-agent.greeting.welcome':
     'Hello! I am your ReAct specialist agent. I have high-fidelity local workspace tool bindings. Describe a software task, and watch me inspect the repository, write the code, and run tests sequentially to execute it safely.',
