@@ -47,6 +47,7 @@ export interface DispatchReport {
   messages: string[];
   demoSuspected: boolean;
   verdict: "DONE" | "BLOCKED" | "OK" | "INCOMPLETE";
+  tokensPerSec: number; // final-generation throughput from the done event (0 when absent)
 }
 
 export interface DispatchTask {
@@ -112,6 +113,7 @@ export function parseDispatchReport(
   const files: string[] = [];
   const errors: string[] = [];
   const messages: string[] = [];
+  let tokensPerSec = 0;
 
   for (const ev of Array.isArray(events) ? events : []) {
     if (!ev || typeof ev !== "object") continue;
@@ -127,6 +129,8 @@ export function parseDispatchReport(
       if (ev.text?.trim()) messages.push(ev.text.trim());
     } else if (ev.type === "done") {
       if (ev.text?.trim()) messages.push(ev.text.trim());
+      const t = (ev as { tokensPerSec?: unknown }).tokensPerSec;
+      if (typeof t === "number" && Number.isFinite(t)) tokensPerSec = t;
     } else if (ev.type === "error") {
       errors.push(ev.message || "unknown");
     }
@@ -147,7 +151,7 @@ export function parseDispatchReport(
         ? "OK"
         : "INCOMPLETE";
 
-  return { host, steps, files, errors, messages, demoSuspected, verdict };
+  return { host, steps, files, errors, messages, demoSuspected, verdict, tokensPerSec };
 }
 
 // JSON.stringify that never throws (circular/exotic result payloads → "").
