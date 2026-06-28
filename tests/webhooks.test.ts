@@ -92,4 +92,34 @@ describe("webhook delivery pipeline (Faz 11B/12C)", () => {
     await outbound.processDeliveries();
     expect(received.some((r) => r.body.includes("strand_1"))).toBe(true);
   });
+
+  // vFinal: reclaimStranded only runs at worker STARTUP — a crash mid-run strands a
+  // claim until restart. reclaimStale(window) runs each worker tick: it requeues claims
+  // older than the window WITHOUT double-sending a fresh in-flight claim.
+  test("reclaimStale requeues a claim older than the window", async () => {
+    received.length = 0;
+    const t = await store.createTenant("whkstaleold", "pro");
+    await store.addWebhook(t.id, receiverUrl, ["key.created"]);
+    await store.queueWebhookEvent(t.id, "key.created", { keyId: "staleold_1" });
+    const claimed = await store.claimDeliveries(); // status → claimed_*, claimed_at = now
+    expect(claimed.some((r: any) => JSON.parse(r.payload).data.keyId === "staleold_1")).toBe(true);
+    // window 0 → any claim (claimed_at <= now) is stale → requeued
+    const n = await store.reclaimStale(0);
+    expect(n).toBeGreaterThanOrEqual(1);
+    await outbound.processDeliveries();
+    expect(received.some((r) => r.body.includes("staleold_1"))).toBe(true);
+  });
+
+  test("reclaimStale does NOT requeue a fresh in-flight claim (no double-send)", async () => {
+    received.length = 0;
+    const t = await store.createTenant("whkstalefresh", "pro");
+    await store.addWebhook(t.id, receiverUrl, ["key.created"]);
+    await store.queueWebhookEvent(t.id, "key.created", { keyId: "fresh_1" });
+    await store.claimDeliveries(); // claimed_at = now
+    // window 2min → a just-claimed row is NOT stale → left in flight
+    const n = await store.reclaimStale(120_000);
+    expect(n).toBe(0);
+    await outbound.processDeliveries();
+    expect(received.some((r) => r.body.includes("fresh_1"))).toBe(false); // still claimed, not re-sent
+  });
 });

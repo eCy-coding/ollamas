@@ -4,7 +4,7 @@
 // tenants can verify with standard libraries. Zero deps (node:crypto + fetch).
 
 import crypto from "node:crypto";
-import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl, reclaimStranded } from "../store";
+import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl, reclaimStranded, reclaimStale } from "../store";
 
 const MAX_ATTEMPTS = Number(process.env.WEBHOOK_RETRY_MAX_ATTEMPTS || 5);
 const TIMEOUT_MS = Number(process.env.WEBHOOK_REQUEST_TIMEOUT_MS || 15000);
@@ -78,7 +78,11 @@ export function startWebhookWorker(): void {
   const interval = Number(process.env.WEBHOOK_WORKER_INTERVAL_MS || 30000);
   // Recover deliveries left 'claimed' by a previous crash before we start fresh.
   reclaimStranded().catch(() => {});
-  timer = setInterval(() => { processDeliveries().catch(() => {}); }, interval);
+  // Each tick: requeue claims stranded mid-run by a crash (older than the stale window)
+  // BEFORE claiming new ones, so a crashed delivery re-fires without a restart.
+  timer = setInterval(() => {
+    reclaimStale().catch(() => {}).then(() => processDeliveries().catch(() => {}));
+  }, interval);
   timer.unref?.();
 }
 /** Stop the background delivery worker (idempotent) — called on graceful shutdown. */

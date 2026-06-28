@@ -153,6 +153,10 @@ async function migrate() {
   const kcols = (await d().query("PRAGMA table_info(api_keys)")).rows.map((c) => c.name);
   if (!kcols.includes("expires_at")) await d().exec("ALTER TABLE api_keys ADD COLUMN expires_at TEXT");
   if (!kcols.includes("last_used_at")) await d().exec("ALTER TABLE api_keys ADD COLUMN last_used_at TEXT");
+  // claimed_at stamps when a delivery was claimed → reclaimStale() can requeue a
+  // crash-stranded claim at runtime without double-sending a fresh in-flight one.
+  const wcols = (await d().query("PRAGMA table_info(webhook_deliveries)")).rows.map((c) => c.name);
+  if (!wcols.includes("claimed_at")) await d().exec("ALTER TABLE webhook_deliveries ADD COLUMN claimed_at TEXT");
 }
 
 async function seedPlans() {
@@ -571,16 +575,16 @@ export async function queueWebhookEvent(tenantId: string, eventType: string, pay
 export async function claimDeliveries(limit = 50): Promise<Delivery[]> {
   const now = nowIso();
   if (d().dialect === "pg") {
-    const sql = `UPDATE webhook_deliveries SET status='claimed'
+    const sql = `UPDATE webhook_deliveries SET status='claimed', claimed_at=?
       WHERE id IN (SELECT id FROM webhook_deliveries WHERE status='pending' AND next_retry_at <= ?
                    ORDER BY next_retry_at FOR UPDATE SKIP LOCKED LIMIT ?)
       RETURNING *`;
-    return (await d().query(sql, [now, limit])).rows;
+    return (await d().query(sql, [now, now, limit])).rows;
   }
   // sqlite: single-writer model. Tag with a UNIQUE claim token so two parallel
   // workers select disjoint sets (a shared 'claimed' status would double-claim).
   const tok = `claimed_${crypto.randomBytes(6).toString("hex")}`;
-  await d().run("UPDATE webhook_deliveries SET status=? WHERE id IN (SELECT id FROM webhook_deliveries WHERE status='pending' AND next_retry_at <= ? ORDER BY next_retry_at LIMIT ?)", [tok, now, limit]);
+  await d().run("UPDATE webhook_deliveries SET status=?, claimed_at=? WHERE id IN (SELECT id FROM webhook_deliveries WHERE status='pending' AND next_retry_at <= ? ORDER BY next_retry_at LIMIT ?)", [tok, now, now, limit]);
   return (await d().query("SELECT * FROM webhook_deliveries WHERE status=? ORDER BY next_retry_at", [tok])).rows;
 }
 // Requeue claims orphaned by a worker crash. claimDeliveries() tags rows
@@ -590,7 +594,18 @@ export async function claimDeliveries(limit = 50): Promise<Delivery[]> {
 // orphan — safe to reset without a claimed_at timestamp. (Multi-replica pg with
 // concurrent live workers would instead need a claimed_at column + stale-window.)
 export async function reclaimStranded(): Promise<number> {
-  return (await d().run("UPDATE webhook_deliveries SET status='pending' WHERE status LIKE 'claimed%'")).changes;
+  return (await d().run("UPDATE webhook_deliveries SET status='pending', claimed_at=NULL WHERE status LIKE 'claimed%'")).changes;
+}
+// Runtime requeue: reset claims older than `staleMs` (or with no claimed_at) back to
+// pending. Called each worker tick so a delivery stranded by a crash re-fires WITHOUT
+// restart, while a fresh in-flight claim (claimed_at within the window) is left alone
+// → no double-send. staleMs must exceed a single delivery's worst-case duration.
+export async function reclaimStale(staleMs = 120_000): Promise<number> {
+  const cutoff = new Date(Date.now() - staleMs).toISOString();
+  return (await d().run(
+    "UPDATE webhook_deliveries SET status='pending', claimed_at=NULL WHERE status LIKE 'claimed%' AND (claimed_at IS NULL OR claimed_at <= ?)",
+    [cutoff],
+  )).changes;
 }
 export async function markDelivery(id: string, status: string, attempt: number, nextRetryAt: string | null, code?: number): Promise<void> {
   await d().run("UPDATE webhook_deliveries SET status = ?, attempt = ?, next_retry_at = ?, last_code = ? WHERE id = ?", [status, attempt, nextRetryAt ?? nowIso(), code ?? null, id]);
