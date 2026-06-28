@@ -11,6 +11,7 @@
 //   node scripts/agent-dispatch.mjs "<task>" [--model qwen3:8b] [--provider ollama-local]
 //                                            [--root <abs-write-root>] [--steps 10] [--json]
 //   echo "<task>" | node scripts/agent-dispatch.mjs --model qwen3-coder:30b
+//   node scripts/agent-dispatch.mjs "<task>" --remote desktop-ert7724 [--port 8090]
 //
 // Env: OLLAMAS_URL (default http://127.0.0.1:8090), OLLAMAS_TIMEOUT_MS (default 180000).
 
@@ -18,7 +19,11 @@ const args = process.argv.slice(2);
 const opt = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
 const has = (flag) => args.includes(flag);
 
-const URL = process.env.OLLAMAS_URL || "http://127.0.0.1:8090";
+// Target host: --remote <host>[:--port] overrides OLLAMAS_URL (fleet dispatch — drive the ReAct
+// loop ON a remote worker; body/SSE/report/exit semantics stay identical). Default = local.
+const REMOTE = opt("--remote", null);
+const PORT = opt("--port", "8090");
+const URL = REMOTE ? `http://${REMOTE}:${PORT}` : (process.env.OLLAMAS_URL || "http://127.0.0.1:8090");
 // Provider: --provider flag > OLLAMAS_PROVIDER env > ollama-local default. (env knob lets the
 // harness pin a provider, e.g. gemini/ollama-cloud, without editing this script.)
 const PROVIDER = opt("--provider", process.env.OLLAMAS_PROVIDER || "ollama-local");
@@ -34,8 +39,8 @@ const JSON_OUT = has("--json");
 // The task is the first non-flag arg, or stdin.
 const positional = args.filter((a, i) => !a.startsWith("--") && (i === 0 || !args[i - 1].startsWith("--")));
 let task = positional[0];
-if (!task && !process.stdin.isTTY) task = require("fs").readFileSync(0, "utf8").trim();
-if (!task) { console.error("usage: agent-dispatch \"<task>\" [--model m] [--provider p] [--root dir] [--steps n] [--json]"); process.exit(2); }
+if (!task && !process.stdin.isTTY) task = (await import("node:fs")).readFileSync(0, "utf8").trim();
+if (!task) { console.error("usage: agent-dispatch \"<task>\" [--model m] [--provider p] [--root dir] [--steps n] [--remote host] [--port p] [--json]"); process.exit(2); }
 
 // eCyPro calibration: my standards, injected into the task so the sub-agent matches
 // the main-thread quality bar (root-cause, evidence, terse, real output, clear verdict).

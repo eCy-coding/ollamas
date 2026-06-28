@@ -24,6 +24,40 @@ const OLLAMA = (process.env.OLLAMA_HOST || "http://localhost:11434").replace(/\/
 const MODEL = process.env.READY_MODEL || "qwen3:8b";
 const PORT = process.env.PORT || "3000";
 
+// ── --remote <host>: probe a fleet worker's ollamas gateway + ollama model (s.1 parity).
+// Graceful: never crashes when the host is down (prints FAIL, exits 1). Verifies the
+// full-remote-dispatch precondition: gateway /api/health mode=live + ollama has the model.
+const remoteIdx = process.argv.indexOf("--remote");
+if (remoteIdx >= 0) {
+  const host = process.argv[remoteIdx + 1];
+  const gwPort = process.env.OLLAMAS_PORT || "8090";
+  const model = process.env.READY_MODEL || "qwen3:8b";
+  const jsonOut = process.argv.includes("--json");
+  const probe = async (url) => {
+    try { const r = await fetch(url, { signal: AbortSignal.timeout(2500) }); return r.ok ? await r.text() : null; }
+    catch { return null; }
+  };
+  if (!host) { console.error("usage: node scripts/ready.mjs --remote <host> [--json]"); process.exit(2); }
+  const healthBody = await probe(`http://${host}:${gwPort}/api/health`);
+  let mode = null; try { mode = healthBody ? JSON.parse(healthBody).mode : null; } catch { /* not ollamas */ }
+  const tagsBody = await probe(`http://${host}:11434/api/tags`);
+  let models = []; try { models = tagsBody ? (JSON.parse(tagsBody).models || []).map((m) => m.name) : []; } catch { /* */ }
+  const gatewayLive = mode === "live";
+  const hasModel = models.some((m) => m === model || m.startsWith(model));
+  const checks = [
+    { name: "gateway", ok: gatewayLive, detail: gatewayLive ? `:${gwPort}/api/health mode=live` : `:${gwPort}/api/health unreachable or not-live (run ollamas gateway on ${host})` },
+    { name: "model", ok: hasModel, detail: hasModel ? `${model} present` : `${model} missing on ${host}:11434 (ollama pull ${model})` },
+  ];
+  const ok = checks.every((c) => c.ok);
+  if (jsonOut) { console.log(JSON.stringify({ remote: host, ready: ok, checks }, null, 2)); }
+  else {
+    console.log(`\nollamas remote readiness — ${host}\n─────────────────`);
+    for (const c of checks) console.log(`[${c.ok ? " ok  " : "BLOCK"}] ${c.name.padEnd(8)} ${c.detail}`);
+    console.log(ok ? `\n✓ ${host} ready for full-remote dispatch.` : `\n✗ ${host} not ready — see BLOCK items above.`);
+  }
+  process.exit(ok ? 0 : 1);
+}
+
 const steps = [];
 const add = (name, status, detail = "", hint = "") => steps.push({ name, status, detail, hint });
 
