@@ -43,11 +43,16 @@ export function ObservabilityPanel() {
   const { _ } = useLingui();
   const { entries, isLoading, error, refetch } = useLogbook({ limit: 200 });
 
+  // CLS fix (vF12): the loading skeleton must reserve the SAME height as the loaded
+  // panel, else content arrival shifts the whole page down (measured CLS 0.543 → poor).
+  // Heights mirror the loaded sections below (health/vitals/errors/recent).
   if (isLoading) {
     return (
-      <section aria-busy="true" aria-label={_('app.obs.title')} className="space-y-3">
-        <Skeleton height="4rem" />
+      <section aria-busy="true" aria-label={_('app.obs.title')} className="space-y-4 min-h-[31rem]">
+        <Skeleton height="4.5rem" />
         <Skeleton height="6rem" />
+        <Skeleton height="7.5rem" />
+        <Skeleton height="13rem" />
       </section>
     );
   }
@@ -60,7 +65,7 @@ export function ObservabilityPanel() {
   const recent = frontendEvents(entries).slice(-8).reverse();
 
   return (
-    <section aria-label={_('app.obs.title')} className="space-y-4">
+    <section aria-label={_('app.obs.title')} className="space-y-4 min-h-[31rem]">
       {/* Health verdict + refresh */}
       <div className={`rounded border p-4 flex items-start justify-between gap-4 ${VERDICT_COLOR[health.verdict]}`}>
         <div className="flex items-start gap-3">
@@ -140,7 +145,7 @@ export function ObservabilityPanel() {
             <h4 className="text-[10px] text-immersive-text-dim font-mono uppercase tracking-widest font-bold mb-2">
               {_('app.obs.recent')}
             </h4>
-            <ul className="space-y-1">
+            <ul className="space-y-1 h-[13rem] overflow-y-auto">
               {recent.map((e, i) => (
                 <li key={`${e.ts ?? ''}-${i}`} className="flex items-center justify-between gap-3 text-[11px] font-mono bg-immersive-panel border border-immersive-border rounded px-3 py-1.5">
                   <span className="text-immersive-text-muted truncate">{String(e.note ?? e.kind ?? 'event')}</span>

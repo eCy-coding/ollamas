@@ -56,7 +56,8 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const addHook = async () => {
     try {
       const r = await tapi("/api/saas/webhooks", { method: "POST", body: JSON.stringify({ url: whUrl, events: whEvents.split(",").map(s => s.trim()).filter(Boolean) }) });
-      onNotify(`Webhook created — secret (once): ${r.secret.slice(0, 16)}…`, "success"); copy(r.secret); setWhUrl(""); loadSelf();
+      const secret = (r?.secret ?? "") as string; // guard: server may omit secret → no .slice crash, honest message
+      onNotify(secret ? `Webhook created — secret (once): ${secret.slice(0, 16)}…` : "Webhook created (no secret returned)", "success"); if (secret) copy(secret); setWhUrl(""); loadSelf();
     } catch (e: any) { onNotify(e.message, "error"); }
   };
   const delHook = async (id: string) => { try { await tapi(`/api/saas/webhooks/${id}`, { method: "DELETE" }); loadSelf(); } catch (e: any) { onNotify(e.message, "error"); } };
