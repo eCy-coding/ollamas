@@ -108,6 +108,19 @@ describe("store: usage + billing idempotency", () => {
     expect(await store.hasInvoice(t.id, "2026-06")).toBe(true);
   });
 
+  // vFinal (TOCTOU fix): concurrent recordInvoice for the same (tenant,period) must
+  // yield EXACTLY ONE created — the atomic insert-if-absent prevents duplicate invoices.
+  test("recordInvoice: concurrent callers create at most one invoice", async () => {
+    const t = await store.createTenant("invrace", "pro");
+    const results = await Promise.all([
+      store.recordInvoice(t.id, "2026-07", 10),
+      store.recordInvoice(t.id, "2026-07", 10),
+      store.recordInvoice(t.id, "2026-07", 10),
+    ]);
+    expect(results.filter((r) => r.created).length).toBe(1);
+    expect(new Set(results.map((r) => r.id)).size).toBe(1); // all return the same single id
+  });
+
   test("computeRun dry-runs without a Stripe key", async () => {
     const run = await billing.computeRun();
     expect(run.dryRun).toBe(true);
@@ -239,6 +252,23 @@ describe("store: OAuth 2.1 AS — codes + opaque tokens (Faz 19)", () => {
     const first = await store.consumeAuthCode("code-1");
     expect(first!.tenant_id).toBe("t1");
     expect(await store.consumeAuthCode("code-1")).toBeNull(); // already used
+  });
+
+  // vFinal (TOCTOU fix): concurrent consume of one code → EXACTLY ONE caller gets it
+  // (the DELETE-changes arbiter), preventing OAuth auth-code replay.
+  test("auth code: concurrent consume yields exactly one winner", async () => {
+    await store.saveAuthCode({ code: "code-race", client_id: "oc_x", tenant_id: "t1", code_challenge: "c", redirect_uri: "u", scopes: "", resource: null, expires_at: new Date(Date.now() + 60000).toISOString() });
+    const results = await Promise.all([store.consumeAuthCode("code-race"), store.consumeAuthCode("code-race"), store.consumeAuthCode("code-race")]);
+    expect(results.filter((r) => r !== null).length).toBe(1);
+  });
+
+  // vFinal (TOCTOU fix): concurrent rotation of one refresh token → one 'ok', the rest
+  // 'reuse' (RFC 9700 reuse detection via the atomic conditional UPDATE).
+  test("refresh token: concurrent rotation → one ok, rest reuse", async () => {
+    const { token } = await store.saveRefreshToken({ client_id: "oc_x", tenant_id: "t1", scopes: "tools:safe", resource: null, ttlSecs: 3600 });
+    const results = await Promise.all([store.rotateRefreshToken(token), store.rotateRefreshToken(token)]);
+    expect(results.filter((r) => r.status === "ok").length).toBe(1);
+    expect(results.filter((r) => r.status === "reuse").length).toBe(1);
   });
 
   test("expired auth code does not resolve", async () => {

@@ -282,11 +282,17 @@ export async function hasInvoice(tenantId: string, period: string): Promise<bool
   return !!(await d().query("SELECT 1 AS x FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1", [tenantId, period])).rows[0];
 }
 export async function recordInvoice(tenantId: string, period: string, amount: number): Promise<{ id: string; created: boolean }> {
-  const existing = (await d().query("SELECT id FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1", [tenantId, period])).rows[0];
-  if (existing) return { id: existing.id, created: false };
   const id = `inv_${crypto.randomBytes(8).toString("hex")}`;
-  await d().run("INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) VALUES (?,?,?,?,?,?)", [id, tenantId, period, amount, "open", nowIso()]);
-  return { id, created: true };
+  // Atomic insert-if-absent: a single conditional INSERT (sqlite single-writer serializes
+  // it) means two concurrent callers can't both create a row for the same (tenant,period).
+  // changes===1 ⇒ we created it; else it already existed → return the existing id, created=false.
+  const res = await d().run(
+    "INSERT INTO invoices (id, tenant_id, period, amount, status, created_at) SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM invoices WHERE tenant_id = ? AND period = ?)",
+    [id, tenantId, period, amount, "open", nowIso(), tenantId, period],
+  );
+  if (res.changes === 1) return { id, created: true };
+  const existing = (await d().query("SELECT id FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1", [tenantId, period])).rows[0];
+  return { id: existing?.id ?? id, created: false };
 }
 
 // --- Billing config + Stripe webhook dedup (Faz 9C) ---
@@ -430,8 +436,11 @@ export async function getAuthCode(code: string): Promise<AuthCode | null> {
 /** Atomically take a code: returns it once (then deletes), null if missing/expired. */
 export async function consumeAuthCode(code: string): Promise<AuthCode | null> {
   const c = await getAuthCode(code);
-  await d().run("DELETE FROM oauth_codes WHERE code = ?", [code]); // one-time use
-  if (!c) return null;
+  // The DELETE is the atomic arbiter: under concurrent consume of the same code, only
+  // the caller whose DELETE actually removed the row (changes===1) may use it — the
+  // loser sees changes===0 → null. (Prevents OAuth auth-code replay / double-use.)
+  const res = await d().run("DELETE FROM oauth_codes WHERE code = ?", [code]); // one-time use
+  if (!c || res.changes !== 1) return null;
   if (c.expires_at <= nowIso()) return null;
   return c;
 }
@@ -490,8 +499,14 @@ export async function rotateRefreshToken(plaintext: string): Promise<RefreshRota
     await revokeRefreshFamily(r.family_id); // family compromised → kill the chain
     return { status: "reuse" };
   }
-  // Mark consumed regardless of expiry (a token is single-use either way).
-  await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ?", [hash]);
+  // Atomic consume: only the caller whose conditional UPDATE flips used 0→1 (changes===1)
+  // is the legitimate rotation. A concurrent caller that also read used=0 loses the race
+  // (changes===0) → treat as replay: revoke the family (RFC 9700 reuse detection).
+  const res = await d().run("UPDATE oauth_refresh_tokens SET used = 1 WHERE refresh_token_hash = ? AND used = 0", [hash]);
+  if (res.changes !== 1) {
+    await revokeRefreshFamily(r.family_id);
+    return { status: "reuse" };
+  }
   if (r.expires_at <= nowIso()) return { status: "invalid" };
   return { status: "ok", family_id: r.family_id, client_id: r.client_id, tenant_id: r.tenant_id, scopes: r.scopes || "", resource: r.resource ?? null };
 }

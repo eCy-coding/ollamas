@@ -406,6 +406,11 @@ async function initializeServer() {
 
   app.post("/api/keys/test", async (req, res) => {
     const { provider, key, customEndpoint } = req.body;
+    // Guard: without a provider, `db.data.keys[provider]` would persist the key under
+    // the literal "undefined" key → corrupted store on disk. Reject early.
+    if (!provider || typeof provider !== "string") {
+      return res.status(400).json({ error: "provider required" });
+    }
     const testConfig = {
       provider,
       model: "",
@@ -1122,6 +1127,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
   app.get("/api/workspace/file", (req, res) => {
     const relativePath = req.query.relativePath as string;
+    // Guard: a missing relativePath makes path.join throw ERR_INVALID_ARG_TYPE → a
+    // misleading 500. A missing required query param is a client error (400).
+    if (!relativePath || typeof relativePath !== "string") {
+      return res.status(400).json({ error: "relativePath query parameter required" });
+    }
     const isLive = CURRENT_MODE !== "demo";
     try {
       const content = FilesystemManager.readFile(isLive, db.data.workspacePath, relativePath);
