@@ -39,7 +39,7 @@ export function CouncilPanel(): React.ReactElement {
     setTasks([]);
 
     const es = new EventSource(
-      "/api/council/calibrate?models=qwen3:4b,qwen3:8b,phi4,gemini-cli"
+      "/api/council/calibrate?models=qwen3:4b,qwen3:8b,phi4,gemini,gemini-cli"
     );
     esRef.current = es;
 

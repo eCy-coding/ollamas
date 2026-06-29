@@ -256,6 +256,25 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
                 <span className="text-[9px] font-mono text-immersive-text-dim self-center">self-healing · {fleet.poolSize} backend{fleet.poolSize > 1 ? "s" : ""}</span>
               </div>
             )}
+            {telemetry.cloudProviders && telemetry.cloudProviders.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <span className="text-[9px] font-mono text-immersive-text-dim self-center uppercase tracking-wider">cloud</span>
+                {telemetry.cloudProviders.map((c) => (
+                  <span
+                    key={c.name}
+                    title={c.ready ? `${c.name} key present — available as fleet/council backend` : `${c.name} — no API key configured`}
+                    className={`text-[9px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
+                      c.ready
+                        ? "bg-sky-500/10 border-sky-500/30 text-sky-300"
+                        : "bg-white/5 border-immersive-border text-immersive-text-dim opacity-60"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${c.ready ? "bg-sky-400" : "bg-immersive-text-dim"}`} />
+                    {c.name}{c.ready ? " ✓" : ""}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <span className="text-[10px] text-immersive-text-dim font-mono italic">Linking backend stream…</span>

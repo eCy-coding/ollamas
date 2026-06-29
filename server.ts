@@ -409,6 +409,10 @@ async function initializeServer() {
         binaries: cachedBinaries,
         db: "up",
         backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
+        // Cloud LLM providers whose key is present (vault/env) → available as fleet/council
+        // backends alongside the local Mac models. Lets the cockpit show "cloud: gemini ✓".
+        cloudProviders: ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
+          .map((p) => ({ name: p, ready: !!ProviderRouter.getDecryptedKey(p) })),
         fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         models: {
@@ -447,17 +451,21 @@ async function initializeServer() {
     const results: { model: string; taskId: string; correct: boolean; unavailable?: boolean }[] = [];
     send({ type: "start", models, tasks: tasks.map((t) => t.id) });
     for (const model of models) {
-      // gemini-cli is a keyless external-binary provider, not an ollama model. Gate on the
-      // binary ONCE: absent → emit `unavailable` per task (graceful skip, scorer excludes it);
-      // present → route via the gemini-cli provider. Other members use the ollama path.
-      const isGemini = model === "gemini-cli";
-      const gemOk = isGemini ? await geminiCliAvailable().catch(() => false) : true;
+      // Council members can be 3 kinds, gated ONCE so an absent credential skips the
+      // member (unavailable, scorer-excluded) instead of penalizing it as 0%:
+      //  - "gemini-cli": keyless external binary → gate on geminiCliAvailable()
+      //  - "gemini":     cloud api-key provider → gate on a vault/env GEMINI_API_KEY
+      //  - else:         an ollama model on the Mac → localhost /api/generate
+      const isGeminiCli = model === "gemini-cli";
+      const isGeminiCloud = model === "gemini";
+      const gemCliOk = isGeminiCli ? await geminiCliAvailable().catch(() => false) : true;
+      const gemCloudOk = isGeminiCloud ? !!ProviderRouter.getDecryptedKey("gemini") : true;
       for (const task of tasks) {
         if (res.writableEnded) break;
         let correct = false, tokPerSec = 0, ms = 0, unavailable = false;
-        if (isGemini && !gemOk) {
+        if (isGeminiCli && !gemCliOk) {
           unavailable = true; // gemini binary not installed → council member skipped, not penalized
-        } else if (isGemini) {
+        } else if (isGeminiCli) {
           try {
             const t0 = Date.now();
             const r = await generateViaGeminiCli([{ role: "user", content: task.prompt }], undefined, AbortSignal.timeout(90_000));
@@ -465,6 +473,16 @@ async function initializeServer() {
             correct = checkAnswer(r.text || "", task.answer);
             tokPerSec = r.tokensPerSec ?? 0;
           } catch { /* runtime spawn/timeout → counts as incorrect */ }
+        } else if (isGeminiCloud && !gemCloudOk) {
+          unavailable = true; // no GEMINI_API_KEY in vault/env → cloud member skipped, not penalized
+        } else if (isGeminiCloud) {
+          try {
+            const t0 = Date.now();
+            const r = await ProviderRouter.generate({ provider: "gemini", model: "", messages: [{ role: "user", content: task.prompt }], singleAttempt: true });
+            ms = Date.now() - t0;
+            correct = checkAnswer(r.text || "", task.answer);
+            tokPerSec = r.tokensPerSec ?? 0;
+          } catch { /* cloud api error/timeout → counts as incorrect */ }
         } else {
           try {
             const t0 = Date.now();
