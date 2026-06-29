@@ -3,7 +3,7 @@
  * the local-provider worker mapping, task-kind inference, and worker enumeration.
  */
 import { describe, it, expect } from "vitest";
-import { localProviderForWorker, inferTaskKind, buildWorkers } from "../cli/commands/remote";
+import { localProviderForWorker, inferTaskKind, buildWorkers, mergeEpicReport } from "../cli/commands/remote";
 import type { Backend } from "../cli/lib/remote";
 
 describe("localProviderForWorker", () => {
@@ -35,5 +35,22 @@ describe("buildWorkers — gemini-cli worker gating", () => {
   });
   it("always includes the mac control plane", () => {
     expect(buildWorkers(pool, true).find((w) => w.kind === "mac")).toBeTruthy();
+  });
+});
+
+describe("mergeEpicReport — gemini-cli acceptance", () => {
+  const rep = (over: any = {}) => ({ steps: [], files: [], errors: [], messages: ["factorial(5)=120"], demoSuspected: true, verdict: "INCOMPLETE" as const, tokensPerSec: 0, ...over });
+  it("a tool-less gemini-cli answer is accepted (OK / allOk), not failed for 0 steps", () => {
+    const epic = mergeEpicReport([{ taskId: "t1", worker: "gemini-cli", report: rep() as any, failedOver: false }]);
+    expect(epic.allOk).toBe(true);
+    expect(epic.tasks[0].verdict).toBe("OK");
+  });
+  it("a BLOCKED gemini-cli answer is NOT accepted", () => {
+    const epic = mergeEpicReport([{ taskId: "t1", worker: "gemini-cli", report: rep({ verdict: "BLOCKED" }) as any, failedOver: false }]);
+    expect(epic.allOk).toBe(false);
+  });
+  it("a normal (non-local) worker still requires DONE/OK + no demo", () => {
+    const epic = mergeEpicReport([{ taskId: "t1", worker: "box-a", report: rep() as any, failedOver: false }]);
+    expect(epic.allOk).toBe(false); // INCOMPLETE + demoSuspected → not ok for a remote worker
   });
 });

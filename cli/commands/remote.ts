@@ -24,6 +24,7 @@ import { decideTransition } from "../lib/fleet";
 import type { FleetState } from "../lib/fleet";
 import { assignWorker, type LedgerEvent, type FleetWorker, type TaskKind, type DispatchTask as LedgerTask } from "../lib/dispatch-ledger";
 import { RemoteAgentClient, type DispatchTask as RemoteTask, type DispatchReport } from "../lib/remote-agent";
+import { detectGemini } from "../lib/gemini";
 
 const execFileP = promisify(execFile);
 
@@ -590,9 +591,14 @@ export function mergeEpicReport(results: DispatchResult[]): EpicReport {
   for (const r of results) {
     const v = r.report?.verdict ?? "INCOMPLETE";
     if (r.report) { for (const f of r.report.files) files.add(f); errors.push(...r.report.errors); }
-    const ok = (v === "DONE" || v === "OK") && !r.report?.demoSuspected;
+    // A local-provider worker (gemini-cli) returns a final answer with 0 ollamas-tool-steps and
+    // no "VERDICT: DONE" sentinel → it would read INCOMPLETE/demo. A non-blocked answer counts as OK.
+    const localProv = r.worker ? localProviderForWorker(r.worker) : null;
+    const ok = localProv
+      ? !!r.report && r.report.errors.length === 0 && r.report.messages.length > 0 && v !== "BLOCKED"
+      : (v === "DONE" || v === "OK") && !r.report?.demoSuspected;
     if (!ok) allOk = false;
-    tasks.push({ taskId: r.taskId, worker: r.worker, verdict: v, failedOver: r.failedOver });
+    tasks.push({ taskId: r.taskId, worker: r.worker, verdict: localProv && ok ? "OK" : v, failedOver: r.failedOver });
   }
   return { tasks, files: [...files], errors, allOk, verdict: allOk ? "DONE" : "INCOMPLETE" };
 }
@@ -630,7 +636,10 @@ async function runDispatch(args: string[]): Promise<number> {
   const model = values.model as string | undefined;
 
   const pool = loadPool();
-  const baseWorkers = buildWorkers(pool);
+  // Include the gemini-cli backend as a fleet worker only when its binary is present, so
+  // google-grounded tasks can route to it (assignWorker → S1 local-gateway execution).
+  const geminiHealthy = (await detectGemini()).present;
+  const baseWorkers = buildWorkers(pool, true, geminiHealthy);
   const client = new RemoteAgentClient();
   let fence = 1;
   const ledger: LedgerEvent[] = [];
@@ -661,7 +670,14 @@ async function runDispatch(args: string[]): Promise<number> {
           report = b ? await client.dispatchToBackend(b, remoteTask) : await client.dispatch(wname, port, remoteTask);
         }
       } catch { report = null; }
-      const ok = !!report && (report.verdict === "DONE" || report.verdict === "OK") && !report.demoSuspected && report.errors.length === 0;
+      // A local-provider worker (gemini-cli) runs its OWN agent loop and returns a final answer
+      // with 0 ollamas-tool-steps — which the default heuristic flags as demoSuspected/INCOMPLETE.
+      // For it, a non-blocked answer with no errors counts as success (not a failover trigger).
+      const ok = !!report && report.errors.length === 0 && (
+        localProviderForWorker(wname)
+          ? report.messages.length > 0 && report.verdict !== "BLOCKED"
+          : (report.verdict === "DONE" || report.verdict === "OK") && !report.demoSuspected
+      );
       if (ok) { ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "done", ttlMs: 0, fence: fence++ }); break; }
       // Failover: mark the failed worker unhealthy → re-assign (assignWorker yields mac substrate).
       ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "failed", ttlMs: 0, fence: fence++ });
