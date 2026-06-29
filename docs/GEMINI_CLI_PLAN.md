@@ -89,6 +89,24 @@ and Gemini CLI's tools/MCP/extensions — AND lets Gemini CLI call ollamas's own
 (`npm i -g @google/gemini-cli` + OAuth / `GEMINI_API_KEY` / Vertex). Absent → honest skip-with-warn;
 all wiring is unit/ui-tested.
 
+## Concurrent lane + efficiency (vG2)
+
+**Dedicated gemini gateway lane** (run gemini-cli work on its own port, concurrent with the main :3000 — never kills it):
+```bash
+npm run gemini:lane                    # boots a 2nd gateway on :3011 (or the next free port)
+OLLAMAS_GEMINI_PORT=3022 npm run gemini:lane
+ollamas gemini lane --port 3011        # probe it (up/down + models + use-it hint)
+# point any sub-agent at the lane:
+OLLAMAS_GATEWAY=http://127.0.0.1:3011 ollamas agent --provider gemini-cli "<task>"
+```
+The lane isolates its file DBs (`MISSION_CONTROL_DATA_DIR=…/gemini-lane`), disables HMR, and auto-picks
+a free port if the requested one is busy (existing servers left untouched).
+
+**Efficiency** (`server/gemini-cli.ts`): `geminiCliAvailable()` has an 8s TTL cache (no `gemini --version`
+spawn per `/api/models` request); a semaphore caps concurrent `gemini` spawns at `min(cores-2, 8)` so
+parallel dispatch doesn't storm the machine; the provider reports a wall-clock `tokensPerSec`
+(`estimateTokensPerSec`, ~chars/4 ÷ latency) for dispatch-bench/telemetry parity.
+
 ## Verification (E2E, no mocks)
 1. Gate: `tsc --noEmit` 0 · `vitest run` (new pure tests) green · `grep -rn tool-registry cli/` empty · `git diff package.json` shows no new CLI dep.
 2. Bridge: `ollamas gemini "respond with the single word PONG" --json | jq -r .response` → `PONG`, exit 0. Force a bad arg → exit 42.
