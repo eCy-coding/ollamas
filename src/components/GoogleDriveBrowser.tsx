@@ -29,10 +29,12 @@ export function GoogleDriveBrowser() {
         return;
       }
       if (res.status === 403) {
-        // Signed in, but the granted token lacks Drive access — the OAuth consent
-        // screen is missing the drive scope, or the Drive API isn't enabled.
-        const body = await res.text();
-        throw new Error(`Drive access not granted (403). The app's OAuth consent needs the Drive scope and the Drive API must be enabled. ${body.slice(0, 200)}`);
+        // Signed in, but the granted token lacks the Drive scope. Drop back to the
+        // sign-in card so the user can re-consent (sign-in now forces prompt=consent,
+        // which presents the Drive permission). If it still 403s, the project's OAuth
+        // consent screen must add the Drive scope + enable the Drive API.
+        resetAuth("Drive access not granted (403): the token is missing the Drive scope. Click 'Sign in with Google' again and approve the Google Drive permission. If it persists, the gen-lang-client project's OAuth consent screen needs the Drive scope + the Drive API enabled.");
+        return;
       }
       if (!res.ok) {
         throw new Error(`Failed to fetch files from Google Drive (${res.status}).`);
