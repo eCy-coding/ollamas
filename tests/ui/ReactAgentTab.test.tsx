@@ -210,4 +210,51 @@ describe('ReactAgentTab — ReAct Specialist', () => {
     fireEvent.click(screen.getByRole('button', { name: /Delete.*T/i }));
     await waitFor(() => expect(delMock).toHaveBeenCalledWith('/api/agent/sessions/s1'));
   });
+
+  it('retains assistant messages from different steps (no overwrite)', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'message', text: 'first reply', step: 1 },
+      { type: 'message', text: 'second reply', step: 3 },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    await waitFor(() => expect(screen.getByText('first reply')).toBeInTheDocument());
+    expect(screen.getByText('second reply')).toBeInTheDocument();
+  });
+
+  it('auto-closes the approval wizard when the write later applies', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'write_file', ok: true, latency: 1, args: { path: 'a.ts', content: 'X' }, diff: '+X', applied: false },
+      { type: 'step', stepNum: 1, tool: 'write_file', ok: true, latency: 1, args: { path: 'a.ts', content: 'X' }, diff: '+X', applied: true },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('write');
+    // The applied:true re-emit must have cleared the wizard.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /APPROVE WRITE/i })).toBeNull());
+  });
+
+  it('thought event updates the status line', async () => {
+    streamPostMock.mockImplementation((_u: string, _b: unknown, opts: { onChunk: (s: string) => void }) => {
+      opts.onChunk(`data: ${JSON.stringify({ type: 'thought', text: 'Pondering X' })}\n\n`);
+      return new Promise<void>(() => {}); // hang → status bar stays visible
+    });
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    expect(await screen.findByText(/Pondering X/)).toBeInTheDocument();
+  });
+
+  it('blocks a second send while one is in flight (runningRef guard)', async () => {
+    streamPostMock.mockImplementation(() => new Promise<void>(() => {})); // first run hangs
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('first');
+    await waitFor(() => expect(streamPostMock).toHaveBeenCalledTimes(1));
+    // Attempt a second send while the first is still running.
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'second' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', shiftKey: false });
+    expect(streamPostMock).toHaveBeenCalledTimes(1);
+  });
 });
