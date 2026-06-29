@@ -1,24 +1,35 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  initializeAuth, 
-  indexedDBLocalPersistence, 
-  browserLocalPersistence, 
-  inMemoryPersistence, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+import {
+  getAuth,
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  inMemoryPersistence,
+  browserPopupRedirectResolver,
+  signInWithPopup,
+  GoogleAuthProvider,
   User,
   onAuthStateChanged
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Surfaces a clear "configure Firebase" state instead of an opaque throw when
+// the applet config is a placeholder (missing the fields auth actually needs).
+export const isFirebaseConfigured = Boolean(
+  (firebaseConfig as { apiKey?: string }).apiKey &&
+  (firebaseConfig as { authDomain?: string }).authDomain
+);
+
 const app = initializeApp(firebaseConfig);
 
-// Safe auth boot supporting sandboxed iframes
+// Safe auth boot supporting sandboxed iframes.
+// initializeAuth() — unlike getAuth() — does NOT register a default popup/redirect
+// resolver, so signInWithPopup() would throw auth/argument-error. Register it here.
 let auth: any;
 try {
   auth = initializeAuth(app, {
-    persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence]
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver
   });
 } catch (e) {
   auth = getAuth(app);
@@ -55,7 +66,9 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
+    // Pass the resolver explicitly too — works regardless of which boot path
+    // (initializeAuth vs the getAuth fallback) produced `auth`.
+    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
       throw new Error('Failed to get access token from Firebase Auth');
@@ -73,6 +86,12 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 
 export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
+};
+
+// Drop the cached Google access token (e.g. after a 401) so the next sign-in
+// re-issues a fresh one. Lighter than logout(): keeps the Firebase session.
+export const clearAccessToken = (): void => {
+  cachedAccessToken = null;
 };
 
 export const logout = async () => {

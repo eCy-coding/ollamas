@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { googleSignIn, logout, auth } from '../lib/firebase.ts';
+import { googleSignIn, logout, auth, clearAccessToken, isFirebaseConfigured } from '../lib/firebase.ts';
 import { User, onAuthStateChanged } from 'firebase/auth';
 
 export function useAuth() {
@@ -49,11 +49,22 @@ export function useAuth() {
         errMsg = "Sign-in popup was blocked by your browser. Please check your browser's pop-up blocker settings and try again.";
       } else if (err.code === "auth/popup-closed-by-user") {
         errMsg = "Sign-in window was closed before completing authentication.";
+      } else if (err.code === "auth/unauthorized-domain") {
+        errMsg = "This domain isn't authorized for sign-in. Open the app at http://localhost:3000, or add this domain under Firebase Console → Authentication → Settings → Authorized domains.";
       }
       setAuthError(errMsg);
     } finally {
       setIsLoggingIn(false);
     }
+  };
+
+  // Called when a Drive request returns 401 (token expired ~1h). Drop the stale
+  // token and surface the sign-in card instead of silently failing.
+  const resetAuth = (message?: string) => {
+    clearAccessToken();
+    setToken(null);
+    setNeedsAuth(true);
+    if (message) setAuthError(message);
   };
 
   const handleLogout = async () => {
@@ -66,5 +77,5 @@ export function useAuth() {
     setAuthError(null);
   };
 
-  return { needsAuth, token, user, isLoggingIn, handleLogin, handleLogout, isReady, authError };
+  return { needsAuth, token, user, isLoggingIn, handleLogin, handleLogout, resetAuth, isReady, isConfigured: isFirebaseConfigured, authError };
 }

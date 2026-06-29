@@ -9,7 +9,7 @@ interface DriveFile {
 }
 
 export function GoogleDriveBrowser() {
-  const { token, needsAuth, handleLogin, isLoggingIn, authError } = useAuth();
+  const { token, needsAuth, handleLogin, isLoggingIn, authError, resetAuth, isConfigured } = useAuth();
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +23,11 @@ export function GoogleDriveBrowser() {
       const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=50&fields=files(id,name,mimeType)&orderBy=modifiedTime desc", {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        // Token expired (~1h) — drop it and re-show the sign-in card instead of a dead list.
+        resetAuth("Google Drive session expired. Please sign in again.");
+        return;
+      }
       if (!res.ok) {
         throw new Error("Failed to fetch files from Google Drive.");
       }
@@ -52,6 +57,10 @@ export function GoogleDriveBrowser() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        resetAuth("Google Drive session expired. Please sign in again.");
+        return;
+      }
       if (!res.ok) {
         throw new Error("Failed to delete file.");
       }
@@ -61,13 +70,23 @@ export function GoogleDriveBrowser() {
     }
   };
 
+  if (isConfigured === false) {
+    return (
+      <div className="bg-immersive-sidebar border border-immersive-border rounded p-8 flex flex-col items-center justify-center min-h-[300px] text-center shadow-lg">
+        <Folder className="w-12 h-12 text-status-warn mb-4 opacity-50" />
+        <h2 className="text-sm font-bold text-immersive-text-bright font-mono tracking-wider uppercase mb-2">Configure Firebase</h2>
+        <p className="text-xs text-immersive-text-muted max-w-sm font-mono">Google Drive needs a real Firebase web config. Add your <code className="text-status-accent">apiKey</code> / <code className="text-status-accent">authDomain</code> to <code className="text-status-accent">firebase-applet-config.json</code> (Firebase Console → Project settings → Your apps).</p>
+      </div>
+    );
+  }
+
   if (needsAuth) {
     return (
       <div className="bg-immersive-sidebar border border-immersive-border rounded p-8 flex flex-col items-center justify-center min-h-[300px] text-center shadow-lg">
         <Folder className="w-12 h-12 text-status-accent mb-4 opacity-50" />
         <h2 className="text-sm font-bold text-immersive-text-bright font-mono tracking-wider uppercase mb-2">Connect Google Drive</h2>
         <p className="text-xs text-immersive-text-muted mb-6 max-w-sm">Sign in with Google to browse and manage your Drive files directly from this cockpit.</p>
-        
+
         {authError && (
           <div className="bg-rose-500/10 border border-rose-500/20 text-status-err text-xs px-4 py-3 rounded mb-6 max-w-md font-mono text-left">
             <strong>Authentication Error:</strong> {authError}
