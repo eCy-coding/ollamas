@@ -80,3 +80,26 @@ describe("ProviderRouter P2 — least-loaded selection + saturation", () => {
     expect(ProviderRouter.poolSaturation("gemini").allApproaching).toBe(false);
   });
 });
+
+describe("ProviderRouter — non-destructive /api/keys/test override", () => {
+  beforeEach(() => { resetKeyUsage(); process.env.GEMINI_API_KEY = "kA"; process.env.GEMINI_API_KEY_2 = "kB"; });
+  afterEach(() => { ProviderRouter.testKeyOverride = null; delete process.env.GEMINI_API_KEY; delete process.env.GEMINI_API_KEY_2; });
+
+  it("override forces the EXACT candidate key, bypassing least-loaded pool selection", () => {
+    const now = Date.now();
+    for (let i = 0; i < 18; i++) recordKeyUse("gemini", keyId("kA"), now); // kA loaded → pool would pick kB
+    ProviderRouter.testKeyOverride = { provider: "gemini", key: "candidate-XYZ" };
+    expect(ProviderRouter.getDecryptedKey("gemini")).toBe("candidate-XYZ"); // tests the pasted key, not kB
+  });
+
+  it("override is scoped per provider and leaves others on normal pool selection", () => {
+    ProviderRouter.testKeyOverride = { provider: "gemini", key: "candidate-XYZ" };
+    expect(ProviderRouter.getDecryptedKey("openai")).not.toBe("candidate-XYZ");
+  });
+
+  it("clearing the override restores normal selection (no vault mutation persisted)", () => {
+    ProviderRouter.testKeyOverride = { provider: "gemini", key: "candidate-XYZ" };
+    ProviderRouter.testKeyOverride = null;
+    expect(["kA", "kB"]).toContain(ProviderRouter.getDecryptedKey("gemini")); // back to the env pool
+  });
+});

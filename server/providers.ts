@@ -25,6 +25,10 @@ export interface GenerateConfig {
   temperature?: number;
   stream?: boolean;
   tools?: any[];
+  // Validate exactly this provider with exactly the resolved key — NO provider fallback and NO
+  // key-pool rotation. Used by /api/keys/test so a candidate's failure surfaces honestly instead
+  // of a different provider/key answering and reporting a false "verified".
+  singleAttempt?: boolean;
 }
 
 export interface ToolCall {
@@ -255,7 +259,7 @@ export class ProviderRouter {
     signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
-    const providersToTry = this.getFallbackChain(config.provider);
+    const providersToTry = config.singleAttempt ? [config.provider] : this.getFallbackChain(config.provider);
     let lastError: Error | null = null;
 
     for (const prov of providersToTry) {
@@ -283,7 +287,9 @@ export class ProviderRouter {
       // provider with the next live key before falling through the provider chain.
       // (Rotation across user keys only — the system never auto-acquires new keys.)
       const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli";
-      const attempts = cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1;
+      // singleAttempt (key test): exactly one try — no rotation across the pool, so the candidate's
+      // own auth failure is the verdict (rotation would mask it and trip the fallthrough-as-success).
+      const attempts = config.singleAttempt ? 1 : (cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1);
       let provErr: any = null;
       let rotated = false;
       for (let attempt = 0; attempt < attempts; attempt++) {
@@ -450,7 +456,14 @@ export class ProviderRouter {
   // P2 — least-loaded selection: among LIVE (non-cooled) keys, pick the one with the most
   // headroom (lowest % of its rate limit) so load spreads + the next-best serves BEFORE a 429
   // (silent auto-rotation). Falls back to the first key when all are cooled. Stable tie-break by id.
+  // Scoped, non-persistent override used ONLY by /api/keys/test so a candidate key can be
+  // validated as the EXACT key that serves the ping — without mutating the vault or being
+  // overshadowed by the least-loaded pool selection. Set+cleared around a single test call.
+  public static testKeyOverride: { provider: string; key: string } | null = null;
+
   public static getDecryptedKey(provider: string): string {
+    const o = this.testKeyOverride;
+    if (o && o.provider === provider) return o.key;
     const pool = this.keyPool(provider);
     if (pool.length === 0) return "";
     const live = pool.filter((k) => !this.isCooled(provider, k));

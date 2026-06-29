@@ -555,7 +555,10 @@ async function initializeServer() {
     for (const p of providers) {
       const s = ProviderRouter.keyPoolStatus(p);
       const sat = ProviderRouter.poolSaturation(p);
-      pool[p] = { total: s.total, live: s.live, worstPct: Math.round(sat.worstPct * 100) / 100, allApproaching: s.total > 0 && sat.allApproaching };
+      // Empty pool (no keys configured) has nothing to burn — report 0%, not the saturation
+      // sentinel (poolSaturation returns worstPct=1 for "no live keys = saturated", which the
+      // alert path below uses; the display must not paint an unconfigured provider full-red).
+      pool[p] = { total: s.total, live: s.live, worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0, allApproaching: s.total > 0 && sat.allApproaching };
     }
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
     const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));
@@ -610,15 +613,18 @@ async function initializeServer() {
       model: "",
       messages: [{ role: "user" as const, content: "ping test" }],
       stream: false,
+      singleAttempt: true, // validate THIS provider+key only — no fallback/rotation false-positive
     };
 
-    // Temporarily save to memory or override process.env for the test call
+    // Validate the candidate NON-destructively: a scoped override makes generate() use EXACTLY
+    // this key (not the least-loaded pool pick) without touching the encrypted vault or disk —
+    // so a failed test can never clobber/persist the working primary key (the prior bug).
+    const priorEndpoint = db.data.keys["custom-openai-endpoint"];
     if (key) {
-      db.data.keys[provider] = db.encrypt(key);
+      ProviderRouter.testKeyOverride = { provider, key };
       if (provider === "custom-openai" && customEndpoint) {
-        db.data.keys["custom-openai-endpoint"] = customEndpoint;
+        db.data.keys["custom-openai-endpoint"] = customEndpoint; // in-memory only, restored below
       }
-      db.save();
     }
 
     try {
@@ -628,6 +634,12 @@ async function initializeServer() {
       res.json({ success: true, latencyMs: elapsed, output: result.text.substring(0, 50) });
     } catch (e: any) {
       res.json({ success: false, error: e.message || "Credential ping failed" });
+    } finally {
+      ProviderRouter.testKeyOverride = null;
+      if (key && provider === "custom-openai") {
+        if (priorEndpoint === undefined) delete db.data.keys["custom-openai-endpoint"];
+        else db.data.keys["custom-openai-endpoint"] = priorEndpoint;
+      }
     }
   });
 
