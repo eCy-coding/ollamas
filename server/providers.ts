@@ -424,6 +424,9 @@ export class ProviderRouter {
     const keys: string[] = [];
     const enc = db.data.keys?.[provider];
     if (enc) { const d = db.decrypt(enc); if (d) keys.push(d); }
+    // Vault POOL: extra keys added via the guided "add next key" flow (POST /api/keys/add).
+    const extra = (db.data as any).keyPool?.[provider];
+    if (Array.isArray(extra)) for (const e of extra) { const d = db.decrypt(e); if (d) keys.push(d); }
     const base = this.getEnvKeyName(provider);
     if (base) {
       const push = (v?: string) => { if (v && v.trim()) keys.push(v.trim()); };

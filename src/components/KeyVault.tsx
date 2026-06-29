@@ -76,10 +76,18 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     const endpoint = provider === "custom-openai" ? inputs["custom-openai-endpoint"] : undefined;
 
     try {
-      await api.post("/api/keys", { provider, key: keyVal, customEndpoint: endpoint });
-      onNotify(`Secure Key Vault updated: ${provider}`, "success");
+      // If a primary key already exists for this provider, GROW the rotation pool (the guided
+      // "add next key" flow); otherwise set the primary. Either way it joins keyPool().
+      if (masks[provider] && KEY_PAGE[provider]) {
+        const r = await api.post<{ poolSize?: number }>("/api/keys/add", { provider, key: keyVal });
+        onNotify(`Key added to the ${provider} pool (size ${r.poolSize ?? "?"}).`, "success");
+      } else {
+        await api.post("/api/keys", { provider, key: keyVal, customEndpoint: endpoint });
+        onNotify(`Secure Key Vault updated: ${provider}`, "success");
+      }
       setInputs((prev) => ({ ...prev, [provider]: "" }));
       loadMasks();
+      loadPool();
     } catch {
       onNotify(`Failed to save key for ${provider}`, "error");
     } finally {

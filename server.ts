@@ -577,6 +577,19 @@ async function initializeServer() {
     res.json({ success: true });
   });
 
+  // Append a key to the provider's vault POOL (the guided "add next key" flow grows the pool
+  // instead of overwriting the primary). Encrypted at rest; deduped at use by keyPool().
+  app.post("/api/keys/add", (req, res) => {
+    const { provider, key } = req.body;
+    if (!provider || typeof provider !== "string") return res.status(400).json({ error: "provider required" });
+    if (!key || typeof key !== "string" || !key.trim()) return res.status(400).json({ error: "key required" });
+    const store = ((db.data as any).keyPool ||= {});
+    (store[provider] ||= []).push(db.encrypt(key.trim()));
+    db.save();
+    db.logSecurity("permission_change", `Key pool grown: ${provider}`, "Added a rotation key to the encrypted pool", "info");
+    res.json({ success: true, poolSize: ProviderRouter.keyPoolStatus(provider).total });
+  });
+
   app.post("/api/keys/test", async (req, res) => {
     const { provider, key, customEndpoint } = req.body;
     // Guard: without a provider, `db.data.keys[provider]` would persist the key under
