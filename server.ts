@@ -338,7 +338,7 @@ async function initializeServer() {
     (res as any).flushHeaders?.();
 
     const ollamaHostNow = () => process.env.OLLAMA_HOST || "http://localhost:11434";
-    const ollama = { version: "unavailable", loadedModels: [] as any[], allModels: [] as { name: string; size: number }[], reachable: false, latencyMs: null as number | null };
+    const ollama = { version: "unavailable", loadedModels: [] as any[], allModels: [] as { name: string; size: number }[], macLoaded: [] as string[], reachable: false, latencyMs: null as number | null };
     let prevCpus = os.cpus(); // baseline for per-core utilization deltas across ticks
     const readPool = (): unknown => {
       try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), ".ollamas", "backends.json"), "utf8")); }
@@ -360,9 +360,15 @@ async function initializeServer() {
         if (v.ok) ollama.version = (await v.json().catch(() => ({})))?.version || "unknown";
         const ps = await fetch(`${base}/api/ps`, { signal: AbortSignal.timeout(2500) });
         if (ps.ok) ollama.loadedModels = (await ps.json().catch(() => ({})))?.models || [];
-        const tags = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
-        if (tags.ok) ollama.allModels = ((await tags.json().catch(() => ({})))?.models || []).map((m: any) => ({ name: m.name, size: m.size }));
       } catch { ollama.reachable = false; ollama.latencyMs = null; }
+      // Models panel = the user's MacBook library (localhost), independent of the active
+      // serving backend (which may be a remote GPU exposing a smaller set).
+      try {
+        const mt = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(2500) });
+        if (mt.ok) ollama.allModels = ((await mt.json().catch(() => ({})))?.models || []).map((m: any) => ({ name: m.name, size: m.size }));
+        const mp = await fetch("http://localhost:11434/api/ps", { signal: AbortSignal.timeout(2500) });
+        if (mp.ok) ollama.macLoaded = ((await mp.json().catch(() => ({})))?.models || []).map((m: any) => m.name);
+      } catch { /* Mac library unavailable */ }
     };
 
     let tick = 0;
@@ -397,7 +403,7 @@ async function initializeServer() {
         fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         models: {
-          ...rankMacModels(ollama.allModels, os.totalmem(), ollama.loadedModels.map((m: any) => m.name), MAC_MODEL_CHAMPION),
+          ...rankMacModels(ollama.allModels, os.totalmem(), ollama.macLoaded, MAC_MODEL_CHAMPION),
           championTokPerSec: MAC_CHAMPION_TOKS,
         },
         updatedAt: Date.now(), // freshness stamp → cockpit shows LIVE vs polling-fallback
