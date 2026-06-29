@@ -75,6 +75,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
   const providers = [
     { id: "ollama-local", label: "Ollama (Local)" },
     { id: "gemini", label: "Google Gemini" },
+    { id: "gemini-cli", label: "Gemini CLI" },
     { id: "openrouter", label: "OpenRouter.ai" },
     { id: "openai", label: "OpenAI GPT" },
     { id: "anthropic", label: "Anthropic Claude" },

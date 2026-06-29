@@ -203,6 +203,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
   const providers = [
     { id: "gemini", label: "Google Gemini Core", icon: "🌌" },
+    { id: "gemini-cli", label: "Gemini CLI (Local)", icon: "🔑" },
     { id: "openai", label: "OpenAI gpt-series", icon: "🟢" },
     { id: "anthropic", label: "Anthropic Claude", icon: "🎨" },
     { id: "openrouter", label: "OpenRouter Hub", icon: "🛰️" },
@@ -218,7 +219,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       setModelsList(list);
       if (list.length > 0) {
         // Filter out error placeholder elements for initial selection
-        const validModel = list.find((m: string) => !m.includes("not set") && !m.includes("API key"));
+        const validModel = list.find((m: string) => !m.includes("not set") && !m.includes("API key") && !m.includes("not installed"));
         setModel(validModel || list[0]);
       }
     } catch (e) {

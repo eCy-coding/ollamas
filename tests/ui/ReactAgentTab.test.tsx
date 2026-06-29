@@ -76,6 +76,12 @@ describe('ReactAgentTab — ReAct Specialist', () => {
     expect(screen.getByRole('button', { name: /EXECUTE/i })).toBeInTheDocument();
   });
 
+  it('offers the gemini-cli provider in the picker', async () => {
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    expect(screen.getByRole('option', { name: /Gemini CLI \(Local\)/i })).toBeInTheDocument();
+  });
+
   it('Enter submits the prompt; Shift+Enter does NOT', async () => {
     renderUI(<ReactAgentTab onNotify={onNotify} />);
     await waitFor(() => expect(getMock).toHaveBeenCalled());
