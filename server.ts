@@ -17,6 +17,7 @@ import { ProviderRouter, repairJson, getToolArgError } from "./server/providers"
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
+import { notify } from "./server/notify";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
@@ -169,7 +170,25 @@ app.post("/api/revenue/testgen", async (req, res) => {
   try { res.json(await runTestgen(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
 });
 app.post("/api/revenue/audit", async (req, res) => {
-  try { res.json(await runAudit(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+  try {
+    const result = await runAudit(req.body || {});
+    // Best-effort alert (no-op without a configured sink; never throws into the response).
+    if (result.ok) void notify(`✅ ollamas audit complete: ${result.findings ?? 0} finding(s)${result.reportPath ? ` → ${result.reportPath}` : ""}`, db.data.notify);
+    res.json(result);
+  } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+});
+
+// Outbound alert sinks (Slack/Discord incoming webhooks). Local-owner config.
+app.get("/api/notify/config", (_req, res) => res.json(db.data.notify ?? {}));
+app.post("/api/notify/config", (req, res) => {
+  const { slackWebhookUrl, discordWebhookUrl } = req.body || {};
+  db.data.notify = { slackWebhookUrl: slackWebhookUrl || undefined, discordWebhookUrl: discordWebhookUrl || undefined };
+  db.save?.(db.data);
+  res.json({ ok: true, notify: db.data.notify });
+});
+app.post("/api/notify/test", async (req, res) => {
+  const sent = await notify(String(req.body?.text || "ollamas test alert ✅"), db.data.notify);
+  res.json({ ok: sent.length > 0, sent });
 });
 app.post("/api/revenue/storefront", (req, res) => {
   try { res.json(generateStorefront(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }

@@ -62,6 +62,8 @@ export interface DBConfig {
   cluster: ClusterConfig;
   /** Revenue Ops (Faz19) — personal income tooling config (local-owner only). */
   revenue?: { model?: string; brand?: string; email?: string; paymentLink?: string };
+  /** Outbound alert sinks (Slack/Discord incoming webhooks) — local-owner only. */
+  notify?: { slackWebhookUrl?: string; discordWebhookUrl?: string };
 }
 
 const DEFAULT_CONFIG: DBConfig = {
