@@ -5,7 +5,8 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
 import { generateViaGeminiCli } from "./gemini-cli";
-import { keyId, recordKeyUse } from "./key-usage";
+import { keyId, recordKeyUse, keyWindows } from "./key-usage";
+import { limitFor, pctOfLimit, approaching } from "./key-limits";
 
 // Types
 export interface ProviderMessage {
@@ -443,11 +444,33 @@ export class ProviderRouter {
     return { total: pool.length, live: pool.filter((k) => !this.isCooled(provider, k)).length };
   }
 
+  // P2 — least-loaded selection: among LIVE (non-cooled) keys, pick the one with the most
+  // headroom (lowest % of its rate limit) so load spreads + the next-best serves BEFORE a 429
+  // (silent auto-rotation). Falls back to the first key when all are cooled. Stable tie-break by id.
   public static getDecryptedKey(provider: string): string {
     const pool = this.keyPool(provider);
     if (pool.length === 0) return "";
-    // Prefer the first key not in cooldown; if all are cooled, best-effort the first.
-    return pool.find((k) => !this.isCooled(provider, k)) || pool[0];
+    const live = pool.filter((k) => !this.isCooled(provider, k));
+    if (!live.length) return pool[0];
+    const lim = limitFor(provider);
+    return live
+      .map((k) => ({ k, pct: pctOfLimit(keyWindows(provider, keyId(k)), lim), id: keyId(k) }))
+      .sort((a, b) => a.pct - b.pct || a.id.localeCompare(b.id))[0].k;
+  }
+
+  // P2 — pool saturation for the proactive alert: true `allApproaching` when EVERY live key is
+  // ≥ the threshold (the pool can't absorb more without a new key). No live keys = saturated.
+  public static poolSaturation(provider: string): { worstPct: number; minPct: number; liveCount: number; allApproaching: boolean } {
+    const pool = this.keyPool(provider);
+    const live = pool.filter((k) => !this.isCooled(provider, k));
+    const lim = limitFor(provider);
+    const pcts = live.map((k) => pctOfLimit(keyWindows(provider, keyId(k)), lim));
+    return {
+      worstPct: pcts.length ? Math.max(...pcts) : 1,
+      minPct: pcts.length ? Math.min(...pcts) : 1,
+      liveCount: live.length,
+      allApproaching: pcts.length === 0 || pcts.every((p) => approaching(p)),
+    };
   }
 
   private static getEnvKeyName(provider: string): string {
