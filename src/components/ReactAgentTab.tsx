@@ -52,6 +52,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [autoApply, setAutoApply] = useState<boolean>(true);
   const [currentStepInfo, setCurrentStepInfo] = useState<string>("");
+  // Run lifecycle summary (from the server `done` event): clean finish vs depth-limit
+  // truncation + the final throughput. null while no run has completed.
+  const [runStatus, setRunStatus] = useState<"complete" | "limit" | null>(null);
+  const [lastTokS, setLastTokS] = useState<number>(0);
 
   // ReAct Sessions Memory States
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -258,41 +262,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     if (traceSteps.length) traceEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [traceSteps]);
 
-  // Handle standard ReAct agent submit
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputMessage.trim() || isLoading || runningRef.current) return;
-    runningRef.current = true;
-
-    const userText = inputMessage.trim();
-    setInputMessage("");
-    setPendingApproval(null);
-
-    setIsLoading(true);
-    setTraceSteps([]);
-    setCurrentStepInfo(_("react-agent.step.spinningUp"));
-
-    let currentSessionId = activeSessionId;
-    if (!currentSessionId) {
-      try {
-        const newSess = await api.post<ChatSession>("/api/agent/sessions", {
-          title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
-          providerId: provider,
-          modelId: model
-        });
-        currentSessionId = newSess.id;
-        setActiveSessionId(newSess.id);
-      } catch (err) {
-        // non-ok previously fell through silently; only log non-ApiError (network) failures
-        if (!(err instanceof ApiError)) {
-          console.error("Auto session generation failed", err);
-        }
-      }
-    }
-
-    const newMessages: Message[] = [...messages, { role: "user", content: userText }];
-    setMessages(newMessages);
-
+  // Single dispatch path: stream the ReAct agent over the given history. Reused by a fresh
+  // submit AND by the post-approval continuation (so the agent resumes after an approved write
+  // instead of stalling). The caller sets up isLoading/runningRef/trace before calling.
+  const streamAgent = async (history: Message[], sessionId: string | null) => {
     // Cancel any prior run, start a fresh abortable one.
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -306,10 +279,10 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         {
           provider,
           model,
-          messages: newMessages,
+          messages: history,
           autoApply,
           maxSteps: 10,
-          sessionId: currentSessionId
+          sessionId
         },
         {
           signal: ctrl.signal,
@@ -397,6 +370,11 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 }
                 else if (parsed.type === "done") {
                   setCurrentStepInfo(_("react-agent.step.done"));
+                  if (typeof parsed.tokensPerSec === "number") setLastTokS(parsed.tokensPerSec);
+                  const limit = parsed.status === "limit";
+                  setRunStatus(limit ? "limit" : "complete");
+                  // Tell the user when the run was TRUNCATED at the step cap (not a clean finish).
+                  if (limit) onNotify(_("react-agent.notify.truncated"), "info");
                 }
                 else if (parsed.type === "error") {
                   onNotify(`${_("react-agent.notify.agentReasoner")} ${parsed.message}`, "error");
@@ -423,6 +401,44 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     }
   };
 
+  // Handle standard ReAct agent submit (fresh run).
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputMessage.trim() || isLoading || runningRef.current) return;
+    runningRef.current = true;
+
+    const userText = inputMessage.trim();
+    setInputMessage("");
+    setPendingApproval(null);
+
+    setIsLoading(true);
+    setTraceSteps([]);
+    setRunStatus(null);
+    setCurrentStepInfo(_("react-agent.step.spinningUp"));
+
+    let currentSessionId = activeSessionId;
+    if (!currentSessionId) {
+      try {
+        const newSess = await api.post<ChatSession>("/api/agent/sessions", {
+          title: userText.slice(0, 45) + (userText.length > 45 ? "..." : ""),
+          providerId: provider,
+          modelId: model
+        });
+        currentSessionId = newSess.id;
+        setActiveSessionId(newSess.id);
+      } catch (err) {
+        // non-ok previously fell through silently; only log non-ApiError (network) failures
+        if (!(err instanceof ApiError)) {
+          console.error("Auto session generation failed", err);
+        }
+      }
+    }
+
+    const newMessages: Message[] = [...messages, { role: "user", content: userText }];
+    setMessages(newMessages);
+    await streamAgent(newMessages, currentSessionId);
+  };
+
   const approveWrite = async () => {
     if (!pendingApproval) return;
     setApproving(true);
@@ -432,21 +448,35 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         content: pendingApproval.content
       });
 
-      onNotify(`${_("react-agent.notify.applied")} ${pendingApproval.path}`, "success");
+      const approvedPath = pendingApproval.path;
+      const approvedStep = pendingApproval.stepIndex;
+      onNotify(`${_("react-agent.notify.applied")} ${approvedPath}`, "success");
       // Update trace status in the list
       setTraceSteps((prev) =>
-        prev.map((s) => s.stepNum === pendingApproval.stepIndex && s.tool === "write_file"
+        prev.map((s) => s.stepNum === approvedStep && s.tool === "write_file"
           ? { ...s, applied: true, result: _("react-agent.result.writtenManual") }
           : s
         )
       );
       setPendingApproval(null);
 
-      // Let assistant know user approved
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `${_("react-agent.msg.approvedWrite.prefix")} \`${pendingApproval.path}\`. ${_("react-agent.msg.approvedWrite.suffix")}` }
-      ]);
+      // Resume the agent (human-in-the-loop): the file is now on disk → re-dispatch over the
+      // same session with an approval note + a continuation cue, so the ReAct loop keeps going
+      // instead of stalling after the paused write. Reuses the single streamAgent path.
+      const note: Message = {
+        role: "assistant",
+        content: `${_("react-agent.msg.approvedWrite.prefix")} \`${approvedPath}\`. ${_("react-agent.msg.approvedWrite.suffix")}`
+      };
+      const resume: Message = { role: "user", content: `${_("react-agent.msg.approvedContinue")} ${approvedPath}` };
+      const history: Message[] = [...messages, note, resume];
+      setMessages(history);
+      if (!runningRef.current) {
+        runningRef.current = true;
+        setIsLoading(true);
+        setRunStatus(null);
+        setCurrentStepInfo(_("react-agent.step.spinningUp"));
+        void streamAgent(history, activeSessionId);
+      }
     } catch (err: any) {
       // non-ok responses previously parsed the JSON body for an error message
       const msg = err instanceof ApiError
@@ -812,6 +842,23 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         </div>
       </div>
     </div>
+
+      {/* Run summary — surfaced from the server `done` event (steps · tok/s · clean-vs-truncated) */}
+      {runStatus && !isLoading && (
+        <div className="flex items-center gap-3 flex-wrap text-[10px] font-mono bg-immersive-sidebar border border-immersive-border rounded-lg px-4 py-2.5">
+          <span className="text-immersive-text-muted">{traceSteps.length} {_("react-agent.summary.steps")}</span>
+          {lastTokS > 0 && <span className="text-immersive-text-muted">· {lastTokS} {_("react-agent.summary.tokps")}</span>}
+          <span
+            className={`ml-auto px-2 py-0.5 rounded font-bold ${
+              runStatus === "limit"
+                ? "bg-amber-500/10 border border-amber-500/20 text-status-warn"
+                : "bg-emerald-500/10 border border-emerald-500/20 text-status-ok"
+            }`}
+          >
+            {runStatus === "limit" ? _("react-agent.summary.truncated") : _("react-agent.summary.complete")}
+          </span>
+        </div>
+      )}
 
       {/* Real-time Steps Trace execution stream */}
       {traceSteps.length > 0 && (
