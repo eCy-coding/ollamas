@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink } from "lucide-react";
 import { api } from "../lib/apiClient";
 
@@ -63,12 +63,31 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
   // Guided provisioning: open the provider's key page so the operator logs into the NEXT
   // account + creates a key, then pastes it into the field below + Save (→ joins the pool).
+  // Best-effort window.open with the noreferrer feature (anchors are the primary, never-blocked
+  // path — see the "Key ↗" link below); used for the auto-open-on-alert convenience.
   const openKeyPage = (provider: string) => {
     const url = KEY_PAGE[provider];
     if (!url) return;
-    window.open(url, "_blank", "noopener");
+    window.open(url, "_blank", "noopener,noreferrer");
     onNotify(`Opened ${provider} key page — log into the next account, create a key, paste it below.`, "info");
   };
+
+  // The "otomatik" ask: when a provider's whole live pool newly saturates, open its key page
+  // automatically (once per provider — a ref guards against the 15s poll reopening every cycle).
+  // A no-gesture window.open may be popup-blocked → the alert banner's anchor is the guaranteed
+  // one-click fallback, so the operator always has a reliable path to the key page.
+  const autoOpened = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const active = new Set(alerts.map((a) => a.provider));
+    for (const a of alerts) {
+      if (!autoOpened.current.has(a.provider) && KEY_PAGE[a.provider]) {
+        autoOpened.current.add(a.provider);
+        openKeyPage(a.provider);
+      }
+    }
+    // Reset once a provider recovers (pool no longer saturating) so a future re-saturation re-opens.
+    for (const p of Array.from(autoOpened.current)) if (!active.has(p)) autoOpened.current.delete(p);
+  }, [alerts]);
 
   const handleSave = async (provider: string) => {
     setLoading(true);
@@ -173,7 +192,21 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
           <div>
             <strong>Rate-limit approaching:</strong>{" "}
             {alerts.map((a) => `${a.provider} ${Math.round(a.worstPct * 100)}% (${a.live} live)`).join(" · ")}.
-            Add the next account's key — click <strong>Key ↗</strong>, log into the next account, create a key, paste it below, Save.
+            Add the next account's key — log into the next account, create a key, paste it below, Save.
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {alerts.filter((a) => KEY_PAGE[a.provider]).map((a) => (
+                <a
+                  key={a.provider}
+                  href={KEY_PAGE[a.provider]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => onNotify(`Opened ${a.provider} key page — create a key, paste it below.`, "info")}
+                  className="bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-status-warn rounded px-2 py-1 flex items-center gap-1 cursor-pointer no-underline"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open {a.provider} key page →
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -253,13 +286,18 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
                 <div className="flex gap-1.5 shrink-0">
                   {KEY_PAGE[prov.id] && (
-                    <button
-                      onClick={() => openKeyPage(prov.id)}
+                    // A real anchor (not window.open) so the browser treats it as a user-gesture
+                    // navigation that is NEVER popup-blocked (mirrors GoogleSheetsBrowser).
+                    <a
+                      href={KEY_PAGE[prov.id]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => onNotify(`Opened ${prov.label} key page — log into the next account, create a key, paste it below.`, "info")}
                       title={`Open ${prov.label} key page (log into the next account → create → paste below)`}
-                      className="bg-white/5 text-immersive-text-muted hover:bg-white/10 font-mono font-medium text-[10px] rounded px-2.5 py-1.5 border border-immersive-border-strong flex items-center gap-1 cursor-pointer"
+                      className="bg-white/5 text-immersive-text-muted hover:bg-white/10 font-mono font-medium text-[10px] rounded px-2.5 py-1.5 border border-immersive-border-strong flex items-center gap-1 cursor-pointer no-underline"
                     >
                       <ExternalLink className="w-3 h-3" /> Key
-                    </button>
+                    </a>
                   )}
                   <button
                     onClick={() => handleSave(prov.id)}
