@@ -78,7 +78,15 @@ try { registerHostScripts(ToolRegistry, TOOL_DEPS); } catch (e) { console.error(
 // Security headers (helmet, Faz 9A). CSP/COEP disabled: the app serves a Vite
 // SPA with inline scripts + SSE + cross-origin MCP clients; the remaining headers
 // (HSTS, X-Frame-Options, noSniff, etc.) apply without breaking those flows.
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// COOP is relaxed to same-origin-allow-popups: helmet's default `same-origin`
+// severs the opener↔popup handle, which makes Firebase signInWithPopup (Google
+// Drive sign-in) spuriously throw auth/popup-closed-by-user. allow-popups keeps
+// cross-origin isolation while letting the app retain popups it opens.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+}));
 
 // Observability (Faz 9D): structured request logs (skip noisy polling) + Prometheus
 // HTTP latency histogram on every response.
