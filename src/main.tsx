@@ -36,9 +36,14 @@ if (typeof window !== 'undefined') {
   window.addEventListener('error', (e) =>
     logClientEvent('window_error', {message: e.message, source: e.filename, line: e.lineno}),
   );
-  window.addEventListener('unhandledrejection', (e) =>
-    logClientEvent('unhandled_rejection', {reason: String((e as PromiseRejectionEvent).reason)}),
-  );
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = String((e as PromiseRejectionEvent).reason);
+    // Ignore the Vite dev-client HMR WebSocket noise (HMR is disabled in the served
+    // build, so @vite/client's ws attempt always rejects) — a dev-tool artifact, not an
+    // app error; it must not be counted as a crash that flips RUM health to "critical".
+    if (/WebSocket closed without opened|@vite\/client|\[vite\]/i.test(reason)) return;
+    logClientEvent('unhandled_rejection', {reason});
+  });
 }
 
 // vF3 — ship field Core Web Vitals to the seyir defteri after paint.

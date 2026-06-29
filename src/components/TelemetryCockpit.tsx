@@ -22,17 +22,22 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   }, [telemetry]);
 
   if (!telemetry) {
+    // Reserve the SAME height as the populated cockpit (3-col grid + backend/fleet
+    // panel) so the skeleton→data swap doesn't shift the page (CLS=0).
     return (
-      <div
-        aria-busy="true"
-        aria-label="Loading host telemetry"
-        className="p-6 bg-immersive-panel border border-immersive-border rounded-xl flex flex-col gap-3"
-      >
-        <Skeleton width="40%" height="0.9rem" />
-        <div className="flex gap-3">
-          <Skeleton width="100%" height="3.5rem" count={3} />
+      <div aria-busy="true" aria-label="Loading host telemetry" className="space-y-4 min-h-[16.5rem]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="p-4 bg-immersive-panel border border-immersive-border rounded flex flex-col gap-3 min-h-[11rem]">
+              <Skeleton width="50%" height="0.9rem" />
+              <Skeleton width="100%" height="2.5rem" count={2} />
+            </div>
+          ))}
         </div>
-        <Skeleton width="70%" height="0.8rem" />
+        <div className="p-4 bg-immersive-panel border border-immersive-border rounded min-h-[5.5rem]">
+          <Skeleton width="40%" height="0.9rem" />
+          <div className="mt-2"><Skeleton width="70%" height="1.2rem" /></div>
+        </div>
       </div>
     );
   }
@@ -55,7 +60,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   const hostShort = backend ? backend.host.replace(/^https?:\/\//, "") : "";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-h-[16.5rem]">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* 1. Environment & Health */}
       <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded flex flex-col justify-between shadow-lg">
