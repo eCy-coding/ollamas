@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
 import { generateViaGeminiCli } from "./gemini-cli";
+import { keyId, recordKeyUse } from "./key-usage";
 
 // Types
 export interface ProviderMessage {
@@ -289,6 +290,9 @@ export class ProviderRouter {
           const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
           const elapsed = Date.now() - start;
           latencyCache[prov] = { latencyMs: elapsed, updatedAt: Date.now() };
+          // Per-key usage for proactive quota awareness (keyless providers skip). The key used is
+          // the one getDecryptedKey resolved — recorded by its safe keyId, never the raw value.
+          if (cloudKeyed) { const used = this.getDecryptedKey(prov); if (used) recordKeyUse(prov, keyId(used)); }
           return { ...result, latencyMs: elapsed };
         } catch (err: any) {
           provErr = err;
