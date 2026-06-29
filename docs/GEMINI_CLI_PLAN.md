@@ -69,6 +69,26 @@ and Gemini CLI's tools/MCP/extensions — AND lets Gemini CLI call ollamas's own
 - **Evidence law:** "works" = run the command + show real stdout + exit code; A2A = a real SSE round-trip.
 - **Version pinning:** the `-p`→positional deprecation and the `type:http` settings bug are version-sensitive.
 
+## Sub-agent usage matrix (100% E2E surfaces)
+
+`gemini-cli` is a first-class provider — EVERY ollamas sub-agent can select/route it. One backend
+(`server/gemini-cli.ts`) serves them all (the efficient seam: no per-surface allowlist).
+
+| Sub-agent surface | How to use gemini-cli | Status |
+|---|---|---|
+| CLI ReAct agent | `ollamas agent --provider gemini-cli "<task>"` | ✅ (no allowlist) |
+| CLI chat | `ollamas chat -p gemini-cli "<prompt>"` | ✅ |
+| Sub-agent dispatcher | `node scripts/agent-dispatch.mjs "<task>" --provider gemini-cli` | ✅ |
+| ReAct Specialist UI | provider dropdown → "Gemini CLI (Local)" | ✅ (S2) |
+| Multi-agent pipeline UI | per-stage provider → "Gemini CLI" (architect/coder/reviewer) | ✅ (S2) |
+| Dispatch fleet | a `google-grounded` task → `gemini-cli` worker, executed on the local gateway | ✅ (P2 + S1) |
+| Server endpoints | `/api/agent/chat`, `/api/pipeline`, `/api/generate` accept `provider:"gemini-cli"` | ✅ (no allowlist) |
+| Models | `GET /api/models/gemini-cli` → models or install hint | ✅ |
+
+**Env-gate (operator step, P5):** the LIVE call needs the `gemini` binary + Google auth
+(`npm i -g @google/gemini-cli` + OAuth / `GEMINI_API_KEY` / Vertex). Absent → honest skip-with-warn;
+all wiring is unit/ui-tested.
+
 ## Verification (E2E, no mocks)
 1. Gate: `tsc --noEmit` 0 · `vitest run` (new pure tests) green · `grep -rn tool-registry cli/` empty · `git diff package.json` shows no new CLI dep.
 2. Bridge: `ollamas gemini "respond with the single word PONG" --json | jq -r .response` → `PONG`, exit 0. Force a bad arg → exit 42.
