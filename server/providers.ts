@@ -1056,7 +1056,7 @@ export class ProviderRouter {
         // its OWN agent loop (tools + Google grounding) and returns the final text → no
         // tool_calls, so the ollamas ReAct loop treats this as a final reply and halts.
         const r = await generateViaGeminiCli(msgs, config.model || undefined, signal);
-        return { text: r.text, source: "gemini-cli", modelUsed: r.modelUsed, tokens: undefined, tokensPerSec: undefined };
+        return { text: r.text, source: "gemini-cli", modelUsed: r.modelUsed, tokens: undefined, tokensPerSec: r.tokensPerSec };
       }
 
       case "demo":

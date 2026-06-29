@@ -8,11 +8,32 @@
 // Self-contained (no cli/ import — server is the lower layer): minimal spawn + json parse.
 // The headless contract (json shape, exit codes) is documented in docs/GEMINI_CLI_RESEARCH.md.
 import { spawn } from "node:child_process";
+import { cpus } from "node:os";
 
 // Structural — matches ProviderMessage (role/content) without coupling to its module.
 interface Msg { role: string; content?: unknown }
 
-export interface GeminiCliResult { text: string; modelUsed: string; latencyMs: number }
+export interface GeminiCliResult { text: string; modelUsed: string; latencyMs: number; tokensPerSec?: number }
+
+// E2 — pure counting semaphore: caps concurrent `gemini` spawns so N parallel dispatched
+// tasks don't storm the machine. acquire() resolves when a slot is free; release() frees one.
+export function makeSemaphore(max: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const release = () => { active--; const next = queue.shift(); if (next) { active++; next(); } };
+  const acquire = (): Promise<void> => new Promise((res) => {
+    if (active < max) { active++; res(); } else queue.push(res);
+  });
+  return { acquire, release, get active() { return active; }, get waiting() { return queue.length; } };
+}
+// Cap = cores-2, clamped to [1,8]. The gemini binary is the real bottleneck; this just avoids a storm.
+const SPAWN_CAP = Math.max(1, Math.min(8, (cpus()?.length || 4) - 2));
+const spawnGate = makeSemaphore(SPAWN_CAP);
+
+// E1 — TTL cache for the `gemini --version` availability probe (hot path: /api/models). 8s,
+// mirrors ProviderRouter.probeFleet. null = never probed.
+let availCache: { at: number; ok: boolean } | null = null;
+const AVAIL_TTL_MS = 8000;
 
 // Flatten a ReAct history into ONE prompt: the system instruction + the readable transcript.
 // Pure → unit-testable. Gemini is stateless per call, so the whole conversation is inlined.
@@ -49,30 +70,48 @@ export async function generateViaGeminiCli(
   const prompt = flattenForGemini(messages);
   const args = ["--output-format", "json", ...(model ? ["--model", model] : []), prompt];
   const start = Date.now();
-  const { code, stdout, stderr } = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let out = ""; let err = "";
-    const onAbort = () => child.kill("SIGKILL");
-    signal?.addEventListener("abort", onAbort, { once: true });
-    child.stdout.on("data", (d) => { out += String(d); });
-    child.stderr.on("data", (d) => { err += String(d); });
-    const done = (r: { code: number | null; stdout: string; stderr: string }) => { signal?.removeEventListener("abort", onAbort); resolve(r); };
-    child.on("error", (e) => done({ code: null, stdout: out, stderr: err || String((e as any)?.message || e) }));
-    child.on("close", (c) => done({ code: c, stdout: out, stderr: err }));
-  });
+  await spawnGate.acquire(); // E2 — bounded concurrency
+  let result: { code: number | null; stdout: string; stderr: string };
+  try {
+    result = await new Promise((resolve) => {
+      const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+      let out = ""; let err = "";
+      const onAbort = () => child.kill("SIGKILL");
+      signal?.addEventListener("abort", onAbort, { once: true });
+      child.stdout.on("data", (d) => { out += String(d); });
+      child.stderr.on("data", (d) => { err += String(d); });
+      const done = (r: { code: number | null; stdout: string; stderr: string }) => { signal?.removeEventListener("abort", onAbort); resolve(r); };
+      child.on("error", (e) => done({ code: null, stdout: out, stderr: err || String((e as any)?.message || e) }));
+      child.on("close", (c) => done({ code: c, stdout: out, stderr: err }));
+    });
+  } finally {
+    spawnGate.release();
+  }
+  const { code, stdout, stderr } = result;
   // Exit codes (headless contract): 0 ok · 1 api/general · 42 input · 53 turn-limit.
   if (code !== 0) {
     const reason = (stderr || stdout).trim().slice(0, 240) || "no output";
     throw new Error(`gemini-cli exit ${code === null ? "spawn-failed (binary not installed?)" : code}: ${reason}`);
   }
-  return { text: extractGeminiText(stdout), modelUsed: model || "gemini (default)", latencyMs: Date.now() - start };
+  const text = extractGeminiText(stdout);
+  const latencyMs = Date.now() - start;
+  return { text, modelUsed: model || "gemini (default)", latencyMs, tokensPerSec: estimateTokensPerSec(text, latencyMs) };
 }
 
-// Is the `gemini` binary installed? Cheap probe for /api/models + health.
-export function geminiCliAvailable(bin = "gemini"): Promise<boolean> {
+// E3 — wall-clock tok/s estimate (~4 chars/token) so dispatch-bench/telemetry can rank
+// gemini-cli (it doesn't report eval_count). Pure. 0 when no text/elapsed.
+export function estimateTokensPerSec(text: string, latencyMs: number): number {
+  if (!text || latencyMs <= 0) return 0;
+  return Math.round(((text.length / 4) / (latencyMs / 1000)) * 10) / 10;
+}
+
+// Is the `gemini` binary installed? E1 — 8s TTL cache (hot path: /api/models).
+export function geminiCliAvailable(bin = "gemini", nowMs = Date.now()): Promise<boolean> {
+  if (availCache && nowMs - availCache.at < AVAIL_TTL_MS) return Promise.resolve(availCache.ok);
   return new Promise((resolve) => {
     const child = spawn(bin, ["--version"], { stdio: "ignore" });
-    child.on("error", () => resolve(false));
-    child.on("close", (c) => resolve(c === 0));
+    const settle = (ok: boolean) => { availCache = { at: nowMs, ok }; resolve(ok); };
+    child.on("error", () => settle(false));
+    child.on("close", (c) => settle(c === 0));
   });
 }
