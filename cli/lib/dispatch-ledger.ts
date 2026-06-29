@@ -91,7 +91,7 @@ export function nextFence(events: LedgerEvent[], taskId: string): number {
 
 // ── Pure routing: assignWorker (mirror of dispatchbench.assignWorker) ─────────────
 
-export type TaskKind = "codegen" | "analysis" | "host-tool";
+export type TaskKind = "codegen" | "analysis" | "host-tool" | "google-grounded";
 export interface DispatchTask { id: string; kind: TaskKind; estTokens?: number; }
 export interface FleetWorker { name: string; kind: "mac" | "remote"; healthy: boolean; tokS?: number; }
 // Flat (not a union) so property narrowing on `worker` never collapses callers to `never`.
@@ -112,8 +112,14 @@ export function assignWorker(
   const remotes = healthy.filter((w) => w.kind === "remote")
     .sort((a, b) => (b.tokS ?? 0) - (a.tokS ?? 0) || a.name.localeCompare(b.name));
 
+  // google-grounded (Google Search / Gemini-native) → prefer the gemini-cli backend if
+  // healthy, else fall through to the normal GPU-remote/mac path.
+  const gemini = healthy.find((w) => w.name === "gemini-cli") || null;
   const eligible: FleetWorker[] =
-    task.kind === "host-tool" ? (mac ? [mac] : []) : [...remotes, ...(mac ? [mac] : [])];
+    task.kind === "host-tool" ? (mac ? [mac] : [])
+    : task.kind === "google-grounded"
+      ? [...(gemini ? [gemini] : []), ...remotes.filter((r) => r.name !== "gemini-cli"), ...(mac ? [mac] : [])]
+      : [...remotes, ...(mac ? [mac] : [])];
 
   if (!eligible.length) {
     return { worker: null, reason: task.kind === "host-tool"
@@ -129,8 +135,10 @@ export function assignWorker(
   const pick = eligible[0];
   const reason = task.kind === "host-tool"
     ? "host-tool → mac control plane"
-    : pick.kind === "remote"
-      ? `GPU-heavy ${task.kind} → remote ${pick.name} (${pick.tokS ?? "?"} tok/s)`
-      : `no remote → mac substrate failover (${task.kind})`;
+    : pick.name === "gemini-cli"
+      ? "google-grounded → gemini-cli backend"
+      : pick.kind === "remote"
+        ? `GPU-heavy ${task.kind} → remote ${pick.name} (${pick.tokS ?? "?"} tok/s)`
+        : `no remote → mac substrate failover (${task.kind})`;
   return { worker: pick.name, reason };
 }

@@ -20,7 +20,7 @@ const J = (x: unknown) => JSON.stringify(x);
 // ── small generative enumeration (deterministic, no proptest dep) ──────────────────
 const WORKER_NAMES = ["mac", "desktop-ert7724", "box-a", "box-b"] as const;
 const KINDS = ["mac", "remote"] as const;
-const TASK_KINDS = ["codegen", "analysis", "host-tool"] as const;
+const TASK_KINDS = ["codegen", "analysis", "host-tool", "google-grounded"] as const;
 
 /** Deterministic worker-set enumeration: a handful of hand-curated + small cartesian fixtures. */
 function fixtureWorkerSets(): FleetWorker[][] {
@@ -101,6 +101,35 @@ describe("assignWorker — I1 totality · I2 determinism · I3 soundness · I4 s
     const noRemote: FleetWorker[] = [{ name: "mac", kind: "mac", healthy: true, tokS: 10 }];
     expect(assignWorker({ id: "c", kind: "codegen" }, noRemote).worker).toBe("mac"); // failover
     expect(assignWorker({ id: "c", kind: "codegen" }, []).worker).toBe(null);
+  });
+
+  it("google-grounded → prefers the gemini-cli worker when healthy", () => {
+    const withGemini: FleetWorker[] = [
+      { name: "box-a", kind: "remote", healthy: true, tokS: 99 },
+      { name: "gemini-cli", kind: "remote", healthy: true },
+      { name: "mac", kind: "mac", healthy: true },
+    ];
+    expect(assignWorker({ id: "g", kind: "google-grounded" }, withGemini).worker).toBe("gemini-cli");
+    // No gemini-cli worker → falls through to the normal GPU-remote path.
+    const noGemini: FleetWorker[] = [
+      { name: "box-a", kind: "remote", healthy: true, tokS: 99 },
+      { name: "mac", kind: "mac", healthy: true },
+    ];
+    expect(assignWorker({ id: "g", kind: "google-grounded" }, noGemini).worker).toBe("box-a");
+    // gemini-cli unhealthy → not chosen.
+    const geminiDown: FleetWorker[] = [
+      { name: "gemini-cli", kind: "remote", healthy: false },
+      { name: "mac", kind: "mac", healthy: true },
+    ];
+    expect(assignWorker({ id: "g", kind: "google-grounded" }, geminiDown).worker).toBe("mac");
+  });
+
+  it("gemini-cli is NOT preferred for plain codegen (competes as a tok/s=0 remote)", () => {
+    const workers: FleetWorker[] = [
+      { name: "box-a", kind: "remote", healthy: true, tokS: 50 },
+      { name: "gemini-cli", kind: "remote", healthy: true },
+    ];
+    expect(assignWorker({ id: "c", kind: "codegen" }, workers).worker).toBe("box-a");
   });
 
   it("tok/s tie → deterministic name tie-break", () => {

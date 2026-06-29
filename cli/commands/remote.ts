@@ -559,17 +559,21 @@ export function parseEpic(text: string): { id: string; prompt: string }[] {
     .map((prompt, i) => ({ id: `t${i + 1}`, prompt }));
 }
 
-/** Heuristic kind: terminal/shell work = host-tool (mac only); analyse = analysis; else codegen. Pure. */
+/** Heuristic kind: terminal/shell = host-tool (mac only); web/search = google-grounded
+ *  (prefers gemini-cli); analyse = analysis; else codegen. Pure. */
 export function inferTaskKind(prompt: string): TaskKind {
   if (/\b(terminal|shell|iterm|run it|execute|open app|macos)\b/i.test(prompt)) return "host-tool";
+  if (/\b(google search|web search|search the web|grounding|latest|current events|real[- ]?time|up[- ]?to[- ]?date)\b/i.test(prompt)) return "google-grounded";
   if (/\b(analy|review|explain|investigate|audit)\b/i.test(prompt)) return "analysis";
   return "codegen";
 }
 
-/** Fleet workers = pool backends (remote) + the mac control plane. Pure. */
-export function buildWorkers(pool: Backend[], macHealthy = true): FleetWorker[] {
+/** Fleet workers = pool backends (remote) + the mac control plane (+ the gemini-cli backend
+ *  when its binary is present). Pure. */
+export function buildWorkers(pool: Backend[], macHealthy = true, geminiHealthy = false): FleetWorker[] {
   const remotes: FleetWorker[] = pool.map((b) => ({ name: b.name, kind: "remote", healthy: true }));
-  return [...remotes, { name: "mac", kind: "mac", healthy: macHealthy }];
+  const gemini: FleetWorker[] = geminiHealthy ? [{ name: "gemini-cli", kind: "remote", healthy: true }] : [];
+  return [...remotes, ...gemini, { name: "mac", kind: "mac", healthy: macHealthy }];
 }
 
 /** Merge per-task results → one epic report (allOk = every task DONE/OK && none demo). Pure. */
