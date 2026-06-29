@@ -13,6 +13,7 @@ import { runBackup } from "./commands/backup";
 import { runShortcuts } from "./commands/shortcuts";
 import { runTop } from "./commands/top";
 import { runRemote } from "./commands/remote";
+import { runGemini } from "./commands/gemini";
 import { complete, completionScript, COMMAND_TREE, type DynamicValues } from "./lib/completion";
 import { PROVIDERS } from "./lib/providers";
 import { cachedModels } from "./lib/modelcache";
@@ -43,6 +44,7 @@ commands:
   top [--watch]      live metrics dashboard (requests, latency, tool calls)
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
   remote check       verify gateway is bound to a remote ollama GPU backend
+  gemini <prompt>    bridge to Google's Gemini CLI (run|setup-mcp|status)
   doctor             health of gateway + ollama + bridge + ready + agent
   config [k] [v]     show config, or set a key (gateway|model|provider|apiKey|saasAdminToken)
     config use <name>  switch active gateway profile (secrets sealed per profile)
@@ -205,6 +207,7 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   top: "live metrics dashboard (requests, latency, tool calls)",
   shortcuts: "generate an Apple Shortcuts pack",
   remote: "verify gateway is bound to a remote ollama GPU backend",
+  gemini: "bridge to Google's Gemini CLI (run, setup-mcp, status)",
   doctor: "health of gateway, ollama, bridge, ready and agent",
   config: "show config or set a key; manage profiles and the keystore",
   completion: "print a shell completion script (bash, zsh, fish)",
@@ -313,6 +316,8 @@ export async function main(argv: string[]): Promise<number> {
     }
     case "remote":
       return runRemote(rest);
+    case "gemini":
+      return runGemini(rest);
     case "doctor":
       return runDoctor(rest);
     case "config":
