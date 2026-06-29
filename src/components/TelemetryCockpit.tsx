@@ -4,6 +4,7 @@ import { Cpu, Zap, Server, Radio, RotateCw } from "lucide-react";
 import { Skeleton } from "./Skeleton";
 import { Sparkline } from "./Sparkline";
 import { LiveActivityPanel } from "./cockpit/LiveActivityPanel";
+import { ModelsPanel } from "./cockpit/ModelsPanel";
 
 interface CockpitProps {
   telemetry: HealthTelemetry | null;
@@ -26,7 +27,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
     // Reserve the SAME height as the populated cockpit (3-col grid + backend/fleet
     // panel) so the skeleton→data swap doesn't shift the page (CLS=0).
     return (
-      <div aria-busy="true" aria-label="Loading host telemetry" className="space-y-4 min-h-[24rem]">
+      <div aria-busy="true" aria-label="Loading host telemetry" className="space-y-4 min-h-[38rem]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
             <div key={i} className="p-4 bg-immersive-panel border border-immersive-border rounded flex flex-col gap-3 min-h-[11rem]">
@@ -38,6 +39,14 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
         <div className="p-4 bg-immersive-panel border border-immersive-border rounded min-h-[5.5rem]">
           <Skeleton width="40%" height="0.9rem" />
           <div className="mt-2"><Skeleton width="70%" height="1.2rem" /></div>
+        </div>
+        <div className="p-4 bg-immersive-panel border border-immersive-border rounded min-h-[7rem]">
+          <Skeleton width="40%" height="0.9rem" />
+          <div className="mt-2"><Skeleton width="100%" height="3.5rem" /></div>
+        </div>
+        <div className="p-4 bg-immersive-panel border border-immersive-border rounded min-h-[8rem]">
+          <Skeleton width="40%" height="0.9rem" />
+          <div className="mt-2"><Skeleton width="100%" height="4.5rem" /></div>
         </div>
       </div>
     );
@@ -63,7 +72,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   const hostShort = backend ? backend.host.replace(/^https?:\/\//, "") : "";
 
   return (
-    <div className="space-y-4 min-h-[24rem]">
+    <div className="space-y-4 min-h-[38rem]">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* 1. Environment & Health */}
       <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded flex flex-col justify-between shadow-lg">
@@ -253,6 +262,14 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
         cores={telemetry.realtime?.cores ?? []}
         activity={telemetry.realtime?.activity ?? { sessionCount: 0, recentRuns: 0, lastActivityAgoSec: null }}
         backendLatencyMs={telemetry.realtime?.backendLatencyMs ?? null}
+      />
+
+      {/* All local ollama models + Mac-fit + benchmarked-efficient champion (concurrent real data) */}
+      <ModelsPanel
+        list={telemetry.models?.list ?? []}
+        recommended={telemetry.models?.recommended ?? null}
+        championTokPerSec={telemetry.models?.championTokPerSec ?? null}
+        totalRamGb={telemetry.models?.totalRamGb ?? 0}
       />
     </div>
   );

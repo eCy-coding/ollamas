@@ -72,6 +72,12 @@ export interface HealthTelemetry {
     activity: { sessionCount: number; recentRuns: number; lastActivityAgoSec: number | null };
     backendLatencyMs: number | null;
   };
+  models?: {
+    list: { name: string; sizeGb: number; fitsRam: boolean; loaded: boolean; recommended: boolean }[];
+    recommended: string | null;
+    totalRamGb: number;
+    championTokPerSec: number | null;
+  };
 }
 
 export interface FileItem {

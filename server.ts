@@ -57,6 +57,12 @@ import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } f
 import { discoverBinaries } from "./server/artifacts";
 import { buildFleetView } from "./server/cockpit";
 import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
+import { rankMacModels } from "./server/cockpit-models";
+// Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
+// qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
+// single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
+const MAC_MODEL_CHAMPION = process.env.MAC_MODEL_CHAMPION || "qwen3:8b";
+const MAC_CHAMPION_TOKS = Number(process.env.MAC_CHAMPION_TOKS || 82);
 
 // Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
 const TOOL_DEPS: ToolDeps = {
@@ -332,12 +338,17 @@ async function initializeServer() {
     (res as any).flushHeaders?.();
 
     const ollamaHostNow = () => process.env.OLLAMA_HOST || "http://localhost:11434";
-    const ollama = { version: "unavailable", loadedModels: [] as any[], reachable: false, latencyMs: null as number | null };
+    const ollama = { version: "unavailable", loadedModels: [] as any[], allModels: [] as { name: string; size: number }[], reachable: false, latencyMs: null as number | null };
     let prevCpus = os.cpus(); // baseline for per-core utilization deltas across ticks
     const readPool = (): unknown => {
       try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), ".ollamas", "backends.json"), "utf8")); }
       catch { return []; }
     };
+    // Mac efficiency: compute the binary manifest ONCE per connection + cache the pool —
+    // they were re-read from disk every 2s frame (wasteful fs ops). Pool refreshes on the
+    // throttled tick so fleet failover still surfaces.
+    const cachedBinaries = discoverBinaries();
+    let cachedPool = readPool();
     const probeOllama = async () => {
       if (CURRENT_MODE === "demo") { ollama.reachable = false; return; }
       const base = ollamaHostNow().replace(/\/+$/, "");
@@ -349,18 +360,21 @@ async function initializeServer() {
         if (v.ok) ollama.version = (await v.json().catch(() => ({})))?.version || "unknown";
         const ps = await fetch(`${base}/api/ps`, { signal: AbortSignal.timeout(2500) });
         if (ps.ok) ollama.loadedModels = (await ps.json().catch(() => ({})))?.models || [];
+        const tags = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
+        if (tags.ok) ollama.allModels = ((await tags.json().catch(() => ({})))?.models || []).map((m: any) => ({ name: m.name, size: m.size }));
       } catch { ollama.reachable = false; ollama.latencyMs = null; }
     };
 
     let tick = 0;
     const push = async () => {
       if (res.writableEnded) return;
-      if (tick % 3 === 0) await probeOllama(); // throttle ollama probe to ~6s
+      if (tick % 3 === 0) { await probeOllama(); cachedPool = readPool(); } // throttle disk+net to ~6s
       const cpu = os.loadavg();
       const host = ollamaHostNow();
-      // real-time concurrent data: per-core CPU (delta vs last tick) + live activity rollup
+      // real-time concurrent data: per-core CPU (delta vs last tick) + live activity rollup.
+      // Skip tick-0 cores (≈0ms interval → noisy); first real sample lands at tick 1.
       const nowCpus = os.cpus();
-      const cores = coreUtilization(prevCpus, nowCpus);
+      const cores = tick === 0 ? [] : coreUtilization(prevCpus, nowCpus);
       prevCpus = nowCpus;
       const sessions = db.data.sessions || [];
       const activity = activitySummary(sessions, sessions.map((s: any) => ({ ts: s.updatedAt })), Date.now());
@@ -377,11 +391,15 @@ async function initializeServer() {
         permissions: db.data.permissions,
         workspacePath: db.data.workspacePath,
         hasBackupEnabled: db.data.backup.enabled,
-        binaries: discoverBinaries(),
+        binaries: cachedBinaries,
         db: "up",
         backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
-        fleet: buildFleetView(readPool(), host),
+        fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
+        models: {
+          ...rankMacModels(ollama.allModels, os.totalmem(), ollama.loadedModels.map((m: any) => m.name), MAC_MODEL_CHAMPION),
+          championTokPerSec: MAC_CHAMPION_TOKS,
+        },
         updatedAt: Date.now(), // freshness stamp → cockpit shows LIVE vs polling-fallback
       };
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
