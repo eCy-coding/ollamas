@@ -23,6 +23,10 @@ interface TraceStep {
 interface Message {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
+  // The agent step that produced this assistant message. Server emits one `message`
+  // per step (full per-step text, not a delta) → key by step so a later step APPENDS a
+  // new message instead of overwriting an earlier step's text.
+  step?: number;
 }
 
 interface ReactAgentTabProps {
@@ -325,12 +329,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 }
                 else if (parsed.type === "message") {
                   setMessages((prev) => {
-                    // If the last message is already assistant, append or replace
+                    // Replace ONLY a same-step re-emit (idempotent re-render); a message from a
+                    // NEW step appends → multi-step assistant output is no longer overwritten.
                     const last = prev[prev.length - 1];
-                    if (last && last.role === "assistant") {
-                      return [...prev.slice(0, -1), { role: "assistant", content: parsed.text }];
+                    if (last && last.role === "assistant" && last.step === parsed.step) {
+                      return [...prev.slice(0, -1), { role: "assistant", content: parsed.text, step: parsed.step }];
                     }
-                    return [...prev, { role: "assistant", content: parsed.text }];
+                    return [...prev, { role: "assistant", content: parsed.text, step: parsed.step }];
                   });
                 }
                 else if (parsed.type === "step") {
@@ -354,6 +359,12 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     next[i] = { ...next[i], ...incoming };
                     return next;
                   });
+
+                  // The write applied (auto-apply or approved) → close any lingering approval
+                  // wizard for this step so it can't show stale data after the file is written.
+                  if (parsed.tool === "write_file" && parsed.applied) {
+                    setPendingApproval((p) => (p && p.stepIndex === parsed.stepNum ? null : p));
+                  }
 
                   // If a write tool is called with auto-apply turned OFF, lock the visual approval wizard
                   // Guard parsed.args: a partial/errored trace can omit it; reading
@@ -642,7 +653,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                     onClick={() => copyText(m.content)}
                     aria-label={_("react-agent.copy")}
                     title={_("react-agent.copy")}
-                    className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 p-1 rounded text-current/70 hover:text-current transition"
+                    className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 p-1 rounded text-current transition"
                   >
                     <Copy className="w-3 h-3" />
                   </button>
