@@ -22,6 +22,7 @@ usage:
   ollamas gemini "<prompt>" [options]      run Gemini headless, print the answer
   ollamas gemini setup-mcp [options]       register the ollamas MCP server into Gemini CLI
   ollamas gemini status [--json]           show binary / auth mode / MCP registration
+  ollamas gemini lane [--port p] [--json]  probe the dedicated gemini gateway lane (npm run gemini:lane)
 
 run options:
   --json              print the raw Gemini JSON ({response,stats,error})
@@ -74,13 +75,14 @@ export async function runGemini(argv: string[]): Promise<number> {
   const sub = positional[0];
   if (sub === "setup-mcp") return setupMcp(argv);
   if (sub === "status") return status(argv);
+  if (sub === "lane") return lane(argv);
   return runPrompt(argv, positional);
 }
 
 // True when argv[i] is the VALUE of a preceding value-flag (so it isn't a positional).
 function isFlagValue(argv: string[], i: number): boolean {
   const prev = argv[i - 1];
-  return prev === "-m" || prev === "--model" || prev === "--include" || prev === "--scope" || prev === "--url";
+  return prev === "-m" || prev === "--model" || prev === "--include" || prev === "--scope" || prev === "--url" || prev === "--port";
 }
 
 async function runPrompt(argv: string[], positional: string[]): Promise<number> {
@@ -194,4 +196,27 @@ async function status(argv: string[]): Promise<number> {
     `gateway       : ${gatewayUrl()}\n`,
   );
   return present ? 0 : 2;
+}
+
+// Probe the DEDICATED gemini gateway lane (a 2nd ollamas server booted by `npm run gemini:lane`
+// on its own port, concurrent with :3000). Reports up/down + the models + the use-it hint.
+async function lane(argv: string[]): Promise<number> {
+  const port = flagVal(argv, "--port") || process.env.OLLAMAS_GEMINI_PORT || "3011";
+  const url = `http://127.0.0.1:${port}`;
+  let health: any = null; let models: unknown = null;
+  try { const r = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(2500) }); if (r.ok) health = await r.json(); } catch { /* down */ }
+  try { const r = await fetch(`${url}/api/models/gemini-cli`, { signal: AbortSignal.timeout(2500) }); if (r.ok) models = await r.json(); } catch { /* down */ }
+  const up = !!health;
+  if (argv.includes("--json")) {
+    process.stdout.write(JSON.stringify({ url, up, mode: health?.mode ?? null, geminiModels: models }, null, 2) + "\n");
+    return up ? 0 : 2;
+  }
+  process.stdout.write(
+    `gemini lane : ${up ? `✓ up (${url}, mode=${health.mode})` : `✗ not running at ${url}`}\n` +
+    (up
+      ? `models      : ${Array.isArray(models) ? models.join(", ") : "—"}\n` +
+        `use it      : OLLAMAS_GATEWAY=${url} ollamas agent --provider gemini-cli "<task>"\n`
+      : `start it    : npm run gemini:lane   (dedicated gateway, never touches :3000)\n`),
+  );
+  return up ? 0 : 2;
 }
