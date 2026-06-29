@@ -1082,8 +1082,12 @@ export class ProviderRouter {
         // Concurrent backend: drive the external Google Gemini CLI as a subprocess. It runs
         // its OWN agent loop (tools + Google grounding) and returns the final text → no
         // tool_calls, so the ollamas ReAct loop treats this as a final reply and halts.
-        const r = await generateViaGeminiCli(msgs, config.model || undefined, signal);
-        return { text: r.text, source: "gemini-cli", modelUsed: r.modelUsed, tokens: undefined, tokensPerSec: r.tokensPerSec };
+        // Use a pooled GEMINI_API_KEY when available (per-key 1000/day × N, rotatable) — falls
+        // back to the binary's own OAuth when the pool is empty. Count the use against the pool.
+        const poolKey = ProviderRouter.getDecryptedKey("gemini");
+        const r = await generateViaGeminiCli(msgs, config.model || undefined, signal, "gemini", poolKey || undefined);
+        if (poolKey) recordKeyUse("gemini", keyId(poolKey));
+        return { text: r.text, source: poolKey ? "gemini-cli:keyed" : "gemini-cli:oauth", modelUsed: r.modelUsed, tokens: undefined, tokensPerSec: r.tokensPerSec };
       }
 
       case "demo":

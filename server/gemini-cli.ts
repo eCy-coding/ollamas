@@ -66,6 +66,7 @@ export async function generateViaGeminiCli(
   model?: string,
   signal?: AbortSignal,
   bin = "gemini",
+  apiKey?: string,
 ): Promise<GeminiCliResult> {
   const prompt = flattenForGemini(messages);
   const args = ["--output-format", "json", ...(model ? ["--model", model] : []), prompt];
@@ -75,8 +76,14 @@ export async function generateViaGeminiCli(
   try {
     result = await new Promise((resolve) => {
       // GEMINI_CLI_TRUST_WORKSPACE: gemini-cli v0.49+ refuses headless runs in an "untrusted"
-      // directory unless this is set → required for non-interactive automation.
-      const env = { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: process.env.GEMINI_CLI_TRUST_WORKSPACE || "true" };
+      // directory unless this is set → required for non-interactive automation. apiKey (from the
+      // pool) makes the binary use a rotatable API key (per-key 1000/day × N) instead of the
+      // shared OAuth free tier — the sustainable path.
+      const env = {
+        ...process.env,
+        GEMINI_CLI_TRUST_WORKSPACE: process.env.GEMINI_CLI_TRUST_WORKSPACE || "true",
+        ...(apiKey ? { GEMINI_API_KEY: apiKey } : {}),
+      };
       const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
       let out = ""; let err = "";
       const onAbort = () => child.kill("SIGKILL");

@@ -542,9 +542,16 @@ async function initializeServer() {
   // provider's user-supplied key pool is exhausted (all cooled) so a new key can be added.
   app.get("/api/keys/pool", (_req, res) => {
     const providers = ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"];
-    const pool: Record<string, { total: number; live: number }> = {};
-    for (const p of providers) pool[p] = ProviderRouter.keyPoolStatus(p);
-    res.json({ pool });
+    // Per-provider pool health + proactive saturation (worst key burn %, all-approaching alert).
+    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean }> = {};
+    for (const p of providers) {
+      const s = ProviderRouter.keyPoolStatus(p);
+      const sat = ProviderRouter.poolSaturation(p);
+      pool[p] = { total: s.total, live: s.live, worstPct: Math.round(sat.worstPct * 100) / 100, allApproaching: s.total > 0 && sat.allApproaching };
+    }
+    // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
+    const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));
+    res.json({ pool, alerts });
   });
 
   app.post("/api/keys", (req, res) => {
