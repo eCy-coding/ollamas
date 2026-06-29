@@ -73,6 +73,7 @@ const sample: DoctorReport = {
   agent: { ok: true, detail: "sessions=2" },
   saas: { ok: true, detail: "skipped (no admin token)" },
   mcp: { ok: true, detail: "tools=22 upstreams=0" },
+  gemini: { ok: true, detail: "binary absent (optional)" },
 };
 
 describe("formatDoctor", () => {

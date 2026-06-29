@@ -5,6 +5,7 @@ import type { DoctorReport } from "./output";
 import type { McpTool, McpProgress, McpResource, McpPrompt } from "./mcp";
 import type { BackupConfig } from "./backup";
 import { rpcEnvelope, parseRpcResponse } from "./mcp";
+import { detectGemini, detectAuthMode } from "./gemini";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -652,6 +653,11 @@ export async function buildDoctorReport(
   // SaaS probe only when an admin token is configured; otherwise report skipped
   // (don't gate overall health on it).
   const saas = client.hasAdminToken() ? await safeProbe(() => client.listPlans()) : null;
+  // Optional Gemini-CLI bridge: is the binary present + which auth mode? Informational only.
+  const gem = await safeProbe(async () => {
+    const d = await detectGemini();
+    return { present: d.present, version: d.version, auth: detectAuthMode().mode };
+  });
 
   return {
     ts: nowIso,
@@ -663,6 +669,9 @@ export async function buildDoctorReport(
     agent: { ok: agent.ok, detail: agent.ok ? `sessions=${countOf(agent.value)}` : agent.error },
     saas: saas ? { ok: saas.ok, detail: saas.ok ? `plans=${countOf(saas.value)}` : saas.error } : { ok: true, detail: "skipped (no admin token)" },
     mcp: { ok: mcp.ok, detail: mcp.ok ? `tools=${countOf(mcp.value?.exposedTools)} upstreams=${countOf(mcp.value?.upstreams)}` : mcp.error },
+    gemini: { ok: true, detail: gem.ok && gem.value?.present
+      ? `✓ ${gem.value.version} · auth ${gem.value.auth}`
+      : "binary absent (optional — npm i -g @google/gemini-cli)" },
   };
 }
 

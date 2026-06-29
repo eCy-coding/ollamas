@@ -8,7 +8,7 @@
 // Choke-point safe (N-012): shells out to the external `gemini` binary; no server import.
 // Zero-dep: node built-ins only. Research/plan: docs/GEMINI_CLI_{RESEARCH,PLAN}.md.
 import { execFile } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -134,6 +134,18 @@ async function runPrompt(argv: string[], positional: string[]): Promise<number> 
   return verdict.ok ? 0 : 1;
 }
 
+// Pure: the v0.22.2 `gemini mcp add -t http` bug writes an invalid `type` key into the
+// ollamas server entry that then fails to load. Strip it. Returns whether a fix was made.
+export function stripBadMcpType(settings: any): { fixed: boolean; settings: any } {
+  const entry = settings?.mcpServers?.ollamas;
+  if (entry && typeof entry === "object" && "type" in entry) {
+    const rest = { ...entry };
+    delete rest.type;
+    return { fixed: true, settings: { ...settings, mcpServers: { ...settings.mcpServers, ollamas: rest } } };
+  }
+  return { fixed: false, settings };
+}
+
 async function setupMcp(argv: string[]): Promise<number> {
   const { present } = await detectGemini();
   if (!present) { process.stderr.write(ABSENT + "\n"); return 2; }
@@ -145,9 +157,19 @@ async function setupMcp(argv: string[]): Promise<number> {
     return 1;
   }
   process.stdout.write(`registered ollamas MCP → Gemini CLI (${scope} scope): ${url}\n`);
-  // Known bug (v0.22.2): mcp add may write an invalid "type":"http" key. Warn so the user
-  // can fix ~/.gemini/settings.json if Gemini later refuses to load it.
-  process.stdout.write("verify with: gemini mcp list   (if it errors on 'type', edit ~/.gemini/settings.json)\n");
+  // Auto-fix the known v0.22.2 invalid `type` key so Gemini can load the entry.
+  const settingsPath = scope === "project" ? join(process.cwd(), ".gemini", "settings.json") : join(homedir(), ".gemini", "settings.json");
+  try {
+    if (existsSync(settingsPath)) {
+      const obj = JSON.parse(readFileSync(settingsPath, "utf8"));
+      const { fixed, settings } = stripBadMcpType(obj);
+      if (fixed) {
+        writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+        process.stdout.write("auto-fixed the invalid 'type' key in settings.json (v0.22.2 bug).\n");
+      }
+    }
+  } catch { /* best-effort — the user can still edit settings.json manually */ }
+  process.stdout.write("verify with: gemini mcp list\n");
   return 0;
 }
 
