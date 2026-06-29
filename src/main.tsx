@@ -10,6 +10,15 @@ import {i18n} from './lib/i18n';
 import {logClientEvent} from './lib/apiClient';
 import {reportWebVitals} from './lib/vitals';
 
+// Firebase auth (Google Drive sign-in) only authorizes `localhost`, not `127.0.0.1`
+// — signInWithPopup validates the page origin and throws auth/unauthorized-domain on
+// the raw IP. Force the already-authorized host before anything (incl. Firebase) mounts.
+if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
+  const {port, pathname, search, hash} = window.location;
+  window.location.replace(`http://localhost:${port || '3000'}${pathname}${search}${hash}`);
+  throw new Error('redirecting 127.0.0.1 → localhost for Firebase auth'); // halt module eval; the replace navigates away
+}
+
 // vF8 — every render crash routes to the seyir defteri (adopted: react-error-boundary, MIT).
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

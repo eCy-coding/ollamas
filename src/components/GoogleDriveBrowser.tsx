@@ -28,8 +28,14 @@ export function GoogleDriveBrowser() {
         resetAuth("Google Drive session expired. Please sign in again.");
         return;
       }
+      if (res.status === 403) {
+        // Signed in, but the granted token lacks Drive access — the OAuth consent
+        // screen is missing the drive scope, or the Drive API isn't enabled.
+        const body = await res.text();
+        throw new Error(`Drive access not granted (403). The app's OAuth consent needs the Drive scope and the Drive API must be enabled. ${body.slice(0, 200)}`);
+      }
       if (!res.ok) {
-        throw new Error("Failed to fetch files from Google Drive.");
+        throw new Error(`Failed to fetch files from Google Drive (${res.status}).`);
       }
       const data = await res.json();
       setFiles(data.files || []);
@@ -93,7 +99,16 @@ export function GoogleDriveBrowser() {
           </div>
         )}
 
-        <button 
+        {typeof window !== "undefined" && window.location.hostname === "127.0.0.1" && (
+          <div className="bg-amber-500/10 border border-amber-500/20 text-status-warn text-xs px-4 py-3 rounded mb-6 max-w-md font-mono text-left">
+            Google sign-in is only authorized on <strong>localhost</strong>.{" "}
+            <a href={`http://localhost:${window.location.port || "3000"}${window.location.pathname}`} className="underline text-status-accent">
+              Open on localhost to sign in →
+            </a>
+          </div>
+        )}
+
+        <button
           onClick={handleLogin} 
           disabled={isLoggingIn}
           className="gsi-material-button bg-immersive-bg text-immersive-text-dim border border-immersive-border rounded px-4 py-2 flex items-center gap-2 hover:bg-immersive-bg transition cursor-pointer font-medium text-sm disabled:opacity-50"
