@@ -1,16 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { Key, CheckCircle, XCircle, Loader2, Info } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 interface KeyVaultProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
 }
 
+// Where the operator logs into the NEXT account + creates a key (the guided-paste flow).
+const KEY_PAGE: Record<string, string> = {
+  gemini: "https://aistudio.google.com/apikey",
+  openai: "https://platform.openai.com/api-keys",
+  anthropic: "https://console.anthropic.com/settings/keys",
+  openrouter: "https://openrouter.ai/keys",
+};
+
+interface PoolEntry { total: number; live: number; worstPct: number; allApproaching: boolean }
+
 export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [masks, setMasks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string }>>({});
+  const [pool, setPool] = useState<Record<string, PoolEntry>>({});
+  const [alerts, setAlerts] = useState<Array<{ provider: string; worstPct: number; live: number }>>([]);
 
   // Form Inputs
   const [inputs, setInputs] = useState<Record<string, string>>({
@@ -32,9 +44,31 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     }
   };
 
+  // Pool health (per-key burn % + saturation alerts) — poll so the operator sees a key
+  // approaching its limit and can add the next account's key BEFORE a 429.
+  const loadPool = async () => {
+    try {
+      const data = await api.get<{ pool: Record<string, PoolEntry>; alerts: typeof alerts }>("/api/keys/pool");
+      setPool(data.pool || {});
+      setAlerts(data.alerts || []);
+    } catch { /* gateway down — leave prior state */ }
+  };
+
   useEffect(() => {
     loadMasks();
+    loadPool();
+    const t = setInterval(loadPool, 15000); // 15s burn-rate refresh
+    return () => clearInterval(t);
   }, []);
+
+  // Guided provisioning: open the provider's key page so the operator logs into the NEXT
+  // account + creates a key, then pastes it into the field below + Save (→ joins the pool).
+  const openKeyPage = (provider: string) => {
+    const url = KEY_PAGE[provider];
+    if (!url) return;
+    window.open(url, "_blank", "noopener");
+    onNotify(`Opened ${provider} key page — log into the next account, create a key, paste it below.`, "info");
+  };
 
   const handleSave = async (provider: string) => {
     setLoading(true);
@@ -124,9 +158,22 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
         </p>
       </div>
 
+      {/* P3 — approaching-limit alert: the whole live pool of a provider is saturating → act */}
+      {alerts.length > 0 && (
+        <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/25 p-3 rounded mb-4 text-[10px] font-mono text-status-warn leading-relaxed">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div>
+            <strong>Rate-limit approaching:</strong>{" "}
+            {alerts.map((a) => `${a.provider} ${Math.round(a.worstPct * 100)}% (${a.live} live)`).join(" · ")}.
+            Add the next account's key — click <strong>Key ↗</strong>, log into the next account, create a key, paste it below, Save.
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {providers.map((prov) => {
           const isConfigured = !!masks[prov.id];
+          const ph = pool[prov.id];
           const maskText = masks[prov.id] || "No key registered (operating in offline fallback)";
           const isTestingThis = !!testing[prov.id];
           const testReport = pingStatus[prov.id];
@@ -145,6 +192,18 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 }`}>
                   {isConfigured ? `CONFIGURED: ${maskText}` : "KEYS INACTIVE"}
                 </span>
+
+                {/* P3 — pool burn meter: live/total + worst-key % of its rate limit */}
+                {ph && ph.total > 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded border ${ph.allApproaching ? "bg-amber-500/15 border-amber-500/25 text-status-warn" : "bg-immersive-bg border-immersive-border text-immersive-text-dim"}`}>
+                      pool {ph.live}/{ph.total} · {Math.round(ph.worstPct * 100)}%
+                    </span>
+                    <div className="flex-1 h-1 rounded bg-immersive-bg overflow-hidden max-w-[80px]">
+                      <div className={`h-full ${ph.worstPct >= 0.8 ? "bg-status-warn" : "bg-status-accent"}`} style={{ width: `${Math.min(100, Math.round(ph.worstPct * 100))}%` }} />
+                    </div>
+                  </div>
+                )}
 
                 {/* Ping Result Indicators */}
                 {testReport && (
@@ -185,6 +244,15 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 />
 
                 <div className="flex gap-1.5 shrink-0">
+                  {KEY_PAGE[prov.id] && (
+                    <button
+                      onClick={() => openKeyPage(prov.id)}
+                      title={`Open ${prov.label} key page (log into the next account → create → paste below)`}
+                      className="bg-white/5 text-immersive-text-muted hover:bg-white/10 font-mono font-medium text-[10px] rounded px-2.5 py-1.5 border border-immersive-border-strong flex items-center gap-1 cursor-pointer"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Key
+                    </button>
+                  )}
                   <button
                     onClick={() => handleSave(prov.id)}
                     disabled={loading || !inputs[prov.id]}
