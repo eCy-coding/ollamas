@@ -257,4 +257,41 @@ describe('ReactAgentTab — ReAct Specialist', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter', shiftKey: false });
     expect(streamPostMock).toHaveBeenCalledTimes(1);
   });
+
+  it('resumes the agent after approving a write (re-dispatches the run)', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'write_file', ok: true, latency: 4, args: { path: 'a.ts', content: 'X' }, diff: '+X', applied: false },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('write it');
+    fireEvent.click(await screen.findByRole('button', { name: /APPROVE WRITE/i }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledWith('/api/agent/approve-write', { path: 'a.ts', content: 'X' }));
+    // The approval re-dispatches /api/agent/chat → a 2nd stream (the agent continues).
+    await waitFor(() => expect(streamPostMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('signals a truncated run and shows a Truncated summary', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'read_file', ok: true, latency: 1, args: {}, result: 'x' },
+      { type: 'done', status: 'limit', text: 'depth limit', tokensPerSec: 0 },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('truncated'), 'info'));
+    expect(await screen.findByText('Truncated')).toBeInTheDocument();
+  });
+
+  it('shows a clean run summary with tok/s', async () => {
+    streamPostMock.mockImplementation(streamWith([
+      { type: 'step', stepNum: 1, tool: 'read_file', ok: true, latency: 1, args: {}, result: 'x' },
+      { type: 'done', status: 'complete', text: 'ok', tokensPerSec: 42 },
+    ]));
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    await send('go');
+    await waitFor(() => expect(screen.getByText('Complete')).toBeInTheDocument());
+    expect(screen.getByText(/42/)).toBeInTheDocument();
+  });
 });

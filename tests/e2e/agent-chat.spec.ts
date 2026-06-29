@@ -86,4 +86,35 @@ test.describe('agent chat flow (mocked)', () => {
     await approve.click();
     await reqP;
   });
+
+  test('resumes the agent (2nd chat dispatch) after approving a write', async ({ page }) => {
+    await stubBase(page);
+    await page.route('**/api/agent/approve-write', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true}' }),
+    );
+    let chatHits = 0;
+    await page.route('**/api/agent/chat', (route) => {
+      chatHits++;
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: 'data: {"type":"step","stepNum":1,"tool":"write_file","ok":true,"latency":4,"args":{"path":"a.ts","content":"X"},"diff":"+X","applied":false}\n\n',
+      });
+    });
+    await openTabAndSend(page, 'write a file');
+    await page.getByRole('button', { name: /APPROVE WRITE/i }).click();
+    // The approval re-dispatches /api/agent/chat (the agent continues).
+    await expect.poll(() => chatHits).toBeGreaterThanOrEqual(2);
+  });
+
+  test('marks a run truncated at the step limit', async ({ page }) => {
+    await stubBase(page);
+    await stubChat(
+      page,
+      'data: {"type":"step","stepNum":1,"tool":"read_file","ok":true,"latency":1,"args":{},"result":"x"}\n\n' +
+        'data: {"type":"done","status":"limit","text":"depth limit"}\n\n',
+    );
+    await openTabAndSend(page, 'long task');
+    await expect(page.getByText('Truncated')).toBeVisible();
+  });
 });
