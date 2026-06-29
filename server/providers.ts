@@ -392,14 +392,18 @@ export class ProviderRouter {
     return selectBackend(pool, probes, { required: [model] });
   }
 
-  private static getFallbackChain(initial: string): string[] {
-    const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "openai", "ollama-cloud", "demo"];
-    const index = defaults.indexOf(initial);
-    if (index === -1) {
-      return [initial, ...defaults];
-    }
-    // Reorder so that initial is first, then rest
-    return [initial, ...defaults.filter((p) => p !== initial)];
+  // public for unit testing the chain order (pure helper, no side effects)
+  public static getFallbackChain(initial: string): string[] {
+    const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "gemini-cli", "openai", "ollama-cloud", "demo"];
+    // Keep the Gemini family ADJACENT and FIRST when a gemini provider is requested: an exhausted
+    // gemini API-key pool (429/cooled) self-sustains on the KEYLESS gemini-cli OAuth binary (same
+    // Gemini family, 1000/day, no paste/rotation) BEFORE dropping to local — minimum-manual
+    // sustainability. gemini-cli is keyless-safe in the loop; with OAuth absent it errors fast
+    // (non-interactive json, no hang) → the chain continues.
+    const front = initial === "gemini" ? ["gemini", "gemini-cli"]
+      : initial === "gemini-cli" ? ["gemini-cli", "gemini"]
+      : [initial];
+    return [...front, ...defaults.filter((p) => !front.includes(p))];
   }
 
   private static hasKey(provider: string): boolean {

@@ -40,3 +40,22 @@ describe("demo-fallback honesty guard", () => {
     expect(r.text.length).toBeGreaterThan(0);
   });
 });
+
+// Sustainable gemini: when the gemini API-key pool exhausts, the chain must self-sustain on the
+// keyless gemini-cli OAuth binary (same Gemini family) BEFORE dropping to local/other (vK-LIVE-4).
+describe("gemini self-sustains via the keyless gemini-cli fallback", () => {
+  it("the gemini chain tries gemini-cli right after gemini, before local/other/demo", () => {
+    const chain = ProviderRouter.getFallbackChain("gemini");
+    expect(chain[0]).toBe("gemini");
+    expect(chain[1]).toBe("gemini-cli");
+    // and it precedes the local/other fallbacks
+    expect(chain.indexOf("gemini-cli")).toBeLessThan(chain.indexOf("ollama-local"));
+    expect(chain.indexOf("gemini-cli")).toBeLessThan(chain.indexOf("demo"));
+  });
+
+  it("gemini-cli is present in every provider's chain (keyless universal fallback)", () => {
+    for (const p of ["openai", "openrouter", "ollama-local"]) {
+      expect(ProviderRouter.getFallbackChain(p)).toContain("gemini-cli");
+    }
+  });
+});
