@@ -1,13 +1,17 @@
 import React, { useState, useRef } from "react";
 import { Users, Play, Check, X, Loader2 } from "lucide-react";
 
-type Cell = { correct: boolean; tokPerSec: number };
+type Cell = { correct: boolean; tokPerSec: number; unavailable?: boolean };
 type Results = Record<string, Record<string, Cell>>;
 
+// Matches the /api/council/calibrate `done` frame (scoreCouncil output).
 type Verdict = {
-  models?: Record<string, { correct: number; total: number; pct: number }>;
-  rates?: { singleBest?: number; bestOfN?: number; majority?: number };
-  recommended?: { detail?: string; combination?: string };
+  perModel?: { model: string; correct: number; total: number; rate: number }[];
+  singleBest?: { model: string; rate: number } | null;
+  bestOfN?: number;   // fraction 0..1
+  majority?: number;  // fraction 0..1
+  recommended?: { policy?: string; detail?: string };
+  unavailable?: string[];
   [k: string]: unknown;
 };
 
@@ -35,21 +39,21 @@ export function CouncilPanel(): React.ReactElement {
     setTasks([]);
 
     const es = new EventSource(
-      "/api/council/calibrate?models=qwen3:4b,qwen3:8b,phi4"
+      "/api/council/calibrate?models=qwen3:4b,qwen3:8b,phi4,gemini-cli"
     );
     esRef.current = es;
 
     es.onmessage = (ev: MessageEvent) => {
-      let msg: { type?: string; model?: string; taskId?: string; cell?: Cell } & Verdict;
+      let msg: { type?: string; model?: string; taskId?: string; correct?: boolean; tokPerSec?: number; unavailable?: boolean } & Verdict;
       try {
         msg = JSON.parse(ev.data);
       } catch {
         return;
       }
-      if (msg.type === "result" && msg.model && msg.taskId && msg.cell) {
+      if (msg.type === "result" && msg.model && msg.taskId) {
         const model = msg.model;
         const taskId = msg.taskId;
-        const cell = msg.cell;
+        const cell: Cell = { correct: !!msg.correct, tokPerSec: Number(msg.tokPerSec) || 0, unavailable: !!msg.unavailable };
         setResults((prev) => ({
           ...prev,
           [model]: { ...(prev[model] ?? {}), [taskId]: cell },
@@ -132,24 +136,31 @@ export function CouncilPanel(): React.ReactElement {
               </tr>
             </thead>
             <tbody>
-              {models.map((m) => (
-                <tr key={m}>
-                  <td className="pr-3 py-0.5 text-immersive-text-dim">{m}</td>
+              {models.map((m) => {
+                const memberCells: Cell[] = Object.values(results[m] ?? {});
+                const memberUnavailable = memberCells.length > 0 && memberCells.every((c) => c.unavailable);
+                return (
+                <tr key={m} className={memberUnavailable ? "opacity-50" : ""}>
+                  <td className="pr-3 py-0.5 text-immersive-text-dim">{m}{memberUnavailable ? " · unavailable" : ""}</td>
                   {tasks.map((t) => {
                     const cell = results[m]?.[t];
                     return (
                       <td key={t} className="px-2 py-0.5">
                         {cell ? (
-                          <span className="flex items-center gap-1">
-                            {cell.correct ? (
-                              <Check className="w-3 h-3 text-status-ok" />
-                            ) : (
-                              <X className="w-3 h-3 text-status-err" />
-                            )}
-                            <span className="text-immersive-text-dim">
-                              {cell.tokPerSec.toFixed(0)} t/s
+                          cell.unavailable ? (
+                            <span className="text-immersive-text-dim italic opacity-60">n/a</span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              {cell.correct ? (
+                                <Check className="w-3 h-3 text-status-ok" />
+                              ) : (
+                                <X className="w-3 h-3 text-status-err" />
+                              )}
+                              <span className="text-immersive-text-dim">
+                                {cell.tokPerSec.toFixed(0)} t/s
+                              </span>
                             </span>
-                          </span>
+                          )
                         ) : (
                           <span className="text-immersive-text-dim">·</span>
                         )}
@@ -157,7 +168,7 @@ export function CouncilPanel(): React.ReactElement {
                     );
                   })}
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>
@@ -165,42 +176,42 @@ export function CouncilPanel(): React.ReactElement {
 
       {verdict && (
         <div className="mt-3 pt-3 border-t border-immersive-border flex flex-col gap-2">
-          {verdict.models && (
+          {verdict.perModel && (
             <div className="flex flex-wrap gap-2 font-mono text-[10px]">
-              {Object.entries(verdict.models).map(([m, s]: [string, { correct: number; total: number; pct: number }]) => (
-                <span
-                  key={m}
-                  className="px-1.5 py-0.5 rounded bg-white/5 text-immersive-text-dim"
-                >
-                  {m}: {s.pct.toFixed(0)}%
+              {verdict.perModel.map((s) => (
+                <span key={s.model} className="px-1.5 py-0.5 rounded bg-white/5 text-immersive-text-dim">
+                  {s.model}: {Math.round(s.rate * 100)}%
+                </span>
+              ))}
+              {(verdict.unavailable ?? []).map((m) => (
+                <span key={m} className="px-1.5 py-0.5 rounded bg-white/5 text-immersive-text-dim opacity-50 italic">
+                  {m}: n/a
                 </span>
               ))}
             </div>
           )}
           {verdict.recommended?.detail && (
             <p className="font-mono text-[11px] text-emerald-400">
-              {verdict.recommended.detail}
+              ★ {verdict.recommended.detail}
             </p>
           )}
-          {verdict.rates && (
-            <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
-              {verdict.rates.singleBest != null && (
-                <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
-                  single-best {verdict.rates.singleBest.toFixed(0)}%
-                </span>
-              )}
-              {verdict.rates.bestOfN != null && (
-                <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
-                  best-of-N {verdict.rates.bestOfN.toFixed(0)}%
-                </span>
-              )}
-              {verdict.rates.majority != null && (
-                <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
-                  majority {verdict.rates.majority.toFixed(0)}%
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
+            {verdict.singleBest && (
+              <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
+                single-best {Math.round(verdict.singleBest.rate * 100)}%
+              </span>
+            )}
+            {verdict.bestOfN != null && (
+              <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
+                best-of-N {Math.round(verdict.bestOfN * 100)}%
+              </span>
+            )}
+            {verdict.majority != null && (
+              <span className="px-1.5 py-0.5 rounded border border-immersive-border text-immersive-text-dim">
+                majority {Math.round(verdict.majority * 100)}%
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -101,4 +101,27 @@ describe("scoreCouncil", () => {
     expect(s.majority).toBe(0);
     expect(s.recommended.policy).toBe("single");
   });
+
+  it("excludes a fully-unavailable member (gemini-cli binary absent) from scoring", () => {
+    const s = scoreCouncil([
+      { model: "qwen3:8b", taskId: "a", correct: true },
+      { model: "qwen3:8b", taskId: "b", correct: true },
+      { model: "gemini-cli", taskId: "a", correct: false, unavailable: true },
+      { model: "gemini-cli", taskId: "b", correct: false, unavailable: true },
+    ]);
+    expect(s.unavailable).toEqual(["gemini-cli"]);
+    expect(s.perModel.map((p) => p.model)).toEqual(["qwen3:8b"]); // omitted, not a misleading 0%
+    expect(s.bestOfN).toBe(1); // unavailable member doesn't drag the union
+    expect(s.singleBest?.model).toBe("qwen3:8b");
+  });
+
+  it("keeps a member with at least one real result (partial availability)", () => {
+    const s = scoreCouncil([
+      { model: "gemini-cli", taskId: "a", correct: true },
+      { model: "gemini-cli", taskId: "b", correct: false, unavailable: true },
+    ]);
+    expect(s.unavailable).toEqual([]); // ran at least once → not excluded
+    expect(s.perModel[0].model).toBe("gemini-cli");
+    expect(s.perModel[0].total).toBe(1); // only the available result counts
+  });
 });

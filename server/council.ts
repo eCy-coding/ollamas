@@ -2,7 +2,7 @@
 // the same auto-verifiable tasks; we score combination policies (single / best-of-N /
 // majority) to find the cheapest combination that reaches the max correctness rate.
 
-export interface CouncilResult { model: string; taskId: string; correct: boolean; }
+export interface CouncilResult { model: string; taskId: string; correct: boolean; unavailable?: boolean }
 export interface PerModel { model: string; correct: number; total: number; rate: number; }
 export interface CouncilScore {
   perModel: PerModel[];
@@ -10,6 +10,7 @@ export interface CouncilScore {
   bestOfN: number;   // fraction of tasks ANY model got right
   majority: number;  // fraction of tasks where >= half the models got it
   recommended: { policy: "single" | "best-of-n" | "majority"; detail: string };
+  unavailable: string[]; // members that never ran (e.g. gemini-cli binary absent) — excluded from scoring
 }
 
 // Normalize a model response then test whether the ground-truth answer is present.
@@ -30,7 +31,12 @@ export function checkAnswer(response: string, answer: string): boolean {
 }
 
 export function scoreCouncil(results: CouncilResult[]): CouncilScore {
-  const rs = Array.isArray(results) ? results : [];
+  const raw = Array.isArray(results) ? results : [];
+  // A member whose results are all `unavailable` never ran (e.g. gemini-cli binary absent) —
+  // exclude it so it is neither a misleading 0% nor a drag on the union/majority.
+  const unavailable = [...new Set(raw.filter((r) => r.unavailable).map((r) => r.model))]
+    .filter((m) => !raw.some((r) => r.model === m && !r.unavailable));
+  const rs = raw.filter((r) => !r.unavailable);
   const models = [...new Set(rs.map((r) => r.model))];
   const tasks = [...new Set(rs.map((r) => r.taskId))];
   const perModel: PerModel[] = models.map((m) => {
@@ -56,5 +62,5 @@ export function scoreCouncil(results: CouncilResult[]): CouncilScore {
   if (sb >= maxRate) recommended = { policy: "single", detail: `${singleBest?.model ?? "?"} @ ${Math.round(sb * 100)}% (no ensemble cost)` };
   else if (majority >= maxRate) recommended = { policy: "majority", detail: `majority-vote @ ${Math.round(majority * 100)}%` };
   else recommended = { policy: "best-of-n", detail: `best-of-${models.length} @ ${Math.round(bestOfN * 100)}%` };
-  return { perModel, singleBest, bestOfN, majority, recommended };
+  return { perModel, singleBest, bestOfN, majority, recommended, unavailable };
 }

@@ -14,7 +14,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
-import { geminiCliAvailable } from "./server/gemini-cli";
+import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
 import { FilesystemManager } from "./server/files";
@@ -436,29 +436,46 @@ async function initializeServer() {
       { id: "dedupe.order", answer: "3,1,2", prompt: "From the array [3,1,3,2,1] remove duplicates keeping first-seen order. Reply with ONLY the result comma-joined with no spaces, nothing else. /no_think" },
       { id: "binsearch.miss", answer: "-1", prompt: "A binary search looks for 7 in the sorted array [1,2,3,4,5]; 7 is absent. Reply with ONLY the integer a correct binary search returns when the value is not found, nothing else. /no_think" },
     ];
-    const results: { model: string; taskId: string; correct: boolean }[] = [];
+    const results: { model: string; taskId: string; correct: boolean; unavailable?: boolean }[] = [];
     send({ type: "start", models, tasks: tasks.map((t) => t.id) });
     for (const model of models) {
+      // gemini-cli is a keyless external-binary provider, not an ollama model. Gate on the
+      // binary ONCE: absent → emit `unavailable` per task (graceful skip, scorer excludes it);
+      // present → route via the gemini-cli provider. Other members use the ollama path.
+      const isGemini = model === "gemini-cli";
+      const gemOk = isGemini ? await geminiCliAvailable().catch(() => false) : true;
       for (const task of tasks) {
         if (res.writableEnded) break;
-        let correct = false, tokPerSec = 0, ms = 0;
-        try {
-          const t0 = Date.now();
-          const r = await fetch(`${macBase}/api/generate`, {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ model, prompt: task.prompt, stream: false, keep_alive: "30s", options: { num_predict: 512, num_ctx: 1024 } }),
-            signal: AbortSignal.timeout(90_000),
-          });
-          ms = Date.now() - t0;
-          if (r.ok) {
-            const j: any = await r.json().catch(() => ({}));
-            correct = checkAnswer(j.response || "", task.answer);
-            const ec = j.eval_count || 0, ed = j.eval_duration || 1;
-            tokPerSec = ed > 0 ? Math.round((ec / (ed / 1e9)) * 10) / 10 : 0;
-          }
-        } catch { /* model load/timeout → counts as incorrect for this task */ }
-        results.push({ model, taskId: task.id, correct });
-        send({ type: "result", model, taskId: task.id, correct, tokPerSec, ms });
+        let correct = false, tokPerSec = 0, ms = 0, unavailable = false;
+        if (isGemini && !gemOk) {
+          unavailable = true; // gemini binary not installed → council member skipped, not penalized
+        } else if (isGemini) {
+          try {
+            const t0 = Date.now();
+            const r = await generateViaGeminiCli([{ role: "user", content: task.prompt }], undefined, AbortSignal.timeout(90_000));
+            ms = Date.now() - t0;
+            correct = checkAnswer(r.text || "", task.answer);
+            tokPerSec = r.tokensPerSec ?? 0;
+          } catch { /* runtime spawn/timeout → counts as incorrect */ }
+        } else {
+          try {
+            const t0 = Date.now();
+            const r = await fetch(`${macBase}/api/generate`, {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ model, prompt: task.prompt, stream: false, keep_alive: "30s", options: { num_predict: 512, num_ctx: 1024 } }),
+              signal: AbortSignal.timeout(90_000),
+            });
+            ms = Date.now() - t0;
+            if (r.ok) {
+              const j: any = await r.json().catch(() => ({}));
+              correct = checkAnswer(j.response || "", task.answer);
+              const ec = j.eval_count || 0, ed = j.eval_duration || 1;
+              tokPerSec = ed > 0 ? Math.round((ec / (ed / 1e9)) * 10) / 10 : 0;
+            }
+          } catch { /* model load/timeout → counts as incorrect for this task */ }
+        }
+        results.push({ model, taskId: task.id, correct, unavailable });
+        send({ type: "result", model, taskId: task.id, correct, tokPerSec, ms, unavailable });
       }
     }
     send({ type: "done", ...scoreCouncil(results) });
