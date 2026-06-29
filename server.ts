@@ -58,6 +58,7 @@ import { discoverBinaries } from "./server/artifacts";
 import { buildFleetView } from "./server/cockpit";
 import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
 import { rankMacModels } from "./server/cockpit-models";
+import { checkAnswer, scoreCouncil } from "./server/council";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -415,6 +416,53 @@ async function initializeServer() {
     const timer = setInterval(() => { void push(); }, 2000);
     timer.unref?.();
     req.on("close", () => clearInterval(timer));
+  });
+
+  // Live council calibration — dispatch the 4 auto-verifiable micro-tasks (combo-bench
+  // ground-truths) to each Mac council model sequentially (MAX_LOADED_MODELS=1), stream
+  // each (model,task) verdict + tok/s LIVE, then the combination verdict (single /
+  // best-of-N / majority). Pure generate (no terminal/ReAct) → fast enough to watch.
+  app.get("/api/council/calibrate", async (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    (res as any).flushHeaders?.();
+    const models = String(req.query.models || "qwen3:8b").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 6);
+    const macBase = "http://localhost:11434";
+    const send = (o: any) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(o)}\n\n`); };
+    const tasks = [
+      { id: "overflow.fib", answer: "12586269025", prompt: "Compute Fibonacci where fib(0)=0, fib(1)=1. Reply with ONLY fib(50) as a single integer, nothing else. /no_think" },
+      { id: "float.round", answer: "0.30", prompt: "What is (0.1 + 0.2) rounded to exactly 2 decimal places, formatted with two decimals like 0.30? Reply with ONLY that value, nothing else. /no_think" },
+      { id: "dedupe.order", answer: "3,1,2", prompt: "From the array [3,1,3,2,1] remove duplicates keeping first-seen order. Reply with ONLY the result comma-joined with no spaces, nothing else. /no_think" },
+      { id: "binsearch.miss", answer: "-1", prompt: "A binary search looks for 7 in the sorted array [1,2,3,4,5]; 7 is absent. Reply with ONLY the integer a correct binary search returns when the value is not found, nothing else. /no_think" },
+    ];
+    const results: { model: string; taskId: string; correct: boolean }[] = [];
+    send({ type: "start", models, tasks: tasks.map((t) => t.id) });
+    for (const model of models) {
+      for (const task of tasks) {
+        if (res.writableEnded) break;
+        let correct = false, tokPerSec = 0, ms = 0;
+        try {
+          const t0 = Date.now();
+          const r = await fetch(`${macBase}/api/generate`, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ model, prompt: task.prompt, stream: false, keep_alive: "30s", options: { num_predict: 512, num_ctx: 1024 } }),
+            signal: AbortSignal.timeout(90_000),
+          });
+          ms = Date.now() - t0;
+          if (r.ok) {
+            const j: any = await r.json().catch(() => ({}));
+            correct = checkAnswer(j.response || "", task.answer);
+            const ec = j.eval_count || 0, ed = j.eval_duration || 1;
+            tokPerSec = ed > 0 ? Math.round((ec / (ed / 1e9)) * 10) / 10 : 0;
+          }
+        } catch { /* model load/timeout → counts as incorrect for this task */ }
+        results.push({ model, taskId: task.id, correct });
+        send({ type: "result", model, taskId: task.id, correct, tokPerSec, ms });
+      }
+    }
+    send({ type: "done", ...scoreCouncil(results) });
+    if (!res.writableEnded) res.end();
   });
 
   /**
