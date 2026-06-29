@@ -36,6 +36,14 @@ if (port !== WANT) console.error(`[gemini-lane] :${WANT} busy → using :${port}
 
 const dataDir = join(homedir(), ".llm-mission-control", "gemini-lane");
 const env = { ...process.env, PORT: String(port), MISSION_CONTROL_DATA_DIR: dataDir, VITE_HMR: "false", DISABLE_HMR: "1" };
+// The @google/genai SDK honors HTTP(S)_PROXY (but NOT NO_PROXY) — a dead/blocking corporate proxy
+// strangles its transport with a bare "fetch failed" while every other provider (raw fetch) reaches
+// its host. This lane is DEDICATED to Google/gemini work, so strip the proxy vars for the child so
+// gemini reaches Google directly (proven: proxy-set→fetch failed; proxy-free→real cloud:gemini).
+// The main :3000 stack keeps its proxy untouched. Opt out with OLLAMAS_KEEP_PROXY=1.
+if (process.env.OLLAMAS_KEEP_PROXY !== "1") {
+  for (const v of ["HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","FTP_PROXY","GRPC_PROXY","http_proxy","https_proxy","all_proxy","ftp_proxy","grpc_proxy","GLOBAL_AGENT_HTTP_PROXY","GLOBAL_AGENT_HTTPS_PROXY"]) delete env[v];
+}
 console.error(`[gemini-lane] booting a dedicated ollamas gateway on :${port}  (data: ${dataDir})`);
 
 const child = spawn("./node_modules/.bin/tsx", ["server.ts"], { cwd: process.cwd(), env, stdio: "inherit" });
