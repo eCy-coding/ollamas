@@ -55,6 +55,7 @@ function logSeyir(entry: Record<string, any>) {
 import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } from "./server/host-bridge";
 import { discoverBinaries } from "./server/artifacts";
 import { buildFleetView } from "./server/cockpit";
+import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
 
 // Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
 const TOOL_DEPS: ToolDeps = {
@@ -330,7 +331,8 @@ async function initializeServer() {
     (res as any).flushHeaders?.();
 
     const ollamaHostNow = () => process.env.OLLAMA_HOST || "http://localhost:11434";
-    const ollama = { version: "unavailable", loadedModels: [] as any[], reachable: false };
+    const ollama = { version: "unavailable", loadedModels: [] as any[], reachable: false, latencyMs: null as number | null };
+    let prevCpus = os.cpus(); // baseline for per-core utilization deltas across ticks
     const readPool = (): unknown => {
       try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), ".ollamas", "backends.json"), "utf8")); }
       catch { return []; }
@@ -339,12 +341,14 @@ async function initializeServer() {
       if (CURRENT_MODE === "demo") { ollama.reachable = false; return; }
       const base = ollamaHostNow().replace(/\/+$/, "");
       try {
+        const t0 = Date.now();
         const v = await fetch(`${base}/api/version`, { signal: AbortSignal.timeout(2500) });
+        ollama.latencyMs = Date.now() - t0; // real backend round-trip
         ollama.reachable = v.ok;
         if (v.ok) ollama.version = (await v.json().catch(() => ({})))?.version || "unknown";
         const ps = await fetch(`${base}/api/ps`, { signal: AbortSignal.timeout(2500) });
         if (ps.ok) ollama.loadedModels = (await ps.json().catch(() => ({})))?.models || [];
-      } catch { ollama.reachable = false; }
+      } catch { ollama.reachable = false; ollama.latencyMs = null; }
     };
 
     let tick = 0;
@@ -353,6 +357,12 @@ async function initializeServer() {
       if (tick % 3 === 0) await probeOllama(); // throttle ollama probe to ~6s
       const cpu = os.loadavg();
       const host = ollamaHostNow();
+      // real-time concurrent data: per-core CPU (delta vs last tick) + live activity rollup
+      const nowCpus = os.cpus();
+      const cores = coreUtilization(prevCpus, nowCpus);
+      prevCpus = nowCpus;
+      const sessions = db.data.sessions || [];
+      const activity = activitySummary(sessions, sessions.map((s: any) => ({ ts: s.updatedAt })), Date.now());
       const payload = {
         mode: CURRENT_MODE,
         isLive: CURRENT_MODE === "live",
@@ -370,6 +380,7 @@ async function initializeServer() {
         db: "up",
         backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
         fleet: buildFleetView(readPool(), host),
+        realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         updatedAt: Date.now(), // freshness stamp → cockpit shows LIVE vs polling-fallback
       };
       res.write(`data: ${JSON.stringify(payload)}\n\n`);

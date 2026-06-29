@@ -3,6 +3,7 @@ import { HealthTelemetry } from "../types";
 import { Cpu, Zap, Server, Radio, RotateCw } from "lucide-react";
 import { Skeleton } from "./Skeleton";
 import { Sparkline } from "./Sparkline";
+import { LiveActivityPanel } from "./cockpit/LiveActivityPanel";
 
 interface CockpitProps {
   telemetry: HealthTelemetry | null;
@@ -25,7 +26,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
     // Reserve the SAME height as the populated cockpit (3-col grid + backend/fleet
     // panel) so the skeleton→data swap doesn't shift the page (CLS=0).
     return (
-      <div aria-busy="true" aria-label="Loading host telemetry" className="space-y-4 min-h-[16.5rem]">
+      <div aria-busy="true" aria-label="Loading host telemetry" className="space-y-4 min-h-[24rem]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => (
             <div key={i} className="p-4 bg-immersive-panel border border-immersive-border rounded flex flex-col gap-3 min-h-[11rem]">
@@ -62,7 +63,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   const hostShort = backend ? backend.host.replace(/^https?:\/\//, "") : "";
 
   return (
-    <div className="space-y-4 min-h-[16.5rem]">
+    <div className="space-y-4 min-h-[24rem]">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* 1. Environment & Health */}
       <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded flex flex-col justify-between shadow-lg">
@@ -246,6 +247,13 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
           <span className="text-[10px] text-immersive-text-dim font-mono italic">Linking backend stream…</span>
         )}
       </div>
+
+      {/* Real-time concurrent data — per-core CPU + live activity + backend latency (SSE) */}
+      <LiveActivityPanel
+        cores={telemetry.realtime?.cores ?? []}
+        activity={telemetry.realtime?.activity ?? { sessionCount: 0, recentRuns: 0, lastActivityAgoSec: null }}
+        backendLatencyMs={telemetry.realtime?.backendLatencyMs ?? null}
+      />
     </div>
   );
 };

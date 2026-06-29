@@ -67,6 +67,11 @@ export interface HealthTelemetry {
   backend?: { host: string; reachable: boolean; version: string; activeModel: string | null };
   fleet?: { activeUrl: string; poolSize: number; backends: { name: string; url: string; priority: number; active: boolean }[] };
   updatedAt?: number; // SSE frame timestamp; absent on /api/health poll fallback
+  realtime?: {
+    cores: number[]; // per-core CPU % (live deltas)
+    activity: { sessionCount: number; recentRuns: number; lastActivityAgoSec: number | null };
+    backendLatencyMs: number | null;
+  };
 }
 
 export interface FileItem {
