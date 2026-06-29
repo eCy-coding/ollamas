@@ -66,6 +66,7 @@ export interface HealthTelemetry {
   // vCockpit (live SSE) — present on /api/cockpit/stream frames, absent on plain /api/health.
   backend?: { host: string; reachable: boolean; version: string; activeModel: string | null };
   fleet?: { activeUrl: string; poolSize: number; backends: { name: string; url: string; priority: number; active: boolean }[] };
+  updatedAt?: number; // SSE frame timestamp; absent on /api/health poll fallback
 }
 
 export interface FileItem {

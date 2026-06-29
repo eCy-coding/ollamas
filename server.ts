@@ -370,6 +370,7 @@ async function initializeServer() {
         db: "up",
         backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
         fleet: buildFleetView(readPool(), host),
+        updatedAt: Date.now(), // freshness stamp → cockpit shows LIVE vs polling-fallback
       };
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
       tick++;

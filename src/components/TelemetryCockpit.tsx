@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { HealthTelemetry } from "../types";
-import { Cpu, Zap, Server, Radio } from "lucide-react";
+import { Cpu, Zap, Server, Radio, RotateCw } from "lucide-react";
 import { Skeleton } from "./Skeleton";
 import { Sparkline } from "./Sparkline";
 
@@ -43,6 +43,8 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
   }
 
   const { mode, metrics, os: osInfo, workspacePath, permissions, backend, fleet } = telemetry;
+  // LIVE when the last frame carries a fresh SSE timestamp; POLLING on /api/health fallback.
+  const streamLive = typeof telemetry.updatedAt === "number" && Date.now() - telemetry.updatedAt < 6000;
   
   // Choose badge color
   const badgeColors = {
@@ -93,9 +95,21 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
       <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded shadow-lg">
         <div className="flex justify-between items-center mb-3">
           <span className="text-[10px] text-immersive-text-dim font-mono tracking-widest uppercase">Compute Load</span>
-          <div className="flex items-center gap-1.5 text-[10px] text-immersive-text-muted font-mono">
-            <Cpu className="w-3.5 h-3.5 text-status-accent" />
-            <span>Dual Core Polling</span>
+          <div className="flex items-center gap-2 text-[10px] font-mono">
+            {/* live SSE freshness vs poll-fallback — replaces the stale "polling" label */}
+            <span className="flex items-center gap-1" title={streamLive ? "Live SSE stream" : "Polling fallback"}>
+              <span className={`w-1.5 h-1.5 rounded-full ${streamLive ? "bg-status-ok animate-pulse" : "bg-status-warn"}`} />
+              <span className={streamLive ? "text-status-ok" : "text-status-warn"}>{streamLive ? "LIVE" : "POLLING"}</span>
+            </span>
+            <button
+              type="button"
+              onClick={onRefresh}
+              aria-label="Re-sync telemetry"
+              title="Re-sync telemetry"
+              className="text-immersive-text-dim hover:text-immersive-text-bright transition-colors"
+            >
+              <RotateCw className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
