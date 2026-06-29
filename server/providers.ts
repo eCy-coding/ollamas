@@ -1,5 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join as pathJoin } from "node:path";
+import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
+import { generateViaGeminiCli } from "./gemini-cli";
 
 // Types
 export interface ProviderMessage {
@@ -265,8 +270,9 @@ export class ProviderRouter {
       if (ProviderRouter.shouldSkipDemoFallback(prov, config.provider)) {
         continue;
       }
-      // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode
-      if (prov !== "ollama-local" && prov !== "demo" && !this.hasKey(prov)) {
+      // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode.
+      // gemini-cli is KEYLESS (the external `gemini` binary carries its own Google auth) → never key-gated.
+      if (prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && !this.hasKey(prov)) {
         continue;
       }
 
@@ -274,7 +280,7 @@ export class ProviderRouter {
       // quota (429) or auth (401) failure, cool the spent key and retry the SAME
       // provider with the next live key before falling through the provider chain.
       // (Rotation across user keys only — the system never auto-acquires new keys.)
-      const cloudKeyed = prov !== "ollama-local" && prov !== "demo";
+      const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli";
       const attempts = cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1;
       let provErr: any = null;
       let rotated = false;
@@ -339,8 +345,44 @@ export class ProviderRouter {
   /**
    * Determine fallback chain based on selected initial provider
    */
+  // --- Fleet-aware routing (server/providers.ts darboğaz fix: boş Windows CUDA'yı kullan) ---
+  private static fleetProbeCache: { at: number; probes: BackendProbe[] } | null = null;
+
+  private static loadFleetPool(): Backend[] {
+    try {
+      const raw = JSON.parse(readFileSync(pathJoin(homedir(), ".ollamas", "backends.json"), "utf8"));
+      return parseBackendPool(raw);
+    } catch { return []; }
+  }
+
+  // Hafif /api/tags probe (reachability + model listesi), per-request hız için ~8s cache'li.
+  private static async probeFleet(pool: Backend[]): Promise<BackendProbe[]> {
+    const now = Date.now();
+    if (this.fleetProbeCache && now - this.fleetProbeCache.at < 8000) return this.fleetProbeCache.probes;
+    const probes = await Promise.all(pool.map(async (b): Promise<BackendProbe> => {
+      try {
+        const res = await fetch(`${b.url}/api/tags`, { signal: AbortSignal.timeout(1500) });
+        if (!res.ok) return { url: b.url, reachable: false, models: [] };
+        const j: any = await res.json();
+        const models = Array.isArray(j?.models) ? j.models.map((m: any) => m.name).filter(Boolean) : [];
+        return { url: b.url, reachable: true, models };
+      } catch { return { url: b.url, reachable: false, models: [] }; }
+    }));
+    this.fleetProbeCache = { at: now, probes };
+    return probes;
+  }
+
+  // Gerekli modeli sunan en düşük-öncelikli erişilebilir backend (Windows 10 → Mac 99). Yoksa null.
+  // Test için pool/probes override edilebilir (saf karar).
+  public static async selectFleetBackend(model: string, poolOverride?: Backend[], probesOverride?: BackendProbe[]): Promise<Backend | null> {
+    const pool = poolOverride ?? this.loadFleetPool();
+    if (!pool.length) return null;
+    const probes = probesOverride ?? await this.probeFleet(pool);
+    return selectBackend(pool, probes, { required: [model] });
+  }
+
   private static getFallbackChain(initial: string): string[] {
-    const defaults = ["ollama-local", "openrouter", "gemini", "openai", "ollama-cloud", "demo"];
+    const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "openai", "ollama-cloud", "demo"];
     const index = defaults.indexOf(initial);
     if (index === -1) {
       return [initial, ...defaults];
@@ -451,6 +493,20 @@ export class ProviderRouter {
     const nonSystemMessages = msgs.filter((m) => m.role !== "system");
 
     switch (config.provider) {
+      case "fleet": {
+        // Fleet-aware routing: rutin modeli (qwen3:8b) BOŞ Windows CUDA worker'a kaydır, Mac'i
+        // ağır/orkestrasyona ayır. Uygun uzak backend yoksa Mac-local'e düşer → asla daha kötü değil.
+        const fModel = config.model || "qwen3:8b";
+        const backend = await ProviderRouter.selectFleetBackend(fModel);
+        if (!backend) {
+          return this.executeProvider({ ...config, provider: "ollama-local" }, onStreamChunk, signal);
+        }
+        const sub: GenerateConfig = { ...config, provider: "ollama-local" };
+        (sub as any)._ollamaHost = backend.url;
+        const fr = await this.executeProvider(sub, onStreamChunk, signal);
+        return { ...fr, source: `fleet:${backend.name}` };
+      }
+
       case "ollama-local": {
         const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
         // The model actually used. After a provider fallback config.model is nulled
@@ -481,10 +537,11 @@ export class ProviderRouter {
         // a connection-level failure (DNS/refused) advances to the next candidate so
         // the SAME .env works in both docker and `npm run dev` (no manual edit).
         const ollamaHosts = [...new Set([
+          (config as any)._ollamaHost,
           process.env.OLLAMA_HOST || "http://localhost:11434",
           "http://localhost:11434",
           "http://127.0.0.1:11434",
-        ])];
+        ].filter(Boolean) as string[])];
         const genStart = Date.now(); // wall-clock fallback for tok/s when ollama omits eval_duration
         let response: Response | undefined;
         let connErr: any = null;
@@ -992,6 +1049,14 @@ export class ProviderRouter {
             toolCalls: toolCalls?.length ? toolCalls : undefined
           };
         }
+      }
+
+      case "gemini-cli": {
+        // Concurrent backend: drive the external Google Gemini CLI as a subprocess. It runs
+        // its OWN agent loop (tools + Google grounding) and returns the final text → no
+        // tool_calls, so the ollamas ReAct loop treats this as a final reply and halts.
+        const r = await generateViaGeminiCli(msgs, config.model || undefined, signal);
+        return { text: r.text, source: "gemini-cli", modelUsed: r.modelUsed, tokens: undefined, tokensPerSec: undefined };
       }
 
       case "demo":

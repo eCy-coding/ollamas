@@ -14,6 +14,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
+import { geminiCliAvailable } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
 import { FilesystemManager } from "./server/files";
@@ -559,6 +560,12 @@ async function initializeServer() {
           return res.json(names);
         }
         return res.json(["google/gemini-2.5-flash-lite:free", "meta-llama/llama-3-8b-instruct:free"]);
+      }
+
+      if (prov === "gemini-cli") {
+        // Keyless local backend: the external `gemini` binary carries its own Google auth.
+        const ok = await geminiCliAvailable();
+        return res.json(ok ? ["gemini-3-pro", "gemini-3-flash"] : ["gemini CLI not installed — npm i -g @google/gemini-cli"]);
       }
 
       if (prov === "gemini") {
