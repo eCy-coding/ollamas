@@ -74,7 +74,10 @@ export async function generateViaGeminiCli(
   let result: { code: number | null; stdout: string; stderr: string };
   try {
     result = await new Promise((resolve) => {
-      const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+      // GEMINI_CLI_TRUST_WORKSPACE: gemini-cli v0.49+ refuses headless runs in an "untrusted"
+      // directory unless this is set → required for non-interactive automation.
+      const env = { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: process.env.GEMINI_CLI_TRUST_WORKSPACE || "true" };
+      const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
       let out = ""; let err = "";
       const onAbort = () => child.kill("SIGKILL");
       signal?.addEventListener("abort", onAbort, { once: true });

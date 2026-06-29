@@ -135,8 +135,12 @@ export function spawnGemini(
 ): Promise<GeminiResult> {
   const args = buildGeminiArgs(opts);
   return new Promise((resolve) => {
+    // gemini-cli v0.49+ blocks headless runs in an "untrusted" directory unless
+    // GEMINI_CLI_TRUST_WORKSPACE is set → required for non-interactive automation.
+    const baseEnv = io.env ?? process.env;
+    const env = { ...baseEnv, GEMINI_CLI_TRUST_WORKSPACE: baseEnv.GEMINI_CLI_TRUST_WORKSPACE || "true" };
     const child = spawn(io.bin ?? "gemini", args, {
-      env: io.env ?? process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
