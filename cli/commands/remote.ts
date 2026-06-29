@@ -568,6 +568,12 @@ export function inferTaskKind(prompt: string): TaskKind {
   return "codegen";
 }
 
+/** Workers that are LOCAL providers (run on the local gateway with this provider override,
+ *  not a remote host). Returns the provider id, or null for a normal host/mac worker. Pure. */
+export function localProviderForWorker(wname: string): string | null {
+  return wname === "gemini-cli" ? "gemini-cli" : null;
+}
+
 /** Fleet workers = pool backends (remote) + the mac control plane (+ the gemini-cli backend
  *  when its binary is present). Pure. */
 export function buildWorkers(pool: Backend[], macHealthy = true, geminiHealthy = false): FleetWorker[] {
@@ -644,8 +650,13 @@ async function runDispatch(args: string[]): Promise<number> {
       const wname = assignment.worker;
       ledger.push({ ts: Date.now(), taskId: rt.id, worker: wname, status: "claimed", ttlMs: 1_200_000, fence: fence++ });
       try {
+        const localProvider = localProviderForWorker(wname);
         if (wname === "mac") report = await client.dispatch("127.0.0.1", port, remoteTask);
-        else {
+        else if (localProvider) {
+          // Local-provider worker (e.g. gemini-cli): run on the LOCAL gateway with the
+          // provider overridden — it is a backend, not a remote host. Mirrors the mac branch.
+          report = await client.dispatch("127.0.0.1", port, { ...remoteTask, provider: localProvider });
+        } else {
           const b = pool.find((p) => p.name === wname);
           report = b ? await client.dispatchToBackend(b, remoteTask) : await client.dispatch(wname, port, remoteTask);
         }
