@@ -45,7 +45,7 @@ export default [
   {
     // apiClient is the choke-point; Google Drive hits an external API; SaaSAdmin
     // keeps a local token-scoped wrapper — all may use raw fetch by design.
-    files: ['src/lib/apiClient.ts', 'src/components/GoogleDriveBrowser.tsx', 'src/components/SaaSAdmin.tsx'],
+    files: ['src/lib/apiClient.ts', 'src/components/GoogleDriveBrowser.tsx', 'src/components/GoogleSheetsBrowser.tsx', 'src/components/SaaSAdmin.tsx'],
     rules: { 'no-restricted-globals': 'off' },
   },
 ];

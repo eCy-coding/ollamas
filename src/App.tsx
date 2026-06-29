@@ -7,6 +7,7 @@ import { MultiAgentPipeline } from "./components/MultiAgentPipeline";
 import { ReactAgentTab } from "./components/ReactAgentTab";
 import { WorkspaceTree } from "./components/WorkspaceTree";
 import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
+import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
 import { FileTransfer } from "./components/FileTransfer";
@@ -29,7 +30,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign,
+  MousePointer2, Building2, Lock, DollarSign, Sheet,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -86,6 +87,7 @@ export default function App() {
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     const startPolling = () => { if (!pollTimer) pollTimer = setInterval(() => fetchTelemetry(false), 5000); };
     try {
+      // eslint-disable-next-line no-restricted-globals -- native SSE for the cockpit stream (apiClient has no EventSource wrapper)
       es = new EventSource("/api/cockpit/stream");
       es.onmessage = (ev) => {
         try { setTelemetry(JSON.parse(ev.data) as HealthTelemetry); } catch { /* ignore malformed frame */ }
@@ -106,6 +108,7 @@ export default function App() {
     { id: "react-agent", icon: <Sparkles className="w-4 h-4 text-pink-400" /> },
     { id: "files", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
     { id: "drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
+    { id: "sheets", icon: <Sheet className="w-4 h-4 text-green-400" /> },
     { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
     { id: "keys", icon: <Key className="w-4 h-4 text-indigo-400" /> },
     { id: "security", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
@@ -303,6 +306,12 @@ export default function App() {
           {activeTab === "drive" && (
             <div className="animate-fade-in">
               <GoogleDriveBrowser />
+            </div>
+          )}
+
+          {activeTab === "sheets" && (
+            <div className="animate-fade-in">
+              <GoogleSheetsBrowser />
             </div>
           )}
 

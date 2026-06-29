@@ -42,6 +42,8 @@ const provider = new GoogleAuthProvider();
 // so listing still works if only the lighter scope is grantable.
 provider.addScope('https://www.googleapis.com/auth/drive');
 provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+// Sheets (#3) — same single sign-in grants this alongside Drive (one consent, one token).
+provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 // Force the consent screen every sign-in. Without prompt=consent Google can
 // silently re-grant a PRIOR sign-in's scopes (basic profile, no Drive) → the
 // token omits Drive → Drive API 403 "insufficient authentication scopes".

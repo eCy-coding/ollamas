@@ -9,6 +9,7 @@ export const messages: Record<string, string> = {
   'app.tab.react-agent': 'ReAct Specialist',
   'app.tab.files': 'Files Explorer',
   'app.tab.drive': 'Google Drive',
+  'app.tab.sheets': 'Google Sheets',
   'app.tab.terminal': 'Interactive CLI',
   'app.tab.keys': 'Hardware Vault',
   'app.tab.security': 'Guard Policies',
