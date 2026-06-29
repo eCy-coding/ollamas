@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { googleSignIn, logout, auth, clearAccessToken, isFirebaseConfigured } from '../lib/firebase.ts';
+import { googleSignIn, logout, auth, clearAccessToken, getAccessToken, isFirebaseConfigured } from '../lib/firebase.ts';
 import { User, onAuthStateChanged } from 'firebase/auth';
 
 export function useAuth() {
@@ -13,9 +13,16 @@ export function useAuth() {
   useEffect(() => {
     if (!auth) return;
     try {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         if (currentUser) {
           setUser(currentUser);
+          // Rehydrate a persisted Drive token (sessionStorage) so a page reload
+          // doesn't force re-sign-in. A stale token self-heals via the 401→resetAuth path.
+          const stored = await getAccessToken();
+          if (stored) {
+            setToken(stored);
+            setNeedsAuth(false);
+          }
         } else {
           setUser(null);
           setToken(null);

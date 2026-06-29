@@ -48,7 +48,23 @@ provider.addScope('https://www.googleapis.com/auth/drive.readonly');
 provider.setCustomParameters({ prompt: 'consent', include_granted_scopes: 'true' });
 
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+
+// Persist the Drive access token in sessionStorage (cleared on tab close) so a
+// page reload doesn't force a fresh sign-in. The Firebase session itself persists
+// via indexedDB, but the Google OAuth access token lives only in memory otherwise.
+const TOKEN_KEY = 'gdrive_access_token';
+const readStoredToken = (): string | null => {
+  try { return typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(TOKEN_KEY) : null; }
+  catch { return null; }
+};
+const writeStoredToken = (token: string | null): void => {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch { /* storage blocked (private mode) — in-memory token still works this session */ }
+};
+let cachedAccessToken: string | null = readStoredToken();
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -81,6 +97,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    writeStoredToken(cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Sign in error:', error);
@@ -98,9 +115,11 @@ export const getAccessToken = async (): Promise<string | null> => {
 // re-issues a fresh one. Lighter than logout(): keeps the Firebase session.
 export const clearAccessToken = (): void => {
   cachedAccessToken = null;
+  writeStoredToken(null);
 };
 
 export const logout = async () => {
   await auth.signOut();
   cachedAccessToken = null;
+  writeStoredToken(null);
 };
