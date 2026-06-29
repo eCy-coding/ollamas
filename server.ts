@@ -54,6 +54,7 @@ function logSeyir(entry: Record<string, any>) {
 // Extracted to ./server/host-bridge (v1.8) so the stdio entry point shares it.
 import { runOnHostTerminal, execOnHost, writeHostFile, HOST_TOOLS_DIR, shArg } from "./server/host-bridge";
 import { discoverBinaries } from "./server/artifacts";
+import { buildFleetView } from "./server/cockpit";
 
 // Injected host-side deps for the single tool choke-point (server/tool-registry.ts).
 const TOOL_DEPS: ToolDeps = {
@@ -314,6 +315,69 @@ async function initializeServer() {
       binaries: discoverBinaries(),
       db: dbUp ? "up" : "down",
     });
+  });
+
+  // 2026 cockpit: ONE live SSE stream pushes the full mission-control view (host
+  // metrics + active LLM backend + self-healing fleet) every 2s — push, not poll, so
+  // the dashboard stays live with a single connection. Runs on the shared :3000 (HTTP
+  // SSE, not the Vite WS) so it never flaps. Ollama is probed throttled (~6s) to avoid
+  // load; system metrics are instant each tick.
+  app.get("/api/cockpit/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    (res as any).flushHeaders?.();
+
+    const ollamaHostNow = () => process.env.OLLAMA_HOST || "http://localhost:11434";
+    const ollama = { version: "unavailable", loadedModels: [] as any[], reachable: false };
+    const readPool = (): unknown => {
+      try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), ".ollamas", "backends.json"), "utf8")); }
+      catch { return []; }
+    };
+    const probeOllama = async () => {
+      if (CURRENT_MODE === "demo") { ollama.reachable = false; return; }
+      const base = ollamaHostNow().replace(/\/+$/, "");
+      try {
+        const v = await fetch(`${base}/api/version`, { signal: AbortSignal.timeout(2500) });
+        ollama.reachable = v.ok;
+        if (v.ok) ollama.version = (await v.json().catch(() => ({})))?.version || "unknown";
+        const ps = await fetch(`${base}/api/ps`, { signal: AbortSignal.timeout(2500) });
+        if (ps.ok) ollama.loadedModels = (await ps.json().catch(() => ({})))?.models || [];
+      } catch { ollama.reachable = false; }
+    };
+
+    let tick = 0;
+    const push = async () => {
+      if (res.writableEnded) return;
+      if (tick % 3 === 0) await probeOllama(); // throttle ollama probe to ~6s
+      const cpu = os.loadavg();
+      const host = ollamaHostNow();
+      const payload = {
+        mode: CURRENT_MODE,
+        isLive: CURRENT_MODE === "live",
+        os: { platform: os.platform(), release: os.release(), arch: os.arch(), uptime: os.uptime() },
+        metrics: {
+          cpuLoad1Min: Number(cpu[0].toFixed(2)),
+          memory: { total: os.totalmem(), free: os.freemem(), percentageUsed: Number(((1 - os.freemem() / os.totalmem()) * 100).toFixed(1)) },
+          ollamaVersion: ollama.version,
+          loadedModels: ollama.loadedModels,
+        },
+        permissions: db.data.permissions,
+        workspacePath: db.data.workspacePath,
+        hasBackupEnabled: db.data.backup.enabled,
+        binaries: discoverBinaries(),
+        db: "up",
+        backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
+        fleet: buildFleetView(readPool(), host),
+      };
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      tick++;
+    };
+    void push();
+    const timer = setInterval(() => { void push(); }, 2000);
+    timer.unref?.();
+    req.on("close", () => clearInterval(timer));
   });
 
   /**

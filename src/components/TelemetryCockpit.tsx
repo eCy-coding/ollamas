@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { HealthTelemetry } from "../types";
-import { Cpu, HardDrive, ShieldAlert, Wifi, Zap } from "lucide-react";
+import { Cpu, Zap, Server, Radio } from "lucide-react";
 import { Skeleton } from "./Skeleton";
+import { Sparkline } from "./Sparkline";
 
 interface CockpitProps {
   telemetry: HealthTelemetry | null;
@@ -36,7 +37,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
     );
   }
 
-  const { mode, metrics, os: osInfo, workspacePath, permissions } = telemetry;
+  const { mode, metrics, os: osInfo, workspacePath, permissions, backend, fleet } = telemetry;
   
   // Choose badge color
   const badgeColors = {
@@ -51,7 +52,10 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
     demo: "DEMO · Simulated Sandbox Mode",
   };
 
+  const hostShort = backend ? backend.host.replace(/^https?:\/\//, "") : "";
+
   return (
+    <div className="space-y-4">
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* 1. Environment & Health */}
       <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded flex flex-col justify-between shadow-lg">
@@ -120,6 +124,14 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
               Free: {((metrics.memory.free) / 1024 / 1024 / 1024).toFixed(1)} GB / Total: {((metrics.memory.total) / 1024 / 1024 / 1024).toFixed(1)} GB
             </span>
           </div>
+
+          {/* Live CPU trend — fed from the SSE stream (was collected but never drawn) */}
+          <div className="pt-1">
+            <div className="flex justify-between text-[9px] text-immersive-text-dim font-mono uppercase tracking-widest mb-1">
+              <span>CPU Trend</span><span>live</span>
+            </div>
+            <Sparkline data={cpuHistory} width={320} height={28} ariaLabel="CPU load trend" className="w-full text-status-accent" />
+          </div>
         </div>
       </div>
 
@@ -166,6 +178,54 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
             <span className="text-[10px] text-immersive-text-dim font-mono italic">No local models currently loaded in memory</span>
           )}
         </div>
+      </div>
+    </div>
+
+      {/* Active Backend & self-healing Fleet — live SSE; reserved height keeps CLS=0 */}
+      <div className="bg-immersive-sidebar border border-immersive-border p-4 rounded shadow-lg min-h-[5.5rem]">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] text-immersive-text-dim font-mono tracking-widest uppercase flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5 text-status-accent" /> Active LLM Backend &amp; Fleet
+          </span>
+          {backend && (
+            <span className="flex items-center gap-1.5 text-[10px] font-mono">
+              <Radio className={`w-3 h-3 ${backend.reachable ? "text-status-ok animate-pulse" : "text-status-err"}`} />
+              <span className={backend.reachable ? "text-status-ok" : "text-status-err"}>{backend.reachable ? "ONLINE" : "UNREACHABLE"}</span>
+            </span>
+          )}
+        </div>
+        {backend ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-immersive-text-muted truncate" title={backend.host}>{hostShort}</span>
+              <span className="text-immersive-text-dim shrink-0 ml-2">
+                {backend.activeModel ? <span className="text-status-accent">{backend.activeModel}</span> : "no model loaded"}
+                {backend.version && backend.version !== "unavailable" ? <span className="text-immersive-text-dim"> · v{backend.version}</span> : null}
+              </span>
+            </div>
+            {fleet && fleet.poolSize > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {fleet.backends.map((b) => (
+                  <span
+                    key={b.url}
+                    title={`${b.url} · priority ${b.priority}`}
+                    className={`text-[9px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
+                      b.active
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-status-ok"
+                        : "bg-white/5 border-immersive-border text-immersive-text-muted"
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${b.active ? "bg-status-ok animate-pulse" : "bg-immersive-text-dim"}`} />
+                    {b.name}{b.active ? " · serving" : ""}
+                  </span>
+                ))}
+                <span className="text-[9px] font-mono text-immersive-text-dim self-center">self-healing · {fleet.poolSize} backend{fleet.poolSize > 1 ? "s" : ""}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-[10px] text-immersive-text-dim font-mono italic">Linking backend stream…</span>
+        )}
       </div>
     </div>
   );

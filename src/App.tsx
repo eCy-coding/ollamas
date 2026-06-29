@@ -79,9 +79,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchTelemetry(true);
-    const interval = setInterval(() => fetchTelemetry(false), 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
+    fetchTelemetry(true); // immediate paint
+    // 2026 cockpit: prefer the live SSE push (one connection, ~2s cadence, includes the
+    // active backend + fleet). Fall back to 5s polling if the stream errors/unsupported.
+    let es: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => { if (!pollTimer) pollTimer = setInterval(() => fetchTelemetry(false), 5000); };
+    try {
+      es = new EventSource("/api/cockpit/stream");
+      es.onmessage = (ev) => {
+        try { setTelemetry(JSON.parse(ev.data) as HealthTelemetry); } catch { /* ignore malformed frame */ }
+      };
+      es.onerror = () => { es?.close(); es = null; startPolling(); }; // degrade gracefully
+    } catch {
+      startPolling();
+    }
+    return () => { es?.close(); if (pollTimer) clearInterval(pollTimer); };
   }, []);
 
   // Tab labels resolve via i18n at render: `_(`app.tab.${id}`)` (vF9).

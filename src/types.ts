@@ -63,6 +63,9 @@ export interface HealthTelemetry {
     git: boolean;
   };
   hasBackupEnabled: boolean;
+  // vCockpit (live SSE) — present on /api/cockpit/stream frames, absent on plain /api/health.
+  backend?: { host: string; reachable: boolean; version: string; activeModel: string | null };
+  fleet?: { activeUrl: string; poolSize: number; backends: { name: string; url: string; priority: number; active: boolean }[] };
 }
 
 export interface FileItem {
