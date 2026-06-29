@@ -430,8 +430,12 @@ async function initializeServer() {
         backend: { host, reachable: ollama.reachable, version: ollama.version, activeModel: ollama.loadedModels[0]?.name ?? null },
         // Cloud LLM providers whose key is present (vault/env) → available as fleet/council
         // backends alongside the local Mac models. Lets the cockpit show "cloud: gemini ✓".
+        // ready reflects POOL LIVENESS (a non-cooled key), not mere key-presence, so the
+        // chip honestly tracks the KeyVault rotation pool: it flips ✓ the instant a fresh
+        // key joins and drops when the whole pool is quota-cooled. live/total mirror the
+        // KeyVault burn meter so both tabs agree.
         cloudProviders: ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
-          .map((p) => ({ name: p, ready: !!ProviderRouter.getDecryptedKey(p) })),
+          .map((p) => { const s = ProviderRouter.keyPoolStatus(p); return { name: p, ready: s.live > 0, live: s.live, total: s.total }; }),
         fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         models: {
@@ -478,7 +482,9 @@ async function initializeServer() {
       const isGeminiCli = model === "gemini-cli";
       const isGeminiCloud = model === "gemini";
       const gemCliOk = isGeminiCli ? await geminiCliAvailable().catch(() => false) : true;
-      const gemCloudOk = isGeminiCloud ? !!ProviderRouter.getDecryptedKey("gemini") : true;
+      // Require a LIVE (non-cooled) pool key, not mere key-presence: a fully quota-cooled
+      // pool → skip (unavailable) instead of a doomed 429 call; a fresh KeyVault key → attempt.
+      const gemCloudOk = isGeminiCloud ? ProviderRouter.keyPoolStatus("gemini").live > 0 : true;
       for (const task of tasks) {
         if (res.writableEnded) break;
         let correct = false, tokPerSec = 0, ms = 0, unavailable = false;

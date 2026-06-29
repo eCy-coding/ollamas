@@ -66,7 +66,7 @@ export interface HealthTelemetry {
   // vCockpit (live SSE) — present on /api/cockpit/stream frames, absent on plain /api/health.
   backend?: { host: string; reachable: boolean; version: string; activeModel: string | null };
   fleet?: { activeUrl: string; poolSize: number; backends: { name: string; url: string; priority: number; active: boolean }[] };
-  cloudProviders?: { name: string; ready: boolean }[]; // cloud LLM providers with a key present (fleet/council backends)
+  cloudProviders?: { name: string; ready: boolean; live?: number; total?: number }[]; // cloud LLM providers; ready = a live (non-cooled) pool key exists; live/total = rotation-pool health
   updatedAt?: number; // SSE frame timestamp; absent on /api/health poll fallback
   realtime?: {
     cores: number[]; // per-core CPU % (live deltas)
