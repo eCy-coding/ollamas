@@ -27,6 +27,10 @@ const GEMINI_DEFAULT_MODEL = "gemini-3.5-flash";
 // fallback for code tasks when Gemini is unavailable.
 export const LOCAL_CODER_HINT = "coder";
 
+// Benchmarked Mac champion (qwen3:8b ≈ 82 tok/s, resident). On MAX_LOADED_MODELS=1 a raw
+// /api/tags-order default can land on a 70B that contends → 0 tok/s; prefer the champion.
+export const MAC_MODEL_CHAMPION = process.env.MAC_MODEL_CHAMPION || "qwen3:8b";
+
 // Default-model resolution is cached briefly so back-to-back calls don't hammer
 // /api/tags on every request.
 let defaultModelCache: { model: string; at: number } | null = null;
@@ -68,8 +72,11 @@ export async function resolveDefaultModel(): Promise<string> {
   }
   const models = await listModels();
   if (!models.length) throw new Error("no local ollama model available");
-  defaultModelCache = { model: models[0], at: Date.now() };
-  return models[0];
+  // T1.4 (vNext): default to the benchmarked champion when installed, else first tag.
+  // Avoids silently defaulting to a big contending model (0 tok/s) on the single-GPU Mac.
+  const chosen = models.includes(MAC_MODEL_CHAMPION) ? MAC_MODEL_CHAMPION : models[0];
+  defaultModelCache = { model: chosen, at: Date.now() };
+  return chosen;
 }
 
 /** Resolve {provider, model} from opts: explicit wins, else provider-aware default. */
