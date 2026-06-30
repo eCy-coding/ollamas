@@ -17,6 +17,8 @@ import { ProviderRouter, repairJson, getToolArgError } from "./server/providers"
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
+import { parseRepoSlug } from "./server/github";
+import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
@@ -130,6 +132,8 @@ app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 // UKP inbound stage-events: raw body required for HMAC signature verification
 // (same reason as Stripe — must be registered before the global JSON parser).
 app.use("/api/ingest/stage-events", express.raw({ type: "*/*" }));
+// GitHub App webhook: raw body required to verify the HMAC-SHA256 signature (X-Hub-Signature-256).
+app.use("/api/github/webhook", express.raw({ type: "*/*" }));
 // Binary file upload: capture the raw body (any content type) as a Buffer BEFORE the
 // 50mb JSON parser — otherwise express.json swallows the stream and the byte payload
 // is lost. 1gb cap; binary-safe round-trip via FilesystemManager.writeFileBuffer.
@@ -184,6 +188,49 @@ app.post("/api/revenue/audit", async (req, res) => {
     if (result.ok) void notify(`✅ ollamas audit complete: ${result.findings ?? 0} finding(s)${url ? ` → ${url}` : result.reportPath ? ` → ${result.reportPath}` : ""}`, db.data.notify);
     res.json({ ...result, github });
   } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
+});
+
+// GitHub App — Checks API (per-PR pass/fail). Post a Check run on a commit SHA. Graceful skip
+// when the App creds (App id / private key / installation id) are not yet in the vault.
+app.post("/api/revenue/check", async (req, res) => {
+  try {
+    const slug = parseRepoSlug(String(req.body?.githubRepo || ""));
+    const headSha = String(req.body?.headSha || "");
+    if (!slug || !headSha) return res.json({ ok: false, skipped: true, reason: "githubRepo (owner/name) + headSha required" });
+    const creds = getAppCreds();
+    if (!creds) return res.json({ ok: false, skipped: true, reason: "no GitHub App in vault — paste App id + private key + installation id (Checks API is App-only)" });
+    const tok = await getInstallationToken(creds, Math.floor(Date.now() / 1000));
+    if (!tok.ok) return res.json({ ok: false, reason: tok.error });
+    const conclusion = req.body?.conclusion === "failure" ? "failure" : req.body?.conclusion === "neutral" ? "neutral" : "success";
+    const r = await createCheckRun(slug.owner, slug.repo, tok.token!, {
+      headSha, conclusion,
+      title: String(req.body?.title || "ollamas audit"),
+      summary: String(req.body?.summary || "Audit completed by ollamas."),
+    });
+    res.json(r.ok ? { ok: true, checkUrl: r.url } : { ok: false, reason: r.error });
+  } catch (e) { res.status(500).json({ ok: false, reason: String((e as Error).message) }); }
+});
+
+// GitHub App webhook receiver (raw body verified above). On a pull_request open/sync, post a
+// Check run on the PR head SHA. HMAC-verified; 503 graceful when no App is configured.
+app.post("/api/github/webhook", async (req, res) => {
+  const creds = getAppCreds();
+  if (!creds || !creds.webhookSecret) return res.status(503).json({ ok: false, reason: "GitHub App webhook not configured" });
+  const raw: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+  if (!verifyWebhookSignature(creds.webhookSecret, raw, req.headers["x-hub-signature-256"] as string | undefined)) {
+    return res.status(401).json({ ok: false, reason: "bad signature" });
+  }
+  let event: { action?: string; repository?: { owner?: { login?: string }; name?: string }; pull_request?: { head?: { sha?: string } } } = {};
+  try { event = JSON.parse(raw.toString("utf8")); } catch { /* non-json */ }
+  res.json({ ok: true }); // ack fast; the Check posts asynchronously
+  const kind = req.headers["x-github-event"];
+  if (kind !== "pull_request" || !["opened", "synchronize", "reopened"].includes(event.action || "")) return;
+  const owner = event.repository?.owner?.login, repo = event.repository?.name, sha = event.pull_request?.head?.sha;
+  if (!owner || !repo || !sha) return;
+  try {
+    const tok = await getInstallationToken(creds, Math.floor(Date.now() / 1000));
+    if (tok.ok) await createCheckRun(owner, repo, tok.token!, { headSha: sha, conclusion: "neutral", title: "ollamas audit queued", summary: "ollamas received this PR; run the audit from the dashboard to publish findings." });
+  } catch { /* webhook is best-effort */ }
 });
 
 // Outbound alert sinks (Slack/Discord incoming webhooks). Local-owner config.

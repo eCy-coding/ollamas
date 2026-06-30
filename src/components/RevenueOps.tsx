@@ -17,6 +17,8 @@ export function RevenueOps({ onNotify }: Props) {
   const [ghRepo, setGhRepo] = useState("");
   const [ghToken, setGhToken] = useState("");
   const [ghDeliver, setGhDeliver] = useState<"issue" | "pr">("issue");
+  const [showApp, setShowApp] = useState(false);
+  const [ghApp, setGhApp] = useState({ id: "", key: "", installation: "", secret: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
@@ -96,6 +98,32 @@ export function RevenueOps({ onNotify }: Props) {
               </button>
             </div>
           </div>
+
+          {/* GitHub App (Checks API / per-PR CI tier — App-only). Collapsed by default. */}
+          <button className="text-[11px] text-slate-500 hover:text-slate-300 mt-0.5" onClick={() => setShowApp((s) => !s)}>
+            {showApp ? "▾" : "▸"} GitHub App (Checks / CI tier)
+          </button>
+          {showApp && (
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              <input className={input} placeholder="App id" value={ghApp.id} onChange={(e) => setGhApp({ ...ghApp, id: e.target.value })} />
+              <input className={input} placeholder="Installation id" value={ghApp.installation} onChange={(e) => setGhApp({ ...ghApp, installation: e.target.value })} />
+              <input className={input} type="password" placeholder="Webhook secret" value={ghApp.secret} onChange={(e) => setGhApp({ ...ghApp, secret: e.target.value })} />
+              <textarea className={`${input} col-span-2 font-mono text-[11px]`} rows={3} placeholder="App private key (PEM)" value={ghApp.key} onChange={(e) => setGhApp({ ...ghApp, key: e.target.value })} />
+              <button className={`${btn} bg-slate-600 hover:bg-slate-500 text-white col-span-2`} disabled={!ghApp.id || !ghApp.key || !ghApp.installation}
+                onClick={async () => {
+                  try {
+                    await api.post("/api/keys", { provider: "github-app-id", key: ghApp.id });
+                    await api.post("/api/keys", { provider: "github-app-key", key: ghApp.key });
+                    await api.post("/api/keys", { provider: "github-app-installation", key: ghApp.installation });
+                    if (ghApp.secret) await api.post("/api/keys", { provider: "github-webhook-secret", key: ghApp.secret });
+                    setGhApp({ id: "", key: "", installation: "", secret: "" });
+                    onNotify("GitHub App creds saved to the encrypted vault — Checks API enabled", "success");
+                  } catch (e) { err(e); }
+                }}>
+                Save App creds (enables per-PR Checks)
+              </button>
+            </div>
+          )}
         </div>
 
         <button className={`${btn} bg-amber-600 hover:bg-amber-500 text-white`} disabled={!!busy || !auditRepo}
