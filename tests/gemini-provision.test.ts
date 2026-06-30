@@ -1,5 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { parseProjectIds, keyAddUrl, redactKeys, summarize, newProjectId, extractGcloudError } from "../scripts/gemini-provision.mjs";
+import { parseProjectIds, keyAddUrl, redactKeys, summarize, newProjectId, extractGcloudError, gcloudArgsFor, parseAccounts, isProjectQuota } from "../scripts/gemini-provision.mjs";
+
+describe("gemini-provision multi-account helpers", () => {
+  it("gcloudArgsFor prepends --account only when given", () => {
+    expect(gcloudArgsFor("a@b.com", ["projects", "list"])).toEqual(["--account", "a@b.com", "projects", "list"]);
+    expect(gcloudArgsFor("", ["projects", "list"])).toEqual(["projects", "list"]);
+  });
+  it("parseAccounts keeps email lines only", () => {
+    expect(parseAccounts("a@b.com\n ACTIVE \n\nc@d.com\n")).toEqual(["a@b.com", "c@d.com"]);
+    expect(parseAccounts("")).toEqual([]);
+  });
+  it("isProjectQuota detects the GCP project-create cap, not normal errors", () => {
+    expect(isProjectQuota("exceeded your allotted project quota")).toBe(true);
+    expect(isProjectQuota("ERROR: Cloud Resource Manager quota exceeded")).toBe(true);
+    expect(isProjectQuota("PERMISSION_DENIED: billing not enabled")).toBe(false);
+    expect(isProjectQuota("")).toBe(false);
+  });
+  it("summarize includes the account when present", () => {
+    expect(summarize([{ account: "a@b.com", project: "p1", status: "added" }])).toContain("a@b.com/p1: added");
+  });
+});
 
 describe("gemini-provision pure helpers", () => {
   it("parseProjectIds trims, drops blanks + a header line", () => {

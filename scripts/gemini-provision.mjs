@@ -54,23 +54,42 @@ export function newProjectId(i, rand) {
   return `ollamas-gem-${i}-${suffix}`.slice(0, 30).replace(/-+$/, "");
 }
 
+/** Pure: prepend `--account <email>` to a gcloud arg list when an account is given. */
+export function gcloudArgsFor(account, args) {
+  return account ? ["--account", account, ...args] : [...args];
+}
+
+/** Pure: parse `gcloud auth list --format=value(account)` → authed account emails. */
+export function parseAccounts(stdout) {
+  return String(stdout || "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.includes("@"));
+}
+
+/** Pure: is this gcloud failure the GCP per-account project-creation quota cap? */
+export function isProjectQuota(reason) {
+  return /allotted project quota|project quota|quota exceeded|cloud resource manager quota/i.test(String(reason || ""));
+}
+
 /** Human summary from per-project results. NEVER includes key values. */
 export function summarize(results) {
   const by = (s) => results.filter((r) => r.status === s).length;
   const added = by("added"), skipped = by("skipped"), failed = by("failed");
-  const lines = results.map((r) => `  ${r.status === "added" ? "✓" : r.status === "skipped" ? "·" : "✗"} ${r.project}: ${r.status}${r.reason ? ` (${r.reason})` : ""}`);
+  const lines = results.map((r) => `  ${r.status === "added" ? "✓" : r.status === "skipped" ? "·" : "✗"} ${r.account ? `${r.account}/` : ""}${r.project}: ${r.status}${r.reason ? ` (${r.reason})` : ""}`);
   return `Provisioned: ${added} added · ${skipped} skipped · ${failed} failed (of ${results.length})\n${lines.join("\n")}`;
 }
 
 // ── IO (only runs when invoked directly) ─────────────────────────────────────
 
-async function gcloud(args) {
+async function gcloud(args, account = "") {
   // execFile (no shell) → no injection; capture both streams; sanitize on throw.
   // --quiet: this runs non-interactively (execFile, no TTY); without it gcloud aborts on
   // any confirmation prompt (e.g. the projects-create operation poll) → "not in an
   // interactive session" failure. --quiet accepts default answers so the flow completes.
+  // --account targets a specific authed account (multi-account scale).
   try {
-    const { stdout } = await pexec("gcloud", ["--quiet", ...args], { maxBuffer: 8 * 1024 * 1024 });
+    const { stdout } = await pexec("gcloud", ["--quiet", ...gcloudArgsFor(account, args)], { maxBuffer: 8 * 1024 * 1024 });
     return { ok: true, stdout };
   } catch (e) {
     return { ok: false, reason: extractGcloudError(e?.stderr || e?.message || "gcloud failed") };
@@ -80,6 +99,12 @@ async function gcloud(args) {
 async function activeAccount() {
   const r = await gcloud(["auth", "list", "--filter=status:ACTIVE", "--format=value(account)"]);
   return r.ok ? r.stdout.trim().split("\n")[0] : "";
+}
+
+/** All authed gcloud accounts (for --all-accounts). */
+async function listAccounts() {
+  const r = await gcloud(["auth", "list", "--format=value(account)"]);
+  return r.ok ? parseAccounts(r.stdout) : [];
 }
 
 async function addToVault(gateway, key) {
@@ -101,79 +126,89 @@ async function poolStatus(gateway) {
   } catch { return null; }
 }
 
+// Provision every project of ONE account → vault. Returns {results, quotaHit}.
+async function provisionAccount(account, { gateway, limit, newProjects, dry }) {
+  console.log(`\n━━ account: ${account} ━━`);
+  const list = await gcloud(["projects", "list", "--format=value(projectId)"], account);
+  if (!list.ok) { console.error(`  could not list projects: ${list.reason}`); return { results: [], quotaHit: false }; }
+  let projects = parseProjectIds(list.stdout);
+  if (Number.isFinite(limit)) projects = projects.slice(0, limit);
+  console.log(`  projects (${projects.length}): ${projects.join(", ") || "(none)"}`);
+
+  const toCreate = Array.from({ length: newProjects }, (_, k) => newProjectId(k + 1, Math.random().toString(36).slice(2, 8)));
+  if (dry) {
+    if (newProjects > 0) console.log(`  [--dry] would CREATE ${newProjects} project(s): ${toCreate.join(", ")}`);
+    console.log(`  [--dry] would provision one 'ollamas-gemini' key per project (${projects.length + newProjects} total → ~${(projects.length + newProjects) * 20}/day). No changes.`);
+    return { results: [], quotaHit: false };
+  }
+
+  let quotaHit = false;
+  for (const id of toCreate) {
+    process.stdout.write(`  + creating project ${id}… `);
+    const c = await gcloud(["projects", "create", id, "--name=ollamas gemini"], account);
+    if (c.ok) { console.log("✓"); projects.push(id); }
+    else { if (isProjectQuota(c.reason)) quotaHit = true; console.log(`✗ (${c.reason})`); }
+  }
+
+  const results = [];
+  let i = 0;
+  for (const project of projects) {
+    i++;
+    process.stdout.write(`  [${i}/${projects.length}] ${project}: enabling APIs… `);
+    const en = await gcloud(["services", "enable", "generativelanguage.googleapis.com", "apikeys.googleapis.com", `--project=${project}`], account);
+    if (!en.ok) { console.log(`✗ enable failed (${en.reason})`); results.push({ account, project, status: "failed", reason: `enable: ${en.reason}` }); continue; }
+    const existing = await gcloud(["services", "api-keys", "list", "--filter=displayName:ollamas-gemini", `--project=${project}`, "--format=value(name)"], account);
+    if (existing.ok && existing.stdout.trim()) { console.log("· already provisioned (skip)"); results.push({ account, project, status: "skipped", reason: "ollamas-gemini key exists" }); continue; }
+    process.stdout.write("creating key… ");
+    const created = await gcloud(["services", "api-keys", "create", "--display-name=ollamas-gemini", `--project=${project}`, "--format=value(response.keyString)"], account);
+    if (!created.ok) { console.log(`✗ create failed (${created.reason})`); results.push({ account, project, status: "failed", reason: `create: ${created.reason}` }); continue; }
+    const key = created.stdout.trim();
+    if (!key) { console.log("✗ no keyString returned"); results.push({ account, project, status: "failed", reason: "no keyString returned" }); continue; }
+    try { await addToVault(gateway, key); console.log("→ added to vault ✓"); results.push({ account, project, status: "added" }); }
+    catch (e) { console.log("✗ vault add failed"); results.push({ account, project, status: "failed", reason: redactKeys(e?.message || "vault add failed") }); }
+  }
+  return { results, quotaHit };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const dry = args.includes("--dry");
+  const allAccounts = args.includes("--all-accounts");
   const limitArg = args.indexOf("--limit");
   const limit = limitArg >= 0 ? Number(args[limitArg + 1]) : Infinity;
   const gwArg = args.indexOf("--gateway");
   const gateway = gwArg >= 0 ? args[gwArg + 1] : "http://127.0.0.1:3000";
   const npArg = args.indexOf("--new-projects");
   const newProjects = npArg >= 0 ? Math.max(0, Number(args[npArg + 1]) || 0) : 0;
+  const acctArg = args.indexOf("--account");
+  const oneAccount = acctArg >= 0 ? args[acctArg + 1] : "";
 
-  const acct = await activeAccount();
-  if (!acct) {
-    console.error("No active gcloud account. Run:  gcloud auth login   then re-run this script.");
-    process.exit(0);
+  const authed = await listAccounts();
+  if (!authed.length) { console.error("No authed gcloud account. Run:  gcloud auth login   then re-run."); process.exit(0); }
+  // Which accounts to provision: --all-accounts (every authed) · --account <email> · else active.
+  const accounts = allAccounts ? authed : oneAccount ? [oneAccount] : [await activeAccount() || authed[0]];
+  console.log(`gcloud authed accounts: ${authed.join(", ")}\nprovisioning: ${accounts.join(", ")}`);
+
+  const all = [];
+  let quotaHit = false;
+  for (const acct of accounts) {
+    const r = await provisionAccount(acct, { gateway, limit, newProjects, dry });
+    all.push(...r.results);
+    quotaHit = quotaHit || r.quotaHit;
   }
-  console.log(`gcloud account: ${acct}`);
+  if (dry) return;
 
-  const list = await gcloud(["projects", "list", "--format=value(projectId)"]);
-  if (!list.ok) { console.error(`Could not list projects: ${list.reason}`); process.exit(1); }
-  let projects = parseProjectIds(list.stdout);
-  if (Number.isFinite(limit)) projects = projects.slice(0, limit);
-  console.log(`Projects (${projects.length}): ${projects.join(", ")}`);
-
-  // --new-projects N: GCP project ids to create (each = +20/day free-tier quota).
-  const toCreate = Array.from({ length: newProjects }, (_, k) =>
-    newProjectId(k + 1, Math.random().toString(36).slice(2, 8)));
-
-  if (dry) {
-    if (newProjects > 0) console.log(`[--dry] Would CREATE ${newProjects} new project(s): ${toCreate.join(", ")} (+~${newProjects * 20}/day).`);
-    console.log(`[--dry] Would create one 'ollamas-gemini' key per project (${projects.length + newProjects} total → ~${(projects.length + newProjects) * 20}/day) and load each into the vault. No changes made.`);
-    return;
+  console.log(`\n${summarize(all)}`);
+  if (quotaHit) {
+    const others = authed.filter((a) => !accounts.includes(a));
+    console.log(`\n⚠ GCP project quota reached (~12/account). Scale options:`);
+    if (others.length) console.log(`  · provision another authed account:  npm run gemini:provision -- --account ${others[0]}`);
+    console.log(`  · provision ALL your accounts:        npm run gemini:provision -- --all-accounts`);
+    console.log(`  · request a project-quota increase:   https://console.cloud.google.com/iam-admin/quotas (filter 'Project')`);
   }
-
-  // Create the new projects first (graceful per-item), then provision keys on all.
-  for (const id of toCreate) {
-    process.stdout.write(`  + creating project ${id}… `);
-    const c = await gcloud(["projects", "create", id, "--name=ollamas gemini"]);
-    if (c.ok) { console.log("✓"); projects.push(id); }
-    else console.log(`✗ (${c.reason}) — GCP project-create quota or billing may be required`);
-  }
-
-  const results = [];
-  // Per-project live progress so a multi-minute run (each gcloud enable is 30-60s) never
-  // looks hung. Each line ends with the outcome; key VALUES are never printed.
-  const note = (s) => process.stdout.write(s);
-  let i = 0;
-  for (const project of projects) {
-    i++;
-    note(`  [${i}/${projects.length}] ${project}: enabling APIs… `);
-    const en = await gcloud(["services", "enable", "generativelanguage.googleapis.com", "apikeys.googleapis.com", `--project=${project}`]);
-    if (!en.ok) { console.log(`✗ enable failed (${en.reason})`); results.push({ project, status: "failed", reason: `enable: ${en.reason}` }); continue; }
-    // Idempotent: reuse an existing ollamas-gemini key (the vault dedups; skip create → no GCP key sprawl on re-runs).
-    const existing = await gcloud(["services", "api-keys", "list", "--filter=displayName:ollamas-gemini", `--project=${project}`, "--format=value(name)"]);
-    if (existing.ok && existing.stdout.trim()) { console.log("· already provisioned (skip)"); results.push({ project, status: "skipped", reason: "ollamas-gemini key exists" }); continue; }
-    note("creating key… ");
-    const created = await gcloud(["services", "api-keys", "create", "--display-name=ollamas-gemini", `--project=${project}`, "--format=value(response.keyString)"]);
-    if (!created.ok) { console.log(`✗ create failed (${created.reason})`); results.push({ project, status: "failed", reason: `create: ${created.reason}` }); continue; }
-    const key = created.stdout.trim(); // secret — used immediately, never logged
-    if (!key) { console.log("✗ no keyString returned"); results.push({ project, status: "failed", reason: "no keyString returned" }); continue; }
-    try {
-      await addToVault(gateway, key);
-      console.log("→ added to vault ✓");
-      results.push({ project, status: "added" });
-    } catch (e) {
-      console.log(`✗ vault add failed`);
-      results.push({ project, status: "failed", reason: redactKeys(e?.message || "vault add failed") });
-    }
-  }
-
-  console.log(`\n${summarize(results)}`);
   const pool = await poolStatus(gateway);
   if (pool) console.log(`\nGemini vault pool now: total ${pool.total} · live ${pool.live}`);
-  console.log("\nRotation auto-uses a live key; on 429 it cools that key + rotates. Re-run after adding GCP projects.");
+  console.log("\nRotation auto-uses a live key; on 429 it cools that key + rotates.");
 }
 
 // Only run main when invoked as a script (not when imported by tests).
