@@ -93,8 +93,9 @@ export async function generateViaGeminiCli(
       const onAbort = () => child.kill("SIGKILL");
       signal?.addEventListener("abort", onAbort, { once: true });
       // Wall-clock backstop: a hung gemini (OAuth/network stall) must not block the request
-      // forever — kill after 30s so the provider chain fails over.
-      const killTimer = setTimeout(() => child.kill("SIGKILL"), 30_000);
+      // forever — kill after GEMINI_CLI_TIMEOUT_MS (default 30s; raise to match a longer
+      // dispatch budget so a valid slow grounded run isn't SIGKILLed early — vNext T1.2).
+      const killTimer = setTimeout(() => child.kill("SIGKILL"), Number(process.env.GEMINI_CLI_TIMEOUT_MS) || 30_000);
       child.stdout.on("data", (d) => { out += String(d); });
       child.stderr.on("data", (d) => { err += String(d); });
       const done = (r: { code: number | null; stdout: string; stderr: string }) => { clearTimeout(killTimer); signal?.removeEventListener("abort", onAbort); resolve(r); };

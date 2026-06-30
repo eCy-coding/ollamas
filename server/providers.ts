@@ -224,10 +224,10 @@ interface LatencyEntry {
 }
 const latencyCache: Record<string, LatencyEntry> = {};
 
-// Compose caller-supplied cancellation with the 300s provider timeout.
-// When no caller signal is given the plain timeout is preserved unchanged.
-function buildSignal(callerSignal?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(300000);
+// Compose caller-supplied cancellation with the provider timeout (default 300s,
+// overridable via PROVIDER_TIMEOUT_MS — vNext T1.3, no hardcode). Caller signal preserved.
+function buildSignal(callerSignal?: AbortSignal, timeoutMs = Number(process.env.PROVIDER_TIMEOUT_MS) || 300000): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
   return callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
 }
 
