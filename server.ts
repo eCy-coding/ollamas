@@ -161,7 +161,7 @@ app.use(
   [
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
-    "/api/agent", "/api/keys", "/api/models", "/api/revenue",
+    "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
   ],
   localOwnerGuard,
 );
@@ -923,6 +923,12 @@ async function initializeServer() {
       return res.status(400).json({ error: "messages (non-empty array) required; use POST /api/ai/generate for a single prompt string" });
     }
 
+    // Abort the in-flight provider chain when the client disconnects (mirrors the ReAct
+    // loop): a slow/hung upstream (e.g. gemini-cli) no longer pins resources after the
+    // caller has gone away. The signal is threaded as the 4th arg of ProviderRouter.generate.
+    const ctrl = new AbortController();
+    res.on("close", () => ctrl.abort());
+
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -933,7 +939,9 @@ async function initializeServer() {
           { provider, model, messages, temperature, stream: true },
           (chunk) => {
             res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-          }
+          },
+          undefined,
+          ctrl.signal,
         );
         res.write(`data: ${JSON.stringify({ done: true, source: result.source, latencyMs: result.latencyMs })}\n\n`);
         res.end();
@@ -943,13 +951,12 @@ async function initializeServer() {
       }
     } else {
       try {
-        const result = await ProviderRouter.generate({
-          provider,
-          model,
-          messages,
-          temperature,
-          stream: false,
-        });
+        const result = await ProviderRouter.generate(
+          { provider, model, messages, temperature, stream: false },
+          undefined,
+          undefined,
+          ctrl.signal,
+        );
         res.json(result);
       } catch (err: any) {
         res.status(500).json({ error: err?.message || "Execution engine failure" });
