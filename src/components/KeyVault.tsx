@@ -12,6 +12,7 @@ const KEY_PAGE: Record<string, string> = {
   openai: "https://platform.openai.com/api-keys",
   anthropic: "https://console.anthropic.com/settings/keys",
   openrouter: "https://openrouter.ai/keys",
+  "ollama-cloud": "https://ollama.com/settings/keys",
 };
 
 interface PoolEntry { total: number; live: number; worstPct: number; allApproaching: boolean }
@@ -193,6 +194,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     { id: "anthropic", label: "Anthropic Claude", placeholder: "Key: ANTHROPIC_API_KEY", desc: "Native Claude 3 / 3.5 messaging protocols" },
     { id: "openai", label: "OpenAI GPT", placeholder: "Key: OPENAI_API_KEY", desc: "Native GPT chat completions access" },
     { id: "openrouter", label: "OpenRouter.ai", placeholder: "Key: OPENROUTER_API_KEY", desc: "Aggregated cloud providers; filterable to FREE models" },
+    { id: "ollama-cloud", label: "Ollama Cloud", placeholder: "Key: OLLAMA_CLOUD_KEY", desc: "ollama.com cloud models — guided: Key ↗ opens ollama.com/settings/keys" },
     { id: "custom-openai", label: "Custom OpenAI compatible", placeholder: "Bearer token", desc: "Connect local wrappers, LM Studio, or vLLM hosts" },
   ];
 
