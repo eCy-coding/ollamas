@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db";
-import { buildIssueBody, createIssue, parseRepoSlug, type Finding } from "./github";
+import { buildIssueBody, createIssue, parseRepoSlug, getDefaultBranch, createBranch, putFile, createPullRequest, auditBranchName, type Finding } from "./github";
 
 const pexec = promisify(execFile);
 const REPO_ROOT = process.cwd(); // server is launched from the repo root
@@ -89,6 +89,46 @@ export async function publishAuditToGitHub(input: { repo: string; githubRepo?: s
   const r = await createIssue({ owner: slug.owner, repo: slug.repo, title, body, token });
   if (!r.ok) return { published: false, reason: r.error };
   return { published: true, issueUrl: r.data?.html_url };
+}
+
+/** Read the findings.json the audit wrote for a given repo path (empty on any failure). */
+function readFindings(repo: string): { name: string; findings: Finding[] } {
+  const name = path.basename(path.resolve(repo));
+  let findings: Finding[] = [];
+  try { findings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "audit-out", name, "findings.json"), "utf8")).findings || []; } catch { /* none */ }
+  return { name, findings };
+}
+
+/** Deliver the audit as a PULL REQUEST (the Fix-PR tier): zero-clone — create a branch off the
+ *  default branch, commit AUDIT-FINDINGS.md via the Contents API, open a PR. Graceful skip when
+ *  the repo/token is absent; honest on every GitHub 4xx (422 branch-exists → retry with a suffix). */
+export async function publishAuditPR(input: { repo: string; githubRepo?: string; model?: string }): Promise<{
+  published: boolean; prUrl?: string; skipped?: boolean; reason?: string;
+}> {
+  const slug = input.githubRepo ? parseRepoSlug(input.githubRepo) : null;
+  if (!slug) return { published: false, skipped: true, reason: "no target githubRepo (owner/name) — findings kept local" };
+  const token = db.decrypt((db.data.keys || {})["github"] || "");
+  if (!token) return { published: false, skipped: true, reason: "no GitHub token in vault — paste a fine-grained PAT (contents:write + pull_requests:write)" };
+  const { owner, repo } = slug;
+  const { name, findings } = readFindings(input.repo);
+  const base = await getDefaultBranch(owner, repo, token);
+  if (!base.ok) return { published: false, reason: base.error };
+  const body = buildIssueBody(findings, { model: input.model });
+  // Try a unique branch (retry once with a numeric suffix if it already exists → 422).
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const branch = auditBranchName(name, attempt ? String(findings.length + attempt) : undefined);
+    const br = await createBranch(owner, repo, token, branch, base.data!.sha);
+    if (!br.ok) {
+      if (br.status === 422 && attempt < 2) continue; // branch exists → try a new name
+      return { published: false, reason: br.error };
+    }
+    const put = await putFile({ owner, repo, token, path: "AUDIT-FINDINGS.md", branch, message: `ollamas audit: ${findings.length} finding(s)`, content: body });
+    if (!put.ok) return { published: false, reason: put.error };
+    const pr = await createPullRequest({ owner, repo, token, title: `ollamas audit: ${findings.length} finding(s) — ${name}`, head: branch, base: base.data!.branch, body });
+    if (!pr.ok) return { published: false, reason: pr.error };
+    return { published: true, prUrl: pr.data?.html_url };
+  }
+  return { published: false, reason: "could not create a unique audit branch (all attempts taken)" };
 }
 
 /** Fill the storefront landing-page template from config. LOCAL artifact only — no deploy.

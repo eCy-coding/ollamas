@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildIssueBody, parseRepoSlug, type Finding } from "../server/github";
+import { buildIssueBody, parseRepoSlug, auditBranchName, toBase64, type Finding } from "../server/github";
 
 describe("github — buildIssueBody (pure, severity-sorted)", () => {
   const findings: Finding[] = [
@@ -43,5 +43,17 @@ describe("github — parseRepoSlug (pure, tolerant)", () => {
     expect(parseRepoSlug("nope")).toBeNull();
     expect(parseRepoSlug("")).toBeNull();
     expect(parseRepoSlug("  ")).toBeNull();
+  });
+});
+
+describe("github — PR helpers (pure)", () => {
+  it("auditBranchName slugifies + namespaces, with optional suffix", () => {
+    expect(auditBranchName("my repo!")).toBe("ollamas-audit/my-repo");
+    expect(auditBranchName("widgets", "2")).toBe("ollamas-audit/widgets-2");
+    expect(auditBranchName("")).toBe("ollamas-audit/audit");
+  });
+  it("toBase64 round-trips UTF-8", () => {
+    const s = "# audit\n- bug: déjà";
+    expect(Buffer.from(toBase64(s), "base64").toString("utf8")).toBe(s);
   });
 });

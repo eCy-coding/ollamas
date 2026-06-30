@@ -16,6 +16,7 @@ export function RevenueOps({ onNotify }: Props) {
   const [auditRepo, setAuditRepo] = useState("");
   const [ghRepo, setGhRepo] = useState("");
   const [ghToken, setGhToken] = useState("");
+  const [ghDeliver, setGhDeliver] = useState<"issue" | "pr">("issue");
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
@@ -74,7 +75,17 @@ export function RevenueOps({ onNotify }: Props) {
 
         {/* Optional: deliver the findings to a client repo as a GitHub Issue (the paid artifact) */}
         <div className="border-t border-slate-700 mt-2 pt-2">
-          <p className="text-[11px] text-slate-400 mb-1.5">GitHub delivery <span className="text-slate-500">(optional — posts findings as an Issue)</span></p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[11px] text-slate-400">GitHub delivery <span className="text-slate-500">(optional)</span></p>
+            <div className="flex gap-1 text-[11px]">
+              {(["issue", "pr"] as const).map((d) => (
+                <button key={d} onClick={() => setGhDeliver(d)}
+                  className={`px-2 py-0.5 rounded border ${ghDeliver === d ? "bg-amber-600/30 border-amber-500/40 text-amber-300" : "border-slate-700 text-slate-400 hover:bg-slate-700/40"}`}>
+                  {d === "issue" ? "Issue" : "Pull Request"}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <input className={input} placeholder="client repo (owner/name)" value={ghRepo} onChange={(e) => setGhRepo(e.target.value)} />
             <div className="flex gap-1.5">
@@ -88,21 +99,23 @@ export function RevenueOps({ onNotify }: Props) {
         </div>
 
         <button className={`${btn} bg-amber-600 hover:bg-amber-500 text-white`} disabled={!!busy || !auditRepo}
-          onClick={() => runOp("audit", "/api/revenue/audit", { repo: auditRepo, maxUnits: 6, githubRepo: ghRepo || undefined }, (r) => {
-            const gh = r.github as { issueUrl?: string; skipped?: boolean; reason?: string } | undefined;
-            if (gh?.issueUrl) return [`Audit done: ${r.findings ?? 0} findings → posted to GitHub`, "success"];
+          onClick={() => runOp("audit", "/api/revenue/audit", { repo: auditRepo, maxUnits: 6, githubRepo: ghRepo || undefined, deliver: ghDeliver }, (r) => {
+            const gh = r.github as { issueUrl?: string; prUrl?: string; reason?: string } | undefined;
+            const url = gh?.prUrl || gh?.issueUrl;
+            if (url) return [`Audit done: ${r.findings ?? 0} findings → posted to GitHub (${gh?.prUrl ? "PR" : "Issue"})`, "success"];
             if (gh?.reason) return [`Audit done: ${r.findings ?? 0} findings · GitHub: ${gh.reason}`, "info"];
             return [`Audit done: ${r.findings ?? 0} findings`, "info"];
           })}>
-          {busy === "audit" ? "Auditing…" : ghRepo ? "Run audit → post to GitHub" : "Run audit (capped 6 units)"}
+          {busy === "audit" ? "Auditing…" : ghRepo ? `Run audit → open ${ghDeliver === "pr" ? "PR" : "Issue"}` : "Run audit (capped 6 units)"}
         </button>
 
         {(() => {
-          const gh = result?.github as { issueUrl?: string } | undefined;
-          return gh?.issueUrl ? (
+          const gh = result?.github as { issueUrl?: string; prUrl?: string } | undefined;
+          const url = gh?.prUrl || gh?.issueUrl;
+          return url ? (
             <p className="mt-2 text-xs">
-              <a href={gh.issueUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
-                ↗ View the published audit issue
+              <a href={url} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+                ↗ View the published audit {gh?.prUrl ? "pull request" : "issue"}
               </a>
             </p>
           ) : null;

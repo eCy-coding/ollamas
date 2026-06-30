@@ -146,3 +146,47 @@ export function createIssue(args: {
     args.signal,
   );
 }
+
+// ── PR delivery (the Fix-PR tier) — zero-clone via the Contents/Git REST API ───────────────────
+
+/** Pure: a stable, filesystem-safe audit branch name. */
+export function auditBranchName(name: string, suffix?: string): string {
+  const slug = String(name || "audit").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "audit";
+  return `ollamas-audit/${slug}${suffix ? `-${suffix}` : ""}`;
+}
+
+/** Pure: UTF-8 → base64 (GitHub Contents API wants base64 file content). */
+export function toBase64(s: string): string {
+  return Buffer.from(s, "utf8").toString("base64");
+}
+
+/** The repo's default branch + the SHA its head points at (the PR base). */
+export async function getDefaultBranch(owner: string, repo: string, token: string, signal?: AbortSignal): Promise<GhResult<{ branch: string; sha: string }>> {
+  const r = await getRepo(owner, repo, token, signal);
+  if (!r.ok) return { ok: false, status: r.status, error: r.error };
+  const branch = (r.data as { default_branch?: string })?.default_branch || "main";
+  const ref = await ghRequest<{ object: { sha: string } }>("GET", `/repos/${owner}/${repo}/git/ref/heads/${branch}`, token, undefined, signal);
+  if (!ref.ok) return { ok: false, status: ref.status, error: ref.error };
+  return { ok: true, status: ref.status, data: { branch, sha: ref.data!.object.sha } };
+}
+
+export function createBranch(owner: string, repo: string, token: string, branch: string, sha: string, signal?: AbortSignal) {
+  return ghRequest<{ ref: string }>("POST", `/repos/${owner}/${repo}/git/refs`, token, { ref: `refs/heads/${branch}`, sha }, signal);
+}
+
+export function putFile(args: { owner: string; repo: string; token: string; path: string; branch: string; message: string; content: string; signal?: AbortSignal }) {
+  return ghRequest<{ commit: { sha: string } }>("PUT", `/repos/${args.owner}/${args.repo}/contents/${args.path}`, args.token, {
+    message: args.message,
+    content: toBase64(args.content),
+    branch: args.branch,
+  }, args.signal);
+}
+
+export function createPullRequest(args: { owner: string; repo: string; token: string; title: string; head: string; base: string; body: string; signal?: AbortSignal }) {
+  return ghRequest<{ number: number; html_url: string }>("POST", `/repos/${args.owner}/${args.repo}/pulls`, args.token, {
+    title: args.title,
+    head: args.head,
+    base: args.base,
+    body: args.body,
+  }, args.signal);
+}
