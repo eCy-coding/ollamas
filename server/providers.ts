@@ -935,6 +935,7 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              abortSignal: buildSignal(signal), // bound by the same 300s/caller signal as every fetch provider
               ...(config.tools ? {
                 tools: config.tools.map((t: any) => ({
                   functionDeclarations: [{
@@ -964,6 +965,7 @@ export class ProviderRouter {
             config: {
               systemInstruction: systemMessage,
               temperature: config.temperature ?? 0.7,
+              abortSignal: buildSignal(signal), // bound by the same 300s/caller signal as every fetch provider
               ...(config.tools ? {
                 tools: config.tools.map((t: any) => ({
                   functionDeclarations: [{
