@@ -15,6 +15,9 @@ interface Analytics {
   success?: boolean;
   data?: { summary?: { total_threats?: number; total_domains?: number; total_ips?: number } };
 }
+interface SupStatus {
+  state?: string; running?: boolean; ready?: boolean; restarts?: number; circuitOpen?: boolean; baseUrl?: string;
+}
 
 export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string, type?: "success" | "error" | "info") => void }) {
   const [reachable, setReachable] = useState<boolean | null>(null);
@@ -24,11 +27,37 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<SearchResp | null>(null);
   const [err, setErr] = useState<string>("");
+  const [sup, setSup] = useState<SupStatus | null>(null);
+  const [acting, setActing] = useState(false);
+  const [logs, setLogs] = useState<string[] | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const refreshStatus = async () => {
+    try { setSup(await api.get<SupStatus>("/api/ecysearcher/status")); } catch { /* supervisor route absent */ }
+  };
+  const doUp = async () => {
+    setActing(true); onNotify?.("eCySearcher başlatılıyor (docker compose up)…", "info");
+    try { await api.post("/api/ecysearcher/up"); await refreshStatus(); onNotify?.("eCySearcher up komutu gönderildi", "success"); }
+    catch (e) { onNotify?.(`up hatası: ${String((e as Error)?.message || e)}`, "error"); }
+    finally { setActing(false); }
+  };
+  const doDown = async () => {
+    setActing(true);
+    try { await api.post("/api/ecysearcher/down"); await refreshStatus(); onNotify?.("eCySearcher durduruldu", "info"); }
+    catch (e) { onNotify?.(`down hatası: ${String((e as Error)?.message || e)}`, "error"); }
+    finally { setActing(false); }
+  };
+  const loadLogs = async () => {
+    setShowLogs((v: boolean) => !v);
+    try { const r = await api.get<{ lines?: string[] }>("/api/ecysearcher/logs?limit=200"); setLogs(r?.lines || []); }
+    catch { setLogs([]); }
+  };
 
   // Probe reachability + load the analytics summary on mount (on-demand, no constant background poll).
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      void refreshStatus();
       try {
         const root = await api.get<{ service?: string; version?: string }>("/api/ecysearcher/");
         if (cancelled) return;
@@ -82,6 +111,32 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
           {reachable === null ? "probing…" : reachable ? `UP${version ? ` v${version}` : ""}` : "DOWN"}
         </span>
       </div>
+
+      {/* Supervisor controls + state — docker-compose stack health under ollamas */}
+      <div className="flex items-center gap-2 flex-wrap text-xs">
+        <button onClick={doUp} disabled={acting} className="px-2 py-1 rounded border border-emerald-700 text-emerald-300 hover:bg-emerald-950/40 disabled:opacity-40">
+          {acting ? "…" : "Up"}
+        </button>
+        <button onClick={doDown} disabled={acting} className="px-2 py-1 rounded border border-rose-700 text-rose-300 hover:bg-rose-950/30 disabled:opacity-40">
+          Down
+        </button>
+        <button onClick={loadLogs} className="px-2 py-1 rounded border border-slate-600 text-slate-300 hover:bg-slate-700">
+          {showLogs ? "Logları gizle" : "Loglar"}
+        </button>
+        {sup && (
+          <span className="text-slate-400">
+            durum: <span className={sup.circuitOpen ? "text-rose-300" : sup.ready ? "text-emerald-300" : "text-amber-300"}>{sup.state || "?"}</span>
+            {typeof sup.restarts === "number" ? ` · restart: ${sup.restarts}` : ""}
+            {sup.circuitOpen ? " · circuit AÇIK (manuel Up gerekli)" : ""}
+          </span>
+        )}
+      </div>
+
+      {showLogs && (
+        <pre className="text-[11px] leading-snug bg-slate-950 border border-slate-800 rounded p-2 max-h-64 overflow-auto text-slate-300 whitespace-pre-wrap">
+          {logs === null ? "yükleniyor…" : logs.length ? logs.join("\n") : "log yok"}
+        </pre>
+      )}
 
       {reachable === false && (
         <div className="flex items-start gap-2 text-sm text-rose-300 bg-rose-950/30 border border-rose-800 rounded p-3">
