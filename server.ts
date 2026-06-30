@@ -507,10 +507,23 @@ async function initializeServer() {
         // KeyVault burn meter so both tabs agree.
         cloudProviders: [
           ...["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
-            .map((p) => { const s = ProviderRouter.keyPoolStatus(p); return { name: p, ready: s.live > 0, live: s.live, total: s.total, keyless: false }; }),
+            // vNEXT-D3: also carry worstPct + allApproaching (poolSaturation) so KeyVault can ride
+            // this SSE instead of its 15s poll. Empty-pool guarded (worstPct 0, not the sentinel).
+            .map((p) => {
+              const s = ProviderRouter.keyPoolStatus(p);
+              const sat = ProviderRouter.poolSaturation(p);
+              return { name: p, ready: s.live > 0, live: s.live, total: s.total, keyless: false,
+                worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0,
+                allApproaching: s.total > 0 && sat.allApproaching };
+            }),
           // keyless: no API key, uses the user's Google OAuth via the gemini CLI binary.
-          { name: "gemini-cli", ready: geminiCliReady, live: geminiCliReady ? 1 : 0, total: 1, keyless: true },
+          { name: "gemini-cli", ready: geminiCliReady, live: geminiCliReady ? 1 : 0, total: 1, keyless: true, worstPct: 0, allApproaching: false },
         ],
+        // vNEXT-D3: key-pool saturation alerts (mirrors /api/keys/pool `alerts`) for KeyVault over SSE.
+        keyAlerts: ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
+          .map((p) => ({ p, s: ProviderRouter.keyPoolStatus(p), sat: ProviderRouter.poolSaturation(p) }))
+          .filter(({ s, sat }) => s.total > 0 && sat.allApproaching)
+          .map(({ p, s, sat }) => ({ provider: p, worstPct: Math.round(sat.worstPct * 100) / 100, live: s.live })),
         fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         models: {

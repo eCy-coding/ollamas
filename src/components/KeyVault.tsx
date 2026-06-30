@@ -56,9 +56,35 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
   useEffect(() => {
     loadMasks();
-    loadPool();
-    const t = setInterval(loadPool, 15000); // 15s burn-rate refresh
-    return () => clearInterval(t);
+    loadPool(); // authoritative initial paint
+    // vNEXT-D3: ride the live cockpit SSE (≤2s) — it now carries per-provider worstPct/allApproaching
+    // + keyAlerts. The 15s poll is SLOWED to 60s as a graceful fallback (non-breaking: if any SSE
+    // field is missing or the stream errors, the poll authoritatively backfills the full shape).
+    let es: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => { if (!pollTimer) pollTimer = setInterval(loadPool, 60000); };
+    try {
+      // eslint-disable-next-line no-restricted-globals -- native SSE for the cockpit stream
+      es = new EventSource("/api/cockpit/stream");
+      es.onmessage = (ev) => {
+        try {
+          const t = JSON.parse(ev.data) as { cloudProviders?: Array<{ name: string; total: number; live: number; worstPct?: number; allApproaching?: boolean; keyless?: boolean }>; keyAlerts?: typeof alerts };
+          if (Array.isArray(t.cloudProviders)) {
+            const next: Record<string, PoolEntry> = {};
+            for (const c of t.cloudProviders) {
+              if (c.keyless) continue; // gemini-cli has no key pool
+              next[c.name] = { total: c.total, live: c.live, worstPct: c.worstPct ?? 0, allApproaching: !!c.allApproaching };
+            }
+            setPool(next);
+          }
+          if (Array.isArray(t.keyAlerts)) setAlerts(t.keyAlerts);
+        } catch { /* ignore malformed frame — poll fallback covers it */ }
+      };
+      es.onerror = () => { es?.close(); es = null; startPolling(); };
+    } catch {
+      startPolling();
+    }
+    return () => { es?.close(); if (pollTimer) clearInterval(pollTimer); };
   }, []);
 
   // Guided provisioning: open the provider's key page so the operator logs into the NEXT
