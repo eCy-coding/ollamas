@@ -16,7 +16,7 @@ import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, fo
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
-import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig } from "./server/revenue";
+import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub } from "./server/revenue";
 import { notify } from "./server/notify";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
@@ -172,9 +172,15 @@ app.post("/api/revenue/testgen", async (req, res) => {
 app.post("/api/revenue/audit", async (req, res) => {
   try {
     const result = await runAudit(req.body || {});
+    // Optional delivery: publish the findings to the client repo as a GitHub Issue (the paid
+    // artifact). Graceful no-op when no githubRepo/token — the existing local path is unchanged.
+    let github: Awaited<ReturnType<typeof publishAuditToGitHub>> | undefined;
+    if (result.ok && req.body?.githubRepo) {
+      github = await publishAuditToGitHub({ repo: req.body.repo, githubRepo: req.body.githubRepo, model: result.model });
+    }
     // Best-effort alert (no-op without a configured sink; never throws into the response).
-    if (result.ok) void notify(`✅ ollamas audit complete: ${result.findings ?? 0} finding(s)${result.reportPath ? ` → ${result.reportPath}` : ""}`, db.data.notify);
-    res.json(result);
+    if (result.ok) void notify(`✅ ollamas audit complete: ${result.findings ?? 0} finding(s)${github?.issueUrl ? ` → ${github.issueUrl}` : result.reportPath ? ` → ${result.reportPath}` : ""}`, db.data.notify);
+    res.json({ ...result, github });
   } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
 });
 

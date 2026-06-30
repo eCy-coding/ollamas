@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db";
+import { buildIssueBody, createIssue, parseRepoSlug, type Finding } from "./github";
 
 const pexec = promisify(execFile);
 const REPO_ROOT = process.cwd(); // server is launched from the repo root
@@ -68,6 +69,26 @@ export async function runAudit(input: { repo: string; model?: string; maxUnits?:
     const er = e as { stdout?: string; stderr?: string; message?: string };
     return { ok: false, model, output: tail((er.stdout || "") + (er.stderr || "") || er.message, 1500) };
   }
+}
+
+/** Publish the audit findings to a client repo as a GitHub Issue (Audit-as-a-Service delivery
+ *  = the paid artifact lands natively in the client's GitHub). Graceful no-op when the target
+ *  repo or the vault GitHub token is absent — the honest boundary, never throws into the flow. */
+export async function publishAuditToGitHub(input: { repo: string; githubRepo?: string; model?: string }): Promise<{
+  published: boolean; issueUrl?: string; skipped?: boolean; reason?: string;
+}> {
+  const slug = input.githubRepo ? parseRepoSlug(input.githubRepo) : null;
+  if (!slug) return { published: false, skipped: true, reason: "no target githubRepo (owner/name) — findings kept local" };
+  const token = db.decrypt((db.data.keys || {})["github"] || "");
+  if (!token) return { published: false, skipped: true, reason: "no GitHub token in vault — paste a fine-grained PAT (issues:write)" };
+  const name = path.basename(path.resolve(input.repo));
+  let findings: Finding[] = [];
+  try { findings = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "audit-out", name, "findings.json"), "utf8")).findings || []; } catch { /* none */ }
+  const title = `ollamas audit: ${findings.length} finding(s) — ${name}`;
+  const body = buildIssueBody(findings, { model: input.model });
+  const r = await createIssue({ owner: slug.owner, repo: slug.repo, title, body, token });
+  if (!r.ok) return { published: false, reason: r.error };
+  return { published: true, issueUrl: r.data?.html_url };
 }
 
 /** Fill the storefront landing-page template from config. LOCAL artifact only — no deploy.

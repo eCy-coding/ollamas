@@ -14,8 +14,10 @@ export function RevenueOps({ onNotify }: Props) {
   const [cfg, setCfg] = useState<Cfg>({});
   const [tg, setTg] = useState({ file: "orchestration/bin/lib/bench.ts", fn: "median" });
   const [auditRepo, setAuditRepo] = useState("");
+  const [ghRepo, setGhRepo] = useState("");
+  const [ghToken, setGhToken] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => { api.get<Cfg>("/api/revenue/config").then(setCfg).catch((e) => onNotify((e as Error)?.message || "revenue config load failed", "error")); }, []);
 
@@ -65,14 +67,46 @@ export function RevenueOps({ onNotify }: Props) {
         </button>
       </div>
 
-      {/* Audit (480b) */}
+      {/* Audit (480b) + optional GitHub delivery */}
       <div className={card}>
         <h3 className="text-sm font-semibold text-slate-200 mb-2">Audit <span className="text-amber-400 font-normal">(480b-cloud · ~cents/repo, higher yield than $0)</span></h3>
         <input className={`${input} mb-2`} placeholder="repo path to audit" value={auditRepo} onChange={(e) => setAuditRepo(e.target.value)} />
+
+        {/* Optional: deliver the findings to a client repo as a GitHub Issue (the paid artifact) */}
+        <div className="border-t border-slate-700 mt-2 pt-2">
+          <p className="text-[11px] text-slate-400 mb-1.5">GitHub delivery <span className="text-slate-500">(optional — posts findings as an Issue)</span></p>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input className={input} placeholder="client repo (owner/name)" value={ghRepo} onChange={(e) => setGhRepo(e.target.value)} />
+            <div className="flex gap-1.5">
+              <input className={input} type="password" placeholder="GitHub PAT (issues:write)" value={ghToken} onChange={(e) => setGhToken(e.target.value)} />
+              <button className={`${btn} bg-slate-600 hover:bg-slate-500 text-white shrink-0`} disabled={!ghToken}
+                onClick={async () => { try { await api.post("/api/keys", { provider: "github", key: ghToken }); setGhToken(""); onNotify("GitHub token saved to the encrypted vault", "success"); } catch (e) { err(e); } }}>
+                Save token
+              </button>
+            </div>
+          </div>
+        </div>
+
         <button className={`${btn} bg-amber-600 hover:bg-amber-500 text-white`} disabled={!!busy || !auditRepo}
-          onClick={() => runOp("audit", "/api/revenue/audit", { repo: auditRepo, maxUnits: 6 }, (r) => [`Audit done: ${r.findings ?? 0} findings`, "info"])}>
-          {busy === "audit" ? "Auditing…" : "Run audit (capped 6 units)"}
+          onClick={() => runOp("audit", "/api/revenue/audit", { repo: auditRepo, maxUnits: 6, githubRepo: ghRepo || undefined }, (r) => {
+            const gh = r.github as { issueUrl?: string; skipped?: boolean; reason?: string } | undefined;
+            if (gh?.issueUrl) return [`Audit done: ${r.findings ?? 0} findings → posted to GitHub`, "success"];
+            if (gh?.reason) return [`Audit done: ${r.findings ?? 0} findings · GitHub: ${gh.reason}`, "info"];
+            return [`Audit done: ${r.findings ?? 0} findings`, "info"];
+          })}>
+          {busy === "audit" ? "Auditing…" : ghRepo ? "Run audit → post to GitHub" : "Run audit (capped 6 units)"}
         </button>
+
+        {(() => {
+          const gh = result?.github as { issueUrl?: string } | undefined;
+          return gh?.issueUrl ? (
+            <p className="mt-2 text-xs">
+              <a href={gh.issueUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline">
+                ↗ View the published audit issue
+              </a>
+            </p>
+          ) : null;
+        })()}
       </div>
 
       {/* Storefront */}
