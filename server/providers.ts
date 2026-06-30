@@ -231,6 +231,13 @@ export function latencyForFailure(elapsedMs: number, penaltyMs = Number(process.
   return Math.max(elapsedMs, penaltyMs);
 }
 
+// Streaming fail-safe: throw if the caller has cancelled, so a provider read loop never keeps
+// draining a backend that streams PAST an abort (fetch-abort only rejects read() if the remote
+// honors it; this guards the rest). Called at the top of every streaming loop iteration.
+export function abortIfCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new Error("provider stream aborted (caller cancelled or timed out)");
+}
+
 // API-key cooldown persistence (pure-core). Cooldown entries are `provider::keyId → expiryEpochMs`.
 // toPersist: serialize the live map, DROPPING anything already expired (prunes stale junk so the
 // config never grows unbounded). fromPersist: parse the saved object on boot, keeping ONLY numeric
@@ -746,6 +753,7 @@ export class ProviderRouter {
           };
 
           while (true) {
+            abortIfCancelled(signal); // never drain a backend past a caller abort
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
@@ -854,6 +862,7 @@ export class ProviderRouter {
           let fullText = "";
 
           while (true) {
+            abortIfCancelled(signal); // never drain a backend past a caller abort
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
@@ -940,6 +949,7 @@ export class ProviderRouter {
 
           let fullText = "";
           for await (const chunk of responseStream) {
+            abortIfCancelled(signal); // SDK stream may not honor the abort signal — guard explicitly
             const chunkText = chunk.text || "";
             if (chunkText) {
               onStreamChunk(chunkText);
@@ -1017,6 +1027,7 @@ export class ProviderRouter {
           let fullText = "";
 
           while (true) {
+            abortIfCancelled(signal); // never drain a backend past a caller abort
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
@@ -1102,6 +1113,7 @@ export class ProviderRouter {
           let fullText = "";
 
           while (true) {
+            abortIfCancelled(signal); // never drain a backend past a caller abort
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
@@ -1184,6 +1196,7 @@ export class ProviderRouter {
           let fullText = "";
 
           while (true) {
+            abortIfCancelled(signal); // never drain a backend past a caller abort
             const { done, value } = await reader.read();
             if (done) break;
             accumulated += decoder.decode(value, { stream: true });
