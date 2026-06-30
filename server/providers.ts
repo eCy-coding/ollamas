@@ -415,7 +415,29 @@ export class ProviderRouter {
     const front = initial === "gemini" ? ["gemini", "gemini-cli"]
       : initial === "gemini-cli" ? ["gemini-cli", "gemini"]
       : [initial];
-    return [...front, ...defaults.filter((p) => !front.includes(p))];
+    const rest = defaults.filter((p) => !front.includes(p));
+    return [...front, ...this.orderRestByLatency(rest, (p) => this.getLatency(p))];
+  }
+
+  // vNext T2.2: order the fallback TAIL by measured latency WITHOUT breaking invariants —
+  // $0 local (fleet, ollama-local) stays first, demo last, and the gemini family stays
+  // adjacent. Only the cloud tier reorders, fastest-first; providers with no fresh latency
+  // (getLatency = -1) sort last via Infinity, so a cold cache preserves the original order
+  // (zero behavior change until real measurements exist). Pure (getLatency injected) → tested.
+  public static orderRestByLatency(rest: string[], getLatency: (p: string) => number): string[] {
+    const EARLY = ["fleet", "ollama-local"];
+    const early = rest.filter((p) => EARLY.includes(p));
+    const hasDemo = rest.includes("demo");
+    const cloud = rest.filter((p) => !EARLY.includes(p) && p !== "demo");
+    const lat = (p: string) => { const v = getLatency(p); return v < 0 ? Infinity : v; };
+    const sorted = [...cloud].sort((a, b) => lat(a) - lat(b)); // stable: equal/unmeasured keep order
+    // Keep the gemini family adjacent: pin gemini-cli immediately after gemini if both present.
+    const gi = sorted.indexOf("gemini"), ci = sorted.indexOf("gemini-cli");
+    if (gi >= 0 && ci >= 0 && ci !== gi + 1) {
+      sorted.splice(ci, 1);
+      sorted.splice(sorted.indexOf("gemini") + 1, 0, "gemini-cli");
+    }
+    return [...early, ...sorted, ...(hasDemo ? ["demo"] : [])];
   }
 
   private static hasKey(provider: string): boolean {
