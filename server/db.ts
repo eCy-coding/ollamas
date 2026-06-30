@@ -112,6 +112,29 @@ const DEFAULT_CONFIG: DBConfig = {
   },
 };
 
+// Master-key source decision (pure → unit-tested). Priority: an injected env key (the stable
+// Cloud-Run/Docker secret-mount path) wins; else an existing on-disk key file; else — if an
+// encrypted store ALREADY exists — FAIL CLOSED rather than mint a key that can't decrypt it;
+// else (truly fresh) mint a new one. This is what prevents a silent secret-wipe on restart.
+export type MasterKeyDecision =
+  | { source: "env"; key: Buffer }
+  | { source: "file" }
+  | { source: "mint" }
+  | { source: "fail"; reason: string };
+
+export function decideMasterKeySource(o: { envB64?: string; keyFileExists: boolean; configExists: boolean }): MasterKeyDecision {
+  if (o.envB64) {
+    const key = Buffer.from(o.envB64, "base64");
+    if (key.length !== 32) return { source: "fail", reason: "MASTER_KEY_B64 must be base64 of exactly 32 bytes" };
+    return { source: "env", key };
+  }
+  if (o.keyFileExists) return { source: "file" };
+  if (o.configExists) {
+    return { source: "fail", reason: "encrypted store exists but no master key — set MASTER_KEY_B64 (the original 32-byte key, base64) to decrypt it" };
+  }
+  return { source: "mint" };
+}
+
 export class SecureDB {
   private filePath: string;
   private masterKey: Buffer;
@@ -135,14 +158,32 @@ export class SecureDB {
 
     this.filePath = path.join(dir, "config.json");
     
-    // 2. Setup master key file for AES encryption
+    // 2. Setup master key for AES encryption (fail-closed). A MISSING key with an EXISTING
+    // encrypted store must NEVER silently mint a new key — that would orphan every persisted
+    // secret (provider keys, Stripe/GitHub, OAuth) to undecryptable ciphertext (decrypt → "").
+    // On Cloud Run / multi-replica, inject the stable 32-byte key (base64) via MASTER_KEY_B64.
     const keyPath = path.join(dir, ".master_key");
-    if (fs.existsSync(keyPath)) {
-      this.masterKey = fs.readFileSync(keyPath);
-    } else {
-      const newKey = crypto.randomBytes(32);
-      atomicWriteFileSync(keyPath, newKey, { mode: 0o600 });
-      this.masterKey = newKey;
+    const decision = decideMasterKeySource({
+      envB64: process.env.MASTER_KEY_B64,
+      keyFileExists: fs.existsSync(keyPath),
+      configExists: fs.existsSync(this.filePath),
+    });
+    switch (decision.source) {
+      case "env":
+        this.masterKey = decision.key;
+        break;
+      case "file":
+        this.masterKey = fs.readFileSync(keyPath);
+        break;
+      case "mint": {
+        const newKey = crypto.randomBytes(32);
+        atomicWriteFileSync(keyPath, newKey, { mode: 0o600 });
+        this.masterKey = newKey;
+        if (isCloud) console.warn("[db] minted ephemeral master key — set MASTER_KEY_B64 to persist secrets across restarts/replicas");
+        break;
+      }
+      case "fail":
+        throw new Error("[db] " + decision.reason);
     }
 
     // 3. Load or initiate data
