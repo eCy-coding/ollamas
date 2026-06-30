@@ -7,6 +7,7 @@ import { MultiAgentPipeline } from "./components/MultiAgentPipeline";
 import { ReactAgentTab } from "./components/ReactAgentTab";
 import { WorkspaceTree } from "./components/WorkspaceTree";
 import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
+import EcySearchPanel from "./components/EcySearchPanel";
 import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
@@ -30,7 +31,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign, Sheet,
+  MousePointer2, Building2, Lock, DollarSign, Sheet, Search,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -109,6 +110,7 @@ export default function App() {
     { id: "files", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
     { id: "drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
     { id: "sheets", icon: <Sheet className="w-4 h-4 text-green-400" /> },
+    { id: "search", icon: <Search className="w-4 h-4 text-cyan-300" /> },
     { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
     { id: "keys", icon: <Key className="w-4 h-4 text-indigo-400" /> },
     { id: "security", icon: <ShieldCheck className="w-4 h-4 text-teal-400" /> },
@@ -312,6 +314,12 @@ export default function App() {
           {activeTab === "sheets" && (
             <div className="animate-fade-in">
               <GoogleSheetsBrowser />
+            </div>
+          )}
+
+          {activeTab === "search" && (
+            <div className="animate-fade-in">
+              <EcySearchPanel onNotify={notify} />
             </div>
           )}
 

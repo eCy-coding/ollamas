@@ -6,6 +6,7 @@ import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, unhandledRejectionTotal, ukpStageEventsTotal } from "./server/metrics";
 import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
+import { ecySupervisor } from "./server/ecysearch";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -165,9 +166,21 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
+    "/api/ecysearch",
   ],
   localOwnerGuard,
 );
+
+// ecysearch sub-service (supervised) — launch the external GitHub-search app under ollamas on its
+// own port, health-check + auto-restart it, surface it as the "Search" tab. Local-owner only
+// (gated above): the spawn surface is never exposed in SaaS mode.
+app.post("/api/ecysearch/start", (_req, res) => res.json(ecySupervisor.ensureRunning()));
+app.post("/api/ecysearch/stop", (_req, res) => res.json(ecySupervisor.stop()));
+app.get("/api/ecysearch/status", async (_req, res) => {
+  const status = ecySupervisor.status();
+  res.json({ ...status, ready: status.running ? await ecySupervisor.probeReady() : false });
+});
+app.get("/api/ecysearch/logs", (_req, res) => res.json({ lines: ecySupervisor.logs() }));
 
 // Revenue Ops (Faz19) — local-owner-only personal income tooling (gated above). Produces
 // LOCAL artifacts only (test-gen / audit / storefront); no money movement, no outreach.
