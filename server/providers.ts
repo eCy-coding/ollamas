@@ -231,6 +231,24 @@ export function latencyForFailure(elapsedMs: number, penaltyMs = Number(process.
   return Math.max(elapsedMs, penaltyMs);
 }
 
+// API-key cooldown persistence (pure-core). Cooldown entries are `provider::keyId → expiryEpochMs`.
+// toPersist: serialize the live map, DROPPING anything already expired (prunes stale junk so the
+// config never grows unbounded). fromPersist: parse the saved object on boot, keeping ONLY numeric
+// FUTURE expiries (ignores corrupt/past entries). Both pure → unit-tested, no IO.
+export function cooldownToPersist(entries: Array<[string, number]>, now: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, exp] of entries) { if (typeof exp === "number" && exp > now) out[k] = exp; }
+  return out;
+}
+export function cooldownFromPersist(obj: unknown, now: number): Array<[string, number]> {
+  if (!obj || typeof obj !== "object") return [];
+  const out: Array<[string, number]> = [];
+  for (const [k, exp] of Object.entries(obj as Record<string, unknown>)) {
+    if (typeof exp === "number" && Number.isFinite(exp) && exp > now) out.push([k, exp]);
+  }
+  return out;
+}
+
 // Compose caller-supplied cancellation with the provider timeout (default 300s,
 // overridable via PROVIDER_TIMEOUT_MS — vNext T1.3, no hardcode). Caller signal preserved.
 function buildSignal(callerSignal?: AbortSignal, timeoutMs = Number(process.env.PROVIDER_TIMEOUT_MS) || 300000): AbortSignal {
@@ -463,10 +481,32 @@ export class ProviderRouter {
   }
 
   // --- API key pool + rotation (user-supplied keys only; never auto-acquired) ---
-  // Per-process cooldown: keyed by provider+key → expiry epoch ms. In-memory by design
-  // (simplest; resets on restart, by which time provider quotas have refilled).
+  // Cooldown: provider+key → expiry epoch ms. PERSISTED to the same JSON config that holds the
+  // keys (db.data.keyCooldowns) + hydrated lazily on first access, so a key benched 24h (invalid)
+  // or 6h (quota) stays benched across deploys/crashes/reboots — the self-sustaining pool no longer
+  // thrashes on boot (a wiped cooldown would instantly retry a known-bad key / re-hit a 429).
+  // SECURITY: keyed by keyId() (SHA256-12, non-reversible) NOT the raw value, so nothing written
+  // to plaintext config can leak a key. In-memory behavior is identical (keyId is deterministic).
   private static keyCooldown = new Map<string, number>();
-  private static ckey(provider: string, key: string): string { return `${provider}::${key}`; }
+  private static cooldownHydrated = false;
+  private static ckey(provider: string, key: string): string { return `${provider}::${keyId(key)}`; }
+  // Load persisted cooldowns into the in-memory map once (boot/first-touch). Dropped if expired.
+  private static ensureHydrated(): void {
+    if (this.cooldownHydrated) return;
+    this.cooldownHydrated = true;
+    try {
+      const saved = (db.data as any).keyCooldowns;
+      for (const [k, exp] of cooldownFromPersist(saved ?? {}, Date.now())) this.keyCooldown.set(k, exp);
+    } catch { /* corrupt/absent config → start cold (cooldown is best-effort) */ }
+  }
+  // Write the live (non-expired) cooldowns back to the config. Best-effort: a disk error must
+  // never break generation. Pruned via cooldownToPersist so stale entries don't accumulate.
+  private static persistCooldowns(): void {
+    try {
+      (db.data as any).keyCooldowns = cooldownToPersist([...this.keyCooldown], Date.now());
+      db.save();
+    } catch { /* persistence is best-effort */ }
+  }
   // Drop every expired cooldown. isCooled only evicts on access, so a key that is never re-checked
   // after recovery would linger forever; sweeping at the write site bounds the map to live cooldowns.
   public static sweepCooldowns(nowMs: number = Date.now()): number {
@@ -475,11 +515,14 @@ export class ProviderRouter {
     return removed;
   }
   public static markKeyCooldown(provider: string, key: string, ttlMs: number): void {
+    this.ensureHydrated();
     const now = Date.now();
     this.keyCooldown.set(this.ckey(provider, key), now + ttlMs);
     this.sweepCooldowns(now); // bound the map to currently-cooled keys
+    this.persistCooldowns(); // survive restart (sustainable pool)
   }
   private static isCooled(provider: string, key: string): boolean {
+    this.ensureHydrated();
     const exp = this.keyCooldown.get(this.ckey(provider, key));
     if (!exp) return false;
     if (Date.now() >= exp) { this.keyCooldown.delete(this.ckey(provider, key)); return false; } // recovered
