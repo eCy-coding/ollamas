@@ -109,17 +109,29 @@ async function main() {
   }
 
   const results = [];
+  // Per-project live progress so a multi-minute run (each gcloud enable is 30-60s) never
+  // looks hung. Each line ends with the outcome; key VALUES are never printed.
+  const note = (s) => process.stdout.write(s);
+  let i = 0;
   for (const project of projects) {
+    i++;
+    note(`  [${i}/${projects.length}] ${project}: enabling APIs… `);
     const en = await gcloud(["services", "enable", "generativelanguage.googleapis.com", "apikeys.googleapis.com", `--project=${project}`]);
-    if (!en.ok) { results.push({ project, status: "failed", reason: `enable: ${en.reason}` }); continue; }
+    if (!en.ok) { console.log(`✗ enable failed (${en.reason})`); results.push({ project, status: "failed", reason: `enable: ${en.reason}` }); continue; }
+    // Idempotent: reuse an existing ollamas-gemini key (the vault dedups; skip create → no GCP key sprawl on re-runs).
+    const existing = await gcloud(["services", "api-keys", "list", "--filter=displayName:ollamas-gemini", `--project=${project}`, "--format=value(name)"]);
+    if (existing.ok && existing.stdout.trim()) { console.log("· already provisioned (skip)"); results.push({ project, status: "skipped", reason: "ollamas-gemini key exists" }); continue; }
+    note("creating key… ");
     const created = await gcloud(["services", "api-keys", "create", "--display-name=ollamas-gemini", `--project=${project}`, "--format=value(response.keyString)"]);
-    if (!created.ok) { results.push({ project, status: "failed", reason: `create: ${created.reason}` }); continue; }
+    if (!created.ok) { console.log(`✗ create failed (${created.reason})`); results.push({ project, status: "failed", reason: `create: ${created.reason}` }); continue; }
     const key = created.stdout.trim(); // secret — used immediately, never logged
-    if (!key) { results.push({ project, status: "failed", reason: "no keyString returned" }); continue; }
+    if (!key) { console.log("✗ no keyString returned"); results.push({ project, status: "failed", reason: "no keyString returned" }); continue; }
     try {
       await addToVault(gateway, key);
+      console.log("→ added to vault ✓");
       results.push({ project, status: "added" });
     } catch (e) {
+      console.log(`✗ vault add failed`);
       results.push({ project, status: "failed", reason: redactKeys(e?.message || "vault add failed") });
     }
   }
