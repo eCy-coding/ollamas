@@ -27,6 +27,7 @@
     "conformance:stdio": "mcp-inspector --cli node dist/mcp-stdio.cjs --method tools/list",
     "dev": "tsx server.ts",
     "gemini:lane": "node scripts/gemini-lane.mjs",
+    "gemini:provision": "node scripts/gemini-provision.mjs",
     "harden": "make harden",
     "lint": "tsc --noEmit",
     "lint:fix": "eslint . --fix",
