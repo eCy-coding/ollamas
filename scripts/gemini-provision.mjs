@@ -66,8 +66,11 @@ export function summarize(results) {
 
 async function gcloud(args) {
   // execFile (no shell) → no injection; capture both streams; sanitize on throw.
+  // --quiet: this runs non-interactively (execFile, no TTY); without it gcloud aborts on
+  // any confirmation prompt (e.g. the projects-create operation poll) → "not in an
+  // interactive session" failure. --quiet accepts default answers so the flow completes.
   try {
-    const { stdout } = await pexec("gcloud", args, { maxBuffer: 8 * 1024 * 1024 });
+    const { stdout } = await pexec("gcloud", ["--quiet", ...args], { maxBuffer: 8 * 1024 * 1024 });
     return { ok: true, stdout };
   } catch (e) {
     return { ok: false, reason: extractGcloudError(e?.stderr || e?.message || "gcloud failed") };
