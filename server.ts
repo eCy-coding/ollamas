@@ -780,6 +780,7 @@ async function initializeServer() {
    * Models listing endpoints to avoid catalog hardcoding (L3, M1)
    */
   const MODELS_TTL_MS = 8000;
+  const MODELS_CACHE_MAX = 64; // bound: a client looping arbitrary :provider names can't grow it unbounded
   const modelsCache = new Map<string, { at: number; list: string[] }>();
   app.get("/api/models/:provider", async (req, res) => {
     const prov = req.params.provider;
@@ -793,7 +794,11 @@ async function initializeServer() {
     if (hit && Date.now() - hit.at < MODELS_TTL_MS) return res.json(hit.list);
     const sendJson = res.json.bind(res);
     res.json = ((list: unknown) => {
-      if (Array.isArray(list)) modelsCache.set(cacheKey, { at: Date.now(), list: list as string[] });
+      if (Array.isArray(list)) {
+        modelsCache.set(cacheKey, { at: Date.now(), list: list as string[] });
+        // Evict the oldest entry past the cap (Map preserves insertion order) — bounded memory.
+        if (modelsCache.size > MODELS_CACHE_MAX) modelsCache.delete(modelsCache.keys().next().value as string);
+      }
       return sendJson(list);
     }) as typeof res.json;
 

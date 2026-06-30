@@ -467,8 +467,17 @@ export class ProviderRouter {
   // (simplest; resets on restart, by which time provider quotas have refilled).
   private static keyCooldown = new Map<string, number>();
   private static ckey(provider: string, key: string): string { return `${provider}::${key}`; }
+  // Drop every expired cooldown. isCooled only evicts on access, so a key that is never re-checked
+  // after recovery would linger forever; sweeping at the write site bounds the map to live cooldowns.
+  public static sweepCooldowns(nowMs: number = Date.now()): number {
+    let removed = 0;
+    for (const [k, exp] of this.keyCooldown) { if (nowMs >= exp) { this.keyCooldown.delete(k); removed++; } }
+    return removed;
+  }
   public static markKeyCooldown(provider: string, key: string, ttlMs: number): void {
-    this.keyCooldown.set(this.ckey(provider, key), Date.now() + ttlMs);
+    const now = Date.now();
+    this.keyCooldown.set(this.ckey(provider, key), now + ttlMs);
+    this.sweepCooldowns(now); // bound the map to currently-cooled keys
   }
   private static isCooled(provider: string, key: string): boolean {
     const exp = this.keyCooldown.get(this.ckey(provider, key));
@@ -476,6 +485,8 @@ export class ProviderRouter {
     if (Date.now() >= exp) { this.keyCooldown.delete(this.ckey(provider, key)); return false; } // recovered
     return true;
   }
+  /** Test/observability helper — number of retained cooldown entries. */
+  public static cooldownSize(): number { return this.keyCooldown.size; }
 
   // All candidate keys for a provider: vault key first, then env `NAME`, `NAME_1..9`,
   // and comma-separated `NAMES`. Deduped, non-empty. Drop a new key into .env (e.g.

@@ -16,6 +16,21 @@ interface Bucket { minTs: number; minCount: number; dayTs: number; dayCount: num
 const buckets = new Map<string, Bucket>();
 const bk = (provider: string, id: string) => `${provider}::${id}`;
 
+// A bucket is keyed provider::keyId → a NEW entry per rotated key. Without eviction the map
+// grows unbounded over weeks of key rotation. sweepKeyUsage drops any bucket whose per-day window
+// has fully elapsed (its counts already read 0), so only currently-active keys are retained.
+export function sweepKeyUsage(nowMs: number = Date.now()): number {
+  let removed = 0;
+  for (const [key, b] of buckets) {
+    if (nowMs - b.dayTs >= DAY_MS) { buckets.delete(key); removed++; }
+  }
+  return removed;
+}
+// Amortized lazy sweep: run it once every SWEEP_EVERY records so the hot path stays O(1) and
+// there is no background timer to leak.
+const SWEEP_EVERY = 256;
+let recordCount = 0;
+
 // Count one successful use of (provider, keyId), rolling the per-minute/day windows.
 export function recordKeyUse(provider: string, id: string, nowMs: number = Date.now()): void {
   const key = bk(provider, id);
@@ -24,6 +39,7 @@ export function recordKeyUse(provider: string, id: string, nowMs: number = Date.
   if (nowMs - b.minTs >= MIN_MS) { b.minTs = nowMs; b.minCount = 0; }
   if (nowMs - b.dayTs >= DAY_MS) { b.dayTs = nowMs; b.dayCount = 0; }
   b.minCount++; b.dayCount++;
+  if (++recordCount % SWEEP_EVERY === 0) sweepKeyUsage(nowMs);
 }
 
 // Current per-minute / per-day counts for a key (0 once a window has elapsed).
@@ -64,4 +80,7 @@ export function costSummary(): CostSummary {
 }
 
 // Test/maintenance helper — clear all counters.
-export function resetKeyUsage(): void { buckets.clear(); costByProvider.clear(); }
+export function resetKeyUsage(): void { buckets.clear(); costByProvider.clear(); recordCount = 0; }
+
+// Test/observability helper — current number of retained key buckets.
+export function keyUsageSize(): number { return buckets.size; }
