@@ -318,6 +318,12 @@ export async function main(argv: string[]): Promise<number> {
       return runRemote(rest);
     case "gemini":
       return runGemini(rest);
+    case "council": {
+      // Live multi-model council debate in a new Terminal.app window. Thin launcher (N-012-safe:
+      // spawns the zero-dep script, no server import). Run from the repo (like the npm scripts).
+      const r = spawnSync(process.execPath, ["scripts/council.mjs", ...rest], { stdio: "inherit" });
+      return r.status ?? 0;
+    }
     case "doctor":
       return runDoctor(rest);
     case "config":
