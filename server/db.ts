@@ -3,6 +3,23 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 
+// Atomic file write: write a temp sibling then rename over the target. rename(2) is atomic on
+// POSIX within the same directory, so a crash / power loss mid-write can never leave the target
+// half-written or truncated — critical for config.json (the encrypted vault + sessions) and the
+// master key, where a torn write means total credential loss. Best-effort cleanup of the temp on
+// failure. Exported for the durability test.
+export function atomicWriteFileSync(filePath: string, data: string | Buffer, opts?: { mode?: number }): void {
+  const tmp = `${filePath}.tmp.${process.pid}.${atomicWriteSeq++}`;
+  try {
+    fs.writeFileSync(tmp, data, opts?.mode != null ? { mode: opts.mode } : undefined);
+    fs.renameSync(tmp, filePath);
+  } catch (e) {
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch { /* best-effort */ }
+    throw e;
+  }
+}
+let atomicWriteSeq = 0;
+
 export interface SecurityEvent {
   id: string;
   timestamp: string;
@@ -124,7 +141,7 @@ export class SecureDB {
       this.masterKey = fs.readFileSync(keyPath);
     } else {
       const newKey = crypto.randomBytes(32);
-      fs.writeFileSync(keyPath, newKey, { mode: 0o600 });
+      atomicWriteFileSync(keyPath, newKey, { mode: 0o600 });
       this.masterKey = newKey;
     }
 
@@ -150,7 +167,8 @@ export class SecureDB {
 
   public save(newData: DBConfig = this.data): void {
     this.data = newData;
-    fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2), "utf-8");
+    // Atomic temp+rename — a crash mid-write must never truncate config.json (the vault).
+    atomicWriteFileSync(this.filePath, JSON.stringify(this.data, null, 2));
   }
 
   /**
