@@ -6,6 +6,8 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { monthToDateUsage, queueWebhookEvent } from "../store";
+import { notify } from "../notify";
+import { db } from "../db";
 
 interface Bucket {
   tokens: number;
@@ -87,6 +89,8 @@ export function rateLimitMiddleware() {
 
     if (t.plan.monthly_quota > 0 && (await monthToDateUsage(t.tenantId)) >= t.plan.monthly_quota) {
       queueWebhookEvent(t.tenantId, "usage.quota_exceeded", { quota: t.plan.monthly_quota, plan: t.plan.id }).catch(() => {});
+      // Ops alert sink (#9): Slack/Discord ping on quota exhaustion. No-op without a configured URL.
+      void notify(`⚠️ ollamas: tenant ${t.tenantId} monthly quota exceeded (plan ${t.plan.id}, ${t.plan.monthly_quota})`, db.data.notify);
       return res.status(429).json({ error: "Monthly quota exceeded", quota: t.plan.monthly_quota, plan: t.plan.id });
     }
 

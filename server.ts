@@ -420,6 +420,9 @@ async function initializeServer() {
       prevCpus = nowCpus;
       const sessions = db.data.sessions || [];
       const activity = activitySummary(sessions, sessions.map((s: any) => ({ ts: s.updatedAt })), Date.now());
+      // gemini-cli is keyless (the user's Google OAuth, no API key) → not in the api-key pool;
+      // surface it separately so the cockpit shows the WORKING keyless path. 8s-cached → cheap.
+      const geminiCliReady = await geminiCliAvailable().catch(() => false);
       const payload = {
         mode: CURRENT_MODE,
         isLive: CURRENT_MODE === "live",
@@ -442,8 +445,12 @@ async function initializeServer() {
         // chip honestly tracks the KeyVault rotation pool: it flips ✓ the instant a fresh
         // key joins and drops when the whole pool is quota-cooled. live/total mirror the
         // KeyVault burn meter so both tabs agree.
-        cloudProviders: ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
-          .map((p) => { const s = ProviderRouter.keyPoolStatus(p); return { name: p, ready: s.live > 0, live: s.live, total: s.total }; }),
+        cloudProviders: [
+          ...["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
+            .map((p) => { const s = ProviderRouter.keyPoolStatus(p); return { name: p, ready: s.live > 0, live: s.live, total: s.total, keyless: false }; }),
+          // keyless: no API key, uses the user's Google OAuth via the gemini CLI binary.
+          { name: "gemini-cli", ready: geminiCliReady, live: geminiCliReady ? 1 : 0, total: 1, keyless: true },
+        ],
         fleet: buildFleetView(cachedPool, host),
         realtime: { cores, activity, backendLatencyMs: ollama.latencyMs },
         models: {

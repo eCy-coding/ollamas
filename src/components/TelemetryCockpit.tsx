@@ -263,7 +263,9 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
                   <span
                     key={c.name}
                     title={
-                      c.total
+                      c.keyless
+                        ? `${c.name} — keyless (your Google OAuth via the gemini CLI, no API key)${c.ready ? " — available" : " — CLI not installed/authed"}`
+                        : c.total
                         ? `${c.name} — rotation pool ${c.live}/${c.total} live key(s)${c.ready ? " — available as fleet/council backend" : " — all keys quota-cooled; add a fresh key in Donanım Kasası"}`
                         : `${c.name} — no API key configured`
                     }
@@ -274,7 +276,7 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${c.ready ? "bg-sky-400" : "bg-immersive-text-dim"}`} />
-                    {c.name}{c.ready ? ` ✓${c.total && c.total > 1 ? ` ${c.live}/${c.total}` : ""}` : ""}
+                    {c.name}{c.ready ? (c.keyless ? " ✓ keyless" : ` ✓${c.total && c.total > 1 ? ` ${c.live}/${c.total}` : ""}`) : ""}
                   </span>
                 ))}
               </div>
