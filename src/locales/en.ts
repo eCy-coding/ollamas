@@ -11,6 +11,7 @@ export const messages: Record<string, string> = {
   'app.tab.drive': 'Google Drive',
   'app.tab.sheets': 'Google Sheets',
   'app.tab.search': 'GitHub Search',
+  'app.tab.threatintel': 'Threat Intel',
   'app.tab.terminal': 'Interactive CLI',
   'app.tab.keys': 'Hardware Vault',
   'app.tab.security': 'Guard Policies',
