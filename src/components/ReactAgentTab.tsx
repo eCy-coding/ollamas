@@ -208,7 +208,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     { id: "anthropic", label: "Anthropic Claude", icon: "🎨" },
     { id: "openrouter", label: "OpenRouter Hub", icon: "🛰️" },
     { id: "ollama-local", label: "Ollama (Local Engine)", icon: "🏠" },
-    { id: "ollama-cloud", label: "Ollama Cloud Infrastructure", icon: "🌩️" }
+    { id: "ollama-cloud", label: "Ollama Cloud Infrastructure", icon: "🌩️" },
+    { id: "vllm", label: "vLLM (Local)", icon: "⚡" },
+    { id: "llamacpp", label: "llama.cpp (Local)", icon: "🦙" }
   ];
 
   // Fetch real models whenever provider changes

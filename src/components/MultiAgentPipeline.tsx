@@ -79,6 +79,8 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
     { id: "openrouter", label: "OpenRouter.ai" },
     { id: "openai", label: "OpenAI GPT" },
     { id: "anthropic", label: "Anthropic Claude" },
+    { id: "vllm", label: "vLLM (Local)" },
+    { id: "llamacpp", label: "llama.cpp (Local)" },
     { id: "demo", label: "Sandbox Simulated" },
   ];
 

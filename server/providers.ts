@@ -277,8 +277,8 @@ export class ProviderRouter {
         continue;
       }
       // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode.
-      // gemini-cli is KEYLESS (the external `gemini` binary carries its own Google auth) → never key-gated.
-      if (prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && !this.hasKey(prov)) {
+      // gemini-cli + vllm/llamacpp are KEYLESS local backends (own auth / no auth) → never key-gated.
+      if (prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp" && !this.hasKey(prov)) {
         continue;
       }
 
@@ -286,7 +286,7 @@ export class ProviderRouter {
       // quota (429) or auth (401) failure, cool the spent key and retry the SAME
       // provider with the next live key before falling through the provider chain.
       // (Rotation across user keys only — the system never auto-acquires new keys.)
-      const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli";
+      const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp";
       // singleAttempt (key test): exactly one try — no rotation across the pool, so the candidate's
       // own auth failure is the verdict (rotation would mask it and trip the fallthrough-as-success).
       const attempts = config.singleAttempt ? 1 : (cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1);
@@ -491,6 +491,14 @@ export class ProviderRouter {
       liveCount: live.length,
       allApproaching: pcts.length === 0 || pcts.every((p) => approaching(p)),
     };
+  }
+
+  // Pure: resolve the OpenAI-compatible base URL for a local backend (env-overridable defaults).
+  // vLLM serves on :8000, llama.cpp-server on :8080 — both expose /v1/chat|/v1/models.
+  public static localCompatBaseUrl(provider: string, env: NodeJS.ProcessEnv = process.env): string {
+    if (provider === "vllm") return env.VLLM_BASE_URL || "http://localhost:8000/v1";
+    if (provider === "llamacpp") return env.LLAMACPP_BASE_URL || "http://localhost:8080/v1";
+    return "";
   }
 
   private static getEnvKeyName(provider: string): string {
@@ -943,24 +951,32 @@ export class ProviderRouter {
       }
 
       case "openai":
-      case "custom-openai": {
-        const isCustom = config.provider === "custom-openai";
-        const keyProvider = isCustom ? "custom-openai" : "openai";
+      case "custom-openai":
+      case "vllm":
+      case "llamacpp": {
+        const prov = config.provider;
+        const isCustom = prov === "custom-openai";
+        // vLLM / llama.cpp are KEYLESS local OpenAI-compat servers (no auth required).
+        const localCompat = prov === "vllm" || prov === "llamacpp";
+        const keyProvider = isCustom ? "custom-openai" : prov === "openai" ? "openai" : prov;
         const apiKey = this.getDecryptedKey(keyProvider);
-        if (!apiKey) throw new Error(`${isCustom ? "Custom" : "OpenAI"} API Key not set`);
+        if (!apiKey && !localCompat) throw new Error(`${isCustom ? "Custom" : "OpenAI"} API Key not set`);
 
-        const baseUrl = isCustom 
-          ? (db.data.keys["custom-openai-endpoint"] || "https://api.openai.com/v1")
-          : "https://api.openai.com/v1";
+        const baseUrl = localCompat
+          ? ProviderRouter.localCompatBaseUrl(prov)
+          : isCustom
+            ? (db.data.keys["custom-openai-endpoint"] || "https://api.openai.com/v1")
+            : "https://api.openai.com/v1";
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
+            // Only send Authorization when a key exists (local backends 400 on a bogus bearer).
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
           },
           body: JSON.stringify({
-            model: config.model || (isCustom ? "" : "gpt-4o-mini"),
+            model: config.model || (isCustom || localCompat ? "" : "gpt-4o-mini"),
             messages: toOpenAiMessages(config.messages),
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,
@@ -1000,7 +1016,7 @@ export class ProviderRouter {
               } catch (e) {}
             }
           }
-          return { text: fullText, source: `cloud:${keyProvider}`, modelUsed: config.model };
+          return { text: fullText, source: localCompat ? `local:${prov}` : `cloud:${keyProvider}`, modelUsed: config.model };
         } else {
           const json = await response.json();
           const tcs = json.choices?.[0]?.message?.tool_calls;
@@ -1012,7 +1028,7 @@ export class ProviderRouter {
 
           return {
             text: json.choices?.[0]?.message?.content || "",
-            source: `cloud:${keyProvider}`,
+            source: localCompat ? `local:${prov}` : `cloud:${keyProvider}`,
             modelUsed: config.model,
             toolCalls: toolCalls?.length ? toolCalls : undefined,
           };

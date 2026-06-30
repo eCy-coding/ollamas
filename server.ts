@@ -791,6 +791,21 @@ async function initializeServer() {
         return res.json(["qwen3:8b", "qwen3:4b", "qwen3-coder:30b", "deepseek-r1:32b", "llama3.3:70b"]);
       }
 
+      // Local OpenAI-compat backends (vLLM :8000, llama.cpp-server :8080). Probe /v1/models;
+      // graceful "not running" when the host is down — no fabrication.
+      if (prov === "vllm" || prov === "llamacpp") {
+        const base = ProviderRouter.localCompatBaseUrl(prov);
+        try {
+          const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(2500) });
+          if (r.ok) {
+            const j = await r.json();
+            const names = (j.data || []).map((m: any) => m.id).filter(Boolean);
+            return res.json(names.length ? names : [`${prov} running but no model loaded (${base})`]);
+          }
+        } catch { /* host down */ }
+        return res.json([`${prov} not running on ${base}`]);
+      }
+
       if (prov === "openrouter") {
         const key = ProviderRouter.getDecryptedKey("openrouter");
         if (!key) {
