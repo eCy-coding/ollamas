@@ -38,7 +38,7 @@ import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/w
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync } from "./server/billing/stripe";
+import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync, isLive as stripeIsLive, createAuditCheckout, dollarsToCents } from "./server/billing/stripe";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -231,6 +231,18 @@ app.post("/api/github/webhook", async (req, res) => {
     const tok = await getInstallationToken(creds, Math.floor(Date.now() / 1000));
     if (tok.ok) await createCheckRun(owner, repo, tok.token!, { headSha: sha, conclusion: "neutral", title: "ollamas audit queued", summary: "ollamas received this PR; run the audit from the dashboard to publish findings." });
   } catch { /* webhook is best-effort */ }
+});
+
+// Audit-service payment: mint a one-time Stripe Checkout link for a deliverable (the operator
+// sends it to the client; the client pays on Stripe's hosted page). Graceful skip without a key.
+app.post("/api/revenue/checkout", async (req, res) => {
+  try {
+    if (!stripeIsLive()) return res.json({ ok: false, skipped: true, reason: "no Stripe key in vault — paste your Stripe secret key (test mode: sk_test_...)" });
+    const amount = Number(req.body?.amount || 0);
+    if (!(amount > 0)) return res.json({ ok: false, skipped: true, reason: "amount (USD) required" });
+    const url = await createAuditCheckout({ amountCents: dollarsToCents(amount), description: String(req.body?.description || "ollamas Verified Audit") });
+    res.json(url ? { ok: true, url } : { ok: false, reason: "checkout session not created" });
+  } catch (e) { res.status(500).json({ ok: false, reason: String((e as Error).message) }); }
 });
 
 // Outbound alert sinks (Slack/Discord incoming webhooks). Local-owner config.

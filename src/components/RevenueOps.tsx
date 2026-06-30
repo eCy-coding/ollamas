@@ -19,6 +19,9 @@ export function RevenueOps({ onNotify }: Props) {
   const [ghDeliver, setGhDeliver] = useState<"issue" | "pr">("issue");
   const [showApp, setShowApp] = useState(false);
   const [ghApp, setGhApp] = useState({ id: "", key: "", installation: "", secret: "" });
+  const [stripeKey, setStripeKey] = useState("");
+  const [pay, setPay] = useState({ amount: "300", description: "ollamas Verified Audit" });
+  const [payUrl, setPayUrl] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
@@ -148,6 +151,35 @@ export function RevenueOps({ onNotify }: Props) {
             </p>
           ) : null;
         })()}
+      </div>
+
+      {/* Stripe — get paid (one-time Checkout link for an audit deliverable) */}
+      <div className={card}>
+        <h3 className="text-sm font-semibold text-slate-200 mb-2">Get paid <span className="text-green-400 font-normal">(Stripe Checkout link)</span></h3>
+        <div className="flex gap-1.5 mb-2">
+          <input className={input} type="password" placeholder="Stripe secret key (sk_test_… then sk_live_…)" value={stripeKey} onChange={(e) => setStripeKey(e.target.value)} />
+          <button className={`${btn} bg-slate-600 hover:bg-slate-500 text-white shrink-0`} disabled={!stripeKey}
+            onClick={async () => { try { await api.post("/api/keys", { provider: "stripe", key: stripeKey }); setStripeKey(""); onNotify("Stripe key saved to the encrypted vault", "success"); } catch (e) { err(e); } }}>
+            Save key
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <input className={input} type="number" placeholder="USD" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} />
+          <input className={`${input} col-span-2`} placeholder="description" value={pay.description} onChange={(e) => setPay({ ...pay, description: e.target.value })} />
+        </div>
+        <button className={`${btn} bg-green-600 hover:bg-green-500 text-white`} disabled={!!busy || !(Number(pay.amount) > 0)}
+          onClick={() => runOp("checkout", "/api/revenue/checkout", { amount: Number(pay.amount), description: pay.description }, (r) => {
+            if (r.url) { setPayUrl(String(r.url)); return [`Payment link created ($${pay.amount})`, "success"]; }
+            return [`Stripe: ${r.reason || "not configured"}`, "info"];
+          })}>
+          {busy === "checkout" ? "Creating…" : "Create payment link"}
+        </button>
+        {payUrl && (
+          <p className="mt-2 text-xs break-all">
+            <a href={payUrl} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:underline">↗ {payUrl}</a>
+            <span className="text-slate-500"> — send this to the client</span>
+          </p>
+        )}
       </div>
 
       {/* Storefront */}

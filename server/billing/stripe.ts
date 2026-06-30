@@ -5,6 +5,7 @@
 
 import Stripe from "stripe";
 import crypto from "node:crypto";
+import { db } from "../db";
 import { aggregateUsage, recordInvoice, setTenantPlan, getTenant, getTenantByStripeCustomer, setTenantStripeCustomer, getBillingConfig, setBillingConfig, stripeEventSeen, queueWebhookEvent, monthKey, type UsageAgg } from "../store";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
@@ -23,16 +24,52 @@ export interface BillingRun {
   total: number;
 }
 
+// Secrets are vault-first (paste in the dashboard like the GitHub PAT — no .env editing),
+// falling back to env for migration/CI. db.decrypt returns "" on any miss → graceful.
+function vaultOrEnv(slot: string, envName: string): string {
+  let v = "";
+  try { v = db.decrypt(((db.data.keys || {}) as Record<string, string>)[slot] || ""); } catch { /* db not ready */ }
+  return v || process.env[envName] || "";
+}
+
 let stripe: Stripe | null = null;
+let stripeKey = "";
 function getStripe(): Stripe | null {
-  const key = process.env.STRIPE_API_KEY;
-  if (!key) return null;
-  if (!stripe) stripe = new Stripe(key);
+  const key = vaultOrEnv("stripe", "STRIPE_API_KEY");
+  if (!key) { stripe = null; stripeKey = ""; return null; }
+  if (!stripe || stripeKey !== key) { stripe = new Stripe(key); stripeKey = key; } // re-instantiate on key change
   return stripe;
 }
 
 export function isLive(): boolean {
   return !!getStripe();
+}
+
+/** Pure: USD dollars → integer cents, clamped to Stripe's ~$0.50 minimum. */
+export function dollarsToCents(dollars: number): number {
+  return Math.max(50, Math.round((Number(dollars) || 0) * 100));
+}
+
+/** A ONE-TIME hosted Checkout link for an audit deliverable (Verified Audit / Fix-PR). Inline
+ *  price_data → no pre-created product/price needed. The CLIENT pays on Stripe's page; this only
+ *  mints the link. Null without a Stripe key (graceful). */
+export async function createAuditCheckout(input: { amountCents: number; description: string; currency?: string }): Promise<string | null> {
+  const s = getStripe();
+  if (!s) return null;
+  const sess = await s.checkout.sessions.create({
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: input.currency || "usd",
+        product_data: { name: input.description || "ollamas Verified Audit" },
+        unit_amount: Math.max(50, Math.round(input.amountCents)),
+      },
+      quantity: 1,
+    }],
+    success_url: `${APP_URL}/?audit=paid`,
+    cancel_url: `${APP_URL}/?audit=cancel`,
+  });
+  return sess.url;
 }
 
 /**
@@ -165,7 +202,7 @@ export async function runBilling(period = monthKey()): Promise<BillingRun> {
  */
 export async function handleWebhook(rawBody: Buffer, signature: string): Promise<{ type: string; handled: boolean }> {
   const s = getStripe();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = vaultOrEnv("stripe-webhook-secret", "STRIPE_WEBHOOK_SECRET");
   if (!s || !secret) throw new Error("Stripe not configured (STRIPE_API_KEY / STRIPE_WEBHOOK_SECRET)");
   const event = s.webhooks.constructEvent(rawBody, signature, secret);
 
