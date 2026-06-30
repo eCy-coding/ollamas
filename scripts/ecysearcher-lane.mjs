@@ -45,7 +45,7 @@ export function ecyHealthUrl(env = process.env) {
 }
 /** `docker compose` argv for an action. v2 syntax (`docker compose …`), the current standard. */
 export function composeArgs(action) {
-  if (action === "up") return ["compose", "up", "-d"];
+  if (action === "up") return ["compose", "up", "-d", "--build"]; // --build → code/Dockerfile changes rebuild
   if (action === "down") return ["compose", "down"];
   if (action === "ps") return ["compose", "ps"];
   if (action === "logs") return ["compose", "logs", "--tail", "200", "--no-color"];

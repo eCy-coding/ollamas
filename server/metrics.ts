@@ -68,6 +68,23 @@ export const ecysearchReady = new client.Gauge({
   registers: [register],
 });
 
+/** eCySearcher (docker-compose threat-intel stack) supervision telemetry (set by server/ecysearcher.ts). */
+export const ecysearcherRestartsTotal = new client.Counter({
+  name: "ecysearcher_restarts_total",
+  help: "Number of times the supervisor (re)ran `docker compose up` to heal eCySearcher",
+  registers: [register],
+});
+export const ecysearcherUp = new client.Gauge({
+  name: "ecysearcher_up",
+  help: "1 when the eCySearcher stack is supervised + started, else 0",
+  registers: [register],
+});
+export const ecysearcherReady = new client.Gauge({
+  name: "ecysearcher_ready",
+  help: "1 when the eCySearcher Flask API answers its health check, else 0",
+  registers: [register],
+});
+
 /**
  * Pull-time gauges sourced from the store at scrape (prom-client async collect).
  * Lazily registered once at boot so this module has no import cycle with the store.

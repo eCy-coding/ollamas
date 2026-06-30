@@ -26,7 +26,7 @@ describe("ecysearcher-lane — pure helpers", () => {
   });
 
   it("composeArgs emits docker compose v2 argv incl. logs", () => {
-    expect(composeArgs("up")).toEqual(["compose", "up", "-d"]);
+    expect(composeArgs("up")).toEqual(["compose", "up", "-d", "--build"]);
     expect(composeArgs("down")).toEqual(["compose", "down"]);
     expect(composeArgs("ps")).toEqual(["compose", "ps"]);
     expect(composeArgs("logs")).toEqual(["compose", "logs", "--tail", "200", "--no-color"]);

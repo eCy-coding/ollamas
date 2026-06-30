@@ -8,6 +8,7 @@ import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
 import { ecySupervisor } from "./server/ecysearch";
 import { ecysearcherProxy } from "./server/ecysearcher-proxy";
+import { ecysearcherSupervisor } from "./server/ecysearcher";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -172,9 +173,21 @@ app.use(
   localOwnerGuard,
 );
 
-// eCySearcher threat-intel subsystem — reverse-proxy its (open) Flask API through ollamas so the
-// cockpit reaches it CORS-free + the local-owner guard is the only exposure. Mounted after the
-// guard above. See server/ecysearcher-proxy.ts.
+// eCySearcher threat-intel subsystem (docker-compose stack). SUPERVISOR control routes — single
+// segment paths (up/down/status/logs) registered BEFORE the proxy mount so they win; the proxy
+// catches everything else (/api/ecysearcher/api/...). The supervisor self-heals via `docker compose
+// up` (health loop + backoff + crash-loop breaker). See server/ecysearcher.ts.
+app.post("/api/ecysearcher/up", async (_req, res) => res.json(await ecysearcherSupervisor.ensureRunning({ manual: true })));
+app.post("/api/ecysearcher/down", async (_req, res) => res.json(await ecysearcherSupervisor.stop()));
+app.get("/api/ecysearcher/status", (_req, res) => res.json(ecysearcherSupervisor.status()));
+app.get("/api/ecysearcher/logs", async (req, res) => {
+  const limit = Math.min(2000, Math.max(1, Number(req.query.limit) || 200));
+  res.json({ lines: await ecysearcherSupervisor.recentLogs(limit) });
+});
+
+// eCySearcher reverse-proxy — forward its (open) Flask API through ollamas so the cockpit reaches it
+// CORS-free + the local-owner guard is the only exposure. Mounted AFTER the supervisor control
+// routes. See server/ecysearcher-proxy.ts.
 app.use("/api/ecysearcher", ecysearcherProxy);
 
 // ecysearch sub-service (supervised) — launch the external GitHub-search app under ollamas on its
@@ -2783,6 +2796,7 @@ content
       stopWebhookWorker();
       stopOAuthGc();
       stopSupervisor();
+      ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeStore();
       clearTimeout(force);
