@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
-import { generateViaGeminiCli } from "./gemini-cli";
+import { generateViaGeminiCli, geminiCliAvailable } from "./gemini-cli";
 import { keyId, recordKeyUse, keyWindows, recordCallCost } from "./key-usage";
 import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
@@ -1134,6 +1134,10 @@ export class ProviderRouter {
       }
 
       case "gemini-cli": {
+        // T1.1 (vNext): fail-fast when the gemini binary is absent/unauthed (8s-cached probe)
+        // so a fallback-chain pass-through doesn't pay the spawn + kill-timer wait. Keeps
+        // gemini-cli as a chain member (loop design) but skips it instantly when unusable.
+        if (!(await geminiCliAvailable())) throw new Error("gemini-cli unavailable (binary not installed/authed)");
         // Concurrent backend: drive the external Google Gemini CLI as a subprocess. It runs
         // its OWN agent loop (tools + Google grounding) and returns the final text → no
         // tool_calls, so the ollamas ReAct loop treats this as a final reply and halts.

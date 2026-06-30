@@ -11,49 +11,60 @@
 
 const FREE_TIER_PER_KEY = 20; // free-tier Gemini = 20 req/day/project
 
-/** One-line health summary from a pool entry {total,live}. Pure → unit-tested. */
-export function poolHealthLine(pool) {
+/** One-line health summary from a pool entry {total,live}. Pure → unit-tested.
+ * `perKeyQuota` is the free-tier-per-key budget (gemini=20/day per project; account-level
+ * providers like ollama-cloud share one limit → 0 = don't claim a per-key allowance). */
+export function poolHealthLine(pool, name = "gemini", perKeyQuota = FREE_TIER_PER_KEY) {
   const total = pool?.total ?? 0;
   const live = pool?.live ?? 0;
-  const left = live * FREE_TIER_PER_KEY;
   const state = total === 0 ? "UNCONFIGURED" : live === 0 ? "DRY" : "OK";
-  return `gemini pool: ${state} · live ${live}/${total} · ~${left} req left today`;
+  const budget = perKeyQuota > 0 ? ` · ~${live * perKeyQuota} req left today` : " · account-level limit";
+  return `${name} pool: ${state} · live ${live}/${total}${budget}`;
 }
 
-/** Decide alert + exit code from a pool entry. Pure. */
-export function assess(pool) {
+/** Decide alert + exit code from a pool entry. Pure. `hint` is the provider-specific remedy. */
+export function assess(pool, name = "gemini", hint = "wait for the daily reset or run `npm run gemini:provision`") {
   const total = pool?.total ?? 0;
   const live = pool?.live ?? 0;
   if (total > 0 && live === 0) {
-    return { dry: true, code: 2, alert: "⚠️ ollamas: Gemini key pool is DRY (all keys quota-cooled). Wait for the daily reset or run `npm run gemini:provision`." };
+    return { dry: true, code: 2, alert: `⚠️ ollamas: ${name} key pool is DRY (all keys cooled). ${hint}` };
   }
   return { dry: false, code: 0, alert: null };
 }
 
+// Providers to monitor: gemini (per-project free quota, 20/key) + ollama-cloud (account-level).
+const MONITORED = [
+  { name: "gemini", perKey: FREE_TIER_PER_KEY, hint: "wait for the daily reset or run `npm run gemini:provision`" },
+  { name: "ollama-cloud", perKey: 0, hint: "account-level quota — wait for reset or upgrade the ollama.com plan" },
+];
+
 async function main() {
   const gateway = (process.env.GATEWAY || "http://127.0.0.1:3000").replace(/\/+$/, "");
-  let pool = null;
+  let pools = {};
   try {
     const r = await fetch(`${gateway}/api/keys/pool`, { signal: AbortSignal.timeout(8000) });
-    pool = (await r.json())?.pool?.gemini ?? null;
+    pools = (await r.json())?.pool ?? {};
   } catch (e) {
     console.error(`pool check failed: ${e?.message || e}`);
     process.exit(1);
   }
-  console.log(poolHealthLine(pool));
-  const { dry, code, alert } = assess(pool);
-  if (dry && alert) {
-    // Best-effort alert via the existing notify sink (no-op without a configured URL).
-    try {
-      await fetch(`${gateway}/api/notify/test`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: alert }),
-        signal: AbortSignal.timeout(8000),
-      });
-    } catch { /* alert is best-effort */ }
+  let worstCode = 0;
+  for (const { name, perKey, hint } of MONITORED) {
+    const pool = pools[name] ?? null;
+    if (!pool || pool.total === 0) continue; // not configured → skip silently
+    console.log(poolHealthLine(pool, name, perKey));
+    const { dry, code, alert } = assess(pool, name, hint);
+    if (code > worstCode) worstCode = code;
+    if (dry && alert) {
+      try {
+        await fetch(`${gateway}/api/notify/test`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text: alert }), signal: AbortSignal.timeout(8000),
+        });
+      } catch { /* alert is best-effort */ }
+    }
   }
-  process.exit(code);
+  process.exit(worstCode);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

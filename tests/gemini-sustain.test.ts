@@ -8,6 +8,8 @@ describe("gemini-pool-check helpers", () => {
     expect(poolHealthLine({ total: 9, live: 0 })).toContain("DRY");
     expect(poolHealthLine({ total: 0, live: 0 })).toContain("UNCONFIGURED");
     expect(poolHealthLine(null)).toContain("UNCONFIGURED");
+    // account-level provider (perKey=0) → no per-key allowance claim
+    expect(poolHealthLine({ total: 3, live: 3 }, "ollama-cloud", 0)).toBe("ollama-cloud pool: OK · live 3/3 · account-level limit");
   });
 
   it("assess flags dry (exit 2 + alert) only when keys exist but none live", () => {
