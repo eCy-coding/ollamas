@@ -2,7 +2,8 @@
 // scripts/council.mjs — open a NEW Terminal.app window and run the live council debate inside it
 // (so the operator SEES the local models argue interactively). Zero-dep.
 //
-//   node scripts/council.mjs "is binary search O(log n)? prove it" [--models a,b,c] [--rounds 2] [--here]
+//   node scripts/council.mjs "is binary search O(log n)? prove it" [--models a,b,c] [--rounds 2] [--here] [--deep]
+// Default panel = the FAST proven members (seconds); --deep adds the slow local 30B/32B reasoners.
 //
 // --here (or a non-macOS host / no osascript) runs the debate inline in the current terminal.
 import { spawn, execFileSync } from "node:child_process";

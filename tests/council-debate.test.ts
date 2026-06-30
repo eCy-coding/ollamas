@@ -3,12 +3,13 @@ import { parseArgs, pickCouncilModels, buildMemberPrompt, COUNCIL_RULES } from "
 
 describe("council-debate — pure helpers", () => {
   it("parseArgs: flags + positional topic, rounds clamped 1..5", () => {
-    expect(parseArgs(["--topic", "x", "--models", "a,b", "--rounds", "3"])).toEqual({ topic: "x", models: "a,b", rounds: 3, here: false });
+    expect(parseArgs(["--topic", "x", "--models", "a,b", "--rounds", "3"])).toEqual({ topic: "x", models: "a,b", rounds: 3, here: false, deep: false });
     expect(parseArgs(["just a topic"]).topic).toBe("just a topic");
     expect(parseArgs(["--rounds", "99"]).rounds).toBe(5);  // clamp to max
     expect(parseArgs(["--rounds", "0"]).rounds).toBe(2);   // 0/invalid → default 2
     expect(parseArgs(["--rounds", "1"]).rounds).toBe(1);   // valid min honored
     expect(parseArgs(["--here", "--topic", "q"]).here).toBe(true);
+    expect(parseArgs(["--deep", "--topic", "q"]).deep).toBe(true);  // deep panel opt-in
   });
 
   it("pickCouncilModels: champion first, then distinct installed, capped at `want`", () => {

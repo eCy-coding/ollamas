@@ -9,7 +9,15 @@ npm run council "<topic>"            # same
 node scripts/council-debate.mjs --here --topic "<topic>"   # inline / headless / CI
 ```
 
-Flags: `--models a,b,c` (override with explicit local models) · `--rounds 1..5` · `--here` (inline).
+Flags: `--models a,b,c` (override with explicit local models) · `--rounds 1..5` · `--here` (inline) ·
+`--deep` (add the slow local 30B/32B reasoners — see below).
+
+**Default = the FAST proven panel (seconds, not minutes).** Measured on this single-GPU box
+(2026-06-30): `qwen3:8b` 5.1s/turn, `gpt-oss:120b-cloud` 1.2s/turn vs the local `qwen3-coder:30b`
+34.7s + `deepseek-r1:32b` 47.8s (which often time out). The cloud frontier out-reasons AND
+out-paces the local 30B/32B (~40×), so the default council seats a fast generalist chair + diverse
+fast frontiers. `--deep` re-includes the slow local coder/reasoner when you want local depth and
+have the patience.
 
 ## Why each member sits (every seat is proven)
 
@@ -28,8 +36,10 @@ model installed · cloud key live in the vault · keyless binary present). Each 
 | **$0 Cloud Aggregator** | `openrouter …:free` | cloud | Non-Google diverse free models | OpenRouter free tier ($0) |
 | **Cheap Cloud Generalist** | `gpt-4o-mini` | cloud | Independent broad-coverage opinion | low-cost OpenAI |
 
-The roster lives in `scripts/council-roster.mjs` (`COUNCIL_ROSTER`); `selectCouncil(avail, want)`
-seats a **diverse** available panel (chair + coder + reasoner + ≤2 live cloud frontiers).
+The roster lives in `scripts/council-roster.mjs` (`COUNCIL_ROSTER`); `selectCouncil(avail, want, {deep})`
+seats the available panel. **Default** = the **fast** members only (chair + diverse fast frontiers).
+**`{deep:true}`** also seats the slow local coder + reasoner (30B/32B). Every member carries a
+measured `fast` boolean from the latency benchmark above.
 
 ## Debate rules (each member's system prompt)
 ONE answer · only **real global evidence** (math / science / code) · honest **"fikrim yok"** when

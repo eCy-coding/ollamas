@@ -4,7 +4,8 @@
 // to the terminal, then a synthesis pass prints the SINGLE converged answer. Designed to run
 // inside a Terminal.app window opened by scripts/council.mjs (or inline with --here).
 //
-//   node scripts/council-debate.mjs --topic "is binary search O(log n)? prove it" [--models a,b,c] [--rounds 2]
+//   node scripts/council-debate.mjs --topic "is binary search O(log n)? prove it" [--models a,b,c] [--rounds 2] [--deep]
+// Default panel = the FAST proven members (seconds); --deep adds the slow local 30B/32B reasoners.
 //
 // Council rules (operator-set): ONE answer · only real global evidence (math/science/code) ·
 // say "fikrim yok" if no evidence · no guessing/derivation · terse · converge.
@@ -17,13 +18,14 @@ const GATEWAYS = [process.env.OLLAMAS_GATEWAY, "http://127.0.0.1:3000", "http://
 
 // ── pure helpers (unit-tested) ──────────────────────────────────────────────────────────────
 export function parseArgs(argv) {
-  const a = { topic: "", models: "", rounds: 2, here: false };
+  const a = { topic: "", models: "", rounds: 2, here: false, deep: false };
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
     if (t === "--topic") a.topic = argv[++i] || "";
     else if (t === "--models") a.models = argv[++i] || "";
     else if (t === "--rounds") a.rounds = Math.max(1, Math.min(5, Number(argv[++i]) || 2));
     else if (t === "--here") a.here = true;
+    else if (t === "--deep") a.deep = true;
     else if (!a.topic && !t.startsWith("--")) a.topic = t;
   }
   return a;
@@ -206,7 +208,7 @@ async function runDebate(topic, members, rounds, gateway) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.topic) { process.stdout.write("kullanım: node scripts/council-debate.mjs --topic \"<soru>\" [--models a,b,c] [--rounds 2]\n"); process.exit(1); }
+  if (!args.topic) { process.stdout.write("kullanım: node scripts/council-debate.mjs --topic \"<soru>\" [--models a,b,c] [--rounds 2] [--deep]\n"); process.exit(1); }
   const avail = await getAvailability();
   if (!avail.localModels.length && !avail.gateway) { process.stdout.write(`⚠ ollama (${OLLAMA}) ve gateway erişilemez — council çalışamaz.\n`); process.exit(1); }
 
@@ -215,7 +217,7 @@ async function main() {
   if (args.models) {
     members = args.models.split(",").map((s) => s.trim()).filter(Boolean).map((id) => ({ id, kind: "local", provider: "ollama-local", model: id, specialty: "operator-selected", rationale: "--models", proof: "—" }));
   } else {
-    members = selectCouncil(avail, 5);
+    members = selectCouncil(avail, 5, { deep: args.deep });
   }
   if (!members.length) { process.stdout.write("⚠ erişilebilir council üyesi yok (model/anahtar).\n"); process.exit(1); }
 
@@ -225,7 +227,7 @@ async function main() {
     const m = members[i];
     process.stdout.write(`${C.colors[i % C.colors.length]}${C.bold}▸ ${seatLine(m)}${C.reset}\n${C.dim}   kanıt: ${m.proof}${C.reset}\n`);
   }
-  process.stdout.write(`${C.dim}gateway: ${avail.gateway || "yok (yalnız local)"} · tur: ${args.rounds}${C.reset}\n`);
+  process.stdout.write(`${C.dim}gateway: ${avail.gateway || "yok (yalnız local)"} · tur: ${args.rounds} · panel: ${args.deep ? "deep (yavaş local 30B/32B dahil)" : "fast (varsayılan — saniyeler)"}${C.reset}\n`);
 
   // Single-shot when there's no interactive TTY (piped / CI / --here in a pipe).
   if (!process.stdin.isTTY) { await runDebate(args.topic, members, args.rounds, avail.gateway); return; }

@@ -27,22 +27,42 @@ describe("council-roster — availability gating (a member must prove it's alive
     expect(isAvailable({ kind: "keyless", provider: "gemini-cli" }, avail)).toBe(true);
   });
 
-  it("selectCouncil seats a diverse, available panel capped at `want`", () => {
-    const seated = selectCouncil(avail, 4);
-    expect(seated.length).toBeLessThanOrEqual(4);
-    expect(seated.length).toBeGreaterThanOrEqual(3);
+  it("every roster member carries a measured `fast` boolean", () => {
+    for (const m of COUNCIL_ROSTER) expect(typeof m.fast).toBe("boolean");
+    // the slow local 30B/32B are tagged not-fast (measured 34.7s/47.8s on the single-GPU box)
+    expect(COUNCIL_ROSTER.find((m) => m.model === "qwen3-coder:30b").fast).toBe(false);
+    expect(COUNCIL_ROSTER.find((m) => m.model === "deepseek-r1:32b").fast).toBe(false);
+    // the fast generalist chair + cloud frontier are fast
+    expect(COUNCIL_ROSTER.find((m) => m.model === "qwen3:8b").fast).toBe(true);
+    expect(COUNCIL_ROSTER.find((m) => m.model === "gpt-oss:120b-cloud").fast).toBe(true);
+  });
+
+  it("DEFAULT selectCouncil seats ONLY fast members (no slow local 30B/32B)", () => {
+    const seated = selectCouncil(avail, 5);
+    expect(seated.length).toBeGreaterThanOrEqual(2);
+    expect(seated.every((m) => m.fast)).toBe(true);
     // the chair (qwen3:8b) leads
     expect(seated[0].model).toBe("qwen3:8b");
+    // the slow local 30B/32B are NOT seated by default
+    expect(seated.find((m) => m.model === "qwen3-coder:30b")).toBeUndefined();
+    expect(seated.find((m) => m.model === "deepseek-r1:32b")).toBeUndefined();
     // only available members sit (openai has no key → excluded)
     expect(seated.find((m) => m.provider === "openai")).toBeUndefined();
-    // distinct roles represented
+  });
+
+  it("{deep:true} re-includes the slow local coder + reasoner", () => {
+    const seated = selectCouncil(avail, 5, { deep: true });
     const roles = seated.map((m) => m.role);
     expect(roles).toContain("coder");
     expect(roles).toContain("reasoner");
+    expect(seated.find((m) => m.model === "qwen3-coder:30b")).toBeDefined();
+    expect(seated.find((m) => m.model === "deepseek-r1:32b")).toBeDefined();
   });
 
-  it("nothing seats when no backend is available", () => {
-    expect(selectCouncil({ localModels: [], liveProviders: {}, geminiCli: false }, 5)).toEqual([]);
+  it("nothing seats when no backend is available (fast or deep)", () => {
+    const none = { localModels: [], liveProviders: {}, geminiCli: false };
+    expect(selectCouncil(none, 5)).toEqual([]);
+    expect(selectCouncil(none, 5, { deep: true })).toEqual([]);
   });
 
   it("seatLine carries the justification", () => {
