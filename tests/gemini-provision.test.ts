@@ -1,11 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { parseProjectIds, keyAddUrl, redactKeys, summarize } from "../scripts/gemini-provision.mjs";
+import { parseProjectIds, keyAddUrl, redactKeys, summarize, newProjectId } from "../scripts/gemini-provision.mjs";
 
 describe("gemini-provision pure helpers", () => {
   it("parseProjectIds trims, drops blanks + a header line", () => {
     expect(parseProjectIds("proj-a\n proj-b \n\nprojectId\nproj-c\n")).toEqual(["proj-a", "proj-b", "proj-c"]);
     expect(parseProjectIds("")).toEqual([]);
     expect(parseProjectIds(null as any)).toEqual([]);
+  });
+
+  it("newProjectId yields a GCP-valid id (≤30, lowercase, letter-start, no trailing -)", () => {
+    const id = newProjectId(1, "K3X9aZbQ");
+    expect(id).toBe("ollamas-gem-1-k3x9az");
+    expect(id.length).toBeLessThanOrEqual(30);
+    expect(id).toMatch(/^[a-z][a-z0-9-]*[a-z0-9]$/);
+    expect(newProjectId(2, "")).toBe("ollamas-gem-2-x"); // empty rand → fallback, still valid
   });
 
   it("keyAddUrl builds the endpoint + strips trailing slashes", () => {

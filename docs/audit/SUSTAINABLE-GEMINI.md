@@ -21,7 +21,10 @@ launchctl load ~/Library/LaunchAgents/com.ollamas.gemini-pool-check.plist
 ```
 Runs `gemini:check` every 4h (read-only) → pings you only when the pool is genuinely dry.
 
-## Need more than ~N×20/day?
-- **More keys:** create more GCP projects (`gcloud projects create …`) → `npm run gemini:provision` again → +20/day each.
+## Need more than ~N×20/day? — grow the pool (one command)
+- **More projects (auto):** `npm run gemini:provision -- --new-projects 6` → creates 6 new GCP projects + a key in each → **+~120/day**. Preview first: add `--dry` (creates nothing). Caveat: GCP caps active projects (~12-30 default; beyond → a quota-increase request at console.cloud.google.com, Google-side). Some brand-new projects may require billing for certain APIs (the script reports per-project + continues).
 - **Unlimited:** enable billing on one project (paid tier) — no quota wall.
-Both are one-time operator actions (creating credentials/billing is yours, not the agent's).
+
+> Why only Gemini? Free-tier quota is **per-project** (20/day) → N projects multiply it. OpenAI / Anthropic / OpenRouter enforce limits at the **account level** (not per key), so pooling their keys adds NO capacity — and none has a gcloud-style zero-bootstrap auto-provision. Gemini is the only provider where this works.
+
+Creating projects/credentials/billing is the operator's action (classifier-gated for the agent), one command.

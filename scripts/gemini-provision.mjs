@@ -38,6 +38,13 @@ export function redactKeys(text) {
   return String(text ?? "").replace(/AIza[0-9A-Za-z_-]{35}/g, "AIza…REDACTED");
 }
 
+/** GCP-valid project id for a new pool project. Pure (rand passed in). 6-30 chars,
+ * lowercase letter start, [a-z0-9-], no trailing hyphen. e.g. ollamas-gem-1-k3x9. */
+export function newProjectId(i, rand) {
+  const suffix = String(rand).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "x";
+  return `ollamas-gem-${i}-${suffix}`.slice(0, 30).replace(/-+$/, "");
+}
+
 /** Human summary from per-project results. NEVER includes key values. */
 export function summarize(results) {
   const by = (s) => results.filter((r) => r.status === s).length;
@@ -89,6 +96,8 @@ async function main() {
   const limit = limitArg >= 0 ? Number(args[limitArg + 1]) : Infinity;
   const gwArg = args.indexOf("--gateway");
   const gateway = gwArg >= 0 ? args[gwArg + 1] : "http://127.0.0.1:3000";
+  const npArg = args.indexOf("--new-projects");
+  const newProjects = npArg >= 0 ? Math.max(0, Number(args[npArg + 1]) || 0) : 0;
 
   const acct = await activeAccount();
   if (!acct) {
@@ -103,9 +112,22 @@ async function main() {
   if (Number.isFinite(limit)) projects = projects.slice(0, limit);
   console.log(`Projects (${projects.length}): ${projects.join(", ")}`);
 
+  // --new-projects N: GCP project ids to create (each = +20/day free-tier quota).
+  const toCreate = Array.from({ length: newProjects }, (_, k) =>
+    newProjectId(k + 1, Math.random().toString(36).slice(2, 8)));
+
   if (dry) {
-    console.log(`\n[--dry] Would create one 'ollamas-gemini' key per project (${projects.length} keys → ~${projects.length * 20}/day) and load each into the vault. No changes made.`);
+    if (newProjects > 0) console.log(`[--dry] Would CREATE ${newProjects} new project(s): ${toCreate.join(", ")} (+~${newProjects * 20}/day).`);
+    console.log(`[--dry] Would create one 'ollamas-gemini' key per project (${projects.length + newProjects} total → ~${(projects.length + newProjects) * 20}/day) and load each into the vault. No changes made.`);
     return;
+  }
+
+  // Create the new projects first (graceful per-item), then provision keys on all.
+  for (const id of toCreate) {
+    process.stdout.write(`  + creating project ${id}… `);
+    const c = await gcloud(["projects", "create", id, "--name=ollamas gemini"]);
+    if (c.ok) { console.log("✓"); projects.push(id); }
+    else console.log(`✗ (${c.reason}) — GCP project-create quota or billing may be required`);
   }
 
   const results = [];
