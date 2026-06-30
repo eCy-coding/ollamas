@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Read-only Gemini key-pool health monitor. Runs every 4h, GETs /api/keys/pool, and alerts
+     (Slack/Discord via /api/notify) only if the live pool is dry. Creates/handles NO credentials.
+     Activate once:  launchctl load ~/Library/LaunchAgents/com.ollamas.gemini-pool-check.plist  -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ollamas.gemini-pool-check</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Desktop/ollamas" &amp;&amp; exec node scripts/gemini-pool-check.mjs</string>
+  </array>
+  <key>StartInterval</key><integer>14400</integer>
+  <key>RunAtLoad</key><true/>
+  <key>WorkingDirectory</key><string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>StandardOutPath</key><string>/tmp/ollamas-gemini-pool-check.log</string>
+  <key>StandardErrorPath</key><string>/tmp/ollamas-gemini-pool-check.log</string>
+  <key>ProcessType</key><string>Background</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+</dict>
+</plist>
