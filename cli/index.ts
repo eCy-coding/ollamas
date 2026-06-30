@@ -327,6 +327,13 @@ export async function main(argv: string[]): Promise<number> {
       const r = spawnSync(process.execPath, ["scripts/council.mjs", ...rest], { stdio: "inherit" });
       return r.status ?? 0;
     }
+    case "ecysearcher": {
+      // Manage the eCySearcher threat-intel subsystem UNDER ollamas (up|down|status|health [--dry|--json]).
+      // Thin launcher (N-012-safe: spawns the zero-dep lane script that drives `docker compose`; no
+      // server import). ollamas is the control plane; the main :3000 stack is never touched.
+      const r = spawnSync(process.execPath, ["scripts/ecysearcher-lane.mjs", ...rest], { stdio: "inherit" });
+      return r.status ?? 0;
+    }
     case "doctor":
       return runDoctor(rest);
     case "config":
