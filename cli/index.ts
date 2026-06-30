@@ -7,6 +7,7 @@ import { runChat } from "./commands/chat";
 import { runDoctor } from "./commands/doctor";
 import { runAgent } from "./commands/agent";
 import { runSaas } from "./commands/saas";
+import { runKeys } from "./commands/keys";
 import { runBench } from "./commands/bench";
 import { runMcp } from "./commands/mcp";
 import { runBackup } from "./commands/backup";
@@ -318,6 +319,8 @@ export async function main(argv: string[]): Promise<number> {
       return runRemote(rest);
     case "gemini":
       return runGemini(rest);
+    case "keys":
+      return runKeys(rest);
     case "council": {
       // Live multi-model council debate in a new Terminal.app window. Thin launcher (N-012-safe:
       // spawns the zero-dep script, no server import). Run from the repo (like the npm scripts).

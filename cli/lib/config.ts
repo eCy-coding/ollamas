@@ -13,6 +13,7 @@ import { loadMasterKey } from "./keystore";
 export interface CliConfig {
   gateway: string;
   apiKey?: string; // in-memory plaintext (sealed on disk as apiKeyEnc)
+  apiKeyPool?: string[]; // olm_ gateway-key pool (sealed on disk as apiKeyPoolEnc) — rotated client-side
   saasAdminToken?: string; // X-Admin-Token; sealed on disk as saasAdminTokenEnc
   mcpGuardAllow?: string; // CSV glob whitelist for `mcp tools|call` (v5)
   mcpGuardDeny?: string; // CSV glob blacklist for `mcp tools|call` (v5)
@@ -26,6 +27,7 @@ export interface CliConfig {
 interface DiskConfig {
   gateway?: string;
   apiKeyEnc?: string;
+  apiKeyPoolEnc?: string; // sealed JSON array of olm_ pool keys
   saasAdminTokenEnc?: string;
   mcpGuardAllow?: string;
   mcpGuardDeny?: string;
@@ -89,6 +91,7 @@ export function resolveConfig(fileData: Partial<CliConfig>, env: NodeJS.ProcessE
   return {
     gateway: env.OLLAMAS_GATEWAY || fileData.gateway || DEFAULTS.gateway,
     apiKey: env.OLLAMAS_API_KEY || fileData.apiKey,
+    apiKeyPool: env.OLLAMAS_API_KEY_POOL ? env.OLLAMAS_API_KEY_POOL.split(",").map((s) => s.trim()).filter(Boolean) : fileData.apiKeyPool,
     saasAdminToken: env.OLLAMAS_SAAS_ADMIN || fileData.saasAdminToken,
     mcpGuardAllow: env.OLLAMAS_MCP_ALLOW || fileData.mcpGuardAllow,
     mcpGuardDeny: env.OLLAMAS_MCP_DENY || fileData.mcpGuardDeny,
@@ -98,33 +101,51 @@ export function resolveConfig(fileData: Partial<CliConfig>, env: NodeJS.ProcessE
   };
 }
 
+// PURE: pick the gateway key to use for a call — a random member of the olm_ pool (spreads load
+// across N tenants = N× the per-tenant rate limit; a rate-limited/revoked key is just one of many),
+// else the single apiKey. rng injectable for tests. Returns undefined when neither is set.
+export function pickPoolKey(cfg: Pick<CliConfig, "apiKey" | "apiKeyPool">, rng: () => number = Math.random): string | undefined {
+  const pool = cfg.apiKeyPool?.filter(Boolean) ?? [];
+  if (pool.length) return pool[Math.floor(rng() * pool.length) % pool.length];
+  return cfg.apiKey;
+}
+
 // PURE: decrypt an on-disk config into plaintext fileData. Reports whether legacy
 // plaintext secrets were present (caller migrates). `key` is required only when a
 // sealed *Enc field exists; pass null otherwise.
 export function unsealDisk(disk: DiskConfig, key: Buffer | null): { fileData: Partial<CliConfig>; legacy: boolean } {
-  const { apiKey: legacyKey, saasAdminToken: legacyAdmin, apiKeyEnc, saasAdminTokenEnc, ...rest } = disk;
+  const { apiKey: legacyKey, saasAdminToken: legacyAdmin, apiKeyEnc, apiKeyPoolEnc, saasAdminTokenEnc, ...rest } = disk;
   const legacy = !!(legacyKey || legacyAdmin);
   let apiKey = legacyKey;
   let saasAdminToken = legacyAdmin;
+  let apiKeyPool: string[] | undefined;
   if (apiKeyEnc) {
     if (!key) throw new Error("master key required to decrypt apiKey");
     apiKey = open(apiKeyEnc, key);
+  }
+  if (apiKeyPoolEnc) {
+    if (!key) throw new Error("master key required to decrypt apiKeyPool");
+    try { apiKeyPool = JSON.parse(open(apiKeyPoolEnc, key)); } catch { apiKeyPool = undefined; }
   }
   if (saasAdminTokenEnc) {
     if (!key) throw new Error("master key required to decrypt saasAdminToken");
     saasAdminToken = open(saasAdminTokenEnc, key);
   }
-  return { fileData: { ...rest, apiKey, saasAdminToken }, legacy };
+  return { fileData: { ...rest, apiKey, apiKeyPool, saasAdminToken }, legacy };
 }
 
 // PURE: seal plaintext fileData into the on-disk shape. `key` required only when a
 // secret is present. Plaintext secrets never survive into the returned object.
 export function sealDisk(fileData: Partial<CliConfig>, key: Buffer | null): DiskConfig {
-  const { apiKey, saasAdminToken, ...rest } = fileData;
+  const { apiKey, apiKeyPool, saasAdminToken, ...rest } = fileData;
   const disk: DiskConfig = { ...rest };
   if (apiKey) {
     if (!key) throw new Error("master key required to seal apiKey");
     disk.apiKeyEnc = seal(apiKey, key);
+  }
+  if (apiKeyPool && apiKeyPool.length) {
+    if (!key) throw new Error("master key required to seal apiKeyPool");
+    disk.apiKeyPoolEnc = seal(JSON.stringify(apiKeyPool), key);
   }
   if (saasAdminToken) {
     if (!key) throw new Error("master key required to seal saasAdminToken");
@@ -173,7 +194,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliConfig {
   const disk = readDisk(path);
   const { fileData, legacy } = unsealOrWarn(disk, env);
   if (legacy) migrateLegacy(path, disk, fileData, env);
-  return resolveConfig(fileData, env);
+  const cfg = resolveConfig(fileData, env);
+  // Rotate: when an olm_ pool is configured, every GatewayClient(cfg.apiKey) call transparently
+  // uses a pooled key (load spread across N tenants). Single-key configs are untouched (non-breaking).
+  if (cfg.apiKeyPool?.length) cfg.apiKey = pickPoolKey(cfg);
+  return cfg;
 }
 
 // One-way migration of a pre-v7 plaintext file → sealed at rest. Backs up the
@@ -200,7 +225,7 @@ export function saveConfig(patch: Partial<CliConfig>, env: NodeJS.ProcessEnv = p
   const path = profilePath(activeProfileName(env));
   const fileData = unsealOrWarn(readDisk(path), env).fileData;
   const next: Partial<CliConfig> = { ...DEFAULTS, ...fileData, ...patch };
-  const needKey = !!(next.apiKey || next.saasAdminToken);
+  const needKey = !!(next.apiKey || next.saasAdminToken || next.apiKeyPool?.length);
   const disk = sealDisk(next, needKey ? loadMasterKey() : null);
   const prevPointer = readDisk(path).activeProfile;
   if (prevPointer) disk.activeProfile = prevPointer;
