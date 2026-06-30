@@ -43,6 +43,14 @@ export const shutdownTotal = new client.Counter({
   registers: [register],
 });
 
+/** Stray-background-rejection counter — incremented each time an unhandledRejection is
+ * survived (logged, not fatal). A rising value flags a `.catch`-less promise to fix. */
+export const unhandledRejectionTotal = new client.Counter({
+  name: "ollamas_unhandled_rejection_total",
+  help: "Number of unhandled promise rejections survived (logged, process kept alive)",
+  registers: [register],
+});
+
 /**
  * Pull-time gauges sourced from the store at scrape (prom-client async collect).
  * Lazily registered once at boot so this module has no import cycle with the store.

@@ -3,7 +3,8 @@ import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
-import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, ukpStageEventsTotal } from "./server/metrics";
+import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, unhandledRejectionTotal, ukpStageEventsTotal } from "./server/metrics";
+import { installProcessGuards } from "./server/process-guards";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -2765,6 +2766,15 @@ content
   };
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
+
+  // Last-resort guards: a stray `.catch`-less background promise must NOT kill the gateway
+  // (Node ≥15 terminates on an unhandled rejection by default). Survive + log + count rejections;
+  // graceful-exit on an uncaughtException (undefined state). See server/process-guards.ts.
+  installProcessGuards({
+    shutdown: (signal) => void shutdown(signal),
+    logError: (msg, err) => console.error(msg, err),
+    onRejectionSurvived: () => unhandledRejectionTotal.inc(),
+  });
 }
 
 // Start full stack Express services
