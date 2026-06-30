@@ -42,6 +42,13 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-everything"],
       "allowedTools": ["echo", "add", "printEnv", "longRunningOperation"]
+    },
+    {
+      "name": "ecysearcher",
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/Users/emrecnyngmail.com/Desktop/ollamas/scripts/ecysearcher-mcp.mjs"],
+      "allowedTools": ["ecysearcher_search", "ecysearcher_domain", "ecysearcher_ip", "ecysearcher_threats"]
     }
   ],
   "tools": {
