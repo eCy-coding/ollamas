@@ -763,9 +763,23 @@ async function initializeServer() {
   /**
    * Models listing endpoints to avoid catalog hardcoding (L3, M1)
    */
+  const MODELS_TTL_MS = 8000;
+  const modelsCache = new Map<string, { at: number; list: string[] }>();
   app.get("/api/models/:provider", async (req, res) => {
     const prov = req.params.provider;
     const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
+
+    // C1 — short-TTL cache: the UI model dropdown polls this; without it every poll re-fetches
+    // ollama tags / vLLM-llamacpp /v1/models / openrouter / gemini. 8s TTL (mirrors the fleet/
+    // gemini-cli probe caches). Keyed by provider + freeOnly. Wrapping res.json caches every branch.
+    const cacheKey = `${prov}:${req.query.freeOnly === "true" ? "free" : ""}`;
+    const hit = modelsCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < MODELS_TTL_MS) return res.json(hit.list);
+    const sendJson = res.json.bind(res);
+    res.json = ((list: unknown) => {
+      if (Array.isArray(list)) modelsCache.set(cacheKey, { at: Date.now(), list: list as string[] });
+      return sendJson(list);
+    }) as typeof res.json;
 
     try {
       if (prov === "ollama-local") {

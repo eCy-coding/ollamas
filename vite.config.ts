@@ -77,6 +77,18 @@ export default defineConfig(() => {
           landing: path.resolve(__dirname, 'web/index.html'),
           embedDemo: path.resolve(__dirname, 'web/embed-demo.html'),
         },
+        // vNEXT-C2: split heavy vendors out of the single 572K app chunk → smaller initial JS +
+        // long-term caching (vendors change rarely). Path-matching (function) form — firebase has
+        // no bare "." export so the array form can't name it; match by node_modules path instead.
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'vendor-firebase';
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-error-boundary')) return 'vendor-react';
+            if (id.includes('node_modules/lucide-react') || id.includes('node_modules/motion')) return 'vendor-ui';
+            if (id.includes('node_modules/@lingui')) return 'vendor-i18n';
+            return undefined;
+          },
+        },
       },
     },
     server: {

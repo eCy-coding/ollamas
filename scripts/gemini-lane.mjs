@@ -15,6 +15,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const WANT = Number(process.env.OLLAMAS_GEMINI_PORT || 3011);
 
@@ -44,9 +45,21 @@ const env = { ...process.env, PORT: String(port), MISSION_CONTROL_DATA_DIR: data
 if (process.env.OLLAMAS_KEEP_PROXY !== "1") {
   for (const v of ["HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","FTP_PROXY","GRPC_PROXY","http_proxy","https_proxy","all_proxy","ftp_proxy","grpc_proxy","GLOBAL_AGENT_HTTP_PROXY","GLOBAL_AGENT_HTTPS_PROXY"]) delete env[v];
 }
+// vNEXT-C3: single-lane reaper — kill the PREVIOUS gemini-lane (this lineage only, via its recorded
+// PID; NEVER :3000) so repeated boots don't pile up orphan `tsx server.ts` lanes on a loaded box.
+mkdirSync(dataDir, { recursive: true });
+const pidFile = join(dataDir, "lane.pid");
+try {
+  const prior = Number(String(readFileSync(pidFile, "utf8")).trim());
+  if (prior && prior !== process.pid) {
+    try { process.kill(prior, "SIGTERM"); console.error(`[gemini-lane] reaped stale lane pid ${prior}`); } catch { /* already gone */ }
+  }
+} catch { /* no prior pid file */ }
+
 console.error(`[gemini-lane] booting a dedicated ollamas gateway on :${port}  (data: ${dataDir})`);
 
 const child = spawn("./node_modules/.bin/tsx", ["server.ts"], { cwd: process.cwd(), env, stdio: "inherit" });
+try { writeFileSync(pidFile, String(child.pid)); } catch { /* best-effort */ }
 child.on("error", (e) => { console.error(`[gemini-lane] spawn failed: ${e?.message || e}`); process.exit(1); });
 child.on("exit", (c) => process.exit(c ?? 0));
 
