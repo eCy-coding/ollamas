@@ -25,6 +25,12 @@ export const COUNCIL_ROSTER = [
     proof: "DeepSeek-R1 reasoning model (native CoT); installed locally on the M4 Max.",
   },
   {
+    id: "gpt-oss:120b-cloud", kind: "local", provider: "ollama-local", model: "gpt-oss:120b-cloud", role: "frontier",
+    specialty: "Cloud Frontier (signin · $0-key)",
+    rationale: "ollama.com 120B frontier via the `ollama signin` session — NO api key, 0-manual, sustainable.",
+    proof: "Live: gateway provider:ollama-local model:gpt-oss:120b-cloud → real answer (GATEWAY-CLOUD-REAL).",
+  },
+  {
     id: "gemini-cli", kind: "keyless", provider: "gemini-cli", model: "", role: "frontier",
     specialty: "Keyless Frontier (OAuth)",
     rationale: "Google frontier via the gemini binary — 1M context, 1000/day, $0, no key needed.",

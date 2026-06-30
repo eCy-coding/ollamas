@@ -22,6 +22,7 @@ model installed · cloud key live in the vault · keyless binary present). Each 
 | **Chair** | `qwen3:8b` | local | Fast generalist, leads + synthesizes | 82 tok/s resident on the M4 Max; `MODEL_SELECTION.json` singleBest rate 1.0 ("cheapest 100%") |
 | **Coder** | `qwen3-coder:30b` | local | Algorithmic / code-correctness | coder-tuned (`LOCAL_CODER_HINT`), architect/coder role (vO6 code bench) |
 | **Reasoner** | `deepseek-r1:32b` | local | Hard logic / multi-step proofs | DeepSeek-R1 native chain-of-thought |
+| **Cloud Frontier** | `gpt-oss:120b-cloud` | local→cloud | ollama.com 120B frontier, $0-key, **0-manual** | `ollama signin` session proxies it via `provider:ollama-local` — NO api key (live-proven) |
 | **Keyless Frontier** | `gemini-cli` | keyless | Google frontier, 1M ctx, $0 | the `gemini` binary carries Google OAuth (1000/day) |
 | **Fastest Frontier** | `gemini-3.5-flash` | cloud | Lowest-latency frontier, decisive turn | `NOTE-model-efficiency`: gemini-2.5-pro 4/4 @ 28.3s (fastest) |
 | **$0 Cloud Aggregator** | `openrouter …:free` | cloud | Non-Google diverse free models | OpenRouter free tier ($0) |
@@ -40,3 +41,8 @@ times out is **skipped honestly** (never a fabricated turn). Local turns 60s, cl
 - **Cloud / keyless** members → the ollamas gateway `/api/generate {provider, model, stream:true}`
   (uses the AES-256-GCM vault key + the ProviderRouter). Auto-detected: `OLLAMAS_GATEWAY` → :3000 → :3020.
   No gateway up → cloud members are skipped; the local panel still debates.
+- **0-manual ollama.com cloud (no API key):** once the operator runs `ollama signin`, the local
+  ollama proxies `:cloud` models (`gpt-oss:120b-cloud`, `kimi-k2.5:cloud`, `qwen3-coder:480b-cloud`)
+  through `provider:ollama-local` — frontier cloud at **$0 key, zero manual**, the sustainable path.
+  A Bearer ollama-cloud API key (web-minted at ollama.com/settings/keys, guided in KeyVault) is an
+  ALTERNATE for headless/external use; it can't be minted 0-manual (the `ollama` CLI has no keys cmd).
