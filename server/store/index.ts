@@ -304,9 +304,11 @@ export async function setBillingConfig(key: string, value: string): Promise<void
   await d().run("INSERT INTO billing_config (k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", [key, value]);
 }
 export async function stripeEventSeen(eventId: string): Promise<boolean> {
-  const seen = !!(await d().query("SELECT 1 AS x FROM stripe_events WHERE id = ?", [eventId])).rows[0];
-  if (!seen) await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?)", [eventId, nowIso()]);
-  return seen;
+  // Atomic: a single INSERT … ON CONFLICT DO NOTHING — `changes>0` means WE inserted it (first
+  // time → not seen); `changes===0` means a concurrent/earlier delivery already has it (seen).
+  // Replaces the SELECT-then-INSERT TOCTOU where two duplicate webhook deliveries could both pass.
+  const r = await d().run("INSERT INTO stripe_events (id, ts) VALUES (?,?) ON CONFLICT(id) DO NOTHING", [eventId, nowIso()]);
+  return r.changes === 0;
 }
 
 /** List UKP stage-events ordered by ts DESC. Limit clamped [1, 1000].

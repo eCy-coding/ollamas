@@ -71,6 +71,10 @@ export async function generateViaGeminiCli(
   const prompt = flattenForGemini(messages);
   const args = ["--output-format", "json", ...(model ? ["--model", model] : []), prompt];
   const start = Date.now();
+  // Honor an already-aborted caller BEFORE spawning (the abort listener below only catches an
+  // abort that fires AFTER spawn — a pre-aborted signal would otherwise run the subprocess to
+  // completion and stall the whole provider chain on failover).
+  if (signal?.aborted) throw new Error("gemini-cli: signal already aborted");
   await spawnGate.acquire(); // E2 — bounded concurrency
   let result: { code: number | null; stdout: string; stderr: string };
   try {
@@ -88,9 +92,12 @@ export async function generateViaGeminiCli(
       let out = ""; let err = "";
       const onAbort = () => child.kill("SIGKILL");
       signal?.addEventListener("abort", onAbort, { once: true });
+      // Wall-clock backstop: a hung gemini (OAuth/network stall) must not block the request
+      // forever — kill after 30s so the provider chain fails over.
+      const killTimer = setTimeout(() => child.kill("SIGKILL"), 30_000);
       child.stdout.on("data", (d) => { out += String(d); });
       child.stderr.on("data", (d) => { err += String(d); });
-      const done = (r: { code: number | null; stdout: string; stderr: string }) => { signal?.removeEventListener("abort", onAbort); resolve(r); };
+      const done = (r: { code: number | null; stdout: string; stderr: string }) => { clearTimeout(killTimer); signal?.removeEventListener("abort", onAbort); resolve(r); };
       child.on("error", (e) => done({ code: null, stdout: out, stderr: err || String((e as any)?.message || e) }));
       child.on("close", (c) => done({ code: c, stdout: out, stderr: err }));
     });

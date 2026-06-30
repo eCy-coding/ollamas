@@ -23,11 +23,14 @@ describe("LLM Mission Control Core Software Suite Tests", () => {
     expect(chainOpenRouter).toContain("gemini");
     expect(chainOpenRouter).toContain("openai");
     expect(chainOpenRouter).toContain("demo");
-    expect(chainOpenRouter.length).toBe(6);
+    expect(chainOpenRouter).toContain("fleet");
+    expect(chainOpenRouter).toContain("gemini-cli"); // keyless OAuth backend in the chain
+    expect(chainOpenRouter.length).toBe(8); // fleet + gemini-cli (server/providers.ts fallback defaults)
 
     const chainUnknown = getFallbackChain("unknown-provider");
     expect(chainUnknown[0]).toBe("unknown-provider");
-    expect(chainUnknown[1]).toBe("ollama-local");
+    expect(chainUnknown[1]).toBe("fleet"); // fleet artık ilk default; ardından ollama-local
+    expect(chainUnknown[2]).toBe("ollama-local");
   });
 
   // 2. FILE: marker parser used by pipeline

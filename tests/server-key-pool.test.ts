@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { limitFor, pctOfLimit, approaching } from "../server/key-limits";
 import { keyId, recordKeyUse, keyWindows, resetKeyUsage } from "../server/key-usage";
 import { ProviderRouter } from "../server/providers";
+import { db } from "../server/db";
 
 describe("key-limits", () => {
   it("known defaults; env override; unknown → unlimited", () => {
@@ -56,8 +57,22 @@ describe("key-usage", () => {
 });
 
 describe("ProviderRouter P2 — least-loaded selection + saturation", () => {
-  beforeEach(() => { resetKeyUsage(); process.env.GEMINI_API_KEY = "kA"; process.env.GEMINI_API_KEY_2 = "kB"; });
-  afterEach(() => { delete process.env.GEMINI_API_KEY; delete process.env.GEMINI_API_KEY_2; });
+  // Hermetic: keyPool merges the VAULT (db.data.keys/keyPool) with env keys, so isolate the gemini
+  // pool to exactly the env kA/kB — clear any operator-pasted vault gemini keys + extra env slots.
+  let savedKey: string | undefined; let savedPool: unknown;
+  beforeEach(() => {
+    resetKeyUsage();
+    for (let i = 1; i <= 9; i++) delete process.env[`GEMINI_API_KEY_${i}`];
+    delete process.env.GEMINI_API_KEYS;
+    savedKey = db.data.keys["gemini"]; delete db.data.keys["gemini"];
+    savedPool = (db.data as any).keyPool?.["gemini"]; if ((db.data as any).keyPool) delete (db.data as any).keyPool["gemini"];
+    process.env.GEMINI_API_KEY = "kA"; process.env.GEMINI_API_KEY_2 = "kB";
+  });
+  afterEach(() => {
+    delete process.env.GEMINI_API_KEY; delete process.env.GEMINI_API_KEY_2;
+    if (savedKey !== undefined) db.data.keys["gemini"] = savedKey;
+    if (savedPool !== undefined && (db.data as any).keyPool) (db.data as any).keyPool["gemini"] = savedPool;
+  });
 
   it("getDecryptedKey picks the live key with the most headroom", () => {
     const now = Date.now();

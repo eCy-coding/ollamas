@@ -74,9 +74,13 @@ export async function getInstallationToken(creds: AppCreds, nowSec: number): Pro
       headers: GH_HEADERS(jwt),
     });
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
+    let data: { token?: string; expires_at?: string; message?: string } = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { /* non-JSON */ }
     if (!res.ok) return { ok: false, error: `GitHub ${res.status}: ${data.message || text.slice(0, 160)}` };
-    tokenCache = { token: data.token, exp: Math.floor(new Date(data.expires_at).getTime() / 1000) };
+    // Validate before caching — a 200 without token/expires_at must not yield `Bearer undefined` + NaN exp.
+    const expMs = data.expires_at ? new Date(data.expires_at).getTime() : NaN;
+    if (!data.token || Number.isNaN(expMs)) return { ok: false, error: "GitHub returned no usable installation token" };
+    tokenCache = { token: data.token, exp: Math.floor(expMs / 1000) };
     return { ok: true, token: data.token };
   } catch (e) {
     return { ok: false, error: `fetch failed: ${(e as Error).message}` };
