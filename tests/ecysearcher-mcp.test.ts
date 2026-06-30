@@ -5,27 +5,24 @@ import { ecyBase, searchUrl, domainUrl, ipUrl, threatsUrl, urlForTool, TOOLS } f
 describe("ecysearcher-mcp — pure request builders", () => {
   const base = "http://localhost:5000";
 
-  it("ecyBase default + env override", () => {
-    expect(ecyBase({} as any)).toBe("http://localhost:5000");
+  it("ecyBase default (remapped :5055) + env override", () => {
+    expect(ecyBase({} as any)).toBe("http://localhost:5055");
+    expect(ecyBase({ ECYSEARCHER_API_PORT: "5099" } as any)).toBe("http://localhost:5099");
     expect(ecyBase({ ECYSEARCHER_URL: "http://h:5050/" } as any)).toBe("http://h:5050");
   });
 
-  it("searchUrl encodes q/type/limit", () => {
+  it("all tools hit the ONE fixed unified endpoint /api/search/search with a type filter", () => {
     expect(searchUrl(base, { q: "example.com", type: "all", limit: 10 }))
-      .toBe("http://localhost:5000/api/search?q=example.com&type=all&limit=10");
+      .toBe("http://localhost:5000/api/search/search?q=example.com&type=all&limit=10");
     expect(searchUrl(base, { q: "a b" })).toContain("q=a+b");
-    expect(searchUrl(base, { q: "x" })).toContain("limit=50"); // default
-  });
-
-  it("domain/ip/threats URLs", () => {
-    expect(domainUrl(base, { name: "evil.test" })).toBe("http://localhost:5000/api/domains/evil.test/threats");
-    expect(ipUrl(base, { ip: "1.2.3.4" })).toBe("http://localhost:5000/api/ips/1.2.3.4/geolocation");
-    expect(threatsUrl(base, { limit: 5 })).toBe("http://localhost:5000/api/threats?limit=5");
+    expect(domainUrl(base, { name: "evil.test" })).toBe("http://localhost:5000/api/search/search?q=evil.test&type=domains&limit=50");
+    expect(ipUrl(base, { ip: "1.2.3.4" })).toBe("http://localhost:5000/api/search/search?q=1.2.3.4&type=ips&limit=50");
+    expect(threatsUrl(base, { limit: 5 })).toBe("http://localhost:5000/api/search/search?q=&type=threats&limit=5");
   });
 
   it("urlForTool dispatches by tool name; unknown throws", () => {
-    expect(urlForTool("ecysearcher_search", { q: "x" }, {} as any)).toContain("/api/search?q=x");
-    expect(urlForTool("ecysearcher_ip", { ip: "8.8.8.8" }, {} as any)).toContain("/api/ips/8.8.8.8/");
+    expect(urlForTool("ecysearcher_search", { q: "x" }, {} as any)).toContain("/api/search/search?q=x");
+    expect(urlForTool("ecysearcher_ip", { ip: "8.8.8.8" }, {} as any)).toContain("type=ips");
     expect(() => urlForTool("nope", {}, {} as any)).toThrow(/unknown tool/);
   });
 

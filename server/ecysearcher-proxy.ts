@@ -7,9 +7,11 @@
 // the ollamas choke-point. Graceful 502 when eCySearcher is down — never throws into the request.
 import type { Request, Response } from "express";
 
-/** Base URL of the eCySearcher Flask API. */
+/** Base URL of the eCySearcher Flask API (remapped host API port, default 5055 — see the lane). */
 export function ecyBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  return (env.ECYSEARCHER_URL || "http://localhost:5000").replace(/\/$/, "");
+  if (env.ECYSEARCHER_URL) return env.ECYSEARCHER_URL.replace(/\/$/, "");
+  const port = env.ECYSEARCHER_API_PORT || "5055";
+  return `http://localhost:${port}`;
 }
 
 /** Build the upstream URL from the base + the sub-path (express strips the mount prefix into req.url).

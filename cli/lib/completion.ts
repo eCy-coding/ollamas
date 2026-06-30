@@ -48,7 +48,7 @@ export const COMMAND_TREE: CommandTree = {
     config: ["use", "profiles", "keystore", "gateway", "model", "provider", "apiKey", "saasAdminToken"],
     remote: ["check", "discover", "add", "rm", "ls", "pick", "up"],
     gemini: ["setup-mcp", "status", "lane"],
-    ecysearcher: ["up", "down", "status", "health"],
+    ecysearcher: ["up", "down", "status", "health", "logs"],
     completion: ["bash", "zsh", "fish"],
     plugin: ["list", "install", "remove"],
     update: ["--check"],

@@ -2,8 +2,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { ecyBaseUrl, ecyTargetUrl, ecysearcherProxy } from "../server/ecysearcher-proxy";
 
 describe("ecysearcher-proxy — pure URL helpers", () => {
-  it("ecyBaseUrl default + env override (trailing slash stripped)", () => {
-    expect(ecyBaseUrl({} as NodeJS.ProcessEnv)).toBe("http://localhost:5000");
+  it("ecyBaseUrl default (remapped :5055) + env override (trailing slash stripped)", () => {
+    expect(ecyBaseUrl({} as NodeJS.ProcessEnv)).toBe("http://localhost:5055");
+    expect(ecyBaseUrl({ ECYSEARCHER_API_PORT: "5099" } as any)).toBe("http://localhost:5099");
     expect(ecyBaseUrl({ ECYSEARCHER_URL: "http://h:5050/" } as any)).toBe("http://h:5050");
   });
   it("ecyTargetUrl joins base + sub-path (carrying the query string)", () => {

@@ -11,15 +11,15 @@ interface SearchResp {
   success?: boolean; query?: string; type?: string; count?: number;
   data?: { threats?: any[]; domains?: any[]; ips?: any[] };
 }
-interface Dashboard {
+interface Analytics {
   success?: boolean;
-  data?: { counts?: { threats?: number; domains?: number; ips?: number }; top_sources?: any[] };
+  data?: { summary?: { total_threats?: number; total_domains?: number; total_ips?: number } };
 }
 
 export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string, type?: "success" | "error" | "info") => void }) {
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [version, setVersion] = useState<string>("");
-  const [dash, setDash] = useState<Dashboard["data"] | null>(null);
+  const [counts, setCounts] = useState<{ threats: number; domains: number; ips: number } | null>(null);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<SearchResp | null>(null);
@@ -39,8 +39,10 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
         return;
       }
       try {
-        const d = await api.get<Dashboard>("/api/ecysearcher/api/analytics/dashboard");
-        if (!cancelled) setDash(d?.data || null);
+        // The fixed unified analytics endpoint (/api/search + /search/analytics).
+        const a = await api.get<Analytics>("/api/ecysearcher/api/search/search/analytics");
+        const s = a?.data?.summary;
+        if (!cancelled && s) setCounts({ threats: s.total_threats ?? 0, domains: s.total_domains ?? 0, ips: s.total_ips ?? 0 });
       } catch { /* analytics optional */ }
     })();
     return () => { cancelled = true; };
@@ -51,7 +53,7 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
     if (!query) return;
     setBusy(true); setErr(""); setResults(null);
     try {
-      const r = await api.get<SearchResp>(`/api/ecysearcher/api/search?q=${encodeURIComponent(query)}&type=all&limit=50`);
+      const r = await api.get<SearchResp>(`/api/ecysearcher/api/search/search?q=${encodeURIComponent(query)}&type=all&limit=50`);
       setResults(r);
       onNotify?.(`eCySearcher: ${r?.count ?? 0} sonuç`, "info");
     } catch (e) {
@@ -64,9 +66,9 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
   };
 
   const rows = [
-    ...(results?.data?.threats || []).map((t: any) => ({ kind: "threat", v: t.indicator || t.name, meta: t.severity || t.threat_type || "" })),
-    ...(results?.data?.domains || []).map((d: any) => ({ kind: "domain", v: d.name, meta: d.status || "" })),
-    ...(results?.data?.ips || []).map((i: any) => ({ kind: "ip", v: i.ip, meta: i.status || "" })),
+    ...(results?.data?.threats || []).map((t: any) => ({ kind: "threat", v: t.indicator, meta: [t.severity, t.type].filter(Boolean).join(" · ") })),
+    ...(results?.data?.domains || []).map((d: any) => ({ kind: "domain", v: d.name, meta: [d.reputation, d.category].filter(Boolean).join(" · ") })),
+    ...(results?.data?.ips || []).map((i: any) => ({ kind: "ip", v: i.ip, meta: [i.reputation, i.country].filter(Boolean).join(" · ") })),
   ];
 
   return (
@@ -85,17 +87,17 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
         <div className="flex items-start gap-2 text-sm text-rose-300 bg-rose-950/30 border border-rose-800 rounded p-3">
           <AlertTriangle className="w-4 h-4 mt-0.5" />
           <div>
-            <div>eCySearcher erişilemiyor (:5000).</div>
+            <div>eCySearcher erişilemiyor.</div>
             <div className="text-slate-400 text-xs mt-1 font-mono">ollamas ecysearcher up &nbsp;# docker compose ile başlat</div>
           </div>
         </div>
       )}
 
-      {dash?.counts && (
+      {counts && (
         <div className="grid grid-cols-3 gap-2 text-center">
           {(["threats", "domains", "ips"] as const).map((k) => (
             <div key={k} className="rounded border border-slate-700 bg-slate-900/40 py-2">
-              <div className="text-lg font-semibold text-slate-100">{dash.counts?.[k] ?? 0}</div>
+              <div className="text-lg font-semibold text-slate-100">{counts[k] ?? 0}</div>
               <div className="text-xs text-slate-400 capitalize">{k}</div>
             </div>
           ))}

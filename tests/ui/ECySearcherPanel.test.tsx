@@ -8,8 +8,8 @@ const { get } = vi.hoisted(() => ({
   get: vi.fn(async (ep?: string) => {
     const e = ep || '';
     if (e === '/api/ecysearcher/') return { service: 'eCySearcher API', version: '1.0.0' };
-    if (e.includes('/analytics/dashboard')) return { data: { counts: { threats: 3, domains: 2, ips: 1 } } };
-    if (e.includes('/api/search')) return { query: 'example.com', count: 1, data: { domains: [{ name: 'example.com', status: 'active' }] } };
+    if (e.includes('/search/analytics')) return { data: { summary: { total_threats: 3, total_domains: 2, total_ips: 1 } } };
+    if (e.includes('/api/search/search')) return { query: 'example.com', count: 1, data: { domains: [{ name: 'example.com', reputation: 'malicious' }] } };
     return {};
   }),
 }));
@@ -28,6 +28,6 @@ describe('ECySearcherPanel — threat-intel tab via the ollamas proxy', () => {
     await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument());
     // it talked to the proxy, not eCySearcher directly
     expect(get).toHaveBeenCalledWith('/api/ecysearcher/');
-    expect(get).toHaveBeenCalledWith('/api/ecysearcher/api/analytics/dashboard');
+    expect(get).toHaveBeenCalledWith('/api/ecysearcher/api/search/search/analytics');
   });
 });

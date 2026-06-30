@@ -11,26 +11,31 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
 // ── pure request-builders (unit-tested) ──────────────────────────────────────────────────────
+// All tools hit the ONE fixed unified endpoint /api/search/search (blueprint /api/search + route
+// /search) with a type filter — the other CRUD routes share a latent bug + aren't needed.
 export function ecyBase(env = process.env) {
-  return (env.ECYSEARCHER_URL || "http://localhost:5000").replace(/\/$/, "");
+  if (env.ECYSEARCHER_URL) return env.ECYSEARCHER_URL.replace(/\/$/, "");
+  const port = env.ECYSEARCHER_API_PORT || "5055";
+  return `http://localhost:${port}`;
+}
+function unifiedUrl(base, { q, type, limit }) {
+  const u = new URL(`${base}/api/search/search`);
+  u.searchParams.set("q", String(q ?? ""));
+  if (type) u.searchParams.set("type", String(type));
+  u.searchParams.set("limit", String(limit ?? 50));
+  return u.toString();
 }
 export function searchUrl(base, args = {}) {
-  const u = new URL(`${base}/api/search`);
-  u.searchParams.set("q", String(args.q ?? ""));
-  if (args.type) u.searchParams.set("type", String(args.type));
-  u.searchParams.set("limit", String(args.limit ?? 50));
-  return u.toString();
+  return unifiedUrl(base, { q: args.q, type: args.type || "all", limit: args.limit });
 }
 export function domainUrl(base, args = {}) {
-  return `${base}/api/domains/${encodeURIComponent(String(args.name ?? ""))}/threats`;
+  return unifiedUrl(base, { q: args.name, type: "domains", limit: args.limit });
 }
 export function ipUrl(base, args = {}) {
-  return `${base}/api/ips/${encodeURIComponent(String(args.ip ?? ""))}/geolocation`;
+  return unifiedUrl(base, { q: args.ip, type: "ips", limit: args.limit });
 }
 export function threatsUrl(base, args = {}) {
-  const u = new URL(`${base}/api/threats`);
-  u.searchParams.set("limit", String(args.limit ?? 50));
-  return u.toString();
+  return unifiedUrl(base, { q: args.q ?? "", type: "threats", limit: args.limit });
 }
 
 export const TOOLS = [

@@ -20,9 +20,24 @@ const DEFAULT_DIR = "/Users/emrecnyngmail.com/projem/eCySearcher";
 export function ecyDir(env = process.env) {
   return env.ECYSEARCHER_DIR || DEFAULT_DIR;
 }
-/** Base URL of the eCySearcher Flask API (host port 5000 by default). */
+// Remapped HOST ports — eCySearcher's compose defaults (5000/5432/6379/8080) collide with macOS
+// AirPlay (:5000) + the existing ecypro-* dev containers (:5432/:6379). These dodge them; each is
+// overridable. The container-internal ports are unchanged.
+export const ECY_API_PORT = 5055;
+export function composeEnv(env = process.env) {
+  return {
+    ...env,
+    API_PORT: env.ECYSEARCHER_API_PORT || String(ECY_API_PORT),
+    DB_PORT: env.ECYSEARCHER_DB_PORT || "5433",
+    REDIS_PORT: env.ECYSEARCHER_REDIS_PORT || "6380",
+    FRONTEND_PORT: env.ECYSEARCHER_FRONTEND_PORT || "8088",
+  };
+}
+/** Base URL of the eCySearcher Flask API (the remapped host API port, default 5055). */
 export function ecyBaseUrl(env = process.env) {
-  return env.ECYSEARCHER_URL || "http://localhost:5000";
+  if (env.ECYSEARCHER_URL) return env.ECYSEARCHER_URL.replace(/\/$/, "");
+  const port = env.ECYSEARCHER_API_PORT || String(ECY_API_PORT);
+  return `http://localhost:${port}`;
 }
 /** Liveness URL — the Flask app root returns {service:"eCySearcher API", version}. */
 export function ecyHealthUrl(env = process.env) {
@@ -33,6 +48,7 @@ export function composeArgs(action) {
   if (action === "up") return ["compose", "up", "-d"];
   if (action === "down") return ["compose", "down"];
   if (action === "ps") return ["compose", "ps"];
+  if (action === "logs") return ["compose", "logs", "--tail", "200", "--no-color"];
   throw new Error(`unknown compose action: ${action}`);
 }
 /** Parse the lane CLI argv → { action, dry, json }. Pure. */
@@ -41,7 +57,7 @@ export function parseLaneArgs(argv) {
   for (const t of argv) {
     if (t === "--dry") a.dry = true;
     else if (t === "--json") a.json = true;
-    else if (["up", "down", "status", "health", "ps"].includes(t)) a.action = t;
+    else if (["up", "down", "status", "health", "ps", "logs"].includes(t)) a.action = t;
   }
   return a;
 }
@@ -58,9 +74,10 @@ export async function probeEcy(env = process.env, timeoutMs = 2500) {
   }
 }
 
-function runCompose(action, dir) {
+function runCompose(action, dir, env = process.env) {
   return new Promise((resolve) => {
-    const child = spawn("docker", composeArgs(action), { cwd: dir, stdio: "inherit" });
+    // Pass the remapped port env so compose binds the non-conflicting host ports.
+    const child = spawn("docker", composeArgs(action), { cwd: dir, env: composeEnv(env), stdio: "inherit" });
     child.on("error", (e) => { console.error(`[ecysearcher-lane] docker not available: ${e?.message || e}`); resolve(127); });
     child.on("exit", (c) => resolve(c ?? 0));
   });
@@ -91,14 +108,16 @@ async function main() {
     return;
   }
 
+  const ce = composeEnv(env);
   if (dry) {
     console.error(`[ecysearcher-lane] DRY — would run: (cd ${dir} && docker ${composeArgs(action).join(" ")})`);
-    console.error(`[ecysearcher-lane] then poll ${ecyHealthUrl(env)} until healthy.`);
+    console.error(`[ecysearcher-lane]   ports: API=${ce.API_PORT} DB=${ce.DB_PORT} REDIS=${ce.REDIS_PORT} FRONTEND=${ce.FRONTEND_PORT}  (AirPlay/ecypro-safe)`);
+    if (action === "up") console.error(`[ecysearcher-lane] then poll ${ecyHealthUrl(env)} until healthy.`);
     return;
   }
 
   console.error(`[ecysearcher-lane] ${action} — (cd ${dir} && docker ${composeArgs(action).join(" ")})  [main :3000 untouched]`);
-  const code = await runCompose(action, dir);
+  const code = await runCompose(action, dir, env);
   if (code !== 0) { console.error(`[ecysearcher-lane] docker compose ${action} exited ${code}`); process.exit(code); }
   if (action === "up") await waitHealthy(env);
 }
