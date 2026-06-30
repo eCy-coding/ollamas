@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseProjectIds, keyAddUrl, redactKeys, summarize, newProjectId } from "../scripts/gemini-provision.mjs";
+import { parseProjectIds, keyAddUrl, redactKeys, summarize, newProjectId, extractGcloudError } from "../scripts/gemini-provision.mjs";
 
 describe("gemini-provision pure helpers", () => {
   it("parseProjectIds trims, drops blanks + a header line", () => {
@@ -14,6 +14,13 @@ describe("gemini-provision pure helpers", () => {
     expect(id.length).toBeLessThanOrEqual(30);
     expect(id).toMatch(/^[a-z][a-z0-9-]*[a-z0-9]$/);
     expect(newProjectId(2, "")).toBe("ollamas-gem-2-x"); // empty rand → fallback, still valid
+  });
+
+  it("extractGcloudError surfaces the real ERROR past gcloud's progress noise", () => {
+    const out = "Create in progress for [https://.../projects/ollamas-gem-1].\nWaiting for [operations/create_project.global.747]\nERROR: (gcloud.projects.create) PERMISSION_DENIED: Cloud Resource Manager quota exceeded";
+    expect(extractGcloudError(out)).toContain("quota exceeded");
+    expect(extractGcloudError(out)).not.toContain("Create in progress");
+    expect(extractGcloudError("just one line")).toBe("just one line"); // fallback = last line
   });
 
   it("keyAddUrl builds the endpoint + strips trailing slashes", () => {

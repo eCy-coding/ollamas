@@ -38,6 +38,15 @@ export function redactKeys(text) {
   return String(text ?? "").replace(/AIza[0-9A-Za-z_-]{35}/g, "AIza…REDACTED");
 }
 
+/** Extract the meaningful failure reason from gcloud output. gcloud prints progress
+ * ("Create in progress… Waiting for [operation]") BEFORE the real ERROR, so a head-slice
+ * hides the cause. Prefer the ERROR/quota/permission line; else the last non-empty line. */
+export function extractGcloudError(text) {
+  const lines = String(text ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const hit = lines.find((l) => /^ERROR|error:|quota|exceeded|permission|denied|precondition|billing|not been used|disabled/i.test(l));
+  return redactKeys((hit || lines[lines.length - 1] || "gcloud failed").slice(0, 300));
+}
+
 /** GCP-valid project id for a new pool project. Pure (rand passed in). 6-30 chars,
  * lowercase letter start, [a-z0-9-], no trailing hyphen. e.g. ollamas-gem-1-k3x9. */
 export function newProjectId(i, rand) {
@@ -61,7 +70,7 @@ async function gcloud(args) {
     const { stdout } = await pexec("gcloud", args, { maxBuffer: 8 * 1024 * 1024 });
     return { ok: true, stdout };
   } catch (e) {
-    return { ok: false, reason: redactKeys((e?.stderr || e?.message || "gcloud failed").toString().trim().slice(0, 160)) };
+    return { ok: false, reason: extractGcloudError(e?.stderr || e?.message || "gcloud failed") };
   }
 }
 
