@@ -1,29 +1,34 @@
 // server/ecysearch.ts — run the external `ecysearch` app (a zero-token GitHub keyword searcher,
 // its own TS+React+Express project) as a SUPERVISED SUB-SERVICE under ollamas.
 //
-// ollamas spawns ecysearch on its own port (default 3100), health-checks it, auto-restarts it on
-// an unexpected exit, and never leaves an orphan. The "Search" tab embeds ecysearch's own UI (it
-// serves its SPA + /api on its own origin) via an iframe — no proxy, no code merge. ecysearch's
-// port is env-driven (PORT), so NOTHING in the ecysearch repo changes.
+// Production-grade supervision: a state machine (stopped→starting→ready, unhealthy, crashed) with a
+// background health loop, exponential restart backoff that RESETS after a stable run, a crash-loop
+// CIRCUIT BREAKER (stop hammering a broken service), structured status, Prometheus metrics, and
+// PERSISTENT rotating .log files on disk. The "Search" tab embeds ecysearch's own UI via an iframe.
+// ecysearch's port is env-driven (PORT) → NOTHING in the ecysearch repo changes.
 //
-// Zero runtime dep: node builtins only (child_process/fetch/path/os). Pure-core (config + helpers)
-// is unit-tested; the spawn/supervise singleton is thin IO.
+// Zero runtime dep: node builtins (child_process/fetch/path/os/fs) + prom-client (already present).
 import { spawn, type ChildProcess } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { appendLogLine, fmtLogLine, maskSecrets } from "./logfile";
+import { ecysearchRestartsTotal, ecysearchUp, ecysearchReady } from "./metrics";
 
-export interface EcyConfig { dir: string; port: number; cmd: string; args: string[]; healthUrl: string }
+export interface EcyConfig { dir: string; port: number; cmd: string; args: string[]; healthUrl: string; logFile: string }
 
-/** Resolve config from the environment (pure). Every value is overridable; defaults assume the
- * checkout at ~/Desktop/ecysearch with deps installed. `npm run dev` = ecysearch's `tsx
- * server/index.ts` (one process, serves SPA + API). */
+function dataDir(env: NodeJS.ProcessEnv, home: string): string {
+  return env.MISSION_CONTROL_DATA_DIR || join(home, ".llm-mission-control");
+}
+
+/** Resolve config from the environment (pure). Everything overridable; defaults assume the checkout
+ * at ~/Desktop/ecysearch. `npm run dev` = ecysearch's `tsx server/index.ts` (one self-serving proc). */
 export function resolveEcyConfig(env: NodeJS.ProcessEnv = process.env, home: string = homedir()): EcyConfig {
   const dir = env.ECYSEARCH_DIR || join(home, "Desktop", "ecysearch");
   const port = Number(env.ECYSEARCH_PORT) || 3100;
-  // Split a command string into bin + args (no shell — spawn with an argv array, shell:false).
   const cmdStr = (env.ECYSEARCH_CMD || "npm run dev").trim();
   const [cmd, ...args] = cmdStr.split(/\s+/);
-  return { dir, port, cmd, args, healthUrl: healthUrl(port) };
+  return { dir, port, cmd, args, healthUrl: healthUrl(port), logFile: join(dataDir(env, home), "ecysearch.log") };
 }
 
 export function healthUrl(port: number): string { return `http://127.0.0.1:${port}/api/health`; }
@@ -34,69 +39,185 @@ export function backoffMs(attempt: number, base = 500, cap = 30_000): number {
   return Math.min(cap, base * 2 ** attempt);
 }
 
-/** Fixed-size FIFO log ring (last N lines). Defensive token masking (ecysearch self-masks too). */
+/** Circuit-breaker decision (pure): ≥max restarts within the trailing window = a crash loop. */
+export function isCrashLoop(restartTimesMs: number[], nowMs: number, max = 5, windowMs = 60_000): boolean {
+  return restartTimesMs.filter((t) => nowMs - t <= windowMs).length >= max;
+}
+
+/** Backoff-reset decision (pure): a child up longer than stableMs has earned a clean slate. */
+export function shouldResetBackoff(uptimeMs: number, stableMs = 60_000): boolean {
+  return uptimeMs >= stableMs;
+}
+
+/** Fixed-size FIFO log ring (last N lines), secrets masked. Mirrors what is persisted to disk. */
 export class RingBuffer {
   private buf: string[] = [];
   constructor(private readonly max = 200) {}
   push(line: string): void {
-    const masked = line.replace(/\b(gh[posu]_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{20,})\b/g, "[REDACTED]");
-    for (const l of masked.split(/\r?\n/)) { if (l) this.buf.push(l); }
+    for (const l of maskSecrets(line).split(/\r?\n/)) { if (l) this.buf.push(l); }
     if (this.buf.length > this.max) this.buf = this.buf.slice(-this.max);
   }
   lines(): string[] { return [...this.buf]; }
 }
 
-export interface EcyStatus { running: boolean; ready: boolean; port: number; pid: number | null; restarts: number; lastError: string | null }
+// Kill the child's WHOLE process group, not just the immediate child. `npm run dev` forks a node
+// grandchild (the real ecysearch server); signalling only the npm wrapper orphans that grandchild
+// (it gets reparented to launchd and keeps the port alive). With `detached:true` the child is a
+// group leader, so `process.kill(-pid)` reaps npm + grandchild together. Falls back to a direct
+// kill. Best-effort — never throws.
+function killGroup(child: ChildProcess | null, signal: NodeJS.Signals): void {
+  if (!child?.pid) return;
+  try { process.kill(-child.pid, signal); }
+  catch { try { child.kill(signal); } catch { /* already gone */ } }
+}
+
+export type EcyState = "stopped" | "starting" | "ready" | "unhealthy" | "crashed";
+
+export interface EcyStatus {
+  state: EcyState; running: boolean; ready: boolean; port: number; pid: number | null;
+  startedAt: number | null; uptimeMs: number; lastReadyAt: number | null; lastExitCode: number | null;
+  restarts: number; consecutiveFailures: number; circuitOpen: boolean; logFile: string;
+}
+
+const HEALTH_INTERVAL_MS = 3000;
+const UNHEALTHY_THRESHOLD = 5; // ~15s of failing health while alive → zombie → recycle
+const STABLE_MS = 60_000;      // up this long → forgive prior crashes (reset backoff)
 
 class EcySupervisor {
   private child: ChildProcess | null = null;
   private enabled = false;
-  private restarts = 0;
-  private lastError: string | null = null;
+  private starting = false;
+  private state: EcyState = "stopped";
+  private startedAt: number | null = null;
+  private lastReadyAt: number | null = null;
+  private lastExitCode: number | null = null;
+  private readyFlag = false;
+  private consecutiveFailures = 0;
+  private restartTimes: number[] = [];
+  private restartsTotal = 0;
   private readonly log = new RingBuffer();
   private exitHooked = false;
   private restartTimer: NodeJS.Timeout | null = null;
+  private healthTimer: NodeJS.Timeout | null = null;
 
   private cfg(): EcyConfig { return resolveEcyConfig(); }
 
-  /** Idempotent: start ecysearch if no live child exists. Spawns with PORT/HOST in env (no shell). */
-  ensureRunning(): EcyStatus {
+  /** Append a structured, masked, timestamped line to BOTH the in-memory ring and the .log file. */
+  private record(level: string, msg: string): void {
+    const line = fmtLogLine(new Date().toISOString(), level, msg);
+    this.log.push(line);
+    appendLogLine(this.cfg().logFile, line, { maxBytes: 1_000_000, keep: 5 });
+  }
+
+  /** Start (or restart) ecysearch. Idempotent. `manual` (the route) reopens a tripped circuit. */
+  ensureRunning(opts: { manual?: boolean } = {}): EcyStatus {
     this.enabled = true;
-    if (this.child && this.child.exitCode === null && !this.child.killed) return this.status();
+    if (opts.manual && (this.state === "crashed" || this.restartTimes.length)) {
+      this.restartTimes = [];
+      if (this.state === "crashed") this.state = "stopped"; // reopen the tripped circuit
+      this.record("info", "[supervise] manual start — circuit reset");
+    }
+    if (this.starting || (this.child && this.child.exitCode === null && !this.child.killed)) return this.status();
+    if (this.state === "crashed") return this.status(); // circuit open — only a manual start (above) reopens
     this.hookProcessExit();
+    this.spawnChild();
+    return this.status();
+  }
+
+  /** The actual spawn + wiring (also the restart entry point). */
+  private spawnChild(): void {
     const { dir, port, cmd, args } = this.cfg();
+    this.starting = true;
+    this.state = "starting";
+    this.startedAt = Date.now();
+    this.readyFlag = false;
     try {
       const child = spawn(cmd, args, {
         cwd: dir,
         env: { ...process.env, PORT: String(port), HOST: "127.0.0.1" },
         stdio: ["ignore", "pipe", "pipe"],
         shell: false,
+        detached: true, // own process group so killGroup() reaps the `npm`→node grandchild too
       });
       this.child = child;
-      this.lastError = null;
-      child.stdout?.on("data", (d) => this.log.push(String(d)));
-      child.stderr?.on("data", (d) => this.log.push(String(d)));
-      child.on("error", (e) => { this.lastError = String((e as Error)?.message || e); this.log.push(`[spawn-error] ${this.lastError}`); });
-      child.on("exit", (code, signal) => {
-        this.log.push(`[exit] code=${code} signal=${signal}`);
-        this.child = null;
-        // Auto-restart only on an UNEXPECTED exit while still enabled (supervised, backoff).
-        if (this.enabled) {
-          this.restarts++;
-          const delay = backoffMs(this.restarts);
-          this.log.push(`[supervise] restarting in ${delay}ms (restart #${this.restarts})`);
-          this.restartTimer = setTimeout(() => { if (this.enabled) this.ensureRunning(); }, delay);
-          this.restartTimer.unref?.();
-        }
-      });
+      this.starting = false;
+      ecysearchUp.set(1);
+      this.record("info", `[supervise] spawned pid=${child.pid} cmd="${cmd} ${args.join(" ")}" port=${port}`);
+      child.stdout?.on("data", (d) => this.record("out", String(d).trimEnd()));
+      child.stderr?.on("data", (d) => this.record("err", String(d).trimEnd()));
+      child.on("error", (e) => this.record("err", `[spawn-error] ${String((e as Error)?.message || e)}`));
+      child.on("exit", (code, signal) => this.onChildExit(code, signal));
+      this.startHealthLoop();
     } catch (e) {
-      this.lastError = String((e as Error)?.message || e);
-      this.log.push(`[spawn-throw] ${this.lastError}`);
+      this.starting = false;
+      this.child = null;
+      ecysearchUp.set(0);
+      this.record("err", `[spawn-throw] ${String((e as Error)?.message || e)}`);
+      this.onChildExit(null, null);
     }
-    return this.status();
   }
 
-  /** Health probe — true once ecysearch answers /api/health (its SPA+API are up). */
+  private onChildExit(code: number | null, signal: NodeJS.Signals | null): void {
+    this.lastExitCode = code;
+    this.child = null;
+    this.readyFlag = false;
+    ecysearchUp.set(0);
+    ecysearchReady.set(0);
+    this.record("info", `[supervise] exit code=${code} signal=${signal}`);
+    if (!this.enabled) return; // a deliberate stop() — do not resurrect
+    const now = Date.now();
+    this.restartTimes.push(now);
+    this.restartsTotal++;
+    ecysearchRestartsTotal.inc();
+    if (isCrashLoop(this.restartTimes, now)) {
+      this.state = "crashed";
+      this.record("err", `[supervise] crash-loop (${this.restartTimes.length} restarts/min) — giving up; manual start to retry`);
+      this.stopHealthLoop();
+      return; // circuit OPEN — schedule nothing
+    }
+    const delay = backoffMs(this.restartTimes.length);
+    this.state = "starting";
+    this.record("info", `[supervise] restarting in ${delay}ms (restart #${this.restartsTotal})`);
+    this.restartTimer = setTimeout(() => { if (this.enabled && this.state !== "crashed") this.spawnChild(); }, delay);
+    this.restartTimer.unref?.();
+  }
+
+  /** Background health monitor: keeps `ready` live, resets backoff on stability, recycles a zombie. */
+  private startHealthLoop(): void {
+    if (this.healthTimer) return;
+    this.healthTimer = setInterval(() => { void this.healthTick(); }, HEALTH_INTERVAL_MS);
+    this.healthTimer.unref?.();
+  }
+  private stopHealthLoop(): void {
+    if (this.healthTimer) { clearInterval(this.healthTimer); this.healthTimer = null; }
+  }
+
+  private async healthTick(): Promise<void> {
+    if (!this.child) return; // between exits — restart logic owns this
+    const ok = await this.probeReady();
+    if (ok) {
+      ecysearchReady.set(1);
+      this.consecutiveFailures = 0;
+      this.lastReadyAt = Date.now();
+      if (this.state !== "ready") { this.state = "ready"; this.record("info", "[supervise] healthy → ready"); }
+      if (this.startedAt && shouldResetBackoff(Date.now() - this.startedAt) && this.restartTimes.length) {
+        this.restartTimes = [];
+        this.record("info", "[supervise] stable uptime — backoff reset");
+      }
+    } else {
+      ecysearchReady.set(0);
+      this.readyFlag = false;
+      this.consecutiveFailures++;
+      if (this.consecutiveFailures >= UNHEALTHY_THRESHOLD && this.state !== "unhealthy") {
+        this.state = "unhealthy";
+        this.record("err", `[supervise] unhealthy (${this.consecutiveFailures} failed probes) — recycling`);
+        killGroup(this.child, "SIGTERM"); // exit handler will restart
+      }
+    }
+    this.readyFlag = ok;
+  }
+
+  /** Health probe — true once ecysearch answers /api/health. */
   async probeReady(): Promise<boolean> {
     if (!this.child) return false;
     try {
@@ -105,27 +226,50 @@ class EcySupervisor {
     } catch { return false; }
   }
 
-  /** Stop supervising + terminate the child (no orphan). */
+  /** Stop supervising + terminate the child (no orphan), halt the health loop. */
   stop(): EcyStatus {
     this.enabled = false;
     if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null; }
-    if (this.child && this.child.exitCode === null) { try { this.child.kill("SIGTERM"); } catch { /* already gone */ } }
+    this.stopHealthLoop();
+    if (this.child && this.child.exitCode === null) killGroup(this.child, "SIGTERM");
     this.child = null;
+    this.starting = false;
+    this.state = "stopped";
+    this.readyFlag = false;
+    ecysearchUp.set(0);
+    ecysearchReady.set(0);
+    this.record("info", "[supervise] stopped");
     return this.status();
   }
 
-  logs(): string[] { return this.log.lines(); }
+  /** Recent log lines — from the persisted .log file (survives restart), falling back to the ring. */
+  recentLogs(limit = 200): string[] {
+    const file = this.cfg().logFile;
+    try {
+      if (existsSync(file)) {
+        const lines = readFileSync(file, "utf-8").split("\n").filter(Boolean);
+        return lines.slice(-limit);
+      }
+    } catch { /* fall through to the in-memory ring */ }
+    return this.log.lines().slice(-limit);
+  }
 
   status(): EcyStatus {
     const alive = !!(this.child && this.child.exitCode === null && !this.child.killed);
-    return { running: alive, ready: false, port: this.cfg().port, pid: this.child?.pid ?? null, restarts: this.restarts, lastError: this.lastError };
+    const uptimeMs = alive && this.startedAt ? Date.now() - this.startedAt : 0;
+    return {
+      state: this.state, running: alive, ready: this.readyFlag && alive, port: this.cfg().port,
+      pid: this.child?.pid ?? null, startedAt: this.startedAt, uptimeMs, lastReadyAt: this.lastReadyAt,
+      lastExitCode: this.lastExitCode, restarts: this.restartsTotal, consecutiveFailures: this.consecutiveFailures,
+      circuitOpen: this.state === "crashed", logFile: this.cfg().logFile,
+    };
   }
 
   /** Kill the child when ollamas itself exits — never leak a process. Registered once. */
   private hookProcessExit(): void {
     if (this.exitHooked) return;
     this.exitHooked = true;
-    const kill = () => { this.enabled = false; if (this.child && this.child.exitCode === null) { try { this.child.kill("SIGTERM"); } catch { /* noop */ } } };
+    const kill = () => { this.enabled = false; if (this.child && this.child.exitCode === null) killGroup(this.child, "SIGTERM"); };
     process.on("exit", kill);
     process.on("SIGTERM", kill);
     process.on("SIGINT", kill);

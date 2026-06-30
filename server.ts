@@ -180,13 +180,13 @@ app.use("/api/ecysearcher", ecysearcherProxy);
 // ecysearch sub-service (supervised) — launch the external GitHub-search app under ollamas on its
 // own port, health-check + auto-restart it, surface it as the "Search" tab. Local-owner only
 // (gated above): the spawn surface is never exposed in SaaS mode.
-app.post("/api/ecysearch/start", (_req, res) => res.json(ecySupervisor.ensureRunning()));
+app.post("/api/ecysearch/start", (_req, res) => res.json(ecySupervisor.ensureRunning({ manual: true })));
 app.post("/api/ecysearch/stop", (_req, res) => res.json(ecySupervisor.stop()));
-app.get("/api/ecysearch/status", async (_req, res) => {
-  const status = ecySupervisor.status();
-  res.json({ ...status, ready: status.running ? await ecySupervisor.probeReady() : false });
+app.get("/api/ecysearch/status", (_req, res) => res.json(ecySupervisor.status())); // ready kept live by the health loop
+app.get("/api/ecysearch/logs", (req, res) => {
+  const limit = Math.min(2000, Math.max(1, Number(req.query.limit) || 200));
+  res.json({ lines: ecySupervisor.recentLogs(limit) }); // persisted .log tail (survives restart)
 });
-app.get("/api/ecysearch/logs", (_req, res) => res.json({ lines: ecySupervisor.logs() }));
 
 // Revenue Ops (Faz19) — local-owner-only personal income tooling (gated above). Produces
 // LOCAL artifacts only (test-gen / audit / storefront); no money movement, no outreach.

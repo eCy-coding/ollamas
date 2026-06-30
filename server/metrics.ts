@@ -51,6 +51,23 @@ export const unhandledRejectionTotal = new client.Counter({
   registers: [register],
 });
 
+/** ecysearch supervised sub-service — supervision telemetry (set by server/ecysearch.ts). */
+export const ecysearchRestartsTotal = new client.Counter({
+  name: "ecysearch_restarts_total",
+  help: "Number of times the ecysearch sub-service was (re)started by the supervisor",
+  registers: [register],
+});
+export const ecysearchUp = new client.Gauge({
+  name: "ecysearch_up",
+  help: "1 when the ecysearch child process is alive, else 0",
+  registers: [register],
+});
+export const ecysearchReady = new client.Gauge({
+  name: "ecysearch_ready",
+  help: "1 when the ecysearch sub-service answers its health check, else 0",
+  registers: [register],
+});
+
 /**
  * Pull-time gauges sourced from the store at scrape (prom-client async collect).
  * Lazily registered once at boot so this module has no import cycle with the store.
