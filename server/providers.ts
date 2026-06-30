@@ -224,6 +224,13 @@ interface LatencyEntry {
 }
 const latencyCache: Record<string, LatencyEntry> = {};
 
+// vNext T2.2 (live): the latency a FAILED/HUNG provider records so it sorts AFTER any healthy
+// one. A hang records its real (large) timeout time; a fast auth/quota error is floored to the
+// penalty so a broken provider can never sort ahead of a working one. Pure → unit-tested.
+export function latencyForFailure(elapsedMs: number, penaltyMs = Number(process.env.PROVIDER_FAIL_PENALTY_MS) || 60_000): number {
+  return Math.max(elapsedMs, penaltyMs);
+}
+
 // Compose caller-supplied cancellation with the provider timeout (default 300s,
 // overridable via PROVIDER_TIMEOUT_MS — vNext T1.3, no hardcode). Caller signal preserved.
 function buildSignal(callerSignal?: AbortSignal, timeoutMs = Number(process.env.PROVIDER_TIMEOUT_MS) || 300000): AbortSignal {
@@ -295,11 +302,16 @@ export class ProviderRouter {
       const attempts = config.singleAttempt ? 1 : (cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1);
       let provErr: any = null;
       let rotated = false;
+      let lastAttemptMs = 0; // this provider's OWN time (per-attempt) for the latency cache — NOT cumulative
       for (let attempt = 0; attempt < attempts; attempt++) {
+        const attemptStart = Date.now();
         try {
           const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
-          const elapsed = Date.now() - start;
-          latencyCache[prov] = { latencyMs: elapsed, updatedAt: Date.now() };
+          lastAttemptMs = Date.now() - attemptStart;
+          const elapsed = Date.now() - start; // total wall-clock incl. fallbacks (honest caller-facing number)
+          // T2.2 (live): record the provider's OWN latency (not `elapsed`, which includes prior failed
+          // attempts) so getFallbackChain learns the fastest proven-working cloud provider.
+          this.recordLatency(prov, lastAttemptMs);
           // Per-key usage for proactive quota awareness (keyless providers skip). The key used is
           // the one getDecryptedKey resolved — recorded by its safe keyId, never the raw value.
           if (cloudKeyed) { const used = this.getDecryptedKey(prov); if (used) recordKeyUse(prov, keyId(used)); }
@@ -315,6 +327,7 @@ export class ProviderRouter {
           return { ...result, latencyMs: elapsed };
         } catch (err: any) {
           provErr = err;
+          lastAttemptMs = Date.now() - attemptStart;
           const m = (err?.message || "").toLowerCase();
           const isQuota = m.includes("429") || m.includes("quota") || m.includes("rate limit") || m.includes("resource_exhausted") || m.includes("exceeded");
           const isAuth = m.includes("401") || m.includes("403") || m.includes("unauthorized") || m.includes("forbidden") || m.includes("api key");
@@ -333,6 +346,9 @@ export class ProviderRouter {
 
       // Provider exhausted (all its keys, or a non-key error). Decide fallback.
       console.warn(`[Router] Provider ${prov} failed: ${provErr?.message || provErr}. Retrying fallback...`);
+      // T2.2 (live): a failed/hung provider records a penalized latency so it sorts AFTER any
+      // healthy one on the next chain build (cooldown handles keyed exhaustion; this guards order).
+      this.recordLatency(prov, latencyForFailure(lastAttemptMs));
       lastError = provErr;
       const lowercaseMsg = (provErr?.message || "").toLowerCase();
       const isQuotaErr = lowercaseMsg.includes("429") || lowercaseMsg.includes("quota") || lowercaseMsg.includes("resource_exhausted") || lowercaseMsg.includes("exceeded");
@@ -1201,6 +1217,14 @@ To run genuine macOS terminal execution, read/write local filesystem files direc
         return { text: simulatedText, source: "demo", modelUsed: config.model };
       }
     }
+  }
+
+  /**
+   * Record a provider's measured latency (success = its own per-attempt ms; failure = penalized
+   * via latencyForFailure). Feeds getFallbackChain's cloud-tier ordering (T2.2). O(1) hot-path write.
+   */
+  public static recordLatency(providerId: string, ms: number): void {
+    latencyCache[providerId] = { latencyMs: ms, updatedAt: Date.now() };
   }
 
   /**
