@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error — plain .mjs script, no types
 import { parseProjectIds, keyAddUrl, redactKeys, summarize } from "../scripts/gemini-provision.mjs";
 
 describe("gemini-provision pure helpers", () => {
