@@ -7,6 +7,7 @@ import { register as metricsRegister, httpDuration, recordToolMetric, registerSt
 import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
 import { ecySupervisor } from "./server/ecysearch";
+import { ecysearcherProxy } from "./server/ecysearcher-proxy";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -166,10 +167,15 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
-    "/api/ecysearch",
+    "/api/ecysearch", "/api/ecysearcher",
   ],
   localOwnerGuard,
 );
+
+// eCySearcher threat-intel subsystem — reverse-proxy its (open) Flask API through ollamas so the
+// cockpit reaches it CORS-free + the local-owner guard is the only exposure. Mounted after the
+// guard above. See server/ecysearcher-proxy.ts.
+app.use("/api/ecysearcher", ecysearcherProxy);
 
 // ecysearch sub-service (supervised) — launch the external GitHub-search app under ollamas on its
 // own port, health-check + auto-restart it, surface it as the "Search" tab. Local-owner only
