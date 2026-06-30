@@ -36,5 +36,32 @@ export function keyWindows(provider: string, id: string, nowMs: number = Date.no
   };
 }
 
+// ── Per-call token + cost telemetry (vNEXT-D1) ─────────────────────────────────────────────
+// In-memory, session-scoped (reset on restart) — bytes of RAM, no DB write per LLM call, no
+// tenant coupling (distinct from the SaaS usage_events billing path). The cockpit reads
+// costSummary() over the existing SSE so the operator sees real per-call tokens + USD spend.
+interface CostAgg { calls: number; tokensIn: number; tokensOut: number; usd: number }
+const costByProvider = new Map<string, CostAgg>();
+
+export function recordCallCost(provider: string, tokensIn: number, tokensOut: number, usd: number): void {
+  let a = costByProvider.get(provider);
+  if (!a) { a = { calls: 0, tokensIn: 0, tokensOut: 0, usd: 0 }; costByProvider.set(provider, a); }
+  a.calls++; a.tokensIn += Math.max(0, tokensIn || 0); a.tokensOut += Math.max(0, tokensOut || 0); a.usd += Math.max(0, usd || 0);
+}
+
+export interface CostSummary {
+  totalCalls: number; totalTokensIn: number; totalTokensOut: number; totalUsd: number;
+  perProvider: Record<string, CostAgg>;
+}
+export function costSummary(): CostSummary {
+  const perProvider: Record<string, CostAgg> = {};
+  let totalCalls = 0, totalTokensIn = 0, totalTokensOut = 0, totalUsd = 0;
+  for (const [prov, a] of costByProvider) {
+    perProvider[prov] = { ...a };
+    totalCalls += a.calls; totalTokensIn += a.tokensIn; totalTokensOut += a.tokensOut; totalUsd += a.usd;
+  }
+  return { totalCalls, totalTokensIn, totalTokensOut, totalUsd: Math.round(totalUsd * 1e6) / 1e6, perProvider };
+}
+
 // Test/maintenance helper — clear all counters.
-export function resetKeyUsage(): void { buckets.clear(); }
+export function resetKeyUsage(): void { buckets.clear(); costByProvider.clear(); }

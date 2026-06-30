@@ -14,6 +14,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
+import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
@@ -516,6 +517,7 @@ async function initializeServer() {
           ...rankMacModels(ollama.allModels, os.totalmem(), ollama.macLoaded, MAC_MODEL_CHAMPION),
           championTokPerSec: MAC_CHAMPION_TOKS,
         },
+        llmCost: costSummary(), // vNEXT-D1 — per-call token + USD telemetry (session-scoped)
         updatedAt: Date.now(), // freshness stamp → cockpit shows LIVE vs polling-fallback
       };
       res.write(`data: ${JSON.stringify(payload)}\n\n`);

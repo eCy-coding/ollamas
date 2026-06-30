@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { limitFor, pctOfLimit, approaching } from "../server/key-limits";
-import { keyId, recordKeyUse, keyWindows, resetKeyUsage } from "../server/key-usage";
+import { keyId, recordKeyUse, keyWindows, resetKeyUsage, recordCallCost, costSummary } from "../server/key-usage";
 import { ProviderRouter } from "../server/providers";
 import { db } from "../server/db";
 
@@ -23,6 +23,31 @@ describe("key-limits", () => {
     expect(approaching(0.8)).toBe(true);
     expect(approaching(0.79)).toBe(false);
     expect(approaching(0.5, 0.5)).toBe(true);
+  });
+});
+
+describe("key-usage — per-call cost telemetry (D1)", () => {
+  beforeEach(() => resetKeyUsage());
+  it("accumulates tokens + USD per provider and totals", () => {
+    recordCallCost("gemini", 100, 50, 0.002);
+    recordCallCost("gemini", 200, 80, 0.003);
+    recordCallCost("llamacpp", 300, 120, 0); // local = $0
+    const s = costSummary();
+    expect(s.totalCalls).toBe(3);
+    expect(s.totalTokensIn).toBe(600);
+    expect(s.totalTokensOut).toBe(250);
+    expect(s.totalUsd).toBeCloseTo(0.005);
+    expect(s.perProvider.gemini).toEqual({ calls: 2, tokensIn: 300, tokensOut: 130, usd: 0.005 });
+    expect(s.perProvider.llamacpp.usd).toBe(0);
+  });
+  it("ignores negative/NaN inputs (defensive)", () => {
+    recordCallCost("x", -5, NaN, -1);
+    expect(costSummary().perProvider.x).toEqual({ calls: 1, tokensIn: 0, tokensOut: 0, usd: 0 });
+  });
+  it("resetKeyUsage clears cost too", () => {
+    recordCallCost("y", 10, 10, 0.1);
+    resetKeyUsage();
+    expect(costSummary().totalCalls).toBe(0);
   });
 });
 

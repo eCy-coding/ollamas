@@ -55,8 +55,10 @@ describe("ai façade — listModels / default model", () => {
     expect(await ai.listModels()).toEqual(["qwen3:8b", "llama3.3:70b"]);
   });
 
-  test("resolveDefaultModel picks the first local model", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue(tagsResponse(["qwen3-coder:30b", "qwen3:8b"]));
+  test("resolveDefaultModel picks the first local model when the champion is absent", async () => {
+    // T1.4 (loop 4b59efd): resolveDefaultModel now prefers MAC_MODEL_CHAMPION (qwen3:8b) when
+    // installed, else the first tag. Mock a list WITHOUT the champion to assert the first-tag path.
+    vi.spyOn(global, "fetch").mockResolvedValue(tagsResponse(["qwen3-coder:30b", "llama3.3:70b"]));
     expect(await ai.resolveDefaultModel()).toBe("qwen3-coder:30b");
   });
 

@@ -5,7 +5,8 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
 import { generateViaGeminiCli } from "./gemini-cli";
-import { keyId, recordKeyUse, keyWindows } from "./key-usage";
+import { keyId, recordKeyUse, keyWindows, recordCallCost } from "./key-usage";
+import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
 
 // Types
@@ -211,6 +212,8 @@ export interface GenerateResult {
   latencyMs: number;
   tokensPerSec?: number;
   tokens?: number; // output tokens (eval_count) when the provider reports them
+  tokensIn?: number;  // prompt tokens from the provider `usage` (vNEXT-D1)
+  tokensOut?: number; // completion tokens from the provider `usage` (== tokens; explicit)
   toolCalls?: ToolCall[];
 }
 
@@ -300,6 +303,15 @@ export class ProviderRouter {
           // Per-key usage for proactive quota awareness (keyless providers skip). The key used is
           // the one getDecryptedKey resolved — recorded by its safe keyId, never the raw value.
           if (cloudKeyed) { const used = this.getDecryptedKey(prov); if (used) recordKeyUse(prov, keyId(used)); }
+          // vNEXT-D1 — per-call token + USD telemetry. Use the provider's real `usage` when present
+          // (tokensIn/tokensOut), else estimate (~4 chars/token). Cost via the env-tunable table.
+          {
+            const inChars = (config.messages || []).reduce((n, m) => n + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length), 0);
+            const estIn = Math.ceil(inChars / 4);
+            const tokensIn = result.tokensIn ?? estIn;
+            const tokensOut = result.tokensOut ?? result.tokens ?? Math.ceil((result.text || "").length / 4);
+            recordCallCost(prov, tokensIn, tokensOut, estimateCost(result.modelUsed || resolvedConfig.model || prov, tokensIn, tokensOut));
+          }
           return { ...result, latencyMs: elapsed };
         } catch (err: any) {
           provErr = err;
@@ -540,7 +552,7 @@ export class ProviderRouter {
     config: GenerateConfig,
     onStreamChunk?: (text: string) => void,
     signal?: AbortSignal
-  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; toolCalls?: ToolCall[] }> {
+  ): Promise<{ text: string; source: string; modelUsed: string; tokensPerSec?: number; tokens?: number; tokensIn?: number; tokensOut?: number; toolCalls?: ToolCall[] }> {
     // Defensive: a malformed call (no messages) must not crash the router with a
     // TypeError — fall through to an empty conversation (provider/demo handles it).
     const msgs = config.messages || [];
@@ -869,10 +881,12 @@ export class ProviderRouter {
             arguments: fc.args
           }));
 
-          return { 
-            text: response.text || "", 
-            source: "cloud:gemini", 
+          return {
+            text: response.text || "",
+            source: "cloud:gemini",
             modelUsed: geminiModel,
+            tokensIn: (response as any).usageMetadata?.promptTokenCount,
+            tokensOut: (response as any).usageMetadata?.candidatesTokenCount,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined
           };
         }
@@ -1030,6 +1044,9 @@ export class ProviderRouter {
             text: json.choices?.[0]?.message?.content || "",
             source: localCompat ? `local:${prov}` : `cloud:${keyProvider}`,
             modelUsed: config.model,
+            // Real OpenAI-compat token usage (openai/custom/vllm/llamacpp) — D1 cost telemetry.
+            tokensIn: json.usage?.prompt_tokens,
+            tokensOut: json.usage?.completion_tokens,
             toolCalls: toolCalls?.length ? toolCalls : undefined,
           };
         }
@@ -1105,10 +1122,12 @@ export class ProviderRouter {
             arguments: tu.input
           }));
 
-          return { 
-            text: reply, 
-            source: "cloud:anthropic", 
+          return {
+            text: reply,
+            source: "cloud:anthropic",
             modelUsed: config.model,
+            tokensIn: json.usage?.input_tokens,
+            tokensOut: json.usage?.output_tokens,
             toolCalls: toolCalls?.length ? toolCalls : undefined
           };
         }
