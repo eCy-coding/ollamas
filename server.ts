@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, unhandledRejectionTotal, ukpStageEventsTotal } from "./server/metrics";
 import { installProcessGuards } from "./server/process-guards";
+import { selftestProbePlan } from "./server/selftest-plan";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
 import swaggerUi from "swagger-ui-express";
@@ -2452,6 +2453,9 @@ content
 
   app.get("/api/selftest", async (req, res) => {
     const isLive = CURRENT_MODE === "live";
+    // Probe plan: the local LLM gates (G2/G3/G8) run whenever ollama can be reached — degraded-live
+    // INCLUDED, not just full live. Only a true cloud `demo` skips them. See server/selftest-plan.ts.
+    const plan = selftestProbePlan(CURRENT_MODE);
     const report: Record<string, { status: "PASS" | "FAIL" | "WARN"; details: string }> = {};
 
     // Health gates must stay responsive: bound each live LLM probe so a slow/cold
@@ -2501,11 +2505,11 @@ content
     // G3: Sequential Pipeline Fallback Check
     try {
       const pipelineResult = await withTimeout(ProviderRouter.generate({
-        provider: CURRENT_MODE === "live" ? "ollama-local" : "demo",
-        model: CURRENT_MODE === "live" ? "qwen3:8b" : "simulation",
+        provider: plan.pipelineProvider,
+        model: plan.pipelineModel,
         messages: [{ role: "user", content: "test design target" }],
       }), 8000, "pipeline router");
-      const expectedSource = CURRENT_MODE === "live" ? "ollama_local" : "demo";
+      const expectedSource = plan.expectedSource;
       report["G3_PipelineFallback"] = {
         status: pipelineResult.source === expectedSource ? "PASS" : "WARN",
         details: `Adaptive router fallback responsive. Source traced: ${pipelineResult.source}`,
@@ -2611,8 +2615,9 @@ content
         : "Storage contains zero external cloud keys. Operating under offline default.",
     };
 
-    // G8: ReAct Agent Tool Loop self-test Gate
-    if (CURRENT_MODE === "live") {
+    // G8: ReAct Agent Tool Loop self-test Gate — runs whenever ollama is reachable (degraded-live
+    // included, mirroring G2); only a true cloud demo sandbox (no local daemon) skips it.
+    if (plan.runAgentLoop) {
       try {
         const TEST_TOOLS = [
           {
@@ -2661,7 +2666,7 @@ content
     } else {
       report["G8_AgentToolLoop"] = {
         status: "WARN",
-        details: "Agent Tool-Loop self-test ignored in demo mode (Ollama isolated from cloud containment).",
+        details: "Agent tool-loop skipped — cloud demo sandbox has no local ollama daemon to drive the ReAct loop.",
       };
     }
 
