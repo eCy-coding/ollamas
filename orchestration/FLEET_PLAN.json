@@ -1,0 +1,168 @@
+{
+  "ts": "2026-07-01T11:18:30Z",
+  "plan": {
+    "assignments": [
+      {
+        "stream": "typescript-core",
+        "lang": "TypeScript",
+        "concern": "security+types (all new logic)",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "qwen3-coder:480b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "typescript-core",
+        "lang": "TypeScript",
+        "concern": "security+types (all new logic)",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "qwen3-coder:30b",
+        "runtime": "local"
+      },
+      {
+        "stream": "errors-resilience",
+        "lang": "TypeScript",
+        "concern": "error-handling + exit-code + logging",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "qwen3-coder:480b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "errors-resilience",
+        "lang": "TypeScript",
+        "concern": "error-handling + exit-code + logging",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "deepseek-r1:32b",
+        "runtime": "local"
+      },
+      {
+        "stream": "concurrency-safety",
+        "lang": "TypeScript",
+        "concern": "race-condition + synchronization",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "gpt-oss:120b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "concurrency-safety",
+        "lang": "TypeScript",
+        "concern": "race-condition + synchronization",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "deepseek-r1:32b",
+        "runtime": "local"
+      },
+      {
+        "stream": "mjs-migration",
+        "lang": "JavaScript→TypeScript",
+        "concern": "type-safety (.mjs → .ts, 490 files)",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "gpt-oss:120b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "mjs-migration",
+        "lang": "JavaScript→TypeScript",
+        "concern": "type-safety (.mjs → .ts, 490 files)",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "qwen3-coder-64k:latest",
+        "runtime": "local"
+      },
+      {
+        "stream": "shell-harden",
+        "lang": "Shell",
+        "concern": "env-guard + exit-code hardening",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "gpt-oss:20b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "shell-harden",
+        "lang": "Shell",
+        "concern": "env-guard + exit-code hardening",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "qwen3:8b",
+        "runtime": "local"
+      },
+      {
+        "stream": "test-coverage",
+        "lang": "TypeScript",
+        "concern": "vitest coverage",
+        "slot": "terminal",
+        "app": "Terminal.app",
+        "model": "gpt-oss:20b-cloud",
+        "runtime": "cloud"
+      },
+      {
+        "stream": "test-coverage",
+        "lang": "TypeScript",
+        "concern": "vitest coverage",
+        "slot": "iterm2",
+        "app": "iTerm2",
+        "model": "qwen3:8b",
+        "runtime": "local"
+      }
+    ],
+    "perModel": [
+      {
+        "model": "deepseek-r1:32b",
+        "streams": [
+          "errors-resilience",
+          "concurrency-safety"
+        ]
+      },
+      {
+        "model": "gpt-oss:120b-cloud",
+        "streams": [
+          "concurrency-safety",
+          "mjs-migration"
+        ]
+      },
+      {
+        "model": "gpt-oss:20b-cloud",
+        "streams": [
+          "shell-harden",
+          "test-coverage"
+        ]
+      },
+      {
+        "model": "qwen3-coder-64k:latest",
+        "streams": [
+          "mjs-migration"
+        ]
+      },
+      {
+        "model": "qwen3-coder:30b",
+        "streams": [
+          "typescript-core"
+        ]
+      },
+      {
+        "model": "qwen3-coder:480b-cloud",
+        "streams": [
+          "typescript-core",
+          "errors-resilience"
+        ]
+      },
+      {
+        "model": "qwen3:8b",
+        "streams": [
+          "shell-harden",
+          "test-coverage"
+        ]
+      }
+    ],
+    "maxTwoOk": true,
+    "localSlots": 6,
+    "cloudSlots": 6,
+    "unassigned": []
+  }
+}

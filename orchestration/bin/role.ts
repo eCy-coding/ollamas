@@ -34,6 +34,7 @@ export interface RoleInputs {
   selfPolice?: { completeness: number; dod: number } | null;        // vO10-12 öz-denetim açık-iş (CRITIC/DOD.json)
   topReq?: { criticality: string; target: string; readiness: number } | null; // vO14 fuse birleşik kritik gereksinim (REQUIREMENTS.json)
   council?: { present: number; total: number; covered: number; uncovered: string[] } | null; // model-council roster (COUNCIL_ROSTER.json)
+  fleet?: { slots: number; local: number; cloud: number; maxTwoOk: boolean } | null; // local model-fleet plan (FLEET_PLAN.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -93,6 +94,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     i.selfPolice ? `- 🧭 **Öz-denetim (vO10-12):** completeness ${i.selfPolice.completeness} açık · DoD ${i.selfPolice.dod} yarım-iş — \`CRITIC.md\`/\`DOD.md\` (autopilot→conduct tüketir)` : `- Öz-denetim: \`tsx bin/critic.ts\` + \`tsx bin/dod.ts\` koş`,
     i.topReq ? `- 🎯 **Kritik gereksinim (vO14 füzyon):** ${i.topReq.criticality}:${i.topReq.target} · proje hazırlık ${i.topReq.readiness}/100 — \`REQUIREMENTS.md\` (tüm-gate birleşik)` : `- Kritik gereksinim: \`tsx bin/fuse.ts\` koş (REQUIREMENTS füzyonu)`,
     i.council ? `- 🎭 **Model-council:** roster ${i.council.present}/${i.council.total} seat · lane coverage ${i.council.covered}/7${i.council.uncovered.length ? ` · ⚠️ uncovered: ${i.council.uncovered.join(",")}` : ""} — \`COUNCIL_ROSTER.json\` (yetenek→model→lane)` : `- Model-council: \`tsx bin/council.ts\` koş (roster + E2E analiz)`,
+    i.fleet ? `- 🛰 **Model-fleet:** ${i.fleet.slots} slot (local ${i.fleet.local}/cloud ${i.fleet.cloud}) · ≤2/model ${i.fleet.maxTwoOk ? "✅" : "❌"} — \`FLEET_PLAN.md\` (Terminal.app+iTerm2; \`fleet-launch --go\`, \`fleet-conduct\`)` : `- Model-fleet: \`tsx bin/fleet-launch.ts\` koş (Terminal.app+iTerm2 dağıtım planı)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -220,6 +222,16 @@ async function main(): Promise<void> {
     }
   } catch { /* graceful */ }
 
+  // local model-fleet plan (FLEET_PLAN.json varsa; graceful absent).
+  let fleet: RoleInputs["fleet"] = null;
+  try {
+    const fF = join(ORCH_DIR, "FLEET_PLAN.json");
+    if (existsSync(fF)) {
+      const p = JSON.parse(readFileSync(fF, "utf8"))?.plan;
+      if (p) fleet = { slots: (p.assignments ?? []).filter((a: any) => a.model).length, local: p.localSlots ?? 0, cloud: p.cloudSlots ?? 0, maxTwoOk: p.maxTwoOk ?? false };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -232,6 +244,7 @@ async function main(): Promise<void> {
     selfPolice,
     topReq,
     council,
+    fleet,
   });
 
   console.log(answer);
