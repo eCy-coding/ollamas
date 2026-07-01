@@ -1,6 +1,6 @@
 # FLEET_NEXT.md — prioritized next-task queue (precomputed)
 
-> Auto: `tsx orchestration/bin/fleet-next.ts` · 2026-07-01T17:03:11Z · 26 task
+> Auto: `tsx orchestration/bin/fleet-next.ts` · 2026-07-01T21:29:42Z · 26 task
 > Order: P1 safe-additive apply → P2 risky-edit apply (per-lane review) → P3 research (no-guess).
 
 | # | Task | Stream | Target | Rationale |

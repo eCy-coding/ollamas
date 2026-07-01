@@ -89,6 +89,11 @@ function detailFor(step: string): string {
     if (r) return `roster ${r.present ?? "?"}/${r.total ?? "?"} seat · coverage ${(r.lanesCovered ?? []).length}/7${(r.lanesUncovered ?? []).length ? ` · ⚠️ ${(r.lanesUncovered).join(",")}` : ""}`;
     return "council roster tazelendi";
   }
+  if (step === "tasklist") {
+    const f = join(ORCH_DIR, "..", "docs", "MASTER_TASKLIST.md");
+    if (existsSync(f)) { const m = /acceptance \((\d+)\/(\d+)\)/i.exec(readFileSync(f, "utf8")); if (m) return `master task list tazelendi · kabul ${m[1]}/${m[2]}`; }
+    return "master task list tazelendi";
+  }
   if (step === "next") {
     const f = join(ORCH_DIR, "FLEET_NEXT.md");
     if (existsSync(f)) {
@@ -176,6 +181,7 @@ function main(): void {
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("think", "think.ts", []),     // vO22 THINK loop: finding → PROVEN-solution(registry) | NEEDS_RESEARCH (no-guess)
     runStep("next", "fleet-next.ts", []), // vO24 precompute next-task queue (safe-additive apply → edit → research) → FLEET_NEXT.md
+    runStep("tasklist", "tasklist.ts", []), // vO29 persistent master task list → docs/MASTER_TASKLIST.md (auto-refresh)
     runStep("status", "status.ts", []),
     runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),
