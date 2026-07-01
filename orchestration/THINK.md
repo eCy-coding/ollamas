@@ -1,6 +1,6 @@
 # THINK.md — sustainable problem-solving loop (evidence-based, no-guess)
 
-> Auto: `tsx orchestration/bin/think.ts` · 2026-07-01T13:22:17Z · 29 problem · 6 proven · 23 needs-research
+> Auto: `tsx orchestration/bin/think.ts` · 2026-07-01T15:25:15Z · 31 problem · 6 proven · 25 needs-research
 > Rule: unknown problems are flagged NEEDS_RESEARCH — the mechanism never invents a fix (only cited, proven solutions).
 
 ## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
@@ -38,7 +38,7 @@
 - Evidence: orchestration/bin/lib/* shared cores (claims/bench/optimize) + .policy-suppress.json for false-positives
 
 ## ✅ uncommitted-green — PROVEN
-- Problem: dod:uncommitted-green:35 dosya Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUT
+- Problem: dod:uncommitted-green:32 dosya Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUT
 - Solution: Green work must be committed at the phase boundary (quality gate: tsc → tests → conventional commit). Uncommitted-green is half-work; commit when the FULL gate passes (quiesce heavy load first so the gate isn't flaky).
 - Sources: AGENTS.md §3 quality gate (this project) · trunk-based development: small, gated, frequent commits
 - Evidence: each vO phase closed with a gated conventional commit (d1cce40 etc.)
@@ -92,6 +92,10 @@
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 
 ## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
+- Problem: dod:concurrent-task:fleet-next fleet-next kısmen tamam — eksik eş-zamanlı: roadmap-row, SEYIR-entry
+- Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
+
+## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
 - Problem: dod:concurrent-task:oracle oracle kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 
@@ -116,6 +120,10 @@
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 
 ## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
+- Problem: dod:roadmap-coherence:fleet-next fleet-next aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)
+- Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
+
+## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
 - Problem: dod:roadmap-coherence:fleet-watch fleet-watch aracı roadmap'te anılmıyor (izlenebilirlik boşluğu)
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 
@@ -128,6 +136,6 @@
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 
 ## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)
-- Problem: CRITICAL red:integration/v17-core tsc 18 hata
+- Problem: COMPLETENESS crit:done-no-evidence:vO16 vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşl
 - Action: research ≥2 authoritative sources, verify, then append to PROBLEM_REGISTRY.json (mechanism learns).
 

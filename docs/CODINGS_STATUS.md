@@ -28,10 +28,10 @@
 |--------|----------|--------|----------|
 | errors-resilience | `formatSseError` + `isSessionStalled` in `server/agent-events.ts` | ✅ **DONE (applied)** | additive pure exports; `tests/agent-events.test.ts` 16 green; tsc 0 |
 | mjs-migration | `scripts/tsconfig.json` (incremental .mjs→.ts) | ✅ **DONE (applied)** | `tsc -p scripts/tsconfig.json --noEmit` = 0 errors |
+| test-coverage | `cli/lib/client.ts` `parseSSEBuffer` unit test | ✅ **DONE (applied)** | `tests/cli-parse-sse.test.ts` 6 green (node-project gateable — test placed in `tests/`, imports `../cli/lib/client`) |
 | typescript-core | fleet-gated proposal (qwen3-coder:480b-cloud) | 🟡 PROPOSAL | `~/.llm-mission-control/fleet/work/typescript-core.*/PROPOSAL.md` |
 | concurrency-safety | `server/host-bridge.ts` single-flight base-resolution | ⏸ **QUEUED** | runtime behavior change on the LIVE bridge → needs live test; server-lane review |
 | shell-harden | `start.sh` `require_env` guard | ⏸ **QUEUED** | boot-blocking guard → needs live boot test; scripts-lane review |
-| test-coverage | `cli/lib/client.ts` `parseSSEBuffer` unit test | ⏸ **QUEUED** | cli tests are NOT in the root vitest projects → cli-lane runner gates it |
 
 ## C. Why the QUEUED items are held (not half-work)
 
