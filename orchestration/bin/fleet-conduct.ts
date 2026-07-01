@@ -15,10 +15,11 @@
  *   tsx orchestration/bin/fleet-conduct.ts --stop     # kill-switch: release all fleet claims
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
-import { defaultStore, readClaims, activeClaims, closeClaim, type ClaimEvent } from "./lib/claims";
+import { defaultStore, readClaims, activeClaims, closeClaim } from "./lib/claims";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -27,6 +28,7 @@ const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
 const REPORTS = join(FLEET_HOME, "reports");
 const JSON_OUT = process.argv.includes("--json");
 const STOP = process.argv.includes("--stop");
+const WATCH = process.argv.includes("--watch");
 
 interface WorkerReport { stream: string; slot: string; model?: string; verdict?: string; steps?: number; demoSuspected?: boolean; allOk?: boolean; proposal?: string; error?: string; }
 
@@ -80,44 +82,94 @@ function killSwitch(): void {
   console.log(`🛑 kill-switch: ${n} claim released.`);
 }
 
-function main(): void {
-  if (STOP) return killSwitch();
+interface PerStream { stream: string; halves: (WorkerReport & { gate: { ok: boolean; reason: string } })[]; gatedOk: number; ensembleDone: boolean; }
+interface Snapshot { reports: WorkerReport[]; liveKeys: string[]; perStream: PerStream[]; converged: boolean; }
 
+function snapshot(): Snapshot {
   const reports = readReports();
   const store = defaultStore(SEYIR_DIR);
-  const live: ClaimEvent[] = activeClaims(readClaims(store), Date.now());
+  const live = activeClaims(readClaims(store), Date.now());
+  const liveKeys = live.map((c) => `${c.lane}.${c.version}`);
   const streams = [...new Set(reports.map((r) => r.stream))];
-
-  const perStream = streams.map((s) => {
+  const perStream: PerStream[] = streams.map((s) => {
     const halves = reports.filter((r) => r.stream === s).map((r) => ({ ...r, gate: gate(r) }));
     const gatedOk = halves.filter((h) => h.gate.ok).length;
     return { stream: s, halves, gatedOk, ensembleDone: gatedOk >= 1 };
   });
   const converged = perStream.length > 0 && perStream.every((p) => p.ensembleDone) && live.length === 0;
+  return { reports, liveKeys, perStream, converged };
+}
 
-  if (JSON_OUT) { console.log(JSON.stringify({ ts: new Date().toISOString(), converged, activeClaims: live.length, perStream }, null, 2)); return; }
-
+function writeStatus(s: Snapshot): void {
   const L = [
     `# FLEET_STATUS.md — conductor view (report to Claude, not user)`,
-    ``, `> Auto: \`tsx orchestration/bin/fleet-conduct.ts\` · reports ${reports.length} · active claims ${live.length}`,
-    `> Convergence: ${converged ? "✅ CONVERGED" : "⏳ in-progress"}`,
-    ``, `| Stream | Ensemble | Gated slots | Detay |`, `|--------|----------|-------------|-------|`,
+    ``, `> Auto: \`tsx orchestration/bin/fleet-conduct.ts\` · reports ${s.reports.length} · active ${s.liveKeys.length}`,
+    `> Convergence: ${s.converged ? "✅ CONVERGED" : "⏳ in-progress"}`,
+    ``, `| Stream | Ensemble | Gated | Detay |`, `|--------|----------|-------|-------|`,
   ];
-  for (const p of perStream) {
-    const detail = p.halves.map((h) => `${h.slot}=${h.gate.ok ? "✅" : "❌"}(${h.model ?? "?"}: ${h.gate.reason})`).join(" · ");
+  for (const p of s.perStream) {
+    const detail = p.halves.map((h) => `${h.slot}=${h.gate.ok ? "✅" : "❌"}(${h.model ?? "?"})`).join(" · ");
     L.push(`| ${p.stream} | ${p.ensembleDone ? "✅" : "⏳"} | ${p.gatedOk}/${p.halves.length} | ${detail} |`);
   }
-  if (live.length) { L.push(``, `## Active claims (running)`); for (const c of live) L.push(`- ${c.lane}|${c.version} → ${c.tab}`); }
-  L.push(``, `## Conductor directive (next)`);
-  if (!reports.length) L.push(`- No reports yet — launch: \`tsx orchestration/bin/fleet-launch.ts --go\``);
-  else if (!converged) {
-    const pending = perStream.filter((p) => !p.ensembleDone).map((p) => p.stream);
-    L.push(`- Pending streams: ${pending.join(", ") || "(claims still active)"}. Re-run failed halves or wait for GPU queue.`);
-  } else L.push(`- ✅ All streams gated-DONE. Review PROPOSAL.md in ~/.llm-mission-control/fleet/work/*, then apply green ones.`);
   writeFileSync(join(ORCH_DIR, "FLEET_STATUS.md"), L.join("\n") + "\n");
+}
 
-  console.log(`🛰  fleet-conduct · ${reports.length} report · ${perStream.filter((p) => p.ensembleDone).length}/${perStream.length} stream done · ${live.length} active · ${converged ? "✅ CONVERGED" : "⏳"}`);
-  for (const p of perStream) console.log(`  ${p.ensembleDone ? "✅" : "⏳"} ${p.stream}: ${p.gatedOk}/${p.halves.length} gated`);
+const WRAPPERS = join(homedir(), ".llm-mission-control", "fleet", "wrappers");
+const attempts = new Map<string, number>(); // stream.slot → re-dispatch count
+const MAX_REDISPATCH = Number(process.env.FLEET_MAX_REDISPATCH || 3);
+
+/** GÖREV VER: re-dispatch slots of not-yet-gated streams that are idle (no active claim) + under cap.
+ *  Returns the keys re-dispatched this tick. Spawns the existing wrapper detached (fire-and-forget). */
+function redispatch(s: Snapshot): string[] {
+  if (!existsSync(WRAPPERS)) return [];
+  const fired: string[] = [];
+  for (const p of s.perStream) {
+    if (p.ensembleDone) continue; // already has a gated-DONE half
+    for (const h of p.halves) {
+      const key = `${h.stream}.${h.slot}`;
+      if (h.gate.ok) continue;                       // this half already good
+      if (s.liveKeys.includes(key)) continue;        // still running → wait (veri bekle)
+      if ((attempts.get(key) ?? 0) >= MAX_REDISPATCH) continue; // capped → BLOCKED-final, daemon stays open
+      const wrapper = join(WRAPPERS, `${key}.sh`);
+      if (!existsSync(wrapper)) continue;
+      attempts.set(key, (attempts.get(key) ?? 0) + 1);
+      try { spawn("bash", [wrapper], { detached: true, stdio: "ignore" }).unref(); fired.push(`${key}#${attempts.get(key)}`); }
+      catch { /* best-effort */ }
+    }
+  }
+  return fired;
+}
+
+function statusLine(s: Snapshot, fired: string[]): string {
+  const done = s.perStream.filter((p) => p.ensembleDone).length;
+  return `🛰 conduct · ${s.reports.length} report · ${done}/${s.perStream.length} stream done · ${s.liveKeys.length} active` +
+    (fired.length ? ` · 🔁 re-dispatch: ${fired.join(",")}` : "") + (s.converged ? " · ✅ CONVERGED" : "");
+}
+
+async function watchLoop(): Promise<void> {
+  const PERIOD = Math.max(5, Number(process.env.FLEET_CONDUCT_SEC || 20)) * 1000;
+  let lastLine = "";
+  console.log(`🛰 fleet-conduct DAEMON açık (persistent) · her ${PERIOD / 1000}s · Ctrl-C / --stop ile kapat`);
+  // never exits — "daima açık kal" (görev al: readReports; görev ver: redispatch)
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const s = snapshot();
+    writeStatus(s);
+    const fired = redispatch(s);
+    const line = statusLine(s, fired);
+    if (line !== lastLine || fired.length) { console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`); lastLine = line; } // delta-only (gürültü yok)
+    await new Promise((r) => setTimeout(r, PERIOD));
+  }
+}
+
+function main(): void {
+  if (STOP) return killSwitch();
+  if (WATCH) { void watchLoop(); return; }
+  const s = snapshot();
+  if (JSON_OUT) { console.log(JSON.stringify({ ts: new Date().toISOString(), converged: s.converged, activeClaims: s.liveKeys.length, perStream: s.perStream })); return; }
+  writeStatus(s);
+  console.log(statusLine(s, []));
+  for (const p of s.perStream) console.log(`  ${p.ensembleDone ? "✅" : "⏳"} ${p.stream}: ${p.gatedOk}/${p.halves.length} gated`);
 }
 
 main();
