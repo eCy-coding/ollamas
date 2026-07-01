@@ -14,11 +14,13 @@
  *
  * Run (usually via fleet-launch --go):  tsx orchestration/bin/fleet-agent.ts typescript-core terminal
  */
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { pullTicket, tryTurn, releaseTurn } from "./lib/gpu-lock";
+import { fullJitterDelay, isTransient } from "./lib/backoff";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -80,7 +82,7 @@ function taskPrompt(attempt: number): string {
   ].join("\n");
 }
 
-function dispatch(model: string, prompt: string, steps: number): { verdict: string; proposal: string; steps: number } {
+function dispatch(model: string, prompt: string, steps: number): { verdict: string; proposal: string; steps: number; err?: string } {
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,
@@ -93,9 +95,23 @@ function dispatch(model: string, prompt: string, steps: number): { verdict: stri
     const proposal = i >= 0 ? msgs.slice(i).trim() : "";
     return { verdict: j.verdict ?? "?", proposal, steps: (j.steps ?? []).length };
   } catch (e: any) {
-    try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: String(e?.message ?? e).slice(0, 200) })); } catch { /* ignore */ }
-    return { verdict: "ERROR", proposal: "", steps: 0 };
+    const err = String(e?.message ?? e).slice(0, 200);
+    try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: err })); } catch { /* ignore */ }
+    return { verdict: "ERROR", proposal: "", steps: 0, err };
   }
+}
+
+// skip-done idempotency: if the sibling slot already produced a gated proposal, this stream is DONE →
+// don't grind the GPU redundantly (proven: idempotency + don't over-subscribe). Reads sibling report.
+function streamAlreadyGated(): boolean {
+  const sib = slot === "terminal" ? "iterm2" : "terminal";
+  const f = join(FLEET_HOME, "reports", `${stream}.${sib}.json`);
+  if (!existsSync(f)) return false;
+  try {
+    const j = JSON.parse(readFileSync(f, "utf8"));
+    const msgs = Array.isArray(j.messages) ? j.messages.map(String).join("\n") : "";
+    return (j.verdict === "DONE" || j.verdict === "OK") && /##\s*Change/i.test(msgs);
+  } catch { return false; }
 }
 
 async function main(): Promise<void> {
@@ -104,24 +120,42 @@ async function main(): Promise<void> {
   log(`🛰 fleet-agent START · ${stream}/${slot} · ${p?.model ?? "?"} (${p?.runtime ?? "?"})`);
   if (!p) { log("⚠️ no plan assignment — standing by"); return idle("NO-PLAN"); }
   const isLocal = p.runtime === "local";
+  const GPU_DIR = join(ORCH_DIR, "seyir");
+  const GPU_TTL = 20 * 60 * 1000; // dead-holder liveness (> any single dispatch's 300s)
   const STEPS = [8, 12, 16];
   let status = "PENDING";
   for (let attempt = 0; attempt < STEPS.length; attempt++) {
-    // claim (dedup); if held by us/another, retry a few times
-    let claimed = claim(stream, slot);
-    for (let k = 0; !claimed && k < 3; k++) { await sleep(4000); claimed = claim(stream, slot); }
-    if (isLocal) { log("… waiting for GPU"); while (!claim("gpu", "local")) await sleep(5000); log("🔓 GPU acquired"); }
+    // skip-done idempotency: sibling already produced a gated proposal → this stream is DONE, don't grind
+    if (streamAlreadyGated()) { log("✅ sibling already gated this stream — skip (no redundant GPU grind)"); status = "DONE-SIBLING"; break; }
+    claim(stream, slot); // dedup marker (best-effort)
+    // FAIR FIFO GPU access (ticket-lock / bakery) — replaces the unfair claim-retry mutex that starved
+    let ticket = -1;
+    if (isLocal) {
+      ticket = pullTicket(GPU_DIR);
+      log(`… GPU queue: ticket ${ticket} (FIFO, starvation-free)`);
+      while (!tryTurn(GPU_DIR, ticket, process.env.ORCH_TAB!, Date.now(), GPU_TTL)) {
+        if (streamAlreadyGated()) { releaseTurn(GPU_DIR, ticket); log("✅ sibling gated while queued — leave queue"); status = "DONE-SIBLING"; break; }
+        await sleep(3000);
+      }
+      if (status === "DONE-SIBLING") { releaseClaim(stream, slot); break; }
+      log(`🔓 GPU acquired (ticket ${ticket})`);
+    }
     log(`▶ attempt ${attempt + 1}/${STEPS.length} · ${p.model} · steps ${STEPS[attempt]}${attempt > 0 ? " · narrowed scope" : ""}`);
     const r = dispatch(p.model, taskPrompt(attempt), STEPS[attempt]);
-    if (isLocal) releaseClaim("gpu", "local");
+    if (isLocal) releaseTurn(GPU_DIR, ticket);
     releaseClaim(stream, slot);
     const gated = (r.verdict === "DONE" || r.verdict === "OK") && /##\s*Change/i.test(r.proposal);
     log(`↳ verdict=${r.verdict} steps=${r.steps} proposal=${r.proposal ? r.proposal.length + "c" : "none"} → ${gated ? "✅ GATED" : "not gated"}`);
     if (gated) { status = "DONE"; break; }
-    if (attempt === STEPS.length - 1) status = "BLOCKED";
-    else { log("retry with more budget + narrower scope…"); await sleep(1500); }
+    if (attempt === STEPS.length - 1) { status = "BLOCKED"; break; }
+    // PROVEN backoff: on a transient error, wait full-jitter delay before retry (let server recover, no herd)
+    if (r.verdict === "ERROR" && isTransient(r.err)) {
+      const d = fullJitterDelay(attempt, 2000, 60_000);
+      log(`transient error → backoff ${(d / 1000).toFixed(1)}s (full-jitter) then retry`);
+      await sleep(d);
+    } else { log("retry with more budget + narrower scope…"); await sleep(1500); }
   }
-  log(status === "DONE" ? "✅ STREAM COMPLETE — standing by (live)" : "⚠️ BLOCKED after escalation — standing by (live)");
+  log(status.startsWith("DONE") ? "✅ STREAM COMPLETE — standing by (live)" : "⚠️ BLOCKED after escalation — standing by (live)");
   return idle(status);
 }
 

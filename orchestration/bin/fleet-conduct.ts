@@ -29,6 +29,9 @@ const REPORTS = join(FLEET_HOME, "reports");
 const JSON_OUT = process.argv.includes("--json");
 const STOP = process.argv.includes("--stop");
 const WATCH = process.argv.includes("--watch");
+// fleet-agent tabs self-retry with escalation; conductor re-dispatch is opt-in to avoid double-run
+// (one-shot wrapper competing with a living agent = wasteful). Default watch = OBSERVE-only.
+const REDISPATCH = process.argv.includes("--redispatch");
 
 interface WorkerReport { stream: string; slot: string; model?: string; verdict?: string; steps?: number; demoSuspected?: boolean; allOk?: boolean; proposal?: string; error?: string; }
 
@@ -155,7 +158,7 @@ async function watchLoop(): Promise<void> {
   while (true) {
     const s = snapshot();
     writeStatus(s);
-    const fired = redispatch(s);
+    const fired = REDISPATCH ? redispatch(s) : [];
     const line = statusLine(s, fired);
     if (line !== lastLine || fired.length) { console.log(`[${new Date().toISOString().slice(11, 19)}] ${line}`); lastLine = line; } // delta-only (gürültü yok)
     await new Promise((r) => setTimeout(r, PERIOD));
