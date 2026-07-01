@@ -1,0 +1,90 @@
+{
+  "ts": "2026-07-01T22:16:41Z",
+  "steps": [
+    {
+      "order": 1,
+      "stream": "shell-harden",
+      "task": "env-guard + exit-code hardening",
+      "models": [
+        "gpt-oss:20b-cloud",
+        "qwen3:8b"
+      ],
+      "dependsOn": [],
+      "tier": "host",
+      "gate": "tsc 0 + vitest green + conductor gate before apply (PROPOSE-only, isolated --root)"
+    },
+    {
+      "order": 2,
+      "stream": "mjs-migration",
+      "task": "type-safety (.mjs → .ts, 490 files)",
+      "models": [
+        "gpt-oss:120b-cloud",
+        "qwen3-coder-64k:latest"
+      ],
+      "dependsOn": [
+        "shell-harden"
+      ],
+      "tier": "host",
+      "gate": "tsc 0 + vitest green + conductor gate before apply (PROPOSE-only, isolated --root)"
+    },
+    {
+      "order": 3,
+      "stream": "typescript-core",
+      "task": "security+types (all new logic)",
+      "models": [
+        "qwen3-coder:480b-cloud",
+        "qwen3-coder:30b"
+      ],
+      "dependsOn": [
+        "mjs-migration"
+      ],
+      "tier": "host",
+      "gate": "tsc 0 + vitest green + conductor gate before apply (PROPOSE-only, isolated --root)"
+    },
+    {
+      "order": 4,
+      "stream": "errors-resilience",
+      "task": "error-handling + exit-code + logging",
+      "models": [
+        "qwen3-coder:480b-cloud",
+        "deepseek-r1:32b"
+      ],
+      "dependsOn": [
+        "typescript-core"
+      ],
+      "tier": "host",
+      "gate": "tsc 0 + vitest green + conductor gate before apply (PROPOSE-only, isolated --root)"
+    },
+    {
+      "order": 5,
+      "stream": "concurrency-safety",
+      "task": "race-condition + synchronization",
+      "models": [
+        "gpt-oss:120b-cloud",
+        "deepseek-r1:32b"
+      ],
+      "dependsOn": [
+        "typescript-core"
+      ],
+      "tier": "host",
+      "gate": "tsc 0 + vitest green + conductor gate before apply (PROPOSE-only, isolated --root)"
+    },
+    {
+      "order": 6,
+      "stream": "test-coverage",
+      "task": "vitest coverage",
+      "models": [
+        "gpt-oss:20b-cloud",
+        "qwen3:8b"
+      ],
+      "dependsOn": [
+        "errors-resilience",
+        "concurrency-safety"
+      ],
+      "tier": "safe",
+      "gate": "tsc 0 + vitest green (read-only analysis + new file)"
+    }
+  ],
+  "ok": true,
+  "maxTwoOk": true
+}

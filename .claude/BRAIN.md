@@ -30,6 +30,7 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 | **Task list** | Persistent master-directive acceptance-criteria + DONE log + next (auto-refreshed, cross-session truth) | `orchestration/bin/tasklist.ts` → `docs/MASTER_TASKLIST.md` | `/tasklist` |
 | **Autopilot** | 30-min always-open loop: benchprompt→council→fleet→critic→dod→conduct→fuse→think→next→tasklist→status→dispatch→doctor | `orchestration/bin/autopilot.ts` | (launchd) |
 | **E2E-loop** | Runs the autopilot chain until CONVERGED (bounded 3 rounds; `--watch` persistent), detects convergence honestly → `docs/E2E_LOOP.md` | `orchestration/bin/loop.ts` + `bin/lib/loop.ts` | `/loop` |
+| **Mission** | Sequences the parallel fleet into step-by-step (T1→Tn) dependency-ordered tasks, ≤2/model, ethical tool-tier per step (never `privileged`) → `orchestration/MISSION.md` | `orchestration/bin/mission.ts` + `bin/lib/mission.ts` | `/mission` |
 | **Oracle** | Deterministic ground-truth (TRUE/FALSE/UNDECIDABLE + proof); LLM-free | `orchestration/oracle/index.ts` | — |
 | **Claims** | Atomic collision-free work ledger (LWW+fence, TTL) | `orchestration/bin/lib/claims.ts` | — |
 

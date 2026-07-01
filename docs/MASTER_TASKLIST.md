@@ -1,9 +1,9 @@
 # MASTER_TASKLIST.md — persistent task list (auto-generated, do not hand-edit)
 
-> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T22:03:36Z. The operator's recurring master-directive as
+> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T22:17:39Z. The operator's recurring master-directive as
 > durable acceptance-criteria + live DONE/next. Refreshed by autopilot + `/tasklist`. Map: `.claude/BRAIN.md`.
 
-## A. Master-directive acceptance (13/13)
+## A. Master-directive acceptance (14/14)
 - [x] **council** — Council: capability-matched multi-model analysis + oracle verify + debate  
   ↳ orchestration/bin/council.ts, /council
 - [x] **fleet-tabs** — Terminal.app + iTerm2 living agent-tabs, ≤2 tasks/model, stay open  
@@ -30,6 +30,8 @@
   ↳ all commits EN, reports TR
 - [x] **e2e-loop** — End-to-end convergence loop: run autopilot until converged (bounded), detect convergence  
   ↳ orchestration/bin/loop.ts + lib/loop.ts, /loop → docs/E2E_LOOP.md
+- [x] **sequenced-mission** — Sequenced ethical mission: step-by-step (T1→Tn) dependency-ordered tasks, ≤2/model, tool-tier bounded (never privileged)  
+  ↳ orchestration/bin/mission.ts + lib/mission.ts, /mission → orchestration/MISSION.md
 
 ## B. Current status
 - CODE_PLAN streams: **6/6 DONE** (docs/CODINGS_STATUS.md)
@@ -52,11 +54,11 @@
 - vO28 — self-heal flaky root-fix (gate clean, no GATE_SKIP) (`6082ddc`)
 
 ## D. Next-task queue (0 P1 safe-additive · 20 total) — see FLEET_NEXT.md
+- recent: 665945c fix(orchestration): e2e loop reaches CONVERGED — reconcile next-queue vs applied-state (vO31)
 - recent: a0c85e2 feat(orchestration): e2e convergence loop (/loop) — runs autopilot until converged, bounded
 - recent: a6f3d54 feat(orchestration): persistent MASTER_TASKLIST.md + auto-refresh generator (/tasklist)
 - recent: 6082ddc fix(host-bridge): self-heal probe fail-fast (5000→1500) — kills the recurring flaky, NO GATE_SKIP
 - recent: 6ea7926 feat: complete final 3 streams — real code + gated tests (6/6 DONE, no QUEUED)
-- recent: 7bec554 feat: complete test-coverage coding — cli parseSSEBuffer unit test (gateable)
 
 > Convergence = all acceptance ✅ + gate clean + next-queue drained. This file is the durable source of
 > truth across sessions; the plan file is scratch.
