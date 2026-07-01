@@ -4,6 +4,7 @@
 // (bin/mcp-stdio.ts) share ONE bridge client — no duplicated signing/transport.
 import path from "node:path";
 import { signRequest } from "./bridge-hmac";
+import { createSingleFlight } from "./lib/single-flight";
 
 // Bridge host resolution is environment-dependent: Docker reaches the host at
 // host.docker.internal, a local `tsx server.ts` reaches it at 127.0.0.1. The static
@@ -15,10 +16,33 @@ const BRIDGE_CANDIDATES: string[] = [...new Set(
 )];
 let resolvedBridgeBase: string | null = null;
 
+// concurrency-safety: N concurrent cold-start callers each ran the full candidate loop and raced the
+// shared `resolvedBridgeBase` write. Single-flight the cold-start discovery so exactly ONE lightweight
+// probe runs while the rest await it (behavior-preserving — every caller then targets the same base).
+const baseSF = createSingleFlight();
+
+/** Discover the reachable base with ONE cheap GET probe per candidate (any HTTP response = reachable,
+ *  connection failure → next). Single-flighted so concurrent cold-start callers share one probe.
+ *  Exported for tests (inject `fetchImpl`); production passes the global fetch. */
+export async function resolveBridgeBase(candidates: string[], fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  if (resolvedBridgeBase) return resolvedBridgeBase;
+  return baseSF.run("bridge-base", async () => {
+    if (resolvedBridgeBase) return resolvedBridgeBase; // another caller resolved while we queued
+    for (const base of candidates) {
+      try { await fetchImpl(`${base}/`, { method: "GET", signal: AbortSignal.timeout(1500) }); resolvedBridgeBase = base; return base; }
+      catch { /* unreachable → next candidate */ }
+    }
+    return null; // none reachable; the request loop below surfaces the real error
+  });
+}
+/** Test hook: reset the cached base + in-flight probe between cases. */
+export function _resetBridgeBaseForTest(): void { resolvedBridgeBase = null; }
+
 // Fetch a bridge path, trying each candidate base until one is reachable (a network/DNS
-// failure → next candidate; any HTTP response means reachable → cache it). The same init
-// (incl. signal) is reused across candidates; the timeout signal bounds the whole attempt.
+// failure → next candidate; any HTTP response means reachable → cache it). Concurrent cold-start
+// callers first share one single-flighted probe (resolveBridgeBase), then each sends its own request.
 async function bridgeFetch(bridgePath: string, init: RequestInit): Promise<Response> {
+  if (!resolvedBridgeBase) await resolveBridgeBase(BRIDGE_CANDIDATES).catch(() => {});
   const bases = resolvedBridgeBase
     ? [resolvedBridgeBase, ...BRIDGE_CANDIDATES.filter((b) => b !== resolvedBridgeBase)]
     : BRIDGE_CANDIDATES;

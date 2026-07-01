@@ -14,6 +14,12 @@ WARM_MODEL="${WARM_MODEL:-qwen3:8b}" # benchmark winner
 TOOLS="$REPO/bin/host-bridge/tools"
 DRY_RUN="${DRY_RUN:-0}" # 1 → yan etki yok; mutating ops [DRY] yazılır (prova/test)
 
+# shell-harden: fail fast + clearly if a critical env var is unset (all above have defaults, so this is a
+# defensive no-op today; guards genuinely-required vars added later). See bin/require-env.sh.
+# shellcheck source=bin/require-env.sh
+source "$REPO/bin/require-env.sh"
+require_env PORT BRIDGE_PORT OLLAMA_URL WARM_MODEL
+
 log() { printf '\033[36m[up]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[up] uyarı:\033[0m %s\n' "$*"; }
 die() {

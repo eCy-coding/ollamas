@@ -29,9 +29,9 @@
 | errors-resilience | `formatSseError` + `isSessionStalled` in `server/agent-events.ts` | ✅ **DONE (applied)** | additive pure exports; `tests/agent-events.test.ts` 16 green; tsc 0 |
 | mjs-migration | `scripts/tsconfig.json` (incremental .mjs→.ts) | ✅ **DONE (applied)** | `tsc -p scripts/tsconfig.json --noEmit` = 0 errors |
 | test-coverage | `cli/lib/client.ts` `parseSSEBuffer` unit test | ✅ **DONE (applied)** | `tests/cli-parse-sse.test.ts` 6 green (node-project gateable — test placed in `tests/`, imports `../cli/lib/client`) |
-| typescript-core | fleet-gated proposal (qwen3-coder:480b-cloud) | 🟡 PROPOSAL | `~/.llm-mission-control/fleet/work/typescript-core.*/PROPOSAL.md` |
-| concurrency-safety | `server/host-bridge.ts` single-flight base-resolution | ⏸ **QUEUED** | runtime behavior change on the LIVE bridge → needs live test; server-lane review |
-| shell-harden | `start.sh` `require_env` guard | ⏸ **QUEUED** | boot-blocking guard → needs live boot test; scripts-lane review |
+| typescript-core | `server/analyzer.ts:computeGaps` tool-implementation validation | ✅ **DONE** | already coded + tested: `tests/audit-batch2-server.test.ts` (2 cases) — no dup added (DRY) |
+| concurrency-safety | `server/lib/single-flight.ts` + host-bridge cold-start `resolveBridgeBase` wire | ✅ **DONE (applied)** | `tests/single-flight.test.ts` (3) + `tests/host-bridge-resolve.test.ts` (3): concurrent→one probe, cached, none→null; tsc 0. Behavior-preserving GET-`/` probe |
+| shell-harden | `bin/require-env.sh` (sourceable guard) + `start.sh` wire | ✅ **DONE (applied)** | `scripts/tests/require-env.test.ts` (4): set→silent, unset→exit 78+msg, lists-all, empty→unset; start.sh sources it |
 
 ## C. Why the QUEUED items are held (not half-work)
 
