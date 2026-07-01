@@ -74,6 +74,14 @@
       "appliedIn": "vO12"
     },
     {
+      "category": "test-flaky-timeout",
+      "pattern": "flaky|test timed out|Test timed out in|probe.*hang|timeout.*collision|timed out in \\d+ms",
+      "provenSolution": "A test that spawns a subprocess doing a network/health probe MUST use a probe timeout FAR below the test's own timeout (fail-fast). Colliding equal timeouts (probe 5000ms == test 5000ms) race under load → flaky. Fix: probe timeout « test timeout (e.g. 1500ms probe vs 5000ms test).",
+      "sources": ["health-check/liveness fail-fast timeout best-practice (probe short, bounded)", "this project: self_heal.mjs probe 5000→1500 → scripts/self-heal.test.ts stable, FULL-gate green with NO GATE_SKIP (vO28)"],
+      "evidence": "bin/host-bridge/tools/self_heal.mjs probeBridge/probeApp AbortSignal.timeout(1500)",
+      "appliedIn": "vO28"
+    },
+    {
       "category": "uncommitted-green",
       "pattern": "uncommitted|commit.?siz|built.?not.?committed|yeşil iş.*commit",
       "provenSolution": "Green work must be committed at the phase boundary (quality gate: tsc → tests → conventional commit). Uncommitted-green is half-work; commit when the FULL gate passes (quiesce heavy load first so the gate isn't flaky).",

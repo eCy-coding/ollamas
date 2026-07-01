@@ -1,6 +1,6 @@
 # THINK.md — sustainable problem-solving loop (evidence-based, no-guess)
 
-> Auto: `tsx orchestration/bin/think.ts` · 2026-07-01T15:25:15Z · 31 problem · 6 proven · 25 needs-research
+> Auto: `tsx orchestration/bin/think.ts` · 2026-07-01T17:03:11Z · 31 problem · 6 proven · 25 needs-research
 > Rule: unknown problems are flagged NEEDS_RESEARCH — the mechanism never invents a fix (only cited, proven solutions).
 
 ## 🔬 NEEDS_RESEARCH (no proven solution in registry — do NOT guess)

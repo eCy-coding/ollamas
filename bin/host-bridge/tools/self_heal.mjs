@@ -36,7 +36,9 @@ async function probeBridge() {
   let headers = {};
   try { const t = readFileSync(TOKEN_FILE, "utf8").trim(); if (t) headers = { "X-Bridge-Token": t }; } catch {}
   try {
-    const r = await fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(5000), headers });
+    // Health probe fails FAST (1500ms « the 5000ms test timeout) — a dead/unreachable bridge must not
+    // hang near the caller's timeout (that collision made self-heal.test.ts flaky under load).
+    const r = await fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(1500), headers });
     return { ok: r.ok };
   } catch { return { ok: false }; }
 }
@@ -44,7 +46,7 @@ async function probeBridge() {
 async function probeApp() {
   try {
     // loopback-only health probe; the local app speaks plain HTTP on 127.0.0.1 (same pattern as health_probe.mjs).
-    const r = await fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(5000) }); // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
+    const r = await fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(1500) }); // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request — fail-fast « test timeout
     return { ok: r.ok };
   } catch { return { ok: false }; }
 }

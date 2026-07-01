@@ -39,6 +39,12 @@ Held items are **runtime-behavior-changing** or **non-gateable here** — applyi
 live server/boot (violates 0-hata) or can't be verified by the root gate. They are queued in `FLEET_NEXT.md`
 for the owning lane to apply + verify with its own gate. Queued ≠ abandoned.
 
+## C.1 Infra debt — FIXED
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| `scripts/tests/self-heal.test.ts` flaky (forced GATE_SKIP every commit) | ✅ **FIXED** | root cause: `self_heal.mjs` probe `AbortSignal.timeout(5000)` == test 5000ms → collision. Fix: probe → 1500ms (fail-fast). **FULL-repo gate now green with NO GATE_SKIP** (1348 passed, 0 failed). Registry learned: `test-flaky-timeout`. |
+
 ## D. Next task (conductor-assigned) — see FLEET_NEXT.md
 
 1. **P1** cli-lane: apply `parseSSEBuffer` test via the cli test runner.
