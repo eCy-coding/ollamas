@@ -30,6 +30,7 @@ export const ACCEPTANCE: { id: string; text: string; done: boolean; evidence: st
   { id: "evidence", text: "Only evidence, no guessing: sources cited or NEEDS_RESEARCH", done: true, evidence: "PROBLEM_REGISTRY sources + THINK no-guess" },
   { id: "gate-clean", text: "e2e 100%: full-repo gate green with NO GATE_SKIP", done: false, evidence: "self-heal flaky fixed (6082ddc) — verify each commit" },
   { id: "report-tr", text: "Build EN, report TR", done: true, evidence: "all commits EN, reports TR" },
+  { id: "e2e-loop", text: "End-to-end convergence loop: run autopilot until converged (bounded), detect convergence", done: true, evidence: "orchestration/bin/loop.ts + lib/loop.ts, /loop → docs/E2E_LOOP.md" },
 ];
 
 export function renderTaskList(i: TaskListInputs): string {

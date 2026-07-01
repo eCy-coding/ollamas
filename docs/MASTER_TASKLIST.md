@@ -1,9 +1,9 @@
 # MASTER_TASKLIST.md — persistent task list (auto-generated, do not hand-edit)
 
-> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T21:41:25Z. The operator's recurring master-directive as
+> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T21:50:08Z. The operator's recurring master-directive as
 > durable acceptance-criteria + live DONE/next. Refreshed by autopilot + `/tasklist`. Map: `.claude/BRAIN.md`.
 
-## A. Master-directive acceptance (12/12)
+## A. Master-directive acceptance (13/13)
 - [x] **council** — Council: capability-matched multi-model analysis + oracle verify + debate  
   ↳ orchestration/bin/council.ts, /council
 - [x] **fleet-tabs** — Terminal.app + iTerm2 living agent-tabs, ≤2 tasks/model, stay open  
@@ -28,10 +28,12 @@
   ↳ self-heal flaky fixed (6082ddc) — verify each commit
 - [x] **report-tr** — Build EN, report TR  
   ↳ all commits EN, reports TR
+- [x] **e2e-loop** — End-to-end convergence loop: run autopilot until converged (bounded), detect convergence  
+  ↳ orchestration/bin/loop.ts + lib/loop.ts, /loop → docs/E2E_LOOP.md
 
 ## B. Current status
 - CODE_PLAN streams: **6/6 DONE** (docs/CODINGS_STATUS.md)
-- THINK: 0 PROVEN · 25 NEEDS_RESEARCH (PROBLEM_REGISTRY.json)
+- THINK: 0 PROVEN · 27 NEEDS_RESEARCH (PROBLEM_REGISTRY.json)
 - Full-repo gate: ✅ green, NO GATE_SKIP
 
 ## C. DONE log (vO history)
@@ -50,11 +52,11 @@
 - vO28 — self-heal flaky root-fix (gate clean, no GATE_SKIP) (`6082ddc`)
 
 ## D. Next-task queue (2 P1 safe-additive · 26 total) — see FLEET_NEXT.md
+- recent: a6f3d54 feat(orchestration): persistent MASTER_TASKLIST.md + auto-refresh generator (/tasklist)
 - recent: 6082ddc fix(host-bridge): self-heal probe fail-fast (5000→1500) — kills the recurring flaky, NO GATE_SKIP
 - recent: 6ea7926 feat: complete final 3 streams — real code + gated tests (6/6 DONE, no QUEUED)
 - recent: 7bec554 feat: complete test-coverage coding — cli parseSSEBuffer unit test (gateable)
 - recent: f577999 feat: complete gateable codings — agent-events SSE error/stall + scripts tsconfig + CODINGS_STATUS
-- recent: a784638 feat(orchestration): next-task queue + worker precompute-next (## Next:)
 
 > Convergence = all acceptance ✅ + gate clean + next-queue drained. This file is the durable source of
 > truth across sessions; the plan file is scratch.

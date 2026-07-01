@@ -13,6 +13,8 @@ deepsearch/deepthink → PLAN (before any task) → dispatch (council/fleet) →
                                    ↑___________________ autopilot 30-min loop (always-open) ___________________|
 ```
 Every worker PLANS before executing (detect what's needed → mini-plan → then propose). No half-work.
+The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above until convergence
+(all acceptance ✅ + gate clean + P1 queue drained) or a bounded round cap, then reports honestly.
 
 ## 1. Mechanisms (entry points)
 
@@ -26,7 +28,8 @@ Every worker PLANS before executing (detect what's needed → mini-plan → then
 | **THINK loop** | Detect problem → proven cited solution \| NEEDS_RESEARCH (no-guess); learns (append-only) | `orchestration/bin/think.ts` + `PROBLEM_REGISTRY.json` | `/think` |
 | **Fleet-next** | Precompute next-task queue (safe-additive apply → risky-edit → research); workers also `## Next:` precompute | `orchestration/bin/fleet-next.ts` | `/fleet-next` |
 | **Task list** | Persistent master-directive acceptance-criteria + DONE log + next (auto-refreshed, cross-session truth) | `orchestration/bin/tasklist.ts` → `docs/MASTER_TASKLIST.md` | `/tasklist` |
-| **Autopilot** | 30-min always-open loop: benchprompt→council→fleet→critic→dod→conduct→fuse→think→status→doctor | `orchestration/bin/autopilot.ts` | (launchd) |
+| **Autopilot** | 30-min always-open loop: benchprompt→council→fleet→critic→dod→conduct→fuse→think→next→tasklist→status→dispatch→doctor | `orchestration/bin/autopilot.ts` | (launchd) |
+| **E2E-loop** | Runs the autopilot chain until CONVERGED (bounded 3 rounds; `--watch` persistent), detects convergence honestly → `docs/E2E_LOOP.md` | `orchestration/bin/loop.ts` + `bin/lib/loop.ts` | `/loop` |
 | **Oracle** | Deterministic ground-truth (TRUE/FALSE/UNDECIDABLE + proof); LLM-free | `orchestration/oracle/index.ts` | — |
 | **Claims** | Atomic collision-free work ledger (LWW+fence, TTL) | `orchestration/bin/lib/claims.ts` | — |
 
