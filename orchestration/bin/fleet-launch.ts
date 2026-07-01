@@ -98,12 +98,13 @@ log "✅ DONE report → ${report} (rc=$RC)"
   return wrapper;
 }
 
-/** AppleScript to open a NEW tab and run a command (Terminal.app do script / iTerm2 write text). */
+/** AppleScript to open a NEW tab and run a command. iTerm2: create a window if none is open (root-fix
+ *  for silent skip when no window existed). The command itself keeps the tab alive (persistent agent). */
 function openTab(app: Assignment["app"], cmd: string): void {
   const inner = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const script = app === "Terminal.app"
     ? `tell application "Terminal"\n  activate\n  do script "${inner}"\nend tell`
-    : `tell application "iTerm"\n  activate\n  tell current window\n    create tab with default profile\n    tell current session to write text "${inner}"\n  end tell\nend tell`;
+    : `tell application "iTerm"\n  activate\n  if (count of windows) = 0 then\n    create window with default profile\n    tell current session of current window to write text "${inner}"\n  else\n    tell current window\n      create tab with default profile\n      tell current session to write text "${inner}"\n    end tell\n  end if\nend tell`;
   execFileSync("osascript", ["-e", script], { timeout: 15000 });
 }
 
@@ -133,19 +134,20 @@ function main(): void {
   if (streamsArg) slots = slots.filter((a) => streamsArg.includes(a.stream));
   if (CLOUD_ONLY) slots = slots.filter((a) => a.runtime === "cloud");
 
-  const wrappers = new Map<string, string>();
-  for (const a of slots) wrappers.set(`${a.stream}.${a.slot}`, writeWrapper(a));
+  for (const a of slots) writeWrapper(a); // keep one-shot wrappers on disk for fleet-conduct re-dispatch compat
 
   mkdirSync(ORCH_DIR, { recursive: true });
   writeFileSync(join(ORCH_DIR, "FLEET_PLAN.json"), JSON.stringify({ ts: new Date().toISOString().slice(0, 19) + "Z", plan }, null, 2) + "\n");
   writeFileSync(join(ORCH_DIR, "FLEET_PLAN.md"), renderPlanMd(plan) + "\n");
 
   console.log(`🛰  fleet-launch [${GO ? "GO" : "dry-run"}] · ${slots.length} slot · local ${plan.localSlots}/cloud ${plan.cloudSlots} · ≤2/model ${plan.maxTwoOk ? "✅" : "❌"}`);
+  const tsx = join(REPO, "node_modules", ".bin", "tsx");
   for (const a of slots) {
-    const w = wrappers.get(`${a.stream}.${a.slot}`)!;
-    const cmd = `bash ${w}`;
-    if (!GO) { console.log(`  [dry] ${a.app} · ${a.stream} · ${a.model} (${a.runtime}) → ${cmd}`); continue; }
-    try { openTab(a.app, cmd); console.log(`  ▶ opened ${a.app} · ${a.stream} · ${a.model}`); }
+    // each tab runs the PERSISTENT living agent (not the one-shot wrapper) so it stays open + followable;
+    // trailing `exec $SHELL` guarantees the tab survives even if the agent ever returns.
+    const cmd = `cd ${REPO} && ${tsx} orchestration/bin/fleet-agent.ts ${a.stream} ${a.slot}; exec $SHELL`;
+    if (!GO) { console.log(`  [dry] ${a.app} · ${a.stream} · ${a.model} (${a.runtime}) → fleet-agent ${a.stream} ${a.slot}`); continue; }
+    try { openTab(a.app, cmd); console.log(`  ▶ opened ${a.app} · ${a.stream} · ${a.model} (persistent agent)`); }
     catch (e: any) { console.error(`  ✗ ${a.app} ${a.stream}: ${(e?.message ?? "osascript hata").slice(0, 60)}`); }
   }
   if (!GO) console.log(`\nDry-run. Gerçek aç: --go [--cloud-only] [--streams a,b]. Kondüktör: tsx orchestration/bin/fleet-conduct.ts`);
