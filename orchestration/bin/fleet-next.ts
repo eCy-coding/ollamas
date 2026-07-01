@@ -13,10 +13,11 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
-import { prioritizeNext, renderNext, type ProposalRef } from "./lib/fleet-next";
+import { prioritizeNext, renderNext, appliedStreams, type ProposalRef } from "./lib/fleet-next";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
+const REPO = join(ORCH_DIR, "..");
 const REPORTS = join(homedir(), ".llm-mission-control", "fleet", "reports");
 const JSON_OUT = process.argv.includes("--json");
 
@@ -59,7 +60,11 @@ function main(): void {
   const proposals = gatedProposals();
   // THINK.json (if think --json ran) carries the needsResearch count; probes are best-effort from THINK.md
   const probes = researchProbes();
-  const queue = prioritizeNext(proposals, probes);
+  // Reconcile against applied-state: streams already shipped (CODINGS_STATUS.md §B ✅ DONE) drop out of the
+  // queue — shipped work is not "next", and re-listing it kept the e2e loop from ever converging (vO31).
+  const codingsF = join(REPO, "docs", "CODINGS_STATUS.md");
+  const applied = appliedStreams(existsSync(codingsF) ? readFileSync(codingsF, "utf8") : "");
+  const queue = prioritizeNext(proposals, probes, applied);
   const ts = nowIso();
   writeFileSync(join(ORCH_DIR, "FLEET_NEXT.md"), renderNext(queue, ts) + "\n");
   if (JSON_OUT) { console.log(JSON.stringify({ ts, tasks: queue })); return; }

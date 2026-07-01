@@ -1,6 +1,6 @@
 # MASTER_TASKLIST.md — persistent task list (auto-generated, do not hand-edit)
 
-> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T21:50:08Z. The operator's recurring master-directive as
+> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T22:03:36Z. The operator's recurring master-directive as
 > durable acceptance-criteria + live DONE/next. Refreshed by autopilot + `/tasklist`. Map: `.claude/BRAIN.md`.
 
 ## A. Master-directive acceptance (13/13)
@@ -51,12 +51,12 @@
 - vO27 — final 3 streams complete (6/6, single-flight/require-env) (`6ea7926`)
 - vO28 — self-heal flaky root-fix (gate clean, no GATE_SKIP) (`6082ddc`)
 
-## D. Next-task queue (2 P1 safe-additive · 26 total) — see FLEET_NEXT.md
+## D. Next-task queue (0 P1 safe-additive · 20 total) — see FLEET_NEXT.md
+- recent: a0c85e2 feat(orchestration): e2e convergence loop (/loop) — runs autopilot until converged, bounded
 - recent: a6f3d54 feat(orchestration): persistent MASTER_TASKLIST.md + auto-refresh generator (/tasklist)
 - recent: 6082ddc fix(host-bridge): self-heal probe fail-fast (5000→1500) — kills the recurring flaky, NO GATE_SKIP
 - recent: 6ea7926 feat: complete final 3 streams — real code + gated tests (6/6 DONE, no QUEUED)
 - recent: 7bec554 feat: complete test-coverage coding — cli parseSSEBuffer unit test (gateable)
-- recent: f577999 feat: complete gateable codings — agent-events SSE error/stall + scripts tsconfig + CODINGS_STATUS
 
 > Convergence = all acceptance ✅ + gate clean + next-queue drained. This file is the durable source of
 > truth across sessions; the plan file is scratch.

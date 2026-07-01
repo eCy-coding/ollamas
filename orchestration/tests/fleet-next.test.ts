@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffTarget, isAdditive, prioritizeNext, renderNext, type ProposalRef } from "../bin/lib/fleet-next";
+import { diffTarget, isAdditive, prioritizeNext, renderNext, appliedStreams, type ProposalRef } from "../bin/lib/fleet-next";
 
 const ADDITIVE = `## Change: add scripts/tsconfig.json
 ## Diff:
@@ -48,5 +48,56 @@ describe("prioritizeNext — safe-additive first, research last", () => {
   it("empty → no blind-apply directive", () => {
     const md = renderNext(prioritizeNext([], []), "t");
     expect(md).toContain("Nothing to blind-apply");
+  });
+});
+
+const CODINGS = `## B. CODE_PLAN stream proposals — apply status
+| Stream | Proposal | Status | Evidence |
+|--------|----------|--------|----------|
+| mjs-migration | \`scripts/tsconfig.json\` | ✅ **DONE (applied)** | tsc 0 |
+| test-coverage | \`cli/lib/client.ts\` | ✅ **DONE (applied)** | 6 green |
+| typescript-core | computeGaps | ✅ **DONE** | already tested |
+| pending-stream | something | 🔶 QUEUED | held |
+`;
+
+describe("appliedStreams — reconcile shipped work out of the queue (vO31)", () => {
+  it("collects streams marked ✅ DONE (applied) or ✅ DONE from CODINGS_STATUS §B", () => {
+    const s = appliedStreams(CODINGS);
+    expect(s.has("mjs-migration")).toBe(true);
+    expect(s.has("test-coverage")).toBe(true);
+    expect(s.has("typescript-core")).toBe(true); // plain ✅ **DONE also counts
+    expect(s.has("pending-stream")).toBe(false); // QUEUED stays pending
+    expect(s.size).toBe(3);
+  });
+
+  it("empty/garbage input → empty set (safe)", () => {
+    expect(appliedStreams("").size).toBe(0);
+    expect(appliedStreams("no table here").size).toBe(0);
+  });
+});
+
+describe("prioritizeNext — applied streams drop (loop can converge)", () => {
+  const proposals: ProposalRef[] = [
+    { stream: "mjs-migration", slot: "a", proposal: ADDITIVE },
+    { stream: "errors-resilience", slot: "b", proposal: EDIT },
+  ];
+
+  it("drops proposals whose stream is already applied", () => {
+    const applied = new Set(["mjs-migration"]);
+    const q = prioritizeNext(proposals, [], applied);
+    expect(q.find((t) => t.stream === "mjs-migration")).toBeUndefined(); // shipped → dropped
+    expect(q.find((t) => t.stream === "errors-resilience")).toBeDefined(); // still pending
+  });
+
+  it("all applied → no P1 left (nextP1 == 0 → convergence reachable)", () => {
+    const applied = new Set(["mjs-migration", "errors-resilience"]);
+    const q = prioritizeNext(proposals, [], applied);
+    expect(q.filter((t) => t.priority === 1).length).toBe(0);
+    expect(q.filter((t) => t.kind !== "research").length).toBe(0);
+  });
+
+  it("empty applied set → backward-compatible (nothing dropped)", () => {
+    const q = prioritizeNext(proposals, []);
+    expect(q.length).toBe(2);
   });
 });

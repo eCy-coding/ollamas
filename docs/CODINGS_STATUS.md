@@ -44,6 +44,7 @@ for the owning lane to apply + verify with its own gate. Queued ≠ abandoned.
 | Item | Status | Evidence |
 |------|--------|----------|
 | `scripts/tests/self-heal.test.ts` flaky (forced GATE_SKIP every commit) | ✅ **FIXED** | root cause: `self_heal.mjs` probe `AbortSignal.timeout(5000)` == test 5000ms → collision. Fix: probe → 1500ms (fail-fast). **FULL-repo gate now green with NO GATE_SKIP** (1348 passed, 0 failed). Registry learned: `test-flaky-timeout`. |
+| e2e loop never converged (nextP1 stuck > 0) | ✅ **FIXED (vO31)** | root cause: `fleet-next.ts` re-listed already-shipped streams as P1 forever (no applied-state check). Fix: `appliedStreams()` parses CODINGS §B `✅ DONE` → `prioritizeNext` drops shipped streams → P1 drains. **Live `loop.ts --rounds 1` → Verdict: CONVERGED ✅** (13/13 acceptance, gate ✅, 0 P1). |
 
 ## D. Next task (conductor-assigned) — see FLEET_NEXT.md
 

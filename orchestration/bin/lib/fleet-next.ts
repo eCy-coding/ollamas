@@ -35,9 +35,25 @@ export function isAdditive(proposal: string): boolean {
   return newFile && !editsExisting;
 }
 
-/** Rank the next-task queue: safe-additive applies first, then risky edits, then research. Deterministic. */
-export function prioritizeNext(proposals: ProposalRef[], researchProbes: string[] = []): NextTask[] {
-  const fromProposals: NextTask[] = (proposals ?? []).map((p) => {
+/** Streams already APPLIED (shipped) per CODINGS_STATUS.md §B — a `| stream | … | ✅ **DONE …` table row.
+ *  Such a stream's proposal is done, not "next" — so it must drop out of the queue (else the loop never
+ *  converges: re-listing shipped work keeps nextP1 > 0 forever). Parses the first table cell. IO-free. */
+export function appliedStreams(codingsMd: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of (codingsMd ?? "").split("\n")) {
+    // A data row marked done: "| <stream> | <proposal> | ✅ **DONE …** | <evidence> |"
+    if (!/✅\s*\*\*DONE/.test(line)) continue;
+    const m = /^\|\s*([\w-]+)\s*\|/.exec(line);
+    if (m) out.add(m[1]);
+  }
+  return out;
+}
+
+/** Rank the next-task queue: safe-additive applies first, then risky edits, then research. Deterministic.
+ *  `applied` = streams already shipped (from appliedStreams) → their proposals are dropped (not "next"). */
+export function prioritizeNext(proposals: ProposalRef[], researchProbes: string[] = [], applied: Set<string> = new Set()): NextTask[] {
+  const pending = (proposals ?? []).filter((p) => !applied.has(p.stream)); // shipped streams are not next-work
+  const fromProposals: NextTask[] = pending.map((p) => {
     const additive = isAdditive(p.proposal);
     return {
       stream: p.stream,
