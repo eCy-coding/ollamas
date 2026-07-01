@@ -25,12 +25,14 @@ import {
   type LaneContext, type LaneResult, type Finding,
 } from "./lib/council";
 import { verify } from "../oracle/index";
+import { synthesize, renderCodePlan, type LangCount } from "./lib/synth";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const REPO = join(ORCH_DIR, "..");
 const JSON_OUT = process.argv.includes("--json");
-const ALL = process.argv.includes("--all") || process.argv.includes("--refresh");
+const DEBATE = process.argv.includes("--debate"); // lane-başı ÇOK model (uzlaşı/güven) — implies --all
+const ALL = process.argv.includes("--all") || process.argv.includes("--refresh") || DEBATE;
 const laneArg = (() => { const i = process.argv.indexOf("--lane"); return i >= 0 ? process.argv[i + 1] : null; })();
 const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const DISPATCH_TIMEOUT = Number(process.env.OLLAMAS_TIMEOUT_MS || 180_000);
@@ -119,24 +121,57 @@ function rankedSeats(roster: Roster, lane: string): Seat[] {
   return [...seats].sort((a, b) => rank(a) - rank(b));
 }
 
+async function runSeat(seat: Seat, lane: string, prompt: string): Promise<LaneResult> {
+  const d = await dispatch(seat.model!, prompt);
+  const findings = parseFindings(lane, seat.model!, d.text);
+  return { lane, model: seat.model!, ok: findings.length > 0, findings, tokPerSec: d.tokPerSec, ms: d.ms, error: d.error };
+}
+
 /** Analyse a lane: try ranked seats until one produces findings (supervision: a failing/silent
  *  model falls through to the next capable seat). Bounded to MAX_ATTEMPTS to keep the pass cheap. */
 async function runLane(roster: Roster, lane: string): Promise<LaneResult> {
   const seats = rankedSeats(roster, lane);
   if (!seats.length) return { lane, model: "(none)", ok: false, findings: [], error: "lane için present seat yok" };
-  const ctx = laneContext(lane);
-  const prompt = buildLanePrompt(ctx);
-  const MAX_ATTEMPTS = 3;
+  const prompt = buildLanePrompt(laneContext(lane));
   let last: LaneResult | null = null;
-  for (const seat of seats.slice(0, MAX_ATTEMPTS)) {
-    const d = await dispatch(seat.model!, prompt);
-    const findings = parseFindings(lane, seat.model!, d.text);
-    const res: LaneResult = { lane, model: seat.model!, ok: findings.length > 0, findings, tokPerSec: d.tokPerSec, ms: d.ms, error: d.error };
+  for (const seat of seats.slice(0, 3)) {
+    const res = await runSeat(seat, lane, prompt);
     if (res.ok) return res;             // success → done
-    last = res;                          // remember for reporting; try next seat
-    process.stderr.write(`    ${lane}: ${seat.model} boş/hata${d.error ? ` (${d.error})` : ""} → sıradaki seat\n`);
+    last = res;
+    process.stderr.write(`    ${lane}: ${seat.model} boş/hata${res.error ? ` (${res.error})` : ""} → sıradaki seat\n`);
   }
   return last!;
+}
+
+/** Debate: dispatch UP TO 3 diverse seats (primary + adversary + reasoning) — bir temayı ≥2 model
+ *  görürse yüksek-güven (synth uzlaşı sinyali). Tek-GPU: sıralı (contention yok). */
+async function runLaneDebate(roster: Roster, lane: string): Promise<LaneResult[]> {
+  const seats = rankedSeats(roster, lane).slice(0, 3);
+  if (!seats.length) return [{ lane, model: "(none)", ok: false, findings: [], error: "lane için present seat yok" }];
+  const prompt = buildLanePrompt(laneContext(lane));
+  const out: LaneResult[] = [];
+  for (const seat of seats) {
+    const res = await runSeat(seat, lane, prompt);
+    out.push(res);
+    process.stderr.write(`    ${lane}: ${seat.model} → ${res.findings.length} bulgu${res.error ? ` (${res.error})` : ""}\n`);
+  }
+  return out;
+}
+
+/** Ground-truth dil dosya-sayımı (find; node_modules/dist hariç). synth'in matematiksel temeli. */
+function langCounts(): LangCount[] {
+  const map: [string, string][] = [
+    ["TypeScript", "-name '*.ts' -o -name '*.tsx'"], ["JavaScript", "-name '*.js' -o -name '*.mjs'"],
+    ["Shell", "-name '*.sh'"], ["Python", "-name '*.py'"], ["Rust", "-name '*.rs'"], ["Go", "-name '*.go'"],
+  ];
+  return map.map(([lang, expr]) => {
+    try {
+      const out = execFileSync("bash", ["-c",
+        `find "${REPO}" -path '*/node_modules' -prune -o -path '*/dist' -prune -o \\( ${expr} \\) -print 2>/dev/null | grep -v node_modules | grep -v /dist/ | wc -l`],
+        { encoding: "utf8", timeout: 15_000 }).trim();
+      return { lang, files: parseInt(out, 10) || 0 };
+    } catch { return { lang, files: 0 }; }
+  }).filter((c) => c.files > 0);
 }
 
 /** Oracle-audit the checkable claims among findings (deterministic ground-truth). */
@@ -231,24 +266,36 @@ async function main(): Promise<void> {
     return;
   }
 
-  // heavy mode: dispatch real models per lane, audit, write artifacts
+  // heavy mode: dispatch real models per lane, audit, synthesize, write artifacts
   const lanes = laneArg ? [laneArg] : LANES;
   const results: LaneResult[] = [];
   for (const lane of lanes) {
-    process.stderr.write(`  council: ${lane} → dispatch...\n`);
-    results.push(await runLane(roster, lane)); // sequential = single-GPU safe
+    process.stderr.write(`  council${DEBATE ? " [debate]" : ""}: ${lane} → dispatch...\n`);
+    if (DEBATE) results.push(...await runLaneDebate(roster, lane)); // çok-model uzlaşı
+    else results.push(await runLane(roster, lane));                 // tek-model (fallback'li)
+    // sequential = single-GPU safe
   }
   const allFindings = results.flatMap((r) => r.findings);
   const audits = auditFindings(allFindings);
   const summary = summarizeCouncil(results);
-  writeFileSync(join(ORCH_DIR, "COUNCIL.json"), JSON.stringify({ ts, summary, results, audits }, null, 2) + "\n");
-  // E2E_ANALYSIS.md is a shared doc — only write the full report on --all (whole-project view)
-  if (!laneArg) writeFileSync(join(REPO, "docs", "E2E_ANALYSIS.md"), renderE2E(results, audits, ts) + "\n");
+  writeFileSync(join(ORCH_DIR, "COUNCIL.json"), JSON.stringify({ ts, debate: DEBATE, summary, results, audits }, null, 2) + "\n");
 
-  if (JSON_OUT) { process.stdout.write(JSON.stringify({ mode: "heavy", ts, summary, audits }) + "\n"); return; }
-  process.stdout.write(`🎭 council [heavy] · ${results.length} lane · ${summary.totalFindings} bulgu · ${audits.length} oracle-denetim\n`);
+  // whole-project view (not --lane): E2E raporu + KESİN CEVAP sentezi (CODE_PLAN.md)
+  let plan: ReturnType<typeof synthesize> | null = null;
+  if (!laneArg) {
+    writeFileSync(join(REPO, "docs", "E2E_ANALYSIS.md"), renderE2E(results, audits, ts) + "\n");
+    plan = synthesize(allFindings, langCounts(), ts);
+    writeFileSync(join(REPO, "docs", "CODE_PLAN.md"), renderCodePlan(plan) + "\n");
+  }
+
+  if (JSON_OUT) { process.stdout.write(JSON.stringify({ mode: "heavy", debate: DEBATE, ts, summary, audits, plan }) + "\n"); return; }
+  process.stdout.write(`🎭 council [${DEBATE ? "debate" : "heavy"}] · ${lanes.length} lane · ${results.length} dispatch · ${summary.totalFindings} bulgu · ${audits.length} oracle-denetim\n`);
   for (const r of results) process.stdout.write(`  ${r.ok ? "✓" : "✗"} ${r.lane} (${r.model}): ${r.findings.length} bulgu${r.error ? ` — ${r.error}` : ""}\n`);
   if (summary.silentLanes.length) process.stdout.write(`  ⚠️ sessiz lane: ${summary.silentLanes.join(", ")}\n`);
+  if (plan) {
+    process.stdout.write(`\n📋 KESİN CEVAP → docs/CODE_PLAN.md\n  ${plan.headline}\n`);
+    for (const t of plan.themes.slice(0, 5)) process.stdout.write(`  P${t.priority} ${t.theme}: ${t.count} bulgu · ${t.lanes.length} lane · ${t.models.length} model${t.risks ? ` · ⚠️${t.risks} risk` : ""}\n`);
+  }
 }
 
 main().catch((e) => { console.error("[council] hata:", e?.message ?? e); process.exit(1); });
