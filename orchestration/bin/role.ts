@@ -36,6 +36,7 @@ export interface RoleInputs {
   council?: { present: number; total: number; covered: number; uncovered: string[] } | null; // model-council roster (COUNCIL_ROSTER.json)
   fleet?: { slots: number; local: number; cloud: number; maxTwoOk: boolean } | null; // local model-fleet plan (FLEET_PLAN.json)
   think?: { registry: number } | null; // sustainable problem-solving loop (PROBLEM_REGISTRY.json)
+  nextTask?: { p1: number; total: number } | null; // precomputed next-task queue (FLEET_NEXT.md)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -97,6 +98,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     i.council ? `- 🎭 **Model-council:** roster ${i.council.present}/${i.council.total} seat · lane coverage ${i.council.covered}/7${i.council.uncovered.length ? ` · ⚠️ uncovered: ${i.council.uncovered.join(",")}` : ""} — \`COUNCIL_ROSTER.json\` (yetenek→model→lane)` : `- Model-council: \`tsx bin/council.ts\` koş (roster + E2E analiz)`,
     i.fleet ? `- 🛰 **Model-fleet:** ${i.fleet.slots} slot (local ${i.fleet.local}/cloud ${i.fleet.cloud}) · ≤2/model ${i.fleet.maxTwoOk ? "✅" : "❌"} — \`FLEET_PLAN.md\` (Terminal.app+iTerm2; \`fleet-launch --go\`, \`fleet-conduct\`)` : `- Model-fleet: \`tsx bin/fleet-launch.ts\` koş (Terminal.app+iTerm2 dağıtım planı)`,
     i.think ? `- 🧠 **Think-loop (vO22):** ${i.think.registry} kanıtlı-çözüm registry · problem→proven|NEEDS_RESEARCH (no-guess) — \`PROBLEM_REGISTRY.json\`/\`THINK.md\` (autopilot sürekli çağırır)` : `- Think-loop: \`tsx bin/think.ts\` koş (sürdürülebilir sorun-çözme mekanizması)`,
+    i.nextTask ? `- ⏭️ **Next-task (vO24):** ${i.nextTask.p1} safe-additive (P1) · ${i.nextTask.total} kuyrukta — \`FLEET_NEXT.md\` (\`/fleet-next\`; worker'lar \`## Next:\` precompute eder)` : `- Next-task: \`tsx bin/fleet-next.ts\` koş (precompute next-task kuyruğu)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -241,6 +243,18 @@ async function main(): Promise<void> {
     if (existsSync(tF)) { const t = JSON.parse(readFileSync(tF, "utf8")); think = { registry: (t.entries ?? []).length }; }
   } catch { /* graceful */ }
 
+  // precomputed next-task queue (FLEET_NEXT.md varsa; graceful absent).
+  let nextTask: RoleInputs["nextTask"] = null;
+  try {
+    const nF = join(ORCH_DIR, "FLEET_NEXT.md");
+    if (existsSync(nF)) {
+      const txt = readFileSync(nF, "utf8");
+      const p1 = (txt.match(/P1 apply-additive/g) ?? []).length;
+      const total = (txt.match(/\| P[123] /g) ?? []).length;
+      nextTask = { p1, total };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -255,6 +269,7 @@ async function main(): Promise<void> {
     council,
     fleet,
     think,
+    nextTask,
   });
 
   console.log(answer);

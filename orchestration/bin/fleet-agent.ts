@@ -79,7 +79,8 @@ function taskPrompt(attempt: number): string {
     `## Change: <one concrete high-value change>`,
     `## Diff: <a short unified diff>`,
     `## Test: <the test that proves it>`,
-    `Then end with: VERDICT: DONE. Plan BEFORE proposing. Keep under 25 lines. Evidence over prose.`,
+    `## Next: <precompute — the 1-line NEXT step for this stream after this change lands>`,
+    `Then end with: VERDICT: DONE. Plan BEFORE proposing, precompute Next AFTER. Keep under 28 lines. Evidence over prose.`,
   ].join("\n");
 }
 

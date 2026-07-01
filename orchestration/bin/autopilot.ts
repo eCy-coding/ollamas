@@ -89,6 +89,14 @@ function detailFor(step: string): string {
     if (r) return `roster ${r.present ?? "?"}/${r.total ?? "?"} seat · coverage ${(r.lanesCovered ?? []).length}/7${(r.lanesUncovered ?? []).length ? ` · ⚠️ ${(r.lanesUncovered).join(",")}` : ""}`;
     return "council roster tazelendi";
   }
+  if (step === "next") {
+    const f = join(ORCH_DIR, "FLEET_NEXT.md");
+    if (existsSync(f)) {
+      const rows = readFileSync(f, "utf8").split("\n").filter((l) => /P1 apply-additive/.test(l)).length;
+      return `next-task kuyruğu tazelendi · ${rows} safe-additive (P1)`;
+    }
+    return "next-task kuyruğu tazelendi";
+  }
   if (step === "think") {
     const t = readJson(join(ORCH_DIR, "THINK.json")); // think --json ürünü (varsa)
     if (t) return `${t.proven ?? 0} proven · ${t.needsResearch ?? 0} needs-research · registry ${t.registrySize ?? "?"}`;
@@ -167,6 +175,7 @@ function main(): void {
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("think", "think.ts", []),     // vO22 THINK loop: finding → PROVEN-solution(registry) | NEEDS_RESEARCH (no-guess)
+    runStep("next", "fleet-next.ts", []), // vO24 precompute next-task queue (safe-additive apply → edit → research) → FLEET_NEXT.md
     runStep("status", "status.ts", []),
     runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),
