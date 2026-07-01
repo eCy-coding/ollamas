@@ -75,10 +75,11 @@ function taskPrompt(attempt: number): string {
   return [
     `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Repo: ${REPO}. Do NOT edit repo files.${focus}`,
     `Read AT MOST 2 files, then STOP reading. Your FINAL MESSAGE must BE the proposal in this exact shape:`,
+    `## Plan: <detect what THIS stream needs, then a 1-line plan of the change you will propose>`,
     `## Change: <one concrete high-value change>`,
     `## Diff: <a short unified diff>`,
     `## Test: <the test that proves it>`,
-    `Then end with: VERDICT: DONE. Keep under 25 lines. Evidence over prose.`,
+    `Then end with: VERDICT: DONE. Plan BEFORE proposing. Keep under 25 lines. Evidence over prose.`,
   ].join("\n");
 }
 
