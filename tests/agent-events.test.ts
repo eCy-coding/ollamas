@@ -5,6 +5,8 @@ import {
   isSessionDone,
   formatSseEvent,
   formatSseDone,
+  formatSseError,
+  isSessionStalled,
 } from "../server/agent-events";
 
 // Helper: build a session whose messages[] are the replayable steps.
@@ -132,5 +134,29 @@ describe("SSE tail route integration (fake session in db)", () => {
     tail(db, "s1", -1, res);
     expect(res.out.at(-1)).toBe(formatSseDone({ steps: 2, reason: "complete" }));
     expect(res.ended).toBe(true);
+  });
+});
+
+describe("formatSseError — terminal error frame (errors-resilience stream)", () => {
+  test("frames an SSE `error` event with JSON payload", () => {
+    expect(formatSseError({ reason: "stalled", after: 3 })).toBe(
+      `event: error\ndata: ${JSON.stringify({ reason: "stalled", after: 3 })}\n\n`,
+    );
+  });
+  test("distinct from the done frame", () => {
+    expect(formatSseError({ x: 1 })).not.toBe(formatSseDone({ x: 1 }));
+  });
+});
+
+describe("isSessionStalled — quiescence stall guard (no clock, caller passes quiet time)", () => {
+  test("no growth + quiet >= max → stalled", () => {
+    expect(isSessionStalled(3, 3, 31_000, 30_000)).toBe(true);
+    expect(isSessionStalled(3, 3, 30_000, 30_000)).toBe(true);
+  });
+  test("still growing → not stalled even if quiet exceeds max", () => {
+    expect(isSessionStalled(3, 4, 99_000, 30_000)).toBe(false);
+  });
+  test("no growth but not quiet long enough → not stalled", () => {
+    expect(isSessionStalled(3, 3, 10_000, 30_000)).toBe(false);
   });
 });

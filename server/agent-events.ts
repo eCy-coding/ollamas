@@ -68,3 +68,21 @@ export function formatSseEvent(id: number, data: any): string {
 export function formatSseDone(payload: Record<string, any>): string {
   return `event: done\ndata: ${JSON.stringify(payload)}\n\n`;
 }
+
+/**
+ * Frame a terminal `error` event. The tail is completion-detected by quiescence (see module header) and
+ * only ever emits `done`; a session that stalls or errors would otherwise tail forever. This lets the
+ * caller emit an explicit `error` frame so the client stops instead of hanging. (errors-resilience stream)
+ */
+export function formatSseError(payload: Record<string, any>): string {
+  return `event: error\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+/**
+ * Stall guard for the quiescence poll: true when the step count has NOT grown (curCount === prevCount)
+ * AND it has been quiet at least `maxQuietMs`. The caller uses this to emit `formatSseError` instead of
+ * tailing a hung/errored session indefinitely. Pure (no clock): the caller passes the measured quiet time.
+ */
+export function isSessionStalled(prevCount: number, curCount: number, quietMs: number, maxQuietMs: number): boolean {
+  return curCount === prevCount && quietMs >= maxQuietMs;
+}
