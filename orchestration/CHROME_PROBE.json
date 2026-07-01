@@ -1,0 +1,159 @@
+{
+  "ts": "2026-07-01T23:20:01Z",
+  "url": "http://127.0.0.1:3000",
+  "rows": [
+    {
+      "model": "qwen3-coder-64k:latest",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "I see you're trying to access a file outside of the allowed directory. The error indicates that you're attempting to access `/Users/emrecnyngmail.com/.llm-mission-control/agent-work/README.md` but the"
+    },
+    {
+      "model": "qwen3:8b-16k",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "ollamas-reviewer:latest",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "qwen2.5vl:32b",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "qwen2.5vl:7b",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "qwen3:8b",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "qwen3:30b-a3b",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "spawnSync node ETIMEDOUT"
+    },
+    {
+      "model": "deepseek-r1:32b",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "DONE",
+      "capable": false,
+      "proof": "I'll help open Google Chrome on this Mac using terminal tools. Reasoning: 1. The task requires opening Chrome via terminal 2. No file writes needed 3. Will use `open` and `pgrep` commands Action: maco"
+    },
+    {
+      "model": "qwen3-coder:30b",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "ReAct loop complete. Reached step depth limit."
+    },
+    {
+      "model": "qwen3:4b",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "spawnSync node ETIMEDOUT"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "**Output of `pgrep -x \"Google Chrome\"`:** ``` 52878 ``` The process ID indicates that Google Chrome is running. Therefore, Chrome has been opened successfully. **VERDICT: DONE Chrome opened**"
+    },
+    {
+      "model": "phi4:latest",
+      "provider": "ollama-local",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "kimi-k2.5:cloud",
+      "provider": "ollama-cloud",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "Authentication failure: invalid or missing key for ollama-cloud. Error: Ollama Cloud returned status 403: {\"error\":\"this model requires a subscription, upgrade for access: https://ollama.com/upgrade ("
+    },
+    {
+      "model": "gpt-oss:20b-cloud",
+      "provider": "ollama-cloud",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "gpt-oss:120b-cloud",
+      "provider": "ollama-cloud",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "spawnSync node ETIMEDOUT"
+    },
+    {
+      "model": "qwen3-coder:480b-cloud",
+      "provider": "ollama-cloud",
+      "calledOpener": true,
+      "openerOk": true,
+      "verdict": "DONE",
+      "capable": true,
+      "proof": "VERDICT: DONE Chrome opened"
+    },
+    {
+      "model": "llama3.3:70b",
+      "provider": "ollama-local",
+      "calledOpener": false,
+      "openerOk": false,
+      "verdict": "INCOMPLETE",
+      "capable": false,
+      "proof": "no output"
+    }
+  ]
+}
