@@ -1,0 +1,106 @@
+// council-roster — pure capability→model→lane assignment (0-manuel model council).
+//
+// A "seat" = one responsibility area (e.g. root-cause reasoning) with an ORDERED list of
+// preferred models. `buildRoster(available)` picks the first model that is actually pulled
+// (live `ollama list`), marking the seat present/absent. No IO, no model calls → fully
+// unit-testable. The CLI (bin/council.ts) feeds live availability in and dispatches only the
+// present seats. Absent seats are surfaced (never silently dropped — AGENTS.md §2.5).
+//
+// Lanes mirror shared.ts KNOWN_LANES (the 7 worktree lanes). A seat lists the lanes it is
+// responsible for analysing; a lane is "covered" if ≥1 present seat lists it.
+
+export type Capability =
+  | "deep-code" | "long-ctx-code" | "local-code" | "reasoning" | "vision"
+  | "moe-mid" | "fast-verify" | "cheap-triage" | "adversarial" | "big-reasoning"
+  | "cloud-alt" | "small-logic" | "embedding" | "custom-review";
+
+export type SeatRole =
+  | "architect" | "coder" | "reviewer" | "verifier" | "analyst" | "adversary" | "search" | "triage";
+
+export interface SeatSpec {
+  capability: Capability;
+  models: string[];       // ordered preference; first available wins
+  role: SeatRole;
+  responsibility: string; // human-readable area
+  lanes: string[];        // KNOWN_LANES this seat analyses
+}
+
+export interface Seat {
+  capability: Capability;
+  role: SeatRole;
+  responsibility: string;
+  lanes: string[];
+  model: string | null;   // resolved available model, or null if none pulled
+  available: boolean;
+}
+
+export interface Roster {
+  seats: Seat[];
+  present: number;
+  absentCapabilities: Capability[];
+  lanesCovered: string[];
+  lanesUncovered: string[];
+}
+
+// 7 worktree lanes (shared.ts KNOWN_LANES). Kept here as a literal so this module stays IO-free.
+export const LANES = ["backend", "frontend", "cli", "scripts", "integrations", "bench", "orchestration"];
+
+// Capability→model preference. Ordered: strongest/cheapest-appropriate first, then fallbacks.
+// Cloud tags cost no local RAM (host is RAM-bound) so they lead where correctness matters.
+export const SEAT_SPEC: SeatSpec[] = [
+  { capability: "deep-code", role: "architect", responsibility: "Derin kod-tasarım + mimari (server/backend, protocol)",
+    lanes: ["backend", "integrations"], models: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest"] },
+  { capability: "long-ctx-code", role: "analyst", responsibility: "Uzun/çok-dosya kod sweep (64k ctx whole-lane)",
+    lanes: ["backend", "orchestration"], models: ["qwen3-coder-64k:latest", "qwen3-coder:30b"] },
+  { capability: "local-code", role: "coder", responsibility: "cli/scripts lane kod analizi + bug-detect",
+    lanes: ["cli", "scripts"], models: ["qwen3-coder:30b", "qwen3-coder-64k:latest"] },
+  { capability: "reasoning", role: "verifier", responsibility: "Root-cause + mantıksal invariant + algoritma doğrulama",
+    lanes: LANES, models: ["deepseek-r1:32b", "qwen3:30b-a3b"] },
+  { capability: "vision", role: "analyst", responsibility: "web/frontend UI + diagram + screenshot analizi",
+    lanes: ["frontend"], models: ["qwen2.5vl:32b", "qwen2.5vl:7b"] },
+  { capability: "moe-mid", role: "analyst", responsibility: "orchestration lane + cross-lane dep-graph",
+    lanes: ["orchestration"], models: ["qwen3:30b-a3b", "gpt-oss:20b"] },
+  { capability: "fast-verify", role: "reviewer", responsibility: "Hızlı review + council verifier koltuğu (champion)",
+    lanes: LANES, models: ["qwen3:8b", "qwen3:8b-16k", "qwen3:4b"] },
+  { capability: "cheap-triage", role: "triage", responsibility: "Bulgu sınıflandırma + önceliklendirme",
+    lanes: LANES, models: ["qwen3:4b", "phi4:latest"] },
+  { capability: "adversarial", role: "adversary", responsibility: "Adversarial ikinci-görüş (best-of-N refute)",
+    lanes: LANES, models: ["gpt-oss:120b-cloud", "gpt-oss:20b", "gpt-oss:20b-cloud"] },
+  { capability: "big-reasoning", role: "adversary", responsibility: "Bağımsız çapraz-kontrol (majority-vote üyesi)",
+    lanes: LANES, models: ["llama3.3:70b", "deepseek-r1:32b"] },
+  { capability: "cloud-alt", role: "analyst", responsibility: "Cloud yük dengeleme / paralel koltuk (bench)",
+    lanes: ["bench"], models: ["kimi-k2.5:cloud", "qwen3-coder:480b-cloud"] },
+  { capability: "small-logic", role: "analyst", responsibility: "Hafif mantık kontrolü (scripts)",
+    lanes: ["scripts"], models: ["phi4:latest", "qwen3:4b"] },
+  { capability: "embedding", role: "search", responsibility: "Semantik kod-arama + duplikat tespiti",
+    lanes: LANES, models: ["nomic-embed-text:latest", "nomic-embed-text"] },
+  { capability: "custom-review", role: "reviewer", responsibility: "Proje-özel fine-tuned review",
+    lanes: LANES, models: ["ollamas-reviewer:latest", "qwen3:8b"] },
+];
+
+/** Resolve the first available model for a seat (exact tag match against live `ollama list`). */
+export function resolveSeat(spec: SeatSpec, available: Set<string>): Seat {
+  const model = spec.models.find((m) => available.has(m)) ?? null;
+  return {
+    capability: spec.capability, role: spec.role, responsibility: spec.responsibility,
+    lanes: spec.lanes, model, available: model !== null,
+  };
+}
+
+/** Build the full roster from a list of pulled model tags (order-independent). */
+export function buildRoster(availableModels: string[]): Roster {
+  const available = new Set((availableModels ?? []).map((m) => String(m).trim()).filter(Boolean));
+  const seats = SEAT_SPEC.map((s) => resolveSeat(s, available));
+  const present = seats.filter((s) => s.available).length;
+  const absentCapabilities = seats.filter((s) => !s.available).map((s) => s.capability);
+  const coveredSet = new Set<string>();
+  for (const s of seats) if (s.available) for (const l of s.lanes) coveredSet.add(l);
+  const lanesCovered = LANES.filter((l) => coveredSet.has(l));
+  const lanesUncovered = LANES.filter((l) => !coveredSet.has(l));
+  return { seats, present, absentCapabilities, lanesCovered, lanesUncovered };
+}
+
+/** Present seats responsible for a given lane (for dispatch fan-out). */
+export function seatsForLane(roster: Roster, lane: string): Seat[] {
+  return roster.seats.filter((s) => s.available && s.lanes.includes(lane));
+}

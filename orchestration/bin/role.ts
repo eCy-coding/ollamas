@@ -33,6 +33,7 @@ export interface RoleInputs {
   health?: { green: number; red: number; unknown: number } | null;  // vO9 lane sağlık roll-up (QUALITY.json)
   selfPolice?: { completeness: number; dod: number } | null;        // vO10-12 öz-denetim açık-iş (CRITIC/DOD.json)
   topReq?: { criticality: string; target: string; readiness: number } | null; // vO14 fuse birleşik kritik gereksinim (REQUIREMENTS.json)
+  council?: { present: number; total: number; covered: number; uncovered: string[] } | null; // model-council roster (COUNCIL_ROSTER.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -91,6 +92,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     i.health ? `- 🩺 **Lane health (vO9):** ${i.health.green}🟢 / ${i.health.red}🔴 / ${i.health.unknown}⚪ — \`QUALITY.md\` (tsc canlı + vitest cache)` : `- Lane health: \`tsx bin/quality.ts\` koş (henüz QUALITY.json yok)`,
     i.selfPolice ? `- 🧭 **Öz-denetim (vO10-12):** completeness ${i.selfPolice.completeness} açık · DoD ${i.selfPolice.dod} yarım-iş — \`CRITIC.md\`/\`DOD.md\` (autopilot→conduct tüketir)` : `- Öz-denetim: \`tsx bin/critic.ts\` + \`tsx bin/dod.ts\` koş`,
     i.topReq ? `- 🎯 **Kritik gereksinim (vO14 füzyon):** ${i.topReq.criticality}:${i.topReq.target} · proje hazırlık ${i.topReq.readiness}/100 — \`REQUIREMENTS.md\` (tüm-gate birleşik)` : `- Kritik gereksinim: \`tsx bin/fuse.ts\` koş (REQUIREMENTS füzyonu)`,
+    i.council ? `- 🎭 **Model-council:** roster ${i.council.present}/${i.council.total} seat · lane coverage ${i.council.covered}/7${i.council.uncovered.length ? ` · ⚠️ uncovered: ${i.council.uncovered.join(",")}` : ""} — \`COUNCIL_ROSTER.json\` (yetenek→model→lane)` : `- Model-council: \`tsx bin/council.ts\` koş (roster + E2E analiz)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -208,6 +210,16 @@ async function main(): Promise<void> {
     }
   } catch { /* graceful */ }
 
+  // model-council roster (COUNCIL_ROSTER.json varsa; graceful absent).
+  let council: RoleInputs["council"] = null;
+  try {
+    const cF = join(ORCH_DIR, "COUNCIL_ROSTER.json");
+    if (existsSync(cF)) {
+      const c = JSON.parse(readFileSync(cF, "utf8"));
+      council = { present: c.present ?? 0, total: c.total ?? 0, covered: (c.lanesCovered ?? []).length, uncovered: c.lanesUncovered ?? [] };
+    }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -219,6 +231,7 @@ async function main(): Promise<void> {
     health,
     selfPolice,
     topReq,
+    council,
   });
 
   console.log(answer);

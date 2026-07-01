@@ -1,6 +1,6 @@
 # Bu sekme = ollamas Orkestra Şefi (orchestration lane)
 
-> Canlı durum (`role.ts` üretti — bayat değil). ollamas **v1.6.0** @ `feat/v1.11-roots-abort`.
+> Canlı durum (`role.ts` üretti — bayat değil). ollamas **v1.6.0** @ `chore/p1-hardening`.
 
 ## Görev
 **Bu sekme = ollamas'ın orkestra şefi.** Tek görev: çalışan diğer lane sekmelerini (backend/MCP, frontend, cli, scripts, integrations/gateway, bench + test/integration) **read-only** takip et, birleşik durum matrisi üret, her lane'in sıradaki versiyonunu **10 versiyon ileriye** kadar planla, her iş için optimal prompt'u üret, OSS adoption fırsatlarını lane'lere map'le, hataları seyir defterine yaz ve **asla tekrarlama**.
@@ -19,49 +19,52 @@
 - İzole worktree, branch git ile doğrulanır (RISK-ORCH-001 branch-hijack)
 
 ## Mevcut aşama
-- Orchestration: **vO13 (Horizon auto roadmap (10 versiyon lookahead) lib hazır, cond) DONE** → sıradaki **(ROADMAP'e planlı versiyon ekle)**
-- İzlenen lane'ler (10): `feat/v1.11-roots-abort` · `feat/cli-v2-clean` · `feat/frontend-vf3` · `feat/general-oauth-grants` · `feat/ukp-ingest-receiver` · `feat/gateway-v2` · `feat/orchestration-v3` · `feat/scripts-v1` · `feat/tunnel-v1` · `feat/v1.8-bench`
-- Optimal runtime: `tsx bin/benchprompt.ts` koş (henüz MODEL_SELECTION.json yok)
-- 🩺 **Lane health (vO9):** 1🟢 / 1🔴 / 7⚪ — `QUALITY.md` (tsc canlı + vitest cache)
-- 🧭 **Öz-denetim (vO10-12):** completeness 1 açık · DoD 10 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
-- 🎯 **Kritik gereksinim (vO14 füzyon):** SECURITY:lic:f/prompts.chat · proje hazırlık 42/100 — `REQUIREMENTS.md` (tüm-gate birleşik)
+- Orchestration: **vO19 (MASTER_DISPATCH kalıcı master prompt + horizon wiring + memo) DONE** → sıradaki **(ROADMAP'e planlı versiyon ekle)**
+- İzlenen lane'ler (11): `chore/p1-hardening` · `feat/colab-gpu` · `fix/audit-security` · `verify/gwv2-all-lanes` · `fix/binary-architecture-calibration` · `fix/audit-cont` · `claude/cool-cohen-b245ee` · `(detached)` · `claude/loving-varahamihira-77d4a9` · `claude/naughty-kowalevski-2ccc35` · `(detached)`
+- 🏆 **Optimal runtime (0-manuel):** `qwen3-coder:480b-cloud` @ Apple M4 Max (null tok/s) — `MODEL_PROMPT.md`
+- 🩺 **Lane health (vO9):** 0🟢 / 2🔴 / 4⚪ — `QUALITY.md` (tsc canlı + vitest cache)
+- 🧭 **Öz-denetim (vO10-12):** completeness 3 açık · DoD 16 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
+- 🎯 **Kritik gereksinim (vO14 füzyon):** COMPLETENESS:crit:done-no-evidence:vO16 · proje hazırlık 40/100 — `REQUIREMENTS.md` (tüm-gate birleşik)
+- 🎭 **Model-council:** roster 14/14 seat · lane coverage 7/7 — `COUNCIL_ROSTER.json` (yetenek→model→lane)
 
 ## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)
 | Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |
 |------|-----------------|----------------------------|-------|
-| `v1.11-roots-abort` | ✅ ~~RFC 8707 resource binding enforce… | → ✅ Faz 22 v1.13 (OAuth Refresh Token R… | 3△ |
-| `cli-v2-clean` | v14 — DONE (kanıt) | → v15 TUI v2 / agent watch top multi pa… | 0△ |
-| `frontend-vf3` | ✅ Faz 13 v1.4 (Production Operations … | → — | 0△ |
-| `general-oauth-grants` | ✅ ~~roots/list upstream agregasyonu +… | → — | 0△ |
-| `ukp-ingest-receiver` | ✅ ~~roots/list upstream agregasyonu +… | → ✅ Faz 22 v1.13 (OAuth Refresh Token R… | 0△ |
-| `gateway-v2` | ✅ Per tenant upstream tool visibility… | → — | 0△ |
-| `orchestration-v3` | — | → — | 41△ |
-| `scripts-v1` | v16 — LaunchAgent Auto Load ✅ (reboot… | → Durum işaretleri: ⬜ planlı · 🔵 devam… | 4△ |
-| `tunnel-v1` | — | → vT9 Connectivity aware routing transp… | 3△ |
-| `v1.8-bench` | ✅ Faz 15 v1.6 (MCP Ecosystem Interop … | → — | 1△ |
+| `chore/p1-hardening` | P4 Migration drift fix — migrations.t… | → — | 74△ |
+| `colab-gpu` | P4 Migration drift fix — migrations.t… | → — | 13△ |
+| `fix/audit-security` | P4 Migration drift fix — migrations.t… | → — | 3△ |
+| `verify/gwv2-all-lanes` | P4 Migration drift fix — migrations.t… | → — | 0△ |
+| `fix/binary-architecture-calibration` | P4 Migration drift fix — migrations.t… | → — | 12△ |
+| `fix/audit-cont` | P4 Migration drift fix — migrations.t… | → — | 1△ |
+| `claude/cool-cohen-b245ee` | P4 Migration drift fix — migrations.t… | → — | 1△ |
+| `(detached)` | P4 Migration drift fix — migrations.t… | → — | 0△ |
+| `claude/loving-varahamihira-77d4a9` | ✅ Faz 12 v1.3 (Postgres + async store… | → — | 1△ |
+| `claude/naughty-kowalevski-2ccc35` | ✅ Faz 12 v1.3 (Postgres + async store… | → — | 566△ |
+| `(detached)` | P4 Migration drift fix — migrations.t… | → — | 0△ |
 
 ## Geliştirilebilir aşamalar (ROADMAP planned)
 - (ROADMAP'te planned vO yok)
 
 ### Lane bazında geliştirilebilir sonraki (canlı NEXT sinyalleri)
-- **v1.11-roots-abort** → ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
-- **cli-v2-clean** → v15 TUI v2 / agent watch top multi pane (request
-- **ukp-ingest-receiver** → ✅ Faz 22 v1.13 (OAuth Refresh Token Rotation [RF
-- **scripts-v1** → Durum işaretleri: ⬜ planlı · 🔵 devam · ✅ done. 
-- **tunnel-v1** → vT9 Connectivity aware routing transport reachVi
+- (lane NEXT sinyali okunamadı)
 
-## Araç envanteri (24 bin/)
+## Araç envanteri (32 bin/)
 - `adopt-gate.ts` — adopt-gate.ts — vO4 OSS Adoption License-Discipline Gate
 - `adopt.ts` — OSS adoption tracker + lisans-disiplini GATE
 - `autofix.ts` — Self-healing remediation
 - `autopilot.ts` — vO-AUTO 0-manuel orkestrasyon tetikleyici.
+- `backlog.ts` — vO15 cross-lane CRITICAL backlog delivery
 - `bench.ts` — Benchmark agregasyon raporu
 - `benchprompt.ts` — FÜZYON: 0-manuel optimal model+config → TEK portable prompt
 - `claim.ts` — vO7 Work-Claim CLI: bir sekme bir görevi
 - `conduct.ts` — Zero-touch autonomous conductor
+- `council.ts` — Hibrit model-council: yetenek-eşlemeli 18-model fleet ollamas'ı
 - `critic.ts` — Self-auditing completeness critic
 - `depgraph.ts` — Cross-lane bağımlılık grafiği + API-gap raporu
 - `discover.ts` — READ-ONLY canlı keşif: çalışan dev-server'ları cwd ile
+- `dispatchbench.ts` — vO18 Distributed-Dispatch research→test→update harness
+- `dispatchdoctor.ts` — vO21 Fleet dispatch readiness doctor CLI
+- `dispatchsim.ts` — vO20 Dispatch flow simulator CLI
 - `doctor.ts` — vO-AUTO.1 readiness doctor
 - `dod.ts` — Definition-of-Done + Concurrent-Task detector
 - `driftguard.ts` — vO8 Drift-Guard CLI: deterministik tutarlılık GATE
@@ -69,9 +72,12 @@
 - `heartbeat.ts` — Otonom sürdürülebilir tick
 - `horizon.ts` — vO12 Roadmap Horizon Auto-Generator CLI
 - `model-hook.ts` — UserPromptSubmit hook wrapper
+- `oracle-serve.ts` — kalıcı Doğruluk Oracle daemon'u.
+- `oracle.ts` — Doğruluk Oracle'ı CLI.
 - `panel.ts` — panel.ts — vO4 panel "Tech-Lead orchestrator"
 - `plan-next.ts` — Trigger §4 otomasyonu: "sıradaki versiyonu planla [lane]".
 - `quality.ts` — vO9 Quality-Gate Roll-Up: 0-manuel tüm-lane sağlık matrisi.
+- `reconcile.ts` — vO23 Autonomous Fleet Reconcile CLI + continuous loop.
 - `scan.ts` — scan.ts — vO4 panel "parallel review" fazı: persona-başı DETERMİNİSTİK
 - `serve.ts` — serve.ts — vO3 canlı cockpit sunucusu. ZERO-DEP
 - `status.ts` — ollamas lane'lerinin READ-ONLY birleşik durum matrisi.

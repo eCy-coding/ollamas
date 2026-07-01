@@ -84,6 +84,11 @@ function detailFor(step: string): string {
     }
     return "fleet reconcile tazelendi";
   }
+  if (step === "council") {
+    const r = readJson(join(ORCH_DIR, "COUNCIL_ROSTER.json"));
+    if (r) return `roster ${r.present ?? "?"}/${r.total ?? "?"} seat · coverage ${(r.lanesCovered ?? []).length}/7${(r.lanesUncovered ?? []).length ? ` · ⚠️ ${(r.lanesUncovered).join(",")}` : ""}`;
+    return "council roster tazelendi";
+  }
   if (step === "status") return "lane matrisi tazelendi";
   return "ok";
 }
@@ -142,6 +147,7 @@ function main(): void {
   const results: StepResult[] = [
     ...(HEAL ? [runHeal()] : []),  // launchd --heal: bayatsa önce tazele; SessionStart'ta atlanır (hızlı)
     runStep("benchprompt", "benchprompt.ts", []),
+    runStep("council", "council.ts", []),  // model-council light: roster tazele (ollama list) → COUNCIL_ROSTER.json (ağır --all opt-in)
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir

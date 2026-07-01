@@ -1,0 +1,619 @@
+{
+  "ts": "2026-07-01T09:54:07Z",
+  "summary": {
+    "lanes": [
+      "backend",
+      "frontend",
+      "cli",
+      "scripts",
+      "integrations",
+      "bench",
+      "orchestration"
+    ],
+    "totalFindings": 55,
+    "byLane": [
+      {
+        "lane": "backend",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "TypeScript, Rust, Go"
+        ],
+        "models": [
+          "qwen3-coder:480b-cloud"
+        ]
+      },
+      {
+        "lane": "frontend",
+        "tasks": 5,
+        "risks": 1,
+        "langs": [
+          "TypeScript/React"
+        ],
+        "models": [
+          "qwen2.5vl:32b"
+        ]
+      },
+      {
+        "lane": "cli",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "TypeScript, Shell"
+        ],
+        "models": [
+          "qwen3-coder:30b"
+        ]
+      },
+      {
+        "lane": "scripts",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "TypeScript, JavaScript, Shell"
+        ],
+        "models": [
+          "qwen3-coder:30b"
+        ]
+      },
+      {
+        "lane": "integrations",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "TypeScript, Shell"
+        ],
+        "models": [
+          "qwen3-coder:480b-cloud"
+        ]
+      },
+      {
+        "lane": "bench",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "JavaScript (ES modules), TypeScript"
+        ],
+        "models": [
+          "deepseek-r1:32b"
+        ]
+      },
+      {
+        "lane": "orchestration",
+        "tasks": 6,
+        "risks": 1,
+        "langs": [
+          "TypeScript, Shell"
+        ],
+        "models": [
+          "qwen3-coder-64k:latest"
+        ]
+      }
+    ],
+    "respondedModels": [
+      "qwen3-coder:480b-cloud",
+      "qwen2.5vl:32b",
+      "qwen3-coder:30b",
+      "deepseek-r1:32b",
+      "qwen3-coder-64k:latest"
+    ],
+    "silentLanes": []
+  },
+  "results": [
+    {
+      "lane": "backend",
+      "model": "qwen3-coder:480b-cloud",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "LANG",
+          "text": "TypeScript, Rust, Go"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Implement SSE-based live-tailing for agent sessions in `server/agent-events.ts` with proper event emission and quiescence detection"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Extend `server/ai.ts` to support dynamic model listing and generation functions aligned with `google.colab.ai` interface"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Refactor `server/analyzer.ts` to correctly validate tool implementations based on actual file presence in `bin/scripts`"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Add comprehensive unit tests for the ProviderRouter fallback chain logic in `server/ai.ts`"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Implement structured error handling and logging around missing or malformed tool entryPoints in `server/analyzer.ts`"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Optimize polling mechanism in agent session completion detection to reduce latency and server load"
+        },
+        {
+          "lane": "backend",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "RISK",
+          "text": "Misinterpretation of session completion due to reliance on message count and final assistant turn without explicit status field may lead to premature stream closure"
+        }
+      ],
+      "tokPerSec": 70.91917591125198,
+      "ms": 2607
+    },
+    {
+      "lane": "frontend",
+      "model": "qwen2.5vl:32b",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "LANG",
+          "text": "TypeScript/React"
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "TASK",
+          "text": "Refactor `web/landing.js` to leverage React components for improved reusability and maintainability."
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "TASK",
+          "text": "Migrate CSS styling from vanilla CSS in `web/landing.css` to styled-components or CSS-in-JS for consistency with the frontend stack."
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "TASK",
+          "text": "Integrate accessibility checks into all new UI components created, ensuring compliance with WCAG standards."
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "TASK",
+          "text": "Optimize performance of dynamic components like `GoogleDriveBrowser`, `GoogleSheetsBrowser`, and `WorkspaceTree` by implementing lazy loading or virtualization techniques."
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "TASK",
+          "text": "Add unit tests for core functional components such as `TelemetryCockpit`, `KeyVault`, and `MultiAgentPipeline` to ensure stability during future changes."
+        },
+        {
+          "lane": "frontend",
+          "model": "qwen2.5vl:32b",
+          "kind": "RISK",
+          "text": "Potential compatibility issues with legacy health endpoint payloads in `web/landing.js`."
+        }
+      ],
+      "tokPerSec": 8.590481031144074,
+      "ms": 34905
+    },
+    {
+      "lane": "cli",
+      "model": "qwen3-coder:30b",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "LANG",
+          "text": "TypeScript, Shell"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Implement TypeScript type definitions for all CLI command handlers in cli/commands/ to improve type safety and developer experience"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Add unit tests for cli/lib/client.ts to ensure HTTP request handling is robust and secure"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Refactor cli/bin/ollamas.sh to support new model provider endpoints defined in cli/lib/providers.ts"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Create a TypeScript migration script in cli/lib/ to handle config schema changes between versions"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Enhance cli/lib/mcp.ts with proper error handling for MCP gateway communication failures"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Update cli/commands/agent.ts to support streaming responses from the backend for long-running tasks"
+        },
+        {
+          "lane": "cli",
+          "model": "qwen3-coder:30b",
+          "kind": "RISK",
+          "text": "The POSIX shell script cli/bin/ollamas.sh may fail silently when environment variables are not properly set, leading to unhandled runtime errors"
+        }
+      ],
+      "tokPerSec": 79.90368419711012,
+      "ms": 7845
+    },
+    {
+      "lane": "scripts",
+      "model": "qwen3-coder:30b",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "LANG",
+          "text": "TypeScript, JavaScript, Shell"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Refactor agent-bench.mjs to use structured config parsing (yargs or similar) instead of manual argv indexing"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Add unit tests for agent-dispatch.mjs output formatting and exit code logic"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Implement logging middleware in agent-fleet.mjs to track sub-agent performance metrics"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Create a shared utility module for common OLLAMA API interaction patterns used across scripts"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Add type definitions (ts) for all script interfaces and data flows"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "TASK",
+          "text": "Standardize error handling and timeout configurations across all benchmark scripts"
+        },
+        {
+          "lane": "scripts",
+          "model": "qwen3-coder:30b",
+          "kind": "RISK",
+          "text": "Inconsistent exit codes in agent-dispatch.mjs may break downstream orchestration logic"
+        }
+      ],
+      "tokPerSec": 70.10189486934823,
+      "ms": 3947
+    },
+    {
+      "lane": "integrations",
+      "model": "qwen3-coder:480b-cloud",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "LANG",
+          "text": "TypeScript, Shell"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Implement structured logging in all tunnel/src/*.ts modules using a shared logger interface"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Add unit tests for error paths in tunnel/src/transport.ts and tunnel/src/transports/caddy-tls.test.ts"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Refactor tunnel/scripts/whoami.sh to output JSON format for better integration with downstream tools"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Extend client/ai-client.ts to support model downloading and caching with integrity checks"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Create a new transport module for WebRTC under tunnel/src/transports/ with full test coverage"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "TASK",
+          "text": "Add health check timeout and retry logic to tunnel/src/health.ts and update related tests"
+        },
+        {
+          "lane": "integrations",
+          "model": "qwen3-coder:480b-cloud",
+          "kind": "RISK",
+          "text": "Missing input validation in ai-client.ts could lead to injection attacks via model parameters"
+        }
+      ],
+      "tokPerSec": 60.008054772452674,
+      "ms": 2488
+    },
+    {
+      "lane": "bench",
+      "model": "deepseek-r1:32b",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "LANG",
+          "text": "JavaScript (ES modules), TypeScript"
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Refactor agent-bench.mjs to use async/await for model execution instead of synchronous execFileSync."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Implement proper error handling and retries in agent-dispatch.mjs for task failures."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Add a request-response queue system to agent-fleet.mjs for better agent coordination."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Enhance the e2e test coverage in master_e2e_workflow.ts to include more edge cases."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Replace the opt function with yargs for better command-line option parsing in agent-bench.mjs."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "TASK",
+          "text": "Implement CI/CD pipeline using GitHub Actions or similar to run tests and benchmarks automatically."
+        },
+        {
+          "lane": "bench",
+          "model": "deepseek-r1:32b",
+          "kind": "RISK",
+          "text": "Potential race conditions when coordinating multiple agents in agent-fleet.mjs without proper synchronization."
+        }
+      ],
+      "tokPerSec": 7.7958347114997615,
+      "ms": 109349
+    },
+    {
+      "lane": "orchestration",
+      "model": "qwen3-coder-64k:latest",
+      "ok": true,
+      "findings": [
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "LANG",
+          "text": "TypeScript, Shell"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Implement comprehensive unit tests for `orchestration/bin/lib/autopilot.ts` to validate autopilot agent lifecycle management"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Refactor `orchestration/bin/activate.sh` to use dynamic path resolution for both macOS and Linux launchd configurations"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Add detailed logging and error handling to `orchestration/bin/adopt-gate.ts` for SBOM license validation failures"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Create a migration script to convert legacy adoption entries in `ADOPTIONS_ORCHESTRATION.md` to new format used by `adopt.ts`"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Enhance `orchestration/bin/lib/council.ts` with role-based access control checks for council member actions"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "TASK",
+          "text": "Integrate automated dependency license scanning into CI pipeline using syft within `orchestration/bin/adopt.ts`"
+        },
+        {
+          "lane": "orchestration",
+          "model": "qwen3-coder-64k:latest",
+          "kind": "RISK",
+          "text": "Potential race condition in `heartbeat.ts` when multiple agents attempt to update shared state simultaneously"
+        }
+      ],
+      "tokPerSec": 67.54928659645152,
+      "ms": 8682
+    }
+  ],
+  "audits": [
+    {
+      "claim": "Implement SSE-based live-tailing for agent sessions in `server/agent-events.ts` with proper event emission and quiescence detection",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Extend `server/ai.ts` to support dynamic model listing and generation functions aligned with `google.colab.ai` interface",
+      "verdict": "UNDECIDABLE",
+      "basis": "value-judgment",
+      "proof": "Değer/etik/estetik yargısı içeriyor — gözlemciden bağımsız hesapla kararlaştırılamaz; evrensel doğru/yanlış kapsamı dışı"
+    },
+    {
+      "claim": "Implement structured error handling and logging around missing or malformed tool entryPoints in `server/analyzer.ts`",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Optimize polling mechanism in agent session completion detection to reduce latency and server load",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Misinterpretation of session completion due to reliance on message count and final assistant turn without explicit status field may lead to premature stream closure",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Refactor `web/landing.js` to leverage React components for improved reusability and maintainability.",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Migrate CSS styling from vanilla CSS in `web/landing.css` to styled-components or CSS-in-JS for consistency with the frontend stack.",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Optimize performance of dynamic components like `GoogleDriveBrowser`, `GoogleSheetsBrowser`, and `WorkspaceTree` by implementing lazy loading or virtualization techniques.",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add unit tests for core functional components such as `TelemetryCockpit`, `KeyVault`, and `MultiAgentPipeline` to ensure stability during future changes.",
+      "verdict": "UNDECIDABLE",
+      "basis": "value-judgment",
+      "proof": "Değer/etik/estetik yargısı içeriyor — gözlemciden bağımsız hesapla kararlaştırılamaz; evrensel doğru/yanlış kapsamı dışı"
+    },
+    {
+      "claim": "Implement TypeScript type definitions for all CLI command handlers in cli/commands/ to improve type safety and developer experience",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add unit tests for cli/lib/client.ts to ensure HTTP request handling is robust and secure",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "The POSIX shell script cli/bin/ollamas.sh may fail silently when environment variables are not properly set, leading to unhandled runtime errors",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Refactor agent-bench.mjs to use structured config parsing (yargs or similar) instead of manual argv indexing",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add unit tests for agent-dispatch.mjs output formatting and exit code logic",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add type definitions (ts) for all script interfaces and data flows",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Standardize error handling and timeout configurations across all benchmark scripts",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add unit tests for error paths in tunnel/src/transport.ts and tunnel/src/transports/caddy-tls.test.ts",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Extend client/ai-client.ts to support model downloading and caching with integrity checks",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Add health check timeout and retry logic to tunnel/src/health.ts and update related tests",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    },
+    {
+      "claim": "Implement proper error handling and retries in agent-dispatch.mjs for task failures.",
+      "verdict": "UNDECIDABLE",
+      "basis": "out-of-scope",
+      "proof": "Bu girdi deterministik bir kategoriye (matematik/mantık/sıra/kod) oturmuyor; nesnel doğru/yanlış verilemez."
+    }
+  ]
+}

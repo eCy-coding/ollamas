@@ -1,0 +1,205 @@
+{
+  "ts": "2026-07-01T09:58:12Z",
+  "chip": "Apple M4 Max",
+  "source": "council.ts (canlı ollama list)",
+  "present": 14,
+  "total": 14,
+  "absentCapabilities": [],
+  "lanesCovered": [
+    "backend",
+    "frontend",
+    "cli",
+    "scripts",
+    "integrations",
+    "bench",
+    "orchestration"
+  ],
+  "lanesUncovered": [],
+  "seats": [
+    {
+      "capability": "deep-code",
+      "role": "architect",
+      "model": "qwen3-coder:480b-cloud",
+      "available": true,
+      "responsibility": "Derin kod-tasarım + mimari (server/backend, protocol)",
+      "lanes": [
+        "backend",
+        "integrations"
+      ]
+    },
+    {
+      "capability": "long-ctx-code",
+      "role": "analyst",
+      "model": "qwen3-coder-64k:latest",
+      "available": true,
+      "responsibility": "Uzun/çok-dosya kod sweep (64k ctx whole-lane)",
+      "lanes": [
+        "backend",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "local-code",
+      "role": "coder",
+      "model": "qwen3-coder:30b",
+      "available": true,
+      "responsibility": "cli/scripts lane kod analizi + bug-detect",
+      "lanes": [
+        "cli",
+        "scripts"
+      ]
+    },
+    {
+      "capability": "reasoning",
+      "role": "verifier",
+      "model": "deepseek-r1:32b",
+      "available": true,
+      "responsibility": "Root-cause + mantıksal invariant + algoritma doğrulama",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "vision",
+      "role": "analyst",
+      "model": "qwen2.5vl:32b",
+      "available": true,
+      "responsibility": "web/frontend UI + diagram + screenshot analizi",
+      "lanes": [
+        "frontend"
+      ]
+    },
+    {
+      "capability": "moe-mid",
+      "role": "analyst",
+      "model": "qwen3:30b-a3b",
+      "available": true,
+      "responsibility": "orchestration lane + cross-lane dep-graph",
+      "lanes": [
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "fast-verify",
+      "role": "reviewer",
+      "model": "qwen3:8b",
+      "available": true,
+      "responsibility": "Hızlı review + council verifier koltuğu (champion)",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "cheap-triage",
+      "role": "triage",
+      "model": "qwen3:4b",
+      "available": true,
+      "responsibility": "Bulgu sınıflandırma + önceliklendirme",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "adversarial",
+      "role": "adversary",
+      "model": "gpt-oss:120b-cloud",
+      "available": true,
+      "responsibility": "Adversarial ikinci-görüş (best-of-N refute)",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "big-reasoning",
+      "role": "adversary",
+      "model": "llama3.3:70b",
+      "available": true,
+      "responsibility": "Bağımsız çapraz-kontrol (majority-vote üyesi)",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "cloud-alt",
+      "role": "analyst",
+      "model": "kimi-k2.5:cloud",
+      "available": true,
+      "responsibility": "Cloud yük dengeleme / paralel koltuk (bench)",
+      "lanes": [
+        "bench"
+      ]
+    },
+    {
+      "capability": "small-logic",
+      "role": "analyst",
+      "model": "phi4:latest",
+      "available": true,
+      "responsibility": "Hafif mantık kontrolü (scripts)",
+      "lanes": [
+        "scripts"
+      ]
+    },
+    {
+      "capability": "embedding",
+      "role": "search",
+      "model": "nomic-embed-text:latest",
+      "available": true,
+      "responsibility": "Semantik kod-arama + duplikat tespiti",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    },
+    {
+      "capability": "custom-review",
+      "role": "reviewer",
+      "model": "ollamas-reviewer:latest",
+      "available": true,
+      "responsibility": "Proje-özel fine-tuned review",
+      "lanes": [
+        "backend",
+        "frontend",
+        "cli",
+        "scripts",
+        "integrations",
+        "bench",
+        "orchestration"
+      ]
+    }
+  ]
+}
