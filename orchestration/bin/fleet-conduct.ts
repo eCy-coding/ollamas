@@ -14,7 +14,7 @@
  *   tsx orchestration/bin/fleet-conduct.ts --json     # machine output
  *   tsx orchestration/bin/fleet-conduct.ts --stop     # kill-switch: release all fleet claims
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
@@ -28,15 +28,25 @@ const REPORTS = join(FLEET_HOME, "reports");
 const JSON_OUT = process.argv.includes("--json");
 const STOP = process.argv.includes("--stop");
 
-interface WorkerReport { stream: string; slot: string; model?: string; verdict?: string; steps?: number; demoSuspected?: boolean; allOk?: boolean; error?: string; }
+interface WorkerReport { stream: string; slot: string; model?: string; verdict?: string; steps?: number; demoSuspected?: boolean; allOk?: boolean; proposal?: string; error?: string; }
 
-/** Gate a single worker report: DONE + real steps + not demo = trustworthy (evidence-law). */
+/** Gate a single worker report: DONE/OK + real steps + not demo + a non-empty proposal (evidence-law). */
 function gate(r: WorkerReport): { ok: boolean; reason: string } {
   if (r.error) return { ok: false, reason: r.error.slice(0, 60) };
   if (r.demoSuspected) return { ok: false, reason: "demo-suspected (steps=0, prose only)" };
   if (!(r.steps && r.steps > 0)) return { ok: false, reason: "no tool steps" };
   if (r.verdict !== "DONE" && r.verdict !== "OK") return { ok: false, reason: `verdict=${r.verdict ?? "?"}` };
-  return { ok: true, reason: `${r.verdict} · ${r.steps} steps` };
+  if (!r.proposal || r.proposal.length < 20) return { ok: false, reason: "no proposal content" };
+  return { ok: true, reason: `${r.verdict} · ${r.steps} steps · proposal ${r.proposal.length}c` };
+}
+
+/** Extract the proposal text from a report's final messages (Change/Diff/Test shape). */
+function extractProposal(messages: unknown): string {
+  const arr = Array.isArray(messages) ? messages.map((m) => String(m)) : [];
+  const joined = arr.join("\n").trim();
+  // prefer the segment from the first "## Change" marker (the requested shape); else the last message
+  const i = joined.search(/##\s*Change/i);
+  return (i >= 0 ? joined.slice(i) : (arr[arr.length - 1] ?? "")).trim();
 }
 
 function readReports(): WorkerReport[] {
@@ -47,9 +57,14 @@ function readReports(): WorkerReport[] {
     const [stream, slot] = f.replace(/\.json$/, "").split(".");
     try {
       const j = JSON.parse(readFileSync(join(REPORTS, f), "utf8"));
-      out.push({ stream, slot, model: j.model, verdict: j.verdict, steps: (j.steps ?? []).length, demoSuspected: j.demoSuspected, allOk: j.allOk });
-    } catch (e: any) {
-      // report exists but unparseable (worker still writing / crashed mid-write) — surface, don't hide
+      const proposal = extractProposal(j.messages);
+      // conductor materializes PROPOSAL.md from the report (no worker file-write dependency)
+      if (proposal && proposal.length >= 20) {
+        const dir = join(homedir(), ".llm-mission-control", "fleet", "work", `${stream}.${slot}`);
+        try { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "PROPOSAL.md"), `# ${stream} · ${slot} · ${j.model ?? "?"}\n\n${proposal}\n`); } catch { /* best-effort */ }
+      }
+      out.push({ stream, slot, model: j.model, verdict: j.verdict, steps: (j.steps ?? []).length, demoSuspected: j.demoSuspected, allOk: j.allOk, proposal });
+    } catch {
       out.push({ stream, slot, error: "report parse error / partial" });
     }
   }

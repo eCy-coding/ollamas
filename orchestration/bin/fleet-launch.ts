@@ -31,7 +31,7 @@ const GO = process.argv.includes("--go");
 const CLOUD_ONLY = process.argv.includes("--cloud-only");
 const streamsArg = (() => { const i = process.argv.indexOf("--streams"); return i >= 0 ? (process.argv[i + 1] ?? "").split(",").filter(Boolean) : null; })();
 const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
-const STEPS = Number(process.env.FLEET_STEPS || 6);
+const STEPS = Number(process.env.FLEET_STEPS || 8);
 
 function liveModels(): string[] {
   try {
@@ -40,15 +40,19 @@ function liveModels(): string[] {
   } catch { return []; }
 }
 
-/** PROPOSE-mode task prompt for a stream (model writes patch+notes to --root, never the repo). */
+/** PROPOSE-mode task prompt for a stream. Proposal is the FINAL MESSAGE (no file-write dependency —
+ *  weak/cloud models reliably finish; the conductor materializes PROPOSAL.md from the report). */
 function taskPrompt(a: Assignment): string {
   return [
     `You are a PROPOSE-only worker for the ollamas project, stream "${a.stream}" (${a.concern}).`,
-    `Language focus: ${a.lang}. Working from repo ${REPO}.`,
-    `Read the relevant ${a.lang} files, then WRITE — into your work root only, never the repo tree —`,
-    `a file PROPOSAL.md containing: (1) the single highest-value concrete change for this stream,`,
-    `(2) a unified diff you propose, (3) the test that would prove it. Do NOT edit repo files.`,
-    `End with 'VERDICT: DONE' when PROPOSAL.md is written. Minimize steps; evidence over prose.`,
+    `Language focus: ${a.lang}. Repo: ${REPO}. Do NOT edit any repo file.`,
+    `Read AT MOST 2 relevant ${a.lang} files/dirs (list_tree or read), then STOP reading.`,
+    `Your FINAL MESSAGE must BE the proposal, in exactly this shape:`,
+    `  ## Change: <one concrete high-value change for this stream>`,
+    `  ## Diff: <a short unified diff you propose>`,
+    `  ## Test: <the test that would prove it>`,
+    `Then end with the line: VERDICT: DONE`,
+    `Do not write files. Keep it under ~25 lines. Evidence over prose.`,
   ].join("\n");
 }
 
@@ -57,10 +61,12 @@ function writeWrapper(a: Assignment): string {
   const tsx = join(REPO, "node_modules", ".bin", "tsx");
   const root = join(FLEET_HOME, "work", `${a.stream}.${a.slot}`);
   const report = join(FLEET_HOME, "reports", `${a.stream}.${a.slot}.json`);
+  const log = join(FLEET_HOME, "logs", `${a.stream}.${a.slot}.log`);
   const wrapper = join(FLEET_HOME, "wrappers", `${a.stream}.${a.slot}.sh`);
   mkdirSync(dirname(wrapper), { recursive: true });
   mkdirSync(root, { recursive: true });
   mkdirSync(dirname(report), { recursive: true });
+  mkdirSync(dirname(log), { recursive: true });
   const task = taskPrompt(a).replace(/'/g, `'\\''`);
   const isLocal = a.runtime === "local";
   const sh = `#!/usr/bin/env bash
@@ -69,17 +75,23 @@ set -uo pipefail
 cd ${REPO} || exit 1
 export ORCH_TAB="fleet-${a.stream}-${a.slot}"
 export OLLAMAS_URL="\${OLLAMAS_URL:-http://127.0.0.1:3000}"  # agent-dispatch default :8090 → our server is :3000
-echo "🛰  ${a.stream} · ${a.app} · ${a.model} (${a.runtime})"
+LOG="${log}"
+# live progress → .log (tab shows it too via tee); JSON report stays clean on its own file
+log(){ echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$LOG"; }
+: > "$LOG"
+log "🛰  ${a.stream} · ${a.app} · ${a.model} (${a.runtime}) START"
 # 1) dedup-claim the (stream|slot) so a double launch cannot run twice
-if ! ${tsx} orchestration/bin/claim.ts "${a.stream}" "${a.slot}"; then echo "collision → exit"; exit 3; fi
+if ! ${tsx} orchestration/bin/claim.ts "${a.stream}" "${a.slot}" 2>&1 | tee -a "$LOG"; then log "collision → exit"; exit 3; fi
 ${isLocal ? `# 2) single-GPU mutex: only one LOCAL worker at a time (cloud slots skip this)
-until ${tsx} orchestration/bin/claim.ts gpu local >/dev/null 2>&1; do echo "…GPU busy, waiting"; sleep 5; done` : `# cloud slot — no GPU mutex (parallel-safe)`}
-# 3) PROPOSE run (isolated --root under ~/.llm-mission-control → host-bridge write allowlist ok)
-node scripts/agent-dispatch.mjs '${task}' --provider ollama-local --model "${a.model}" --steps ${STEPS} --root "${root}" --json > "${report}" 2>&1
+until ${tsx} orchestration/bin/claim.ts gpu local >/dev/null 2>&1; do log "…GPU busy, waiting"; sleep 5; done
+log "🔓 GPU acquired"` : `# cloud slot — no GPU mutex (parallel-safe)`}
+# 3) PROPOSE run — stdout=JSON report (clean), stderr=live progress → .log (root-fix: never merge into JSON)
+log "▶ dispatch ${a.model} (steps ${STEPS})…"
+node scripts/agent-dispatch.mjs '${task}' --provider ollama-local --model "${a.model}" --steps ${STEPS} --root "${root}" --json > "${report}" 2>>"$LOG"
 RC=$?
 ${isLocal ? `${tsx} orchestration/bin/claim.ts --done gpu local >/dev/null 2>&1` : ""}
 ${tsx} orchestration/bin/claim.ts --done "${a.stream}" "${a.slot}" >/dev/null 2>&1
-echo "✅ report → ${report} (rc=$RC)"
+log "✅ DONE report → ${report} (rc=$RC)"
 `;
   writeFileSync(wrapper, sh);
   chmodSync(wrapper, 0o755);
