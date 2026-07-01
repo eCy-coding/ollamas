@@ -1,0 +1,85 @@
+{
+  "note": "Proven-solution knowledge base for the THINK mechanism (bin/lib/think.ts). Append-only: every entry MUST cite ≥1 authoritative source (no source → not proven → not here). The mechanism LEARNS by appending newly researched+verified fixes. Order matters: classify() returns the first pattern that matches.",
+  "entries": [
+    {
+      "category": "starvation",
+      "pattern": "starv|waiting for gpu|unfair|never served|queue.*(block|stuck)|fairness",
+      "provenSolution": "Replace lock-retry mutex with a FIFO ticket-lock (Lamport bakery): monotonic next + serving counter, served strictly in arrival order → provably starvation-free. Dead-holder force-advance for liveness.",
+      "sources": ["Lamport bakery algorithm (textbook, provably starvation-free)", "Ollama FAQ docs.ollama.com/faq (NUM_PARALLEL=1 + MAX_QUEUE processed in order)", "Node worker-pool starvation (medium Nexumo/Duckweave): fair scheduling + per-class limits"],
+      "evidence": "orchestration/bin/lib/gpu-lock.ts + tests/gpu-lock.test.ts",
+      "appliedIn": "vO20"
+    },
+    {
+      "category": "transient-error",
+      "pattern": "transient|timeout|timed out|ETIMEDOUT|ECONNRESET|socket|fetch failed|throttl|rate.?limit|429|50[234]|temporarily unavailable",
+      "provenSolution": "Exponential backoff with FULL JITTER: delay=random(0,1)*min(cap, base*2^attempt), capped, bounded retries; classify transient vs non-transient and FAIL FAST on non-transient (circuit-breaker). Operations must be idempotent.",
+      "sources": ["AWS Prescriptive Guidance — Retry with backoff (docs.aws.amazon.com/prescriptive-guidance)", "AWS Builders' Library — Timeouts, retries, and backoff with jitter"],
+      "evidence": "orchestration/bin/lib/backoff.ts + tests/backoff.test.ts",
+      "appliedIn": "vO20"
+    },
+    {
+      "category": "saturation",
+      "pattern": "saturat|over.?subscri|RAM.*9[0-9]%|memory pressure|contention|too many (agents|workers|models)|flaky.*timeout|thundering herd",
+      "provenSolution": "Bound concurrency per class (do not over-subscribe): single-GPU = at most 1 local + N cloud; add skip-done idempotency so already-satisfied work is not re-run. Run heavy gates only when the machine is quiesced.",
+      "sources": ["Node worker-pool starvation/over-subscription (medium Nexumo/Duckweave): per-class limits", "Ollama FAQ: OLLAMA_NUM_PARALLEL default 1 (memory-bound queue)"],
+      "evidence": "orchestration/bin/fleet-agent.ts (skip-done) + fleet-conduct observe-only",
+      "appliedIn": "vO20"
+    },
+    {
+      "category": "model-blocked",
+      "pattern": "blocked|INCOMPLETE|no proposal|model.*(fail|limit|can.?t)|depth.?limit|not gated",
+      "provenSolution": "Conductor escalation: when the fleet models cannot produce a gated result, the conductor reads the REAL source file and authors the proposal itself (evidence-based, honest attribution model:'claude-conductor'). Not a model faking — the conductor solving what it can. No half-work.",
+      "sources": ["operator directive 'sen çözebileceğin konularda yönlendir' + 'yarım-iş yok' (this project)", "evidence-based: every proposal cites the real file it read"],
+      "evidence": "~/.llm-mission-control/fleet/reports/<stream>.conductor.json (vO21, 6/6 CONVERGED)",
+      "appliedIn": "vO21"
+    },
+    {
+      "category": "tab-vanish",
+      "pattern": "tab.*(closed|vanish|açılmad|çalışmıyor|disappear)|window closed|one-?shot",
+      "provenSolution": "One-shot wrappers exit → the terminal closes the tab. Run a PERSISTENT agent that idle-heartbeats and never exits, and append `exec $SHELL` so the tab survives even if the agent returns.",
+      "sources": ["macOS Terminal/iTerm2 'close when shell exits' default behavior (verified live: tab vanished after fast worker)"],
+      "evidence": "orchestration/bin/fleet-agent.ts (idle loop) + fleet-launch openTab (exec $SHELL)",
+      "appliedIn": "vO19"
+    },
+    {
+      "category": "osascript-freeze",
+      "pattern": "osascript.*freeze|osascript.*hang|tab discovery.*slow|5s freeze|automation permission",
+      "provenSolution": "osascript tab discovery blocks synchronously (~5s without Automation permission). Make it opt-in (ORCH_TABS=1) and bound every osascript call with a timeout; never on the hot path.",
+      "sources": ["RISK-ORCH-008 (this project, verified) + orchestration/bin/discover.ts timeout guard"],
+      "evidence": "orchestration/bin/discover.ts (ORCH_TABS opt-in + 5s timeout)",
+      "appliedIn": "vO2"
+    },
+    {
+      "category": "code-duplication",
+      "pattern": "duplicat|duplication|copy.?pas|repeated code|↔.*\\.ts",
+      "provenSolution": "Extract the shared logic into ONE module and import it (Don't Repeat Yourself); if the two only look similar but differ in intent, record a justified suppression instead of merging.",
+      "sources": ["Martin Fowler, Refactoring (Extract Function/Module)", "The Pragmatic Programmer — DRY principle"],
+      "evidence": "orchestration/bin/lib/* shared cores (claims/bench/optimize) + .policy-suppress.json for false-positives",
+      "appliedIn": "vO14"
+    },
+    {
+      "category": "coverage-gap",
+      "pattern": "coverage.?gap|test.?siz|no test|untested|missing test",
+      "provenSolution": "Add a unit test for the pure core first (fast, deterministic); prefer testing IO-free functions. A pure module with property tests closes the gap without brittle IO mocking.",
+      "sources": ["Testing Pyramid (Mike Cohn / Martin Fowler): favor fast unit tests over IO-bound ones", "this project: pure-core + thin-IO split (gpu-lock/backoff/think tested pure)"],
+      "evidence": "orchestration/tests/*.test.ts (pure cores) — gpu-lock/backoff/think/fleet-plan",
+      "appliedIn": "vO20"
+    },
+    {
+      "category": "orphan-artifact",
+      "pattern": "orphan|hiç.*(bağlan|referans)|unused|dead code|never (called|imported|consumed)",
+      "provenSolution": "Wire the artifact into a consumer (produced JSON must be consumed) OR delete it. An orphan that is generated-but-never-read is either half-work (wire it) or dead code (remove it).",
+      "sources": ["this project RISK-ORCH-015 (orphan-tool wiring: produce+consume together)", "dead-code elimination (standard practice)"],
+      "evidence": "autopilot chain consumes critic/dod/fuse/think outputs (no orphan generators)",
+      "appliedIn": "vO12"
+    },
+    {
+      "category": "uncommitted-green",
+      "pattern": "uncommitted|commit.?siz|built.?not.?committed|yeşil iş.*commit",
+      "provenSolution": "Green work must be committed at the phase boundary (quality gate: tsc → tests → conventional commit). Uncommitted-green is half-work; commit when the FULL gate passes (quiesce heavy load first so the gate isn't flaky).",
+      "sources": ["AGENTS.md §3 quality gate (this project)", "trunk-based development: small, gated, frequent commits"],
+      "evidence": "each vO phase closed with a gated conventional commit (d1cce40 etc.)",
+      "appliedIn": "vO-all"
+    }
+  ]
+}

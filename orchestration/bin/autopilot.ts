@@ -89,6 +89,11 @@ function detailFor(step: string): string {
     if (r) return `roster ${r.present ?? "?"}/${r.total ?? "?"} seat · coverage ${(r.lanesCovered ?? []).length}/7${(r.lanesUncovered ?? []).length ? ` · ⚠️ ${(r.lanesUncovered).join(",")}` : ""}`;
     return "council roster tazelendi";
   }
+  if (step === "think") {
+    const t = readJson(join(ORCH_DIR, "THINK.json")); // think --json ürünü (varsa)
+    if (t) return `${t.proven ?? 0} proven · ${t.needsResearch ?? 0} needs-research · registry ${t.registrySize ?? "?"}`;
+    return "think loop tazelendi (THINK.md)";
+  }
   if (step === "fleet") {
     const s = join(ORCH_DIR, "FLEET_STATUS.md");
     if (existsSync(s)) {
@@ -161,6 +166,7 @@ function main(): void {
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
+    runStep("think", "think.ts", []),     // vO22 THINK loop: finding → PROVEN-solution(registry) | NEEDS_RESEARCH (no-guess)
     runStep("status", "status.ts", []),
     runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),

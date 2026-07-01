@@ -35,6 +35,7 @@ export interface RoleInputs {
   topReq?: { criticality: string; target: string; readiness: number } | null; // vO14 fuse birleşik kritik gereksinim (REQUIREMENTS.json)
   council?: { present: number; total: number; covered: number; uncovered: string[] } | null; // model-council roster (COUNCIL_ROSTER.json)
   fleet?: { slots: number; local: number; cloud: number; maxTwoOk: boolean } | null; // local model-fleet plan (FLEET_PLAN.json)
+  think?: { registry: number } | null; // sustainable problem-solving loop (PROBLEM_REGISTRY.json)
 }
 
 /** Branch'ten kısa lane adı (gösterim). feat/frontend-vf3 → frontend-vf3. */
@@ -95,6 +96,7 @@ export function buildRoleAnswer(i: RoleInputs): string {
     i.topReq ? `- 🎯 **Kritik gereksinim (vO14 füzyon):** ${i.topReq.criticality}:${i.topReq.target} · proje hazırlık ${i.topReq.readiness}/100 — \`REQUIREMENTS.md\` (tüm-gate birleşik)` : `- Kritik gereksinim: \`tsx bin/fuse.ts\` koş (REQUIREMENTS füzyonu)`,
     i.council ? `- 🎭 **Model-council:** roster ${i.council.present}/${i.council.total} seat · lane coverage ${i.council.covered}/7${i.council.uncovered.length ? ` · ⚠️ uncovered: ${i.council.uncovered.join(",")}` : ""} — \`COUNCIL_ROSTER.json\` (yetenek→model→lane)` : `- Model-council: \`tsx bin/council.ts\` koş (roster + E2E analiz)`,
     i.fleet ? `- 🛰 **Model-fleet:** ${i.fleet.slots} slot (local ${i.fleet.local}/cloud ${i.fleet.cloud}) · ≤2/model ${i.fleet.maxTwoOk ? "✅" : "❌"} — \`FLEET_PLAN.md\` (Terminal.app+iTerm2; \`fleet-launch --go\`, \`fleet-conduct\`)` : `- Model-fleet: \`tsx bin/fleet-launch.ts\` koş (Terminal.app+iTerm2 dağıtım planı)`,
+    i.think ? `- 🧠 **Think-loop (vO22):** ${i.think.registry} kanıtlı-çözüm registry · problem→proven|NEEDS_RESEARCH (no-guess) — \`PROBLEM_REGISTRY.json\`/\`THINK.md\` (autopilot sürekli çağırır)` : `- Think-loop: \`tsx bin/think.ts\` koş (sürdürülebilir sorun-çözme mekanizması)`,
     ``,
     `## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)`,
     `| Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |`,
@@ -232,6 +234,13 @@ async function main(): Promise<void> {
     }
   } catch { /* graceful */ }
 
+  // sustainable problem-solving loop (PROBLEM_REGISTRY.json varsa; graceful absent).
+  let think: RoleInputs["think"] = null;
+  try {
+    const tF = join(ORCH_DIR, "PROBLEM_REGISTRY.json");
+    if (existsSync(tF)) { const t = JSON.parse(readFileSync(tF, "utf8")); think = { registry: (t.entries ?? []).length }; }
+  } catch { /* graceful */ }
+
   const answer = buildRoleAnswer({
     mission,
     current, next, planned,
@@ -245,6 +254,7 @@ async function main(): Promise<void> {
     topReq,
     council,
     fleet,
+    think,
   });
 
   console.log(answer);
