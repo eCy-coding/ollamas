@@ -1,0 +1,494 @@
+{
+  "ts": "2026-07-02T13:47:40Z",
+  "census": {
+    "langs": [
+      {
+        "ext": "ts",
+        "count": 525
+      },
+      {
+        "ext": "md",
+        "count": 180
+      },
+      {
+        "ext": "json",
+        "count": 133
+      },
+      {
+        "ext": "mjs",
+        "count": 98
+      },
+      {
+        "ext": "tsx",
+        "count": 55
+      },
+      {
+        "ext": "sh",
+        "count": 23
+      },
+      {
+        "ext": "yml",
+        "count": 14
+      },
+      {
+        "ext": "swift",
+        "count": 9
+      },
+      {
+        "ext": "yaml",
+        "count": 8
+      },
+      {
+        "ext": "plist",
+        "count": 7
+      },
+      {
+        "ext": "gitignore",
+        "count": 6
+      },
+      {
+        "ext": "py",
+        "count": 6
+      },
+      {
+        "ext": "html",
+        "count": 5
+      },
+      {
+        "ext": "js",
+        "count": 5
+      },
+      {
+        "ext": "bats",
+        "count": 4
+      },
+      {
+        "ext": "css",
+        "count": 4
+      },
+      {
+        "ext": "example",
+        "count": 2
+      },
+      {
+        "ext": "rs",
+        "count": 2
+      },
+      {
+        "ext": "txt",
+        "count": 2
+      },
+      {
+        "ext": "ps1",
+        "count": 2
+      },
+      {
+        "ext": "jsonl",
+        "count": 2
+      },
+      {
+        "ext": "dockerignore",
+        "count": 1
+      },
+      {
+        "ext": "toml",
+        "count": 1
+      },
+      {
+        "ext": "sol",
+        "count": 1
+      },
+      {
+        "ext": "c",
+        "count": 1
+      },
+      {
+        "ext": "go",
+        "count": 1
+      },
+      {
+        "ext": "ipynb",
+        "count": 1
+      },
+      {
+        "ext": "rb",
+        "count": 1
+      },
+      {
+        "ext": "svg",
+        "count": 1
+      }
+    ],
+    "mjsByDir": [
+      {
+        "dir": "scripts",
+        "count": 31
+      },
+      {
+        "dir": "bin/host-bridge/tools",
+        "count": 19
+      },
+      {
+        "dir": "bin/host-bridge",
+        "count": 12
+      },
+      {
+        "dir": ".claude/hooks",
+        "count": 10
+      },
+      {
+        "dir": "bin/host-bridge/lib",
+        "count": 9
+      },
+      {
+        "dir": "tests/fixtures",
+        "count": 7
+      },
+      {
+        "dir": ".claude",
+        "count": 6
+      },
+      {
+        "dir": "scripts/tests/helpers",
+        "count": 2
+      },
+      {
+        "dir": "bin/host-bridge/tools/lib",
+        "count": 1
+      },
+      {
+        "dir": "bin/ios-bridge",
+        "count": 1
+      }
+    ],
+    "mjsTotal": 98,
+    "shCount": 23,
+    "stubFiles": [
+      "orchestration/bin/completion-scan.ts",
+      "orchestration/bin/dod.ts",
+      "orchestration/bin/lib/dod.ts",
+      "orchestration/bin/lib/completion.ts"
+    ],
+    "sparseDirs": [
+      {
+        "dir": "assets",
+        "count": 1
+      },
+      {
+        "dir": "client",
+        "count": 1
+      },
+      {
+        "dir": "packaging",
+        "count": 1
+      },
+      {
+        "dir": "tokens-light",
+        "count": 1
+      },
+      {
+        "dir": "ops",
+        "count": 2
+      },
+      {
+        "dir": "public",
+        "count": 2
+      },
+      {
+        "dir": "tokens",
+        "count": 2
+      },
+      {
+        "dir": "web",
+        "count": 4
+      },
+      {
+        "dir": "backend",
+        "count": 5
+      }
+    ],
+    "routeGap": {
+      "missing": [
+        "/api/ecysearcher",
+        "/api/ecysearcher/api/search/search/analytics",
+        "/api/ecysearcher/api/search/search"
+      ],
+      "unused": [
+        "/api/ready",
+        "/api/openapi.json",
+        "/api/revenue/check",
+        "/api/github/webhook",
+        "/api/notify/config",
+        "/api/notify/test",
+        "/api/generate",
+        "/api/agent/sessions/*/events",
+        "/api/macos-terminal",
+        "/api/cluster/status",
+        "/api/saas/upstreams/*",
+        "/api/saas/upstreams/status",
+        "/api/saas/self/keys",
+        "/api/saas/self/keys/*/revoke",
+        "/api/saas/usage"
+      ]
+    },
+    "centralTests": 144
+  },
+  "gaps": [
+    {
+      "kind": "language-migration",
+      "title": "98 .mjs files still to migrate to TypeScript",
+      "evidence": "git ls-files '*.mjs' = 98; concentrated in scripts (31), bin/host-bridge/tools (19), bin/host-bridge (12)",
+      "severity": "P1",
+      "ownerStream": "mjs-migration",
+      "justification": "TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts."
+    },
+    {
+      "kind": "route-missing",
+      "title": "Frontend calls `/api/ecysearcher` but no backend route serves it",
+      "evidence": "src /api call with no matching server route",
+      "severity": "P1",
+      "ownerStream": "typescript-core",
+      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
+    },
+    {
+      "kind": "route-missing",
+      "title": "Frontend calls `/api/ecysearcher/api/search/search/analytics` but no backend route serves it",
+      "evidence": "src /api call with no matching server route",
+      "severity": "P1",
+      "ownerStream": "typescript-core",
+      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
+    },
+    {
+      "kind": "route-missing",
+      "title": "Frontend calls `/api/ecysearcher/api/search/search` but no backend route serves it",
+      "evidence": "src /api call with no matching server route",
+      "severity": "P1",
+      "ownerStream": "typescript-core",
+      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/ready` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/openapi.json` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/revenue/check` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/github/webhook` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/notify/config` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/notify/test` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/generate` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/agent/sessions/*/events` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/macos-terminal` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/cluster/status` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/saas/upstreams/*` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/saas/upstreams/status` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/saas/self/keys` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/saas/self/keys/*/revoke` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "route-unused",
+      "title": "Backend route `/api/saas/usage` is never called by the frontend",
+      "evidence": "server route with no matching src /api call",
+      "severity": "P3",
+      "ownerStream": "errors-resilience",
+      "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
+    },
+    {
+      "kind": "stub",
+      "title": "Unfinished marker in `orchestration/bin/completion-scan.ts`",
+      "evidence": "TODO/FIXME/not-implemented found in file",
+      "severity": "P2",
+      "ownerStream": "typescript-core",
+      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
+    },
+    {
+      "kind": "stub",
+      "title": "Unfinished marker in `orchestration/bin/dod.ts`",
+      "evidence": "TODO/FIXME/not-implemented found in file",
+      "severity": "P2",
+      "ownerStream": "typescript-core",
+      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
+    },
+    {
+      "kind": "stub",
+      "title": "Unfinished marker in `orchestration/bin/lib/dod.ts`",
+      "evidence": "TODO/FIXME/not-implemented found in file",
+      "severity": "P2",
+      "ownerStream": "typescript-core",
+      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
+    },
+    {
+      "kind": "stub",
+      "title": "Unfinished marker in `orchestration/bin/lib/completion.ts`",
+      "evidence": "TODO/FIXME/not-implemented found in file",
+      "severity": "P2",
+      "ownerStream": "typescript-core",
+      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `assets` has only 1 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files assets = 1",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `client` has only 1 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files client = 1",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `packaging` has only 1 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files packaging = 1",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `tokens-light` has only 1 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files tokens-light = 1",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `ops` has only 2 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files ops = 2",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `public` has only 2 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files public = 2",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `tokens` has only 2 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files tokens = 2",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `web` has only 4 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files web = 4",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    },
+    {
+      "kind": "sparse-folder",
+      "title": "Folder `backend` has only 5 tracked file(s) — possibly a stub lane",
+      "evidence": "git ls-files backend = 5",
+      "severity": "P3",
+      "ownerStream": "typescript-core",
+      "justification": "A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing)."
+    }
+  ]
+}
