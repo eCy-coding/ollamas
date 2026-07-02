@@ -58,7 +58,10 @@ const STANDARDS = [
   task,
 ].join("\n");
 
-const body = JSON.stringify({ provider: PROVIDER, ...(MODEL ? { model: MODEL } : {}), autoApply: true, maxSteps: STEPS,
+// --no-apply: dispatch read-only (autoApply:false → write_file returns a diff, never saves). Used by the
+// fleet so a PROPOSE worker can READ the repo workspace but cannot mutate it. Default stays autoApply:true.
+const NO_APPLY = has("--no-apply");
+const body = JSON.stringify({ provider: PROVIDER, ...(MODEL ? { model: MODEL } : {}), autoApply: !NO_APPLY, maxSteps: STEPS,
   messages: [{ role: "user", content: STANDARDS }] });
 
 /** @type {{url:string,provider:string,model:string,root:string,steps:{n:number,tool:string,ok:boolean,out:string}[],messages:string[],files:string[],errors:string[],demoSuspected:boolean}} */

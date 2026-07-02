@@ -71,17 +71,30 @@ function releaseClaim(lane: string, version: string): void {
 }
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 
-function taskPrompt(attempt: number): string {
-  const focus = attempt > 0 && FOCUS[stream] ? `\nFOCUS (narrow scope, attempt ${attempt + 1}): ${FOCUS[stream]}\nRead ONLY that file, then propose.` : "";
+// The per-stream target file (before the " — " description). Reading it DIRECTLY beats list_tree, which
+// floods the model with the whole repo tree so it describes the tree instead of proposing (proven live).
+function focusFile(): string {
+  const f = FOCUS[stream] ?? "";
+  return f.split(/\s+[—-]\s+/)[0].trim(); // e.g. "start.sh — add set -euo pipefail" → "start.sh"
+}
+
+function taskPrompt(_attempt: number): string {
+  const target = focusFile();
+  const goal = FOCUS[stream] ?? "one concrete high-value change for this stream";
+  const readLine = target
+    ? `The agent WORKSPACE is the ollamas repo. Call read_file "${target}" DIRECTLY (do NOT call list_tree — it floods context). Read that ONE file, then propose.`
+    : `The agent WORKSPACE is the ollamas repo. read_file the single most relevant workspace-relative file for this stream, then propose (avoid list_tree — it floods context).`;
   return [
-    `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Repo: ${REPO}. Do NOT edit repo files.${focus}`,
-    `Read AT MOST 2 files, then STOP reading. Your FINAL MESSAGE must BE the proposal in this exact shape:`,
-    `## Plan: <detect what THIS stream needs, then a 1-line plan of the change you will propose>`,
-    `## Change: <one concrete high-value change>`,
+    `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Goal: ${goal}.`,
+    readLine,
+    `NEVER call write_file or write_host_file — put your change in "## Diff" as TEXT only. Do NOT edit any file.`,
+    `Your FINAL MESSAGE must BE the proposal in this exact shape (nothing else — do NOT describe the repo):`,
+    `## Plan: <1-line plan of the change you will propose>`,
+    `## Change: <one concrete high-value change to ${target || "the target file"}>`,
     `## Diff: <a short unified diff>`,
     `## Test: <the test that proves it>`,
     `## Next: <precompute — the 1-line NEXT step for this stream after this change lands>`,
-    `Then end with: VERDICT: DONE. Plan BEFORE proposing, precompute Next AFTER. Keep under 28 lines. Evidence over prose.`,
+    `Then end with: VERDICT: DONE. Keep under 28 lines. Evidence over prose.`,
   ].join("\n");
 }
 
@@ -99,7 +112,7 @@ function dispatch(model: string, prompt: string, steps: number, provider: string
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,
-      "--provider", provider, "--model", model, "--steps", String(steps), "--root", root, "--json",
+      "--provider", provider, "--model", model, "--steps", String(steps), "--root", root, "--no-apply", "--json",
     ], { encoding: "utf8", timeout: 300_000, env: { ...process.env, OLLAMAS_URL }, maxBuffer: 8 * 1024 * 1024 });
     writeFileSync(reportF, out);
     return parseReport(out);

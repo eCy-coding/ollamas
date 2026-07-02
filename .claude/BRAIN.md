@@ -21,7 +21,7 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 | Mechanism | What | Entry point | Slash |
 |-----------|------|-------------|-------|
 | **Council** | 18-model capability-matched project analysis + oracle verify + debate | `orchestration/bin/council.ts` | `/council` |
-| **Fleet** | Terminal.app + iTerm2 living agent-tabs, ≤2/model, single-GPU FIFO, PROPOSE-only. `--sequenced` opens tabs in the ethical mission order (T1→Tn, tier-tagged) via `lib/fleet-order.ts` | `orchestration/bin/fleet-launch.ts` + `bin/lib/fleet-order.ts` | `/fleet` |
+| **Fleet** | Terminal.app + iTerm2 living agent-tabs, ≤2/model, single-GPU FIFO, PROPOSE-only. `--sequenced` = ethical mission order (T1→Tn, tier-tagged). Workers read the REPO (fleet-launch sets `POST /api/workspace/select`=repo) read-only (`agent-dispatch --no-apply`, no repo mutation) via DIRECT `read_file` of the per-stream target → real gated Change/Diff/Test proposals (6/6 CONVERGED) | `orchestration/bin/fleet-launch.ts` + `bin/lib/{fleet-order,workspace}.ts` | `/fleet` |
 | **Fleet-agent** | Persistent per-tab worker: PLAN→claim→GPU-ticket→dispatch(escalate+backoff)→self-gate→idle-heartbeat | `orchestration/bin/fleet-agent.ts` | (opened by `/fleet --go`) |
 | **Fleet-conduct** | Conductor: read reports+claims → gate → FLEET_STATUS.md; `--watch` daemon; `--stop` kill | `orchestration/bin/fleet-conduct.ts` | `/fleet-stop` |
 | **Fleet-watch** | Operator live-follow console (claims+verdict+log tail) | `orchestration/bin/fleet-watch.ts` | `/fleet-watch` |

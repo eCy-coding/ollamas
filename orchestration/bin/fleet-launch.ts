@@ -25,6 +25,7 @@ import { homedir } from "node:os";
 import { buildFleetPlan, assertMaxTwo, STREAMS, type FleetPlan, type Assignment } from "./lib/fleet-plan";
 import { buildMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
 import { orderSlotsByMission, type OrderedSlot } from "./lib/fleet-order";
+import { selectWorkspaceRequest, parseWorkspaceResp } from "./lib/workspace";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -32,6 +33,8 @@ const REPO = join(ORCH_DIR, "..");
 const GO = process.argv.includes("--go");
 const SEQUENCED = process.argv.includes("--sequenced");
 const CLOUD_ONLY = process.argv.includes("--cloud-only");
+const NO_WORKSPACE = process.argv.includes("--no-workspace");
+const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const streamsArg = (() => { const i = process.argv.indexOf("--streams"); return i >= 0 ? (process.argv[i + 1] ?? "").split(",").filter(Boolean) : null; })();
 const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
 const STEPS = Number(process.env.FLEET_STEPS || 8);
@@ -129,9 +132,24 @@ function renderPlanMd(plan: FleetPlan): string {
   return L.join("\n");
 }
 
-function main(): void {
+/** Point the ollamas server's agent workspace at the REPO so fleet workers can read repo files (their read
+ *  tools are confined to db.data.workspacePath). Best-effort: warns + continues if the server is down. */
+async function ensureWorkspace(): Promise<void> {
+  if (NO_WORKSPACE) { console.log("  ↳ workspace: skipped (--no-workspace)"); return; }
+  const req = selectWorkspaceRequest(OLLAMAS_URL, REPO);
+  try {
+    const res = await fetch(req.url, { method: req.method, headers: { "Content-Type": req.contentType }, body: req.body, signal: AbortSignal.timeout(4000) });
+    const r = parseWorkspaceResp(await res.text());
+    console.log(r.ok ? `  ↳ workspace → ${r.workspacePath} (fleet workers can read the repo)` : `  ⚠ workspace set failed: ${r.error}`);
+  } catch (e: any) {
+    console.log(`  ⚠ workspace set skipped (server unreachable at ${OLLAMAS_URL}): ${(e?.message ?? e).slice(0, 60)}`);
+  }
+}
+
+async function main(): Promise<void> {
   const plan = buildFleetPlan(liveModels());
   try { assertMaxTwo(plan); } catch (e: any) { console.error(`[fleet-launch] ${e.message}`); process.exit(1); }
+  if (GO) await ensureWorkspace(); // only mutate server workspace when actually opening the fleet
 
   let slots = plan.assignments.filter((a) => a.model);
   if (streamsArg) slots = slots.filter((a) => streamsArg.includes(a.stream));
@@ -168,4 +186,4 @@ function main(): void {
   if (!GO) console.log(`\nDry-run. Gerçek aç: --go [--sequenced] [--cloud-only] [--streams a,b]. Kondüktör: tsx orchestration/bin/fleet-conduct.ts`);
 }
 
-main();
+main().catch((e) => { console.error(`[fleet-launch] ${e?.message ?? e}`); process.exit(1); });
