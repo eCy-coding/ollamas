@@ -14,7 +14,7 @@ const raw = execFileSync("bash", ["-c",
 ]).toString().trim().split("\n").filter(Boolean);
 
 const loc = (f) => {
-  try { return execFileSync("bash", ["-c", `wc -l < ${REPO}/${f}`]).toString().trim() | 0; } catch { return 0; }
+  try { return Number(execFileSync("bash", ["-c", `wc -l < ${REPO}/${f}`]).toString().trim()) | 0; } catch { return 0; }
 };
 const files = raw.map((f) => ({ f, loc: loc(f) }));
 const totalLoc = files.reduce((a, b) => a + b.loc, 0);

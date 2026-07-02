@@ -81,4 +81,4 @@ child.on("exit", (c) => process.exit(c ?? 0));
 })();
 
 // Forward Ctrl-C to the child only (we never touch other servers).
-for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { child.kill(sig); });
+for (const sig of /** @type {NodeJS.Signals[]} */ (["SIGINT", "SIGTERM"])) process.on(sig, () => { child.kill(sig); });

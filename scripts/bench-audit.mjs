@@ -109,8 +109,10 @@ function score(flagged) {
     console.log(`${c.label}: recall=${sc.recall} precision=${sc.precision} composite=${sc.composite} tp=${sc.tp} fp=${sc.fp} demo=${demo} ranTerm=${ranTerminal} ${ms}ms`);
     console.log(`  flagged: ${[...flagged].join(", ") || "(none)"}`);
   }
-  // rank: composite desc, tie-break latency asc
-  const ranked = [...results].filter((r) => !r.error).sort((a, b) => b.composite - a.composite || a.ms - b.ms);
+  // rank: composite desc, tie-break latency asc. `results` is a union of scored rows and error rows
+  // ({label,error,ms}); the `!r.error` filter removes error rows, so the scored props are safe below —
+  // TS can't narrow that union across .filter, so the row is typed `any` here (the guard is real).
+  const ranked = /** @type {any[]} */ ([...results]).filter((r) => !r.error).sort((a, b) => b.composite - a.composite || a.ms - b.ms);
   const out = {
     task: "audit-capability (bug-detection) benchmark",
     fixture: "docs/audit/fixtures/bench-fixture.ts",

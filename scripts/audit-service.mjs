@@ -38,7 +38,7 @@ const list = execFileSync("bash", ["-c",
   `cd ${JSON.stringify(REPO_ABS)} && find . \\( -name '*.ts' -o -name '*.tsx' -o -name '*.mjs' -o -name '*.js' -o -name '*.py' -o -name '*.go' -o -name '*.rs' \\) ` +
   `-not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/build/*' -not -path '*/.next/*' -not -path '*/vendor/*' -not -path '*/.claude/*' -not -path '*/audit-out/*' 2>/dev/null | sed 's|^\\./||' | sort`,
 ]).toString().trim().split("\n").filter(Boolean);
-const loc = (f) => { try { return execFileSync("bash", ["-c", `wc -l < ${JSON.stringify(path.join(REPO_ABS, f))}`]).toString().trim() | 0; } catch { return 0; } };
+const loc = (f) => { try { return Number(execFileSync("bash", ["-c", `wc -l < ${JSON.stringify(path.join(REPO_ABS, f))}`]).toString().trim()) | 0; } catch { return 0; } };
 const files = list.map((f) => ({ f, loc: loc(f) }));
 const totalLoc = files.reduce((a, b) => a + b.loc, 0);
 // bin (dir-affinity preserved by sort order; LOC/file bounded)

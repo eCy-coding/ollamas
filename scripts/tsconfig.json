@@ -2,7 +2,7 @@
   "//": "Incremental TypeScript adoption for the scripts fleet (mjs-migration stream). allowJs compiles the .mjs; checkJs OFF keeps the gate green — enable per-file with // @ts-check, then rename .mjs → .ts. Run: tsc -p scripts/tsconfig.json --noEmit",
   "compilerOptions": {
     "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
-    "allowJs": true, "checkJs": false, "noEmit": true, "skipLibCheck": true, "strict": false
+    "allowJs": true, "checkJs": true, "noEmit": true, "skipLibCheck": true, "strict": false
   },
   "include": ["*.mjs", "*.ts"],
   "exclude": ["tests/**"]

@@ -43,8 +43,13 @@ function census(): CensusInput {
 
   const shCount = notVendored.filter((f) => f.endsWith(".sh")).length;
   const centralTests = notVendored.filter((f) => f.startsWith("tests/") && f.endsWith(".test.ts")).length;
-  // in-place migration progress: .mjs already carrying `// @ts-check` (type-safety without a risky rename).
-  const mjsChecked = mjs.filter((f) => { try { return /\/\/\s*@ts-check/.test(readFileSync(join(REPO, f), "utf8").slice(0, 200)); } catch { return false; } }).length;
+  // in-place migration progress: a .mjs is type-checked when it carries `// @ts-check`, OR it is a top-level
+  // scripts/*.mjs — scripts/tsconfig.json now sets `checkJs:true`, so the whole scripts/ subsystem is checked.
+  const scriptsChecked = /"checkJs"\s*:\s*true/.test((() => { try { return readFileSync(join(REPO, "scripts/tsconfig.json"), "utf8"); } catch { return ""; } })());
+  const mjsChecked = mjs.filter((f) => {
+    if (scriptsChecked && /^scripts\/[^/]+\.mjs$/.test(f)) return true;
+    try { return /\/\/\s*@ts-check/.test(readFileSync(join(REPO, f), "utf8").slice(0, 200)); } catch { return false; }
+  }).length;
 
   // stub markers — REAL code comments only (`// TODO`, `# FIXME:`), not the word inside a string/regex.
   // grep -rn (with line text) → keep files that have ≥1 line passing isRealMarkerLine. Exclude the detector
