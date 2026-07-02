@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { pullTicket, tryTurn, releaseTurn } from "./lib/gpu-lock";
 import { fullJitterDelay, isTransient } from "./lib/backoff";
+import { providerFor } from "./lib/chrome-probe";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -84,19 +85,32 @@ function taskPrompt(attempt: number): string {
   ].join("\n");
 }
 
-function dispatch(model: string, prompt: string, steps: number): { verdict: string; proposal: string; steps: number; err?: string } {
+// Parse a --json report string into {verdict, proposal, steps}. The proposal is the Change/Diff/Test text
+// from the model's messages (a PROPOSE run may make ZERO tool steps — the proposal lives in the message).
+function parseReport(out: string): { verdict: string; proposal: string; steps: number } {
+  const j = JSON.parse(out);
+  const msgs = Array.isArray(j.messages) ? j.messages.map(String).join("\n") : "";
+  const i = msgs.search(/##\s*Change/i);
+  const proposal = i >= 0 ? msgs.slice(i).trim() : "";
+  return { verdict: j.verdict ?? "?", proposal, steps: (j.steps ?? []).length };
+}
+
+function dispatch(model: string, prompt: string, steps: number, provider: string): { verdict: string; proposal: string; steps: number; err?: string } {
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,
-      "--provider", "ollama-local", "--model", model, "--steps", String(steps), "--root", root, "--json",
+      "--provider", provider, "--model", model, "--steps", String(steps), "--root", root, "--json",
     ], { encoding: "utf8", timeout: 300_000, env: { ...process.env, OLLAMAS_URL }, maxBuffer: 8 * 1024 * 1024 });
     writeFileSync(reportF, out);
-    const j = JSON.parse(out);
-    const msgs = Array.isArray(j.messages) ? j.messages.map(String).join("\n") : "";
-    const i = msgs.search(/##\s*Change/i);
-    const proposal = i >= 0 ? msgs.slice(i).trim() : "";
-    return { verdict: j.verdict ?? "?", proposal, steps: (j.steps ?? []).length };
+    return parseReport(out);
   } catch (e: any) {
+    // ROOT-FIX (vO39): agent-dispatch EXITS 1 whenever the run isn't fully allOk — including a valid DONE
+    // run that made ZERO tool steps (a PROPOSE answer is text, not tool calls). execFileSync throws on that
+    // non-zero exit, but the JSON report is still on stdout. Parse it before discarding as ERROR.
+    const stdout = typeof e?.stdout === "string" ? e.stdout : "";
+    if (stdout) {
+      try { const r = parseReport(stdout); writeFileSync(reportF, stdout); return r; } catch { /* not JSON → real failure */ }
+    }
     const err = String(e?.message ?? e).slice(0, 200);
     try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: err })); } catch { /* ignore */ }
     return { verdict: "ERROR", proposal: "", steps: 0, err };
@@ -143,7 +157,9 @@ async function main(): Promise<void> {
       log(`🔓 GPU acquired (ticket ${ticket})`);
     }
     log(`▶ attempt ${attempt + 1}/${STEPS.length} · ${p.model} · steps ${STEPS[attempt]}${attempt > 0 ? " · narrowed scope" : ""}`);
-    const r = dispatch(p.model, taskPrompt(attempt), STEPS[attempt]);
+    // ROOT-FIX (vO39): route by the model's provider — a cloud tag (…-cloud) MUST use ollama-cloud, not the
+    // hardcoded ollama-local (which the local daemon can't serve → every cloud slot silently ERROR'd).
+    const r = dispatch(p.model, taskPrompt(attempt), STEPS[attempt], providerFor(p.model));
     if (isLocal) releaseTurn(GPU_DIR, ticket);
     releaseClaim(stream, slot);
     const gated = (r.verdict === "DONE" || r.verdict === "OK") && /##\s*Change/i.test(r.proposal);
