@@ -10,6 +10,8 @@ export const messages: Record<string, string> = {
   'app.tab.files': 'Files Explorer',
   'app.tab.drive': 'Google Drive',
   'app.tab.sheets': 'Google Sheets',
+  'app.tab.calendar': 'Google Calendar',
+  'app.tab.gmail': 'Gmail Inbox',
   'app.tab.search': 'GitHub Search',
   'app.tab.threatintel': 'Threat Intel',
   'app.tab.terminal': 'Interactive CLI',

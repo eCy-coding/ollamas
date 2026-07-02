@@ -8,6 +8,8 @@ export const messages: Record<string, string> = {
   'app.tab.files': 'Dosya Gezgini',
   'app.tab.drive': 'Google Drive',
   'app.tab.sheets': 'Google Sheets',
+  'app.tab.calendar': 'Google Takvim',
+  'app.tab.gmail': 'Gmail Gelen Kutusu',
   'app.tab.search': 'GitHub Arama',
   'app.tab.threatintel': 'Tehdit İstihbaratı',
   'app.tab.terminal': 'Etkileşimli CLI',

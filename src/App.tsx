@@ -10,6 +10,8 @@ import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
 import EcySearchPanel from "./components/EcySearchPanel";
 import ECySearcherPanel from "./components/ECySearcherPanel";
 import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
+import { GoogleCalendarBrowser } from "./components/GoogleCalendarBrowser";
+import { GmailBrowser } from "./components/GmailBrowser";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
 import { FileTransfer } from "./components/FileTransfer";
@@ -32,7 +34,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign, Sheet, Search,
+  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -111,6 +113,8 @@ export default function App() {
     { id: "files", icon: <FolderOpen className="w-4 h-4 text-blue-400" /> },
     { id: "drive", icon: <CloudLightning className="w-4 h-4 text-sky-400" /> },
     { id: "sheets", icon: <Sheet className="w-4 h-4 text-green-400" /> },
+    { id: "calendar", icon: <Calendar className="w-4 h-4 text-orange-400" /> },
+    { id: "gmail", icon: <Mail className="w-4 h-4 text-red-400" /> },
     { id: "search", icon: <Search className="w-4 h-4 text-cyan-300" /> },
     { id: "threatintel", icon: <ShieldAlert className="w-4 h-4 text-red-400" /> },
     { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
@@ -316,6 +320,18 @@ export default function App() {
           {activeTab === "sheets" && (
             <div className="animate-fade-in">
               <GoogleSheetsBrowser />
+            </div>
+          )}
+
+          {activeTab === "calendar" && (
+            <div className="animate-fade-in">
+              <GoogleCalendarBrowser />
+            </div>
+          )}
+
+          {activeTab === "gmail" && (
+            <div className="animate-fade-in">
+              <GmailBrowser />
             </div>
           )}
 

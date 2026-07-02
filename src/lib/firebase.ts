@@ -44,6 +44,10 @@ provider.addScope('https://www.googleapis.com/auth/drive');
 provider.addScope('https://www.googleapis.com/auth/drive.readonly');
 // Sheets (#3) — same single sign-in grants this alongside Drive (one consent, one token).
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+// Calendar + Gmail (read-only) — same single consent/token covers these too.
+// Deliberately readonly: the cockpit surfaces agenda + inbox headers, never writes.
+provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 // Force the consent screen every sign-in. Without prompt=consent Google can
 // silently re-grant a PRIOR sign-in's scopes (basic profile, no Drive) → the
 // token omits Drive → Drive API 403 "insufficient authentication scopes".
