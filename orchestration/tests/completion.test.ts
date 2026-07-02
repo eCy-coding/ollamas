@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { streamFor, analyzeCompletion, renderCompletionReport, type CensusInput } from "../bin/lib/completion";
+import { streamFor, analyzeCompletion, renderCompletionReport, filterProxiedMissing, isRealMarkerLine, type CensusInput } from "../bin/lib/completion";
 
 const census = (over: Partial<CensusInput> = {}): CensusInput => ({
   langs: [{ ext: "ts", count: 525 }, { ext: "mjs", count: 98 }, { ext: "sh", count: 23 }],
@@ -46,6 +46,28 @@ describe("analyzeCompletion — only provable gaps", () => {
   });
   it("no .mjs → no migration gap", () => {
     expect(analyzeCompletion(census({ mjsTotal: 0, mjsByDir: [] })).some((g) => g.kind === "language-migration")).toBe(false);
+  });
+});
+
+describe("filterProxiedMissing — proxy-served routes are not missing (vO46 precision)", () => {
+  it("drops calls under an app.use proxy prefix, keeps genuine gaps", () => {
+    const out = filterProxiedMissing(["/api/ecysearcher/status", "/api/ecysearcher", "/api/genuinely-absent"], ["/api/ecysearcher"]);
+    expect(out).toEqual(["/api/genuinely-absent"]);
+  });
+  it("no prefixes → unchanged", () => {
+    expect(filterProxiedMissing(["/api/x"], [])).toEqual(["/api/x"]);
+  });
+});
+
+describe("isRealMarkerLine — real comment markers only, not string/regex mentions (vO46 precision)", () => {
+  it("true for a real code comment marker", () => {
+    expect(isRealMarkerLine("  // TODO: implement retry")).toBe(true);
+    expect(isRealMarkerLine("# FIXME broken on macOS")).toBe(true);
+  });
+  it("false for the word inside a string literal (grep arg) or a detector regex", () => {
+    expect(isRealMarkerLine('stubFiles = grep(["-e", "TODO", "-e", "FIXME"])')).toBe(false);
+    expect(isRealMarkerLine("const count = str.match(/\\b(TODO|FIXME)\\b/g)")).toBe(false);
+    expect(isRealMarkerLine("const x = 5; // ordinary comment")).toBe(false);
   });
 });
 

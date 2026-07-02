@@ -43,6 +43,30 @@ export function streamFor(kind: GapKind): string {
   return OWNER[kind];
 }
 
+/** Drop frontend calls that ARE served — by an `app.use("/api/prefix", …)` proxy/router mount whose prefix
+ *  the call sits under. graph.extractRoutes only sees `app.get/post(...)`, so proxy-mounted sub-paths would
+ *  otherwise be false "missing". A call matches a prefix when it equals it or starts with `prefix/`. */
+export function filterProxiedMissing(missing: string[], proxyPrefixes: string[]): string[] {
+  const pre = proxyPrefixes.map((p) => p.replace(/\/+$/, "")).filter(Boolean);
+  return missing.filter((call) => {
+    const c = call.replace(/\/+$/, "");
+    return !pre.some((p) => c === p || c.startsWith(p + "/"));
+  });
+}
+
+/** Is a source line a REAL comment marker (`// TODO`, `# FIXME:`), not an incidental mention of the word
+ *  inside a string literal or a regex (e.g. a grep arg `"-e","TODO"` or a detector's `/(TODO|FIXME)/`)? */
+export function isRealMarkerLine(line: string): boolean {
+  if (!/\b(TODO|FIXME|HACK|XXX)\b/.test(line)) return false;
+  // A real marker follows a comment opener with (optional) whitespace then the word.
+  if (/(?:\/\/|#|\/\*|\*)\s*(TODO|FIXME|HACK|XXX)\b/.test(line)) {
+    // …but not when it's clearly a string/regex mention on that same comment line describing the detector.
+    if (/["'`].*(TODO|FIXME).*["'`]/.test(line) || /\((?:TODO|FIXME)\|/.test(line)) return false;
+    return true;
+  }
+  return false;
+}
+
 /** Derive the completion gaps from the census. Only provable gaps; no fabricated test-coverage gap. */
 export function analyzeCompletion(c: CensusInput): Gap[] {
   const gaps: Gap[] = [];

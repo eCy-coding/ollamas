@@ -1,18 +1,18 @@
 {
-  "ts": "2026-07-02T13:47:40Z",
+  "ts": "2026-07-02T14:19:51Z",
   "census": {
     "langs": [
       {
         "ext": "ts",
-        "count": 525
+        "count": 531
       },
       {
         "ext": "md",
-        "count": 180
+        "count": 184
       },
       {
         "ext": "json",
-        "count": 133
+        "count": 135
       },
       {
         "ext": "mjs",
@@ -163,12 +163,7 @@
     ],
     "mjsTotal": 98,
     "shCount": 23,
-    "stubFiles": [
-      "orchestration/bin/completion-scan.ts",
-      "orchestration/bin/dod.ts",
-      "orchestration/bin/lib/dod.ts",
-      "orchestration/bin/lib/completion.ts"
-    ],
+    "stubFiles": [],
     "sparseDirs": [
       {
         "dir": "assets",
@@ -208,11 +203,7 @@
       }
     ],
     "routeGap": {
-      "missing": [
-        "/api/ecysearcher",
-        "/api/ecysearcher/api/search/search/analytics",
-        "/api/ecysearcher/api/search/search"
-      ],
+      "missing": [],
       "unused": [
         "/api/ready",
         "/api/openapi.json",
@@ -241,30 +232,6 @@
       "severity": "P1",
       "ownerStream": "mjs-migration",
       "justification": "TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts."
-    },
-    {
-      "kind": "route-missing",
-      "title": "Frontend calls `/api/ecysearcher` but no backend route serves it",
-      "evidence": "src /api call with no matching server route",
-      "severity": "P1",
-      "ownerStream": "typescript-core",
-      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
-    },
-    {
-      "kind": "route-missing",
-      "title": "Frontend calls `/api/ecysearcher/api/search/search/analytics` but no backend route serves it",
-      "evidence": "src /api call with no matching server route",
-      "severity": "P1",
-      "ownerStream": "typescript-core",
-      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
-    },
-    {
-      "kind": "route-missing",
-      "title": "Frontend calls `/api/ecysearcher/api/search/search` but no backend route serves it",
-      "evidence": "src /api call with no matching server route",
-      "severity": "P1",
-      "ownerStream": "typescript-core",
-      "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
     },
     {
       "kind": "route-unused",
@@ -385,38 +352,6 @@
       "severity": "P3",
       "ownerStream": "errors-resilience",
       "justification": "Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove."
-    },
-    {
-      "kind": "stub",
-      "title": "Unfinished marker in `orchestration/bin/completion-scan.ts`",
-      "evidence": "TODO/FIXME/not-implemented found in file",
-      "severity": "P2",
-      "ownerStream": "typescript-core",
-      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-    },
-    {
-      "kind": "stub",
-      "title": "Unfinished marker in `orchestration/bin/dod.ts`",
-      "evidence": "TODO/FIXME/not-implemented found in file",
-      "severity": "P2",
-      "ownerStream": "typescript-core",
-      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-    },
-    {
-      "kind": "stub",
-      "title": "Unfinished marker in `orchestration/bin/lib/dod.ts`",
-      "evidence": "TODO/FIXME/not-implemented found in file",
-      "severity": "P2",
-      "ownerStream": "typescript-core",
-      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-    },
-    {
-      "kind": "stub",
-      "title": "Unfinished marker in `orchestration/bin/lib/completion.ts`",
-      "evidence": "TODO/FIXME/not-implemented found in file",
-      "severity": "P2",
-      "ownerStream": "typescript-core",
-      "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
     },
     {
       "kind": "sparse-folder",

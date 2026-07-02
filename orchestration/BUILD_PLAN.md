@@ -1,13 +1,13 @@
 # BUILD_PLAN.md — how to build the missing code, step by step (auto-generated)
 
-> Auto: `tsx orchestration/bin/build-plan.ts` · 2026-07-02T13:58:40Z. Turns COMPLETION_GAPS into an ordered build plan:
+> Auto: `tsx orchestration/bin/build-plan.ts` · 2026-07-02T14:19:51Z. Turns COMPLETION_GAPS into an ordered build plan:
 > phases run in fleet-stream dependency order (foundation first), gaps within a phase by severity, each
 > with a fast / safe / correct recipe. Fastest = reuse adjacent patterns + batch; Safest = verify-before-touch,
 > behavior-preserving, test-first; Correct = typed + gated each step. This is a PLAN — it builds nothing.
 
-## Overview: 3 phase(s) · 32 step(s) · 4 P1
+## Overview: 3 phase(s) · 25 step(s) · 1 P1
 - T1 — `mjs-migration` (1 step, 1 P1)
-- T2 — `typescript-core` (16 steps, 3 P1)
+- T2 — `typescript-core` (9 steps)
 - T3 — `errors-resilience` (15 steps)
 
 ## T1 — Section: `mjs-migration`
@@ -24,73 +24,7 @@
 
 ## T2 — Section: `typescript-core`
 
-### T2.1 · [P1] Frontend calls `/api/ecysearcher` but no backend route serves it
-- **Why:** A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation.
-- **Evidence:** src /api call with no matching server route
-- **Approach (fast/safe/correct):** Verify the call is REAL before implementing — some are URL-concat regex artifacts.
-  1. Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?
-  2. If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.
-  3. If artifact: fix the frontend call (correct the constructed URL); no backend change.
-  4. Add a test (request → expected status/shape) and register the route at the choke-point.
-- **Verify:** New route returns the expected status for valid + invalid input; test green; no 404 for the real call.
-
-### T2.2 · [P1] Frontend calls `/api/ecysearcher/api/search/search/analytics` but no backend route serves it
-- **Why:** A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation.
-- **Evidence:** src /api call with no matching server route
-- **Approach (fast/safe/correct):** Verify the call is REAL before implementing — some are URL-concat regex artifacts.
-  1. Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?
-  2. If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.
-  3. If artifact: fix the frontend call (correct the constructed URL); no backend change.
-  4. Add a test (request → expected status/shape) and register the route at the choke-point.
-- **Verify:** New route returns the expected status for valid + invalid input; test green; no 404 for the real call.
-
-### T2.3 · [P1] Frontend calls `/api/ecysearcher/api/search/search` but no backend route serves it
-- **Why:** A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation.
-- **Evidence:** src /api call with no matching server route
-- **Approach (fast/safe/correct):** Verify the call is REAL before implementing — some are URL-concat regex artifacts.
-  1. Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?
-  2. If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.
-  3. If artifact: fix the frontend call (correct the constructed URL); no backend change.
-  4. Add a test (request → expected status/shape) and register the route at the choke-point.
-- **Verify:** New route returns the expected status for valid + invalid input; test green; no 404 for the real call.
-
-### T2.4 · [P2] Unfinished marker in `orchestration/bin/completion-scan.ts`
-- **Why:** An explicit TODO/stub marks incomplete logic the author flagged.
-- **Evidence:** TODO/FIXME/not-implemented found in file
-- **Approach (fast/safe/correct):** Read the marker context first — some are grep-arg false positives (the literal word TODO in code).
-  1. Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?
-  2. If real: implement the flagged logic, smallest correct change, with a test.
-  3. If false positive: no action (the scanner honestly flags it as 'found in file').
-- **Verify:** Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic.
-
-### T2.5 · [P2] Unfinished marker in `orchestration/bin/dod.ts`
-- **Why:** An explicit TODO/stub marks incomplete logic the author flagged.
-- **Evidence:** TODO/FIXME/not-implemented found in file
-- **Approach (fast/safe/correct):** Read the marker context first — some are grep-arg false positives (the literal word TODO in code).
-  1. Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?
-  2. If real: implement the flagged logic, smallest correct change, with a test.
-  3. If false positive: no action (the scanner honestly flags it as 'found in file').
-- **Verify:** Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic.
-
-### T2.6 · [P2] Unfinished marker in `orchestration/bin/lib/dod.ts`
-- **Why:** An explicit TODO/stub marks incomplete logic the author flagged.
-- **Evidence:** TODO/FIXME/not-implemented found in file
-- **Approach (fast/safe/correct):** Read the marker context first — some are grep-arg false positives (the literal word TODO in code).
-  1. Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?
-  2. If real: implement the flagged logic, smallest correct change, with a test.
-  3. If false positive: no action (the scanner honestly flags it as 'found in file').
-- **Verify:** Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic.
-
-### T2.7 · [P2] Unfinished marker in `orchestration/bin/lib/completion.ts`
-- **Why:** An explicit TODO/stub marks incomplete logic the author flagged.
-- **Evidence:** TODO/FIXME/not-implemented found in file
-- **Approach (fast/safe/correct):** Read the marker context first — some are grep-arg false positives (the literal word TODO in code).
-  1. Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?
-  2. If real: implement the flagged logic, smallest correct change, with a test.
-  3. If false positive: no action (the scanner honestly flags it as 'found in file').
-- **Verify:** Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic.
-
-### T2.8 · [P3] Folder `assets` has only 1 tracked file(s) — possibly a stub lane
+### T2.1 · [P3] Folder `assets` has only 1 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files assets = 1
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -99,7 +33,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.9 · [P3] Folder `client` has only 1 tracked file(s) — possibly a stub lane
+### T2.2 · [P3] Folder `client` has only 1 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files client = 1
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -108,7 +42,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.10 · [P3] Folder `packaging` has only 1 tracked file(s) — possibly a stub lane
+### T2.3 · [P3] Folder `packaging` has only 1 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files packaging = 1
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -117,7 +51,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.11 · [P3] Folder `tokens-light` has only 1 tracked file(s) — possibly a stub lane
+### T2.4 · [P3] Folder `tokens-light` has only 1 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files tokens-light = 1
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -126,7 +60,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.12 · [P3] Folder `ops` has only 2 tracked file(s) — possibly a stub lane
+### T2.5 · [P3] Folder `ops` has only 2 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files ops = 2
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -135,7 +69,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.13 · [P3] Folder `public` has only 2 tracked file(s) — possibly a stub lane
+### T2.6 · [P3] Folder `public` has only 2 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files public = 2
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -144,7 +78,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.14 · [P3] Folder `tokens` has only 2 tracked file(s) — possibly a stub lane
+### T2.7 · [P3] Folder `tokens` has only 2 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files tokens = 2
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -153,7 +87,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.15 · [P3] Folder `web` has only 4 tracked file(s) — possibly a stub lane
+### T2.8 · [P3] Folder `web` has only 4 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files web = 4
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.
@@ -162,7 +96,7 @@
   3. If unfinished: scope its completion as a separate, properly-planned lane (don't inline-guess its contents).
 - **Verify:** Folder either documented as intentional, or a real completion lane is scoped — no invented placeholder code.
 
-### T2.16 · [P3] Folder `backend` has only 5 tracked file(s) — possibly a stub lane
+### T2.9 · [P3] Folder `backend` has only 5 tracked file(s) — possibly a stub lane
 - **Why:** A near-empty top-level folder is either an intentional placeholder or an unfinished lane — verify intent (SUSPECTED, not confirmed-missing).
 - **Evidence:** git ls-files backend = 5
 - **Approach (fast/safe/correct):** Verify intent — a near-empty folder is a placeholder OR an unfinished lane. Never fabricate code.

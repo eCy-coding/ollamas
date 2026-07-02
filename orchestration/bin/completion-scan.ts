@@ -11,7 +11,7 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyzeCompletion, renderCompletionReport, type CensusInput } from "./lib/completion";
+import { analyzeCompletion, renderCompletionReport, filterProxiedMissing, isRealMarkerLine, type CensusInput } from "./lib/completion";
 import { extractRoutes, extractCalls, gapAnalysis } from "./lib/graph";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -44,11 +44,23 @@ function census(): CensusInput {
   const shCount = notVendored.filter((f) => f.endsWith(".sh")).length;
   const centralTests = notVendored.filter((f) => f.startsWith("tests/") && f.endsWith(".test.ts")).length;
 
-  // stub/TODO markers (bounded grep over source)
+  // stub markers — REAL code comments only (`// TODO`, `# FIXME:`), not the word inside a string/regex.
+  // grep -rn (with line text) → keep files that have ≥1 line passing isRealMarkerLine. Exclude the detector
+  // files themselves (they legitimately contain the words TODO/FIXME as grep args / marker regexes).
+  const DETECTORS = /(completion-scan|completion\.ts|\/dod\.ts|lib\/dod\.ts)/;
   let stubFiles: string[] = [];
   try {
-    stubFiles = execFileSync("grep", ["-rIl", "--include=*.ts", "--include=*.mjs", "-e", "TODO", "-e", "FIXME", "-e", "not implemented", "server", "cli", "scripts", "orchestration"],
-      { cwd: REPO, encoding: "utf8", timeout: 15000 }).split("\n").filter(Boolean).slice(0, 20);
+    const lines = execFileSync("grep", ["-rn", "--include=*.ts", "--include=*.mjs", "-E", "TODO|FIXME|HACK|XXX", "server", "cli", "scripts", "orchestration"],
+      { cwd: REPO, encoding: "utf8", timeout: 15000 }).split("\n").filter(Boolean);
+    const hit = new Set<string>();
+    for (const l of lines) {
+      const m = l.match(/^([^:]+):\d+:(.*)$/);
+      if (!m) continue;
+      const [, file, text] = m;
+      if (DETECTORS.test(file)) continue;            // detector self-reference — skip
+      if (isRealMarkerLine(text)) hit.add(file);
+    }
+    stubFiles = [...hit].slice(0, 20);
   } catch { stubFiles = []; }
 
   // sparse top-level folders (few tracked files → suspected stub lane)
@@ -58,13 +70,17 @@ function census(): CensusInput {
   const sparseDirs = [...topCount.entries()].filter(([d, n]) => KNOWN_DIRS.has(d) && n <= 5).map(([dir, count]) => ({ dir, count })).sort((a, b) => a.count - b.count);
 
   // backend ↔ frontend route drift (reuse graph primitives)
-  const routes = notVendored.filter((f) => f === "server.ts" || (f.startsWith("server/") && f.endsWith(".ts") && !f.endsWith(".test.ts")))
-    .flatMap((f) => { try { return extractRoutes(readFileSync(join(REPO, f), "utf8")); } catch { return []; } });
+  const serverFiles = notVendored.filter((f) => f === "server.ts" || (f.startsWith("server/") && f.endsWith(".ts") && !f.endsWith(".test.ts")));
+  const serverSrc = serverFiles.map((f) => { try { return readFileSync(join(REPO, f), "utf8"); } catch { return ""; } });
+  const routes = serverSrc.flatMap((s) => extractRoutes(s));
+  // proxy/router MOUNTS: `app.use("/api/prefix", …)` — graph.extractRoutes misses these, so their sub-paths
+  // must not be flagged missing. Collect the mounted /api prefixes.
+  const proxyPrefixes = serverSrc.flatMap((s) => [...s.matchAll(/\bapp\.use\(\s*['"`](\/api\/[^'"`]+)['"`]/g)].map((m) => m[1]));
   const calls = notVendored.filter((f) => (f.startsWith("src/") || f.startsWith("web/") || f.startsWith("client/")) && /\.(ts|tsx|js|jsx)$/.test(f))
     .flatMap((f) => { try { return extractCalls(readFileSync(join(REPO, f), "utf8")); } catch { return []; } });
   const g = gapAnalysis(routes, calls);
-  // cap the drift lists so the report stays actionable (surface count honestly)
-  const routeGap = { missing: g.missing.slice(0, 15), unused: g.unused.slice(0, 15) };
+  // drop proxy-served calls from "missing" (false positives), then cap the lists (surface count honestly).
+  const routeGap = { missing: filterProxiedMissing(g.missing, proxyPrefixes).slice(0, 15), unused: g.unused.slice(0, 15) };
 
   return { langs, mjsByDir, mjsTotal: mjs.length, shCount, stubFiles, sparseDirs, routeGap, centralTests };
 }

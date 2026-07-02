@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-02T13:58:40Z",
+  "ts": "2026-07-02T14:19:51Z",
   "phases": [
     {
       "order": 1,
@@ -32,142 +32,6 @@
       "order": 2,
       "stream": "typescript-core",
       "steps": [
-        {
-          "gap": {
-            "kind": "route-missing",
-            "title": "Frontend calls `/api/ecysearcher` but no backend route serves it",
-            "evidence": "src /api call with no matching server route",
-            "severity": "P1",
-            "ownerStream": "typescript-core",
-            "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
-          },
-          "recipe": {
-            "approach": "Verify the call is REAL before implementing — some are URL-concat regex artifacts.",
-            "steps": [
-              "Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?",
-              "If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.",
-              "If artifact: fix the frontend call (correct the constructed URL); no backend change.",
-              "Add a test (request → expected status/shape) and register the route at the choke-point."
-            ],
-            "verify": "New route returns the expected status for valid + invalid input; test green; no 404 for the real call."
-          }
-        },
-        {
-          "gap": {
-            "kind": "route-missing",
-            "title": "Frontend calls `/api/ecysearcher/api/search/search/analytics` but no backend route serves it",
-            "evidence": "src /api call with no matching server route",
-            "severity": "P1",
-            "ownerStream": "typescript-core",
-            "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
-          },
-          "recipe": {
-            "approach": "Verify the call is REAL before implementing — some are URL-concat regex artifacts.",
-            "steps": [
-              "Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?",
-              "If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.",
-              "If artifact: fix the frontend call (correct the constructed URL); no backend change.",
-              "Add a test (request → expected status/shape) and register the route at the choke-point."
-            ],
-            "verify": "New route returns the expected status for valid + invalid input; test green; no 404 for the real call."
-          }
-        },
-        {
-          "gap": {
-            "kind": "route-missing",
-            "title": "Frontend calls `/api/ecysearcher/api/search/search` but no backend route serves it",
-            "evidence": "src /api call with no matching server route",
-            "severity": "P1",
-            "ownerStream": "typescript-core",
-            "justification": "A called-but-unimplemented endpoint is a runtime 404 — a genuine missing implementation."
-          },
-          "recipe": {
-            "approach": "Verify the call is REAL before implementing — some are URL-concat regex artifacts.",
-            "steps": [
-              "Open the frontend source line: is it a genuine endpoint or a base-URL concatenation artifact?",
-              "If real: implement the Express handler in server/** reusing an adjacent handler pattern, with input validation + typed body + error handling.",
-              "If artifact: fix the frontend call (correct the constructed URL); no backend change.",
-              "Add a test (request → expected status/shape) and register the route at the choke-point."
-            ],
-            "verify": "New route returns the expected status for valid + invalid input; test green; no 404 for the real call."
-          }
-        },
-        {
-          "gap": {
-            "kind": "stub",
-            "title": "Unfinished marker in `orchestration/bin/completion-scan.ts`",
-            "evidence": "TODO/FIXME/not-implemented found in file",
-            "severity": "P2",
-            "ownerStream": "typescript-core",
-            "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-          },
-          "recipe": {
-            "approach": "Read the marker context first — some are grep-arg false positives (the literal word TODO in code).",
-            "steps": [
-              "Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?",
-              "If real: implement the flagged logic, smallest correct change, with a test.",
-              "If false positive: no action (the scanner honestly flags it as 'found in file')."
-            ],
-            "verify": "Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic."
-          }
-        },
-        {
-          "gap": {
-            "kind": "stub",
-            "title": "Unfinished marker in `orchestration/bin/dod.ts`",
-            "evidence": "TODO/FIXME/not-implemented found in file",
-            "severity": "P2",
-            "ownerStream": "typescript-core",
-            "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-          },
-          "recipe": {
-            "approach": "Read the marker context first — some are grep-arg false positives (the literal word TODO in code).",
-            "steps": [
-              "Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?",
-              "If real: implement the flagged logic, smallest correct change, with a test.",
-              "If false positive: no action (the scanner honestly flags it as 'found in file')."
-            ],
-            "verify": "Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic."
-          }
-        },
-        {
-          "gap": {
-            "kind": "stub",
-            "title": "Unfinished marker in `orchestration/bin/lib/dod.ts`",
-            "evidence": "TODO/FIXME/not-implemented found in file",
-            "severity": "P2",
-            "ownerStream": "typescript-core",
-            "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-          },
-          "recipe": {
-            "approach": "Read the marker context first — some are grep-arg false positives (the literal word TODO in code).",
-            "steps": [
-              "Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?",
-              "If real: implement the flagged logic, smallest correct change, with a test.",
-              "If false positive: no action (the scanner honestly flags it as 'found in file')."
-            ],
-            "verify": "Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic."
-          }
-        },
-        {
-          "gap": {
-            "kind": "stub",
-            "title": "Unfinished marker in `orchestration/bin/lib/completion.ts`",
-            "evidence": "TODO/FIXME/not-implemented found in file",
-            "severity": "P2",
-            "ownerStream": "typescript-core",
-            "justification": "An explicit TODO/stub marks incomplete logic the author flagged."
-          },
-          "recipe": {
-            "approach": "Read the marker context first — some are grep-arg false positives (the literal word TODO in code).",
-            "steps": [
-              "Open the file at the marker: is it real unfinished logic or an incidental occurrence of TODO/FIXME?",
-              "If real: implement the flagged logic, smallest correct change, with a test.",
-              "If false positive: no action (the scanner honestly flags it as 'found in file')."
-            ],
-            "verify": "Marker resolved (implemented + tested) or confirmed a false positive; no dangling unfinished logic."
-          }
-        },
         {
           "gap": {
             "kind": "sparse-folder",
@@ -340,7 +204,7 @@
           }
         }
       ],
-      "p1": 3
+      "p1": 0
     },
     {
       "order": 3,
