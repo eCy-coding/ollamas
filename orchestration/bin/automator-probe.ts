@@ -29,6 +29,10 @@ import {
   providerFor, classifyAutomatorRun, renderAutomatorProbe, classifyDailyRun, renderDailyProbe,
   sanitizeModelDir, type AutomatorRow, type DailyRow, type FileContent,
 } from "./lib/automator-probe";
+import {
+  pendingModels, applyRound, isLoopConverged, shouldContinueLoop, renderAutomatorLoop,
+  type AutomatorLoopRound,
+} from "./lib/automator-loop";
 import type { DispatchReport } from "./lib/chrome-probe";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -44,9 +48,13 @@ const STEPS = flag("--steps", "6")!;
 const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const TIMEOUT_MS = Number(process.env.AUTOMATOR_PROBE_TIMEOUT_MS || "150000");
 
-// --task support (default, vO35): general Automator artifacts. --task daily (vO36): DAILY recurring
-// automations (launchd scheduled / Calendar Alarm) whose recurrence is verified by reading file content.
-const MODE = (flag("--task", "support") || "support").toLowerCase();
+// --loop (vO37): wrap the daily probe in a bounded convergence loop (implies --task daily). --task support
+// (default, vO35): general Automator artifacts. --task daily (vO36): DAILY recurring automations (launchd
+// scheduled / Calendar Alarm) whose recurrence is verified by reading file content.
+const LOOP = argv.includes("--loop");
+const MAX_ROUNDS = Number(flag("--rounds", "3"));
+const MAX_DRY = Number(flag("--max-dry", "1"));
+const MODE = LOOP ? "daily" : (flag("--task", "support") || "support").toLowerCase();
 const DAILY = MODE === "daily";
 const ARTIFACT_ROOT = join(homedir(), "Desktop", DAILY ? "ollamas-daily" : "ollamas-automator");
 
@@ -103,12 +111,12 @@ function nowIso(): string {
 }
 
 /** One sequential dispatch → parsed --json report. Never throws (a failed dispatch = an INCOMPLETE run). */
-function dispatchModel(model: string, rootDir: string): DispatchReport {
+function dispatchModel(model: string, rootDir: string, steps: string = STEPS): DispatchReport {
   const provider = providerFor(model);
   try {
     const out = execFileSync(
       "node",
-      [DISPATCH, taskFor(rootDir), "--model", model, "--provider", provider, "--root", rootDir, "--steps", STEPS, "--json"],
+      [DISPATCH, taskFor(rootDir), "--model", model, "--provider", provider, "--root", rootDir, "--steps", steps, "--json"],
       { encoding: "utf8", timeout: TIMEOUT_MS, env: { ...process.env, OLLAMAS_URL }, maxBuffer: 8 * 1024 * 1024 }
     );
     return JSON.parse(out) as DispatchReport;
@@ -159,9 +167,64 @@ function main(): void {
   }
 
   if (DRY) {
-    console.log(`automator-probe (dry) — ${models.length} model, sıralı. Root: ${ARTIFACT_ROOT}  Server: ${OLLAMAS_URL}`);
+    console.log(`automator-probe (dry) — task=${MODE}${LOOP ? " --loop" : ""} — ${models.length} model, sıralı. Root: ${ARTIFACT_ROOT}  Server: ${OLLAMAS_URL}`);
     for (const m of models) console.log(`  → ${m}  [${providerFor(m)}]  → ${join(ARTIFACT_ROOT, sanitizeModelDir(m))}`);
     console.log(`\nGörev örneği:\n${taskFor(join(ARTIFACT_ROOT, "<model>"))}`);
+    return;
+  }
+
+  if (LOOP) {
+    // A single daily run for one model: dispatch → scan → classify (reads the accumulated dir state, so a
+    // retry that adds the missing plist is reflected). Reused every round.
+    const runModel = (model: string, steps: number): DailyRow => {
+      const dir = join(ARTIFACT_ROOT, sanitizeModelDir(model));
+      mkdirSync(dir, { recursive: true });
+      const report = dispatchModel(model, dir, String(steps));
+      const files = readContents(dir, scanArtifacts(dir));
+      const row = classifyDailyRun(model, report, files);
+      process.stderr.write(`[automator-loop]     ${model.padEnd(24)} ${row.scheduled ? `♻️ recurring(${row.mechanism})` : row.produced ? "one-off" : "nothing"}\n`);
+      return row;
+    };
+
+    const summaries: AutomatorLoopRound[] = [];
+    const baseSteps = Number(STEPS);
+
+    // hesapla/planla/kodla — round 1: dispatch ALL models.
+    process.stderr.write(`[automator-loop] round 1 — ${models.length} model (steps ${baseSteps})\n`);
+    let rows: DailyRow[] = models.map((m) => runModel(m, baseSteps));
+    let recurring = rows.filter((r) => r.scheduled).length;
+    let pend = pendingModels(rows);
+    let dryRounds = 0;
+    let round = 1;
+    summaries.push({ round, targets: models.length, steps: baseSteps, recurring, newRecurring: recurring, pending: pend.length });
+
+    // rounds 2+: recompute pending (hesapla), retry-set with a bigger step budget (planla), re-dispatch (kodla).
+    while (shouldContinueLoop(round, MAX_ROUNDS, pend.length, dryRounds, MAX_DRY)) {
+      round++;
+      const steps = baseSteps + (round - 1) * 2;
+      process.stderr.write(`[automator-loop] round ${round} — retry ${pend.length} pending (steps ${steps})\n`);
+      const roundRows = pend.map((m) => runModel(m, steps));
+      rows = applyRound(rows, roundRows);
+      const now = rows.filter((r) => r.scheduled).length;
+      const newRecurring = now - recurring;
+      dryRounds = newRecurring > 0 ? 0 : dryRounds + 1;
+      recurring = now;
+      pend = pendingModels(rows);
+      summaries.push({ round, targets: roundRows.length, steps, recurring, newRecurring, pending: pend.length });
+    }
+
+    writeFileSync(join(ORCH_DIR, "AUTOMATOR_LOOP.md"), renderAutomatorLoop(summaries, rows, MAX_ROUNDS, ts) + "\n");
+    writeFileSync(join(ORCH_DIR, "AUTOMATOR_LOOP.json"), JSON.stringify({ ts, url: OLLAMAS_URL, root: ARTIFACT_ROOT, rounds: summaries, rows }, null, 2) + "\n");
+    writeFileSync(join(ORCH_DIR, "AUTOMATOR_DAILY.md"), renderDailyProbe(rows, ts) + "\n");
+
+    if (JSON_OUT) { console.log(JSON.stringify({ ts, rounds: summaries, rows })); return; }
+
+    const converged = isLoopConverged(rows);
+    console.log(`\nAUTOMATOR LOOP — ${converged ? "CONVERGED ✅" : `NOT CONVERGED (${summaries.length} round)`} · ${recurring}/${rows.length} recurring:`);
+    for (const s of summaries) console.log(`  round ${s.round}: ${s.targets} dispatched (steps ${s.steps}) → +${s.newRecurring} new → ${s.recurring}/${rows.length} recurring, ${s.pending} pending`);
+    console.log(`\nRecurring üretenler: ${rows.filter((r) => r.scheduled).map((r) => r.model).join(", ") || "(yok)"}`);
+    if (pend.length) console.log(`Hâlâ pending (dürüst, cap sonrası): ${pend.join(", ")}`);
+    console.log(`Takip: orchestration/AUTOMATOR_LOOP.md  ·  artefaktlar: ${ARTIFACT_ROOT}/<model>/ (kurulmadı — sadece üretildi)`);
     return;
   }
 

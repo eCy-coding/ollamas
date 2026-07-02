@@ -1,3 +1,22 @@
+# AUTOMATOR_LOOP.md — daily-automation convergence loop (auto-generated)
+
+> Auto: `tsx orchestration/bin/automator-probe.ts --loop` · 2026-07-02T09:00:08Z. Each round COMPUTES the pending
+> (non-recurring) models, PLANS a retry-set with a bigger step budget, and re-dispatches only those to
+> CODE the missing daily automation. Stops on convergence or after 3 rounds / a dry round
+> (bounded — sustainable ≠ unstoppable). "Recurring" = a real launchd/cron/Calendar schedule.
+
+## Verdict: NOT CONVERGED after 3 round(s) — 11/17 recurring
+
+## Rounds (hesapla → planla → kodla)
+- round 1: dispatched 17 (steps 6) → +10 new recurring · 10/17 total · 7 pending
+- round 2: dispatched 7 (steps 8) → +1 new recurring · 11/17 total · 6 pending
+- round 3: dispatched 6 (steps 10) → +0 new recurring · 11/17 total · 6 pending
+
+## Remaining (honest — no infinite loop)
+- 6 model(s) never produced a recurring automation within 3 rounds: `qwen3-coder-64k:latest`, `deepseek-r1:32b`, `qwen3-coder:30b`, `qwen3:4b`, `kimi-k2.5:cloud`, `llama3.3:70b`
+
+## Final per-model state
+
 # AUTOMATOR_DAILY.md — "produce DAILY, sustainable, recurring automations" tracking (auto-generated)
 
 > Auto: `tsx orchestration/bin/automator-probe.ts --task daily` · 2026-07-02T09:00:08Z. Each model was handed the SAME
