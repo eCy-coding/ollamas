@@ -13,24 +13,15 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildFleetPlan, assertMaxTwo, STREAMS } from "./lib/fleet-plan";
-import { buildMission, renderMission, type AssignmentLike } from "./lib/mission";
+import { buildMission, renderMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const JSON_OUT = process.argv.includes("--json");
 
-// Explicit dependency DAG (evidence: fleet-plan.ts STREAMS CODE_PLAN priority + the operator's tab order
-// TS-primary → mjs→TS → shell-harden). Foundation first: harden the shell, migrate .mjs→.ts to establish
-// the TS base, then build new TS logic on it, then the resilience/concurrency concerns, then verify with
-// test-coverage last. Each stream lists the streams that must complete BEFORE it.
-const DEPS: Record<string, string[]> = {
-  "shell-harden": [],                                   // foundation: safe env/exit-code first
-  "mjs-migration": ["shell-harden"],                    // establish the TS base on hardened scripts
-  "typescript-core": ["mjs-migration"],                 // all new logic sits on the migrated TS base
-  "errors-resilience": ["typescript-core"],             // resilience layered onto the core
-  "concurrency-safety": ["typescript-core"],            // concurrency layered onto the core
-  "test-coverage": ["errors-resilience", "concurrency-safety"], // verify everything last
-};
+// The canonical CODE_PLAN dependency DAG now lives in lib/mission.ts (DEFAULT_DEPS) so the fleet
+// sequenced-launch order reuses the exact same ethical sequence — single source of truth.
+const DEPS = DEFAULT_DEPS;
 
 /** Local models available (best-effort via `ollama list`); cloud tags always allowed. Falls back to the
  *  union of all streams' preferences so the mission is still computable offline (never empty). */

@@ -23,11 +23,14 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { buildFleetPlan, assertMaxTwo, STREAMS, type FleetPlan, type Assignment } from "./lib/fleet-plan";
+import { buildMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
+import { orderSlotsByMission, type OrderedSlot } from "./lib/fleet-order";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const REPO = join(ORCH_DIR, "..");
 const GO = process.argv.includes("--go");
+const SEQUENCED = process.argv.includes("--sequenced");
 const CLOUD_ONLY = process.argv.includes("--cloud-only");
 const streamsArg = (() => { const i = process.argv.indexOf("--streams"); return i >= 0 ? (process.argv[i + 1] ?? "").split(",").filter(Boolean) : null; })();
 const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
@@ -134,23 +137,35 @@ function main(): void {
   if (streamsArg) slots = slots.filter((a) => streamsArg.includes(a.stream));
   if (CLOUD_ONLY) slots = slots.filter((a) => a.runtime === "cloud");
 
-  for (const a of slots) writeWrapper(a); // keep one-shot wrappers on disk for fleet-conduct re-dispatch compat
+  // --sequenced: order the tabs by the sequenced ethical MISSION (T1→Tn dependency order, tier-annotated)
+  // so the live fleet opens foundation-first instead of arbitrarily. Backward-compatible: without the flag
+  // the launch order is unchanged. Each launch line carries its T#/tier so the operator sees the sequence.
+  let launch: { a: Assignment; label: string }[] = slots.map((a) => ({ a, label: "" }));
+  if (SEQUENCED) {
+    const assignLike: AssignmentLike[] = plan.assignments.map((a) => ({ stream: a.stream, concern: a.concern, model: a.model }));
+    const mission = buildMission(assignLike, new Map(Object.entries(DEFAULT_DEPS)));
+    const ordered: OrderedSlot<Assignment>[] = orderSlotsByMission(slots, mission);
+    launch = ordered.map((o) => ({ a: o.slot, label: `T${o.missionOrder}·${o.tier || "?"}` }));
+  }
+
+  for (const { a } of launch) writeWrapper(a); // keep one-shot wrappers on disk for fleet-conduct re-dispatch compat
 
   mkdirSync(ORCH_DIR, { recursive: true });
-  writeFileSync(join(ORCH_DIR, "FLEET_PLAN.json"), JSON.stringify({ ts: new Date().toISOString().slice(0, 19) + "Z", plan }, null, 2) + "\n");
+  writeFileSync(join(ORCH_DIR, "FLEET_PLAN.json"), JSON.stringify({ ts: new Date().toISOString().slice(0, 19) + "Z", sequenced: SEQUENCED, plan }, null, 2) + "\n");
   writeFileSync(join(ORCH_DIR, "FLEET_PLAN.md"), renderPlanMd(plan) + "\n");
 
-  console.log(`🛰  fleet-launch [${GO ? "GO" : "dry-run"}] · ${slots.length} slot · local ${plan.localSlots}/cloud ${plan.cloudSlots} · ≤2/model ${plan.maxTwoOk ? "✅" : "❌"}`);
+  console.log(`🛰  fleet-launch [${GO ? "GO" : "dry-run"}]${SEQUENCED ? " [sequenced T1→Tn]" : ""} · ${launch.length} slot · local ${plan.localSlots}/cloud ${plan.cloudSlots} · ≤2/model ${plan.maxTwoOk ? "✅" : "❌"}`);
   const tsx = join(REPO, "node_modules", ".bin", "tsx");
-  for (const a of slots) {
+  for (const { a, label } of launch) {
+    const tag = label ? `${label} ` : "";
     // each tab runs the PERSISTENT living agent (not the one-shot wrapper) so it stays open + followable;
     // trailing `exec $SHELL` guarantees the tab survives even if the agent ever returns.
     const cmd = `cd ${REPO} && ${tsx} orchestration/bin/fleet-agent.ts ${a.stream} ${a.slot}; exec $SHELL`;
-    if (!GO) { console.log(`  [dry] ${a.app} · ${a.stream} · ${a.model} (${a.runtime}) → fleet-agent ${a.stream} ${a.slot}`); continue; }
-    try { openTab(a.app, cmd); console.log(`  ▶ opened ${a.app} · ${a.stream} · ${a.model} (persistent agent)`); }
+    if (!GO) { console.log(`  [dry] ${tag}${a.app} · ${a.stream} · ${a.model} (${a.runtime}) → fleet-agent ${a.stream} ${a.slot}`); continue; }
+    try { openTab(a.app, cmd); console.log(`  ▶ opened ${tag}${a.app} · ${a.stream} · ${a.model} (persistent agent)`); }
     catch (e: any) { console.error(`  ✗ ${a.app} ${a.stream}: ${(e?.message ?? "osascript hata").slice(0, 60)}`); }
   }
-  if (!GO) console.log(`\nDry-run. Gerçek aç: --go [--cloud-only] [--streams a,b]. Kondüktör: tsx orchestration/bin/fleet-conduct.ts`);
+  if (!GO) console.log(`\nDry-run. Gerçek aç: --go [--sequenced] [--cloud-only] [--streams a,b]. Kondüktör: tsx orchestration/bin/fleet-conduct.ts`);
 }
 
 main();

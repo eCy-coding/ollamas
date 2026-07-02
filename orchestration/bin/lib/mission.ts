@@ -13,6 +13,18 @@
 // only ever reach "safe" (read + new file, no existing-code edit) or "host" (propose a patch, gated apply).
 export type EthicalTier = "safe" | "host";
 
+// The canonical CODE_PLAN dependency DAG (foundation first). Shared by the mission CLI and the fleet
+// sequenced-launch order so both order streams by the SAME ethical sequence. Each stream lists the
+// streams that must complete BEFORE it (evidence: fleet-plan CODE_PLAN priority + operator's tab order).
+export const DEFAULT_DEPS: Record<string, string[]> = {
+  "shell-harden": [],                                            // foundation: safe env/exit-code first
+  "mjs-migration": ["shell-harden"],                             // establish the TS base on hardened scripts
+  "typescript-core": ["mjs-migration"],                          // all new logic sits on the migrated TS base
+  "errors-resilience": ["typescript-core"],                      // resilience layered onto the core
+  "concurrency-safety": ["typescript-core"],                     // concurrency layered onto the core
+  "test-coverage": ["errors-resilience", "concurrency-safety"],  // verify everything last
+};
+
 export interface MissionStep {
   order: number;             // T1..Tn (1-based) after topological sort
   stream: string;
