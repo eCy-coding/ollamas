@@ -1,0 +1,116 @@
+{
+  "ts": "2026-07-02T13:06:58Z",
+  "winner": {
+    "model": "ollamas-reviewer:latest",
+    "score": 25,
+    "validation": {
+      "ok": true,
+      "plist": "OK",
+      "script": "OK",
+      "detail": "plist OK · script OK"
+    }
+  },
+  "ranked": [
+    {
+      "model": "ollamas-reviewer:latest",
+      "score": 25,
+      "mechanism": "launchd",
+      "kinds": [
+        "other",
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen2.5vl:32b",
+      "score": 25,
+      "mechanism": "launchd",
+      "kinds": [
+        "other",
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen3:8b-16k",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen2.5vl:7b",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen3:8b",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen3:30b-a3b",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "phi4:latest",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "gpt-oss:20b-cloud",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "qwen3-coder:480b-cloud",
+      "score": 24,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "readme",
+        "shell"
+      ]
+    },
+    {
+      "model": "gpt-oss:120b-cloud",
+      "score": 21,
+      "mechanism": "launchd",
+      "kinds": [
+        "plist",
+        "shell"
+      ]
+    }
+  ]
+}
