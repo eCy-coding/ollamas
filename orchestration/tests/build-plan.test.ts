@@ -32,6 +32,11 @@ describe("RECIPE — a fast/safe/correct recipe per gap kind", () => {
   it("route-unused never removes without confirming a consumer", () => {
     expect(RECIPE["route-unused"].verify).toMatch(/never removed without|confirm/i);
   });
+  it("language-migration is in-place @ts-check (not a runtime-breaking rename of node entry-points)", () => {
+    expect(RECIPE["language-migration"].approach).toMatch(/in-place|@ts-check|node-executed/i);
+    expect(RECIPE["language-migration"].steps.join(" ")).toMatch(/@ts-check/);
+    expect(RECIPE["language-migration"].steps.join(" ")).toMatch(/do not rename|not rename/i);
+  });
 });
 
 describe("buildPlan — sectioned + dependency-ordered + severity-sorted", () => {

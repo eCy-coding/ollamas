@@ -1,6 +1,6 @@
 # BUILD_PLAN.md — how to build the missing code, step by step (auto-generated)
 
-> Auto: `tsx orchestration/bin/build-plan.ts` · 2026-07-02T14:19:51Z. Turns COMPLETION_GAPS into an ordered build plan:
+> Auto: `tsx orchestration/bin/build-plan.ts` · 2026-07-02T14:34:24Z. Turns COMPLETION_GAPS into an ordered build plan:
 > phases run in fleet-stream dependency order (foundation first), gaps within a phase by severity, each
 > with a fast / safe / correct recipe. Fastest = reuse adjacent patterns + batch; Safest = verify-before-touch,
 > behavior-preserving, test-first; Correct = typed + gated each step. This is a PLAN — it builds nothing.
@@ -15,12 +15,12 @@
 ### T1.1 · [P1] 98 .mjs files still to migrate to TypeScript
 - **Why:** TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts.
 - **Evidence:** git ls-files '*.mjs' = 98; concentrated in scripts (31), bin/host-bridge/tools (19), bin/host-bridge (12)
-- **Approach (fast/safe/correct):** Incremental, behavior-preserving .mjs → .ts migration — never a big-bang rewrite.
-  1. Batch by directory, smallest/leaf first (scripts → bin/host-bridge/lib → tools).
-  2. Per file: rename .mjs → .ts, add explicit param/return types, keep the runtime IDENTICAL (no logic change).
-  3. Update the importers' extension + any build/register manifest.
-  4. Gate each file: `tsc --noEmit` clean + the file's existing test still green before moving on.
-- **Verify:** tsc --noEmit 0 + full test suite green after each directory batch; zero behavior diff.
+- **Approach (fast/safe/correct):** IN-PLACE type-safety first — most .mjs are node-executed entry-points (`node x.mjs`), so a rename would break the zero-build runtime. Add types without renaming; only truly tsx-imported .mjs may later rename.
+  1. Per file (batch by directory, leaf first): add `// @ts-check` at the top + JSDoc `@param`/`@returns` on functions — comments/types ONLY, runtime logic IDENTICAL, the file keeps running under `node`.
+  2. Gate: `tsc -p scripts/tsconfig.json --noEmit` clean (the file is now type-checked in place) + its test / the full suite still green.
+  3. Do NOT rename a shebang/`node x.mjs` entry-point to .ts (node can't run .ts without tsx/build — it breaks the invocation).
+  4. Only after in-place type-safety, a .mjs that is IMPORTED by tsx (never node-executed) MAY be renamed .ts + its importers updated + re-gated.
+- **Verify:** tsc -p scripts/tsconfig.json 0 + full suite green + the .mjs still runs under `node` (zero behavior diff, no broken invocation).
 
 ## T2 — Section: `typescript-core`
 

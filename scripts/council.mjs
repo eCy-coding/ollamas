@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/council.mjs — open a NEW Terminal.app window and run the live council debate inside it
 // (so the operator SEES the local models argue interactively). Zero-dep.
 //
@@ -17,6 +18,7 @@ const here = argv.includes("--here");
 const passed = argv.filter((a) => a !== "--here");
 
 // POSIX single-quote a string for embedding in a shell command.
+/** @param {string} s @returns {string} */
 function shq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 
 function runInline() {

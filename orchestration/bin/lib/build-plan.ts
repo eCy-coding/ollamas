@@ -23,14 +23,14 @@ export interface Recipe { approach: string; steps: string[]; verify: string }
 // false-positive-aware (verify route/stub reality before implementing; never fabricate for a placeholder).
 export const RECIPE: Record<GapKind, Recipe> = {
   "language-migration": {
-    approach: "Incremental, behavior-preserving .mjs → .ts migration — never a big-bang rewrite.",
+    approach: "IN-PLACE type-safety first — most .mjs are node-executed entry-points (`node x.mjs`), so a rename would break the zero-build runtime. Add types without renaming; only truly tsx-imported .mjs may later rename.",
     steps: [
-      "Batch by directory, smallest/leaf first (scripts → bin/host-bridge/lib → tools).",
-      "Per file: rename .mjs → .ts, add explicit param/return types, keep the runtime IDENTICAL (no logic change).",
-      "Update the importers' extension + any build/register manifest.",
-      "Gate each file: `tsc --noEmit` clean + the file's existing test still green before moving on.",
+      "Per file (batch by directory, leaf first): add `// @ts-check` at the top + JSDoc `@param`/`@returns` on functions — comments/types ONLY, runtime logic IDENTICAL, the file keeps running under `node`.",
+      "Gate: `tsc -p scripts/tsconfig.json --noEmit` clean (the file is now type-checked in place) + its test / the full suite still green.",
+      "Do NOT rename a shebang/`node x.mjs` entry-point to .ts (node can't run .ts without tsx/build — it breaks the invocation).",
+      "Only after in-place type-safety, a .mjs that is IMPORTED by tsx (never node-executed) MAY be renamed .ts + its importers updated + re-gated.",
     ],
-    verify: "tsc --noEmit 0 + full test suite green after each directory batch; zero behavior diff.",
+    verify: "tsc -p scripts/tsconfig.json 0 + full suite green + the .mjs still runs under `node` (zero behavior diff, no broken invocation).",
   },
   "route-missing": {
     approach: "Verify the call is REAL before implementing — some are URL-concat regex artifacts.",
