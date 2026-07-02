@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -21,11 +21,13 @@ export function GmailBrowser() {
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enableUrl, setEnableUrl] = useState<string | null>(null);
 
-  const fetchInbox = useCallback(async () => {
+  const fetchInbox = async () => {
     if (!token) return;
     setBusy(true);
     setError(null);
+    setEnableUrl(null);
     try {
       const auth = { Authorization: `Bearer ${token}` };
       const list = await fetch(
@@ -34,6 +36,14 @@ export function GmailBrowser() {
       );
       if (list.status === 401) { resetAuth("Google session expired. Please sign in again."); return; }
       if (list.status === 403) {
+        // Two distinct 403s: the API is disabled on the Google Cloud project
+        // (fix = enable it in the console, a one-time owner action), or the
+        // token lacks the scope (fix = re-consent). Surface the right action.
+        const body = await list.text();
+        if (/has not been used in project|it is disabled/.test(body)) {
+          setEnableUrl(body.match(/https:\/\/console\.developers\.google\.com\/apis\/api\/[^\s"\\]+/)?.[0] ?? null);
+          throw new Error("The Gmail API is disabled for this Google Cloud project. Enable it via the link below, wait a few minutes, then hit Refresh.");
+        }
         throw new Error("Gmail access not granted (403). Sign out and sign in again, approving the Gmail permission.");
       }
       if (!list.ok) throw new Error(`Failed to list inbox (${list.status}).`);
@@ -61,9 +71,14 @@ export function GmailBrowser() {
     } finally {
       setBusy(false);
     }
-  }, [token, resetAuth]);
+  };
 
-  useEffect(() => { fetchInbox(); }, [fetchInbox]);
+  // Fetch on token changes only (GoogleDriveBrowser idiom). Depending on the
+  // fetch function itself loops: useAuth() returns fresh callbacks every render.
+  useEffect(() => {
+    if (token) fetchInbox();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (isConfigured === false) {
     return (
@@ -116,6 +131,17 @@ export function GmailBrowser() {
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-status-err text-xs p-3 rounded font-mono mb-4">
           Error: {error}
+          {enableUrl && (
+            <a
+              href={enableUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 text-status-accent underline flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Enable the Gmail API
+            </a>
+          )}
         </div>
       )}
 

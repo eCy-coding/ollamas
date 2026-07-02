@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -28,11 +28,13 @@ export function GoogleCalendarBrowser() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enableUrl, setEnableUrl] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = async () => {
     if (!token) return;
     setBusy(true);
     setError(null);
+    setEnableUrl(null);
     try {
       const params = new URLSearchParams({
         maxResults: "20",
@@ -46,6 +48,14 @@ export function GoogleCalendarBrowser() {
       );
       if (res.status === 401) { resetAuth("Google session expired. Please sign in again."); return; }
       if (res.status === 403) {
+        // Two distinct 403s: the API is disabled on the Google Cloud project
+        // (fix = enable it in the console, a one-time owner action), or the
+        // token lacks the scope (fix = re-consent). Surface the right action.
+        const body = await res.text();
+        if (/has not been used in project|it is disabled/.test(body)) {
+          setEnableUrl(body.match(/https:\/\/console\.developers\.google\.com\/apis\/api\/[^\s"\\]+/)?.[0] ?? null);
+          throw new Error("The Google Calendar API is disabled for this Google Cloud project. Enable it via the link below, wait a few minutes, then hit Refresh.");
+        }
         throw new Error("Calendar access not granted (403). Sign out and sign in again, approving the Calendar permission.");
       }
       if (!res.ok) throw new Error(`Failed to load events (${res.status}).`);
@@ -56,9 +66,14 @@ export function GoogleCalendarBrowser() {
     } finally {
       setBusy(false);
     }
-  }, [token, resetAuth]);
+  };
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  // Fetch on token changes only (GoogleDriveBrowser idiom). Depending on the
+  // fetch function itself loops: useAuth() returns fresh callbacks every render.
+  useEffect(() => {
+    if (token) fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (isConfigured === false) {
     return (
@@ -111,6 +126,17 @@ export function GoogleCalendarBrowser() {
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-status-err text-xs p-3 rounded font-mono mb-4">
           Error: {error}
+          {enableUrl && (
+            <a
+              href={enableUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 text-status-accent underline flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Enable the Google Calendar API
+            </a>
+          )}
         </div>
       )}
 
