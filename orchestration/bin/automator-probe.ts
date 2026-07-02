@@ -20,19 +20,21 @@
  * Run:  tsx orchestration/bin/automator-probe.ts [--models a,b] [--steps 6] [--dry] [--json]
  * Env:  OLLAMAS_URL (default http://127.0.0.1:3000), AUTOMATOR_PROBE_TIMEOUT_MS (default 150000).
  */
-import { writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readdirSync, existsSync, readFileSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname, relative } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { providerFor, classifyAutomatorRun, renderAutomatorProbe, sanitizeModelDir, type AutomatorRow } from "./lib/automator-probe";
+import {
+  providerFor, classifyAutomatorRun, renderAutomatorProbe, classifyDailyRun, renderDailyProbe,
+  sanitizeModelDir, type AutomatorRow, type DailyRow, type FileContent,
+} from "./lib/automator-probe";
 import type { DispatchReport } from "./lib/chrome-probe";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const REPO = join(ORCH_DIR, "..");
 const DISPATCH = join(REPO, "scripts", "agent-dispatch.mjs");
-const ARTIFACT_ROOT = join(homedir(), "Desktop", "ollamas-automator");
 
 const argv = process.argv.slice(2);
 const flag = (name: string, def?: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : def; };
@@ -42,9 +44,33 @@ const STEPS = flag("--steps", "6")!;
 const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const TIMEOUT_MS = Number(process.env.AUTOMATOR_PROBE_TIMEOUT_MS || "150000");
 
+// --task support (default, vO35): general Automator artifacts. --task daily (vO36): DAILY recurring
+// automations (launchd scheduled / Calendar Alarm) whose recurrence is verified by reading file content.
+const MODE = (flag("--task", "support") || "support").toLowerCase();
+const DAILY = MODE === "daily";
+const ARTIFACT_ROOT = join(homedir(), "Desktop", DAILY ? "ollamas-daily" : "ollamas-automator");
+
 const SKIP = /embed|nomic/i; // embedding models can't drive a tool loop
 
 function taskFor(rootDir: string): string {
+  if (DAILY) {
+    return [
+      "Author a DAILY, RECURRING, SUSTAINABLE macOS automation that makes daily ollamas dev work easier, in this directory:",
+      `  ${rootDir}`,
+      "Write REAL files there using the write_host_file tool (reliable for multi-line content).",
+      "It MUST be recurring/scheduled, not a one-off. Produce:",
+      "  • a launchd LaunchAgent plist named com.ollamas.<job>.daily.plist with a StartCalendarInterval (e.g. Hour 9, Minute 0)",
+      "    — or a StartInterval — that runs your maintenance script on a schedule (label like com.ollamas.daily-health),",
+      "  • the maintenance script it runs — pick a useful daily job: morning start the server (make up) + warm the model",
+      "    + open the cockpit at http://127.0.0.1:3000; OR a daily health-check (curl http://127.0.0.1:3000/api/health",
+      "    + npm run doctor) that shows an osascript notification; OR a daily benchmark that appends a tok/s log,",
+      "  • a README.md with the exact `launchctl load ~/Library/LaunchAgents/...` install step (or how to import it as an",
+      "    Automator Calendar Alarm). Make the job idempotent and safe to run every day.",
+      "Do NOT install or execute anything (no launchctl load, no running the job) — only WRITE the files.",
+      "After writing, list each file you created on its own line with a one-line description.",
+      "End with:  VERDICT: DONE <comma-separated filenames>",
+    ].join("\n");
+  }
   return [
     "Author macOS Automator-compatible artifacts that SUPPORT the ollamas project, in this directory:",
     `  ${rootDir}`,
@@ -111,6 +137,18 @@ function scanArtifacts(baseDir: string): string[] {
   return out;
 }
 
+/** Read each produced file's content (capped) so daily-mode can detect a recurring schedule. Skips
+ *  .workflow bundle dirs and any file >256KB (reads first 4KB — schedule keys sit near the top). */
+function readContents(baseDir: string, files: string[]): FileContent[] {
+  return files.map((name) => {
+    const abs = join(baseDir, name);
+    try {
+      if (statSync(abs).isDirectory()) return { name, content: "" }; // .workflow bundle
+      return { name, content: readFileSync(abs, "utf8").slice(0, 4096) };
+    } catch { return { name, content: "" }; }
+  });
+}
+
 function main(): void {
   const models = liveModels();
   const ts = nowIso();
@@ -124,6 +162,33 @@ function main(): void {
     console.log(`automator-probe (dry) — ${models.length} model, sıralı. Root: ${ARTIFACT_ROOT}  Server: ${OLLAMAS_URL}`);
     for (const m of models) console.log(`  → ${m}  [${providerFor(m)}]  → ${join(ARTIFACT_ROOT, sanitizeModelDir(m))}`);
     console.log(`\nGörev örneği:\n${taskFor(join(ARTIFACT_ROOT, "<model>"))}`);
+    return;
+  }
+
+  if (DAILY) {
+    const rows: DailyRow[] = [];
+    for (const model of models) {
+      const dir = join(ARTIFACT_ROOT, sanitizeModelDir(model));
+      mkdirSync(dir, { recursive: true });
+      process.stderr.write(`[automator-daily] → ${model} (${providerFor(model)}) → ${dir}\n`);
+      const report = dispatchModel(model, dir);
+      const files = readContents(dir, scanArtifacts(dir));
+      const row = classifyDailyRun(model, report, files);
+      rows.push(row);
+      process.stderr.write(`[automator-daily]   ${row.produced ? "✅ produced" : "❌ nothing"} ${row.fileCount} file(s) · ${row.scheduled ? `♻️ recurring(${row.mechanism})` : "one-off"}  verdict=${row.verdict}\n`);
+    }
+
+    writeFileSync(join(ORCH_DIR, "AUTOMATOR_DAILY.md"), renderDailyProbe(rows, ts) + "\n");
+    writeFileSync(join(ORCH_DIR, "AUTOMATOR_DAILY.json"), JSON.stringify({ ts, url: OLLAMAS_URL, root: ARTIFACT_ROOT, rows }, null, 2) + "\n");
+
+    if (JSON_OUT) { console.log(JSON.stringify({ ts, rows })); return; }
+
+    const prod = rows.filter((r) => r.produced);
+    const rec = rows.filter((r) => r.scheduled);
+    console.log(`\nAUTOMATOR DAILY — ${prod.length}/${rows.length} üretti · ${rec.length}/${rows.length} RECURRING (sıralı):`);
+    for (const r of rows) console.log(`  ${r.produced ? "✅" : "❌"} ${r.model.padEnd(26)} ${String(r.fileCount).padStart(2)} dosya  ${r.scheduled ? `♻️ ${r.mechanism}`.padEnd(14) : "one-off".padEnd(14)} ${r.verdict}`);
+    console.log(`\nArtefaktlar: ${ARTIFACT_ROOT}/<model>/  (kurulmadı — sadece üretildi)`);
+    console.log(`Takip: orchestration/AUTOMATOR_DAILY.md`);
     return;
   }
 

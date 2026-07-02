@@ -109,3 +109,89 @@ export function renderAutomatorProbe(rows: AutomatorRow[], ts: string): string {
   ];
   return L.join("\n");
 }
+
+// ── daily task (vO36): is the produced artifact actually a RECURRING/scheduled automation? ────────────
+//
+// "günlük sürdürebilir" = daily + sustainable = a RECURRING schedule, not a one-off script. The repo
+// standardizes on launchd (heartbeat.plist StartInterval, com.ollamas.* labels, KeepAlive) — no cron. So a
+// produced artifact counts as scheduled when its CONTENT carries a launchd schedule key, a cron entry, or
+// an Automator Calendar-Alarm marker. Detection reads file content (the CLI passes {name,content}).
+
+export type ScheduleMechanism = "launchd" | "calendar" | "cron" | "none";
+
+export interface FileContent { name: string; content: string }
+
+export interface ScheduleInfo { scheduled: boolean; mechanism: ScheduleMechanism; markers: string[] }
+
+const LAUNCHD_MARKERS = ["StartCalendarInterval", "StartInterval", "KeepAlive", "RunAtLoad"];
+const CALENDAR_MARKERS = ["Calendar Alarm", "com.apple.Automator", "iCalendar", "OnMyMac calendar"];
+const CRON_RE = /\bcrontab\b|(?:^|\n)\s*[\d*][\d*/,\s-]*\s+[\d*][\d*/,\s-]*\s+[\d*][\d*/,\s-]*\s+[\d*][\d*/,\s-]*\s+[\d*]/;
+
+/** Inspect produced files' content for a recurring-schedule signal. launchd > cron > calendar priority;
+ *  a launchd key only counts inside a .plist (RunAtLoad alone in a .sh is not a schedule). */
+export function detectSchedule(files: FileContent[]): ScheduleInfo {
+  const markers: string[] = [];
+  let launchd = false, cron = false, calendar = false;
+  for (const f of files ?? []) {
+    const c = f?.content ?? "";
+    const isPlist = /\.plist$/i.test(f?.name ?? "") || c.includes("<!DOCTYPE plist") || c.includes("<plist");
+    if (isPlist) {
+      for (const k of LAUNCHD_MARKERS) if (c.includes(k)) { launchd = true; markers.push(k); }
+    }
+    if (CRON_RE.test(c)) { cron = true; markers.push("cron"); }
+    for (const k of CALENDAR_MARKERS) if (c.includes(k)) { calendar = true; markers.push(k); }
+  }
+  const mechanism: ScheduleMechanism = launchd ? "launchd" : cron ? "cron" : calendar ? "calendar" : "none";
+  return { scheduled: mechanism !== "none", mechanism, markers: [...new Set(markers)] };
+}
+
+export interface DailyRow extends AutomatorRow {
+  scheduled: boolean;
+  mechanism: ScheduleMechanism;
+  markers: string[];
+}
+
+/** Classify a daily-mode run: the base produced/artifact tracking (by name) + a recurring-schedule verdict
+ *  from file CONTENT. `produced` still means ≥1 file; `scheduled` means it's actually recurring. */
+export function classifyDailyRun(model: string, report: DispatchReport, files: FileContent[]): DailyRow {
+  const base = classifyAutomatorRun(model, report, (files ?? []).map((f) => f.name));
+  const sched = detectSchedule(files ?? []);
+  return { ...base, scheduled: sched.scheduled, mechanism: sched.mechanism, markers: sched.markers };
+}
+
+/** Render the daily-automation matrix: who produced artifacts AND whose are actually recurring/scheduled. */
+export function renderDailyProbe(rows: DailyRow[], ts: string): string {
+  const producers = rows.filter((r) => r.produced);
+  const recurring = rows.filter((r) => r.scheduled);
+  const L: string[] = [
+    `# AUTOMATOR_DAILY.md — "produce DAILY, sustainable, recurring automations" tracking (auto-generated)`,
+    ``,
+    `> Auto: \`tsx orchestration/bin/automator-probe.ts --task daily\` · ${ts}. Each model was handed the SAME`,
+    `> task one-by-one (sequential; single-GPU truth): author a DAILY, RECURRING automation (launchd`,
+    `> \`StartCalendarInterval\` job / Automator Calendar Alarm) that eases daily ollamas dev work — morning`,
+    `> start+warm+cockpit, daily health-check+doctor+notify, daily benchmark log — into \`~/Desktop/ollamas-daily/<model>/\`.`,
+    `> "Produced" = wrote ≥1 file; "Recurring" = the content carries a real schedule (launchd/cron/calendar).`,
+    ``,
+    `## Result: ${producers.length}/${rows.length} produced · ${recurring.length}/${rows.length} actually RECURRING`,
+    ``,
+    `| # | Model | Provider | Produced | Files | Kinds | Recurring | Mechanism | Verdict |`,
+    `|---|-------|----------|----------|-------|-------|-----------|-----------|---------|`,
+    ...rows.map((r, i) =>
+      `| ${i + 1} | \`${r.model}\` | ${r.provider} | ${yn(r.produced)} | ${r.fileCount} | ${r.kinds.join(", ") || "—"} | ${r.scheduled ? "✅" : "—"} | ${r.mechanism} | ${r.verdict} |`
+    ),
+    ``,
+    `## What each model produced`,
+    ...rows.flatMap((r) =>
+      r.produced
+        ? [`- **\`${r.model}\`** (${r.fileCount}${r.scheduled ? `, recurring via ${r.mechanism}: ${r.markers.join("/")}` : ", one-off"}): ${r.artifacts.map((a) => `\`${a.name}\` [${a.kind}]`).join(", ")}`]
+        : [`- **\`${r.model}\`**: (nothing) — ${r.verdict}`]
+    ),
+    ``,
+    `## Ethics`,
+    `> Producing files is on the operator's OWN Mac and explicitly requested (the request IS the gate for the`,
+    `> privileged write tier). Writes are scoped to \`~/Desktop/ollamas-daily/<model>/\` (per-model). The daily`,
+    `> jobs are PRODUCED and tracked — NOT installed (\`launchctl load\`) or executed. Installing a recurring`,
+    `> job is the operator's explicit one-click decision. Bounded (per-model timeout, sequential).`,
+  ];
+  return L.join("\n");
+}
