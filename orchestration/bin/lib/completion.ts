@@ -16,6 +16,7 @@ export interface CensusInput {
   sparseDirs: { dir: string; count: number }[];   // top-level dirs with very few tracked files
   routeGap: { missing: string[]; unused: string[] }; // frontend /api calls with no backend route / unused routes
   centralTests: number;                           // test files under tests/ (repo keeps tests centralized)
+  mjsChecked: number;                             // .mjs already carrying `// @ts-check` (in-place migration progress)
 }
 
 export type Severity = "P1" | "P2" | "P3";
@@ -76,8 +77,8 @@ export function analyzeCompletion(c: CensusInput): Gap[] {
     const top = c.mjsByDir.slice(0, 3).map((d) => `${d.dir} (${d.count})`).join(", ");
     gaps.push({
       kind: "language-migration",
-      title: `${c.mjsTotal} .mjs files still to migrate to TypeScript`,
-      evidence: `git ls-files '*.mjs' = ${c.mjsTotal}; concentrated in ${top}`,
+      title: `${c.mjsTotal} .mjs files still to migrate to TypeScript (${c.mjsChecked} already \`@ts-check\`'d)`,
+      evidence: `git ls-files '*.mjs' = ${c.mjsTotal}; concentrated in ${top}; in-place @ts-check progress ${c.mjsChecked}/${c.mjsTotal}`,
       severity: c.mjsTotal > 50 ? "P1" : "P2",
       ownerStream: streamFor("language-migration"),
       justification: "TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts.",
@@ -168,7 +169,7 @@ export function renderCompletionReport(gaps: Gap[], c: CensusInput, ts: string):
     ...(c.sparseDirs.length ? c.sparseDirs.map((d) => `- \`${d.dir}\` — ${d.count} tracked file(s); likely a stub/unfinished lane or an intentional placeholder. Verify.`) : ["- (none)"]),
     ``,
     `## §D — Missing / under-migrated languages`,
-    `- **${c.mjsTotal} .mjs files still to migrate → TypeScript** (owner: \`mjs-migration\`).`,
+    `- **${c.mjsTotal} .mjs files still to migrate → TypeScript** (owner: \`mjs-migration\`; in-place \`@ts-check\` progress: **${c.mjsChecked}/${c.mjsTotal}**).`,
     ...c.mjsByDir.slice(0, 6).map((d) => `  - ${d.dir}: ${d.count}`),
     `  - Justification: TS-primary directive; .mjs bypasses \`tsc\` type-checking + shared type contracts.`,
     ``,

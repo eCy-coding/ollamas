@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Generates artifacts/manifest.json — the single discovery index for every
 // compiled native binary (artifacts/bin/), plus pointers to the JS bundles
 // (dist/) and the host-bridge tools (bin/host-bridge/tools). Run by
@@ -20,6 +21,7 @@ const BINARIES = [
   { name: "idle-daemon",           lang: "c",    src: "backend/daemon/idle_daemon.c",                  role: "CPU idle-time throttle monitor" },
 ];
 
+/** @param {string} p @returns {string} */
 const sha256 = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");
 
 const binaries = BINARIES.map((b) => {

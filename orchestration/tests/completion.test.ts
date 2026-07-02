@@ -10,6 +10,7 @@ const census = (over: Partial<CensusInput> = {}): CensusInput => ({
   sparseDirs: [],
   routeGap: { missing: [], unused: [] },
   centralTests: 144,
+  mjsChecked: 3,
   ...over,
 });
 
@@ -43,6 +44,11 @@ describe("analyzeCompletion — only provable gaps", () => {
     const gaps = analyzeCompletion(census({ sparseDirs: [{ dir: "client", count: 1 }], stubFiles: ["scripts/x.mjs"] }));
     expect(gaps.find((g) => g.kind === "sparse-folder")!.severity).toBe("P3");
     expect(gaps.find((g) => g.kind === "stub")!.severity).toBe("P2");
+  });
+  it("reports in-place @ts-check migration progress in the migration gap", () => {
+    const g = analyzeCompletion(census({ mjsTotal: 98, mjsChecked: 4 })).find((x) => x.kind === "language-migration")!;
+    expect(g.title).toContain("4 already");
+    expect(g.evidence).toContain("4/98");
   });
   it("no .mjs → no migration gap", () => {
     expect(analyzeCompletion(census({ mjsTotal: 0, mjsByDir: [] })).some((g) => g.kind === "language-migration")).toBe(false);

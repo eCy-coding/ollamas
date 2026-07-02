@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-02T14:19:51Z",
+  "ts": "2026-07-02T14:43:13Z",
   "census": {
     "langs": [
       {
@@ -20,7 +20,7 @@
       },
       {
         "ext": "tsx",
-        "count": 55
+        "count": 57
       },
       {
         "ext": "sh",
@@ -222,13 +222,14 @@
         "/api/saas/usage"
       ]
     },
-    "centralTests": 144
+    "centralTests": 144,
+    "mjsChecked": 4
   },
   "gaps": [
     {
       "kind": "language-migration",
-      "title": "98 .mjs files still to migrate to TypeScript",
-      "evidence": "git ls-files '*.mjs' = 98; concentrated in scripts (31), bin/host-bridge/tools (19), bin/host-bridge (12)",
+      "title": "98 .mjs files still to migrate to TypeScript (4 already `@ts-check`'d)",
+      "evidence": "git ls-files '*.mjs' = 98; concentrated in scripts (31), bin/host-bridge/tools (19), bin/host-bridge (12); in-place @ts-check progress 4/98",
       "severity": "P1",
       "ownerStream": "mjs-migration",
       "justification": "TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts."

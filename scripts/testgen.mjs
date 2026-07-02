@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // testgen — $0 test-generation (the ollama-FIT, verifiable, sustainable product).
 //
 // Evidence (this session): ollama models are ~100% at code-to-spec but LOW-yield at
@@ -8,10 +9,10 @@
 // Usage: node scripts/testgen.mjs --file <path> --fn <exportName> [--model qwen3:8b]
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { execFileSync } from "node:child_process";
 
 const A = process.argv.slice(2);
+/** @param {string} f @param {string} [d] @returns {string|undefined} */
 const opt = (f, d) => { const i = A.indexOf(f); return i >= 0 ? A[i + 1] : d; };
 const FILE = opt("--file"); const FN = opt("--fn"); const MODEL = opt("--model", "qwen3:8b");
 const OLLAMA = process.env.OLLAMA_HOST_LOCAL || "http://127.0.0.1:11434";
@@ -55,8 +56,8 @@ try {
   console.log(out.split("\n").filter((l) => /Test Files|Tests /.test(l)).join("\n"));
   console.log(pass ? `\n✅ PASS — shippable verified test (qwen3:8b, $0). Deliverable: ${testFile}` : "\n✗ generated test failed — regenerate (not shipped)");
   process.exit(pass ? 0 : 1);
-} catch (e) {
-  const out = (e.stdout || "") + (e.stderr || "");
+} catch (/** @type {any} */ e) {
+  const out = String(e?.stdout ?? "") + String(e?.stderr ?? "");
   console.log(out.split("\n").filter((l) => /Test Files|Tests |Error|FAIL/.test(l)).slice(0, 8).join("\n"));
   console.log("\n✗ generated test failed/errored — regenerate (auto-verify gate caught it → never ships broken)");
   process.exit(1);

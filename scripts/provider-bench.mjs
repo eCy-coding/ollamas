@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/provider-bench.mjs — head-to-head provider benchmark for the "which path is best"
 // decision (correctness → success-rate → latency). Repeatable; spends a little quota per cloud
 // path (capped reps). Read-only otherwise; no key handling.
@@ -12,17 +13,23 @@ const PROVIDERS = [
   { provider: "ollama-local", model: "qwen3:8b", note: "$0 local baseline" },
 ];
 
-/** Rank results by success-rate desc, then avg latency asc. Pure → unit-tested. */
+/** @typedef {{ provider: string, n: number, ok: number, avgMs: number, source?: string }} BenchRow */
+
+/** Rank results by success-rate desc, then avg latency asc. Pure → unit-tested.
+ *  @param {BenchRow[]} results @returns {BenchRow[]} */
 export function rankResults(results) {
   return [...results].sort((a, b) => (b.ok / b.n - a.ok / a.n) || (a.avgMs - b.avgMs));
 }
 
+/** @param {BenchRow} r @returns {string} */
 export function fmtRow(r) {
   const rate = `${r.ok}/${r.n}`;
   const avg = r.ok > 0 ? `${(r.avgMs / 1000).toFixed(2)}s` : "n/a";
   return `${r.provider.padEnd(13)} ${rate.padEnd(5)} ${avg.padEnd(8)} ${r.source || "-"}`;
 }
 
+/** @param {string} gateway @param {string} provider @param {string} model
+ *  @returns {Promise<{ ok: boolean, ms: number, source: string }>} */
 async function one(gateway, provider, model) {
   const t0 = Date.now();
   try {

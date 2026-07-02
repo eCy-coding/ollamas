@@ -43,6 +43,8 @@ function census(): CensusInput {
 
   const shCount = notVendored.filter((f) => f.endsWith(".sh")).length;
   const centralTests = notVendored.filter((f) => f.startsWith("tests/") && f.endsWith(".test.ts")).length;
+  // in-place migration progress: .mjs already carrying `// @ts-check` (type-safety without a risky rename).
+  const mjsChecked = mjs.filter((f) => { try { return /\/\/\s*@ts-check/.test(readFileSync(join(REPO, f), "utf8").slice(0, 200)); } catch { return false; } }).length;
 
   // stub markers — REAL code comments only (`// TODO`, `# FIXME:`), not the word inside a string/regex.
   // grep -rn (with line text) → keep files that have ≥1 line passing isRealMarkerLine. Exclude the detector
@@ -82,7 +84,7 @@ function census(): CensusInput {
   // drop proxy-served calls from "missing" (false positives), then cap the lists (surface count honestly).
   const routeGap = { missing: filterProxiedMissing(g.missing, proxyPrefixes).slice(0, 15), unused: g.unused.slice(0, 15) };
 
-  return { langs, mjsByDir, mjsTotal: mjs.length, shCount, stubFiles, sparseDirs, routeGap, centralTests };
+  return { langs, mjsByDir, mjsTotal: mjs.length, shCount, stubFiles, sparseDirs, routeGap, centralTests, mjsChecked };
 }
 
 function main(): void {
