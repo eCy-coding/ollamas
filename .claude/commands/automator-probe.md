@@ -1,0 +1,9 @@
+---
+description: Hand every local/cloud model the SAME task one-by-one (sequential; single-GPU truth) — author macOS Automator-compatible artifacts (Quick Action / Run Shell Script / AppleScript / shell) that support the ollamas project, into ~/Desktop/ollamas-automator/<model>/ — then TRACK what each model produced by scanning its directory → orchestration/AUTOMATOR_PROBE.md. Producing files is on the operator's own Mac and explicitly requested (the request IS the gate for the privileged write tier); writes are scoped per-model, artifacts are produced + tracked, never executed.
+allowed-tools: Bash(./node_modules/.bin/tsx orchestration/bin/automator-probe.ts:*), Bash(npx tsx orchestration/bin/automator-probe.ts:*), Bash(bash bin/host-bridge/start-bridge.sh:*)
+---
+For reliable `write_host_file` writes to the Desktop artifact dir, first (re)start the bridge with that dir in its write roots:
+```
+BRIDGE_WRITE_ROOTS="$PWD:/tmp/llm-bridge:$HOME/.llm-mission-control:$HOME/Desktop/ollamas-automator" bash bin/host-bridge/start-bridge.sh
+```
+Then run `./node_modules/.bin/tsx orchestration/bin/automator-probe.ts`. It reads the live model list (`ollama list`, embedding models skipped), and SEQUENTIALLY, for each model: makes `~/Desktop/ollamas-automator/<model>/`, dispatches (via `scripts/agent-dispatch.mjs` → POST /api/agent/chat, default `OLLAMAS_URL=http://127.0.0.1:3000`) the task "author Automator-compatible artifacts supporting ollamas (start-server shell, cockpit AppleScript, /api curl, README) in that dir", then **scans the dir** to record what was actually produced. A model counts as "produced" when it wrote ≥1 real file (independent of its VERDICT). Flags: `--dry` (plan only), `--models a,b`, `--steps N` (default 6), `--json`. Reports which model produced which artifacts (the tracking matrix). See `.claude/BRAIN.md`.

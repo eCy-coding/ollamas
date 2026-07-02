@@ -1,0 +1,447 @@
+{
+  "ts": "2026-07-02T03:21:48Z",
+  "url": "http://127.0.0.1:3000",
+  "root": "/Users/emrecnyngmail.com/Desktop/ollamas-automator",
+  "rows": [
+    {
+      "model": "qwen3-coder-64k:latest",
+      "provider": "ollama-local",
+      "produced": false,
+      "fileCount": 0,
+      "kinds": [],
+      "verdict": "INCOMPLETE",
+      "artifacts": [],
+      "note": "I see you're encountering an access denied error. It looks like you're trying to access a path outside of the allowed directories. The system is restricting acc"
+    },
+    {
+      "model": "qwen3:8b-16k",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-ollamas-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt-to-ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "I have created the following files for the Qwen3 8B-16K model automation: 1. `start-ollamas.sh` - A bash script to start the Ollama server 2. `open-ollamas-cock"
+    },
+    {
+      "model": "ollamas-reviewer:latest",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open_ollamas_cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post_prompt_to_ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "The ollamas Automator artifacts have been successfully created and saved in the specified directory. Here's a summary of what was done: 1. **`start-ollamas.sh`*"
+    },
+    {
+      "model": "qwen2.5vl:32b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 6,
+      "kinds": [
+        "applescript",
+        "other",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "automator-import-instructions.txt",
+          "kind": "other"
+        },
+        {
+          "name": "ollamas-artifacts-list.txt",
+          "kind": "other"
+        },
+        {
+          "name": "open-ollamas-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-to-ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "I have created the following files for the Qwen2.5vl_32b model: 1. `start-ollamas.sh` - A shell script to start the Ollamas server using `make up`. 2. `open-oll"
+    },
+    {
+      "model": "qwen2.5vl:7b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-ollamas-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt-to-ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "The `ollamas Automator artifacts` have been successfully created and written to the specified directory. Here's a summary of what was created: 1. **`start-ollam"
+    },
+    {
+      "model": "qwen3:8b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-ollamas.cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "The ollamas automator artifacts have been successfully created, and the logbook has been updated with the creation record. Here's a summary of what was done: ##"
+    },
+    {
+      "model": "qwen3:30b-a3b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "INCOMPLETE",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "curl-prompt.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "open-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "Okay, the user tried to read the README.md file, but got an error saying the target file doesn't exist. Then they tried to list the directory tree, but the resp"
+    },
+    {
+      "model": "deepseek-r1:32b",
+      "provider": "ollama-local",
+      "produced": false,
+      "fileCount": 0,
+      "kinds": [],
+      "verdict": "DONE",
+      "artifacts": [],
+      "note": "Let me create useful macOS-compatible automation artifacts for ollamas: 1. First, creating a shell script to start ollamas server: ```bash #!/bin/bash cd /Users"
+    },
+    {
+      "model": "qwen3-coder:30b",
+      "provider": "ollama-local",
+      "produced": false,
+      "fileCount": 0,
+      "kinds": [],
+      "verdict": "INCOMPLETE",
+      "artifacts": [],
+      "note": "I see you're encountering an access denied error when trying to access a file or directory. The error indicates that the path you're attempting to access is out"
+    },
+    {
+      "model": "qwen3:4b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-ollamas.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "Okay, let me try to figure out what the user needs here. They provided four tool responses, each showing a file path and the bytes count. The paths are all unde"
+    },
+    {
+      "model": "gpt-oss:20b",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "DONE",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.command",
+          "kind": "shell"
+        }
+      ],
+      "note": "start-ollamas.command – shell script that `cd`s into the ollamas repo and runs `npm run dev` open-cockpit.applescript – AppleScript that opens http://127.0.0.1:"
+    },
+    {
+      "model": "phi4:latest",
+      "provider": "ollama-local",
+      "produced": true,
+      "fileCount": 5,
+      "kinds": [
+        "applescript",
+        "other",
+        "readme",
+        "shell"
+      ],
+      "verdict": "DONE",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "ollamas-artifacts-list.txt",
+          "kind": "other"
+        },
+        {
+          "name": "open-ollamas.cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt-to-ollamas.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "VERDICT: DONE start-ollamas.sh,open-ollamas.cockpit.applescript,post-prompt-to-ollamas.sh,README.md,ollamas-artifacts-list.txt"
+    },
+    {
+      "model": "kimi-k2.5:cloud",
+      "provider": "ollama-cloud",
+      "produced": false,
+      "fileCount": 0,
+      "kinds": [],
+      "verdict": "INCOMPLETE",
+      "artifacts": [],
+      "note": "Authentication failure: invalid or missing key for ollama-cloud. Error: Ollama Cloud returned status 403: {\"error\":\"this model requires a subscription, upgrade "
+    },
+    {
+      "model": "gpt-oss:20b-cloud",
+      "provider": "ollama-cloud",
+      "produced": true,
+      "fileCount": 5,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "DONE",
+      "artifacts": [
+        {
+          "name": "OpenOllamas.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "post_prompt.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.command",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "/Users/emrecnyngmail.com/Desktop/ollamas-automator/gpt-oss_20b-cloud/start-ollamas.sh – Shell script that installs dependencies and starts the Ollamas dev serve"
+    },
+    {
+      "model": "gpt-oss:120b-cloud",
+      "provider": "ollama-cloud",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "DONE",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "post-prompt.command",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.command",
+          "kind": "shell"
+        }
+      ],
+      "note": "start-ollamas.command – Bash script that launches the Ollamas server (`make up` or `npm run dev`). open-cockpit.applescript – AppleScript that opens the Ollamas"
+    },
+    {
+      "model": "qwen3-coder:480b-cloud",
+      "provider": "ollama-cloud",
+      "produced": true,
+      "fileCount": 4,
+      "kinds": [
+        "applescript",
+        "readme",
+        "shell"
+      ],
+      "verdict": "OK",
+      "artifacts": [
+        {
+          "name": "README.md",
+          "kind": "readme"
+        },
+        {
+          "name": "open-cockpit.applescript",
+          "kind": "applescript"
+        },
+        {
+          "name": "send-prompt.sh",
+          "kind": "shell"
+        },
+        {
+          "name": "start-ollamas.sh",
+          "kind": "shell"
+        }
+      ],
+      "note": "ReAct loop complete. Reached step depth limit."
+    },
+    {
+      "model": "llama3.3:70b",
+      "provider": "ollama-local",
+      "produced": false,
+      "fileCount": 0,
+      "kinds": [],
+      "verdict": "INCOMPLETE",
+      "artifacts": [],
+      "note": "no output"
+    }
+  ]
+}
