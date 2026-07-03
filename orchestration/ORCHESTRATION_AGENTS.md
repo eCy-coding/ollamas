@@ -79,12 +79,16 @@ Read-only DIŞINDA conductor'a izinli **TEK** yan-etki = **koordinasyon sinyali*
 `orchestration/seyir/nudge-log.jsonl`'e audit'lenir. **Lane FEATURE kodu yazmak HÂLÂ §3 ihlali** —
 bu istisna yalnız teşhis-dürtmesi + bildirim kapsar, kod/dosya mutasyonu DEĞİL.
 
-- **(c) claude-dispatch (vO40)** — fuse'un tespit ettiği EN KRİTİK gereksinimi YENİ bir Claude Code
-  conductor oturumuna delege: yeni Terminal.app/iTerm2 sekmesi + `claude --permission-mode plan`
+- **(c) claude-dispatch (vO40, zincir vO41)** — fuse'un tespit ettiği EN KRİTİK gereksinimi YENİ bir
+  Claude Code conductor oturumuna delege: yeni Terminal.app/iTerm2 sekmesi + `claude --permission-mode plan`
   (`bin/claude-dispatch.ts`). Conductor yine kod yazmaz — kodu spawn edilen oturum, PLAN-MODE insan
-  onayından sonra kendi lane'inde yazar. Güvenlik: dry-run DEFAULT · tek-manuel aktivasyon marker
-  `.claude-dispatch-enabled` · kill-switch `.claude-dispatch-off` · fingerprint idempotency · cap=1 ·
-  cooldown 4h · bayat-REQUIREMENTS'a spawn YOK · audit `seyir/dispatch-log.jsonl`.
+  onayından sonra kendi lane'inde yazar. vO41 kesintisiz zincir: SUCCESS FUNCTION = hedef taze+dolu
+  REQUIREMENTS'tan kaybolursa oturum otomatik `done` (kanıt-bazlı, honor-system'e bağımlılık yok) →
+  sıradaki gereksinim ANINDA dispatch. Güvenlik: dry-run DEFAULT · tek-manuel aktivasyon marker
+  `.claude-dispatch-enabled` · kill-switch `.claude-dispatch-off` · target idempotency · cap=1 ·
+  24h bütçe 6 spawn · failure-backoff 4h (yalnız stale sonrası; done anında zincirler) · 2× stale →
+  blocked + notify (asla sonsuz respawn) · bayat-REQUIREMENTS'a spawn YOK · audit dedup
+  `seyir/dispatch-log.jsonl` · spawn dosyaları `~/.ollamas/` (WatchPaths self-retrigger kök-fix).
 
 ---
 

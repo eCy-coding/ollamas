@@ -1,12 +1,14 @@
-# CLAUDE_DISPATCH.md — otonom Claude Code conductor spawn (vO40)
+# CLAUDE_DISPATCH.md — otonom Claude Code conductor zinciri (vO41)
 
 > Auto: `tsx orchestration/bin/claude-dispatch.ts [--go] [--app iterm2]` · dry-run DEFAULT ·
-> aktivasyon: `touch orchestration/.claude-dispatch-enabled` (tek sefer) · kill-switch: `.claude-dispatch-off`
+> aktivasyon: `touch orchestration/.claude-dispatch-enabled` (tek sefer) · kill-switch: `.claude-dispatch-off` ·
+> zincir: done → anında sıradaki; stale → 4h backoff; 2× stale → blocked (insan)
 
-## ⏭ SKIP — aynı görev zaten aktif (fingerprint d54a73f349ac)
+## ⏭ SKIP — aktif oturum limiti dolu (1/1)
 
-- ts: 2026-07-03T13:36:07.504Z · app: Terminal.app · go-enabled: ❌ · kill-switch: off
-- top requirement: **CRITICAL:red:integration/v17-core** — tsc 18 hata (fingerprint d54a73f349ac)
+- ts: 2026-07-03T14:05:35.545Z · app: Terminal.app · go-enabled: ❌ · kill-switch: off
+- 24h bütçe: 1/6 spawn
+- top requirement: **CRITICAL:red:colab** — tsc 2 hata (fingerprint 585874ff190c)
 
 ## Oturumlar
 | fingerprint | task | app | started | status |

@@ -123,7 +123,7 @@ function detailFor(step: string): string {
   if (step === "claude") {
     const f = join(ORCH_DIR, "CLAUDE_DISPATCH.md");
     if (existsSync(f)) {
-      const line = readFileSync(f, "utf8").split("\n").find((l) => /^##\s+(▶|\[dry\]|⏭)/.test(l));
+      const line = readFileSync(f, "utf8").split("\n").find((l) => /^##\s+(▶|\[dry\]|⏭|🛑)/.test(l));
       if (line) return line.replace(/^#+\s*/, "").replace(/\s+/g, " ").trim().slice(0, 80);
     }
     return "claude-dispatch kararı tazelendi";

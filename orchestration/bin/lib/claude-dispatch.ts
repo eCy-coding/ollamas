@@ -1,14 +1,23 @@
 /**
- * orchestration/bin/lib/claude-dispatch.ts — vO40 autonomous Claude Code session dispatch (PURE).
+ * orchestration/bin/lib/claude-dispatch.ts — vO40/vO41 autonomous Claude Code session dispatch (PURE).
  *
- * Closes the act-gap in the autonomous loop: conduct/fuse DETECT the most critical requirement,
- * this module DECIDES whether to spawn a NEW Claude Code conductor session (plan mode) in a
- * fresh Terminal.app/iTerm2 tab to resolve it. Billing-runaway is impossible by construction:
+ * vO40: closes the act-gap — conduct/fuse DETECT the most critical requirement, this module DECIDES
+ * whether to spawn a NEW Claude Code conductor session (plan mode) in a fresh Terminal.app/iTerm2 tab.
+ * vO41: continuous chain — one task ends → next begins, per researched loop-engineering law:
+ * max-iteration cap + budget cap + agent-evaluable SUCCESS FUNCTION + escalation path (all four,
+ * missing one = runaway).
+ *
+ * Guard layers (billing-runaway impossible by construction):
  *   1. fingerprint idempotency — same requirement never spawns twice while a session is active
- *   2. active-session cap (default 1)
- *   3. cooldown between spawns (default 4h)
- *   4. kill-switch file + one-time activation marker + dry-run default (IO shell enforces)
- *   5. plan mode itself — the spawned session needs human plan-approval before code changes
+ *      (fingerprint = target:action, criticality EXCLUDED: tier de-escalation must not forge identity)
+ *   2. active-session cap (default 1) + rolling-24h spawn budget (default 6)
+ *   3. failure backoff — cooldown ONLY after a stale (crashed/abandoned) session; done chains instantly
+ *   4. escalation — 2× stale on the same requirement → blocked (human needed), never respawned
+ *   5. kill-switch file + one-time activation marker + dry-run default (IO shell enforces)
+ *   6. plan mode itself — the spawned session needs human plan-approval before code changes
+ *
+ * SUCCESS FUNCTION (evidence-based completion): a requirement that disappears from FRESH, NON-EMPTY
+ * REQUIREMENTS.json is resolved — the pipeline itself verifies, no honor-system dependency.
  *
  * Pure: no IO, injected clock. IO shell = bin/claude-dispatch.ts.
  */
@@ -16,17 +25,25 @@ import { createHash } from "node:crypto";
 import type { Requirement } from "./fuse";
 import type { SpawnApp } from "./tab-spawn";
 
+export type SessionStatus = "active" | "done" | "stale" | "blocked";
+
 export interface DispatchSession {
   fingerprint: string;
   task: string;
-  app: SpawnApp;
+  target?: string; // vO41+; older ledger lines derive it from task
+  app: SpawnApp | "-";
   startedTs: string;
-  status: "active" | "done" | "stale";
+  status: SessionStatus;
 }
 
-/** Stable identity of a requirement — survives launchd re-fires and re-runs. */
+/** Stable identity — criticality EXCLUDED (tier flip on same target must not change identity, vO41). */
 export function taskFingerprint(req: Requirement): string {
-  return createHash("sha256").update(`${req.criticality}:${req.target}:${req.action}`).digest("hex").slice(0, 12);
+  return createHash("sha256").update(`${req.target}:${req.action}`).digest("hex").slice(0, 12);
+}
+
+/** Session's requirement-target; vO40 ledger lines lack `target` → derive from task "CRIT:target". */
+export function sessionTarget(s: DispatchSession): string {
+  return s.target ?? s.task.split(":").slice(1).join(":");
 }
 
 /** JSONL fold: last line per fingerprint wins (append-only ledger, LWW — claims.ts pattern). */
@@ -52,6 +69,63 @@ export function reconcileSessions(sessions: DispatchSession[], nowMs: number, st
   return out;
 }
 
+/**
+ * vO41 SUCCESS FUNCTION — evidence-based completion: active session whose TARGET is no longer among
+ * fresh REQUIREMENTS targets → done (pipeline no longer detects the requirement = resolved).
+ * Guards: only on FRESH (<60min) AND NON-EMPTY requirements (fuse-crash → no mass-done storm),
+ * and session ≥ minAgeMin old (another-lane-fixed race → cap-bypass prevention).
+ */
+export function autoCompleteSessions(
+  sessions: DispatchSession[], freshTargets: Set<string>,
+  o: { reqsFresh: boolean; reqsNonEmpty: boolean; nowMs: number; minAgeMin?: number },
+): DispatchSession[] {
+  if (!o.reqsFresh || !o.reqsNonEmpty) return [];
+  const minAge = (o.minAgeMin ?? 30) * 60_000;
+  const out: DispatchSession[] = [];
+  for (const s of sessions) {
+    if (s.status !== "active") continue;
+    const t = Date.parse(s.startedTs);
+    if (!Number.isFinite(t) || o.nowMs - t < minAge) continue;
+    if (!freshTargets.has(sessionTarget(s))) out.push({ ...s, status: "done" });
+  }
+  return out;
+}
+
+/** Escalation input: how many times each fingerprint went stale (raw append-only lines = history). */
+export function staleCounts(rawLines: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const line of rawLines) {
+    try {
+      const s = JSON.parse(line);
+      if (s?.status === "stale" && typeof s.fingerprint === "string") out.set(s.fingerprint, (out.get(s.fingerprint) ?? 0) + 1);
+    } catch { /* skip */ }
+  }
+  return out;
+}
+
+/** Rolling-window spawn budget: only `active` lines COUNT (completions must not consume budget). */
+export function spawnsInWindow(rawLines: string[], nowMs: number, windowH = 24): number {
+  let n = 0;
+  for (const line of rawLines) {
+    try {
+      const s = JSON.parse(line);
+      if (s?.status !== "active") continue;
+      const t = Date.parse(s.startedTs);
+      if (Number.isFinite(t) && nowMs - t <= windowH * 3_600_000) n++;
+    } catch { /* skip */ }
+  }
+  return n;
+}
+
+/** Audit-churn guard: identical consecutive entry (action+fingerprint+reason) → don't write again. */
+export function shouldAudit(lastLine: string | undefined, e: { action: string; fingerprint?: string | null; reason?: string }): boolean {
+  if (!lastLine) return true;
+  try {
+    const last = JSON.parse(lastLine);
+    return !(last.action === e.action && (last.fingerprint ?? null) === (e.fingerprint ?? null) && (last.reason ?? "") === (e.reason ?? ""));
+  } catch { return true; }
+}
+
 export interface DispatchPlanInput {
   sessions: DispatchSession[];
   req: Requirement | null;
@@ -60,32 +134,52 @@ export interface DispatchPlanInput {
   cooldownH?: number;
   killSwitch: boolean;
   goEnabled: boolean;
+  // vO41 chain inputs
+  lastStatus?: SessionStatus;   // LWW status of the most recently started session
+  spawns24h?: number;           // spawnsInWindow() result
+  maxPerDay?: number;           // rolling-24h budget (default 6)
+  staleCountForReq?: number;    // staleCounts().get(fingerprint) for THIS requirement
+  maxStale?: number;            // escalation threshold (default 2)
 }
 export interface DispatchPlan {
   go: boolean;
-  mode: "spawn" | "dry" | "skip";
+  mode: "spawn" | "dry" | "skip" | "blocked";
   reason: string;
   fingerprint?: string;
 }
 
-/** Single spawn/dry/skip decision. Guard order: safety gates first, activation last. */
+/**
+ * Single spawn/dry/skip decision. Guard order (vO41):
+ * kill → no-req → escalation(blocked) → dup-active(by TARGET) → cap → 24h-budget →
+ * cooldown(ONLY after stale = failure backoff; done chains instantly) → activation.
+ */
 export function planDispatch(i: DispatchPlanInput): DispatchPlan {
   const maxActive = i.maxActive ?? 1;
   const cooldownH = i.cooldownH ?? 4;
+  const maxPerDay = i.maxPerDay ?? 6;
+  const maxStale = i.maxStale ?? 2;
   if (i.killSwitch) return { go: false, mode: "skip", reason: "kill-switch aktif (.claude-dispatch-off)" };
   if (!i.req) return { go: false, mode: "skip", reason: "dispatch-edilecek kritik gereksinim yok" };
   const fp = taskFingerprint(i.req);
+  if ((i.staleCountForReq ?? 0) >= maxStale) {
+    return { go: false, mode: "blocked", reason: `escalation: ${i.staleCountForReq}× stale — insan müdahalesi gerekli (${i.req.target})`, fingerprint: fp };
+  }
   const active = i.sessions.filter((s) => s.status === "active");
-  if (active.some((s) => s.fingerprint === fp)) {
-    return { go: false, mode: "skip", reason: `aynı görev zaten aktif (fingerprint ${fp})`, fingerprint: fp };
+  if (active.some((s) => sessionTarget(s) === i.req!.target)) {
+    return { go: false, mode: "skip", reason: `aynı görev zaten aktif (${i.req.target})`, fingerprint: fp };
   }
   if (active.length >= maxActive) {
     return { go: false, mode: "skip", reason: `aktif oturum limiti dolu (${active.length}/${maxActive})`, fingerprint: fp };
   }
-  const lastMs = Math.max(0, ...i.sessions.map((s) => Date.parse(s.startedTs)).filter(Number.isFinite));
-  if (lastMs && (i.nowMs - lastMs) / 3_600_000 < cooldownH) {
-    const left = Math.ceil(cooldownH - (i.nowMs - lastMs) / 3_600_000);
-    return { go: false, mode: "skip", reason: `cooldown (${cooldownH}h) dolmadı — ~${left}h kaldı`, fingerprint: fp };
+  if ((i.spawns24h ?? 0) >= maxPerDay) {
+    return { go: false, mode: "skip", reason: `24h bütçe dolu (${i.spawns24h}/${maxPerDay} spawn)`, fingerprint: fp };
+  }
+  if (i.lastStatus === "stale") {
+    const lastMs = Math.max(0, ...i.sessions.map((s) => Date.parse(s.startedTs)).filter(Number.isFinite));
+    if (lastMs && (i.nowMs - lastMs) / 3_600_000 < cooldownH) {
+      const left = Math.ceil(cooldownH - (i.nowMs - lastMs) / 3_600_000);
+      return { go: false, mode: "skip", reason: `failure-backoff (${cooldownH}h) — ~${left}h kaldı (son oturum stale)`, fingerprint: fp };
+    }
   }
   if (!i.goEnabled) {
     return { go: false, mode: "dry", reason: "dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go", fingerprint: fp };
@@ -93,7 +187,8 @@ export function planDispatch(i: DispatchPlanInput): DispatchPlan {
   return { go: true, mode: "spawn", reason: `spawn: ${i.req.criticality}:${i.req.target}`, fingerprint: fp };
 }
 
-/** Conductor task prompt for the spawned Claude Code session (plan mode). Build EN (fleet doctrine). */
+/** Conductor task prompt (plan mode). Anthropic lead-agent pattern: objective / output format /
+ *  boundaries / success criterion explicit. Build EN (fleet doctrine). */
 export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo: string): string {
   const fp = taskFingerprint(req);
   const sel = modelSelection?.selection;
@@ -104,13 +199,16 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
     : "Optimal local runtime: run `tsx orchestration/bin/benchprompt.ts` for a fresh MODEL_SELECTION.json";
   return [
     `You are the ollamas ORCHESTRA CONDUCTOR — a Claude Code session dispatched autonomously by the`,
-    `orchestration pipeline (claude-dispatch vO40). Repo: ${repo}. Task fingerprint: ${fp}.`,
+    `orchestration pipeline (claude-dispatch vO41). Repo: ${repo}. Task fingerprint: ${fp}.`,
     ``,
-    `MISSION — resolve the single most critical requirement the autonomous pipeline detected:`,
+    `OBJECTIVE — resolve the single most critical requirement the autonomous pipeline detected:`,
     `- criticality: ${req.criticality} (source: ${req.source}, score ${req.score})`,
     `- target: ${req.target}`,
     `- detail: ${req.detail}`,
     `- action: ${req.action}`,
+    ``,
+    `BOUNDARIES: work ONLY on this requirement's lane/scope. Do not refactor unrelated code, do not`,
+    `touch other lanes' WIP, no git push. Your working set is the repo above.`,
     ``,
     `DOCTRINE (non-negotiable):`,
     `1. Invoke the \`fleet-orchestrator\` skill FIRST. You CONDUCT — you do not write feature code yourself.`,
@@ -123,10 +221,15 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
     `6. No half-work. Done means gated: tsc --noEmit 0 → vitest green (fresh run) → conventional commit.`,
     `7. PROPOSE-not-mutate: fleet worker output is gated by YOU before apply.`,
     ``,
-    `COMPLETION PROTOCOL — when the requirement is verified resolved (gate green + committed), append`,
-    `exactly one line to orchestration/seyir/claude-dispatch-state.jsonl so the pipeline can dispatch the`,
-    `next requirement:`,
-    `{"fingerprint":"${fp}","task":"${req.criticality}:${req.target}","app":"-","startedTs":"<now ISO>","status":"done"}`,
+    `OUTPUT FORMAT: end your work with a short evidence report — commands run, outputs, commit hash.`,
+    ``,
+    `SUCCESS CRITERION: after your commit, a fresh pipeline run (tsx orchestration/bin/autopilot.ts) no`,
+    `longer lists target "${req.target}" in REQUIREMENTS.json — the pipeline auto-detects completion and`,
+    `chains to the next requirement even if you forget the protocol below.`,
+    ``,
+    `COMPLETION PROTOCOL (fast path) — when verified resolved, append exactly one line to`,
+    `orchestration/seyir/claude-dispatch-state.jsonl:`,
+    `{"fingerprint":"${fp}","task":"${req.criticality}:${req.target}","target":"${req.target}","app":"-","startedTs":"<now ISO>","status":"done"}`,
   ].join("\n");
 }
 
@@ -134,23 +237,27 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
 export function renderDispatchMd(i: {
   ts: string; plan: DispatchPlan; req: Requirement | null; sessions: DispatchSession[];
   killSwitch: boolean; goEnabled: boolean; app: SpawnApp; reqStale?: boolean;
+  spawns24h?: number; maxPerDay?: number;
 }): string {
-  const icon = i.plan.mode === "spawn" ? "▶" : i.plan.mode === "dry" ? "[dry]" : "⏭";
+  const icon = i.plan.mode === "spawn" ? "▶" : i.plan.mode === "dry" ? "[dry]" : i.plan.mode === "blocked" ? "🛑" : "⏭";
+  const blocked = i.sessions.filter((s) => s.status === "blocked");
   const L = [
-    `# CLAUDE_DISPATCH.md — otonom Claude Code conductor spawn (vO40)`,
+    `# CLAUDE_DISPATCH.md — otonom Claude Code conductor zinciri (vO41)`,
     ``,
     `> Auto: \`tsx orchestration/bin/claude-dispatch.ts [--go] [--app iterm2]\` · dry-run DEFAULT ·`,
-    `> aktivasyon: \`touch orchestration/.claude-dispatch-enabled\` (tek sefer) · kill-switch: \`.claude-dispatch-off\``,
+    `> aktivasyon: \`touch orchestration/.claude-dispatch-enabled\` (tek sefer) · kill-switch: \`.claude-dispatch-off\` ·`,
+    `> zincir: done → anında sıradaki; stale → 4h backoff; 2× stale → blocked (insan)`,
     ``,
     `## ${icon} ${i.plan.mode.toUpperCase()} — ${i.plan.reason}`,
     ``,
     `- ts: ${i.ts} · app: ${i.app} · go-enabled: ${i.goEnabled ? "✅" : "❌"} · kill-switch: ${i.killSwitch ? "🛑 ON" : "off"}${i.reqStale ? " · ⚠️ REQUIREMENTS bayat (spawn engellendi)" : ""}`,
+    `- 24h bütçe: ${i.spawns24h ?? 0}/${i.maxPerDay ?? 6} spawn`,
     i.req
       ? `- top requirement: **${i.req.criticality}:${i.req.target}** — ${i.req.detail.slice(0, 100)} (fingerprint ${i.plan.fingerprint ?? "-"})`
       : `- top requirement: yok`,
-    ``,
-    `## Oturumlar`,
   ];
+  if (blocked.length) L.push(`- 🛑 blocked (insan gerekli): ${blocked.map((b) => `${sessionTarget(b)} (${b.fingerprint})`).join(", ")}`);
+  L.push(``, `## Oturumlar`);
   if (!i.sessions.length) L.push(`- (henüz oturum yok)`);
   else {
     L.push(`| fingerprint | task | app | started | status |`, `|---|---|---|---|---|`);

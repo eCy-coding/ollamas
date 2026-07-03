@@ -6,6 +6,9 @@ import { Sparkline } from "./Sparkline";
 import { LiveActivityPanel } from "./cockpit/LiveActivityPanel";
 import { ModelsPanel } from "./cockpit/ModelsPanel";
 import { CouncilPanel } from "./cockpit/CouncilPanel";
+import { ModelOpsFeed } from "./cockpit/ModelOpsFeed";
+import { RollupTiles } from "./cockpit/RollupTiles";
+import { ProviderLeaderboard } from "./cockpit/ProviderLeaderboard";
 
 interface CockpitProps {
   telemetry: HealthTelemetry | null;
@@ -304,6 +307,11 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
 
       {/* Live multi-model COUNCIL calibration — dispatch real tasks, track verdicts live */}
       <CouncilPanel />
+
+      {/* Master-standard model observability (T5): every model op tracked, metadata-only. */}
+      <RollupTiles />
+      <ProviderLeaderboard />
+      <ModelOpsFeed />
     </div>
   );
 };
