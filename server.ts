@@ -41,6 +41,7 @@ import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
 import { decorateCatalog } from "./server/mcp/catalog";
 import { getFeedItems } from "./server/threatfeed";
+import { validateUpstreamConfig } from "./server/mcp/upstream-guard";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
@@ -387,6 +388,10 @@ async function initializeServer() {
       console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
     }));
     for (const u of await allUpstreamServers()) {
+      // Defense-in-depth: re-validate persisted tenant rows in case a row was
+      // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
+      const v = validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
+      if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); continue; }
       const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
@@ -2325,6 +2330,10 @@ content
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
       // Duplicate names would double-supervise `<tenantId>_<name>` and clobber tools.
       if ((await listUpstreamServers(tId)).some((u) => u.name === name)) return res.status(409).json({ error: "duplicate name" });
+      // Security gate: a tenant key must not be able to spawn an arbitrary host
+      // command via the stdio transport (tenant ≠ owner under SAAS_ENFORCE=1).
+      const v = validateUpstreamConfig({ transport, command, args, url });
+      if (!v.ok) return res.status(400).json({ error: v.error });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
       // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.
       const connect = await superviseUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId);
