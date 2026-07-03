@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport } from "../bin/lib/fleet-apply";
+import { hasSearchReplace, parseSearchReplace, applyEdit } from "../bin/lib/search-replace";
 
 const NEW_FILE = `diff --git a/scripts/x.ts b/scripts/x.ts
 new file mode 100644
@@ -56,6 +57,34 @@ describe("classifyProposal", () => {
   });
   it("no diff → flagged", () => {
     expect(classifyProposal("s", "t", "m", "", null).reason).toBe("no diff block");
+  });
+});
+
+describe("SEARCH/REPLACE proposal path (vO52 loop-close)", () => {
+  const PROPOSAL = `# shell-harden · terminal · gpt-oss:20b-cloud
+## Change: harden start.sh
+## Edit:
+### file: start.sh
+<<<<<<< SEARCH
+set -euo pipefail
+=======
+set -euo pipefail
+require_env PORT
+>>>>>>> REPLACE
+## Test: unset PORT → exits nonzero
+VERDICT: DONE`;
+
+  it("detects a SEARCH/REPLACE proposal (not a unified diff)", () => {
+    expect(hasSearchReplace(PROPOSAL)).toBe(true);
+    const e = parseSearchReplace(PROPOSAL);
+    expect(e[0].file).toBe("start.sh");
+    expect(e[0].search).toBe("set -euo pipefail");
+  });
+  it("resolves deterministically against real file content (the reliable apply path)", () => {
+    const content = "#!/bin/bash\nset -euo pipefail\necho boot";
+    const r = applyEdit(content, parseSearchReplace(PROPOSAL)[0]);
+    expect(r.ok).toBe(true);
+    expect(r.content).toContain("require_env PORT");
   });
 });
 

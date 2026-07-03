@@ -1,6 +1,6 @@
 # FLEET_APPLY.md — conductor apply-readiness triage (auto-generated)
 
-> Auto: `tsx orchestration/bin/fleet-apply.ts` · 2026-07-03T00:15:48Z. Extracts each gated proposal's diff and dry-runs
+> Auto: `tsx orchestration/bin/fleet-apply.ts` · 2026-07-03T00:26:34Z. Extracts each gated proposal's diff and dry-runs
 > `git apply --check`. "Apply-ready" = a shaped diff (real line-numbers or new-file) that applies to the
 > current tree. The conductor applies only these (opt-in, gated); illustrative diffs are surfaced, not applied.
 

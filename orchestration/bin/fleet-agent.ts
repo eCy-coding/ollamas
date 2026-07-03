@@ -87,14 +87,22 @@ function taskPrompt(_attempt: number): string {
   return [
     `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Goal: ${goal}.`,
     readLine,
-    `NEVER call write_file or write_host_file — put your change in "## Diff" as TEXT only. Do NOT edit any file.`,
-    `Your FINAL MESSAGE must BE the proposal in this exact shape (nothing else — do NOT describe the repo):`,
-    `## Plan: <1-line plan of the change you will propose>`,
+    `NEVER call write_file or write_host_file — the conductor applies your edit. Do NOT edit any file yourself.`,
+    `Your FINAL MESSAGE must BE the proposal in this exact shape (nothing else — do NOT describe the repo).`,
+    `Express the change as a SEARCH/REPLACE block: the SEARCH must be an EXACT, VERBATIM copy of lines from the`,
+    `file you read (so it applies deterministically — do NOT use line numbers or a unified diff):`,
+    `## Plan: <1-line plan of the change>`,
     `## Change: <one concrete high-value change to ${target || "the target file"}>`,
-    `## Diff: <a short unified diff>`,
+    `## Edit:`,
+    `### file: ${target || "<workspace-relative path>"}`,
+    `<<<<<<< SEARCH`,
+    `<paste the exact existing lines to replace, copied verbatim from read_file>`,
+    `=======`,
+    `<the replacement lines>`,
+    `>>>>>>> REPLACE`,
     `## Test: <the test that proves it>`,
     `## Next: <precompute — the 1-line NEXT step for this stream after this change lands>`,
-    `Then end with: VERDICT: DONE. Keep under 28 lines. Evidence over prose.`,
+    `Then end with: VERDICT: DONE. Keep the SEARCH minimal + unique. Evidence over prose.`,
   ].join("\n");
 }
 
