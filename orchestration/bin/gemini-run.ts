@@ -19,20 +19,36 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
 import { focusFile, geminiGroundedPrompt } from "./lib/fleet-prompt";
+import { guardQuota, noteOutcome, loadQuota, remaining, todayKey } from "./lib/gemini-quota";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
 const WORK = join(homedir(), ".llm-mission-control", "fleet", "work");
+const QUOTA_FILE = join(homedir(), ".llm-mission-control", "gemini-quota.json");
 
 const argv = process.argv.slice(2);
 const flag = (n: string, d?: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
 const JSON_OUT = argv.includes("--json");
 const MODEL = flag("--model", "gemini-2.5-flash")!;
 const PROPOSE = flag("--propose");
+const QUOTA = argv.includes("--quota");
 const FLASH = "gemini-2.5-flash";
 
-/** Dispatch a prompt to Gemini with 503 backoff + flash fallback. */
+// ── --quota: show today's free-tier budget (no API call) ──────────────────────────────────────────────
+if (QUOTA) {
+  const today = todayKey();
+  const st = loadQuota(QUOTA_FILE);
+  const left = remaining(st, today);
+  const view = { date: today, used: st.date === today ? st.used : 0, limit: st.limit, remaining: left };
+  console.log(JSON_OUT ? JSON.stringify(view) : `gemini quota — ${view.used}/${view.limit} used today · ${view.remaining} left${left === 0 ? " (resets tomorrow)" : ""}`);
+  process.exit(0);
+}
+
+/** Dispatch a prompt to Gemini with 503 backoff + flash fallback. Pre-flight quota gate: if today's free-tier
+ *  budget is spent, fail FAST (no API call, no backoff) — the scarce daily requests are never wasted. */
 function dispatch(prompt: string): { ok: boolean; model: string; text: string; err?: string } {
+  const guard = guardQuota(QUOTA_FILE);
+  if (!guard.allowed) return { ok: false, model: MODEL, text: "", err: guard.msg };
   let lastErr = "";
   for (let attempt = 0; attempt < 4; attempt++) {
     const m = attempt < 2 ? MODEL : FLASH;
@@ -42,12 +58,13 @@ function dispatch(prompt: string): { ok: boolean; model: string; text: string; e
         env: { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: "true" },
       });
       const g = parseGeminiJson(out);
-      if (g.ok) return { ok: true, model: m, text: g.text };
+      if (g.ok) { noteOutcome(QUOTA_FILE, "success"); return { ok: true, model: m, text: g.text }; }
       lastErr = "empty gemini response";
     } catch (e: any) {
       const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
       lastErr = blob.slice(0, 200);
-      if (isGeminiQuotaExhausted(blob) || !isGeminiOverload(blob)) break; // terminal quota / non-transient → stop
+      if (isGeminiQuotaExhausted(blob)) { noteOutcome(QUOTA_FILE, "exhausted"); break; } // latch the day
+      if (!isGeminiOverload(blob)) break; // non-transient → stop
     }
     console.error(`[gemini-run] attempt ${attempt + 1} failed (${lastErr.slice(0, 60)}) — backing off …`);
     try { execFileSync("sleep", [String(Math.min(8, 2 ** attempt))]); } catch { /* best-effort */ }

@@ -24,12 +24,14 @@ import { fullJitterDelay, isTransient } from "./lib/backoff";
 import { dispatchTarget } from "./lib/chrome-probe";
 import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
 import { focusFile as focusFileFor, streamTaskPrompt, geminiGroundedPrompt } from "./lib/fleet-prompt";
+import { guardQuota, noteOutcome } from "./lib/gemini-quota";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const REPO = join(ORCH_DIR, "..");
 const TSX = join(REPO, "node_modules", ".bin", "tsx");
 const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
+const QUOTA_FILE = join(homedir(), ".llm-mission-control", "gemini-quota.json");
 const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 
 const [stream, slot] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -84,6 +86,9 @@ function geminiDispatch(model: string, prompt: string): { verdict: string; propo
   const target = focusFileFor(stream);
   let effective = prompt;
   try { const abs = join(REPO, target); if (target && existsSync(abs)) effective = geminiGroundedPrompt(stream, target, readFileSync(abs, "utf8")); } catch { /* keep prompt */ }
+  // Pre-flight quota gate: skip the doomed call entirely when today's free-tier budget is spent.
+  const guard = guardQuota(QUOTA_FILE);
+  if (!guard.allowed) { try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: guard.msg })); } catch { /* ignore */ } return { verdict: "ERROR", proposal: "", steps: 0, err: guard.msg }; }
   let lastErr = "";
   for (let attempt = 0; attempt < 4; attempt++) {
     const m = attempt < 2 ? model : FLASH; // requested model first, then fall back to the available flash tier
@@ -93,12 +98,13 @@ function geminiDispatch(model: string, prompt: string): { verdict: string; propo
         env: { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: "true" },
       });
       const g = parseGeminiJson(out);
-      if (g.ok) { const j = JSON.stringify({ model: m, verdict: "DONE", messages: [g.text], steps: [] }); writeFileSync(reportF, j); return parseReport(j); }
+      if (g.ok) { noteOutcome(QUOTA_FILE, "success"); const j = JSON.stringify({ model: m, verdict: "DONE", messages: [g.text], steps: [] }); writeFileSync(reportF, j); return parseReport(j); }
       lastErr = "empty gemini response";
     } catch (e: any) {
       const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
       lastErr = blob.slice(0, 200);
-      if (isGeminiQuotaExhausted(blob) || !isGeminiOverload(blob)) break; // terminal quota / non-transient → stop
+      if (isGeminiQuotaExhausted(blob)) { noteOutcome(QUOTA_FILE, "exhausted"); break; } // latch the day
+      if (!isGeminiOverload(blob)) break; // non-transient → stop
     }
     try { execFileSync("sleep", [String(Math.min(8, 2 ** attempt))]); } catch { /* best-effort backoff */ }
   }

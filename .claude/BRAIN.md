@@ -54,6 +54,7 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 | Gate exit masked | Read the REAL exit (execFileSync → `e.status`), never `cmd \| head; echo $?` (pipe's last stage hides red) | RISK-ORCH-041 (vO55/56) | `bin/gate.ts` + `bin/lib/gate.ts` (`/gate`) |
 | Vendor overload (gemini 503) | Backoff + `flash` fallback; `--approval-mode plan` = read-only PROPOSE | gemini-cli headless docs | `bin/lib/gemini.ts` + `backoff.ts` |
 | Gemini daily-quota (429) | FAIL FAST — `isGeminiQuotaExhausted` ≠ transient (retry won't help for hours); distinct from 503 | vO57 live (free-tier 20/day) | `bin/lib/gemini.ts` |
+| Wasting a scarce daily quota | PRE-FLIGHT budget gate: persist daily used/limit, skip the call BEFORE dispatch when spent (0.13s vs ~50s doomed-backoff); first real 429 latches the day | vO58 live (20/day) | `bin/lib/gemini-quota.ts` (`guardQuota`/`noteOutcome`; `/gemini --quota`) |
 | Weak-vendor grounding | INLINE the target file content → model copies EXACT lines into SEARCH (resolvable, no hallucinated snippet) | vO57 (Gemini flash → apply-ready SR) | `bin/lib/fleet-prompt.ts geminiGroundedPrompt` |
 
 ## 3. Immutable principles (from AGENTS.md §2 + operator directives)

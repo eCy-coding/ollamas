@@ -9,9 +9,10 @@ Gemini CLI (0.49.0, account-authed) as a fleet-compatible model. Invoked headles
 
 - `"<task>"` — dispatch and print the response.
 - `--propose <stream>` — GROUNDED fleet proposal: inlines the stream's focus-file content so Gemini copies exact lines into a SEARCH/REPLACE block (deterministic → apply-ready), writes it to `~/.llm-mission-control/fleet/work/<stream>.gemini/PROPOSAL.md`, then triage/apply with `fleet-apply` like any worker. Proven live: gemini-2.5-flash → safe-auto, import-safe, gated-shipped change (vO57).
+- `--quota` — show today's free-tier budget `{date, used, limit, remaining}` (no API call).
 - `--model <tag>` — default `gemini-2.5-flash` (the `pro` tier is often demand-throttled; flash is reliable).
-- `--json` — machine output `{ok, model, text, err?}`.
+- `--json` — machine output.
 
-Free-tier has a **daily quota** (≈20 requests); on 429 the dispatcher fails fast (retry won't help until reset) — distinct from a transient 503 (retried with backoff).
+Free-tier has a **daily quota** (≈20 requests, override `GEMINI_DAILY_LIMIT`). A **pre-flight quota gate** (`bin/lib/gemini-quota.ts`, persisted at `~/.llm-mission-control/gemini-quota.json`) skips the call entirely when the day's budget is spent — fail-fast in ~0.1s instead of a doomed ~50s backoff. The first real 429 latches the day exhausted. Transient 503 is still retried with backoff.
 
 See `.claude/BRAIN.md` (Gemini vendor-overload row).
