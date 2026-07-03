@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
-import { Search, Loader2, ExternalLink, Star, AlertTriangle, CircleDot, GitPullRequest, FileCode2, FolderGit2 } from "lucide-react";
+import { Search, Loader2, ExternalLink, Star, AlertTriangle, CircleDot, GitPullRequest, FileCode2, FolderGit2, Compass, RefreshCw } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 // "GitHub Arama" tab — first-party GitHub keyword search (repos / issues+PRs /
@@ -27,12 +27,37 @@ const safeUrl = (u?: string): string | undefined => {
 };
 const repoFromUrl = (u?: string): string => (u ? u.replace(/^https?:\/\/api\.github\.com\/repos\//, "") : "");
 
+const CAT_LABEL: Record<string, string> = {
+  "adopt-mcp": "Adopt · MCP server", "adopt-gateway": "Adopt · Gateway", competitor: "Rakip", "security-pattern": "Güvenlik",
+  "local-model": "Yerel model", "dependency-cve": "Bağımlılık CVE", "zero-dep": "Zero-dep",
+};
+const fitBadge = (fit: string): { label: string; cls: string } =>
+  fit === "adopt" ? { label: "ADOPT", cls: "bg-emerald-950/50 text-emerald-300 border-emerald-800" }
+  : fit === "idea-only" ? { label: "fikir-only", cls: "bg-amber-950/40 text-amber-300 border-amber-800" }
+  : { label: "lisans?", cls: "bg-slate-800/50 text-slate-400 border-slate-700" };
+
+interface DigestItem { full_name?: string; description?: string | null; stargazers_count?: number; language?: string | null; html_url?: string; pushed_at?: string; adoptFit?: string; title?: string; state?: string; number?: number; repository_url?: string; }
+interface Digest { byCategory: { category: string; rationale: string; items: DigestItem[] }[]; intentsRun: number; intentsTotal: number; rateLimit?: { remaining: number; limit: number }; note?: string; }
+
 export default function GitHubSearchPanel({ onNotify }: { onNotify?: (msg: string, type?: "success" | "error" | "info") => void }) {
+  const [mode, setMode] = useState<"search" | "standard">("search");
   const [type, setType] = useState<SearchType>("repos");
   const [q, setQ] = useState("");
   const [data, setData] = useState<Resp | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [digest, setDigest] = useState<Digest | null>(null);
+  const [digestBusy, setDigestBusy] = useState(false);
+
+  const runStandard = async (refresh = false) => {
+    setDigestBusy(true); setErr("");
+    try {
+      const d = await api.get<Digest>(`/api/github/search/standard${refresh ? "?refresh=1" : ""}`);
+      setDigest(d);
+      onNotify?.(`Standart tarama: ${d.intentsRun}/${d.intentsTotal} intent`, "info");
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setDigestBusy(false); }
+  };
 
   const run = async (t: SearchType = type) => {
     const query = q.trim();
@@ -56,8 +81,57 @@ export default function GitHubSearchPanel({ onNotify }: { onNotify?: (msg: strin
       <div className="flex items-center gap-2 text-sm text-slate-300">
         <Search className="w-4 h-4 text-cyan-300" />
         <span>GitHub Arama — depo · issue · kod</span>
+        <div className="ml-auto flex gap-1">
+          <button onClick={() => setMode("search")} className={`px-2 py-1 rounded text-xs ${mode === "search" ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30" : "text-slate-400 border border-transparent hover:bg-white/5"}`}>Serbest</button>
+          <button onClick={() => { setMode("standard"); if (!digest) runStandard(); }} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${mode === "standard" ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30" : "text-slate-400 border border-transparent hover:bg-white/5"}`}><Compass className="w-3.5 h-3.5" /> Standart Tarama</button>
+        </div>
       </div>
 
+      {mode === "standard" && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400">ollamas'ı geliştirmek için küratörlü keşif — adopt-fit sınıflı görev listesi.</span>
+            <button onClick={() => runStandard(true)} disabled={digestBusy} className="ml-auto flex items-center gap-1 px-2 py-1 rounded border border-slate-600 text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-40">
+              {digestBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Yenile
+            </button>
+          </div>
+          {err && <div className="text-rose-400 text-xs font-mono">{err}</div>}
+          {digest?.note && <div className="text-xs text-amber-300">{digest.note}</div>}
+          {digestBusy && !digest && <div className="text-slate-500 text-sm">tarama çalışıyor…</div>}
+          {digest && digest.byCategory.map((cat) => (
+            <div key={cat.category} className="rounded border border-slate-700 bg-slate-900/40 p-3">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-sm text-cyan-300 font-medium">{CAT_LABEL[cat.category] || cat.category}</span>
+                <span className="text-[10px] text-slate-500">{cat.items.length}</span>
+              </div>
+              <div className="text-[11px] text-slate-500 mb-2">{cat.rationale}</div>
+              <ul className="divide-y divide-slate-800">
+                {cat.items.map((it, i) => it.full_name ? (
+                  <li key={i} className="py-1.5 flex items-center gap-2">
+                    {(() => { const b = fitBadge(it.adoptFit || "unknown"); return <span className={`text-[9px] font-mono px-1 rounded border shrink-0 ${b.cls}`}>{b.label}</span>; })()}
+                    <a href={safeUrl(it.html_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-200 hover:text-cyan-300 truncate flex items-center gap-1 min-w-0">
+                      <span className="truncate">{it.full_name}</span>{safeUrl(it.html_url) && <ExternalLink className="w-3 h-3 shrink-0 opacity-50" />}
+                    </a>
+                    <span className="ml-auto flex items-center gap-2 text-[10px] text-slate-500 shrink-0">
+                      {it.language && <span>{it.language}</span>}
+                      <span className="flex items-center gap-0.5"><Star className="w-3 h-3" />{(it.stargazers_count ?? 0).toLocaleString()}</span>
+                      {it.pushed_at && <span>{it.pushed_at.slice(0, 7)}</span>}
+                    </span>
+                  </li>
+                ) : (
+                  <li key={i} className="py-1.5 flex items-start gap-2">
+                    <CircleDot className={`w-3 h-3 mt-0.5 shrink-0 ${it.state === "open" ? "text-emerald-400" : "text-rose-400"}`} />
+                    <a href={safeUrl(it.html_url)} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-300 hover:text-cyan-300 truncate">{it.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {digest && digest.byCategory.length === 0 && !digestBusy && <div className="text-slate-500 text-sm">sonuç yok (kota veya boş)</div>}
+        </div>
+      )}
+
+      {mode === "search" && (<>
       <div className="flex gap-1">
         {TYPES.map((t) => (
           <button key={t.id} onClick={() => pickType(t.id)}
@@ -130,6 +204,7 @@ export default function GitHubSearchPanel({ onNotify }: { onNotify?: (msg: strin
           </ul>
         </>
       )}
+      </>)}
     </div>
   );
 }

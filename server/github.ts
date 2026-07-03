@@ -258,7 +258,7 @@ export function dispatchWorkflow(owner: string, repo: string, workflowId: string
 }
 
 // ── Search API (GitHub Arama tab). repos/issues read anon; code REQUIRES auth. ──
-export interface RepoResult { full_name?: string; description?: string | null; stargazers_count?: number; language?: string | null; html_url?: string; updated_at?: string; }
+export interface RepoResult { full_name?: string; description?: string | null; stargazers_count?: number; language?: string | null; html_url?: string; updated_at?: string; pushed_at?: string; archived?: boolean; fork?: boolean; license?: { spdx_id?: string | null } | null; }
 export interface IssueResult { title?: string; state?: string; html_url?: string; number?: number; repository_url?: string; user?: { login?: string }; pull_request?: unknown; }
 export interface CodeResult { name?: string; path?: string; html_url?: string; repository?: { full_name?: string }; }
 
