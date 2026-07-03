@@ -2,6 +2,8 @@
 // env-overridable). Pure. The reactive 429 cooldown (providers.ts) stays the backstop, so a
 // wrong guess here never hard-fails — it only shifts WHEN proactive rotation/alerting kicks in.
 
+import { PROVIDER_CATALOG } from "./provider-catalog";
+
 export interface RateLimit { perMin: number; perDay: number } // 0 = unlimited / unknown
 
 const DEFAULTS: Record<string, RateLimit> = {
@@ -10,6 +12,10 @@ const DEFAULTS: Record<string, RateLimit> = {
   openai: { perMin: 500, perDay: 0 },
   anthropic: { perMin: 50, perDay: 0 },
   openrouter: { perMin: 200, perDay: 0 },
+  // Free-tier catalog providers contribute their documented limits (single source of truth).
+  ...Object.fromEntries(Object.values(PROVIDER_CATALOG).map((e) => [
+    e.id, { perMin: e.limits.perMin, perDay: e.limits.perDay },
+  ])),
 };
 
 // Resolve the limit for a provider; env `KEY_LIMIT_<PROVIDER>_PERMIN/_PERDAY` overrides.
