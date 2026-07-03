@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  classify, prioritize, reconcile, buildConductorReport, tierRank, TIERS,
+  classify, prioritize, reconcile, buildConductorReport, tierRank, TIERS, freshRedLanes,
   type ClassifyInput, type Finding,
 } from "../bin/lib/conduct";
 
@@ -124,5 +124,23 @@ describe("buildConductorReport", () => {
   it("eylem yok → stabil mesajı", () => {
     const r = buildConductorReport({ ts: "T", summary: "s", findings: [], action: null, delta: { added: [], resolved: [], persistent: [] }, workingPrompt: "p" });
     expect(r).toMatch(/temiz|stabil|eylem gerekmez/i);
+  });
+});
+
+describe("vO41 freshRedLanes — bayat QUALITY.redLanes yutulmaz (phantom-CRITICAL kökü)", () => {
+  const now = Date.parse("2026-07-03T12:00:00Z");
+  const red = [{ lane: "integration/v17-core", detail: "tsc 18 hata" }];
+  it("dosya-ts taze → redLanes geçer", () => {
+    expect(freshRedLanes({ ts: "2026-07-03T11:50:00Z", redLanes: red }, 60, now)).toEqual(red);
+  });
+  it("dosya-ts bayat → boş (fuse staleWarning zaten üretir)", () => {
+    expect(freshRedLanes({ ts: "2026-06-24T08:39:50.000Z", redLanes: red }, 60, now)).toEqual([]);
+  });
+  it("ts yok/geçersiz → boş (güvenli taraf)", () => {
+    expect(freshRedLanes({ redLanes: red }, 60, now)).toEqual([]);
+    expect(freshRedLanes(null, 60, now)).toEqual([]);
+  });
+  it("redLanes dizi değil → boş", () => {
+    expect(freshRedLanes({ ts: "2026-07-03T11:50:00Z", redLanes: "x" }, 60, now)).toEqual([]);
   });
 });

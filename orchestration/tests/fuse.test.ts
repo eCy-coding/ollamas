@@ -167,3 +167,28 @@ describe("vO16 conduct-RED staleness guard", () => {
     expect(guardStaleConduct(reqs, new Set(["backend"]))[0].criticality).toBe("ROADMAP");
   });
 });
+
+describe("vO41 tsc-fail staleness guard (phantom-CRITICAL: silinmiş lane)", () => {
+  const now = Date.parse("2026-07-03T12:00:00Z");
+  const staleQ = { ts: "2026-06-24T08:39:50.000Z", lanes: [
+    { lane: "integration/v17-core", tsc: "fail", tscErrors: 18, testLast: "unknown", testTs: "" },
+    { lane: "backend", tsc: "pass", tscErrors: 0, testLast: "unknown", testTs: "" },
+  ]};
+  it("staleFailLanes: dosya-ts bayat + tsc-fail lane → set'te (v17-core phantom kökü)", () => {
+    const s = staleFailLanes(staleQ, 60, now);
+    expect(s.has("integration/v17-core")).toBe(true);
+    expect(s.has("backend")).toBe(false); // tsc pass → asla
+  });
+  it("staleFailLanes: dosya-ts TAZE + tsc-fail → set'te DEĞİL (gerçek RED CRITICAL kalır)", () => {
+    const freshQ = { ts: "2026-07-03T11:50:00Z", lanes: [{ lane: "x", tsc: "fail", tscErrors: 3, testLast: "unknown", testTs: "" }] };
+    expect(staleFailLanes(freshQ, 60, now).has("x")).toBe(false);
+  });
+  it("guardStaleConduct: bayat tsc-fail RED → COMPLETENESS downgrade (e2e phantom senaryosu)", () => {
+    const reqs: Requirement[] = [
+      { criticality: "CRITICAL", source: "conduct", target: "red:integration/v17-core", detail: "tsc 18 hata", action: "fix", score: 100 },
+    ];
+    const g = guardStaleConduct(reqs, staleFailLanes(staleQ, 60, now));
+    expect(g[0].criticality).toBe("COMPLETENESS");
+    expect(g[0].source).toMatch(/stale/);
+  });
+});

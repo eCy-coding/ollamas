@@ -14,7 +14,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collect, type CockpitSnapshot } from "./lib/collect";
 import {
-  classify, prioritize, reconcile, buildConductorReport, TIERS,
+  classify, prioritize, reconcile, buildConductorReport, TIERS, freshRedLanes,
   type Finding, type ClassifyInput,
 } from "./lib/conduct";
 import {
@@ -75,7 +75,8 @@ async function main(): Promise<void> {
     depgraphMissing: depgraphMissing(),
     driftCount: 0, // drift.ts DEPGRAPH'a yazıyor; MISSING-only şimdilik (drift soft-warn RISK-ORCH-011)
     benchRegressions: (bench?.regressions ?? []).map((r: any) => ({ model: r.model, dropPct: r.dropPct })),
-    redLanes: Array.isArray(quality?.redLanes) ? quality.redLanes : [], // vO9: quality.ts roll-up (tsc-fail/test-failed) → RED-lane sinyali
+    // vO9 roll-up + vO41 tazelik-gate: bayat QUALITY.json (ör. silinmiş worktree) phantom-RED üretmesin.
+    redLanes: freshRedLanes(quality, Number(process.env.FUSE_STALE_MIN || 60)),
   };
   const baseFindings: Finding[] = classify(ci);
 

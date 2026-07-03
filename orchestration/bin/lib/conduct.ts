@@ -7,6 +7,8 @@
  * Pattern ref: k8s controller reconcile (observe→diff→decide, idempotent), GitOps delta.
  */
 
+import { sourceFresh } from "./fuse";
+
 // Tier sırası = öncelik (küçük rank = yüksek öncelik). Matematiksel/mantıksal bütünlük.
 export const TIERS = ["RED", "SECURITY", "CONTRACT", "DRIFT", "REGRESSION", "COMPLETENESS", "STALE", "ROADMAP"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -30,6 +32,15 @@ export interface ClassifyInput {
   benchRegressions: { model: string; dropPct: number }[];
   redLanes: { lane: string; detail: string }[]; // bilinen kırık gate/test (varsa)
   idleThresholdH?: number;
+}
+
+/**
+ * vO41: QUALITY.json redLanes'i YALNIZ dosya-ts tazeyken yut — bayat roll-up'tan (ör. silinmiş
+ * worktree lane'i) phantom-CRITICAL üretme. Bayat durumda fuse.ts zaten staleWarning üretir. Saf.
+ */
+export function freshRedLanes(quality: any, maxMinutes = 60, nowMs = Date.now()): { lane: string; detail: string }[] {
+  if (!Array.isArray(quality?.redLanes)) return [];
+  return sourceFresh(quality?.ts, maxMinutes, nowMs) ? quality.redLanes : [];
 }
 
 /** Ham sinyalleri Finding[]'e çevir. Saf, test edilebilir. */

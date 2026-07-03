@@ -147,11 +147,18 @@ export function staleWarning(source: string, ts: string | undefined, refreshCmd:
   };
 }
 
-/** QUALITY.lanes'ten güvenilmez-kırık lane adları: testLast=failed AMA testTs bayat → Set. */
+/**
+ * QUALITY.lanes'ten güvenilmez-kırık lane adları → Set.
+ * - testLast=failed AMA testTs bayat (per-lane kanıt-ts).
+ * - vO41: tsc-fail AMA QUALITY dosya-ts'i bayat — tsc'nin per-lane ts'i yok, tek kanıt dosya ts'i.
+ *   (Silinmiş worktree'nin bayat tsc-RED'i phantom-CRITICAL üretmesin.)
+ */
 export function staleFailLanes(q: any, maxMinutes = 60, nowMs = Date.now()): Set<string> {
   const out = new Set<string>();
+  const fileStale = !sourceFresh(q?.ts, maxMinutes, nowMs);
   for (const l of q?.lanes || []) {
     if (l.testLast === "failed" && !sourceFresh(l.testTs, maxMinutes, nowMs)) out.add(l.lane);
+    if (fileStale && (l.tsc === "fail" || (l.tscErrors ?? 0) > 0)) out.add(l.lane);
   }
   return out;
 }

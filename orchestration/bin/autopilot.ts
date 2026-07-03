@@ -51,6 +51,11 @@ function detailFor(step: string): string {
     const tok = sel?.selection?.tokS;
     return m ? `pick ${m}${tok ? ` · ${tok} tok/s` : ""}${sel?.stale ? " · ⚠️ STALE" : ""}` : "model seçimi tazelendi";
   }
+  if (step === "quality") {
+    const q = readJson(join(ORCH_DIR, "QUALITY.json"));
+    const t = q?.totals;
+    return t ? `lane sağlığı tazelendi · 🟢${t.green} 🔴${t.red} ⚪${t.unknown}` : "lane sağlığı tazelendi";
+  }
   if (step === "conduct") {
     const f = join(ORCH_DIR, "CONDUCTOR.md");
     if (existsSync(f)) {
@@ -183,6 +188,9 @@ function main(): void {
     runStep("benchprompt", "benchprompt.ts", []),
     runStep("council", "council.ts", []),  // model-council light: roster tazele (ollama list) → COUNCIL_ROSTER.json (ağır --all opt-in)
     runStep("fleet", "fleet-conduct.ts", []),  // local model-fleet supervise: reports+claims → FLEET_STATUS.md (launch --go opt-in)
+    // vO41: QUALITY.json'u HER koşuda tazele (bayat roll-up → phantom-CRITICAL kökü). SessionStart'ta
+    // --no-tsc (hızlı: lane listesi + vitest cache), launchd --heal'de tam tsc taraması.
+    runStep("quality", "quality.ts", HEAL ? [] : ["--no-tsc"]),
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
