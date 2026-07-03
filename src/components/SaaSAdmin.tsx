@@ -32,6 +32,8 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const [series, setSeries] = useState<any[]>([]);
   const [webhooks, setWebhooks] = useState<any[]>([]);
   const [upstreams, setUpstreams] = useState<any[]>([]);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [addingId, setAddingId] = useState<string>("");
   const [whUrl, setWhUrl] = useState("");
   const [whEvents, setWhEvents] = useState("key.created,usage.quota_exceeded");
 
@@ -46,12 +48,30 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const loadSelf = async () => {
     if (!tenantKey) return;
     localStorage.setItem("saasTenantKey", tenantKey);
+    // Usage panels need the usage:read scope; upstreams/catalog only need a valid
+    // key. Load them independently so a scope gap doesn't hide the catalog.
     try {
       setSelfUsage(await tapi("/api/saas/self/usage"));
       setSeries((await tapi("/api/saas/usage/timeseries")).series || []);
+    } catch (e: any) { onNotify(`Self-service usage: ${e.message} (key needs usage:read scope)`, "error"); }
+    try {
       setWebhooks(await tapi("/api/saas/webhooks"));
       setUpstreams(await tapi("/api/saas/upstreams"));
-    } catch (e: any) { onNotify(`Self-service: ${e.message} (key needs usage:read scope)`, "error"); }
+      setCatalog(await tapi("/api/saas/catalog"));
+    } catch (e: any) { onNotify(`Self-service: ${e.message}`, "error"); }
+  };
+  // One-click add of a curated catalog entry as a stdio upstream (dalga-2).
+  const addCatalog = async (entry: any) => {
+    setAddingId(entry.id);
+    try {
+      await tapi("/api/saas/upstreams", {
+        method: "POST",
+        body: JSON.stringify({ name: entry.id, transport: entry.transport, command: entry.command, args: entry.args }),
+      });
+      onNotify(`Upstream '${entry.title}' added — connecting…`, "success");
+      loadSelf();
+    } catch (e: any) { onNotify(`Add '${entry.id}': ${e.message}`, "error"); }
+    finally { setAddingId(""); }
   };
   const addHook = async () => {
     try {
@@ -285,14 +305,50 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
           {/* Upstreams */}
           <div>
             <div className="text-xs text-immersive-text-muted mb-1">Upstream MCP servers</div>
-            <ul className="space-y-0.5">
+            <ul className="space-y-0.5 mb-3">
               {upstreams.map((u) => (
                 <li key={u.id} className="text-xs font-mono text-immersive-text-muted flex items-center gap-2">
                   <span className="text-immersive-text-muted">{u.name}</span><span className="text-immersive-text-dim">[{u.transport}]</span>
                 </li>
               ))}
-              {upstreams.length === 0 && <li className="text-xs text-immersive-text-dim">none (POST /api/saas/upstreams)</li>}
+              {upstreams.length === 0 && <li className="text-xs text-immersive-text-dim">none — add one from the catalog below</li>}
             </ul>
+            {/* Curated catalog (dalga-2): vetted MIT reference servers, one-click add */}
+            {catalog.length > 0 && (
+              <>
+                <div className="text-xs text-immersive-text-muted mb-1">Catalog (official, MIT, local stdio)</div>
+                <ul className="space-y-1">
+                  {catalog.map((c) => (
+                    <li key={c.id} className="bg-immersive-inset border border-immersive-border-strong rounded-lg px-2 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-immersive-text-bright font-medium">{c.title}</span>
+                        {c.tags?.map((t: string) => (
+                          <span key={t} className={`text-[9px] font-mono px-1 rounded ${t === "outbound-web" ? "bg-amber-500/15 text-status-warn" : "bg-white/5 text-immersive-text-dim"}`}>{t}</span>
+                        ))}
+                        <span className="ml-auto">
+                          {c.installed ? (
+                            <span className="text-[10px] font-mono text-status-ok">installed</span>
+                          ) : !c.available ? (
+                            <span className="text-[10px] font-mono text-immersive-text-dim" title={c.note}>requires {c.requires}</span>
+                          ) : (
+                            <button
+                              aria-label={`Add ${c.title} upstream`}
+                              onClick={() => addCatalog(c)}
+                              disabled={addingId === c.id}
+                              className={`${btn} bg-cyan-500/15 text-status-info hover:bg-cyan-500/25 !px-2 !py-0.5 disabled:opacity-50`}
+                            >
+                              <Plus className="w-3 h-3" /> Add
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-immersive-text-dim mt-0.5">{c.desc}</div>
+                      {c.note && !c.installed && <div className="text-[9px] font-mono text-immersive-text-dim mt-0.5">{c.note}</div>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         </div>
       </div>

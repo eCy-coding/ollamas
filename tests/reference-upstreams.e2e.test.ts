@@ -42,6 +42,25 @@ describe("MCP gateway CONSUME — reference-server fan-out (3+ upstreams)", () =
     expect(String(out.output)).toContain("nodes");
   }, 30000);
 
+  // Live (dalga-2): a curated CATALOG entry drives connectUpstream end-to-end —
+  // proves the catalog's command/args are exactly what the transport needs.
+  test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
+    "catalog 'memory' entry connects the real server via npx stdio",
+    async () => {
+      const { CATALOG, resolveArgs } = await import("../server/mcp/catalog");
+      const { connectUpstream } = await import("../server/mcp/client");
+      const { ToolRegistry } = await import("../server/tool-registry");
+      const entry = CATALOG.find((e) => e.id === "memory")!;
+      const r = await connectUpstream({
+        name: "catmem", transport: entry.transport, command: entry.command, args: resolveArgs(entry),
+      });
+      expect(r.ok).toBe(true);
+      expect(ToolRegistry.has("mcp__catmem__read_graph")).toBe(true);
+      expect(ToolRegistry.tier("mcp__catmem__read_graph")).toBe("host_upstream");
+    },
+    120000,
+  );
+
   // Live: real @modelcontextprotocol/server-everything (canonical test server, no FS writes).
   test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
     "real server-everything registers mcp__everything__echo at host_upstream",
