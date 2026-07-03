@@ -13,7 +13,7 @@ db.data.permissions.commandExec = true;
 describe("LLM Mission Control Core Software Suite Tests", () => {
   
   // 1. ProviderRouter fallback chain order
-  it("ProviderRouter fallback chain advances correctly", () => {
+  it("ProviderRouter fallback chain advances correctly", async () => {
     // Access private static method for testing
     const getFallbackChain = (ProviderRouter as any).getFallbackChain.bind(ProviderRouter);
     const chainOpenRouter = getFallbackChain("openrouter");
@@ -25,7 +25,10 @@ describe("LLM Mission Control Core Software Suite Tests", () => {
     expect(chainOpenRouter).toContain("demo");
     expect(chainOpenRouter).toContain("fleet");
     expect(chainOpenRouter).toContain("gemini-cli"); // keyless OAuth backend in the chain
-    expect(chainOpenRouter.length).toBe(8); // fleet + gemini-cli (server/providers.ts fallback defaults)
+    // 8 legacy defaults + the free-tier PROVIDER_CATALOG (7) — derive, don't hardcode,
+    // so adding a catalog provider doesn't break this invariant test.
+    const { PROVIDER_CATALOG } = await import("../server/provider-catalog");
+    expect(chainOpenRouter.length).toBe(8 + Object.keys(PROVIDER_CATALOG).length);
 
     const chainUnknown = getFallbackChain("unknown-provider");
     expect(chainUnknown[0]).toBe("unknown-provider");

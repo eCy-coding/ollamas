@@ -19,6 +19,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
+import { keyedCloudProviders, catalogEntry } from "./server/provider-catalog";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
@@ -555,7 +556,7 @@ async function initializeServer() {
         // key joins and drops when the whole pool is quota-cooled. live/total mirror the
         // KeyVault burn meter so both tabs agree.
         cloudProviders: [
-          ...["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
+          ...keyedCloudProviders()
             // vNEXT-D3: also carry worstPct + allApproaching (poolSaturation) so KeyVault can ride
             // this SSE instead of its 15s poll. Empty-pool guarded (worstPct 0, not the sentinel).
             .map((p) => {
@@ -569,7 +570,7 @@ async function initializeServer() {
           { name: "gemini-cli", ready: geminiCliReady, live: geminiCliReady ? 1 : 0, total: 1, keyless: true, worstPct: 0, allApproaching: false },
         ],
         // vNEXT-D3: key-pool saturation alerts (mirrors /api/keys/pool `alerts`) for KeyVault over SSE.
-        keyAlerts: ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]
+        keyAlerts: keyedCloudProviders()
           .map((p) => ({ p, s: ProviderRouter.keyPoolStatus(p), sat: ProviderRouter.poolSaturation(p) }))
           .filter(({ s, sat }) => s.total > 0 && sat.allApproaching)
           .map(({ p, s, sat }) => ({ provider: p, worstPct: Math.round(sat.worstPct * 100) / 100, live: s.live })),
@@ -714,10 +715,11 @@ async function initializeServer() {
     });
 
     // Provide default fallback masks if process.env loaded keys are placed
-    const cloudProviders = ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"];
+    const cloudProviders = keyedCloudProviders();
     cloudProviders.forEach((prov) => {
       if (!masks[prov]) {
-        const envKey = process.env[prov.toUpperCase() + "_API_KEY"];
+        // Catalog providers name their own env slot (e.g. GITHUB_MODELS_TOKEN); legacy keeps <PROV>_API_KEY.
+        const envKey = process.env[catalogEntry(prov)?.envKey ?? prov.toUpperCase() + "_API_KEY"];
         if (envKey) {
           masks[prov] = `${prov.toUpperCase()}-ENV-SET`;
         }
@@ -730,7 +732,7 @@ async function initializeServer() {
   // Key-pool health (counts only — NEVER values). Lets the system-monitor alert when a
   // provider's user-supplied key pool is exhausted (all cooled) so a new key can be added.
   app.get("/api/keys/pool", (_req, res) => {
-    const providers = ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"];
+    const providers = keyedCloudProviders();
     // Per-provider pool health + proactive saturation (worst key burn %, all-approaching alert).
     const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean }> = {};
     for (const p of providers) {

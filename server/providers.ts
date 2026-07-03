@@ -8,6 +8,7 @@ import { generateViaGeminiCli, geminiCliAvailable } from "./gemini-cli";
 import { keyId, recordKeyUse, keyWindows, recordCallCost } from "./key-usage";
 import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
+import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catalog";
 
 // Types
 export interface ProviderMessage {
@@ -450,7 +451,10 @@ export class ProviderRouter {
 
   // public for unit testing the chain order (pure helper, no side effects)
   public static getFallbackChain(initial: string): string[] {
-    const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "gemini-cli", "openai", "ollama-cloud", "demo"];
+    // Free-tier catalog providers join the cloud tier (before demo). Keyless ones are
+    // skipped by the hasKey gate at dispatch, so listing them costs nothing until a key
+    // is added — then they participate in latency-ordered failover automatically.
+    const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "gemini-cli", "openai", "ollama-cloud", ...Object.keys(PROVIDER_CATALOG), "demo"];
     // Keep the Gemini family ADJACENT and FIRST when a gemini provider is requested: an exhausted
     // gemini API-key pool (429/cooled) self-sustains on the KEYLESS gemini-cli OAuth binary (same
     // Gemini family, 1000/day, no paste/rotation) BEFORE dropping to local — minimum-manual
@@ -622,7 +626,9 @@ export class ProviderRouter {
       case "openai": return "OPENAI_API_KEY";
       case "openrouter": return "OPENROUTER_API_KEY";
       case "ollama-cloud": return "OLLAMA_CLOUD_KEY";
-      default: return "";
+      // Catalog providers name their own env slot — keyPool's NAME/_1..9/NAMES rotation
+      // then works for them with zero extra wiring.
+      default: return catalogEntry(provider)?.envKey ?? "";
     }
   }
 
@@ -648,6 +654,92 @@ export class ProviderRouter {
   }
 
   /**
+   * Shared OpenAI-compatible chat call — one implementation for openai/custom-openai,
+   * the keyless local backends (vllm/llamacpp) AND every free-tier catalog provider.
+   * Streaming SSE (`data:` lines, `[DONE]` terminator) and non-streaming JSON both handled.
+   */
+  private static async openAiCompatCall(
+    baseUrl: string,
+    apiKey: string,
+    source: string,
+    defaultModel: string,
+    config: GenerateConfig,
+    onStreamChunk?: (text: string) => void,
+    signal?: AbortSignal
+  ): Promise<{ text: string; source: string; modelUsed: string; tokensIn?: number; tokensOut?: number; toolCalls?: ToolCall[] }> {
+    const model = config.model || defaultModel;
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Only send Authorization when a key exists (local backends 400 on a bogus bearer).
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: toOpenAiMessages(config.messages),
+        temperature: config.temperature ?? 0.7,
+        stream: !!onStreamChunk,
+        tools: config.tools,
+      }),
+      signal: buildSignal(signal),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI-compatible host returned error ${response.status}`);
+    }
+
+    if (onStreamChunk && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let fullText = "";
+
+      while (true) {
+        abortIfCancelled(signal); // never drain a backend past a caller abort
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        const lines = accumulated.split("\n");
+        accumulated = lines.pop() || "";
+
+        for (const line of lines) {
+          const cleaned = line.trim();
+          if (!cleaned || !cleaned.startsWith("data:")) continue;
+          if (cleaned === "data: [DONE]") break;
+          try {
+            const parsed = JSON.parse(cleaned.substring(5).trim());
+            const chunkText = parsed.choices?.[0]?.delta?.content || "";
+            if (chunkText) {
+              onStreamChunk(chunkText);
+              fullText += chunkText;
+            }
+          } catch (e) {}
+        }
+      }
+      return { text: fullText, source, modelUsed: model };
+    } else {
+      const json = await response.json();
+      const tcs = json.choices?.[0]?.message?.tool_calls;
+      const toolCalls = tcs?.map((tc: any) => ({
+        id: tc.id,
+        name: tc.function?.name,
+        arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
+      }));
+
+      return {
+        text: json.choices?.[0]?.message?.content || "",
+        source,
+        modelUsed: model,
+        // Real OpenAI-compat token usage — D1 cost telemetry.
+        tokensIn: json.usage?.prompt_tokens,
+        tokensOut: json.usage?.completion_tokens,
+        toolCalls: toolCalls?.length ? toolCalls : undefined,
+      };
+    }
+  }
+
+  /**
    * Individual execution adapter
    */
   private static async executeProvider(
@@ -660,6 +752,17 @@ export class ProviderRouter {
     const msgs = config.messages || [];
     const systemMessage = msgs.find((m) => m.role === "system")?.content || "";
     const nonSystemMessages = msgs.filter((m) => m.role !== "system");
+
+    // Free-tier catalog providers (groq, cerebras, zai, …) all speak OpenAI-compat —
+    // one data-driven branch instead of N copy-paste switch cases.
+    const cat = catalogEntry(config.provider);
+    if (cat) {
+      const baseUrl = catalogBaseUrl(cat.id);
+      if (!baseUrl) throw new Error(`${cat.id}: CLOUDFLARE_ACCOUNT_ID not set (required to compose the API base URL)`);
+      const apiKey = this.getDecryptedKey(cat.id);
+      if (!apiKey) throw new Error(`${cat.id} API key not set (${cat.envKey})`);
+      return this.openAiCompatCall(baseUrl, apiKey, `cloud:${cat.id}`, cat.defaultModel, config, onStreamChunk, signal);
+    }
 
     switch (config.provider) {
       case "fleet": {
@@ -1090,75 +1193,9 @@ export class ProviderRouter {
             ? (db.data.keys["custom-openai-endpoint"] || "https://api.openai.com/v1")
             : "https://api.openai.com/v1";
 
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // Only send Authorization when a key exists (local backends 400 on a bogus bearer).
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          body: JSON.stringify({
-            model: config.model || (isCustom || localCompat ? "" : "gpt-4o-mini"),
-            messages: toOpenAiMessages(config.messages),
-            temperature: config.temperature ?? 0.7,
-            stream: !!onStreamChunk,
-            tools: config.tools,
-          }),
-          signal: buildSignal(signal),
-        });
-
-        if (!response.ok) {
-          throw new Error(`OpenAI-compatible host returned error ${response.status}`);
-        }
-
-        if (onStreamChunk && response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let accumulated = "";
-          let fullText = "";
-
-          while (true) {
-            abortIfCancelled(signal); // never drain a backend past a caller abort
-            const { done, value } = await reader.read();
-            if (done) break;
-            accumulated += decoder.decode(value, { stream: true });
-            const lines = accumulated.split("\n");
-            accumulated = lines.pop() || "";
-
-            for (const line of lines) {
-              const cleaned = line.trim();
-              if (!cleaned || !cleaned.startsWith("data:")) continue;
-              if (cleaned === "data: [DONE]") break;
-              try {
-                const parsed = JSON.parse(cleaned.substring(5).trim());
-                const chunkText = parsed.choices?.[0]?.delta?.content || "";
-                if (chunkText) {
-                  onStreamChunk(chunkText);
-                  fullText += chunkText;
-                }
-              } catch (e) {}
-            }
-          }
-          return { text: fullText, source: localCompat ? `local:${prov}` : `cloud:${keyProvider}`, modelUsed: config.model };
-        } else {
-          const json = await response.json();
-          const tcs = json.choices?.[0]?.message?.tool_calls;
-          const toolCalls = tcs?.map((tc: any) => ({
-            id: tc.id,
-            name: tc.function?.name,
-            arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
-          }));
-
-          return {
-            text: json.choices?.[0]?.message?.content || "",
-            source: localCompat ? `local:${prov}` : `cloud:${keyProvider}`,
-            modelUsed: config.model,
-            // Real OpenAI-compat token usage (openai/custom/vllm/llamacpp) — D1 cost telemetry.
-            tokensIn: json.usage?.prompt_tokens,
-            tokensOut: json.usage?.completion_tokens,
-            toolCalls: toolCalls?.length ? toolCalls : undefined,
-          };
-        }
+        const source = localCompat ? `local:${prov}` : `cloud:${keyProvider}`;
+        const defaultModel = isCustom || localCompat ? "" : "gpt-4o-mini";
+        return this.openAiCompatCall(baseUrl, apiKey, source, defaultModel, config, onStreamChunk, signal);
       }
 
       case "anthropic": {
