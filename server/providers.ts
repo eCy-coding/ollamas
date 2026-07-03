@@ -534,6 +534,10 @@ export class ProviderRouter {
   }
 
   private static hasKey(provider: string): boolean {
+    // A scoped /api/keys/test candidate counts as a key: without this, testing a key for a
+    // provider that has NO stored/env key is skipped by the chain's key gate and reports the
+    // misleading "No usable provider found." instead of the candidate's real verdict.
+    if (this.testKeyOverride && this.testKeyOverride.provider === provider) return true;
     const rawKeys = db.data.keys || {};
     const key = rawKeys[provider] || process.env[this.getEnvKeyName(provider)];
     return typeof key === "string" && key.trim().length > 0;
