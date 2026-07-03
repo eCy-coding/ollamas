@@ -10,6 +10,11 @@ import { generateIdentity, type Identity } from "./identity.ts";
 
 const BASE = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const IDENTITY_PATH = process.env.CONTRACT_IDENTITY_PATH || join(homedir(), ".ollamas", "contract-identity.json");
+const KEY_PATH = process.env.CONTRACT_KEY_PATH || join(homedir(), ".ollamas", "contract-key");
+
+function homeDir(): string {
+  return homedir();
+}
 
 function loadOrCreateIdentity(): Identity {
   try {
@@ -41,7 +46,7 @@ export function localSpecs(): { ramGB: number; os: string; arch: string } {
 async function main(): Promise<number> {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
-    options: { email: { type: "string" }, json: { type: "boolean", default: false } },
+    options: { email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" } },
   });
   const [cmd, id] = positionals;
   const out = (o: unknown) => console.log(values.json ? JSON.stringify(o) : JSON.stringify(o, null, 2));
@@ -83,6 +88,76 @@ async function main(): Promise<number> {
       if (!id) { console.error(`usage: contract ${cmd} <m_id>`); return 2; }
       out(await http("POST", `/api/contract/${id}/${cmd}`, {}, true));
       return 0;
+    }
+    case "join": {
+      if (!values.email) { console.error("usage: contract join --email you@example.com [--timeout 600]"); return 2; }
+      const { joinPool, specsFromOs } = await import("./agent.ts");
+      const os = await import("node:os");
+      const identity = loadOrCreateIdentity();
+      console.error(`applying to ${BASE} … (T0 must run: contract approve <id>)`);
+      const r = await joinPool({
+        baseUrl: BASE,
+        email: values.email,
+        specs: specsFromOs({ totalmemBytes: os.totalmem(), loadavg1: os.loadavg()[0] ?? 0, cpuCount: os.cpus().length, platform: os.platform(), arch: os.arch() }),
+        machinePubkey: identity.publicKeyHex,
+        fetchFn: fetch,
+        pollIntervalMs: 5000,
+        timeoutMs: Number(values.timeout || 600) * 1000,
+        sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+      });
+      const { writeFileSync: wf, mkdirSync: mk } = await import("node:fs");
+      const { dirname: dn } = await import("node:path");
+      mk(dn(KEY_PATH), { recursive: true });
+      wf(KEY_PATH, r.key + "\n", { mode: 0o600 });
+      console.error(`✓ member ${r.memberId} active; key saved to ${KEY_PATH} (0600)`);
+      console.error("next: contract agent install   (0-manuel heartbeat daemon)");
+      out({ memberId: r.memberId, keyPath: KEY_PATH });
+      return 0;
+    }
+    case "agent": {
+      const { collectHeartbeat, heartbeatOnce, installAgent, uninstallAgent, agentLoaded, AGENT_LABEL } = await import("./agent.ts");
+      const os = await import("node:os");
+      const { readFileSync: rf } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
+      const cliPath = fileURLToPath(import.meta.url);
+      const plan = {
+        label: AGENT_LABEL,
+        nodeBin: process.execPath,
+        cliPath,
+        args: ["agent", "run"],
+        logPath: join(homeDir(), ".ollamas", "contract-agent.log"),
+        workdir: join(homeDir(), ".ollamas"),
+      };
+      if (id === "install") { const r = installAgent(plan); console.error(r.reason); return r.ok ? 0 : 1; }
+      if (id === "uninstall") { const r = uninstallAgent(AGENT_LABEL); console.error(r.reason); return r.ok ? 0 : 1; }
+      if (id === "status") { out({ label: AGENT_LABEL, loaded: agentLoaded(AGENT_LABEL) }); return 0; }
+      if (id === "run" || id === "once") {
+        const key = rf(KEY_PATH, "utf8").trim();
+        const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+        const beat = async () => {
+          const hb = await collectHeartbeat({
+            osInfo: { totalmemBytes: os.totalmem(), loadavg1: os.loadavg()[0] ?? 0, cpuCount: os.cpus().length, platform: os.platform(), arch: os.arch() },
+            fetchFn: fetch,
+            ollamaUrl,
+          });
+          const r = await heartbeatOnce({ baseUrl: BASE, key, fetchFn: fetch, hb });
+          console.error(`[agent] heartbeat → ${r.status} (${new Date().toISOString()})`);
+          return r;
+        };
+        const first = await beat();
+        if (id === "once") return first.ok ? 0 : 1;
+        setInterval(() => { beat().catch((e) => console.error(`[agent] ${e.message}`)); }, 60_000);
+        await new Promise(() => {}); // run forever (launchd KeepAlive owns the lifecycle)
+      }
+      console.error("usage: contract agent install|uninstall|status|run|once");
+      return 2;
+    }
+    case "quota": {
+      const { readFileSync: rf } = await import("node:fs");
+      const key = process.env.CONTRACT_API_KEY || rf(KEY_PATH, "utf8").trim();
+      const res = await fetch(`${BASE}/api/pool/quota`, { headers: { authorization: `Bearer ${key}` } });
+      out(await res.json());
+      return res.ok ? 0 : 1;
     }
     case "pool": {
       const key = process.env.CONTRACT_API_KEY || "";
@@ -224,7 +299,7 @@ async function main(): Promise<number> {
       return 0;
     }
     default:
-      console.error("usage: contract document | apply --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | doctor | shard [plan]");
+      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | quota | agent <install|uninstall|status|run|once> | doctor | shard [up|down|status|proof|plan]");
       return 2;
   }
 }

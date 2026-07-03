@@ -162,6 +162,14 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
     res.json({ nodes: contractPoolNodes() });
   });
 
+  app.get("/api/pool/quota", requireAuth, (req, res) => {
+    const tenantId = (req as any).tenant?.tenantId;
+    if (!tenantId) return res.status(401).json({ error: "key required" });
+    const m = getState().members.find((x) => x.tenantId === tenantId && x.status === "active");
+    if (!m) return res.status(404).json({ error: "no active membership for this key" });
+    res.json({ memberId: m.id, ...m.quota });
+  });
+
   // vK4 federated inference gateway — "one big machine" API surface for members.
   // Quota is enforced HERE (nodes are never trusted to self-limit); the scheduler
   // is the EXISTING fleet provider fed by our ranked backends.json projection.
