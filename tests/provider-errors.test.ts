@@ -57,8 +57,11 @@ describe("router integration — 429 with Retry-After cools the spent key", () =
 
   it("catalog provider 429 → the SPENT key leaves the live pool (singleAttempt surfaces the error)", async () => {
     vi.stubEnv("GROQ_API_KEY", "gsk_429_test");
-    // Relative assertion: the operator's real vault may hold live groq keys — only the
-    // spent stub must cool, everything else stays live (machine-state-independent test).
+    // Deterministic baseline: cooldowns persist across runs and the 7s Retry-After from a
+    // PRIOR run can still be live — sweep everything as-if far in the future first, then
+    // assert relatively (the operator's real vault may hold live groq keys; only the spent
+    // stub must cool). Machine-state- and timing-independent.
+    ProviderRouter.sweepCooldowns(Date.now() + 24 * 3600_000);
     const before = ProviderRouter.keyPoolStatus("groq").live;
     vi.stubGlobal("fetch", vi.fn(async () =>
       new Response("rate limited", { status: 429, headers: { "retry-after": "7" } })));
