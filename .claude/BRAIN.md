@@ -51,6 +51,8 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 | Machine saturation | Per-class limit + skip-done idempotency; 1 local + N cloud | Node worker-pool · Ollama NUM_PARALLEL | `fleet-agent.ts` |
 | Model can't gate | Conductor escalation: read real source + author proposal (honest attribution) | project directive + evidence | `<stream>.conductor.json` |
 | Tab vanished | Persistent agent + `exec $SHELL` (one-shot exits close tab) | macOS Terminal/iTerm2 default | `fleet-launch.ts` openTab |
+| Gate exit masked | Read the REAL exit (execFileSync → `e.status`), never `cmd \| head; echo $?` (pipe's last stage hides red) | RISK-ORCH-041 (vO55/56) | `bin/gate.ts` + `bin/lib/gate.ts` (`/gate`) |
+| Vendor overload (gemini 503) | Backoff + `flash` fallback; `--approval-mode plan` = read-only PROPOSE | gemini-cli headless docs | `bin/lib/gemini.ts` + `backoff.ts` |
 
 ## 3. Immutable principles (from AGENTS.md §2 + operator directives)
 

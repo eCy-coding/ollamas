@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 import { pullTicket, tryTurn, releaseTurn } from "./lib/gpu-lock";
 import { fullJitterDelay, isTransient } from "./lib/backoff";
 import { providerFor } from "./lib/chrome-probe";
+import { geminiArgs, parseGeminiJson, isGeminiOverload } from "./lib/gemini";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -116,7 +117,35 @@ function parseReport(out: string): { verdict: string; proposal: string; steps: n
   return { verdict: j.verdict ?? "?", proposal, steps: (j.steps ?? []).length };
 }
 
+/** Dispatch to the Gemini CLI (read-only `--approval-mode plan` → PROPOSE-safe). Retries transient 503/overload
+ *  with backoff and falls back to `gemini-2.5-flash` (the requested model may be demand-throttled). Writes an
+ *  agent-dispatch-compatible report so the conduct pipeline is unchanged. */
+function geminiDispatch(model: string, prompt: string): { verdict: string; proposal: string; steps: number; err?: string } {
+  const FLASH = "gemini-2.5-flash";
+  let lastErr = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const m = attempt < 2 ? model : FLASH; // requested model first, then fall back to the available flash tier
+    try {
+      const out = execFileSync("gemini", geminiArgs(prompt, m), {
+        encoding: "utf8", timeout: 300_000, maxBuffer: 8 * 1024 * 1024,
+        env: { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: "true" },
+      });
+      const g = parseGeminiJson(out);
+      if (g.ok) { const j = JSON.stringify({ model: m, verdict: "DONE", messages: [g.text], steps: [] }); writeFileSync(reportF, j); return parseReport(j); }
+      lastErr = "empty gemini response";
+    } catch (e: any) {
+      const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
+      lastErr = blob.slice(0, 200);
+      if (!isGeminiOverload(blob)) break; // non-transient (auth/usage) → stop retrying
+    }
+    try { execFileSync("sleep", [String(Math.min(8, 2 ** attempt))]); } catch { /* best-effort backoff */ }
+  }
+  try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: lastErr })); } catch { /* ignore */ }
+  return { verdict: "ERROR", proposal: "", steps: 0, err: lastErr };
+}
+
 function dispatch(model: string, prompt: string, steps: number, provider: string): { verdict: string; proposal: string; steps: number; err?: string } {
+  if (provider === "gemini-cli") return geminiDispatch(model, prompt);
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,

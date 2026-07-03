@@ -42,7 +42,7 @@ export const STREAMS: StreamSpec[] = [
   { id: "typescript-core", lang: "TypeScript", concern: "security+types (all new logic)",
     prefer: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest"] },
   { id: "errors-resilience", lang: "TypeScript", concern: "error-handling + exit-code + logging",
-    prefer: ["qwen3-coder:480b-cloud", "deepseek-r1:32b", "gpt-oss:120b-cloud"] },
+    prefer: ["qwen3-coder:480b-cloud", "deepseek-r1:32b", "gpt-oss:120b-cloud", "gemini-2.5-flash"] },
   { id: "concurrency-safety", lang: "TypeScript", concern: "race-condition + synchronization",
     prefer: ["deepseek-r1:32b", "gpt-oss:120b-cloud", "llama3.3:70b"] },
   { id: "mjs-migration", lang: "JavaScript→TypeScript", concern: "type-safety (.mjs → .ts, 490 files)",
@@ -53,9 +53,11 @@ export const STREAMS: StreamSpec[] = [
     prefer: ["qwen3:8b", "qwen3-coder:30b", "gpt-oss:20b-cloud"] },
 ];
 
-/** A model tag is "cloud" if it carries the -cloud suffix (parallelizes; costs no local GPU). */
+/** A model tag is "cloud" (parallelizes; costs no local GPU) when it carries the -cloud suffix OR is a remote
+ *  vendor like Gemini. Only bare ollama tags are "local" (the single GPU that must serialize). */
 export function runtimeOf(model: string | null): Assignment["runtime"] {
   if (!model) return "unknown";
+  if (/^gemini[-.\d]/i.test(model)) return "cloud";
   return /-cloud\b|:cloud\b|cloud$/.test(model) ? "cloud" : "local";
 }
 

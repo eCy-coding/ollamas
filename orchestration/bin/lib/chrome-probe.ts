@@ -7,7 +7,9 @@
 // successfully AND asserted a DONE/OK verdict AND wasn't a demo/no-tool run. This module encodes that
 // judgment deterministically so the capability matrix is evidence-based, not guessed.
 
-export type ChromeProvider = "ollama-local" | "ollama-cloud";
+import { isGeminiModel } from "./gemini";
+
+export type ChromeProvider = "ollama-local" | "ollama-cloud" | "gemini-cli";
 
 // Shell-running tools that can execute `open -a "Google Chrome"`. macos_terminal = privileged (visible
 // terminal); run_command = safe (sandboxed). Either counts as an opener attempt.
@@ -36,8 +38,10 @@ export interface ChromeProbeRow extends ChromeClassification {
   provider: ChromeProvider;
 }
 
-/** Provider for a model tag: cloud tags (…-cloud / …:cloud) go to ollama-cloud, everything else local. */
+/** Provider for a model tag: gemini tags → gemini-cli; cloud tags (…-cloud / …:cloud) → ollama-cloud;
+ *  everything else → ollama-local. */
 export function providerFor(model: string): ChromeProvider {
+  if (isGeminiModel(model)) return "gemini-cli";
   return /-cloud\b|:cloud\b|cloud$/.test(model) ? "ollama-cloud" : "ollama-local";
 }
 

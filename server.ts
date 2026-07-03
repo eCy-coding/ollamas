@@ -19,12 +19,13 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
-import { keyedCloudProviders, catalogEntry, trainsOnData } from "./server/provider-catalog";
+import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor } from "./server/provider-catalog";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
-import { parseRepoSlug } from "./server/github";
+import { parseRepoSlug, rerunFailedJobs, cancelRun } from "./server/github";
+import { getRuns, getJobs, detectRepoSlug } from "./server/github-actions";
 import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
 import { FilesystemManager } from "./server/files";
@@ -174,9 +175,54 @@ app.use(
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
     "/api/ecysearch", "/api/ecysearcher", "/api/threatfeed",
+    // NARROW prefix only: bare "/api/github" would also gate /api/github/webhook
+    // (inbound FROM GitHub) and 403 it under SAAS_ENFORCE=1.
+    "/api/github/actions",
   ],
   localOwnerGuard,
 );
+
+// GitHub Actions cockpit (dalga-6). Read paths work unauthenticated for public
+// repos; write paths (rerun/cancel) require the "github" vault token. Every
+// route validates owner/repo/run_id (assertActionsTarget) before interpolation.
+const ghToken = (): string => db.decrypt((db.data.keys || {})["github"] || "");
+app.get("/api/github/actions/repo-hint", async (_req, res) => {
+  res.json({ slug: await detectRepoSlug() });
+});
+app.get("/api/github/actions/runs", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  try {
+    res.json(await getRuns({ owner: slug.owner, repo: slug.repo, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.get("/api/github/actions/runs/:id/jobs", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  try {
+    res.json(await getJobs({ owner: slug.owner, repo: slug.repo, runId: req.params.id, token: ghToken(), signal: AbortSignal.timeout(8000) }));
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/github/actions/runs/:id/rerun", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  const token = ghToken();
+  if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla" });
+  try {
+    const r = await rerunFailedJobs(slug.owner, slug.repo, req.params.id, token, AbortSignal.timeout(8000));
+    res.status(r.ok ? 200 : 400).json(r.ok ? { ok: true } : { error: r.error });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/github/actions/runs/:id/cancel", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  const token = ghToken();
+  if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla" });
+  try {
+    const r = await cancelRun(slug.owner, slug.repo, req.params.id, token, AbortSignal.timeout(8000));
+    res.status(r.ok ? 200 : 400).json(r.ok ? { ok: true } : { error: r.error });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
 
 // Canlı Tehdit Akışı (dalga-3) — curated RSS/Atom/KEV reader, independent of the
 // eCySearcher Flask stack so the threat-intel tab has live data even when the
@@ -737,14 +783,20 @@ async function initializeServer() {
   app.get("/api/keys/pool", (_req, res) => {
     const providers = keyedCloudProviders();
     // Per-provider pool health + proactive saturation (worst key burn %, all-approaching alert).
-    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean; trainsOnData: boolean }> = {};
+    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean; trainsOnData: boolean; envKey: string; signupUrl: string; defaultModel: string }> = {};
     for (const p of providers) {
       const s = ProviderRouter.keyPoolStatus(p);
       const sat = ProviderRouter.poolSaturation(p);
       // Empty pool (no keys configured) has nothing to burn — report 0%, not the saturation
       // sentinel (poolSaturation returns worstPct=1 for "no live keys = saturated", which the
       // alert path below uses; the display must not paint an unconfigured provider full-red).
-      pool[p] = { total: s.total, live: s.live, worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0, allApproaching: s.total > 0 && sat.allApproaching, trainsOnData: trainsOnData(p) };
+      pool[p] = {
+        total: s.total, live: s.live, worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0,
+        allApproaching: s.total > 0 && sat.allApproaching, trainsOnData: trainsOnData(p),
+        // Guided-onboarding metadata (T2-F2): the KeyVault derives its provider rows from
+        // this response, so a new catalog entry ships its own key form + signup link.
+        envKey: envKeyFor(p), signupUrl: keySignupUrl(p), defaultModel: catalogEntry(p)?.defaultModel ?? "",
+      };
     }
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
     const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));

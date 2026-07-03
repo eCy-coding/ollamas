@@ -6,7 +6,8 @@ interface KeyVaultProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
 }
 
-// Where the operator logs into the NEXT account + creates a key (the guided-paste flow).
+// Legacy fallback key pages — the authoritative source is now the /api/keys/pool
+// `signupUrl` (server provider-catalog); this map only covers a pool-fetch failure.
 const KEY_PAGE: Record<string, string> = {
   gemini: "https://aistudio.google.com/apikey",
   openai: "https://platform.openai.com/api-keys",
@@ -15,7 +16,28 @@ const KEY_PAGE: Record<string, string> = {
   "ollama-cloud": "https://ollama.com/settings/keys",
 };
 
-interface PoolEntry { total: number; live: number; worstPct: number; allApproaching: boolean }
+// Rich display names; providers absent here (future catalog entries) fall back to their id.
+const PROVIDER_LABELS: Record<string, string> = {
+  gemini: "Google Gemini",
+  anthropic: "Anthropic Claude",
+  openai: "OpenAI GPT",
+  openrouter: "OpenRouter.ai",
+  "ollama-cloud": "Ollama Cloud",
+  groq: "Groq",
+  cerebras: "Cerebras",
+  zai: "Zhipu GLM (z.ai)",
+  sambanova: "SambaNova",
+  "nvidia-nim": "NVIDIA NIM",
+  "github-models": "GitHub Models",
+  cloudflare: "Cloudflare Workers AI",
+  mistral: "Mistral",
+};
+
+interface PoolEntry {
+  total: number; live: number; worstPct: number; allApproaching: boolean;
+  // Guided-onboarding metadata (T2-F2, server-driven; optional for old servers/SSE frames).
+  trainsOnData?: boolean; envKey?: string; signupUrl?: string; defaultModel?: string;
+}
 
 export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [masks, setMasks] = useState<Record<string, string>>({});
@@ -88,12 +110,16 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     return () => { es?.close(); if (pollTimer) clearInterval(pollTimer); };
   }, []);
 
+  // Key page for a provider: server catalog (pool.signupUrl) wins, legacy map is the
+  // pool-fetch-failure fallback.
+  const keyPageFor = (provider: string): string => pool[provider]?.signupUrl || KEY_PAGE[provider] || "";
+
   // Guided provisioning: open the provider's key page so the operator logs into the NEXT
   // account + creates a key, then pastes it into the field below + Save (→ joins the pool).
   // Best-effort window.open with the noreferrer feature (anchors are the primary, never-blocked
   // path — see the "Key ↗" link below); used for the auto-open-on-alert convenience.
   const openKeyPage = (provider: string) => {
-    const url = KEY_PAGE[provider];
+    const url = keyPageFor(provider);
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
     onNotify(`Opened ${provider} key page — log into the next account, create a key, paste it below.`, "info");
@@ -107,7 +133,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   useEffect(() => {
     const active = new Set(alerts.map((a) => a.provider));
     for (const a of alerts) {
-      if (!autoOpened.current.has(a.provider) && KEY_PAGE[a.provider]) {
+      if (!autoOpened.current.has(a.provider) && keyPageFor(a.provider)) {
         autoOpened.current.add(a.provider);
         openKeyPage(a.provider);
       }
@@ -124,7 +150,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     try {
       // If a primary key already exists for this provider, GROW the rotation pool (the guided
       // "add next key" flow); otherwise set the primary. Either way it joins keyPool().
-      if (masks[provider] && KEY_PAGE[provider]) {
+      if (masks[provider] && keyPageFor(provider)) {
         const r = await api.post<{ poolSize?: number }>("/api/keys/add", { provider, key: keyVal });
         onNotify(`Key added to the ${provider} pool (size ${r.poolSize ?? "?"}).`, "success");
       } else {
@@ -189,12 +215,29 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     }
   };
 
-  const providers = [
+  // Base rows: the legacy five with their rich descriptions. Every OTHER provider in the
+  // /api/keys/pool response (the free-tier catalog: groq/cerebras/zai/…) gets a row derived
+  // from its server-side metadata — a new catalog entry ships its own onboarding form with
+  // zero client changes. custom-openai (not a pooled provider) stays pinned last.
+  const BASE_ROWS = [
     { id: "gemini", label: "Google Gemini", placeholder: "Key: GEMINI_API_KEY", desc: "Native Google Gen AI API access" },
     { id: "anthropic", label: "Anthropic Claude", placeholder: "Key: ANTHROPIC_API_KEY", desc: "Native Claude 3 / 3.5 messaging protocols" },
     { id: "openai", label: "OpenAI GPT", placeholder: "Key: OPENAI_API_KEY", desc: "Native GPT chat completions access" },
     { id: "openrouter", label: "OpenRouter.ai", placeholder: "Key: OPENROUTER_API_KEY", desc: "Aggregated cloud providers; filterable to FREE models" },
     { id: "ollama-cloud", label: "Ollama Cloud", placeholder: "Key: OLLAMA_CLOUD_KEY", desc: "ollama.com cloud models — guided: Key ↗ opens ollama.com/settings/keys" },
+  ];
+  const baseIds = new Set(BASE_ROWS.map((r) => r.id));
+  const catalogRows = (Object.entries(pool) as Array<[string, PoolEntry]>)
+    .filter(([id]) => !baseIds.has(id))
+    .map(([id, meta]) => ({
+      id,
+      label: PROVIDER_LABELS[id] ?? id,
+      placeholder: meta.envKey ? `Key: ${meta.envKey}` : "API key",
+      desc: meta.defaultModel ? `Free tier · default ${meta.defaultModel}` : "Free-tier cloud provider",
+    }));
+  const providers = [
+    ...BASE_ROWS,
+    ...catalogRows,
     { id: "custom-openai", label: "Custom OpenAI compatible", placeholder: "Bearer token", desc: "Connect local wrappers, LM Studio, or vLLM hosts" },
   ];
 
@@ -222,10 +265,10 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
             {alerts.map((a) => `${a.provider} ${Math.round(a.worstPct * 100)}% (${a.live} live)`).join(" · ")}.
             Add the next account's key — log into the next account, create a key, paste it below, Save.
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {alerts.filter((a) => KEY_PAGE[a.provider]).map((a) => (
+              {alerts.filter((a) => keyPageFor(a.provider)).map((a) => (
                 <a
                   key={a.provider}
-                  href={KEY_PAGE[a.provider]}
+                  href={keyPageFor(a.provider)}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => onNotify(`Opened ${a.provider} key page — create a key, paste it below.`, "info")}
@@ -255,12 +298,19 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 
                 {/* Active Key Status Meter */}
                 <span className={`inline-block mt-2 text-[8px] font-mono px-2 py-0.5 rounded border ${
-                  isConfigured 
-                    ? "bg-indigo-500/15 border-indigo-500/20 text-status-accent" 
+                  isConfigured
+                    ? "bg-indigo-500/15 border-indigo-500/20 text-status-accent"
                     : "bg-immersive-bg border-immersive-border text-immersive-text-dim"
                 }`}>
                   {isConfigured ? `CONFIGURED: ${maskText}` : "KEYS INACTIVE"}
                 </span>
+
+                {/* Sovereign privacy badge (server catalog: free tier trains on prompts) */}
+                {ph?.trainsOnData && (
+                  <span className="inline-block mt-2 ml-1.5 text-[8px] font-mono px-2 py-0.5 rounded border bg-amber-500/10 border-amber-500/25 text-status-warn">
+                    ⚠ trains on prompts — privateMode routes around it
+                  </span>
+                )}
 
                 {/* P3 — pool burn meter: live/total + worst-key % of its rate limit */}
                 {ph && ph.total > 0 && (
@@ -307,17 +357,17 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
                 <input
                   type="password"
                   placeholder={prov.placeholder}
-                  value={inputs[prov.id]}
+                  value={inputs[prov.id] ?? ""}
                   onChange={(e) => setInputs((p) => ({ ...p, [prov.id]: e.target.value }))}
                   className="flex-1 bg-immersive-bg border border-immersive-border rounded px-3 py-1.5 text-xs text-immersive-text-bright placeholder-slate-700 focus:outline-none focus:border-indigo-500/40 font-mono transition-colors"
                 />
 
                 <div className="flex gap-1.5 shrink-0">
-                  {KEY_PAGE[prov.id] && (
+                  {keyPageFor(prov.id) && (
                     // A real anchor (not window.open) so the browser treats it as a user-gesture
                     // navigation that is NEVER popup-blocked (mirrors GoogleSheetsBrowser).
                     <a
-                      href={KEY_PAGE[prov.id]}
+                      href={keyPageFor(prov.id)}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => onNotify(`Opened ${prov.label} key page — log into the next account, create a key, paste it below.`, "info")}
