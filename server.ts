@@ -391,7 +391,7 @@ async function initializeServer() {
     for (const u of await allUpstreamServers()) {
       // Defense-in-depth: re-validate persisted tenant rows in case a row was
       // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
-      const v = validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
+      const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
       if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); continue; }
       const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
@@ -2340,7 +2340,7 @@ content
       if ((await listUpstreamServers(tId)).some((u) => u.name === name)) return res.status(409).json({ error: "duplicate name" });
       // Security gate: a tenant key must not be able to spawn an arbitrary host
       // command via the stdio transport (tenant ≠ owner under SAAS_ENFORCE=1).
-      const v = validateUpstreamConfig({ transport, command, args, url });
+      const v = await validateUpstreamConfig({ transport, command, args, url });
       if (!v.ok) return res.status(400).json({ error: v.error });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
       // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.

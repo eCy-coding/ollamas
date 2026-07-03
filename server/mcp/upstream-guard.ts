@@ -10,6 +10,8 @@
 // allowed runtime can't be turned into "run any npm package". `node` is
 // deliberately excluded — `node -e` is raw code execution and nothing needs it.
 
+import { classifyHost, type LookupFn } from "./host-guard";
+
 export interface UpstreamConfigInput {
   transport?: unknown;
   command?: unknown;
@@ -18,6 +20,8 @@ export interface UpstreamConfigInput {
 }
 
 export interface ValidationResult { ok: boolean; error?: string }
+
+export interface GuardOptions { lookup?: LookupFn }
 
 // Runtimes the catalog spawns. Bare command names only — PATH resolves them.
 const ALLOWED_COMMANDS = new Set(["npx", "uvx"]);
@@ -34,7 +38,7 @@ const PACKAGE_PREFIXES = ["@modelcontextprotocol/", "mcp-server"];
 
 const allowAny = (): boolean => process.env.MCP_UPSTREAM_ALLOW_ANY === "1";
 
-function validateHttp(url: unknown): ValidationResult {
+async function validateHttp(url: unknown, opts: GuardOptions): Promise<ValidationResult> {
   if (typeof url !== "string" || !url) return { ok: false, error: "http transport requires a 'url'" };
   let parsed: URL;
   try { parsed = new URL(url); } catch { return { ok: false, error: "invalid url" }; }
@@ -42,7 +46,10 @@ function validateHttp(url: unknown): ValidationResult {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return { ok: false, error: `url protocol not allowed: ${parsed.protocol}` };
   }
-  return { ok: true };
+  if (allowAny()) return { ok: true }; // local operator escape hatch (also skips host check)
+  // SSRF: a tenant must not point the gateway at internal hosts (metadata, loopback,
+  // RFC1918). linklocal is blocked even locally; loopback/private only under SAAS_ENFORCE.
+  return classifyHost(parsed.hostname, { saas: process.env.SAAS_ENFORCE === "1", lookup: opts.lookup });
 }
 
 function validateStdio(command: unknown, args: unknown): ValidationResult {
@@ -69,10 +76,11 @@ function validateStdio(command: unknown, args: unknown): ValidationResult {
   return { ok: true };
 }
 
-/** Validate a tenant-supplied upstream config before it is persisted or spawned. */
-export function validateUpstreamConfig(cfg: UpstreamConfigInput): ValidationResult {
+/** Validate a tenant-supplied upstream config before it is persisted or spawned.
+ *  Async because http URLs are DNS-resolved for SSRF classification. */
+export async function validateUpstreamConfig(cfg: UpstreamConfigInput, opts: GuardOptions = {}): Promise<ValidationResult> {
   if (cfg.transport !== "stdio" && cfg.transport !== "http") {
     return { ok: false, error: `transport must be 'stdio' or 'http', got: ${String(cfg.transport)}` };
   }
-  return cfg.transport === "http" ? validateHttp(cfg.url) : validateStdio(cfg.command, cfg.args);
+  return cfg.transport === "http" ? validateHttp(cfg.url, opts) : validateStdio(cfg.command, cfg.args);
 }

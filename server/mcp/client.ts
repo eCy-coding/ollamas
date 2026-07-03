@@ -165,6 +165,11 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     if (samplingOn) registerSamplingHandler(client);
     registerRootsHandler(client); // Faz 20A: advertise our workspace root to upstreams
 
+    // NOTE (SSRF residual): tenant-supplied cfg.url is host-classified by
+    // validateUpstreamConfig before we reach here, but this transport re-resolves
+    // the hostname at connect time — a DNS-rebind (public at check, private at
+    // connect) is not pinned. Closing it needs a custom fetch/agent that pins the
+    // vetted IP; tracked as a documented residual, not silently ignored.
     const transport =
       cfg.transport === "stdio"
         ? new StdioClientTransport({ command: cfg.command!, args: cfg.args || [], env: cfg.env })
