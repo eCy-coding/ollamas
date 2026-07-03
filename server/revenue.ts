@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db";
+import { parseProviderModel } from "./provider-catalog";
 import { buildIssueBody, createIssue, parseRepoSlug, getDefaultBranch, createBranch, putFile, createPullRequest, auditBranchName, type Finding } from "./github";
 
 const pexec = promisify(execFile);
@@ -50,6 +51,19 @@ export async function runTestgen(input: { file: string; fn: string; model?: stri
   }
 }
 
+
+/** audit-service.mjs dispatch args (pure). `provider::model` strings (council/fleet seat
+ *  syntax) thread --provider with the BARE model id — audit-service already POSTs
+ *  {provider, model} to the server, so free-tier catalog providers route with no script
+ *  change. Bare tags keep the legacy arg shape. */
+export function auditServiceArgs(repo: string, modelSpec: string, maxUnits: number): string[] {
+  const t = parseProviderModel(modelSpec);
+  const args = ["scripts/audit-service.mjs", "--repo", repo, "--model", t.model];
+  if (t.provider) args.push("--provider", t.provider);
+  if (maxUnits > 0) args.push("--max-units", String(maxUnits));
+  return args;
+}
+
 /** Code-audit on a repo path. Default model = 480b-cloud (cheap, high-yield; qwen3:8b is
  *  low-yield on open-ended audit — proven). Returns finding count + report path. */
 export async function runAudit(input: { repo: string; model?: string; maxUnits?: number }): Promise<{
@@ -57,8 +71,7 @@ export async function runAudit(input: { repo: string; model?: string; maxUnits?:
 }> {
   const model = input.model || "qwen3-coder:480b-cloud";
   if (!input.repo || !fs.existsSync(input.repo)) return { ok: false, model, output: "repo path required/exists" };
-  const args = ["scripts/audit-service.mjs", "--repo", input.repo, "--model", model];
-  if (input.maxUnits && input.maxUnits > 0) args.push("--max-units", String(input.maxUnits));
+  const args = auditServiceArgs(input.repo, model, input.maxUnits ?? 0);
   try {
     const { stdout, stderr } = await pexec("node", args, { cwd: REPO_ROOT, timeout: 600000, maxBuffer: 1 << 25 });
     const name = path.basename(path.resolve(input.repo));

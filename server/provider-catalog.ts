@@ -189,3 +189,14 @@ export function keySignupUrl(provider: string): string {
 export function envKeyFor(provider: string): string {
   return PROVIDER_CATALOG[provider]?.envKey ?? LEGACY_ENV_KEY[provider] ?? "";
 }
+
+/** Parse a `provider::model` routed model string (same syntax as the council/fleet seats).
+ *  Bare/malformed strings return {model} verbatim — callers keep their legacy behavior. */
+export function parseProviderModel(s: string): { provider?: string; model: string } {
+  const i = s.indexOf("::");
+  if (i <= 0) return { model: s };
+  const provider = s.slice(0, i);
+  const model = s.slice(i + 2);
+  if (!model) return { model: s };
+  return { provider, model };
+}
