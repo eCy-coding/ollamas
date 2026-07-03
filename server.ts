@@ -40,6 +40,7 @@ import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
 import { decorateCatalog } from "./server/mcp/catalog";
+import { getFeedItems } from "./server/threatfeed";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
@@ -170,10 +171,17 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
-    "/api/ecysearch", "/api/ecysearcher",
+    "/api/ecysearch", "/api/ecysearcher", "/api/threatfeed",
   ],
   localOwnerGuard,
 );
+
+// Canlı Tehdit Akışı (dalga-3) — curated RSS/Atom/KEV reader, independent of the
+// eCySearcher Flask stack so the threat-intel tab has live data even when the
+// docker stack is down. Lazy 15-min TTL cache; ?refresh=1 forces a refetch.
+app.get("/api/threatfeed", async (req, res) => {
+  res.json(await getFeedItems({ refresh: req.query.refresh === "1" }));
+});
 
 // eCySearcher threat-intel subsystem (docker-compose stack). SUPERVISOR control routes — single
 // segment paths (up/down/status/logs) registered BEFORE the proxy mount so they win; the proxy

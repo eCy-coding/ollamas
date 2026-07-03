@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
-import { ShieldAlert, Loader2, AlertTriangle, Search } from "lucide-react";
+import { ShieldAlert, Loader2, AlertTriangle, Search, Rss, RefreshCw, ExternalLink } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 // "Threat Intel" tab — queries the eCySearcher threat-intel platform (a separate Flask stack run
@@ -18,6 +18,8 @@ interface Analytics {
 interface SupStatus {
   state?: string; running?: boolean; ready?: boolean; restarts?: number; circuitOpen?: boolean; baseUrl?: string;
 }
+interface FeedItem { source: string; title: string; link: string; dateIso: string; summary: string; severity?: "critical" | "high"; }
+interface FeedResp { items?: FeedItem[]; sources?: { id: string; title: string; items: number; error?: string }[]; }
 
 export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string, type?: "success" | "error" | "info") => void }) {
   const [reachable, setReachable] = useState<boolean | null>(null);
@@ -31,6 +33,19 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
   const [acting, setActing] = useState(false);
   const [logs, setLogs] = useState<string[] | null>(null);
   const [showLogs, setShowLogs] = useState(false);
+  // Canlı Tehdit Akışı — server-side curated RSS/Atom/KEV cache; fully
+  // independent of the Flask stack's reachability.
+  const [feed, setFeed] = useState<FeedResp | null>(null);
+  const [feedBusy, setFeedBusy] = useState(false);
+  const [feedErr, setFeedErr] = useState("");
+
+  const loadFeed = async (refresh = false) => {
+    setFeedBusy(true); setFeedErr("");
+    try { setFeed(await api.get<FeedResp>(`/api/threatfeed${refresh ? "?refresh=1" : ""}`)); }
+    catch (e) { setFeedErr(String((e as Error)?.message || e)); }
+    finally { setFeedBusy(false); }
+  };
+  useEffect(() => { loadFeed(); }, []);
 
   const refreshStatus = async () => {
     try { setSup(await api.get<SupStatus>("/api/ecysearcher/status")); } catch { /* supervisor route absent */ }
@@ -158,6 +173,47 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
           ))}
         </div>
       )}
+
+      {/* Canlı Tehdit Akışı — CISA KEV + küratörlü güvenlik feed'leri; Flask stack'ten bağımsız */}
+      <div className="rounded border border-slate-700 bg-slate-900/40 p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Rss className="w-4 h-4 text-amber-400" />
+          <span className="text-sm text-slate-200">Canlı Tehdit Akışı</span>
+          <span className="text-[10px] text-slate-500">CISA KEV · CISA · SANS ISC · THN · Bleeping · P0</span>
+          <button
+            onClick={() => loadFeed(true)}
+            disabled={feedBusy}
+            className="ml-auto flex items-center gap-1 px-2 py-1 rounded border border-slate-600 text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-40"
+          >
+            {feedBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Yenile
+          </button>
+        </div>
+        {feedErr && <div className="text-rose-400 text-xs font-mono">akış alınamadı: {feedErr}</div>}
+        {!feed && !feedErr && <div className="text-slate-500 text-xs">yükleniyor…</div>}
+        {feed && (feed.items?.length ?? 0) === 0 && !feedErr && <div className="text-slate-500 text-xs">öğe yok</div>}
+        {feed && (feed.items?.length ?? 0) > 0 && (
+          <ul className="divide-y divide-slate-800 rounded border border-slate-800 max-h-80 overflow-auto">
+            {(feed.items ?? []).map((it, i) => (
+              <li key={i} className="px-3 py-2 flex items-start gap-2">
+                <span className="text-[10px] font-mono text-slate-500 shrink-0 mt-0.5 w-24 truncate" title={it.source}>{it.source}</span>
+                <div className="min-w-0 flex-1">
+                  <a href={it.link || undefined} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-200 hover:text-sky-300 flex items-center gap-1">
+                    <span className="truncate">{it.title}</span>
+                    {it.link && <ExternalLink className="w-3 h-3 shrink-0 opacity-50" />}
+                  </a>
+                  {it.summary && <div className="text-[11px] text-slate-500 truncate">{it.summary}</div>}
+                </div>
+                <span className="shrink-0 flex items-center gap-1">
+                  {it.severity && (
+                    <span className={`text-[9px] font-mono px-1 rounded ${it.severity === "critical" ? "bg-rose-950/60 text-rose-300" : "bg-amber-950/60 text-amber-300"}`}>{it.severity}</span>
+                  )}
+                  <span className="text-[10px] text-slate-500">{it.dateIso ? it.dateIso.slice(0, 10) : ""}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="flex gap-2">
         <input
