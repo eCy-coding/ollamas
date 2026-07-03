@@ -16,7 +16,7 @@ const ghHeaders = (token: string): Record<string, string> => ({
 
 // Injectable fetch (default: node global). Lets the Actions layer and tests
 // drive GitHub calls without the network (threatfeed pattern).
-export type GhFetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) =>
+export type GhFetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal; redirect?: "manual" | "follow" }) =>
   Promise<{ ok: boolean; status: number; statusText?: string; text(): Promise<string>; headers: { get(name: string): string | null } }>;
 
 export interface RateLimit { remaining: number; limit: number; reset: number }
@@ -178,12 +178,41 @@ export function assertActionsTarget(owner: string, repo: string, runId?: string)
 
 export interface WorkflowRun {
   id: number; name?: string; display_title?: string; head_branch?: string; event?: string;
-  status?: string; conclusion?: string | null; run_number?: number; created_at?: string; html_url?: string;
+  status?: string; conclusion?: string | null; run_number?: number; created_at?: string; updated_at?: string; html_url?: string;
   actor?: { login?: string }; head_commit?: { message?: string };
 }
 export interface WorkflowJob {
-  name?: string; status?: string; conclusion?: string | null;
+  id: number; name?: string; status?: string; conclusion?: string | null;
   steps?: { name?: string; status?: string; conclusion?: string | null; number?: number }[];
+}
+export interface Workflow { id: number; name?: string; path?: string; state?: string; }
+
+// ── Additional path/param validators (distinct contracts from assertActionsTarget) ──
+export function assertJobId(jobId: string): void {
+  if (!/^\d+$/.test(jobId)) throw new Error(`invalid job id: ${jobId}`);
+}
+export function assertWorkflowId(id: string): void {
+  // A workflow is addressable by numeric id OR its file name (ci.yml). Reject
+  // anything with a slash / traversal so it can't re-target the API path.
+  const ok = /^\d+$/.test(id) || (/^[A-Za-z0-9._-]+\.ya?ml$/.test(id) && id.length <= 120 && !id.includes(".."));
+  if (!ok) throw new Error(`invalid workflow id: ${id}`);
+}
+export function validateRef(ref: string): void {
+  // ref rides in the request BODY (not the path), but validate anyway: a real
+  // git ref is alnum + . _ - / and never contains "..".
+  if (!ref || typeof ref !== "string" || ref.length > 255 || ref.includes("..") || !/^[A-Za-z0-9._\-/]+$/.test(ref)) {
+    throw new Error(`invalid ref: ${ref}`);
+  }
+}
+export function normalizeInputs(inputs: unknown): Record<string, string> {
+  if (inputs == null) return {};
+  if (typeof inputs !== "object" || Array.isArray(inputs)) throw new Error("inputs must be an object");
+  const entries = Object.entries(inputs as Record<string, unknown>);
+  if (entries.length > 20) throw new Error("too many inputs (max 20)");
+  const out: Record<string, string> = {};
+  for (const [k, v] of entries) out[k] = String(v);
+  if (JSON.stringify(out).length > 4096) throw new Error("inputs too large (max 4KB)");
+  return out;
 }
 
 export function listWorkflowRuns(owner: string, repo: string, token: string, signal?: AbortSignal, perPage = 20, fetchImpl?: GhFetch) {
@@ -209,6 +238,60 @@ export function rerunFailedJobs(owner: string, repo: string, runId: string, toke
 export function cancelRun(owner: string, repo: string, runId: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
   assertActionsTarget(owner, repo, runId);
   return ghRequest<unknown>("POST", `/repos/${owner}/${repo}/actions/runs/${runId}/cancel`, token, {}, signal, fetchImpl);
+}
+
+export function listWorkflows(owner: string, repo: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo);
+  return ghRequestAnon<{ total_count: number; workflows: Workflow[] }>(
+    "GET", `/repos/${owner}/${repo}/actions/workflows?per_page=100`, token, undefined, signal, fetchImpl,
+  );
+}
+
+export function dispatchWorkflow(owner: string, repo: string, workflowId: string, ref: string, inputs: unknown, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo);
+  assertWorkflowId(workflowId);
+  validateRef(ref);
+  const norm = normalizeInputs(inputs);
+  const body: Record<string, unknown> = { ref };
+  if (Object.keys(norm).length) body.inputs = norm;
+  return ghRequest<unknown>("POST", `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, token, body, signal, fetchImpl);
+}
+
+const LOG_MAX_BYTES = 64 * 1024;
+const LOG_MAX_LINES = 200;
+export interface JobLogResult { ok: boolean; text?: string; truncated?: boolean; error?: string }
+
+/** Fetch a single job's plaintext log. The GitHub endpoint 302-redirects to a
+ *  short-lived blob URL; we follow it MANUALLY and fetch the blob WITHOUT the
+ *  Authorization header so the PAT is never sent to the storage host. */
+export async function getJobLog(owner: string, repo: string, jobId: string, token: string, signal?: AbortSignal, fetchImpl: GhFetch = fetch as unknown as GhFetch): Promise<JobLogResult> {
+  assertActionsTarget(owner, repo);
+  assertJobId(jobId);
+  try {
+    const res = await fetchImpl(`${GH_API}/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, {
+      method: "GET", headers: ghHeaders(token), signal, redirect: "manual",
+    });
+    let body: string;
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) return { ok: false, error: "log redirect had no Location" };
+      // Blob fetch: no GitHub auth header (PAT-leak defense), just a User-Agent.
+      const blob = await fetchImpl(loc, { method: "GET", headers: { "User-Agent": "ollamas-audit-service" }, signal });
+      if (!blob.ok) return { ok: false, error: `log blob ${blob.status}` };
+      body = await blob.text();
+    } else if (res.ok) {
+      body = await res.text(); // some clients auto-follow → body already here
+    } else {
+      return { ok: false, error: `GitHub ${res.status}` };
+    }
+    const lines = body.split("\n");
+    let tail = lines.length > LOG_MAX_LINES ? lines.slice(-LOG_MAX_LINES).join("\n") : body;
+    let truncated = lines.length > LOG_MAX_LINES;
+    if (tail.length > LOG_MAX_BYTES) { tail = tail.slice(-LOG_MAX_BYTES); truncated = true; }
+    return { ok: true, text: tail, truncated };
+  } catch (e) {
+    return { ok: false, error: `fetch failed: ${(e as Error).message}` };
+  }
 }
 
 export function getRepo(owner: string, repo: string, token: string, signal?: AbortSignal) {

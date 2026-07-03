@@ -26,7 +26,7 @@ import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
 import { parseRepoSlug, rerunFailedJobs, cancelRun } from "./server/github";
-import { getRuns, getJobs, detectRepoSlug } from "./server/github-actions";
+import { getRuns, getJobs, getWorkflows, getLog, dispatch, detectRepoSlug } from "./server/github-actions";
 import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
 import { FilesystemManager } from "./server/files";
@@ -224,6 +224,32 @@ app.post("/api/github/actions/runs/:id/cancel", async (req, res) => {
   if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla" });
   try {
     const r = await cancelRun(slug.owner, slug.repo, req.params.id, token, AbortSignal.timeout(8000));
+    res.status(r.ok ? 200 : 400).json(r.ok ? { ok: true } : { error: r.error });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.get("/api/github/actions/jobs/:jobId/log", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  try {
+    res.json(await getLog({ owner: slug.owner, repo: slug.repo, jobId: req.params.jobId, token: ghToken(), signal: AbortSignal.timeout(8000) }));
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.get("/api/github/actions/workflows", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  try {
+    res.json({ ...(await getWorkflows({ owner: slug.owner, repo: slug.repo, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) })), authed: !!ghToken() });
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/github/actions/dispatch", async (req, res) => {
+  const slug = parseRepoSlug(String(req.query.repo || ""));
+  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  const token = ghToken();
+  if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla" });
+  const { workflowId, ref, inputs } = req.body || {};
+  if (!workflowId || !ref) return res.status(400).json({ error: "'workflowId' ve 'ref' gerekli" });
+  try {
+    const r = await dispatch({ owner: slug.owner, repo: slug.repo, workflowId: String(workflowId), ref: String(ref), inputs, token, signal: AbortSignal.timeout(8000) });
     res.status(r.ok ? 200 : 400).json(r.ok ? { ok: true } : { error: r.error });
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });

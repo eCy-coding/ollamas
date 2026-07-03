@@ -1,6 +1,9 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { assertActionsTarget, rerunFailedJobs, cancelRun, type GhFetch } from "../server/github";
-import { getRuns, getJobs, detectRepoSlug, _resetCache } from "../server/github-actions";
+import {
+  assertActionsTarget, assertJobId, assertWorkflowId, validateRef, normalizeInputs,
+  rerunFailedJobs, cancelRun, dispatchWorkflow, getJobLog, type GhFetch,
+} from "../server/github";
+import { getRuns, getJobs, getWorkflows, detectRepoSlug, _resetCache } from "../server/github-actions";
 
 // Fake GitHub fetch: records the URL + whether Authorization was sent, returns a
 // canned body + rate-limit headers. Mirrors threatfeed's injectable-fetch style.
@@ -109,6 +112,91 @@ describe("write verbs require a token (hard-fail preserved)", () => {
     expect(rr.ok).toBe(true);
     expect(calls[0]!.url).toContain("/actions/runs/42/rerun-failed-jobs");
     expect(calls[0]!.authed).toBe(true);
+  });
+});
+
+describe("new path/param validators (dalga-7)", () => {
+  test("assertJobId: pure digits only", () => {
+    expect(() => assertJobId("123")).not.toThrow();
+    for (const bad of ["1e3", "0x1", "abc", "1/x", "", "-1"]) expect(() => assertJobId(bad), bad).toThrow();
+  });
+  test("assertWorkflowId: numeric OR safe yaml filename; traversal rejected", () => {
+    expect(() => assertWorkflowId("123")).not.toThrow();
+    expect(() => assertWorkflowId("ci.yml")).not.toThrow();
+    expect(() => assertWorkflowId("release.yaml")).not.toThrow();
+    for (const bad of ["../x.yml", "a/b.yml", "x.txt", "..", "ci.yml/../x", "ci yml"]) expect(() => assertWorkflowId(bad), bad).toThrow();
+  });
+  test("validateRef: git ref charset, no traversal", () => {
+    expect(() => validateRef("main")).not.toThrow();
+    expect(() => validateRef("feature/x-1")).not.toThrow();
+    for (const bad of ["../etc", "a..b", "a b", "a;b", "", "a".repeat(300)]) expect(() => validateRef(bad), bad).toThrow();
+  });
+  test("normalizeInputs: object→string values, caps", () => {
+    expect(normalizeInputs(undefined)).toEqual({});
+    expect(normalizeInputs({ a: 1, b: true })).toEqual({ a: "1", b: "true" });
+    expect(() => normalizeInputs([1, 2])).toThrow();
+    expect(() => normalizeInputs("x")).toThrow();
+    const many: Record<string, number> = {}; for (let i = 0; i < 21; i++) many[`k${i}`] = i;
+    expect(() => normalizeInputs(many)).toThrow();
+    expect(() => normalizeInputs({ big: "x".repeat(5000) })).toThrow();
+  });
+});
+
+describe("getJobLog — redirect-safe, PAT never leaks to blob", () => {
+  test("302→Location→blob body; blob fetch carries NO Authorization", async () => {
+    const calls: { url: string; authed: boolean }[] = [];
+    const fetch: GhFetch = async (url, init) => {
+      calls.push({ url, authed: "Authorization" in init.headers });
+      if (url.includes("/jobs/42/logs")) {
+        return { ok: false, status: 302, text: async () => "", headers: { get: (n: string) => (n.toLowerCase() === "location" ? "https://blob.example/log?sig=x" : null) } };
+      }
+      return { ok: true, status: 200, text: async () => Array.from({ length: 250 }, (_, i) => `line ${i}`).join("\n"), headers: { get: () => null } };
+    };
+    const r = await getJobLog("o", "r", "42", "ghp_secret", undefined, fetch);
+    expect(r.ok).toBe(true);
+    expect(r.truncated).toBe(true);              // 250 lines → tail 200
+    expect(r.text!.split("\n").length).toBe(200);
+    // The GitHub logs call carried auth; the BLOB call must NOT.
+    expect(calls[0]!.url).toContain("/jobs/42/logs");
+    expect(calls[0]!.authed).toBe(true);
+    expect(calls[1]!.url).toContain("blob.example");
+    expect(calls[1]!.authed).toBe(false);        // ← PAT-leak defense
+  });
+
+  test("302 without Location → error", async () => {
+    const fetch: GhFetch = async () => ({ ok: false, status: 302, text: async () => "", headers: { get: () => null } });
+    expect((await getJobLog("o", "r", "1", "", undefined, fetch)).ok).toBe(false);
+  });
+
+  test("rejects non-numeric job id before any fetch (route maps throw→400)", async () => {
+    let called = false;
+    const fetch: GhFetch = async () => { called = true; return { ok: true, status: 200, text: async () => "", headers: { get: () => null } }; };
+    await expect(getJobLog("o", "r", "1e3", "", undefined, fetch)).rejects.toThrow(/job id/);
+    expect(called).toBe(false); // validation throws before any network call
+  });
+});
+
+describe("dispatchWorkflow + getWorkflows", () => {
+  beforeEach(() => _resetCache());
+  test("dispatch requires a token (no fetch when empty)", async () => {
+    let called = false;
+    const fetch: GhFetch = async () => { called = true; return { ok: true, status: 204, text: async () => "", headers: { get: () => null } }; };
+    const r = await dispatchWorkflow("o", "r", "ci.yml", "main", { a: 1 }, "", undefined, fetch);
+    expect(r.ok).toBe(false);
+    expect(called).toBe(false);
+  });
+  test("dispatch with token POSTs ref+inputs, 204→ok", async () => {
+    const calls: { url: string; body?: string }[] = [];
+    const fetch: GhFetch = async (url, init) => { calls.push({ url, body: init.body }); return { ok: true, status: 204, text: async () => "", headers: { get: () => null } }; };
+    const r = await dispatchWorkflow("eCy-coding", "ollamas", "ci.yml", "main", { name: "x" }, "ghp_x", undefined, fetch);
+    expect(r.ok).toBe(true);
+    expect(calls[0]!.url).toContain("/actions/workflows/ci.yml/dispatches");
+    expect(JSON.parse(calls[0]!.body!)).toEqual({ ref: "main", inputs: { name: "x" } });
+  });
+  test("getWorkflows filters to active only", async () => {
+    const fetch: GhFetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ total_count: 2, workflows: [{ id: 1, name: "CI", state: "active" }, { id: 2, name: "Old", state: "disabled_manually" }] }), headers: { get: () => null } });
+    const r = await getWorkflows({ owner: "o", repo: "r", token: "", fetchImpl: fetch });
+    expect(r.workflows.map((w) => w.id)).toEqual([1]);
   });
 });
 

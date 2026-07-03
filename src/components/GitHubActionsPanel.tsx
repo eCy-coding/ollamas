@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
-import { GitBranch, Loader2, RefreshCw, ExternalLink, RotateCw, XCircle, ChevronRight, ChevronDown, AlertTriangle } from "lucide-react";
+import { GitBranch, Loader2, RefreshCw, ExternalLink, RotateCw, XCircle, ChevronRight, ChevronDown, AlertTriangle, FileText, Play } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 // "GitHub Actions" tab — lists workflow runs with status/conclusion badges,
@@ -9,11 +9,21 @@ import { api } from "../lib/apiClient";
 
 interface Run {
   id: number; name?: string; display_title?: string; head_branch?: string; event?: string;
-  status?: string; conclusion?: string | null; run_number?: number; created_at?: string; html_url?: string;
+  status?: string; conclusion?: string | null; run_number?: number; created_at?: string; updated_at?: string; html_url?: string;
   actor?: { login?: string }; head_commit?: { message?: string };
 }
-interface Job { name?: string; status?: string; conclusion?: string | null; steps?: { name?: string; status?: string; conclusion?: string | null; number?: number }[]; }
+interface Job { id: number; name?: string; status?: string; conclusion?: string | null; steps?: { name?: string; status?: string; conclusion?: string | null; number?: number }[]; }
 interface RunsResp { ok: boolean; authed: boolean; runs: Run[]; rateLimit?: { remaining: number; limit: number }; error?: string; }
+interface Workflow { id: number; name?: string; path?: string; }
+
+// created_at → updated_at as "3m 42s" (best-effort; empty when unknown).
+function duration(a?: string, b?: string): string {
+  if (!a || !b) return "";
+  const ms = Date.parse(b) - Date.parse(a);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
 
 // success→emerald, failure→rose, cancelled→slate, skipped/timed_out→amber; in-flight→sky.
 function badge(run: Run): { label: string; cls: string } {
@@ -39,6 +49,15 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
   const [expanded, setExpanded] = useState<number | null>(null);
   const [jobs, setJobs] = useState<Record<number, Job[]>>({});
   const [acting, setActing] = useState<number | null>(null);
+  const [logs, setLogs] = useState<Record<number, { text: string; truncated?: boolean; loading?: boolean }>>({});
+  const [failuresOnly, setFailuresOnly] = useState(false);
+  // Workflow dispatch
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [showTrigger, setShowTrigger] = useState(false);
+  const [wfId, setWfId] = useState("");
+  const [wfRef, setWfRef] = useState("main");
+  const [wfInputs, setWfInputs] = useState("");
+  const [dispatching, setDispatching] = useState(false);
 
   const loadRuns = async (target: string, refresh = false) => {
     const r = target.trim();
@@ -85,7 +104,60 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
     finally { setActing(null); }
   };
 
+  const loadLog = async (jobId: number) => {
+    if (logs[jobId] && !logs[jobId].loading) { setLogs((p) => { const n = { ...p }; delete n[jobId]; return n; }); return; } // toggle off
+    setLogs((p) => ({ ...p, [jobId]: { text: "", loading: true } }));
+    try {
+      const d = await api.get<{ ok: boolean; text?: string; truncated?: boolean; error?: string }>(`/api/github/actions/jobs/${jobId}/log?repo=${encodeURIComponent(repo)}`);
+      // GitHub gates job logs behind auth even for public repos — surface an
+      // actionable message rather than a bare 403 when no token is connected.
+      const msg = d.ok ? (d.text || "(boş)")
+        : (!data?.authed && /403/.test(d.error || "")) ? "Job log için GitHub token gerekli (Gelir/Kişisel Ops → provider=github)."
+        : `log alınamadı: ${d.error || "?"}`;
+      setLogs((p) => ({ ...p, [jobId]: { text: msg, truncated: d.truncated } }));
+    } catch (e) { setLogs((p) => ({ ...p, [jobId]: { text: `log hatası: ${String((e as Error)?.message || e)}` } })); }
+  };
+
+  const openTrigger = async () => {
+    setShowTrigger((v) => !v);
+    if (!showTrigger && workflows.length === 0) {
+      try {
+        const d = await api.get<{ ok: boolean; workflows: Workflow[] }>(`/api/github/actions/workflows?repo=${encodeURIComponent(repo)}`);
+        setWorkflows(d.workflows || []);
+        if (d.workflows?.[0]) setWfId(String(d.workflows[0].id));
+      } catch (e) { onNotify?.(`Workflows: ${String((e as Error)?.message || e)}`, "error"); }
+    }
+  };
+
+  // Parse "KEY=VALUE" lines OR a JSON object into an inputs map.
+  const parseInputs = (raw: string): Record<string, string> | null => {
+    const s = raw.trim();
+    if (!s) return {};
+    if (s.startsWith("{")) { try { return JSON.parse(s); } catch { return null; } }
+    const out: Record<string, string> = {};
+    for (const line of s.split("\n")) {
+      const i = line.indexOf("=");
+      if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    }
+    return out;
+  };
+
+  const triggerDispatch = async () => {
+    const inputs = parseInputs(wfInputs);
+    if (inputs === null) { onNotify?.("inputs geçersiz (KEY=VALUE satırları veya JSON)", "error"); return; }
+    const wf = workflows.find((w) => String(w.id) === wfId);
+    if (!window.confirm(`Workflow tetikle: ${wf?.name || wfId} @ ${wfRef}?`)) return;
+    setDispatching(true);
+    try {
+      await api.post(`/api/github/actions/dispatch?repo=${encodeURIComponent(repo)}`, { workflowId: wfId, ref: wfRef, inputs });
+      onNotify?.("Workflow tetiklendi", "success");
+      setTimeout(() => loadRuns(repo, true), 2000);
+    } catch (e) { onNotify?.(`Dispatch: ${String((e as Error)?.message || e)}`, "error"); }
+    finally { setDispatching(false); }
+  };
+
   const lowRate = data?.rateLimit && data.rateLimit.remaining < 10;
+  const visibleRuns = (data?.runs || []).filter((r) => !failuresOnly || r.conclusion === "failure" || r.conclusion === "timed_out");
 
   return (
     <div className="space-y-3">
@@ -108,6 +180,42 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
         </button>
       </div>
 
+      {data && (
+        <div className="flex items-center gap-3 text-xs">
+          <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer">
+            <input type="checkbox" checked={failuresOnly} onChange={(e: ChangeEvent<HTMLInputElement>) => setFailuresOnly(e.target.checked)} />
+            sadece başarısızlar
+          </label>
+          {data.authed && (
+            <button onClick={openTrigger} className="flex items-center gap-1 px-2 py-1 rounded border border-slate-600 text-slate-300 hover:bg-slate-700">
+              <Play className="w-3 h-3" /> Workflow tetikle
+            </button>
+          )}
+        </div>
+      )}
+
+      {showTrigger && data?.authed && (
+        <div className="rounded border border-slate-700 bg-slate-900/40 p-3 space-y-2">
+          <div className="text-xs text-slate-300">Workflow tetikle (workflow_dispatch)</div>
+          <div className="flex gap-2">
+            <select value={wfId} onChange={(e: ChangeEvent<HTMLSelectElement>) => setWfId(e.target.value)}
+              className="flex-1 px-2 py-1.5 rounded border border-slate-600 bg-slate-900 text-sm text-slate-200">
+              {workflows.length === 0 && <option value="">workflow yok</option>}
+              {workflows.map((w) => <option key={w.id} value={String(w.id)}>{w.name || w.path}</option>)}
+            </select>
+            <input value={wfRef} onChange={(e: ChangeEvent<HTMLInputElement>) => setWfRef(e.target.value)} placeholder="ref (branch)"
+              className="w-40 px-2 py-1.5 rounded border border-slate-600 bg-slate-900 text-sm text-slate-200 font-mono" />
+          </div>
+          <textarea value={wfInputs} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setWfInputs(e.target.value)} rows={2}
+            placeholder="inputs (opsiyonel) — KEY=VALUE satırları veya JSON"
+            className="w-full px-2 py-1.5 rounded border border-slate-600 bg-slate-900 text-xs text-slate-200 font-mono" />
+          <button onClick={triggerDispatch} disabled={dispatching || !wfId}
+            className="flex items-center gap-1 px-3 py-1.5 rounded border border-emerald-700 text-emerald-300 hover:bg-emerald-950/40 text-sm disabled:opacity-40">
+            {dispatching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} Tetikle
+          </button>
+        </div>
+      )}
+
       {data && !data.authed && (
         <div className="flex items-start gap-2 text-xs text-amber-300 bg-amber-950/20 border border-amber-800 rounded p-2">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -119,11 +227,11 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
       )}
       {err && <div className="text-rose-400 text-xs font-mono">{err}</div>}
 
-      {data && data.runs.length === 0 && !err && <div className="text-slate-500 text-sm py-4 text-center">çalışma yok</div>}
+      {data && visibleRuns.length === 0 && !err && <div className="text-slate-500 text-sm py-4 text-center">çalışma yok</div>}
 
-      {data && data.runs.length > 0 && (
+      {data && visibleRuns.length > 0 && (
         <ul className="divide-y divide-slate-800 rounded border border-slate-700">
-          {data.runs.map((run) => {
+          {visibleRuns.map((run) => {
             const b = badge(run);
             const inProgress = run.status && run.status !== "completed";
             return (
@@ -137,6 +245,7 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
                     <div className="text-xs text-slate-200 truncate">{run.name || run.display_title || "(workflow)"} <span className="text-slate-500">#{run.run_number}</span></div>
                     <div className="text-[10px] text-slate-500 font-mono truncate">
                       {run.head_branch} · {run.event} · {run.actor?.login}{run.created_at ? ` · ${run.created_at.slice(0, 10)}` : ""}
+                      {duration(run.created_at, run.updated_at) ? ` · ⏱ ${duration(run.created_at, run.updated_at)}` : ""}
                       {run.head_commit?.message ? ` · ${run.head_commit.message.split("\n")[0]}` : ""}
                     </div>
                   </div>
@@ -167,12 +276,27 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
                       <div className="text-[11px] text-slate-500">job yok</div>
                     ) : jobs[run.id]!.map((job, ji) => (
                       <div key={ji}>
-                        <div className={`text-[11px] font-mono ${stepCls(job.conclusion)}`}>{job.name} — {job.conclusion || job.status}</div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[11px] font-mono ${stepCls(job.conclusion)}`}>{job.name} — {job.conclusion || job.status}</span>
+                          <button onClick={() => loadLog(job.id)} title="Job log" className="text-slate-500 hover:text-sky-300"><FileText className="w-3 h-3" /></button>
+                        </div>
                         <div className="ml-3">
                           {(job.steps || []).map((s, si) => (
                             <div key={si} className={`text-[10px] font-mono ${stepCls(s.conclusion)}`}>{s.number}. {s.name} · {s.conclusion || s.status}</div>
                           ))}
                         </div>
+                        {logs[job.id] && (
+                          <div className="ml-3 mt-1">
+                            {logs[job.id]!.loading ? (
+                              <div className="text-[10px] text-slate-500">log yükleniyor…</div>
+                            ) : (
+                              <>
+                                {logs[job.id]!.truncated && <div className="text-[9px] text-amber-400">son 200 satır (kırpıldı)</div>}
+                                <pre className="text-[10px] leading-snug bg-slate-950 border border-slate-800 rounded p-2 max-h-64 overflow-auto text-slate-300 whitespace-pre-wrap">{logs[job.id]!.text}</pre>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

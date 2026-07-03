@@ -4,8 +4,8 @@
 // 30s TTL cache keeps the unauth 60/hr budget from being burned by refreshes.
 import { execFile } from "node:child_process";
 import {
-  listWorkflowRuns, listRunJobs, parseRepoSlug, assertActionsTarget,
-  type WorkflowRun, type WorkflowJob, type RateLimit, type GhFetch,
+  listWorkflowRuns, listRunJobs, listWorkflows, dispatchWorkflow, getJobLog, parseRepoSlug, assertActionsTarget,
+  type WorkflowRun, type WorkflowJob, type Workflow, type RateLimit, type GhFetch, type JobLogResult,
 } from "./github";
 
 export interface RunsPayload {
@@ -19,7 +19,7 @@ export interface RunsPayload {
 const TTL_MS = 30_000;
 interface CacheEntry { at: number; payload: RunsPayload }
 const cache = new Map<string, CacheEntry>();
-export function _resetCache(): void { cache.clear(); }
+export function _resetCache(): void { cache.clear(); wfCache.clear(); }
 
 export async function getRuns(opts: {
   owner: string; repo: string; token: string; refresh?: boolean; signal?: AbortSignal; fetchImpl?: GhFetch; now?: () => number;
@@ -44,6 +44,34 @@ export async function getJobs(opts: {
   assertActionsTarget(opts.owner, opts.repo, opts.runId);
   const r = await listRunJobs(opts.owner, opts.repo, opts.runId, opts.token, opts.signal, opts.fetchImpl);
   return r.ok ? { ok: true, jobs: r.data?.jobs ?? [] } : { ok: false, jobs: [], error: r.error };
+}
+
+const wfCache = new Map<string, { at: number; workflows: Workflow[] }>();
+export async function getWorkflows(opts: {
+  owner: string; repo: string; token: string; refresh?: boolean; signal?: AbortSignal; fetchImpl?: GhFetch; now?: () => number;
+}): Promise<{ ok: boolean; workflows: Workflow[]; error?: string }> {
+  assertActionsTarget(opts.owner, opts.repo);
+  const now = opts.now ?? Date.now;
+  const key = `wf:${opts.owner}/${opts.repo}`;
+  const hit = wfCache.get(key);
+  if (!opts.refresh && hit && now() - hit.at < TTL_MS) return { ok: true, workflows: hit.workflows };
+  const r = await listWorkflows(opts.owner, opts.repo, opts.token, opts.signal, opts.fetchImpl);
+  if (!r.ok) return { ok: false, workflows: [], error: r.error };
+  // Only active workflows are dispatchable candidates.
+  const workflows = (r.data?.workflows ?? []).filter((w) => (w.state ?? "active") === "active");
+  wfCache.set(key, { at: now(), workflows });
+  return { ok: true, workflows };
+}
+
+export function getLog(opts: { owner: string; repo: string; jobId: string; token: string; signal?: AbortSignal; fetchImpl?: GhFetch }): Promise<JobLogResult> {
+  return getJobLog(opts.owner, opts.repo, opts.jobId, opts.token, opts.signal, opts.fetchImpl);
+}
+
+export async function dispatch(opts: {
+  owner: string; repo: string; workflowId: string; ref: string; inputs?: unknown; token: string; signal?: AbortSignal; fetchImpl?: GhFetch;
+}): Promise<{ ok: boolean; error?: string }> {
+  const r = await dispatchWorkflow(opts.owner, opts.repo, opts.workflowId, opts.ref, opts.inputs, opts.token, opts.signal, opts.fetchImpl);
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
 }
 
 // Auto-detect the repo slug from git remotes: prefer origin, else the first
