@@ -31,6 +31,18 @@ payload. **Gemini's free tier trains on your prompts** — send `privateMode: tr
 (local tiers always remain). Mistral's free tier requires a training opt-in and Cohere's
 trial forbids commercial use — both were deliberately left OUT of the catalog.
 
+## Other modalities (same $0 keys)
+
+- **Speech-to-text**: `POST /api/ai/transcribe?filename=a.wav` (raw audio body, ≤25MB) →
+  Groq Whisper-large-v3, ~2,000 req/day on the SAME `GROQ_API_KEY`. No key → honest 503.
+- **Embeddings (RAG)**: pin ONE provider per index via `EMBED_PROVIDER=voyage|jina|gemini|cloudflare`
+  (`VOYAGE_API_KEY` 200M free tokens + rerankers; `JINA_API_KEY` 10M; gemini/cloudflare reuse
+  their chat keys). Unset → local ollama nomic. Never rotate per-call — dims are index-bound.
+- **Web search**: `TAVILY_API_KEY` (1,000 credits/month recurring) makes Tavily the primary
+  engine for the agent's web_search tool; DuckDuckGo scrape stays the keyless fallback.
+- **Fleet/council seats**: `provider::model` entries (e.g. `groq::llama-3.3-70b-versatile`)
+  activate automatically once the key is live.
+
 ## Verification
 
 ```bash

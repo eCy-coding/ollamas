@@ -20,6 +20,7 @@ import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor } from "./server/provider-catalog";
+import { sttEntryFor, buildTranscribeForm } from "./server/stt-catalog";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
@@ -150,6 +151,9 @@ app.use("/api/github/webhook", express.raw({ type: "*/*" }));
 // 50mb JSON parser — otherwise express.json swallows the stream and the byte payload
 // is lost. 1gb cap; binary-safe round-trip via FilesystemManager.writeFileBuffer.
 app.use("/api/workspace/upload", express.raw({ type: "*/*", limit: "1gb" }));
+// Raw audio bytes for transcription (T2-F7) — 26mb ceiling leaves headroom over the
+// provider's own 25MB cap, which stt-catalog enforces with an honest error first.
+app.use("/api/ai/transcribe", express.raw({ type: "*/*", limit: "26mb" }));
 
 // Body Parsers with large limit for file saves and backup streams
 app.use(express.json({ limit: "50mb" }));
@@ -1100,6 +1104,40 @@ async function initializeServer() {
       res.json(await aiListModels());
     } catch (err: any) {
       res.status(500).json({ error: err?.message || "model listing failure" });
+    }
+  });
+
+  /**
+   * Speech-to-text (T2-F7): raw audio body -> free-tier STT provider (Groq Whisper,
+   * 2,000 req/day on the chat GROQ_API_KEY). Filename via ?filename= (extension helps the
+   * provider pick a decoder). No key -> honest 503; oversize -> 400 with the real cap.
+   */
+  app.post("/api/ai/transcribe", async (req, res) => {
+    const entry = sttEntryFor();
+    if (!entry) {
+      return res.status(503).json({ error: "no STT provider key configured (set GROQ_API_KEY \u2014 free tier: console.groq.com/keys)" });
+    }
+    const audio: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!audio.byteLength) return res.status(400).json({ error: "raw audio body required (POST bytes, e.g. curl --data-binary @sample.wav)" });
+    try {
+      const filename = String(req.query.filename || "audio.wav");
+      const form = buildTranscribeForm(entry, audio, filename);
+      const key = ProviderRouter.getDecryptedKey(entry.id);
+      const r = await fetch(`${entry.baseUrl}/audio/transcriptions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (!r.ok) {
+        const detail = (await r.text().catch(() => "")).slice(0, 200);
+        return res.status(502).json({ error: `${entry.id} transcription error ${r.status}`, detail });
+      }
+      const j: any = await r.json();
+      return res.json({ text: String(j.text ?? ""), provider: entry.id, model: entry.defaultModel });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      return res.status(/too large/.test(msg) ? 400 : 500).json({ error: msg.slice(0, 300) });
     }
   });
 
