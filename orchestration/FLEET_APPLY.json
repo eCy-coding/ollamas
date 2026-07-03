@@ -1,6 +1,28 @@
 {
-  "ts": "2026-07-03T00:26:34Z",
+  "ts": "2026-07-03T02:57:33Z",
   "rows": [
+    {
+      "stream": "concurrency-safety",
+      "slot": "terminal",
+      "model": "gpt-oss:120b-cloud",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/host-bridge.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "terminal",
+      "model": "qwen3-coder:480b-cloud",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree"
+    },
     {
       "stream": "mjs-migration",
       "slot": "terminal",
@@ -8,116 +30,20 @@
       "hasDiff": true,
       "applyReady": true,
       "files": [
-        "scripts/agent-dispatch.ts"
+        "scripts/agent-dispatch.mjs"
       ],
-      "reason": "clean — applies to the current tree"
-    },
-    {
-      "stream": "concurrency-safety",
-      "slot": "conductor",
-      "model": "claude-conductor",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [
-        "server/host-bridge.ts"
-      ],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "concurrency-safety",
-      "slot": "terminal",
-      "model": "gpt-oss:120b-cloud",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "errors-resilience",
-      "slot": "conductor",
-      "model": "claude-conductor",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [
-        "server/agent-events.ts"
-      ],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "errors-resilience",
-      "slot": "iterm2",
-      "model": "deepseek-r1:32b",
-      "hasDiff": false,
-      "applyReady": false,
-      "files": [],
-      "reason": "no diff block"
-    },
-    {
-      "stream": "errors-resilience",
-      "slot": "terminal",
-      "model": "qwen3-coder:480b-cloud",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [
-        "server/agent-events.ts"
-      ],
-      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
-    },
-    {
-      "stream": "mjs-migration",
-      "slot": "conductor",
-      "model": "claude-conductor",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+      "reason": "search/replace resolves cleanly against the current tree"
     },
     {
       "stream": "shell-harden",
-      "slot": "conductor",
-      "model": "claude-conductor",
+      "slot": "terminal",
+      "model": "gpt-oss:20b-cloud",
       "hasDiff": true,
-      "applyReady": false,
+      "applyReady": true,
       "files": [
         "start.sh"
       ],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "shell-harden",
-      "slot": "iterm2",
-      "model": "qwen3:8b",
-      "hasDiff": false,
-      "applyReady": false,
-      "files": [],
-      "reason": "no diff block"
-    },
-    {
-      "stream": "shell-harden",
-      "slot": "terminal",
-      "model": "gpt-oss:20b-cloud",
-      "hasDiff": false,
-      "applyReady": false,
-      "files": [],
-      "reason": "no diff block"
-    },
-    {
-      "stream": "test-coverage",
-      "slot": "conductor",
-      "model": "claude-conductor",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "test-coverage",
-      "slot": "iterm2",
-      "model": "qwen3:8b",
-      "hasDiff": false,
-      "applyReady": false,
-      "files": [],
-      "reason": "no diff block"
+      "reason": "search/replace resolves cleanly against the current tree"
     },
     {
       "stream": "test-coverage",
@@ -125,21 +51,8 @@
       "model": "gpt-oss:20b-cloud",
       "hasDiff": true,
       "applyReady": false,
-      "files": [
-        "test/client.test.ts"
-      ],
-      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
-    },
-    {
-      "stream": "typescript-core",
-      "slot": "iterm2",
-      "model": "qwen3-coder:30b",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [
-        "src/ollama.ts"
-      ],
-      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
+      "files": [],
+      "reason": "target tests/cli-http.test.ts not found"
     },
     {
       "stream": "typescript-core",
@@ -147,10 +60,8 @@
       "model": "qwen3-coder:480b-cloud",
       "hasDiff": true,
       "applyReady": false,
-      "files": [
-        "server/analyzer.ts"
-      ],
-      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
+      "files": [],
+      "reason": "server/analyzer.ts: SEARCH snippet not found in target (stale / not an exact copy)"
     }
   ]
 }
