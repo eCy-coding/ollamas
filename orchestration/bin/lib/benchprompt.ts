@@ -36,6 +36,14 @@ export const DEFAULT_ROUTING: RoutingPolicy = {
 /** Bench yokken sıcak varsayılan (providers.ts M4 tuned). */
 export const WARM_DEFAULT = "qwen3:8b";
 
+/** Key-canlı ücretsiz API provider (kaynak: /api/keys/pool — HTTP choke-point, server-import yok). */
+export interface FreeApiProvider {
+  id: string;                  // provider id (cerebras, groq, zai, ...)
+  model: string;               // catalog defaultModel
+  caps: string[];              // capability sözlüğü (code/fast/long-ctx/...)
+  trainsOnData: boolean;       // free tier veriyi training'e kullanıyor mu (ToS uyarısı)
+}
+
 export interface BenchPromptInput {
   chip: string;
   best: Record<string, BenchAgg>;   // device → en-verimli-DOĞRU champion
@@ -45,6 +53,7 @@ export interface BenchPromptInput {
   ts: string;                  // ölçüm/üretim zamanı (deterministik test için param)
   localSelection?: LocalSelection;  // VARSA donanım-duyarlı pick (selectBest); YOKSA champion fallback
   stale?: boolean;             // bench verisi bayat mı (uyarı satırı)
+  freeProviders?: FreeApiProvider[]; // key-canlı ücretsiz API tier (yoksa bölüm render edilmez)
 }
 
 /** selection_rule gövdesi: donanım-duyarlı localSelection varsa onu, yoksa champion+hardcoded M4. */
@@ -95,6 +104,26 @@ function champLine(best: Record<string, BenchAgg>): string {
     .join("\n");
 }
 
+/** Key-canlı ücretsiz API tier bölümü. Boş liste → boş dizi (legacy çıktı birebir korunur).
+ *  Semantik: TERCİH, pin değil — provider 429/tükenme'de ProviderRouter zinciri sıradakine,
+ *  en sonda ollama-local'e düşer (sonsuz terminal). */
+function freeApiTierLines(providers: FreeApiProvider[] | undefined): string[] {
+  if (!providers?.length) return [];
+  const rows = providers.map((p) => {
+    const train = p.trainsOnData ? " · ⚠️ free tier veriyi **training**'e kullanır → hassas prompt gönderme" : "";
+    return `- **${p.id}** → \`${p.model}\` (${p.caps.join(", ")})${train}`;
+  });
+  return [
+    ``,
+    `<free_api_tier>`,
+    `Key-canlı ÜCRETSİZ API provider'lar (0 maliyet). Lokal seçim önce; bunlar paralel/fallback kapasite:`,
+    ...rows,
+    `- Semantik: tercih, pin DEĞİL — 429/kota tükenmesinde router zinciri sıradaki provider'a,`,
+    `  terminalde \`ollama-local\`'e düşer (fallback sonsuz). Kota ledger'ı headroom'u proaktif izler.`,
+    `</free_api_tier>`,
+  ];
+}
+
 /** Taşınabilir model-seçim + çalışma-prensibi prompt'u üretir (markdown + XML-section). */
 export function buildModelSelectionPrompt(input: BenchPromptInput): string {
   const { chip, best, aggs, regressions, routing, ts } = input;
@@ -141,6 +170,7 @@ export function buildModelSelectionPrompt(input: BenchPromptInput): string {
     ...selectionLines(input),
     `- Regresyon: ${regList}.`,
     `</selection_rule>`,
+    ...freeApiTierLines(input.freeProviders),
     ``,
     `<output>`,
     `Yukarıdaki seçimlerle ÇALIŞMAYA BAŞLA. "sıradaki versiyonu planla" → sonraki versiyonun todo+phase`,

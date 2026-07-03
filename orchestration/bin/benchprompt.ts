@@ -24,7 +24,7 @@ import {
 import { parseSysctl, selectBest, optimalConfig, type SysInfo } from "./lib/optimize";
 import {
   buildModelSelectionPrompt, DEFAULT_ROUTING,
-  type BenchPromptInput, type BenchAgg, type BenchRegression, type LocalSelection,
+  type BenchPromptInput, type BenchAgg, type BenchRegression, type LocalSelection, type FreeApiProvider,
 } from "./lib/benchprompt";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +73,23 @@ async function maybeRefresh(stale: boolean): Promise<boolean> {
   } catch { console.error("[benchprompt] --refresh: benchmark.mjs hata → mevcut veriyle devam."); return false; }
 }
 
+/** Key-canlı ücretsiz API tier: /api/keys/pool (HTTP choke-point — server-import yok).
+ *  Server kapalı/hata → [] (bölüm render edilmez; benchprompt asla bloklanmaz). */
+async function liveFreeProviders(): Promise<FreeApiProvider[]> {
+  try {
+    const r = await fetch("http://127.0.0.1:3000/api/keys/pool", { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) return [];
+    const j: any = await r.json();
+    return Object.entries(j?.pool ?? {})
+      .filter(([, v]: [string, any]) => (v?.live ?? 0) > 0 && v?.defaultModel)
+      .map(([id, v]: [string, any]) => ({
+        id, model: String(v.defaultModel),
+        caps: Array.isArray(v.capabilities) ? v.capabilities.map(String) : [],
+        trainsOnData: !!v.trainsOnData,
+      }));
+  } catch { return []; }
+}
+
 async function main(): Promise<void> {
   const sys: SysInfo = parseSysctl(sysctl("hw.memsize"), sysctl("hw.physicalcpu"), sysctl("machdep.cpu.brand_string"));
 
@@ -96,9 +113,11 @@ async function main(): Promise<void> {
     };
   }
 
+  const freeProviders = await liveFreeProviders();
   const input: BenchPromptInput = {
     chip: sys.chip, best: best as Record<string, BenchAgg>, aggs: aggs as BenchAgg[],
     regressions: regs as BenchRegression[], routing: DEFAULT_ROUTING, ts, localSelection, stale,
+    freeProviders,
   };
   const prompt = buildModelSelectionPrompt(input);
 
@@ -115,6 +134,9 @@ async function main(): Promise<void> {
     chip: sys.chip, ramGb: sys.ramGb, cores: sys.cores, ts, stale,
     selection: localSelection ?? prevSel?.selection ?? null,
     champions: mergedChampions, regressions: regs,
+    // Key-canlı ücretsiz API tier (0 maliyet; /api/keys/pool anlık görüntüsü). Server kapalıyken
+    // koşulduysa boş kalabilir → önceki değeri koru (clobber etme, bench-merge deseniyle aynı).
+    freeApiTier: freeProviders.length ? freeProviders : (prevSel?.freeApiTier ?? []),
   }, null, 2) + "\n");
 
   process.stdout.write(prompt + "\n");

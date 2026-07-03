@@ -85,3 +85,33 @@ describe("buildModelSelectionPrompt — graceful fallback", () => {
     expect(withReg).toContain("18");
   });
 });
+
+describe("buildModelSelectionPrompt — free_api_tier (key-canlı ücretsiz provider füzyonu)", () => {
+  const providers = [
+    { id: "cerebras", model: "gpt-oss-120b", caps: ["code", "fast"], trainsOnData: false },
+    { id: "zai", model: "glm-4.7-flash", caps: ["code", "long-ctx"], trainsOnData: false },
+    { id: "gemini", model: "gemini-flash", caps: ["code", "long-ctx"], trainsOnData: true },
+  ];
+  const withApi = buildModelSelectionPrompt({ ...full, freeProviders: providers });
+
+  it("key-canlı provider'ları model + capability ile listeler", () => {
+    expect(withApi).toMatch(/<free_api_tier>/);
+    expect(withApi).toContain("cerebras");
+    expect(withApi).toContain("gpt-oss-120b");
+    expect(withApi).toContain("long-ctx");
+  });
+  it("veri-training yapan provider'a hassas-veri uyarısı düşer (Gemini ToS)", () => {
+    expect(withApi).toMatch(/gemini.*(training|hassas)/i);
+  });
+  it("fallback semantiğini taşır: tercih, pin değil — 429'da router zinciri düşer", () => {
+    expect(withApi).toMatch(/429|fallback|zincir/i);
+  });
+  it("provider yokken bölüm hiç render edilmez (legacy çıktı birebir)", () => {
+    const without = buildModelSelectionPrompt(full);
+    expect(without).not.toMatch(/<free_api_tier>/);
+    expect(buildModelSelectionPrompt({ ...full, freeProviders: [] })).toBe(without);
+  });
+  it("deterministik — aynı girdi aynı çıktı", () => {
+    expect(buildModelSelectionPrompt({ ...full, freeProviders: providers })).toBe(withApi);
+  });
+});
