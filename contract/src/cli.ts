@@ -16,6 +16,19 @@ function homeDir(): string {
   return homedir();
 }
 
+/** Invoke this same CLI as a subprocess (used by `offer` to compose serve-rpc +
+ * agent installs). Inherits env so CONTRACT_RPC_PORT etc. propagate. */
+async function runSelf(args: string[]): Promise<number> {
+  const { spawn } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const self = fileURLToPath(import.meta.url);
+  return new Promise((resolve) => {
+    const c = spawn(process.execPath, [self, ...args], { stdio: "inherit", env: process.env });
+    c.on("exit", (code) => resolve(code ?? 1));
+    c.on("error", () => resolve(1));
+  });
+}
+
 function loadOrCreateIdentity(): Identity {
   try {
     return JSON.parse(readFileSync(IDENTITY_PATH, "utf8")) as Identity;
@@ -48,7 +61,7 @@ async function main(): Promise<number> {
     allowPositionals: true,
     options: {
       email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" },
-      port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, "from-pool": { type: "boolean", default: false },
+      port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, model: { type: "string" }, "from-pool": { type: "boolean", default: false },
     },
   });
   const [cmd, id] = positionals;
@@ -281,10 +294,24 @@ async function main(): Promise<number> {
         try {
           plan = buildHeadPlan(nodes || [], HEAD_LAYERS, modelSizeGB(modelPath));
         } catch (e: any) {
-          throw new Error(`pool: ${e.message} — members must run: contract serve-rpc + contract agent run (CONTRACT_RPC_PORT set)`);
+          throw new Error(`pool: ${e.message} — members must run: contract offer (or serve-rpc + agent run)`);
         }
-        console.error(`launching head over ${plan.endpoints.length} pool node(s): ${plan.memberIds.join(", ")}`);
-        return spawnHead(plan.endpoints, modelPath, { source: "pool", memberIds: plan.memberIds });
+        // vK14 preflight: probe each endpoint over the mesh before spawning the head —
+        // an unreachable member would otherwise hang the head's model load.
+        const { preflightEndpoints } = shard;
+        const { reachable, dropped } = await preflightEndpoints(plan.endpoints, (h, p) => probeRpcPort(h, p, 1500));
+        if (dropped.length) console.error(`preflight: dropped ${dropped.length} unreachable endpoint(s): ${dropped.map((e) => `${e.host}:${e.port}`).join(", ")}`);
+        if (reachable.length === 0) {
+          throw new Error("pool: no reachable rpc endpoints (check mesh connectivity + that members ran 'contract offer')");
+        }
+        // re-plan slices over ONLY the reachable members (keep memberIds aligned to endpoints)
+        const reachableSet = new Set(reachable.map((e) => `${e.host}:${e.port}`));
+        const liveNodes = (nodes || []).filter((n) => {
+          try { return n.url && n.rpcPort && reachableSet.has(`${new URL(n.url).hostname}:${n.rpcPort}`); } catch { return false; }
+        });
+        const livePlan = buildHeadPlan(liveNodes, HEAD_LAYERS, modelSizeGB(modelPath));
+        console.error(`launching head over ${livePlan.endpoints.length} reachable pool node(s): ${livePlan.memberIds.join(", ")}`);
+        return spawnHead(livePlan.endpoints, modelPath, { source: "pool", memberIds: livePlan.memberIds });
       };
 
       if (id === "up") {
@@ -349,42 +376,101 @@ async function main(): Promise<number> {
       return 0;
     }
     case "serve-rpc": {
-      // F3: member-side — bind an rpc-server on a mesh/private address so the
-      // operator's head can reach it, then advertise the port via `agent run`.
+      // F3 + vK14: member-side rpc-server. Ephemeral bind (default) OR a persistent
+      // launchd daemon (install/run/status/uninstall) that survives reboot and
+      // self-configures its mesh address from contract-node.json.
       const shard = await import("./shard.ts");
-      const { detectShardCapability, resolveShardBinary, startProcess, stopProcess, rpcServerArgs, shardDir } = shard;
+      const { detectShardCapability, resolveShardBinary, startProcess, stopProcess, probeRpcPort, rpcServerArgs, shardDir } = shard;
+      const { installAgent, uninstallAgent, agentLoaded } = await import("./agent.ts");
+      const { loadNodeConfig, saveNodeConfig } = await import("./node-config.ts");
+      const { detectMeshHost } = await import("./mesh.ts");
       const { execFileSync, spawn } = await import("node:child_process");
       const { openSync, mkdirSync } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
       const rpcBin = resolveShardBinary("rpc-server");
       const headBin = resolveShardBinary("llama-server");
       const has = (bin: string) => { try { execFileSync(bin.includes("/") ? "test" : "which", bin.includes("/") ? ["-x", bin] : [bin], { stdio: "pipe" }); return true; } catch { return false; } };
       const rpcFlag = (() => { try { return execFileSync(headBin, ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
       const cap = detectShardCapability({ "llama-server": has(headBin), "rpc-server": has(rpcBin), rpcFlag });
-      const port = Number(values.port || process.env.CONTRACT_RPC_PORT || 50052);
-      const host = String(values.host || process.env.CONTRACT_RPC_HOST || "127.0.0.1");
+      const RPC_LABEL = "com.ollamas.contract.rpc";
+      const cfg = loadNodeConfig().config;
+      const port = Number(values.port || process.env.CONTRACT_RPC_PORT || cfg.rpcPort);
+      // host precedence: --host > node-config meshHost > live mesh detect > env > loopback
+      const host = String(values.host || cfg.meshHost || detectMeshHost() || process.env.CONTRACT_RPC_HOST || "127.0.0.1");
+      const device = values.device ? String(values.device) : cfg.device;
 
       if (id === "stop") {
         const ok = stopProcess(`member-rpc-${port}`, { kill: (pid) => { try { process.kill(pid); } catch {} return true; } });
         console.error(ok ? `stopped member-rpc-${port}` : `no member-rpc-${port} running`);
         return 0;
       }
+      if (id === "install") {
+        const plan = {
+          label: RPC_LABEL, nodeBin: process.execPath, cliPath: fileURLToPath(import.meta.url),
+          args: ["serve-rpc", "run"], logPath: join(homeDir(), ".ollamas", "contract-rpc.log"), workdir: join(homeDir(), ".ollamas"),
+        };
+        // persist chosen port/host/device so `run` self-configures on reboot
+        saveNodeConfig({ ...cfg, rpcPort: port, meshHost: values.host || cfg.meshHost || detectMeshHost(), device });
+        const r = installAgent(plan); console.error(r.reason); return r.ok ? 0 : 1;
+      }
+      if (id === "uninstall") { const r = uninstallAgent(RPC_LABEL); console.error(r.reason); return r.ok ? 0 : 1; }
+      if (id === "status") {
+        out({ label: RPC_LABEL, loaded: agentLoaded(RPC_LABEL), host, port, reachable: await probeRpcPort(host === "0.0.0.0" ? "127.0.0.1" : host, port, 800) });
+        return 0;
+      }
       if (!cap.capable) { console.error(`serve-rpc NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`); return 1; }
-      const exec = (bin: string, args: string[], logPath: string): number => {
-        const fd = openSync(logPath, "w");
-        const child = spawn(bin, args, { detached: true, stdio: ["ignore", fd, fd] });
-        child.unref();
-        return child.pid as number;
-      };
-      mkdirSync(shardDir(), { recursive: true });
       // rpcServerArgs enforces isPrivateHost — a public bind is refused (RISK-K1).
-      const args = rpcServerArgs({ host, port, device: values.device ? String(values.device) : undefined });
+      const args = rpcServerArgs({ host, port, device });
+      mkdirSync(shardDir(), { recursive: true });
+
+      if (id === "run") {
+        // Foreground launchd target: spawn the rpc-server as a CHILD and stay alive
+        // so launchd KeepAlive owns the lifecycle; if the child dies, exit → restart.
+        const fd = openSync(join(shardDir(), `member-rpc-${port}.log`), "w");
+        const child = spawn(rpcBin, args, { stdio: ["ignore", fd, fd] });
+        console.error(`[serve-rpc] rpc-server bound ${host}:${port} (pid ${child.pid})`);
+        await new Promise<void>((resolve) => { child.on("exit", (code) => { console.error(`[serve-rpc] rpc-server exited ${code}`); resolve(); }); });
+        return 1; // non-zero → launchd KeepAlive restarts
+      }
+
+      // default: ephemeral detached bind (vK12 behavior, back-compat)
+      const exec = (bin: string, a: string[], logPath: string): number => {
+        const fd = openSync(logPath, "w");
+        const c = spawn(bin, a, { detached: true, stdio: ["ignore", fd, fd] });
+        c.unref();
+        return c.pid as number;
+      };
       const pid = startProcess(`member-rpc-${port}`, rpcBin, args, { exec });
       console.log(`rpc-server bound ${host}:${port} (pid ${pid}). Advertise it: CONTRACT_RPC_PORT=${port} contract agent run`);
-      console.error("stop with: contract serve-rpc stop --port " + port);
+      console.error("persist across reboot: contract serve-rpc install");
       return 0;
     }
+    case "offer": {
+      // vK14 capstone: one command → PERMANENT member compute contribution.
+      // Persist node config (mesh host auto-detected) then install BOTH daemons
+      // (rpc-server + heartbeat) so the machine rejoins the pool after any reboot.
+      const { saveNodeConfig, loadNodeConfig } = await import("./node-config.ts");
+      const { detectMeshHost } = await import("./mesh.ts");
+      const cfg = loadNodeConfig().config;
+      const port = Number(values.port || process.env.CONTRACT_RPC_PORT || cfg.rpcPort);
+      if (id === "stop") {
+        const rpc = await runSelf(["serve-rpc", "uninstall"]);
+        const agent = await runSelf(["agent", "uninstall"]);
+        console.error(`offer stopped (rpc:${rpc} agent:${agent})`);
+        return 0;
+      }
+      const meshHost = detectMeshHost();
+      saveNodeConfig({ ...cfg, rpcPort: port, role: "member", meshHost, model: values.model ? String(values.model) : cfg.model, device: values.device ? String(values.device) : cfg.device });
+      console.error(`node config saved: meshHost=${meshHost ?? "(loopback — no mesh detected)"} rpcPort=${port}`);
+      process.env.CONTRACT_RPC_PORT = String(port);
+      const rpc = await runSelf(["serve-rpc", "install"]);
+      const agent = await runSelf(["agent", "install"]);
+      console.log(`offer active — this machine permanently contributes to the pool (rpc daemon:${rpc === 0 ? "ok" : "fail"}, heartbeat daemon:${agent === 0 ? "ok" : "fail"})`);
+      console.error(meshHost ? `advertising ${meshHost}:${port} over the mesh` : "no mesh address detected — bring up tailscale/headscale, then: contract offer");
+      return rpc === 0 && agent === 0 ? 0 : 1;
+    }
     default:
-      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [--host H --port P --device D | stop] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
+      console.error("usage: contract document | apply --email X | join --email X | offer [--model M --port P | stop] | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop | --host H --port P --device D] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
       return 2;
   }
 }

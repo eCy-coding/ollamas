@@ -15,6 +15,7 @@
 | **vK11** | Tamamlama — doctor generate+quota kapsamı (F5), suspend wire (contract_admin+route+cli, dead-code) | ✅ DONE |
 | **vK12** | Pool-kaynaklı çok-makine shard — shard up --from-pool (F1), serve-rpc (F3), modelSize gate (F2), listShardProcesses wire | ✅ DONE |
 | **vK13** | Governance — resume/unsuspend, lane-owned audit-log (secret-free), member-key rotation | ✅ DONE |
+| **vK14** | Kalıcı cross-host üye — node-config, mesh-host keşfi (tailscale), serve-rpc launchd daemon, launch preflight, tek-komut offer | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`
@@ -34,4 +35,6 @@ endpoints=[50052,53], memberIds=2) → /api/pool/generate source:shard:head → 
 log büyüdü (1932B+1631B=layer-split canlı) → `shard down` 3 pid (head+2 rpc) listShardProcesses ile temizledi.
 Hardcoded değil, canlı pool-verisinden. F4 (resume/audit/rotation) vK13'e ertelendi.
 
-## vK14 — NEXT (2.fiziksel makine cross-host: tunnel/mesh üstünden gerçek çok-makine shard; kod hazır, donanım+ağ eksik)
+¹⁴ vK14 CANLI KANIT (loopback + CANLI tailscale): detectMeshHost → gerçek tailnet IP 100.108.67.76 (fallback DEĞİL); serve-rpc install → launchd com.ollamas.contract.rpc loaded (status host=mesh-IP) → uninstall temiz; node-config persist 0600; `offer` → node-config(meshHost+model) + 2 daemon(rpc+agent) "advertising 100.108.67.76:50052 over the mesh" → offer stop temiz; shard up --from-pool PREFLIGHT "2 reachable pool node" → source:shard:head → çift-log split (925B+624B). Kod+daemon+config+preflight cross-host-hazır. EXTENSIBLE: yeni transport CONTRACT_RPC_HOST env ile.
+
+## vK15 — NEXT (aday: gerçek 2-cihaz cross-host e2e — her iki makinede tailscale up + offer + shard up --from-pool; ya da un-suspend-resume-UX / audit-retention governance-2)

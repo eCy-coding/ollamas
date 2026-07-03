@@ -197,6 +197,20 @@ export function resolveShardBinary(name: "rpc-server" | "llama-server"): string 
   return name; // PATH fallback — capability gate reports if it is the RPC-less brew build
 }
 
+/** vK14: probe each rpc endpoint before launching the head — an unreachable
+ * member would otherwise hang the head's load. Returns reachable + dropped so the
+ * caller re-plans over live members and reports the dead ones. */
+export async function preflightEndpoints(
+  endpoints: RpcEndpoint[],
+  probe: (host: string, port: number) => Promise<boolean>,
+): Promise<{ reachable: RpcEndpoint[]; dropped: RpcEndpoint[] }> {
+  const results = await Promise.all(endpoints.map(async (e) => ({ e, ok: await probe(e.host, e.port) })));
+  return {
+    reachable: results.filter((r) => r.ok).map((r) => r.e),
+    dropped: results.filter((r) => !r.ok).map((r) => r.e),
+  };
+}
+
 /** Honest capability gate (tunnel autopilot pattern): sharding needs llama.cpp
  * built WITH the RPC backend — stock brew bottles ship without it. */
 export function detectShardCapability(found: { "llama-server": boolean; "rpc-server": boolean; rpcFlag: boolean }): {

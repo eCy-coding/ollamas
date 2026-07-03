@@ -7,7 +7,7 @@ import { createServer } from "node:net";
 import {
   isPrivateHost, rpcServerArgs, shardServerArgs, planShardGroup, detectShardCapability,
   pidFilePath, startProcess, stopProcess, probeRpcPort, resolveOllamaModelBlob,
-  modelSizeGB, buildHeadPlan,
+  modelSizeGB, buildHeadPlan, preflightEndpoints,
 } from "./shard.ts";
 import { writeFileSync as wf } from "node:fs";
 
@@ -63,6 +63,24 @@ test("planShardGroup: partitions layers over rpc-capable fresh nodes", () => {
   assert.equal(plan.slices.length, 2);
   assert.equal(plan.slices[0]?.endLayer, 24); // 48/64 of 32
   assert.throws(() => planShardGroup(32, [{ memberId: "m", url: "http://10.0.0.1:11434", ramGB: 8 }]), /rpc/i);
+});
+
+test("preflightEndpoints: probes each, splits reachable vs dropped (vK14)", async () => {
+  const eps = [
+    { host: "127.0.0.1", port: 50052 },
+    { host: "100.64.0.9", port: 50053 },
+    { host: "127.0.0.1", port: 50054 },
+  ];
+  const probe = async (host: string, port: number) => port === 50053 ? false : true; // 50053 dead
+  const r = await preflightEndpoints(eps, probe);
+  assert.deepEqual(r.reachable.map((e) => e.port), [50052, 50054]);
+  assert.deepEqual(r.dropped.map((e) => e.port), [50053]);
+});
+
+test("preflightEndpoints: all dead → empty reachable", async () => {
+  const r = await preflightEndpoints([{ host: "127.0.0.1", port: 1 }], async () => false);
+  assert.equal(r.reachable.length, 0);
+  assert.equal(r.dropped.length, 1);
 });
 
 test("modelSizeGB: reads file size in GB; missing file → 0 (F2)", () => {
