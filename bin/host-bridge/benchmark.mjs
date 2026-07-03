@@ -128,7 +128,7 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
   // platform+device+method so macOS and iOS runs accumulate in the same file.
   const ts = new Date().toISOString();
   const method = PLATFORM === "ios" ? "ios-cli" : "app-generate";
-  const records = results.map((r) =>
+  const records = results.map((/** @type {any} */ r) =>
     benchRecord({
       platform: PLATFORM,
       device: DEVICE.device,

@@ -43,11 +43,14 @@ function census(): CensusInput {
 
   const shCount = notVendored.filter((f) => f.endsWith(".sh")).length;
   const centralTests = notVendored.filter((f) => f.startsWith("tests/") && f.endsWith(".test.ts")).length;
-  // in-place migration progress: a .mjs is type-checked when it carries `// @ts-check`, OR it is a top-level
-  // scripts/*.mjs — scripts/tsconfig.json now sets `checkJs:true`, so the whole scripts/ subsystem is checked.
-  const scriptsChecked = /"checkJs"\s*:\s*true/.test((() => { try { return readFileSync(join(REPO, "scripts/tsconfig.json"), "utf8"); } catch { return ""; } })());
+  // in-place migration progress: a .mjs is type-checked when it carries `// @ts-check`, OR it lives under a
+  // subsystem whose tsconfig sets `checkJs:true` (scripts/, bin/host-bridge/ — the whole tree is checked).
+  const hasCheckJs = (/** @type {string} */ cfg) => { try { return /"checkJs"\s*:\s*true/.test(readFileSync(join(REPO, cfg), "utf8")); } catch { return false; } };
+  const scriptsChecked = hasCheckJs("scripts/tsconfig.json");
+  const bridgeChecked = hasCheckJs("bin/host-bridge/tsconfig.json");
   const mjsChecked = mjs.filter((f) => {
     if (scriptsChecked && /^scripts\/[^/]+\.mjs$/.test(f)) return true;
+    if (bridgeChecked && f.startsWith("bin/host-bridge/")) return true;
     try { return /\/\/\s*@ts-check/.test(readFileSync(join(REPO, f), "utf8").slice(0, 200)); } catch { return false; }
   }).length;
 

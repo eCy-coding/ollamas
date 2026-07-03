@@ -132,6 +132,7 @@ async function osa(script, ...args) {
 
 // Serialize all terminal access: one shared window per app means concurrent
 // commands would interleave and race their capture files. Queue them.
+/** @type {Promise<any>} */
 let _chain = Promise.resolve();
 function runCommand(target, command, timeoutMs) {
   const job = _chain.then(() => runCommandInner(target, command, timeoutMs));

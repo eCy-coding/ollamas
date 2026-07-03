@@ -33,6 +33,7 @@ function sh(cmd, args) {
 }
 
 async function probeBridge() {
+  /** @type {Record<string, string>} */
   let headers = {};
   try { const t = readFileSync(TOKEN_FILE, "utf8").trim(); if (t) headers = { "X-Bridge-Token": t }; } catch {}
   try {

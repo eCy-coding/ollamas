@@ -17,7 +17,7 @@ export const PLIST_LABEL = "com.missioncontrol.terminalbridge";
 // guard — a half-rendered plist would silently load a broken agent).
 /**
  * @param {string} template
- * @param {{repoPath:string,token:string,nodePath:string,port?:number}} [opts]
+ * @param {{repoPath?:string,token?:string,nodePath?:string,port?:number}} [opts]
  * @returns {string}
  */
 export function renderPlist(template, { repoPath, token, nodePath, port = 7345 } = {}) {

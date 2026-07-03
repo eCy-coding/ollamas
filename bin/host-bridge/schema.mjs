@@ -32,7 +32,7 @@ export const SCHEMAS = {
 // Zod schema -> JSON-schema (OpenAPI3 dialect; the shape the ReAct `tools:` param
 // and MCP listTools expect: { type, properties, required }).
 export function toJsonSchema(zodSchema) {
-  const js = zodToJsonSchema(zodSchema, { target: "openApi3", $refStrategy: "none" });
+  const js = /** @type {any} */ (zodToJsonSchema(zodSchema, { target: "openApi3", $refStrategy: "none" }));
   // zodToJsonSchema wraps in extra metadata for some inputs; the object body is what we want.
   delete js.$schema;
   delete js.additionalProperties;

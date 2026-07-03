@@ -13,6 +13,7 @@ const execFileP = promisify(execFile);
 const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 // macOS/BSD portability + project-specific pitfalls.
+/** @type {[RegExp, string][]} */
 const HEURISTICS = [
   [/\bbase64\s+-d\b/, "BSD `base64` uses `-D` to decode, not `-d` (or `--decode`)."],
   [/\bsed\s+-i\s+(?!'')\S/, "BSD `sed -i` needs an explicit backup suffix: `sed -i '' …`."],

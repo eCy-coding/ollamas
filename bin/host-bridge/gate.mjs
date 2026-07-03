@@ -23,7 +23,7 @@ const REPO = process.env.OLLAMAS_REPO || join(HERE, "..", "..");
 // is true only if every non-skipped step passed. `now` injectable for deterministic tests.
 /**
  * @param {Array<{name:string,cmd?:string,cwd?:string,skip?:boolean,reason?:string}>} steps
- * @param {{exec:(step:any)=>unknown,now?:()=>number}} [opts]
+ * @param {{exec?:(step:any)=>unknown,now?:()=>number}} [opts]
  * @returns {Promise<{ok:boolean,results:any[],failed:string[]}>}
  */
 export async function runGate(steps, { exec, now = () => Date.now() } = {}) {

@@ -1,0 +1,9 @@
+{
+  "//": "Type-check harness for the security-critical host-bridge subsystem (privileged exec/auth boundary). checkJs ON so every .mjs is validated in place — node runs them directly (zero-build), so this is type-check-only (noEmit), NOT a rename. Run: tsc -p bin/host-bridge/tsconfig.json --noEmit",
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler",
+    "allowJs": true, "checkJs": true, "noEmit": true, "skipLibCheck": true, "strict": false
+  },
+  "include": ["**/*.mjs", "*.mjs"],
+  "exclude": ["tests/**", "**/*.test.mjs"]
+}

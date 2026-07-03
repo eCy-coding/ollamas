@@ -1,6 +1,6 @@
 # COMPLETION_GAPS.md — project-completion gap report (auto-generated)
 
-> Auto: `tsx orchestration/bin/completion-scan.ts` · 2026-07-02T14:52:01Z. The council's end-to-end scan of ollamas:
+> Auto: `tsx orchestration/bin/completion-scan.ts` · 2026-07-03T00:03:01Z. The council's end-to-end scan of ollamas:
 > what code / folders / languages are still needed to complete the project, with justifications and a
 > task distribution across the fleet streams. Evidence only — every gap derives from a real scan fact.
 
@@ -13,7 +13,7 @@
 | .md | 184 |
 | .json | 135 |
 | .mjs | 98 |
-| .tsx | 57 |
+| .tsx | 59 |
 | .sh | 23 |
 | .yml | 14 |
 | .swift | 9 |
@@ -69,7 +69,7 @@
 - `backend` — 5 tracked file(s); likely a stub/unfinished lane or an intentional placeholder. Verify.
 
 ## §D — Missing / under-migrated languages
-- **98 .mjs files still to migrate → TypeScript** (owner: `mjs-migration`; in-place `@ts-check` progress: **31/98**).
+- **98 .mjs files still to migrate → TypeScript** (owner: `mjs-migration`; in-place `@ts-check` progress: **72/98**).
   - scripts: 31
   - bin/host-bridge/tools: 19
   - bin/host-bridge: 12
@@ -80,7 +80,7 @@
 
 ## §E — Task distribution (per fleet stream, ≤2 tasks/model)
 ### `mjs-migration` (1)
-- [P1] 98 .mjs files still to migrate to TypeScript (31 already `@ts-check`'d) — TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts.
+- [P1] 98 .mjs files still to migrate to TypeScript (72 already `@ts-check`'d) — TS is the primary language (type-safety, single toolchain); un-migrated .mjs escapes tsc + the shared type contracts.
 ### `errors-resilience` (15)
 - [P3] Backend route `/api/ready` is never called by the frontend — Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove.
 - [P3] Backend route `/api/openapi.json` is never called by the frontend — Dead route = maintenance cost + attack surface; confirm intentional (public API?) or remove.

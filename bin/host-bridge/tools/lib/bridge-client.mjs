@@ -28,6 +28,7 @@ export function readToken() {
   }
 }
 
+/** @param {string} path @param {{method?:string, body?:any, timeoutMs?:number}} [opts] */
 async function call(path, { method = "GET", body, timeoutMs = 30000 } = {}) {
   const token = readToken();
   const headers = { "Content-Type": "application/json", ...(token ? { "X-Bridge-Token": token } : {}) };

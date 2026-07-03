@@ -13,6 +13,7 @@ const execFileP = promisify(execFile);
 const DIR = dirname(fileURLToPath(import.meta.url));
 
 // [name, args, mode]  mode: "run" = execute + expect ok; "check" = presence+syntax only
+/** @type {[string, string[], string][]} */
 const PLAN = [
   ["health_probe", [], "run"],
   ["git_ops", ["status"], "run"],
