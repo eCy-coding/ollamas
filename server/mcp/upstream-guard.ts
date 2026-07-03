@@ -35,6 +35,13 @@ const DANGEROUS_FLAGS = new Set(["-c", "--call", "-e", "--eval", "-p", "--print"
 // the "npx -y any-evil-package" residual. Covers every catalog entry:
 // @modelcontextprotocol/server-* (npx) and mcp-server-* (uvx).
 const PACKAGE_PREFIXES = ["@modelcontextprotocol/", "mcp-server"];
+// Catalog-vetted vendor packages whose names don't fit the MCP prefixes. Each
+// is a specific, human-reviewed package (see catalog.ts). Matched exactly or
+// with a version suffix ("@…") so a typosquat like "@playwright/mcp-evil"
+// (no "@" separator after the vetted name) is NOT accepted.
+const VETTED_PACKAGES = ["@playwright/mcp"];
+const isVettedPackage = (pkg: string): boolean =>
+  VETTED_PACKAGES.some((v) => pkg === v || pkg.startsWith(`${v}@`));
 
 const allowAny = (): boolean => process.env.MCP_UPSTREAM_ALLOW_ANY === "1";
 
@@ -70,8 +77,8 @@ function validateStdio(command: unknown, args: unknown): ValidationResult {
   // First non-flag token is the package spec; pin it to a known MCP prefix.
   const pkg = argList.find((a) => !a.startsWith("-"));
   if (!pkg) return { ok: false, error: "no package specified" };
-  if (!PACKAGE_PREFIXES.some((p) => pkg.startsWith(p))) {
-    return { ok: false, error: `package not allowed: ${pkg} (must start with ${PACKAGE_PREFIXES.join(" or ")})` };
+  if (!PACKAGE_PREFIXES.some((p) => pkg.startsWith(p)) && !isVettedPackage(pkg)) {
+    return { ok: false, error: `package not allowed: ${pkg} (must start with ${PACKAGE_PREFIXES.join(" or ")}, or be a vetted vendor package)` };
   }
   return { ok: true };
 }

@@ -103,6 +103,30 @@ export const CATALOG: CatalogEntry[] = [
     tags: ["local", "zero-account"],
     note: "Requires Python uvx (brew install uv).",
   },
+  {
+    id: "sequential-thinking",
+    title: "Sequential Thinking",
+    desc: "Structured, reflective step-by-step reasoning aid — the 7th official reference server. Fully local.",
+    license: "MIT",
+    transport: "stdio",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+    requires: "npx",
+    tags: ["local", "zero-account"],
+    note: NPX_NOTE,
+  },
+  {
+    id: "playwright",
+    title: "Playwright (browser)",
+    desc: "Microsoft's browser automation via accessibility snapshots (Chromium/Firefox/WebKit). Runs locally — pages never leave the machine.",
+    license: "MIT",
+    transport: "stdio",
+    command: "npx",
+    args: ["-y", "@playwright/mcp"],
+    requires: "npx",
+    tags: ["local"],
+    note: "First launch downloads the browser engines (~large). Local automation.",
+  },
 ];
 
 /** Dedicated filesystem sandbox for the catalog's filesystem entry. */

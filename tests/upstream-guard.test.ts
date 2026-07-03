@@ -35,6 +35,14 @@ describe("validateUpstreamConfig — blocks tenant→host command execution (std
     expect((await validateUpstreamConfig({ transport: "stdio", command: "npx", args: ["-y"] })).ok).toBe(false);
   });
 
+  test("vetted vendor package (@playwright/mcp) allowed; typosquat rejected", async () => {
+    expect((await validateUpstreamConfig({ transport: "stdio", command: "npx", args: ["-y", "@playwright/mcp"] })).ok).toBe(true);
+    expect((await validateUpstreamConfig({ transport: "stdio", command: "npx", args: ["-y", "@playwright/mcp@1.2.0"] })).ok).toBe(true);
+    // typosquat under/around the vetted name must NOT pass
+    expect((await validateUpstreamConfig({ transport: "stdio", command: "npx", args: ["-y", "@playwright/mcp-evil"] })).ok).toBe(false);
+    expect((await validateUpstreamConfig({ transport: "stdio", command: "npx", args: ["-y", "@playwright-evil/mcp"] })).ok).toBe(false);
+  });
+
   test("path-command: non-basename rejected (PATH escape / symlink)", async () => {
     expect((await validateUpstreamConfig({ transport: "stdio", command: "./x", args: ["mcp-server-git"] })).ok).toBe(false);
     expect((await validateUpstreamConfig({ transport: "stdio", command: "/usr/bin/npx", args: ["-y", "@modelcontextprotocol/server-memory"] })).ok).toBe(false);
