@@ -21,6 +21,7 @@ import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, fo
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm } from "./server/stt-catalog";
+import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
@@ -832,6 +833,26 @@ async function initializeServer() {
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
     const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));
     res.json({ pool, alerts });
+  });
+
+  /**
+   * key-doctor (T3-F3): discover candidate keys already on this machine (env / macOS
+   * keychain / gh CLI) -> validate against the real provider -> connect to the vault ->
+   * report capabilities/roles unlocked. dryRun DEFAULTS TO TRUE (safe); pass
+   * {dryRun:false} to actually save. Report is fully masked - key values never leave
+   * the process. Never runs `gh auth refresh` itself (returns the command instead);
+   * the interactive flow lives in scripts/key-doctor.mjs.
+   */
+  app.post("/api/keys/doctor", async (req, res) => {
+    try {
+      const { sources, dryRun } = req.body ?? {};
+      const allowed = ["env", "keychain", "gh"] as const;
+      const wanted = Array.isArray(sources) ? sources.filter((s: string) => (allowed as readonly string[]).includes(s)) : undefined;
+      const report = await runDoctor({ sources: wanted as any, dryRun: dryRun !== false }, productionDoctorDeps());
+      res.json(report);
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message ?? e).slice(0, 200) });
+    }
   });
 
   app.post("/api/keys", (req, res) => {

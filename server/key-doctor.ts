@@ -7,7 +7,9 @@
 // validation/vault code paths — every report-facing field carries maskKey(); nothing here
 // logs a value; keychain access is read-only over KNOWN service names.
 import { keyedCloudProviders, envKeyFor, capabilitiesFor, capabilityReport, suggestRoles, keySignupUrl, catalogEntry } from "./provider-catalog";
-import { EMBED_CATALOG } from "./embed-catalog";
+import { EMBED_CATALOG, buildEmbedRequest } from "./embed-catalog";
+import { ProviderRouter } from "./providers";
+import { db } from "./db";
 import { keyId } from "./key-usage";
 import { readGenericPassword, keychainAvailable } from "./lib/keychain-scan";
 import { execFileSync } from "node:child_process";
@@ -152,6 +154,53 @@ export interface DoctorReport {
 }
 
 const GH_REFRESH_CMD = "gh auth refresh -h github.com -s models:read";
+
+/** Production deps: chat validation = /api/keys/test semantics IN-PROCESS
+ *  (testKeyOverride + singleAttempt, finally-reset); embed/tavily = one cheap real call;
+ *  vault = encrypted db (primary/pool), with knownKeyIds spanning the WHOLE active pool
+ *  (vault + env) so an env-sourced key honestly reports "already" instead of re-saving. */
+export function productionDoctorDeps(): DoctorDeps {
+  return {
+    async chatValidate(provider, key) {
+      ProviderRouter.testKeyOverride = { provider, key };
+      try {
+        await ProviderRouter.generate({
+          provider, model: "",
+          messages: [{ role: "user", content: "ping test" }],
+          singleAttempt: true,
+        });
+      } finally {
+        ProviderRouter.testKeyOverride = null;
+      }
+    },
+    async embedValidate(providerId, key) {
+      const entry = EMBED_CATALOG[providerId];
+      if (!entry) throw new Error(`unknown embed provider ${providerId}`);
+      const req = buildEmbedRequest(entry, ["ping"], key);
+      const r = await fetch(req.url, { method: "POST", headers: req.headers, body: req.body, signal: AbortSignal.timeout(20_000) });
+      if (!r.ok) throw new Error(`${providerId} embeddings error ${r.status}`);
+    },
+    async tavilyValidate(key) {
+      const r = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ query: "ping", max_results: 1 }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!r.ok) throw new Error(`tavily error ${r.status}`);
+    },
+    vault: {
+      hasPrimary: (p) => !!db.data.keys?.[p],
+      knownKeyIds: (p) => new Set(ProviderRouter.keyPool(p).map((k) => keyId(k))),
+      savePrimary: (p, key) => { db.data.keys[p] = db.encrypt(key); db.save(); },
+      addToPool: (p, key) => {
+        const pool = ((db.data as any).keyPool ??= {});
+        (pool[p] ??= []).push(db.encrypt(key));
+        db.save();
+      },
+    },
+  };
+}
 
 function isQuotaError(msg: string): boolean {
   const m = msg.toLowerCase();
