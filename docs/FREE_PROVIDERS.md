@@ -18,6 +18,7 @@ Single source of truth for limits/models: `server/provider-catalog.ts`. Env over
 | NVIDIA NIM | build.nvidia.com | `NVIDIA_API_KEY` | ~40 rpm, 1K credits | meta/llama-3.3-70b-instruct | 100+ models |
 | GitHub Models | github.com/marketplace/models | `GITHUB_MODELS_TOKEN` | 10 rpm · 50 rpd | openai/gpt-4o-mini | PAT with `models:read`; small quota |
 | Cloudflare | dash.cloudflare.com → Workers AI | `CLOUDFLARE_API_TOKEN` **+** `CLOUDFLARE_ACCOUNT_ID` | 10K neurons/day | @cf/meta/llama-3.3-70b-instruct-fp8-fast | Both vars required |
+| Mistral | console.mistral.ai/api-keys | `MISTRAL_API_KEY` | ~1B tok/mo (Experiment) | mistral-small-latest | ⚠️ flagged trainsOnData:true until terms verified — privateMode excludes it |
 
 Already integrated before this catalog: `gemini` (AI Studio), `openrouter` (`:free`
 models), `openai`, `anthropic`, `ollama-cloud`.

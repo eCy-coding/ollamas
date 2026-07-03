@@ -9,10 +9,10 @@ import {
 } from "../server/provider-catalog";
 import { limitFor } from "../server/key-limits";
 
-const IDS = ["groq", "cerebras", "zai", "sambanova", "nvidia-nim", "github-models", "cloudflare"];
+const IDS = ["groq", "cerebras", "zai", "sambanova", "nvidia-nim", "github-models", "cloudflare", "mistral"];
 
 describe("PROVIDER_CATALOG — free-tier cloud providers (zero-dep, OpenAI-compat)", () => {
-  it("contains exactly the 7 planned providers, each internally consistent", () => {
+  it("contains exactly the planned providers, each internally consistent", () => {
     expect(Object.keys(PROVIDER_CATALOG).sort()).toEqual([...IDS].sort());
     for (const id of IDS) {
       const e = PROVIDER_CATALOG[id] as CatalogEntry;
@@ -70,6 +70,11 @@ describe("PROVIDER_CATALOG — free-tier cloud providers (zero-dep, OpenAI-compa
     expect(trainsOnData("groq")).toBe(false);
     expect(trainsOnData("cerebras")).toBe(false);
     expect(trainsOnData("unknown-prov")).toBe(false);
+  });
+
+  it("mistral joins with the CAUTIOUS training flag (privateMode routes around it until verified)", () => {
+    expect(trainsOnData("mistral")).toBe(true);
+    expect(PROVIDER_CATALOG.mistral.envKey).toBe("MISTRAL_API_KEY");
   });
 
   it("key-limits: catalog limits are merged into limitFor defaults (env still overrides)", () => {

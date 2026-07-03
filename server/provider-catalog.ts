@@ -97,6 +97,20 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     toolCalling: "probe",
     resetBoundary: "utc-midnight",
   },
+  mistral: {
+    id: "mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    envKey: "MISTRAL_API_KEY",
+    signupUrl: "https://console.mistral.ai/api-keys",
+    defaultModel: "mistral-small-latest",
+    limits: { perMin: 30, perDay: 0 }, // Experiment tier ≈1B tok/mo; RPM unpublished — conservative
+    // CAUTIOUS default: the free Experiment tier's terms have historically tied free usage to a
+    // training opt-in (the paid API does NOT train). Verified-safe → flip to false with a source.
+    trainsOnData: true,
+    maxContext: 32_000,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+  },
   cloudflare: {
     id: "cloudflare",
     baseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
