@@ -7,6 +7,7 @@ import {
   formatSseDone,
   formatSseError,
   isSessionStalled,
+  isStreamTimeout,
 } from "../server/agent-events";
 
 // Helper: build a session whose messages[] are the replayable steps.
@@ -158,5 +159,16 @@ describe("isSessionStalled — quiescence stall guard (no clock, caller passes q
   });
   test("no growth but not quiet long enough → not stalled", () => {
     expect(isSessionStalled(3, 3, 10_000, 30_000)).toBe(false);
+  });
+});
+
+describe("isStreamTimeout — hard stream-duration guard (no clock, caller passes elapsed time)", () => {
+  test("elapsed >= max → timed out", () => {
+    expect(isStreamTimeout(30_000, 30_000)).toBe(true);
+    expect(isStreamTimeout(31_000, 30_000)).toBe(true);
+  });
+  test("elapsed < max → not timed out", () => {
+    expect(isStreamTimeout(29_999, 30_000)).toBe(false);
+    expect(isStreamTimeout(0, 30_000)).toBe(false);
   });
 });

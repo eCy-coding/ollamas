@@ -86,3 +86,8 @@ export function formatSseError(payload: Record<string, any>): string {
 export function isSessionStalled(prevCount: number, curCount: number, quietMs: number, maxQuietMs: number): boolean {
   return curCount === prevCount && quietMs >= maxQuietMs;
 }
+
+/** Timeout guard for SSE stream: true when the elapsed time exceeds `maxStreamMs`. */
+export function isStreamTimeout(elapsedMs: number, maxStreamMs: number): boolean {
+  return elapsedMs >= maxStreamMs;
+}
