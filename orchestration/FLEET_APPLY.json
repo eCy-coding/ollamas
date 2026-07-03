@@ -1,0 +1,156 @@
+{
+  "ts": "2026-07-03T00:15:48Z",
+  "rows": [
+    {
+      "stream": "mjs-migration",
+      "slot": "terminal",
+      "model": "gpt-oss:120b-cloud",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "scripts/agent-dispatch.ts"
+      ],
+      "reason": "clean — applies to the current tree"
+    },
+    {
+      "stream": "concurrency-safety",
+      "slot": "conductor",
+      "model": "claude-conductor",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "server/host-bridge.ts"
+      ],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "concurrency-safety",
+      "slot": "terminal",
+      "model": "gpt-oss:120b-cloud",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "conductor",
+      "model": "claude-conductor",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "iterm2",
+      "model": "deepseek-r1:32b",
+      "hasDiff": false,
+      "applyReady": false,
+      "files": [],
+      "reason": "no diff block"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "terminal",
+      "model": "qwen3-coder:480b-cloud",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
+    },
+    {
+      "stream": "mjs-migration",
+      "slot": "conductor",
+      "model": "claude-conductor",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "shell-harden",
+      "slot": "conductor",
+      "model": "claude-conductor",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "start.sh"
+      ],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "shell-harden",
+      "slot": "iterm2",
+      "model": "qwen3:8b",
+      "hasDiff": false,
+      "applyReady": false,
+      "files": [],
+      "reason": "no diff block"
+    },
+    {
+      "stream": "shell-harden",
+      "slot": "terminal",
+      "model": "gpt-oss:20b-cloud",
+      "hasDiff": false,
+      "applyReady": false,
+      "files": [],
+      "reason": "no diff block"
+    },
+    {
+      "stream": "test-coverage",
+      "slot": "conductor",
+      "model": "claude-conductor",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "test-coverage",
+      "slot": "iterm2",
+      "model": "qwen3:8b",
+      "hasDiff": false,
+      "applyReady": false,
+      "files": [],
+      "reason": "no diff block"
+    },
+    {
+      "stream": "test-coverage",
+      "slot": "terminal",
+      "model": "gpt-oss:20b-cloud",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "test/client.test.ts"
+      ],
+      "reason": "illustrative diff (no real line-numbers / new-file marker) — not machine-applyable"
+    },
+    {
+      "stream": "typescript-core",
+      "slot": "iterm2",
+      "model": "qwen3-coder:30b",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "src/ollama.ts"
+      ],
+      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
+    },
+    {
+      "stream": "typescript-core",
+      "slot": "terminal",
+      "model": "qwen3-coder:480b-cloud",
+      "hasDiff": true,
+      "applyReady": false,
+      "files": [
+        "server/analyzer.ts"
+      ],
+      "reason": "diff shaped but `git apply --check` failed (stale vs current tree)"
+    }
+  ]
+}
