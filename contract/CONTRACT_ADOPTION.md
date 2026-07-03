@@ -25,3 +25,14 @@ stub'ları bu lane tarafından KULLANILMAZ (unwired, YAGNI).
 - **RISK-K20** eski-epoch invite (sızmış key-backup'tan) → payload'da epoch gömülü, verify stale-epoch reddeder.
 Manuel-kalan (tasarım): invite-siz üyelik (async adminGuard yolu korunur), operatör-key rotation,
 suspend/rotate/revoke (adminGuard). Auto-approve YALNIZ geçerli-imzalı-invite ile.
+
+## vK19 tek-tık kurulum riski
+- **RISK-K21** cihaz operatör-served kodu çalıştırır (install.sh + CLI bundle). Sovereign
+  tek-kişi (operatör==cihaz-sahibi) kurulumda güvenli. ÇOK-TARAFLI havuzda bu tasarım-gereği
+  RCE'dir (kötücül operatör her katılan cihazı ele geçirir). Azaltma: bundle operatör-imzalı
+  + cihaz opPubHex (invite'ta) ile exec-ÖNCESİ doğrular (sahte/spoofed installer reddedilir);
+  transit mesh-WireGuard-şifreli (operatör private-IP'den fetch). Kalan güven-sınırı: cihaz
+  operatör'ün NİYETİNE güvenir — yalnız güvenilen operatörün invite'ını kabul et.
+- Operatör tek-key disiplini: build-cli.sh (imzala) + server (install.sh verify) + invite
+  (opPubHex) AYNI operatör-key (~/.ollamas/contract-operator-key.json) — otomatik hizalanır;
+  key rotate → bundle YENİDEN imzalanmalı + invite yeniden mint (ERR-CONTRACT-020).

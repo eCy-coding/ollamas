@@ -20,6 +20,8 @@ import {
 import { approveWithKey, revokeWithKey, rotateWithKey, type KeyBridge } from "../contract/src/keys.ts";
 import { verifyInvite } from "../contract/src/invite.ts";
 import { loadOrCreateOperatorKey } from "../contract/src/opkey.ts";
+import { renderInstaller } from "../contract/src/installer.ts";
+import { existsSync } from "node:fs";
 import { recordContractAudit, readContractAudit, type AuditAction } from "../contract/src/audit.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
 import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota, type HeartbeatInput } from "../contract/src/pool.ts";
@@ -494,6 +496,37 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
       const status = e instanceof InviteError ? e.status : 400;
       res.status(status).json({ error: e.message });
     }
+  });
+
+  // vK19 one-click: serve the signed CLI bundle + a self-contained installer. The
+  // device reaches these over the mesh (post-join, pre-key) → public, but the
+  // install.sh only renders for a VALID invite token (token = authorization).
+  const REPO_ROOT = join(dirname(new URL(import.meta.url).pathname), "..");
+  const CLI_BUNDLE = join(REPO_ROOT, "dist", "contract-cli.mjs");
+  const CLI_SIG = join(REPO_ROOT, "dist", "contract-cli.sig");
+
+  app.get("/api/contract/cli", (_req, res) => {
+    if (!existsSync(CLI_BUNDLE)) return res.status(503).type("text/plain").send("CLI bundle not built — operator: run contract/scripts/build-cli.sh");
+    res.type("application/javascript").send(readFileSync(CLI_BUNDLE));
+  });
+  app.get("/api/contract/cli.sig", (_req, res) => {
+    if (!existsSync(CLI_SIG)) return res.status(503).type("text/plain").send("signature not built — operator: run contract/scripts/build-cli.sh");
+    res.type("text/plain").send(readFileSync(CLI_SIG, "utf8"));
+  });
+  app.get("/api/contract/install.sh", (req, res) => {
+    const token = String(req.query.t || "");
+    const op = loadOrCreateOperatorKey();
+    const vr = verifyInvite(token, op.publicKeyHex, Date.now(), currentContractHash(), op.epoch);
+    if (!vr.valid || !vr.payload) return res.status(403).type("text/plain").send(`# invalid invite: ${vr.reason || "?"}`);
+    const p = vr.payload;
+    const script = renderInstaller({
+      operatorMeshUrl: p.serverUrl,
+      token,
+      headscaleUrl: p.headscaleUrl || "",
+      authkey: p.authkey || "",
+      opPubHex: p.opPubHex || op.publicKeyHex,
+    });
+    res.type("text/x-shellscript").send(script);
   });
 
   app.get("/api/contract/status/:id", (req, res) => {

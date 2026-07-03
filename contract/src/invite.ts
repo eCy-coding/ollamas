@@ -13,12 +13,17 @@ export type InvitePayload = {
   v: 1;
   jti: string; // unique id → single-use replay guard (registry tracks redeemed jtis)
   iat: string; // issued-at ISO
-  expiresAt: string; // ISO; keep short (≤15m, RISK-K17)
+  expiresAt: string; // ISO; keep short (≤10m, RISK-K17)
   quotaReqPerDay: number;
   allowedModel?: string;
   contractHash: string; // must match the current ToS hash at redemption
   serverUrl: string; // operator pool URL the device applies to
   epoch: number; // operator-key epoch; server rejects stale epochs (kill switch, RISK-K20)
+  // vK19 one-click: mesh creds + operator pubkey travel INSIDE the signed body so a
+  // single artifact carries everything a fresh device needs (chicken-egg resolved).
+  headscaleUrl?: string; // mesh coordination server (device runs `tailscale up --login-server`)
+  authkey?: string; // fresh headscale preauth key (bearer secret; short-TTL+single-use, RISK-K17)
+  opPubHex?: string; // operator ed25519 pubkey → device verifies the signed CLI bundle before exec (RISK-K21)
 };
 
 export function mintInvite(payload: InvitePayload, operatorPrivPem: string): string {

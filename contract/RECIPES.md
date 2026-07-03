@@ -72,6 +72,35 @@ contract invite rotate    # new operator key + epoch → ALL outstanding invites
 contract revoke <m_id>    # revoke a specific member
 ```
 
+## Recipe 5 — One-click (one-paste) device onboarding (vK19)
+
+The fewest-steps path: the operator emits a single command line; the device pastes it
+once and ends up meshed + contributing. A signed CLI bundle is verified before it runs.
+
+### Operator (once)
+```bash
+contract server install                       # pool always-up
+bash contract/scripts/build-cli.sh            # bundle + sign the CLI (dist/contract-cli.mjs + .sig)
+export CONTRACT_HEADSCALE_URL=http://<mac>.local:8080   # if running headscale
+contract invite --oneclick --model qwen3:4b   # → prints ONE curl|bash line (10-min, single-use)
+```
+The one-liner embeds everything (server URL, fresh headscale authkey, operator pubkey,
+signed invite). Send it to the device (paste/AirDrop/message).
+
+### Device (one paste)
+```bash
+curl -fsSL "http://<mesh-ip>:3000/api/contract/install.sh?t=<token>" | bash
+#   installs node≥24 + cmake → joins the mesh (authkey) → fetches the signed CLI →
+#   VERIFIES the operator signature → bootstrap (build + auto-approve + offer)
+#   → permanent pool member, immediately contributing
+```
+
+Honesty: this is **one paste** (open Terminal, paste, Return), not literally "zero-click".
+A macOS `.command` file would be a double-click but can't cleanly carry a fresh authkey.
+
+Security: the device runs operator-served code, verified against the operator's pubkey
+(carried in the invite). Safe when operator == device owner (sovereign). See RISK-K21.
+
 ## Recipe 2 — Single-machine split proof (no 2nd device)
 ```bash
 contract shard proof qwen3:4b   # 2 local rpc-servers + head; BOTH rpc logs grow = split live

@@ -29,6 +29,21 @@ test("mint → verify roundtrip (valid)", () => {
   assert.equal(r.payload?.serverUrl, "http://100.64.0.1:3000");
 });
 
+test("vK19: one-click fields (headscaleUrl/authkey/opPubHex) survive signed roundtrip", () => {
+  const id = generateIdentity();
+  const token = mintInvite(payload({ headscaleUrl: "http://mac.local:8080", authkey: "tskey-abc", opPubHex: id.publicKeyHex }), id.privateKeyPem);
+  const r = verifyInvite(token, id.publicKeyHex, NOW, HASH, 1);
+  assert.equal(r.valid, true);
+  assert.equal(r.payload?.headscaleUrl, "http://mac.local:8080");
+  assert.equal(r.payload?.authkey, "tskey-abc");
+  assert.equal(r.payload?.opPubHex, id.publicKeyHex);
+  // tampering the authkey after signing → invalid (body-covered signature)
+  const [body, sig] = token.split(".");
+  const forged = Buffer.from(JSON.stringify(payload({ authkey: "tskey-STOLEN", opPubHex: id.publicKeyHex })), "utf8").toString("base64url");
+  assert.equal(verifyInvite(`${forged}.${sig}`, id.publicKeyHex, NOW, HASH, 1).valid, false);
+  assert.ok(body);
+});
+
 test("forged signature (wrong key) → invalid", () => {
   const a = generateIdentity();
   const b = generateIdentity();

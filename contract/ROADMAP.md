@@ -20,6 +20,7 @@
 | **vK16** | Observability+Resilience+Gate — /api/pool/status+health+boot-log, breaker/backoff+watch, cross-host doctor, verify.sh+contract-CI, RECIPES+errors, key-reload test | ✅ DONE |
 | **vK17** | Turnkey 2-cihaz onboarding — invite (imzalı ön-onay) + apply-with-invite (auto-approve, single-use/TTL/epoch-killswitch) + bootstrap (tek-komut mesh+build+approve+offer) + docs | ✅ DONE |
 | **vK18** | Kalibrasyon + ToS v2 + verim-fix — syncFleetFile dirty-check, contract calibrate (microbench+10 invariant), contractdoc v2 (10-bölüm solo+tüm-yetenek), PROBE_TIMEOUT_MS/TTL-10dk | ✅ DONE |
+| **vK19** | Tek-tık kurulum — enriched-invite (mesh-creds+opPubHex), esbuild imzalı CLI-bundle, install.sh+3 serve-route, bundle-verify (RISK-K21), invite --oneclick one-liner | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`

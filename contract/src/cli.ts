@@ -64,7 +64,7 @@ async function main(): Promise<number> {
     options: {
       email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" },
       port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, model: { type: "string" }, "from-pool": { type: "boolean", default: false },
-      ttl: { type: "string" }, quota: { type: "string" }, iters: { type: "string" },
+      ttl: { type: "string" }, quota: { type: "string" }, iters: { type: "string" }, oneclick: { type: "boolean", default: false },
     },
   });
   const [cmd, id] = positionals;
@@ -571,6 +571,18 @@ async function main(): Promise<number> {
       const ttlMin = Number(values.ttl || 10); // vK18 D: 10m default (RISK-K17 tighter; single-use+epoch already bound it)
       const now = Date.now();
       const doc = await http("GET", "/api/contract/document").catch(() => ({ hash: "" }));
+      const oneClick = id === "oneclick" || Boolean(values["oneclick"]);
+      // vK19 --oneclick: embed mesh creds (fresh headscale preauth key + login-server)
+      // + operator pubkey so ONE artifact carries everything a fresh device needs.
+      let headscaleUrl = "";
+      let authkey = "";
+      if (oneClick) {
+        headscaleUrl = String(process.env.CONTRACT_HEADSCALE_URL || "");
+        try {
+          const { execFileSync } = await import("node:child_process");
+          authkey = execFileSync("headscale", ["preauthkeys", "create", "--user", "ollamas", "--expiration", "1h"], { encoding: "utf8", timeout: 5000 }).trim().split("\n").pop()!.trim();
+        } catch { authkey = ""; } // headscale not running → device joins the mesh manually
+      }
       const token = mintInvite({
         v: 1, jti: randomBytes(8).toString("hex"), iat: new Date(now).toISOString(),
         expiresAt: new Date(now + ttlMin * 60000).toISOString(),
@@ -578,9 +590,17 @@ async function main(): Promise<number> {
         allowedModel: values.model ? String(values.model) : undefined,
         contractHash: String((doc as any).hash || ""),
         serverUrl: BASE, epoch: op.epoch,
+        ...(oneClick ? { headscaleUrl: headscaleUrl || undefined, authkey: authkey || undefined, opPubHex: op.publicKeyHex } : {}),
       }, op.privateKeyPem);
-      console.log(token);
-      console.error(`invite minted (TTL ${ttlMin}m, single-use). On the 2nd device:\n  contract bootstrap ${token.slice(0, 24)}…\nMesh: run headscale + 'headscale preauthkeys create --user ollamas --reusable --expiration 1h', hand that authkey to the device.`);
+      if (oneClick) {
+        const meshIp = (await import("./mesh.ts")).detectMeshHost() || "127.0.0.1";
+        const port = (() => { try { return new URL(BASE).port || "3000"; } catch { return "3000"; } })();
+        console.log(`curl -fsSL "http://${meshIp}:${port}/api/contract/install.sh?t=${token}" | bash`);
+        console.error(`↑ one-click installer (single paste). Operator: ensure the pool server is up (contract server install) and the CLI bundle is built (contract/scripts/build-cli.sh).${authkey ? "" : "\nNOTE: no headscale authkey minted — the device must join the mesh manually first."}`);
+      } else {
+        console.log(token);
+        console.error(`invite minted (TTL ${ttlMin}m, single-use). On the 2nd device: contract bootstrap ${token.slice(0, 24)}…  (or use --oneclick for a paste-and-go installer)`);
+      }
       return 0;
     }
     case "bootstrap": {
@@ -676,7 +696,7 @@ async function main(): Promise<number> {
       return r.ok ? 0 : 1;
     }
     default:
-      console.error("usage: contract calibrate [--iters 500]  (measure principles + assert invariants) | invite [--model M --ttl 10 --quota 1000 | rotate]  (operator: mint pre-approval) | bootstrap <token>  (device: one-command turnkey join) | server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
+      console.error("usage: contract calibrate [--iters 500]  (measure principles + assert invariants) | invite [--oneclick] [--model M --ttl 10 --quota 1000 | rotate]  (operator: mint pre-approval / one-click installer) | bootstrap <token>  (device: one-command turnkey join) | server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
       return 2;
   }
 }

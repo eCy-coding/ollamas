@@ -107,6 +107,18 @@
       "title": "syncFleetFile dirty-check skips the write when unchanged",
       "detail": "vK18 A: syncFleetFile compares the projected backends.json to the last written content and SKIPS the disk write when identical — a re-heartbeat with the same url/models/freshness no longer rewrites the file every 60s. A fresh→stale freshness transition DOES change the projection and still flushes.",
       "prevention_rule": "Tests that assert a write happened must change the projection (new member / freshness transition), not just re-send the same heartbeat. Reset the in-memory cache via _resetFleetCacheForTests / _resetContractStateForTests between test runs."
+    },
+    {
+      "id": "ERR-CONTRACT-019",
+      "title": "GET /api/contract/cli returns 503 — CLI bundle not built",
+      "detail": "The one-click installer fetches the CLI bundle from the operator; if dist/contract-cli.mjs (+ .sig) is absent the route 503s. dist/ is gitignored — the bundle is a per-operator build artifact, not committed.",
+      "prevention_rule": "Operator runs `bash contract/scripts/build-cli.sh` once (and after any CLI change) before issuing one-click invites."
+    },
+    {
+      "id": "ERR-CONTRACT-020",
+      "title": "Bundle signature mismatch → device aborts install",
+      "detail": "The device verifies the CLI bundle against the operator pubkey (opPubHex) carried in the invite. If build-cli.sh signed with a DIFFERENT operator key than the one the server/invite use (e.g. CONTRACT_OPERATOR_KEY env inconsistent, or the key was rotated between build and invite), verify fails and install aborts — as designed (RISK-K21).",
+      "prevention_rule": "Use ONE operator key (default ~/.ollamas/contract-operator-key.json) for build-cli.sh, the server, and invite minting. After `contract invite rotate`, re-run build-cli.sh AND re-mint invites."
     }
   ]
 }
