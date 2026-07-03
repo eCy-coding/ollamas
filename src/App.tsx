@@ -12,6 +12,7 @@ import ECySearcherPanel from "./components/ECySearcherPanel";
 import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
 import { GoogleCalendarBrowser } from "./components/GoogleCalendarBrowser";
 import { GmailBrowser } from "./components/GmailBrowser";
+import GitHubActionsPanel from "./components/GitHubActionsPanel";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
 import { FileTransfer } from "./components/FileTransfer";
@@ -34,7 +35,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail,
+  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -116,6 +117,7 @@ export default function App() {
     { id: "calendar", icon: <Calendar className="w-4 h-4 text-orange-400" /> },
     { id: "gmail", icon: <Mail className="w-4 h-4 text-red-400" /> },
     { id: "search", icon: <Search className="w-4 h-4 text-cyan-300" /> },
+    { id: "github-actions", icon: <GitBranch className="w-4 h-4 text-purple-400" /> },
     { id: "threatintel", icon: <ShieldAlert className="w-4 h-4 text-red-400" /> },
     { id: "terminal", icon: <Terminal className="w-4 h-4 text-emerald-400" /> },
     { id: "keys", icon: <Key className="w-4 h-4 text-indigo-400" /> },
@@ -332,6 +334,12 @@ export default function App() {
           {activeTab === "gmail" && (
             <div className="animate-fade-in">
               <GmailBrowser />
+            </div>
+          )}
+
+          {activeTab === "github-actions" && (
+            <div className="animate-fade-in">
+              <GitHubActionsPanel onNotify={notify} />
             </div>
           )}
 

@@ -11,6 +11,7 @@ export const messages: Record<string, string> = {
   'app.tab.calendar': 'Google Takvim',
   'app.tab.gmail': 'Gmail Gelen Kutusu',
   'app.tab.search': 'GitHub Arama',
+  'app.tab.github-actions': 'GitHub Actions',
   'app.tab.threatintel': 'Tehdit İstihbaratı',
   'app.tab.terminal': 'Etkileşimli CLI',
   'app.tab.keys': 'Donanım Kasası',

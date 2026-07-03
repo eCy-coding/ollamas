@@ -6,12 +6,25 @@
 const GH_API = "https://api.github.com";
 
 const ghHeaders = (token: string): Record<string, string> => ({
-  Authorization: `Bearer ${token}`,
+  // Anon reads (public repos) omit Authorization — Bearer "" would 401.
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
   "User-Agent": "ollamas-audit-service", // GitHub rejects requests without a User-Agent
   "Content-Type": "application/json",
 });
+
+// Injectable fetch (default: node global). Lets the Actions layer and tests
+// drive GitHub calls without the network (threatfeed pattern).
+export type GhFetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal }) =>
+  Promise<{ ok: boolean; status: number; statusText?: string; text(): Promise<string>; headers: { get(name: string): string | null } }>;
+
+export interface RateLimit { remaining: number; limit: number; reset: number }
+function parseRateLimit(headers: { get(n: string): string | null }): RateLimit | undefined {
+  const remaining = headers.get("x-ratelimit-remaining");
+  if (remaining == null) return undefined;
+  return { remaining: Number(remaining), limit: Number(headers.get("x-ratelimit-limit") ?? 0), reset: Number(headers.get("x-ratelimit-reset") ?? 0) };
+}
 
 export interface Finding {
   file?: string;
@@ -83,23 +96,26 @@ export interface GhResult<T> {
   status: number;
   data?: T;
   error?: string;
+  rateLimit?: RateLimit;
 }
 
-async function ghRequest<T>(
+// Shared fetch/parse core. `token` may be "" for anon (public) reads.
+async function ghCore<T>(
   method: string,
   apiPath: string,
   token: string,
-  body?: unknown,
-  signal?: AbortSignal,
+  body: unknown,
+  signal: AbortSignal | undefined,
+  fetchImpl: GhFetch,
 ): Promise<GhResult<T>> {
-  if (!token) return { ok: false, status: 0, error: "no GitHub token configured" };
   try {
-    const res = await fetch(`${GH_API}${apiPath}`, {
+    const res = await fetchImpl(`${GH_API}${apiPath}`, {
       method,
       headers: ghHeaders(token),
       body: body == null ? undefined : JSON.stringify(body),
       signal,
     });
+    const rateLimit = parseRateLimit(res.headers);
     const text = await res.text();
     let data: unknown;
     try {
@@ -112,12 +128,87 @@ async function ghRequest<T>(
         (data && typeof data === "object" && (data as { message?: string }).message) ||
         text.slice(0, 200) ||
         res.statusText;
-      return { ok: false, status: res.status, error: `GitHub ${res.status}: ${msg}` };
+      return { ok: false, status: res.status, error: `GitHub ${res.status}: ${msg}`, rateLimit };
     }
-    return { ok: true, status: res.status, data: data as T };
+    return { ok: true, status: res.status, data: data as T, rateLimit };
   } catch (e) {
     return { ok: false, status: 0, error: `fetch failed: ${(e as Error).message}` };
   }
+}
+
+// Strict: a token is REQUIRED (all write verbs + revenue delivery rely on this
+// hard-fail as a safety property — do not relax it).
+async function ghRequest<T>(
+  method: string,
+  apiPath: string,
+  token: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  fetchImpl: GhFetch = fetch as unknown as GhFetch,
+): Promise<GhResult<T>> {
+  if (!token) return { ok: false, status: 0, error: "no GitHub token configured" };
+  return ghCore<T>(method, apiPath, token, body, signal, fetchImpl);
+}
+
+// Anon-capable: used only by public read verbs. An empty token omits the
+// Authorization header (public repos are readable unauthenticated).
+export async function ghRequestAnon<T>(
+  method: string,
+  apiPath: string,
+  token: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  fetchImpl: GhFetch = fetch as unknown as GhFetch,
+): Promise<GhResult<T>> {
+  return ghCore<T>(method, apiPath, token, body, signal, fetchImpl);
+}
+
+// ── Actions API path-segment validation (SSRF/path-injection defense) ──────────
+// owner/repo/run_id are interpolated into /repos/{o}/{r}/actions/runs/{id}/… .
+// parseRepoSlug does NOT validate charset, so a raw ".." or "x%2f.." could
+// re-target the GitHub API path (URL normalization collapses ..). Validate every
+// segment against GitHub's real charset and interpolate verbatim (no decode).
+const SLUG_PART = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export function assertActionsTarget(owner: string, repo: string, runId?: string): void {
+  const badPart = (s: string, max: number) => !s || s.length > max || s === "." || s === ".." || !SLUG_PART.test(s);
+  if (badPart(owner, 39)) throw new Error(`invalid owner: ${owner}`);
+  if (badPart(repo, 100)) throw new Error(`invalid repo: ${repo}`);
+  if (runId !== undefined && !/^\d+$/.test(runId)) throw new Error(`invalid run id: ${runId}`); // string-match; Number() would accept 1e3/0x1
+}
+
+export interface WorkflowRun {
+  id: number; name?: string; display_title?: string; head_branch?: string; event?: string;
+  status?: string; conclusion?: string | null; run_number?: number; created_at?: string; html_url?: string;
+  actor?: { login?: string }; head_commit?: { message?: string };
+}
+export interface WorkflowJob {
+  name?: string; status?: string; conclusion?: string | null;
+  steps?: { name?: string; status?: string; conclusion?: string | null; number?: number }[];
+}
+
+export function listWorkflowRuns(owner: string, repo: string, token: string, signal?: AbortSignal, perPage = 20, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo);
+  const per = Math.min(100, Math.max(1, perPage));
+  return ghRequestAnon<{ total_count: number; workflow_runs: WorkflowRun[] }>(
+    "GET", `/repos/${owner}/${repo}/actions/runs?per_page=${per}`, token, undefined, signal, fetchImpl,
+  );
+}
+
+export function listRunJobs(owner: string, repo: string, runId: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo, runId);
+  return ghRequestAnon<{ total_count: number; jobs: WorkflowJob[] }>(
+    "GET", `/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, token, undefined, signal, fetchImpl,
+  );
+}
+
+export function rerunFailedJobs(owner: string, repo: string, runId: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo, runId);
+  return ghRequest<unknown>("POST", `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, token, {}, signal, fetchImpl);
+}
+
+export function cancelRun(owner: string, repo: string, runId: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch) {
+  assertActionsTarget(owner, repo, runId);
+  return ghRequest<unknown>("POST", `/repos/${owner}/${repo}/actions/runs/${runId}/cancel`, token, {}, signal, fetchImpl);
 }
 
 export function getRepo(owner: string, repo: string, token: string, signal?: AbortSignal) {

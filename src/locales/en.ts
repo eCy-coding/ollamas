@@ -13,6 +13,7 @@ export const messages: Record<string, string> = {
   'app.tab.calendar': 'Google Calendar',
   'app.tab.gmail': 'Gmail Inbox',
   'app.tab.search': 'GitHub Search',
+  'app.tab.github-actions': 'GitHub Actions',
   'app.tab.threatintel': 'Threat Intel',
   'app.tab.terminal': 'Interactive CLI',
   'app.tab.keys': 'Hardware Vault',
