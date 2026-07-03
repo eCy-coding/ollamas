@@ -23,6 +23,8 @@ import { ProviderRouter, repairJson, getToolArgError } from "./server/providers"
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
 import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
+import { recentEvents, rollup, onRequestEvent } from "./server/telemetry";
+import { formatTelemetryFrame, telemetrySnapshot } from "./server/telemetry-sse";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
@@ -566,6 +568,35 @@ async function initializeServer() {
   // the dashboard stays live with a single connection. Runs on the shared :3000 (HTTP
   // SSE, not the Vite WS) so it never flaps. Ollama is probed throttled (~6s) to avoid
   // load; system metrics are instant each tick.
+  // ── Telemetry cockpit (T5-F3): per-request live op-feed + rollup ───────────────────────
+  // Dedicated endpoint (isolated from the 2s host-metrics stream): on connect, replay the
+  // ring buffer as `event: request` frames, subscribe for live pushes, and emit a
+  // `event: rollup` frame every 1s. Events are redacted at record time — nothing here can
+  // leak a raw key. GET /api/telemetry/recent gives a snapshot for the cockpit's first paint.
+  app.get("/api/telemetry/recent", (req, res) => {
+    const n = Math.min(1000, Math.max(1, Number(req.query.n) || 200));
+    res.json(telemetrySnapshot(n, Date.now()));
+  });
+
+  app.get("/api/telemetry/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    (res as any).flushHeaders?.();
+
+    // Replay the buffer so a fresh client sees recent history, then live-tail.
+    for (const e of recentEvents(200)) res.write(formatTelemetryFrame("request", e));
+    res.write(formatTelemetryFrame("rollup", rollup(recentEvents(500), Date.now())));
+
+    const unsub = onRequestEvent((e) => { try { res.write(formatTelemetryFrame("request", e)); } catch { /* client gone */ } });
+    const tick = setInterval(() => {
+      try { res.write(formatTelemetryFrame("rollup", rollup(recentEvents(500), Date.now()))); } catch { /* client gone */ }
+    }, 1000);
+    (tick as any).unref?.();
+    req.on("close", () => { unsub(); clearInterval(tick); });
+  });
+
   app.get("/api/cockpit/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
