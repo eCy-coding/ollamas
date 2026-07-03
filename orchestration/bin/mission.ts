@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildFleetPlan, assertMaxTwo, STREAMS } from "./lib/fleet-plan";
+import { readyApiProviders } from "./lib/ready-api";
 import { buildMission, renderMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -35,10 +36,13 @@ function availableModels(): string[] {
   return [...new Set([...cloud, ...local])];
 }
 
+const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
+
 function nowIso(): string { try { return execFileSync("date", ["-u", "+%Y-%m-%dT%H:%M:%SZ"], { encoding: "utf8" }).trim(); } catch { return "unknown"; } }
 
-function main(): void {
-  const plan = buildFleetPlan(availableModels());
+async function main(): Promise<void> {
+  // Same key-live API-worker resolution as fleet-launch (server down/no keys -> legacy plan).
+  const plan = buildFleetPlan(availableModels(), await readyApiProviders(OLLAMAS_URL));
   assertMaxTwo(plan); // hard ≤2/model guard (throws on violation — never silently ship an over-assignment)
   const assignments: AssignmentLike[] = plan.assignments.map((a) => ({ stream: a.stream, concern: a.concern, model: a.model }));
   const depMap = new Map<string, string[]>(Object.entries(DEPS));
@@ -53,4 +57,4 @@ function main(): void {
   for (const s of mission.steps) console.log(`  T${s.order} ${s.stream} [${s.tier}] ← ${s.dependsOn.join(",") || "start"} · ${s.models.join(", ") || "—"}`);
 }
 
-main();
+main().catch((e) => { console.error(`[mission] ${e?.message ?? e}`); process.exit(1); });

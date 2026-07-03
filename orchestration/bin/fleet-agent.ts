@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { pullTicket, tryTurn, releaseTurn } from "./lib/gpu-lock";
 import { fullJitterDelay, isTransient } from "./lib/backoff";
-import { providerFor } from "./lib/chrome-probe";
+import { dispatchTarget } from "./lib/chrome-probe";
 import { geminiArgs, parseGeminiJson, isGeminiOverload } from "./lib/gemini";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -209,7 +209,9 @@ async function main(): Promise<void> {
     log(`▶ attempt ${attempt + 1}/${STEPS.length} · ${p.model} · steps ${STEPS[attempt]}${attempt > 0 ? " · narrowed scope" : ""}`);
     // ROOT-FIX (vO39): route by the model's provider — a cloud tag (…-cloud) MUST use ollama-cloud, not the
     // hardcoded ollama-local (which the local daemon can't serve → every cloud slot silently ERROR'd).
-    const r = dispatch(p.model, taskPrompt(attempt), STEPS[attempt], providerFor(p.model));
+    // T2-F3: `provider::model` API workers dispatch with the BARE model + their catalog provider.
+    const target = dispatchTarget(p.model);
+    const r = dispatch(target.model, taskPrompt(attempt), STEPS[attempt], target.provider);
     if (isLocal) releaseTurn(GPU_DIR, ticket);
     releaseClaim(stream, slot);
     const gated = (r.verdict === "DONE" || r.verdict === "OK") && /##\s*Change/i.test(r.proposal);

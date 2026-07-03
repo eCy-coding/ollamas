@@ -23,6 +23,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { buildFleetPlan, assertMaxTwo, STREAMS, type FleetPlan, type Assignment } from "./lib/fleet-plan";
+import { readyApiProviders } from "./lib/ready-api";
 import { buildMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
 import { orderSlotsByMission, type OrderedSlot } from "./lib/fleet-order";
 import { selectWorkspaceRequest, parseWorkspaceResp } from "./lib/workspace";
@@ -147,7 +148,9 @@ async function ensureWorkspace(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const plan = buildFleetPlan(liveModels());
+  // Key-live free-tier API providers -> `provider::model` prefer entries become usable
+  // fleet workers (cloud runtime, no GPU ticket). Server down/no keys -> [] -> legacy plan.
+  const plan = buildFleetPlan(liveModels(), await readyApiProviders(OLLAMAS_URL));
   try { assertMaxTwo(plan); } catch (e: any) { console.error(`[fleet-launch] ${e.message}`); process.exit(1); }
   if (GO) await ensureWorkspace(); // only mutate server workspace when actually opening the fleet
 

@@ -38,25 +38,29 @@ export interface FleetPlan {
 }
 
 // The work-streams (CODE_PLAN themes + Emre's explicit language tabs). Ordered by CODE_PLAN priority.
+// `provider::model` tail entries are FREE-tier API workers (server PROVIDER_CATALOG),
+// key-gated: they resolve only when the provider's key is live (readyApiProviders) and
+// never outrank a proven ollama seat. Zero keys → plans identical to the legacy ones.
 export const STREAMS: StreamSpec[] = [
   { id: "typescript-core", lang: "TypeScript", concern: "security+types (all new logic)",
-    prefer: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest"] },
+    prefer: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest", "zai::glm-4.7-flash"] },
   { id: "errors-resilience", lang: "TypeScript", concern: "error-handling + exit-code + logging",
-    prefer: ["qwen3-coder:480b-cloud", "deepseek-r1:32b", "gpt-oss:120b-cloud", "gemini-2.5-flash"] },
+    prefer: ["qwen3-coder:480b-cloud", "deepseek-r1:32b", "gpt-oss:120b-cloud", "gemini-2.5-flash", "groq::llama-3.3-70b-versatile"] },
   { id: "concurrency-safety", lang: "TypeScript", concern: "race-condition + synchronization",
-    prefer: ["deepseek-r1:32b", "gpt-oss:120b-cloud", "llama3.3:70b"] },
+    prefer: ["deepseek-r1:32b", "gpt-oss:120b-cloud", "llama3.3:70b", "cerebras::gpt-oss-120b"] },
   { id: "mjs-migration", lang: "JavaScript→TypeScript", concern: "type-safety (.mjs → .ts, 490 files)",
-    prefer: ["qwen3-coder-64k:latest", "gpt-oss:120b-cloud", "qwen3-coder:30b"] },
+    prefer: ["qwen3-coder-64k:latest", "gpt-oss:120b-cloud", "qwen3-coder:30b", "zai::glm-4.7-flash"] },
   { id: "shell-harden", lang: "Shell", concern: "env-guard + exit-code hardening",
-    prefer: ["qwen3:8b", "gpt-oss:20b-cloud", "phi4:latest"] },
+    prefer: ["qwen3:8b", "gpt-oss:20b-cloud", "phi4:latest", "groq::llama-3.3-70b-versatile"] },
   { id: "test-coverage", lang: "TypeScript", concern: "vitest coverage",
-    prefer: ["qwen3:8b", "qwen3-coder:30b", "gpt-oss:20b-cloud"] },
+    prefer: ["qwen3:8b", "qwen3-coder:30b", "gpt-oss:20b-cloud", "cerebras::gpt-oss-120b"] },
 ];
 
 /** A model tag is "cloud" (parallelizes; costs no local GPU) when it carries the -cloud suffix OR is a remote
  *  vendor like Gemini. Only bare ollama tags are "local" (the single GPU that must serialize). */
 export function runtimeOf(model: string | null): Assignment["runtime"] {
   if (!model) return "unknown";
+  if (model.includes("::")) return "cloud"; // provider::model API workers parallelize, no GPU ticket
   if (/^gemini[-.\d]/i.test(model)) return "cloud";
   return /-cloud\b|:cloud\b|cloud$/.test(model) ? "cloud" : "local";
 }
@@ -67,8 +71,15 @@ export function runtimeOf(model: string | null): Assignment["runtime"] {
  * and surfaced in `unassigned` (never silently dropped). Prefers a cloud model for the first slot so
  * at most one local model is needed per stream (single-GPU friendliness).
  */
-export function buildFleetPlan(availableModels: string[]): FleetPlan {
+export function buildFleetPlan(availableModels: string[], readyApiProviders: string[] = []): FleetPlan {
   const avail = new Set((availableModels ?? []).map((m) => String(m).trim()).filter(Boolean));
+  const readyApi = new Set((readyApiProviders ?? []).map((p) => String(p).trim()).filter(Boolean));
+  // A prefer entry is usable when it is a pulled ollama tag OR a `provider::model` API
+  // worker whose provider has a live key (/api/keys/pool → fleet-launch/mission feed it).
+  const usable = (m: string) => {
+    const i = m.indexOf("::");
+    return i > 0 ? readyApi.has(m.slice(0, i)) : avail.has(m);
+  };
   const usage = new Map<string, string[]>(); // model → streams assigned
   const use = (m: string) => (usage.get(m) ?? []).length;
   const assignments: Assignment[] = [];
@@ -78,7 +89,7 @@ export function buildFleetPlan(availableModels: string[]): FleetPlan {
     // slot0 (Terminal.app) prefers CLOUD (spares the single GPU); slot1 (iTerm2) prefers LOCAL, so
     // each stream is 1 cloud + 1 local — cloud spreads across all streams instead of starving late ones.
     const pick = (exclude: string | null, want: "cloud" | "local"): string | null => {
-      const pool = s.prefer.filter((m) => avail.has(m) && use(m) < 2 && m !== exclude);
+      const pool = s.prefer.filter((m) => usable(m) && use(m) < 2 && m !== exclude);
       return pool.find((m) => runtimeOf(m) === want) ?? pool[0] ?? null;
     };
     const m0 = pick(null, "cloud");

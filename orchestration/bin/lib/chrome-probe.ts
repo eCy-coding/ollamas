@@ -8,8 +8,11 @@
 // judgment deterministically so the capability matrix is evidence-based, not guessed.
 
 import { isGeminiModel } from "./gemini";
+import { parseApiModel } from "./council-roster";
 
-export type ChromeProvider = "ollama-local" | "ollama-cloud" | "gemini-cli";
+// Literal hints for the common cases; any server catalog provider id (groq/cerebras/zai, …)
+// is also valid — `provider::model` fleet entries dispatch through /api with that provider.
+export type ChromeProvider = "ollama-local" | "ollama-cloud" | "gemini-cli" | (string & {});
 
 // Shell-running tools that can execute `open -a "Google Chrome"`. macos_terminal = privileged (visible
 // terminal); run_command = safe (sandboxed). Either counts as an opener attempt.
@@ -38,11 +41,20 @@ export interface ChromeProbeRow extends ChromeClassification {
   provider: ChromeProvider;
 }
 
-/** Provider for a model tag: gemini tags → gemini-cli; cloud tags (…-cloud / …:cloud) → ollama-cloud;
- *  everything else → ollama-local. */
+/** Provider for a model tag: `provider::model` → that catalog provider; gemini tags →
+ *  gemini-cli; cloud tags (…-cloud / …:cloud) → ollama-cloud; everything else → ollama-local. */
 export function providerFor(model: string): ChromeProvider {
+  const api = parseApiModel(model);
+  if (api) return api.provider;
   if (isGeminiModel(model)) return "gemini-cli";
   return /-cloud\b|:cloud\b|cloud$/.test(model) ? "ollama-cloud" : "ollama-local";
+}
+
+/** Dispatch target for a fleet model entry: api-routed entries carry the provider and the
+ *  BARE model id (the cloud API 404s on the prefixed form); everything else keeps the tag. */
+export function dispatchTarget(model: string): { provider: ChromeProvider; model: string } {
+  const api = parseApiModel(model);
+  return api ? { provider: api.provider, model: api.model } : { provider: providerFor(model), model };
 }
 
 /** A step that opened (or tried to open) Chrome: a shell-running tool that SUCCEEDED. The probe's only
