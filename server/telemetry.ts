@@ -78,6 +78,26 @@ function scrub(s: string): string {
   return out;
 }
 
+/** Public shared redactor — scrub secret-shaped substrings from a string. Used by the
+ *  agent SSE path (tool_call args) so no dashboard/agent frame can carry a raw key. */
+export function redactString(s: string): string {
+  return scrub(s);
+}
+
+/** Deep-redact any value: scrubs every string leaf in objects/arrays, preserves structure
+ *  and non-secret content. Non-string primitives pass through unchanged. Zero-leak choke
+ *  point for arbitrary payloads (e.g. tool_call arguments the model may have echoed a key into). */
+export function redactDeep<T>(value: T): T {
+  if (typeof value === "string") return scrub(value) as unknown as T;
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = redactDeep(v);
+    return out as unknown as T;
+  }
+  return value;
+}
+
 function hostOnly(addr: string): string {
   try { return new URL(addr).host; }
   catch { return scrub(addr.split(/[/?#]/)[0]); }

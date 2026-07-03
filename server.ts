@@ -8,6 +8,8 @@ import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
 import { searchGitHub } from "./server/github-search";
 import { runStandard, type Category } from "./server/github-search-standard";
+import { autoconnectGitHub } from "./server/integrations";
+import { checkIntegrations } from "./server/integrations-health";
 import { ecysearcherProxy } from "./server/ecysearcher-proxy";
 import { ecysearcherSupervisor } from "./server/ecysearcher";
 import { logger } from "./server/logger";
@@ -23,7 +25,7 @@ import { ProviderRouter, repairJson, getToolArgError } from "./server/providers"
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
 import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
-import { recentEvents, rollup, onRequestEvent } from "./server/telemetry";
+import { recentEvents, rollup, onRequestEvent, redactDeep } from "./server/telemetry";
 import { formatTelemetryFrame, telemetrySnapshot } from "./server/telemetry-sse";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
@@ -185,10 +187,20 @@ app.use(
     "/api/ecysearcher", "/api/threatfeed",
     // NARROW prefixes only: bare "/api/github" would also gate /api/github/webhook
     // (inbound FROM GitHub) and 403 it under SAAS_ENFORCE=1.
-    "/api/github/actions", "/api/github/search",
+    "/api/github/actions", "/api/github/search", "/api/integrations",
   ],
   localOwnerGuard,
 );
+
+// Integrations completion (dalga-11) — 0-manual GitHub connect (pulls the gh
+// CLI token into the vault) + on-demand health matrix. Local-owner only.
+app.post("/api/integrations/github/autoconnect", async (_req, res) => {
+  res.json(await autoconnectGitHub());
+});
+app.get("/api/integrations/health", async (_req, res) => {
+  try { res.json(await checkIntegrations({ token: ghToken() })); }
+  catch (e: any) { res.status(500).json({ error: e.message }); }
+});
 
 // GitHub Actions cockpit (dalga-6). Read paths work unauthenticated for public
 // repos; write paths (rerun/cancel) require the "github" vault token. Every
@@ -1393,7 +1405,9 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         }
 
         if (result.toolCalls && result.toolCalls.length > 0) {
-          sendEvent("thought", { text: `Evaluating tool activation...`, toolCalls: result.toolCalls });
+          // Zero-leak (T5-F5): tool_call args go to the client SSE — a model may have echoed a
+          // key into them. Deep-redact secret-shaped substrings before they leave the server.
+          sendEvent("thought", { text: `Evaluating tool activation...`, toolCalls: redactDeep(result.toolCalls) });
 
           for (const tc of result.toolCalls) {
             const toolName = tc.name;
