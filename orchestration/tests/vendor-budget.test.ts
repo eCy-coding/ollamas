@@ -4,12 +4,37 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   rollover, canDispatch, remaining, recordSuccess, recordExhausted,
-  pickVendor, defaultLimitFor,
+  pickVendor, defaultLimitFor, isVendorExhausted,
   loadBudget, saveBudget, guardVendor, noteVendorOutcome,
   type VendorState, type BudgetFile,
 } from "../bin/lib/vendor-budget";
 
 const v = (date: string, used: number, limit = 20): VendorState => ({ date, used, limit });
+
+// ── isVendorExhausted: reliable cross-vendor rate/quota detector (NOT gemini-specific wording) ─────────
+describe("isVendorExhausted", () => {
+  it("catches an HTTP 429 status by number", () => {
+    expect(isVendorExhausted('{"code":429,"message":"Too Many Requests"}')).toBe(true);
+    expect(isVendorExhausted("groq API error 429")).toBe(true);
+  });
+  it("catches vendor wordings that omit the literal 429 or 'quota'", () => {
+    expect(isVendorExhausted("Rate limit reached for model llama-3.3-70b")).toBe(true); // groq
+    expect(isVendorExhausted("Too Many Requests")).toBe(true);                           // generic
+    expect(isVendorExhausted("insufficient_quota")).toBe(true);                          // openai-style
+    expect(isVendorExhausted("You exceeded your current requests limit")).toBe(true);    // cerebras/zai
+    expect(isVendorExhausted("RESOURCE_EXHAUSTED")).toBe(true);                          // gemini/google
+  });
+  it("does NOT latch on a transient 5xx overload (that is retry-worthy, not exhausted)", () => {
+    expect(isVendorExhausted("503 Service Unavailable — model is overloaded")).toBe(false);
+    expect(isVendorExhausted("502 Bad Gateway")).toBe(false);
+    expect(isVendorExhausted("500 internal error")).toBe(false);
+  });
+  it("is false on empty / unrelated errors", () => {
+    expect(isVendorExhausted("")).toBe(false);
+    expect(isVendorExhausted("ECONNREFUSED")).toBe(false);
+    expect(isVendorExhausted("invalid model name")).toBe(false);
+  });
+});
 
 // ── pure per-vendor state (shared shape with gemini-quota) ────────────────────────────────────────────
 describe("rollover", () => {

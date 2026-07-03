@@ -25,7 +25,7 @@ import { dispatchTarget } from "./lib/chrome-probe";
 import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
 import { focusFile as focusFileFor, streamTaskPrompt, geminiGroundedPrompt } from "./lib/fleet-prompt";
 import { guardQuota, noteOutcome, loadQuota } from "./lib/gemini-quota";
-import { guardVendor, noteVendorOutcome, pickVendor, loadBudget, todayKey, type BudgetFile } from "./lib/vendor-budget";
+import { guardVendor, noteVendorOutcome, pickVendor, loadBudget, todayKey, isVendorExhausted, type BudgetFile } from "./lib/vendor-budget";
 import { STREAMS } from "./lib/fleet-plan";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -124,9 +124,10 @@ function vendorOf(provider: string): string | null {
   return provider; // groq / cerebras / zai — server PROVIDER_CATALOG API worker
 }
 
-/** An error string that means the vendor's free-tier budget/rate is spent (→ try another vendor). */
+/** An error string that means the vendor's free-tier budget/rate is spent (→ try another vendor). Delegates
+ *  to the shared cross-vendor detector; also matches this layer's own "budget exhausted" gate message. */
 function isExhaustionErr(err?: string): boolean {
-  return !!err && /quota|budget|exhaust|RESOURCE_EXHAUSTED|429|rate.?limit/i.test(err);
+  return !!err && (isVendorExhausted(err) || /budget|exhaust/i.test(err));
 }
 
 /** Vendor-bearing prefer entries for a stream (its free-tier fallback candidates, in preference order):
@@ -136,8 +137,8 @@ function streamVendorCandidates(streamId: string): { vendor: string; provider: s
   if (!spec) return [];
   const out: { vendor: string; provider: string; model: string }[] = [];
   for (const p of spec.prefer) {
-    const i = p.indexOf("::");
-    if (i > 0) { out.push({ vendor: p.slice(0, i), provider: p.slice(0, i), model: p.slice(i + 1) }); continue; }
+    const [vendor, model] = p.split("::"); // "provider::model" — split, not slice (delimiter is 2 chars)
+    if (model) { out.push({ vendor, provider: vendor, model }); continue; }
     if (/^gemini[-.\d]/i.test(p)) out.push({ vendor: "gemini", provider: "gemini-cli", model: p });
   }
   return out;
@@ -201,7 +202,9 @@ function rawDispatch(model: string, prompt: string, steps: number, provider: str
   } catch (e: any) {
     const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
     // A real free-tier 429/quota → latch the vendor for the day (priority over the 0-step-DONE parse below).
-    if (vendor && isGeminiQuotaExhausted(blob)) {
+    // Vendor-agnostic detector: groq/cerebras/zai word their 429 differently from gemini (RISK: gemini-only
+    // matcher missed them → no latch, no fail-over).
+    if (vendor && isVendorExhausted(blob)) {
       noteVendorOutcome(BUDGET_FILE, vendor, "exhausted");
       const err = blob.slice(0, 200);
       try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: err })); } catch { /* ignore */ }

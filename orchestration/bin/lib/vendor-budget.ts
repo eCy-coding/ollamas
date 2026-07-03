@@ -82,6 +82,17 @@ export function pickVendor(candidates: string[], b: BudgetFile, today: string, p
   return best;
 }
 
+// A vendor's free-tier daily rate/quota is spent (→ latch it + fail over). Vendor-AGNOSTIC on purpose: the
+// gemini-specific matcher missed groq/cerebras wordings ("rate limit reached", "Too Many Requests") that omit
+// the literal 429/quota → the vendor never latched. Excludes 5xx: a 500/502/503 is a TRANSIENT overload
+// (retry-worthy, handled by backoff), NOT an exhausted budget — latching it would wrongly abandon the vendor.
+const VENDOR_EXHAUSTED = /\b429\b|too many requests|rate.?limit|resource_exhausted|insufficient_quota|quota|exceeded/i;
+
+/** True when an error/response blob signals the vendor's rate/quota is spent (latch + fail over, not retry). */
+export function isVendorExhausted(text: string): boolean {
+  return typeof text === "string" && VENDOR_EXHAUSTED.test(text);
+}
+
 // ── thin IO (single JSON map; shared by every dispatch site) ──────────────────────────────────────────
 
 /** Load the persisted per-vendor map, or `{}` when absent/corrupt. */
