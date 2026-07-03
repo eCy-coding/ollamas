@@ -8,7 +8,7 @@ const fmtTime = (ts: number) => new Date(ts).toLocaleTimeString([], { hour12: fa
 const fmtMs = (ms?: number) => (typeof ms === "number" ? `${Math.round(ms)}ms` : "—");
 const fmtCost = (usd: number) => (usd > 0 ? `$${usd.toFixed(4)}` : "—");
 
-export function ModelOpsFeed(): JSX.Element {
+export function ModelOpsFeed(): React.ReactElement {
   const { events } = useTelemetry();
   const rows: RequestEventVM[] = [...events].reverse().slice(0, 200);
   return (

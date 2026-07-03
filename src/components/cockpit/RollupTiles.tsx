@@ -13,7 +13,7 @@ function Tile({ label, value, sub, tone = "accent", Icon }: { label: string; val
     </div>
   );
 }
-export function RollupTiles(): JSX.Element {
+export function RollupTiles(): React.ReactElement {
   const { rollup: r } = useTelemetry();
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   return (

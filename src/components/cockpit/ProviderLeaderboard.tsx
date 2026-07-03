@@ -3,7 +3,7 @@ import { Trophy } from "lucide-react";
 import { useTelemetry } from "./useTelemetry";
 
 // Per-provider comparison over the rolling window — pick the best route at a glance.
-export function ProviderLeaderboard(): JSX.Element {
+export function ProviderLeaderboard(): React.ReactElement {
   const { rollup } = useTelemetry();
   const rows = rollup.byProvider;
   return (
