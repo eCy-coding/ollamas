@@ -2,7 +2,7 @@
 // Pure planning/arg-building + thin injectable process runtime (vK7).
 // SECURITY (RISK-K1): rpc-server has NO auth/encryption — every bind and every
 // endpoint MUST be loopback/private/mesh. Public addresses are refused outright.
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { connect } from "node:net";
@@ -71,6 +71,30 @@ export function shardServerArgs(opts: { modelPath: string; endpoints: RpcEndpoin
 
 export type ShardCandidate = { memberId: string; url: string; ramGB: number; rpcPort?: number };
 export type ShardPlan = { endpoints: RpcEndpoint[]; slices: Slice[] };
+
+/** GGUF size in GB for the fitsModel gate; missing file → 0 (gate skipped). */
+export function modelSizeGB(path: string): number {
+  try {
+    return statSync(path).size / 1024 ** 3;
+  } catch {
+    return 0;
+  }
+}
+
+/** A pool node as returned by /api/pool/nodes (the fields buildHeadPlan needs). */
+export type PoolNodeLike = { memberId: string; url?: string; ramGB: number; freshness: string; rpcPort?: number };
+export type HeadPlan = ShardPlan & { memberIds: string[] };
+
+/** Operator-side (F1): turn live pool nodes into a launchable shard-group plan.
+ * Only fresh, rpc-capable, URL-bearing nodes qualify; endpoints/slices come from
+ * planShardGroup (with the fitsModel gate when modelSizeGB is known). */
+export function buildHeadPlan(nodes: PoolNodeLike[], totalLayers: number, modelSizeGB?: number): HeadPlan {
+  const candidates: ShardCandidate[] = nodes
+    .filter((n) => n.freshness === "fresh" && n.rpcPort && n.rpcPort > 0 && n.url)
+    .map((n) => ({ memberId: n.memberId, url: n.url as string, ramGB: n.ramGB, rpcPort: n.rpcPort }));
+  const plan = planShardGroup(totalLayers, candidates, modelSizeGB);
+  return { ...plan, memberIds: candidates.map((c) => c.memberId) };
+}
 
 /** Plan a shard group from pool nodes: rpc-capable nodes only, layer slices by
  * RAM (partition.ts). Endpoint hosts come from each member's ollama URL host.

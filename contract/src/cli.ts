@@ -46,7 +46,10 @@ export function localSpecs(): { ramGB: number; os: string; arch: string } {
 async function main(): Promise<number> {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
-    options: { email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" } },
+    options: {
+      email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" },
+      port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, "from-pool": { type: "boolean", default: false },
+    },
   });
   const [cmd, id] = positionals;
   const out = (o: unknown) => console.log(values.json ? JSON.stringify(o) : JSON.stringify(o, null, 2));
@@ -182,8 +185,9 @@ async function main(): Promise<number> {
     }
     case "shard": {
       const shard = await import("./shard.ts");
-      const { detectShardCapability, planShardGroup, resolveShardBinary, resolveOllamaModelBlob,
-              startProcess, stopProcess, probeRpcPort, shardDir, rpcServerArgs, shardServerArgs } = shard;
+      const { detectShardCapability, buildHeadPlan, resolveShardBinary, resolveOllamaModelBlob,
+              modelSizeGB, startProcess, stopProcess, probeRpcPort, listShardProcesses, shardDir, rpcServerArgs, shardServerArgs } = shard;
+      type RpcEndpoint = { host: string; port: number };
       const { execFileSync, spawn } = await import("node:child_process");
       const { existsSync, openSync, readFileSync, writeFileSync, mkdirSync } = await import("node:fs");
       const { join } = await import("node:path");
@@ -194,8 +198,9 @@ async function main(): Promise<number> {
       const rpcFlag = (() => { try { return execFileSync(headBin, ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
       const cap = detectShardCapability({ "llama-server": has(headBin), "rpc-server": has(rpcBin), rpcFlag });
 
-      const RPC_PORTS = [50052, 50053];
+      const LOCAL_RPC_PORTS = [50052, 50053];
       const HEAD_PORT = Number(process.env.SHARD_HEAD_PORT || 8085);
+      const HEAD_LAYERS = Number(process.env.SHARD_LAYERS || 32);
       const headJsonPath = join(shardDir(), "head.json");
       const exec = (bin: string, args: string[], logPath: string): number => {
         const fd = openSync(logPath, "w"); // fresh log per start — old crash lines poison evidence greps
@@ -203,45 +208,36 @@ async function main(): Promise<number> {
         child.unref();
         return child.pid as number;
       };
+      // downAll kills EVERY tracked pid (head + local rpc-* + member-rpc-*) via the
+      // pid-file registry — no longer limited to hardcoded ports (listShardProcesses wired).
       const downAll = () => {
         let n = 0;
-        for (const name of ["head", ...RPC_PORTS.map((p) => `rpc-${p}`)]) {
-          if (stopProcess(name, { kill: (pid) => { process.kill(pid); return true; } })) n++;
+        for (const name of listShardProcesses()) {
+          if (stopProcess(name, { kill: (pid) => { try { process.kill(pid); } catch { /* dead */ } return true; } })) n++;
         }
         try { writeFileSync(headJsonPath, JSON.stringify({ up: false }) + "\n", { mode: 0o600 }); } catch {}
         return n;
       };
-      const upAll = async (modelArg?: string): Promise<string> => {
-        if (!cap.capable) throw new Error(`shard NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`);
+      const resolveModel = (modelArg?: string): string => {
         let modelPath = modelArg && existsSync(modelArg) ? modelArg : null;
         if (!modelPath && modelArg) modelPath = resolveOllamaModelBlob(modelArg);
-        if (!modelPath) throw new Error("model not found — pass a GGUF path or an installed ollama model name (contract shard up <model>)");
+        if (!modelPath) throw new Error("model not found — pass a GGUF path or an installed ollama model name");
+        return modelPath;
+      };
+      // Spawn ONLY the head llama-server over the given rpc endpoints (members run
+      // their own rpc-servers via `serve-rpc`). Returns the head URL once healthy.
+      const spawnHead = async (endpoints: RpcEndpoint[], modelPath: string, meta: Record<string, unknown>): Promise<string> => {
+        if (!cap.capable) throw new Error(`shard NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`);
         mkdirSync(shardDir(), { recursive: true });
-        // Distinct devices per local rpc-server: default device selection can land
-        // on BLAS (aborts on RMS_NORM). Two Metal instances on unified memory mirror
-        // two real machines each with their own GPU. SHARD_DEVICES overridable.
-        const devices = (process.env.SHARD_DEVICES || "MTL0,MTL0").split(",");
-        RPC_PORTS.forEach((p, i) => {
-          startProcess(`rpc-${p}`, rpcBin, rpcServerArgs({ host: "127.0.0.1", port: p, device: devices[i % devices.length] }), { exec });
-        });
-        // Concurrent Metal init on one GPU is slow (residency sets) — allow 60s per port.
-        for (const p of RPC_PORTS) {
-          let ok = false;
-          for (let i = 0; i < 120 && !ok; i++) { ok = await probeRpcPort("127.0.0.1", p, 500); if (!ok) await new Promise((r) => setTimeout(r, 500)); }
-          if (!ok) { downAll(); throw new Error(`rpc-server on ${p} did not come up (log: ${shardDir()}/rpc-${p}.log)`); }
-        }
         startProcess("head", headBin, shardServerArgs({
           modelPath,
-          endpoints: RPC_PORTS.map((p) => ({ host: "127.0.0.1", port: p })),
+          endpoints,
           port: HEAD_PORT,
           ctxSize: Number(process.env.SHARD_CTX || 2048),
-          // even split by default so BOTH rpc-servers hold layers (CPU-rpc reports
-          // no memory → auto-fit would starve it); real ratios come from partition.ts
-          tensorSplit: process.env.SHARD_TS || "1,1",
+          tensorSplit: process.env.SHARD_TS || endpoints.map(() => "1").join(","),
         }), { exec });
         const url = `http://127.0.0.1:${HEAD_PORT}`;
-        writeFileSync(headJsonPath, JSON.stringify({ up: true, url, model: modelPath, rpc: RPC_PORTS.map((p) => `127.0.0.1:${p}`) }, null, 2) + "\n", { mode: 0o600 });
-        // model load can take a while — poll /health
+        writeFileSync(headJsonPath, JSON.stringify({ up: true, url, model: modelPath, endpoints: endpoints.map((e) => `${e.host}:${e.port}`), ...meta }, null, 2) + "\n", { mode: 0o600 });
         for (let i = 0; i < 120; i++) {
           try { const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(1000) }); if (r.ok) return url; } catch {}
           await new Promise((r) => setTimeout(r, 1000));
@@ -249,23 +245,59 @@ async function main(): Promise<number> {
         downAll();
         throw new Error(`head did not become healthy (log: ${shardDir()}/head.log)`);
       };
+      // Local single-machine path (vK7): spawn 2 local rpc-servers, then the head.
+      const upLocal = async (modelArg?: string): Promise<string> => {
+        const modelPath = resolveModel(modelArg);
+        mkdirSync(shardDir(), { recursive: true });
+        // Distinct devices: default selection can land on BLAS (aborts on RMS_NORM).
+        const devices = (process.env.SHARD_DEVICES || "MTL0,MTL0").split(",");
+        LOCAL_RPC_PORTS.forEach((p, i) => {
+          startProcess(`rpc-${p}`, rpcBin, rpcServerArgs({ host: "127.0.0.1", port: p, device: devices[i % devices.length] }), { exec });
+        });
+        for (const p of LOCAL_RPC_PORTS) {
+          let ok = false;
+          for (let i = 0; i < 120 && !ok; i++) { ok = await probeRpcPort("127.0.0.1", p, 500); if (!ok) await new Promise((r) => setTimeout(r, 500)); }
+          if (!ok) { downAll(); throw new Error(`rpc-server on ${p} did not come up (log: ${shardDir()}/rpc-${p}.log)`); }
+        }
+        return spawnHead(LOCAL_RPC_PORTS.map((p) => ({ host: "127.0.0.1", port: p })), modelPath, { source: "local", rpc: LOCAL_RPC_PORTS.map((p) => `127.0.0.1:${p}`) });
+      };
+      // F1: operator path — build a head over LIVE pool member endpoints.
+      const upFromPool = async (modelArg?: string): Promise<string> => {
+        const key = process.env.CONTRACT_API_KEY || "";
+        if (!key) throw new Error("set CONTRACT_API_KEY=olm_… (a member key) to read the pool");
+        const modelPath = resolveModel(modelArg);
+        const res = await fetch(`${BASE}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` } });
+        const { nodes } = (await res.json()) as { nodes: Array<{ memberId: string; url?: string; ramGB: number; freshness: string; rpcPort?: number }> };
+        let plan;
+        try {
+          plan = buildHeadPlan(nodes || [], HEAD_LAYERS, modelSizeGB(modelPath));
+        } catch (e: any) {
+          throw new Error(`pool: ${e.message} — members must run: contract serve-rpc + contract agent run (CONTRACT_RPC_PORT set)`);
+        }
+        console.error(`launching head over ${plan.endpoints.length} pool node(s): ${plan.memberIds.join(", ")}`);
+        return spawnHead(plan.endpoints, modelPath, { source: "pool", memberIds: plan.memberIds });
+      };
 
       if (id === "up") {
-        const url = await upAll(positionals[2] || process.env.SHARD_MODEL);
-        console.log(`shard head healthy at ${url} (rpc: ${RPC_PORTS.join(",")})`);
+        const fromPool = Boolean(values["from-pool"]);
+        const model = positionals.find((p, i) => i >= 2 && !p.startsWith("--")) || process.env.SHARD_MODEL;
+        const url = fromPool ? await upFromPool(model) : await upLocal(model);
+        console.log(`shard head healthy at ${url}${fromPool ? " (from pool)" : ` (local rpc: ${LOCAL_RPC_PORTS.join(",")})`}`);
         return 0;
       }
       if (id === "down") { console.log(`stopped ${downAll()} shard process(es)`); return 0; }
       if (id === "status") {
-        const probes: Record<string, boolean> = {};
-        for (const p of RPC_PORTS) probes[`rpc-${p}`] = await probeRpcPort("127.0.0.1", p, 500);
-        let head: unknown = null;
+        let head: any = null;
         try { head = JSON.parse(readFileSync(headJsonPath, "utf8")); } catch {}
-        out({ capability: cap, probes, head });
+        const probes: Record<string, boolean> = {};
+        const eps: string[] = Array.isArray(head?.endpoints) ? head.endpoints : LOCAL_RPC_PORTS.map((p) => `127.0.0.1:${p}`);
+        for (const ep of eps) { const [h, p] = ep.split(":"); probes[ep] = await probeRpcPort(h ?? "127.0.0.1", Number(p), 500); }
+        out({ capability: cap, tracked: listShardProcesses(), probes, head });
         return 0;
       }
       if (id === "proof") {
-        const url = await upAll(positionals[2] || process.env.SHARD_MODEL);
+        const url = await upLocal(positionals[2] || process.env.SHARD_MODEL);
+        const RPC_PORTS = LOCAL_RPC_PORTS;
         try {
           // Evidence = BOTH rpc-server logs grow during the completion: layers are
           // genuinely computed in two separate processes over TCP RPC.
@@ -292,11 +324,12 @@ async function main(): Promise<number> {
       if (id === "plan") {
         const key = process.env.CONTRACT_API_KEY || "";
         if (!key) { console.error("set CONTRACT_API_KEY=olm_… for shard plan"); return 2; }
+        const model = positionals.find((p, i) => i >= 2 && !p.startsWith("--"));
+        const size = model ? modelSizeGB(resolveModel(model)) : 0;
         const res = await fetch(`${BASE}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` } });
         const { nodes } = (await res.json()) as { nodes: Array<{ memberId: string; url?: string; ramGB: number; freshness: string; rpcPort?: number }> };
-        const candidates = (nodes || []).filter((n) => n.freshness === "fresh" && n.url).map((n) => ({ memberId: n.memberId, url: n.url as string, ramGB: n.ramGB, rpcPort: (n as any).rpcPort }));
         try {
-          out({ capability: cap, plan: planShardGroup(Number(process.env.SHARD_LAYERS || 32), candidates) });
+          out({ capability: cap, modelSizeGB: size || undefined, plan: buildHeadPlan(nodes || [], HEAD_LAYERS, size) });
         } catch (e: any) {
           out({ capability: cap, plan: null, reason: e.message });
         }
@@ -306,8 +339,43 @@ async function main(): Promise<number> {
       if (!cap.capable) console.error(`shard NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`);
       return 0;
     }
+    case "serve-rpc": {
+      // F3: member-side — bind an rpc-server on a mesh/private address so the
+      // operator's head can reach it, then advertise the port via `agent run`.
+      const shard = await import("./shard.ts");
+      const { detectShardCapability, resolveShardBinary, startProcess, stopProcess, rpcServerArgs, shardDir } = shard;
+      const { execFileSync, spawn } = await import("node:child_process");
+      const { openSync, mkdirSync } = await import("node:fs");
+      const rpcBin = resolveShardBinary("rpc-server");
+      const headBin = resolveShardBinary("llama-server");
+      const has = (bin: string) => { try { execFileSync(bin.includes("/") ? "test" : "which", bin.includes("/") ? ["-x", bin] : [bin], { stdio: "pipe" }); return true; } catch { return false; } };
+      const rpcFlag = (() => { try { return execFileSync(headBin, ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
+      const cap = detectShardCapability({ "llama-server": has(headBin), "rpc-server": has(rpcBin), rpcFlag });
+      const port = Number(values.port || process.env.CONTRACT_RPC_PORT || 50052);
+      const host = String(values.host || process.env.CONTRACT_RPC_HOST || "127.0.0.1");
+
+      if (id === "stop") {
+        const ok = stopProcess(`member-rpc-${port}`, { kill: (pid) => { try { process.kill(pid); } catch {} return true; } });
+        console.error(ok ? `stopped member-rpc-${port}` : `no member-rpc-${port} running`);
+        return 0;
+      }
+      if (!cap.capable) { console.error(`serve-rpc NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`); return 1; }
+      const exec = (bin: string, args: string[], logPath: string): number => {
+        const fd = openSync(logPath, "w");
+        const child = spawn(bin, args, { detached: true, stdio: ["ignore", fd, fd] });
+        child.unref();
+        return child.pid as number;
+      };
+      mkdirSync(shardDir(), { recursive: true });
+      // rpcServerArgs enforces isPrivateHost — a public bind is refused (RISK-K1).
+      const args = rpcServerArgs({ host, port, device: values.device ? String(values.device) : undefined });
+      const pid = startProcess(`member-rpc-${port}`, rpcBin, args, { exec });
+      console.log(`rpc-server bound ${host}:${port} (pid ${pid}). Advertise it: CONTRACT_RPC_PORT=${port} contract agent run`);
+      console.error("stop with: contract serve-rpc stop --port " + port);
+      return 0;
+    }
     default:
-      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | quota | agent <install|uninstall|status|run|once> | doctor | shard [up|down|status|proof|plan]");
+      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|revoke <id> | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [--host H --port P --device D | stop] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
       return 2;
   }
 }

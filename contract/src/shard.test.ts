@@ -7,7 +7,9 @@ import { createServer } from "node:net";
 import {
   isPrivateHost, rpcServerArgs, shardServerArgs, planShardGroup, detectShardCapability,
   pidFilePath, startProcess, stopProcess, probeRpcPort, resolveOllamaModelBlob,
+  modelSizeGB, buildHeadPlan,
 } from "./shard.ts";
+import { writeFileSync as wf } from "node:fs";
 
 test("isPrivateHost: loopback/RFC1918/CGNAT/mesh yes, public no (RISK-K1)", () => {
   for (const h of ["127.0.0.1", "localhost", "10.1.2.3", "192.168.1.50", "172.16.0.9", "100.64.0.7", "fd7a::1", "::1"]) {
@@ -61,6 +63,34 @@ test("planShardGroup: partitions layers over rpc-capable fresh nodes", () => {
   assert.equal(plan.slices.length, 2);
   assert.equal(plan.slices[0]?.endLayer, 24); // 48/64 of 32
   assert.throws(() => planShardGroup(32, [{ memberId: "m", url: "http://10.0.0.1:11434", ramGB: 8 }]), /rpc/i);
+});
+
+test("modelSizeGB: reads file size in GB; missing file → 0 (F2)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gguf-"));
+  const p = join(dir, "m.gguf");
+  wf(p, Buffer.alloc(2 * 1024 * 1024)); // 2 MiB
+  assert.ok(Math.abs(modelSizeGB(p) - 2 / 1024) < 1e-6);
+  assert.equal(modelSizeGB(join(dir, "nope.gguf")), 0);
+});
+
+test("buildHeadPlan: fresh+rpcPort pool nodes → endpoints + slices; stale/no-rpc excluded (F1/F5)", () => {
+  const nodes = [
+    { memberId: "m_a", url: "http://127.0.0.1:11434", ramGB: 32, freshness: "fresh", rpcPort: 50052 },
+    { memberId: "m_b", url: "http://127.0.0.1:11434", ramGB: 16, freshness: "fresh", rpcPort: 50053 },
+    { memberId: "m_stale", url: "http://127.0.0.1:11434", ramGB: 64, freshness: "stale", rpcPort: 50054 },
+    { memberId: "m_norpc", url: "http://127.0.0.1:11434", ramGB: 64, freshness: "fresh" },
+  ];
+  const plan = buildHeadPlan(nodes, 32);
+  assert.deepEqual(plan.memberIds, ["m_a", "m_b"]);
+  assert.deepEqual(plan.endpoints, [
+    { host: "127.0.0.1", port: 50052 },
+    { host: "127.0.0.1", port: 50053 },
+  ]);
+  assert.equal(plan.slices.reduce((a, s) => a + (s.endLayer - s.startLayer), 0), 32);
+  // no capable nodes → throws
+  assert.throws(() => buildHeadPlan([{ memberId: "x", url: "http://127.0.0.1:11434", ramGB: 8, freshness: "stale" }], 32), /rpc-capable/i);
+  // modelSize gate propagates: 48GB pooled vs 100×1.2 → refuse
+  assert.throws(() => buildHeadPlan(nodes, 32, 100), /insufficient/i);
 });
 
 test("planShardGroup fitsModel gate: refuses a model too big for pooled RAM (F1/dead-code)", () => {

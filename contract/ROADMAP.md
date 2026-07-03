@@ -13,6 +13,7 @@
 | **vK9** | Shard sanal-backend — gateway shard-first dalı + fleet fallback + cockpit pool paneli | ✅ DONE |
 | **vK10** | Hardening — rpcPort heartbeat wire (F1), kota-başarıda (F2), SSRF guard (F3), state lock (F4), fitsModel gate, head.json 0600 | ✅ DONE |
 | **vK11** | Tamamlama — doctor generate+quota kapsamı (F5), suspend wire (contract_admin+route+cli, dead-code) | ✅ DONE |
+| **vK12** | Pool-kaynaklı çok-makine shard — shard up --from-pool (F1), serve-rpc (F3), modelSize gate (F2), listShardProcesses wire | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`
@@ -26,4 +27,10 @@ GOTCHA'lar: cmake target `ggml-rpc-server` (rpc-server değil); default device B
 düşerse RMS_NORM abort → `--device` açık ver; `-ngl 99` şart (yoksa RPC boş durur);
 CPU-rpc memory raporlamaz → tensor-split açık ver; grep -q SIGPIPE exit141.
 
-## vK12 — NEXT (aday: 2. fiziksel makine e2e — tunnel/mesh üstünden gerçek çok-makine shard; member rpc-port heartbeat vK10'da hazır)
+¹² vK12 CANLI KANIT (loopback): 2× serve-rpc (member-rpc-50052/53) + 2 üye heartbeat rpcPort →
+`shard up --from-pool qwen3:4b` head'i POOL endpoint'lerinden başlattı (head.json source:pool,
+endpoints=[50052,53], memberIds=2) → /api/pool/generate source:shard:head → HER İKİ member-rpc
+log büyüdü (1932B+1631B=layer-split canlı) → `shard down` 3 pid (head+2 rpc) listShardProcesses ile temizledi.
+Hardcoded değil, canlı pool-verisinden. F4 (resume/audit/rotation) vK13'e ertelendi.
+
+## vK13 — NEXT (governance: resume/unsuspend + admin audit-log + member-key rotation; sonra 2.fiziksel makine cross-host)
