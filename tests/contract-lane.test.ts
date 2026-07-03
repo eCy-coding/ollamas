@@ -9,6 +9,7 @@ const DB = path.join(os.tmpdir(), `ollamas-contract-test-${process.pid}.db`);
 const STATE = path.join(os.tmpdir(), `ollamas-contract-state-${process.pid}.json`);
 const FLEET = path.join(os.tmpdir(), `ollamas-contract-fleet-${process.pid}.json`);
 const SHARD_DIR = path.join(os.tmpdir(), `ollamas-contract-shard-${process.pid}`);
+const AUDIT = path.join(os.tmpdir(), `ollamas-contract-audit-${process.pid}.jsonl`);
 let store: typeof import("../server/store/index");
 let contract: typeof import("../server/contract");
 let doc: typeof import("../contract/src/contractdoc.ts");
@@ -18,6 +19,7 @@ beforeAll(async () => {
   process.env.CONTRACT_STATE_PATH = STATE;
   process.env.FLEET_BACKENDS_PATH = FLEET;
   process.env.CONTRACT_SHARD_DIR = SHARD_DIR;
+  process.env.CONTRACT_AUDIT_PATH = AUDIT;
   delete process.env.STRIPE_API_KEY;
   store = await import("../server/store/index");
   contract = await import("../server/contract");
@@ -26,7 +28,7 @@ beforeAll(async () => {
   contract._resetContractStateForTests();
 });
 afterAll(() => {
-  for (const f of [DB, `${DB}-wal`, `${DB}-shm`, STATE, FLEET]) try { fs.unlinkSync(f); } catch {}
+  for (const f of [DB, `${DB}-wal`, `${DB}-shm`, STATE, FLEET, AUDIT]) try { fs.unlinkSync(f); } catch {}
   try { fs.rmSync(SHARD_DIR, { recursive: true, force: true }); } catch {}
 });
 
@@ -176,5 +178,61 @@ describe("F2 quota charge-on-success", () => {
     // verify used bumped by exactly 1 via a fresh apply's quota inspection is indirect;
     // instead re-consume path: exceeded stays false until cap
     expect(contract.contractQuotaExceeded(g.tenantId)).toBe(false);
+  });
+});
+
+describe("vK13 governance: resume + rotation + audit", () => {
+  test("suspend→resume returns member to active (key preserved)", async () => {
+    const hash = doc.currentContractHash();
+    const m = await contract.contractApply({ email: "res@x.co", machinePubkey: "55".repeat(32), specs: { ramGB: 16, os: "linux", arch: "x64" }, contractHash: hash });
+    const g = await contract.contractApprove(m.id);
+    await contract.contractSuspend(m.id);
+    expect(contract.contractList().find((x) => x.id === m.id)?.status).toBe("suspended");
+    await contract.contractResume(m.id);
+    const after = contract.contractList().find((x) => x.id === m.id);
+    expect(after?.status).toBe("active");
+    expect(after?.keyId).toBe(g.keyId); // key survived
+    // resume on non-suspended throws
+    await expect(contract.contractResume(m.id)).rejects.toThrow(/transition/i);
+  });
+
+  test("rotate: old key stops resolving, new key resolves once via status poll; member stays active", async () => {
+    const hash = doc.currentContractHash();
+    const m = await contract.contractApply({ email: "rot@x.co", machinePubkey: "66".repeat(32), specs: { ramGB: 16, os: "linux", arch: "x64" }, contractHash: hash });
+    await contract.contractApprove(m.id);
+    const oldKey = contract.contractStatus(m.id)!.key!;
+    expect(await store.resolveKey(oldKey)).not.toBeNull();
+
+    const rot = await contract.contractRotate(m.id);
+    // old key revoked
+    expect(await store.resolveKey(oldKey)).toBeNull();
+    // new key delivered once via status poll
+    const newKey = contract.contractStatus(m.id)!.key!;
+    expect(newKey).toMatch(/^olm_/);
+    expect(newKey).not.toBe(oldKey);
+    expect(contract.contractStatus(m.id)!.key).toBeUndefined(); // one-time
+    const resolved = await store.resolveKey(newKey);
+    expect(resolved?.keyId).toBe(rot.keyId);
+    expect(contract.contractList().find((x) => x.id === m.id)?.status).toBe("active");
+    // rotate on non-active throws
+    await contract.contractRevoke(m.id);
+    await expect(contract.contractRotate(m.id)).rejects.toThrow(/active/i);
+  });
+
+  test("audit log records every admin action, ordered, and is secret-free", async () => {
+    const entries = contract.contractAuditLog(1000);
+    const actions = entries.map((e: any) => e.action);
+    // from all prior tests we should have apply/approve/suspend/resume/revoke/rotate present
+    for (const a of ["apply", "approve", "suspend", "resume", "revoke", "rotate"]) {
+      expect(actions).toContain(a);
+    }
+    // every entry carries memberId + ts; none carries a raw key or email
+    for (const e of entries) {
+      expect(e.memberId).toMatch(/^m_/);
+      expect(typeof e.ts).toBe("string");
+    }
+    const rawFile = fs.readFileSync(AUDIT, "utf8");
+    expect(rawFile).not.toContain("olm_");
+    expect(rawFile).not.toContain("@"); // no emails
   });
 });

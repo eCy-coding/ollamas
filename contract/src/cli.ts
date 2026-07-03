@@ -88,9 +88,18 @@ async function main(): Promise<number> {
     case "approve":
     case "reject":
     case "suspend":
+    case "resume":
+    case "rotate":
     case "revoke": {
       if (!id) { console.error(`usage: contract ${cmd} <m_id>`); return 2; }
-      out(await http("POST", `/api/contract/${id}/${cmd}`, {}, true));
+      const r = await http("POST", `/api/contract/${id}/${cmd}`, {}, true);
+      out(r);
+      if (cmd === "rotate") console.error(`rotated. fetch the NEW key once: contract status ${id}`);
+      return 0;
+    }
+    case "audit": {
+      const limit = id ? Number(id) : 100;
+      out(await http("GET", `/api/contract/audit?limit=${limit}`, undefined, true));
       return 0;
     }
     case "join": {
@@ -375,7 +384,7 @@ async function main(): Promise<number> {
       return 0;
     }
     default:
-      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|revoke <id> | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [--host H --port P --device D | stop] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
+      console.error("usage: contract document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [--host H --port P --device D | stop] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
       return 2;
   }
 }

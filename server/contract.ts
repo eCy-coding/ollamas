@@ -9,11 +9,13 @@ import {
   applyForMembership,
   rejectMember,
   suspendMember,
+  resumeMember,
   getMember,
   type RegistryState,
   type Member,
 } from "../contract/src/registry.ts";
-import { approveWithKey, revokeWithKey, type KeyBridge } from "../contract/src/keys.ts";
+import { approveWithKey, revokeWithKey, rotateWithKey, type KeyBridge } from "../contract/src/keys.ts";
+import { recordContractAudit, readContractAudit, type AuditAction } from "../contract/src/audit.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
 import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota, type HeartbeatInput } from "../contract/src/pool.ts";
 import { shardDir } from "../contract/src/shard.ts";
@@ -71,12 +73,19 @@ function maskMember(m: Member) {
   };
 }
 
+// vK13: append a governance audit entry (best-effort, secret-free — see audit.ts).
+function audit(action: AuditAction, memberId: string, actor: string, keyId?: string): void {
+  const m = getMember(getState(), memberId);
+  recordContractAudit({ action, memberId, status: m?.status ?? "?", actor, keyId }, new Date().toISOString());
+}
+
 // --- service functions (shared by HTTP routes, contract_admin tool, CLI path) ---
 
 export function contractApply(input: { email: string; machinePubkey: string; specs: Member["specs"]; contractHash: string }): Promise<Member> {
   return withLock(() => {
     const { state: next, member } = applyForMembership(getState(), input, currentContractHash(), new Date().toISOString());
     setState(next);
+    audit("apply", member.id, "applicant");
     return member;
   });
 }
@@ -86,6 +95,7 @@ export function contractApprove(memberId: string): Promise<{ keyId: string; tena
     const r = await approveWithKey(getState(), memberId, storeBridge, new Date().toISOString());
     setState(r.state);
     pendingRawKeys.set(memberId, r.rawKey); // picked up once via status poll
+    audit("approve", memberId, "admin", r.keyId);
     return { keyId: r.keyId, tenantId: r.tenantId };
   });
 }
@@ -93,25 +103,54 @@ export function contractApprove(memberId: string): Promise<{ keyId: string; tena
 export function contractReject(memberId: string): Promise<void> {
   return withLock(() => {
     setState(rejectMember(getState(), memberId, new Date().toISOString()));
+    audit("reject", memberId, "admin");
   });
 }
 
 /** vK11: suspend an active member (temporary — revoke is permanent). The key
- * stays valid but the node leaves the schedulable pool until re-... (registry
- * currently supports suspend→revoke; un-suspend is a future step). */
+ * stays valid but the node leaves the schedulable pool; vK13 contractResume reverses it. */
 export function contractSuspend(memberId: string): Promise<void> {
   return withLock(() => {
     setState(suspendMember(getState(), memberId));
     syncFleetFile(); // suspended is not fresh, but drop the fleet entry explicitly
+    audit("suspend", memberId, "admin");
+  });
+}
+
+/** vK13: reverse a suspend. The node re-enters the pool on its NEXT heartbeat
+ * (fleet projection only includes fresh nodes) — not instantly. */
+export function contractResume(memberId: string): Promise<void> {
+  return withLock(() => {
+    setState(resumeMember(getState(), memberId));
+    syncFleetFile();
+    audit("resume", memberId, "admin");
   });
 }
 
 export function contractRevoke(memberId: string): Promise<void> {
   return withLock(async () => {
     pendingRawKeys.delete(memberId);
+    const keyId = getMember(getState(), memberId)?.keyId;
     setState(await revokeWithKey(getState(), memberId, storeBridge));
     syncFleetFile(); // drop the node's contract:* fleet entry immediately
+    audit("revoke", memberId, "admin", keyId);
   });
+}
+
+/** vK13: rotate an active member's API key (litellm principle). New raw key is
+ * delivered ONCE via the status poll, like approve. */
+export function contractRotate(memberId: string): Promise<{ keyId: string }> {
+  return withLock(async () => {
+    const r = await rotateWithKey(getState(), memberId, storeBridge);
+    setState(r.state);
+    pendingRawKeys.set(memberId, r.rawKey); // one-time delivery via status poll
+    audit("rotate", memberId, "admin", r.keyId);
+    return { keyId: r.keyId };
+  });
+}
+
+export function contractAuditLog(limit = 100) {
+  return readContractAudit(limit);
 }
 
 /** Project fresh contract nodes into ~/.ollamas/backends.json so the EXISTING
@@ -354,5 +393,28 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
+  });
+
+  app.post("/api/contract/:id/resume", adminGuard, async (req, res) => {
+    try {
+      await contractResume(String(req.params.id));
+      res.json({ id: req.params.id, status: "active" });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/contract/:id/rotate", adminGuard, async (req, res) => {
+    try {
+      // New raw key delivered ONCE via GET /api/contract/status/:id (secret hygiene).
+      res.json({ id: req.params.id, status: "active", ...(await contractRotate(String(req.params.id))) });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/contract/audit", adminGuard, (req, res) => {
+    const limit = req.query.limit ? Math.max(1, Math.min(1000, Number(req.query.limit))) : 100;
+    res.json({ entries: contractAuditLog(limit) });
   });
 }

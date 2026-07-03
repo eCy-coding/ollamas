@@ -7,6 +7,8 @@ import {
   rejectMember,
   revokeMember,
   suspendMember,
+  resumeMember,
+  rotateMemberKey,
   getMember,
   listByStatus,
 } from "./registry.ts";
@@ -88,6 +90,30 @@ test("revoke on pending throws; unknown id throws", () => {
   const { state, member } = applyForMembership(emptyState(), validInput(), HASH, NOW);
   assert.throws(() => revokeMember(state, member.id), /transition/i);
   assert.throws(() => rejectMember(state, "m_nope", NOW), /not found/i);
+});
+
+test("resumeMember: suspended→active (keyId/tenantId preserved); non-suspended throws (vK13)", () => {
+  const { state, member } = applyForMembership(emptyState(), validInput(), HASH, NOW);
+  const active = approveMember(state, member.id, { keyId: "k1", tenantId: "t1" }, NOW);
+  const suspended = suspendMember(active, member.id);
+  const resumed = resumeMember(suspended, member.id);
+  const m = getMember(resumed, member.id);
+  assert.equal(m?.status, "active");
+  assert.equal(m?.keyId, "k1"); // key survives suspend/resume
+  assert.equal(m?.tenantId, "t1");
+  assert.throws(() => resumeMember(active, member.id), /transition/i); // active is not suspended
+  assert.throws(() => resumeMember(active, "m_nope"), /not found/i);
+});
+
+test("rotateMemberKey: active swaps keyId, keeps tenant; non-active throws (vK13)", () => {
+  const { state, member } = applyForMembership(emptyState(), validInput(), HASH, NOW);
+  const active = approveMember(state, member.id, { keyId: "k1", tenantId: "t1" }, NOW);
+  const rotated = rotateMemberKey(active, member.id, "k2");
+  const m = getMember(rotated, member.id);
+  assert.equal(m?.keyId, "k2");
+  assert.equal(m?.tenantId, "t1");
+  assert.equal(m?.status, "active");
+  assert.throws(() => rotateMemberKey(state, member.id, "k2"), /active/i); // pending can't rotate
 });
 
 test("listByStatus filters", () => {

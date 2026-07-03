@@ -128,6 +128,22 @@ export function suspendMember(state: RegistryState, id: string): RegistryState {
   return replace(state, { ...m, status: "suspended" });
 }
 
+/** vK13: reverse of suspend. Key/tenant survive — the node re-enters the pool
+ * on its next heartbeat (projection only includes fresh nodes). */
+export function resumeMember(state: RegistryState, id: string): RegistryState {
+  const m = mustFind(state, id);
+  assertTransition(m, ["suspended"], "active");
+  return replace(state, { ...m, status: "active" });
+}
+
+/** vK13: swap an active member's API key reference (rotation). tenantId is
+ * unchanged; the caller issues the new key and revokes the old in the store. */
+export function rotateMemberKey(state: RegistryState, id: string, newKeyId: string): RegistryState {
+  const m = mustFind(state, id);
+  if (m.status !== "active") throw new Error(`key rotation requires active membership (is: ${m.status})`);
+  return replace(state, { ...m, keyId: newKeyId });
+}
+
 /** Returns the keyId so the caller can revoke it in the server key store. */
 export function revokeMember(state: RegistryState, id: string): { state: RegistryState; keyId?: string } {
   const m = mustFind(state, id);

@@ -14,6 +14,7 @@
 | **vK10** | Hardening — rpcPort heartbeat wire (F1), kota-başarıda (F2), SSRF guard (F3), state lock (F4), fitsModel gate, head.json 0600 | ✅ DONE |
 | **vK11** | Tamamlama — doctor generate+quota kapsamı (F5), suspend wire (contract_admin+route+cli, dead-code) | ✅ DONE |
 | **vK12** | Pool-kaynaklı çok-makine shard — shard up --from-pool (F1), serve-rpc (F3), modelSize gate (F2), listShardProcesses wire | ✅ DONE |
+| **vK13** | Governance — resume/unsuspend, lane-owned audit-log (secret-free), member-key rotation | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`
@@ -33,4 +34,4 @@ endpoints=[50052,53], memberIds=2) → /api/pool/generate source:shard:head → 
 log büyüdü (1932B+1631B=layer-split canlı) → `shard down` 3 pid (head+2 rpc) listShardProcesses ile temizledi.
 Hardcoded değil, canlı pool-verisinden. F4 (resume/audit/rotation) vK13'e ertelendi.
 
-## vK13 — NEXT (governance: resume/unsuspend + admin audit-log + member-key rotation; sonra 2.fiziksel makine cross-host)
+## vK14 — NEXT (2.fiziksel makine cross-host: tunnel/mesh üstünden gerçek çok-makine shard; kod hazır, donanım+ağ eksik)
