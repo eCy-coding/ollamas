@@ -143,7 +143,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case "agent": {
-      const { collectHeartbeat, heartbeatOnce, installAgent, uninstallAgent, agentLoaded, AGENT_LABEL } = await import("./agent.ts");
+      const { collectHeartbeat, heartbeatOnce, agentBeatLoop, installAgent, uninstallAgent, agentLoaded, AGENT_LABEL } = await import("./agent.ts");
       const os = await import("node:os");
       const { readFileSync: rf } = await import("node:fs");
       const { fileURLToPath } = await import("node:url");
@@ -160,12 +160,13 @@ async function main(): Promise<number> {
       if (id === "uninstall") { const r = uninstallAgent(AGENT_LABEL); console.error(r.reason); return r.ok ? 0 : 1; }
       if (id === "status") { out({ label: AGENT_LABEL, loaded: agentLoaded(AGENT_LABEL) }); return 0; }
       if (id === "run" || id === "once") {
-        const key = rf(KEY_PATH, "utf8").trim();
         const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
-        // F1: advertise rpcPort ONLY when a local rpc-server is actually reachable —
-        // this is what lets the operator plan a shard group over real member nodes.
         const { probeRpcPort } = await import("./shard.ts");
-        const beat = async () => {
+        const { backoffMs } = await import("./breaker.ts");
+        // beat re-reads the key each call (G-F: a rebooted daemon reloads the
+        // persisted 0600 key and re-authenticates) and advertises rpcPort only when
+        // a local rpc-server is actually reachable (F1).
+        const beat = async (key: string) => {
           let rpcPort: number | undefined;
           const declared = Number(process.env.CONTRACT_RPC_PORT || 0);
           if (declared > 0 && (await probeRpcPort("127.0.0.1", declared, 500))) rpcPort = declared;
@@ -175,14 +176,21 @@ async function main(): Promise<number> {
             ollamaUrl,
             rpcPort,
           });
-          const r = await heartbeatOnce({ baseUrl: BASE, key, fetchFn: fetch, hb });
-          console.error(`[agent] heartbeat → ${r.status}${rpcPort ? ` rpc:${rpcPort}` : ""} (${new Date().toISOString()})`);
-          return r;
+          return heartbeatOnce({ baseUrl: BASE, key, fetchFn: fetch, hb });
         };
-        const first = await beat();
-        if (id === "once") return first.ok ? 0 : 1;
-        setInterval(() => { beat().catch((e) => console.error(`[agent] ${e.message}`)); }, 60_000);
-        await new Promise(() => {}); // run forever (launchd KeepAlive owns the lifecycle)
+        if (id === "once") {
+          const r = await beat(rf(KEY_PATH, "utf8").trim());
+          console.error(`[agent] heartbeat → ${r.status}`);
+          return r.ok ? 0 : 1;
+        }
+        // G-B: resilient loop — exponential backoff on failure (no launchd spin-restart).
+        await agentBeatLoop({
+          readKey: () => rf(KEY_PATH, "utf8").trim(),
+          beat,
+          sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+          backoff: (attempt) => backoffMs(attempt, 5_000, 300_000),
+          onBeat: (r) => console.error(`[agent] heartbeat → ${r.status} ${r.ok ? "ok" : `fail #${r.attempt} → backoff ${Math.round(r.waitMs / 1000)}s`} (${new Date().toISOString()})`),
+        });
       }
       console.error("usage: contract agent install|uninstall|status|run|once");
       return 2;
@@ -471,6 +479,43 @@ async function main(): Promise<number> {
       console.error(meshHost ? `advertising ${meshHost}:${port} over the mesh` : "no mesh address detected — bring up tailscale/headscale, then: contract offer");
       return rpc === 0 && agent === 0 ? 0 : 1;
     }
+    case "watch": {
+      // vK16 G-B: monitor head + pool-member rpc liveness with a per-endpoint
+      // breaker; report degradation (operator re-runs shard up --from-pool).
+      // Auto-regroup is vK17 (needs a live shard). Ctrl-C to stop.
+      const { probeRpcPort } = await import("./shard.ts");
+      const { CircuitBreaker } = await import("./breaker.ts");
+      const key = process.env.CONTRACT_API_KEY || "";
+      const breakers = new Map<string, InstanceType<typeof CircuitBreaker>>();
+      const once = async () => {
+        const lines: string[] = [];
+        if (key) {
+          try {
+            const res = await fetch(`${BASE}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(2000) });
+            const { nodes } = (await res.json()) as { nodes: Array<{ memberId: string; url?: string; rpcPort?: number; freshness: string }> };
+            for (const n of (nodes || []).filter((x) => x.freshness === "fresh" && x.rpcPort && x.url)) {
+              const host = new URL(n.url as string).hostname; const ep = `${host}:${n.rpcPort}`;
+              if (!breakers.has(ep)) breakers.set(ep, new CircuitBreaker({ failureThreshold: 3, cooldownMs: 30_000 }));
+              const b = breakers.get(ep)!;
+              const ok = await probeRpcPort(host, n.rpcPort as number, 1500);
+              ok ? b.onSuccess() : b.onFailure();
+              lines.push(`${ok ? "✓" : "✗"} ${n.memberId.slice(0, 8)} ${ep} [${b.state()}]${b.state() === "open" ? " — re-run: contract shard up --from-pool" : ""}`);
+            }
+          } catch (e: any) { lines.push(`pool/nodes error: ${e.message}`); }
+        } else {
+          lines.push("set CONTRACT_API_KEY to monitor member endpoints");
+        }
+        let head: any = null;
+        try { head = JSON.parse((await import("node:fs")).readFileSync(join((await import("./shard.ts")).shardDir(), "head.json"), "utf8")); } catch {}
+        lines.push(`head: ${head?.up ? `UP ${head.url}` : "down"}`);
+        console.error(`[watch ${new Date().toISOString()}]\n  ${lines.join("\n  ")}`);
+      };
+      await once();
+      if (id === "once") return 0;
+      setInterval(() => { once().catch((e) => console.error(`[watch] ${e.message}`)); }, 15_000);
+      await new Promise(() => {});
+      return 0;
+    }
     case "server": {
       // G1 (operator): launchd daemon for the ollamas POOL SERVER so the pool is
       // always up (survives reboot) — the #1 0-manual gap. Also persists operator
@@ -507,7 +552,7 @@ async function main(): Promise<number> {
       return r.ok ? 0 : 1;
     }
     default:
-      console.error("usage: contract server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
+      console.error("usage: contract server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
       return 2;
   }
 }

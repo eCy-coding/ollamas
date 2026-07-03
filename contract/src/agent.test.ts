@@ -4,7 +4,7 @@ import { mkdtempSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  collectHeartbeat, joinPool, heartbeatOnce,
+  collectHeartbeat, joinPool, heartbeatOnce, agentBeatLoop,
   renderAgentPlist, agentPlistPath, installAgent, uninstallAgent, AGENT_LABEL,
 } from "./agent.ts";
 
@@ -100,4 +100,38 @@ test("launchd plist: render + install/uninstall with fake launchctl (vK8)", () =
   const u = uninstallAgent(AGENT_LABEL, { launchctl: fake, home });
   assert.equal(u.ok, true);
   assert.equal(existsSync(agentPlistPath(AGENT_LABEL, home)), false);
+});
+
+test("agentBeatLoop: re-reads key each beat (reboot reload); backs off on failure (G-F/G-B)", async () => {
+  const reads: number[] = [];
+  const beats: Array<{ ok: boolean; status: number; attempt: number; waitMs: number }> = [];
+  let keyVersion = 0;
+  await agentBeatLoop({
+    readKey: () => { keyVersion++; reads.push(keyVersion); return `olm_k${keyVersion}`; },
+    beat: async (key) => ({ ok: key === "olm_k1" ? false : key === "olm_k2" ? false : true, status: key === "olm_k3" ? 200 : 0 }),
+    sleep: async () => {},
+    backoff: (attempt) => (attempt + 1) * 1000,
+    onBeat: (r) => beats.push(r),
+    maxIters: 3,
+  });
+  // key re-read every iteration
+  assert.deepEqual(reads, [1, 2, 3]);
+  // fail, fail, success → backoff grows then resets to steady 60s
+  assert.equal(beats[0]?.ok, false);
+  assert.equal(beats[0]?.waitMs, 1000); // backoff(0)
+  assert.equal(beats[1]?.waitMs, 2000); // backoff(1)
+  assert.equal(beats[2]?.ok, true);
+  assert.equal(beats[2]?.waitMs, 60000); // steady on success
+});
+
+test("agentBeatLoop: beat throw is caught (never crashes the daemon)", async () => {
+  let sawBackoff = false;
+  await agentBeatLoop({
+    readKey: () => "olm_x",
+    beat: async () => { throw new Error("network down"); },
+    sleep: async () => {},
+    backoff: () => { sawBackoff = true; return 5000; },
+    maxIters: 1,
+  });
+  assert.equal(sawBackoff, true); // threw → treated as failure → backoff, no crash
 });

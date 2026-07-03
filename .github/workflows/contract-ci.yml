@@ -1,0 +1,31 @@
+# Contract lane GA gate (vK16). The contract lane is isolated (zero-dep, node --test,
+# its own tsconfig) — the shared ci.yml never compiles it, so it needs its OWN gate to
+# be continuously guarded AND to stop being held hostage by other lanes' whole-repo RED.
+# ONE command = contract/scripts/verify.sh (typecheck + node --test). Triggered only on
+# contract-surface changes; runs on macOS (the platform the rpc/launchd paths target).
+name: contract-ci
+
+on:
+  push:
+    paths:
+      - "contract/**"
+      - ".github/workflows/contract-ci.yml"
+  pull_request:
+    paths:
+      - "contract/**"
+      - ".github/workflows/contract-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Contract self-gate (typecheck + node --test)
+        run: bash contract/scripts/verify.sh

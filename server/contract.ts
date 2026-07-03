@@ -201,6 +201,33 @@ export function contractPoolNodes() {
   return poolNodes(getState(), Date.now());
 }
 
+/** vK16 G-A: aggregate, secret-free pool status for observability (/api/pool/status,
+ * /api/health). Counts + shard-head only — no email/keyId ever. */
+export function poolStatusReport(): {
+  version: string;
+  members: { pending: number; active: number; suspended: number; rejected: number; revoked: number };
+  fleetContractNodes: number;
+  shardHead: { up: boolean; source?: string };
+  ts: string;
+} {
+  const members = { pending: 0, active: 0, suspended: 0, rejected: 0, revoked: 0 };
+  for (const m of getState().members) {
+    const k = m.status as keyof typeof members;
+    if (k in members) members[k]++;
+  }
+  let fleetContractNodes = 0;
+  try {
+    const b = JSON.parse(readFileSync(FLEET_PATH, "utf8")) as Array<{ name?: string }>;
+    fleetContractNodes = b.filter((x) => String(x?.name || "").startsWith("contract:")).length;
+  } catch { /* fresh */ }
+  let shardHead: { up: boolean; source?: string } = { up: false };
+  try {
+    const h = JSON.parse(readFileSync(join(shardDir(), "head.json"), "utf8")) as { up?: boolean; source?: string };
+    shardHead = { up: Boolean(h.up), source: h.source };
+  } catch { /* no head */ }
+  return { version: CONTRACT_VERSION, members, fleetContractNodes, shardHead, ts: new Date().toISOString() };
+}
+
 /** vK10: read-only quota check BEFORE doing work (charge-on-success). */
 export function contractQuotaExceeded(tenantId: string): boolean {
   return wouldExceedQuota(getState(), tenantId, new Date().toISOString().slice(0, 10));
@@ -276,6 +303,17 @@ export function _resetContractStateForTests(): void {
 type Middleware = (req: Request, res: Response, next: NextFunction) => unknown;
 
 export function registerContractRoutes(app: Express, adminGuard: Middleware, rateLimit: Middleware, requireAuth: Middleware): void {
+  // vK16 G-A: eager state load surfaces any corrupt-state warning at BOOT (not
+  // mid-request), and a boot log makes the lane discoverable in the server output.
+  const loaded = loadState(STATE_PATH);
+  if (loaded.warning) console.warn(`[contract] ${loaded.warning}`);
+  state = loaded.state;
+  console.log(`[contract] lane active — ${state.members.length} member(s), v${CONTRACT_VERSION} (routes: /api/contract/*, /api/pool/*)`);
+
+  // vK16 G-A: aggregate, secret-free pool status (observability). Public read —
+  // counts only, no email/keyId (poolStatusReport is masked by construction).
+  app.get("/api/pool/status", (_req, res) => res.json(poolStatusReport()));
+
   app.post("/api/pool/heartbeat", requireAuth, async (req, res) => {
     try {
       const tenantId = (req as any).tenant?.tenantId;

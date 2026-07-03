@@ -97,6 +97,38 @@ export async function heartbeatOnce(opts: {
   return { ok: r.ok, status: r.status };
 }
 
+// --- vK16 resilient beat loop (pure-ish core; cli wires real IO) ---
+
+export type BeatLoopDeps = {
+  readKey: () => string; // re-read each beat so a rebooted daemon reloads the persisted key
+  beat: (key: string) => Promise<{ ok: boolean; status: number }>;
+  sleep: (ms: number) => Promise<void>;
+  backoff: (attempt: number) => number;
+  onBeat?: (r: { ok: boolean; status: number; attempt: number; waitMs: number }) => void;
+  maxIters?: number; // test bound; undefined → forever
+};
+
+/** Heartbeat loop: on failure, exponential-backoff instead of spin-restarting.
+ * readKey is called EVERY iteration so a rebooted member reloads its key (G-F).
+ * Never throws — a down server just backs off. */
+export async function agentBeatLoop(deps: BeatLoopDeps): Promise<void> {
+  let fails = 0;
+  for (let i = 0; deps.maxIters === undefined || i < deps.maxIters; i++) {
+    let r: { ok: boolean; status: number };
+    try {
+      const key = deps.readKey();
+      r = await deps.beat(key);
+    } catch {
+      r = { ok: false, status: 0 };
+    }
+    if (r.ok) fails = 0;
+    else fails += 1;
+    const waitMs = r.ok ? 60_000 : deps.backoff(fails - 1);
+    deps.onBeat?.({ ...r, attempt: fails, waitMs });
+    await deps.sleep(waitMs);
+  }
+}
+
 // --- launchd (macOS) — tunnel daemon.ts pattern, contract label ---
 
 export const AGENT_LABEL = "com.ollamas.contract.agent";

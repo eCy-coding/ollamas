@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { generateIdentity } from "./identity.ts";
-import { detectShardCapability, resolveShardBinary, shardDir } from "./shard.ts";
+import { detectShardCapability, resolveShardBinary, shardDir, preflightEndpoints, probeRpcPort } from "./shard.ts";
 import { detectMeshHost } from "./mesh.ts";
 import { agentLoaded, AGENT_LABEL } from "./agent.ts";
 
@@ -45,6 +45,33 @@ async function envHealthSteps(
     }
   } catch {
     step("pending-approvals", true, "SKIP");
+  }
+  // G-C cross-host: from the OPERATOR, probe each pool member's rpc endpoint over
+  // the mesh — the real cross-host readiness check (not just the local head).
+  await crossHostStep(base, step);
+}
+
+async function crossHostStep(base: string, step: (n: string, ok: boolean, d: string) => boolean): Promise<void> {
+  try {
+    const r = await fetch(`${base}/api/pool/status`, { signal: AbortSignal.timeout(2000) });
+    // status is a masked summary; endpoint reachability needs /api/pool/nodes (key-auth).
+    // We report from status when no key is available, else probe nodes.
+    const key = process.env.CONTRACT_API_KEY;
+    if (!key) {
+      const s = r.ok ? ((await r.json()) as { members?: { active?: number } }) : {};
+      step("cross-host", true, `SKIP — set CONTRACT_API_KEY to probe member endpoints (active=${s.members?.active ?? "?"})`);
+      return;
+    }
+    const nodesRes = await fetch(`${base}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(2000) });
+    if (!nodesRes.ok) { step("cross-host", true, `pool/nodes → ${nodesRes.status} (SKIP)`); return; }
+    const { nodes } = (await nodesRes.json()) as { nodes: Array<{ memberId: string; url?: string; rpcPort?: number; freshness: string }> };
+    const targets = (nodes || []).filter((n) => n.freshness === "fresh" && n.rpcPort && n.url);
+    if (targets.length === 0) { step("cross-host", true, "no rpc-capable members (offer + serve-rpc on a member)"); return; }
+    const eps = targets.map((n) => ({ host: new URL(n.url as string).hostname, port: n.rpcPort as number }));
+    const { reachable, dropped } = await preflightEndpoints(eps, (h, p) => probeRpcPort(h, p, 1500));
+    step("cross-host", dropped.length === 0, `${reachable.length}/${eps.length} member rpc reachable over mesh${dropped.length ? ` — unreachable: ${dropped.map((e) => `${e.host}:${e.port}`).join(", ")}` : ""}`);
+  } catch (e: any) {
+    step("cross-host", true, `SKIP — ${String(e?.message || e)}`);
   }
 }
 

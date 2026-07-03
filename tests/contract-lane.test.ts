@@ -269,3 +269,20 @@ describe("G2 applicant notification", () => {
     }
   });
 });
+
+describe("vK16 G-A observability", () => {
+  test("poolStatusReport: masked counts, version, shard-head; no email/keyId", async () => {
+    const hash = doc.currentContractHash();
+    const m = await contract.contractApply({ email: "obs@x.co", machinePubkey: "77".repeat(32), specs: { ramGB: 8, os: "linux", arch: "x64" }, contractHash: hash });
+    const r = contract.poolStatusReport();
+    expect(r.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(r.members.pending).toBeGreaterThanOrEqual(1);
+    expect(typeof r.fleetContractNodes).toBe("number");
+    expect(typeof r.shardHead.up).toBe("boolean");
+    const json = JSON.stringify(r);
+    expect(json).not.toContain("obs@x.co");
+    expect(json).not.toContain(m.machinePubkey);
+    expect(json).not.toContain("olm_");
+    expect(json).not.toContain("key_");
+  });
+});

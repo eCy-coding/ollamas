@@ -17,6 +17,7 @@
 | **vK13** | Governance — resume/unsuspend, lane-owned audit-log (secret-free), member-key rotation | ✅ DONE |
 | **vK14** | Kalıcı cross-host üye — node-config, mesh-host keşfi (tailscale), serve-rpc launchd daemon, launch preflight, tek-komut offer | ✅ DONE |
 | **vK15** | 0-manuel e2e eksiksizlik — server daemon (G1), operator node-config (G6), applicant notify (G2), audit rotation (G4), doctor env-health (G5), cockpit action-cue (G7), errors_registry+README (G3) | ✅ DONE |
+| **vK16** | Observability+Resilience+Gate — /api/pool/status+health+boot-log, breaker/backoff+watch, cross-host doctor, verify.sh+contract-CI, RECIPES+errors, key-reload test | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`

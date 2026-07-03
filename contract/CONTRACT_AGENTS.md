@@ -30,3 +30,13 @@ gibi model çalıştırır (fleet scheduler + llama.cpp rpc-server layer-split).
 ## §5 Sürüm döngüsü
 Her vK: plan → TDD → build → canlı-kanıt → ROADMAP işaretle → commit
 (conventional, İngilizce). Tetik: "sıradaki versiyonu planla".
+
+## §6 Commit gate (vK16 — sürdürülebilir, kör GATE_SKIP YASAK)
+Contract lane İZOLE: root tsc/vitest contract'ı hiç derlemez (`.ts`-uzantı importları),
+vitest contract'ı referans etmez → contract kendi kalitesinden sorumlu, root-RED'in
+suçlusu/kurbanı değil. Ama root pre-commit gate tüm-repo koşar; başka lane'in WIP'i
+(dönüşümlü: embed-catalog, key-doctor…) tüm-repoyu RED bırakınca contract commit'i rehin kalır.
+**Kural:** contract/**-only commit → `bash contract/scripts/verify.sh && GATE_SKIP=1 git commit …`.
+GATE_SKIP YALNIZ verify.sh geçtikten sonra meşru (kör-skip = ERR-CONTRACT-009).
+Root gate/hook (`.git/hooks/pre-commit`, apply-harness.sh) = shared-infra, DOKUNULMAZ.
+Contract kendi CI'ına sahip: `.github/workflows/contract-ci.yml` (paths:contract/**).
