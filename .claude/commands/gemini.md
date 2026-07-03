@@ -9,10 +9,13 @@ Gemini CLI (0.49.0, account-authed) as a fleet-compatible model. Invoked headles
 
 - `"<task>"` — dispatch and print the response.
 - `--propose <stream>` — GROUNDED fleet proposal: inlines the stream's focus-file content so Gemini copies exact lines into a SEARCH/REPLACE block (deterministic → apply-ready), writes it to `~/.llm-mission-control/fleet/work/<stream>.gemini/PROPOSAL.md`, then triage/apply with `fleet-apply` like any worker. Proven live: gemini-2.5-flash → safe-auto, import-safe, gated-shipped change (vO57).
-- `--quota` — show today's free-tier budget `{date, used, limit, remaining}` (no API call).
+- `--quota` — show today's gemini free-tier budget `{date, used, limit, remaining}` (no API call).
+- `--budget` — show the WHOLE free-tier vendor pool's remaining budget today (gemini + groq/cerebras/zai). No API call. This is the pool the fleet fails over across (vO59).
 - `--model <tag>` — default `gemini-2.5-flash` (the `pro` tier is often demand-throttled; flash is reliable).
 - `--json` — machine output.
 
 Free-tier has a **daily quota** (≈20 requests, override `GEMINI_DAILY_LIMIT`). A **pre-flight quota gate** (`bin/lib/gemini-quota.ts`, persisted at `~/.llm-mission-control/gemini-quota.json`) skips the call entirely when the day's budget is spent — fail-fast in ~0.1s instead of a doomed ~50s backoff. The first real 429 latches the day exhausted. Transient 503 is still retried with backoff.
+
+**vO59 — vendor pool (never stall):** the daily-budget math is now generalized into `bin/lib/vendor-budget.ts` (a per-vendor pool at `~/.llm-mission-control/vendor-budget.json`; `gemini-quota.ts` re-exports it). When gemini's day is spent, `fleet-agent.ts` fails over to the next free-tier vendor with budget (`pickVendor` → most-remaining among the stream's `provider::model` tails, groq/cerebras/zai) so the grounded-proposal production loop never stalls on one vendor. Each API-worker dispatch is pre-flight budget-gated + usage-recorded (429 latches the vendor for the day). Proven live: gemini 20/20 → pool picks groq → real `/api/agent/chat` dispatch → budget recorded.
 
 See `.claude/BRAIN.md` (Gemini vendor-overload row).

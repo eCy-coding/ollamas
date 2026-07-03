@@ -7,6 +7,7 @@ import { register as metricsRegister, httpDuration, recordToolMetric, registerSt
 import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
 import { searchGitHub } from "./server/github-search";
+import { runStandard, type Category } from "./server/github-search-standard";
 import { ecysearcherProxy } from "./server/ecysearcher-proxy";
 import { ecysearcherSupervisor } from "./server/ecysearcher";
 import { logger } from "./server/logger";
@@ -20,7 +21,7 @@ import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
-import { sttEntryFor, buildTranscribeForm } from "./server/stt-catalog";
+import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
 import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
@@ -289,6 +290,15 @@ app.get("/api/github/search", async (req, res) => {
   if (!q.trim()) return res.status(400).json({ error: "'q' gerekli" });
   try {
     res.json(await searchGitHub({ type, q, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
+});
+// Search Standard (dalga-9) — runs the curated discovery intents and returns a
+// license-classified, ranked task-list digest. Advisory only.
+app.get("/api/github/search/standard", async (req, res) => {
+  const cat = String(req.query.category || "").trim();
+  const categories = cat ? (cat.split(",").filter(Boolean) as Category[]) : undefined;
+  try {
+    res.json(await runStandard({ token: ghToken(), categories, refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
   } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
@@ -1164,7 +1174,8 @@ async function initializeServer() {
    * provider pick a decoder). No key -> honest 503; oversize -> 400 with the real cap.
    */
   app.post("/api/ai/transcribe", async (req, res) => {
-    const entry = sttEntryFor();
+    // Env first; else any STT provider whose key lives in the VAULT (keyPool covers both).
+    const entry = sttEntryFor() ?? Object.values(STT_CATALOG).find((e) => ProviderRouter.keyPool(e.id).length > 0) ?? null;
     if (!entry) {
       return res.status(503).json({ error: "no STT provider key configured (set GROQ_API_KEY \u2014 free tier: console.groq.com/keys)" });
     }

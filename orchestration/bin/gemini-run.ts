@@ -20,11 +20,13 @@ import { homedir } from "node:os";
 import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
 import { focusFile, geminiGroundedPrompt } from "./lib/fleet-prompt";
 import { guardQuota, noteOutcome, loadQuota, remaining, todayKey } from "./lib/gemini-quota";
+import { loadBudget, remaining as vendorRemaining, defaultLimitFor } from "./lib/vendor-budget";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
 const WORK = join(homedir(), ".llm-mission-control", "fleet", "work");
 const QUOTA_FILE = join(homedir(), ".llm-mission-control", "gemini-quota.json");
+const BUDGET_FILE = join(homedir(), ".llm-mission-control", "vendor-budget.json");
 
 const argv = process.argv.slice(2);
 const flag = (n: string, d?: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
@@ -32,7 +34,27 @@ const JSON_OUT = argv.includes("--json");
 const MODEL = flag("--model", "gemini-2.5-flash")!;
 const PROPOSE = flag("--propose");
 const QUOTA = argv.includes("--quota");
+const BUDGET = argv.includes("--budget");
 const FLASH = "gemini-2.5-flash";
+
+// ── --budget: show the WHOLE free-tier vendor pool's remaining budget today (no API call) ─────────────
+// gemini lives in the single-state quota file; API workers (groq/cerebras/zai) in the pool file. Shows why
+// the loop can keep going when one vendor is spent — the conductor fails over to the most-remaining vendor.
+if (BUDGET) {
+  const today = todayKey();
+  const gq = loadQuota(QUOTA_FILE);
+  const gView = { vendor: "gemini", used: gq.date === today ? gq.used : 0, limit: gq.limit, remaining: remaining(gq, today) };
+  const pool = loadBudget(BUDGET_FILE);
+  const apiVendors = ["groq", "cerebras", "zai"];
+  const rows = [gView, ...apiVendors.map((v) => {
+    const st = pool[v] ?? { date: today, used: 0, limit: defaultLimitFor(v) };
+    return { vendor: v, used: st.date === today ? st.used : 0, limit: st.limit, remaining: vendorRemaining(st, today) };
+  })];
+  if (JSON_OUT) { console.log(JSON.stringify({ date: today, vendors: rows })); process.exit(0); }
+  console.log(`free-tier vendor pool — ${today}`);
+  for (const r of rows) console.log(`  ${r.vendor.padEnd(9)} ${String(r.used).padStart(2)}/${r.limit} used · ${r.remaining} left${r.remaining === 0 ? " (spent)" : ""}`);
+  process.exit(0);
+}
 
 // ── --quota: show today's free-tier budget (no API call) ──────────────────────────────────────────────
 if (QUOTA) {

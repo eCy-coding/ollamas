@@ -1,61 +1,30 @@
-// gemini-quota (pure core + thin IO) — daily free-tier budget accounting for the Gemini vendor.
+// gemini-quota — gemini-specific thin wrapper over the vendor-agnostic budget core (`./vendor-budget`).
 //
-// Why: vO57 hit the Gemini free-tier DAILY quota (429, ~20/day). The dispatcher only noticed AFTER making a
-// doomed call + burning ~50s of backoff. A scarce resource (20 requests/day) must be SPENT, not wasted: this
-// tracks the day's usage in ~/.llm-mission-control/gemini-quota.json and gates BEFORE the call — when the
-// budget is spent, the dispatcher fails fast (no API call, no backoff). The first real 429 latches the day
-// as exhausted, so correctness never depends on guessing the exact limit. Pure logic (today injected, no
-// Date) is unit-tested; the thin IO wrapper is shared by both dispatch sites (gemini-run + fleet-agent).
+// Why: vO57 hit the Gemini free-tier DAILY quota (429, ~20/day) and only noticed AFTER a doomed call + ~50s
+// backoff. vO58 added this pre-flight gate; vO59 generalized the math into `vendor-budget` (a multi-vendor
+// pool) so ONE vendor exhausting no longer stalls the loop. The daily-budget MATH now lives in vendor-budget
+// and is re-exported here unchanged (single source of truth) — `QuotaState` is structurally `VendorState`.
+// The gemini-specific IO below keeps the historical SINGLE-state file `~/.llm-mission-control/gemini-quota.json`
+// ({date,used,limit}, not the pool map) so existing call sites (gemini-run `--quota`, fleet-agent) are
+// behavior-preserving.
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import {
+  rollover, canDispatch, remaining, recordSuccess, recordExhausted,
+  defaultLimitFor, todayKey, type VendorState,
+} from "./vendor-budget";
 
-export interface QuotaState { date: string; used: number; limit: number }
+// ── re-exported pure core (identical shape; ONE source of truth in vendor-budget) ─────────────────────
+export { rollover, canDispatch, remaining, recordSuccess, recordExhausted, todayKey };
+export type QuotaState = VendorState;
 
-/** Default free-tier daily request budget (override with GEMINI_DAILY_LIMIT). */
+/** Default free-tier daily request budget for gemini (override with GEMINI_DAILY_LIMIT). */
 export function defaultLimit(): number {
-  const n = Number(process.env.GEMINI_DAILY_LIMIT);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 20;
+  return defaultLimitFor("gemini");
 }
 
-// ── pure core (today is injected — deterministic, IO-free) ────────────────────────────────────────────
-
-/** Reset the counter when the day rolls over. Returns a fresh state for `today` if the date changed. */
-export function rollover(state: QuotaState, today: string): QuotaState {
-  return state.date === today ? state : { date: today, used: 0, limit: state.limit };
-}
-
-/** Is there budget left today? (rolls over first.) */
-export function canDispatch(state: QuotaState, today: string): boolean {
-  const s = rollover(state, today);
-  return s.used < s.limit;
-}
-
-/** Remaining requests today (never negative). */
-export function remaining(state: QuotaState, today: string): number {
-  const s = rollover(state, today);
-  return Math.max(0, s.limit - s.used);
-}
-
-/** Count one successful request. */
-export function recordSuccess(state: QuotaState, today: string): QuotaState {
-  const s = rollover(state, today);
-  return { ...s, used: s.used + 1 };
-}
-
-/** Latch today as exhausted (a real 429 was seen) — used = limit so nothing else dispatches today, even if
- *  the counter under-estimated the true cap. Correctness independent of the limit guess. */
-export function recordExhausted(state: QuotaState, today: string): QuotaState {
-  const s = rollover(state, today);
-  return { ...s, used: Math.max(s.used, s.limit) };
-}
-
-// ── thin IO (shared by both dispatch sites) ───────────────────────────────────────────────────────────
-
-/** Today's key "YYYY-MM-DD" (local). The only Date use — kept out of the pure core. */
-export function todayKey(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
+// ── gemini-specific single-state IO (historical file format; not the pool map) ────────────────────────
 
 /** Load the persisted state, or a fresh one at `limit`. Corrupt/absent file → fresh. */
 export function loadQuota(path: string, limit: number = defaultLimit()): QuotaState {

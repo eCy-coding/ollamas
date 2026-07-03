@@ -109,3 +109,22 @@ describe("runDoctor", () => {
     expect(JSON.stringify(r)).toContain("…999x");
   });
 });
+
+describe("vault-held providers without a discoverable candidate (T4 live-run fix)", () => {
+  it("vault primary present + no env/keychain/gh candidate → 'already' (source vault), never 'absent'", async () => {
+    const deps = fakeDeps({
+      vault: {
+        hasPrimary: (p) => p === "groq" || p === "voyage",
+        knownKeyIds: () => new Set(),
+        savePrimary: () => { throw new Error("no write"); },
+        addToPool: () => { throw new Error("no write"); },
+      },
+    });
+    const r = await runDoctor({}, deps, envReaders({}));
+    expect(r.providers.groq.status).toBe("already");
+    expect(r.providers.groq.source).toBe("vault");
+    expect(r.providers.voyage.status).toBe("already");
+    expect(r.providers.cerebras.status).toBe("absent");
+    expect(r.capabilityReport.stt).toEqual(["groq"]); // vault-held providers count as connected
+  });
+});

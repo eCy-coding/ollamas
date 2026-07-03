@@ -14,7 +14,7 @@ import { keyId } from "./key-usage";
 import { readGenericPassword, keychainAvailable } from "./lib/keychain-scan";
 import { execFileSync } from "node:child_process";
 
-export type CandidateSource = "env" | "keychain" | "gh";
+export type CandidateSource = "env" | "keychain" | "gh" | "vault";
 
 export interface Candidate {
   provider: string;
@@ -266,14 +266,23 @@ export async function runDoctor(
     if (!connectedProviders.includes(c.provider)) connectedProviders.push(c.provider);
   }
 
-  // Absent providers: surface the single manual step left (signup URL).
-  for (const p of keyedCloudProviders()) {
+  // No candidate discovered, but the VAULT already holds a key (e.g. connected via the
+  // KeyVault UI or a prior doctor run) → the provider is live, report "already", never
+  // "absent". Truly absent providers surface the single manual step left (signup URL).
+  // Universe = every provider the scan surface knows (chat + embed/search modalities).
+  const universe = [...new Set(discoveryTargets().map((t) => t.provider))];
+  for (const p of universe) {
     if (!providers[p]) {
-      providers[p] = {
-        status: "absent", capabilitiesActivated: [],
-        nextManualUrl: keySignupUrl(p) || undefined,
-        note: catalogEntry(p) ? undefined : "legacy provider",
-      };
+      if (deps.vault.hasPrimary(p)) {
+        providers[p] = { status: "already", source: "vault", capabilitiesActivated: capabilitiesFor(p) };
+        if (!connectedProviders.includes(p)) connectedProviders.push(p);
+      } else {
+        providers[p] = {
+          status: "absent", capabilitiesActivated: [],
+          nextManualUrl: keySignupUrl(p) || undefined,
+          note: catalogEntry(p) ? undefined : "legacy provider",
+        };
+      }
     }
   }
 

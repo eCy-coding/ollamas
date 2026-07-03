@@ -56,6 +56,7 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 | Gemini daily-quota (429) | FAIL FAST — `isGeminiQuotaExhausted` ≠ transient (retry won't help for hours); distinct from 503 | vO57 live (free-tier 20/day) | `bin/lib/gemini.ts` |
 | Wasting a scarce daily quota | PRE-FLIGHT budget gate: persist daily used/limit, skip the call BEFORE dispatch when spent (0.13s vs ~50s doomed-backoff); first real 429 latches the day | vO58 live (20/day) | `bin/lib/gemini-quota.ts` (`guardQuota`/`noteOutcome`; `/gemini --quota`) |
 | Weak-vendor grounding | INLINE the target file content → model copies EXACT lines into SEARCH (resolvable, no hallucinated snippet) | vO57 (Gemini flash → apply-ready SR) | `bin/lib/fleet-prompt.ts geminiGroundedPrompt` |
+| Loop stalls when ONE vendor's daily quota is spent | VENDOR POOL: track every free-tier vendor's daily budget in one file; on exhaustion fail over to the most-remaining vendor (`pickVendor`) so the production loop never stalls; each dispatch pre-flight-gated + recorded (429 latches that vendor) | vO59 live (gemini 20/20 → pool→groq real dispatch→recorded) | `bin/lib/vendor-budget.ts` (`pickVendor`/`guardVendor`/`noteVendorOutcome`); `fleet-agent.ts` fail-over; `/gemini --budget` |
 
 ## 3. Immutable principles (from AGENTS.md §2 + operator directives)
 

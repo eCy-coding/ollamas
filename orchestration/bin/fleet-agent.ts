@@ -24,7 +24,9 @@ import { fullJitterDelay, isTransient } from "./lib/backoff";
 import { dispatchTarget } from "./lib/chrome-probe";
 import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
 import { focusFile as focusFileFor, streamTaskPrompt, geminiGroundedPrompt } from "./lib/fleet-prompt";
-import { guardQuota, noteOutcome } from "./lib/gemini-quota";
+import { guardQuota, noteOutcome, loadQuota } from "./lib/gemini-quota";
+import { guardVendor, noteVendorOutcome, pickVendor, loadBudget, todayKey, type BudgetFile } from "./lib/vendor-budget";
+import { STREAMS } from "./lib/fleet-plan";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -32,6 +34,7 @@ const REPO = join(ORCH_DIR, "..");
 const TSX = join(REPO, "node_modules", ".bin", "tsx");
 const FLEET_HOME = join(homedir(), ".llm-mission-control", "fleet");
 const QUOTA_FILE = join(homedir(), ".llm-mission-control", "gemini-quota.json");
+const BUDGET_FILE = join(homedir(), ".llm-mission-control", "vendor-budget.json");
 const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 
 const [stream, slot] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -112,22 +115,104 @@ function geminiDispatch(model: string, prompt: string): { verdict: string; propo
   return { verdict: "ERROR", proposal: "", steps: 0, err: lastErr };
 }
 
-function dispatch(model: string, prompt: string, steps: number, provider: string): { verdict: string; proposal: string; steps: number; err?: string } {
+type DispatchResult = { verdict: string; proposal: string; steps: number; err?: string };
+
+/** A managed free-tier vendor (has a daily budget) for `provider`, or null for local/cloud ollama (no cap). */
+function vendorOf(provider: string): string | null {
+  if (provider === "gemini-cli") return "gemini";
+  if (provider.startsWith("ollama")) return null;
+  return provider; // groq / cerebras / zai — server PROVIDER_CATALOG API worker
+}
+
+/** An error string that means the vendor's free-tier budget/rate is spent (→ try another vendor). */
+function isExhaustionErr(err?: string): boolean {
+  return !!err && /quota|budget|exhaust|RESOURCE_EXHAUSTED|429|rate.?limit/i.test(err);
+}
+
+/** Vendor-bearing prefer entries for a stream (its free-tier fallback candidates, in preference order):
+ *  `provider::model` API workers + gemini tags. Bare ollama tags carry no daily budget → not pool-managed. */
+function streamVendorCandidates(streamId: string): { vendor: string; provider: string; model: string }[] {
+  const spec = STREAMS.find((s) => s.id === streamId);
+  if (!spec) return [];
+  const out: { vendor: string; provider: string; model: string }[] = [];
+  for (const p of spec.prefer) {
+    const i = p.indexOf("::");
+    if (i > 0) { out.push({ vendor: p.slice(0, i), provider: p.slice(0, i), model: p.slice(i + 1) }); continue; }
+    if (/^gemini[-.\d]/i.test(p)) out.push({ vendor: "gemini", provider: "gemini-cli", model: p });
+  }
+  return out;
+}
+
+/** One budget view across BOTH stores: gemini lives in the single-state quota file, API workers in the pool
+ *  file. Merging lets `pickVendor` compare all free-tier vendors without changing gemini's storage. */
+function combinedBudget(vendors: string[]): BudgetFile {
+  const map = loadBudget(BUDGET_FILE);
+  if (vendors.includes("gemini")) map.gemini = loadQuota(QUOTA_FILE);
+  return map;
+}
+
+/** Pick an alternate vendor (not already tried) for the stream that still has budget today — the "never
+ *  stall" core: when the assigned vendor is spent, the loop fails over to the most-remaining free vendor. */
+function poolFallback(streamId: string, tried: Set<string>): { provider: string; model: string } | null {
+  const seen = new Set<string>();
+  const uniq = streamVendorCandidates(streamId)
+    .filter((c) => !tried.has(c.vendor))
+    .filter((c) => (seen.has(c.vendor) ? false : (seen.add(c.vendor), true))); // first model per vendor (pref order)
+  if (!uniq.length) return null;
+  const vendors = uniq.map((c) => c.vendor);
+  const pick = pickVendor(vendors, combinedBudget(vendors), todayKey(), vendors);
+  if (!pick) return null;
+  const c = uniq.find((x) => x.vendor === pick)!;
+  return { provider: c.provider, model: c.model };
+}
+
+/** Dispatch with automatic vendor-pool fail-over: try the assigned vendor; if its free-tier budget is spent
+ *  (pre-flight gate OR a mid-flight 429 latch), route to the next available vendor for this stream so the
+ *  production loop never stalls. `tried` bounds the recursion to the stream's distinct vendors. */
+function dispatch(model: string, prompt: string, steps: number, provider: string, tried: Set<string> = new Set()): DispatchResult {
+  const vendor = vendorOf(provider);
+  if (vendor) tried.add(vendor);
+  const r = rawDispatch(model, prompt, steps, provider);
+  if (vendor && r.verdict === "ERROR" && isExhaustionErr(r.err)) {
+    const alt = poolFallback(stream, tried);
+    if (alt) { log(`↻ ${vendor} budget spent → pool fail-over → ${alt.provider}/${alt.model}`); return dispatch(alt.model, prompt, steps, alt.provider, tried); }
+    log(`⛔ ${vendor} budget spent + no free-tier alternate for ${stream} — honest ERROR (loop waits for reset)`);
+  }
+  return r;
+}
+
+/** Raw single-vendor dispatch (no fail-over). API-worker vendors get a pre-flight budget gate + usage record;
+ *  gemini is gated inside geminiDispatch; ollama has no daily cap. */
+function rawDispatch(model: string, prompt: string, steps: number, provider: string): DispatchResult {
   if (provider === "gemini-cli") return geminiDispatch(model, prompt);
+  const vendor = vendorOf(provider); // groq/cerebras/zai (or null for ollama)
+  if (vendor) {
+    const guard = guardVendor(BUDGET_FILE, vendor);
+    if (!guard.allowed) { try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: guard.msg })); } catch { /* ignore */ } return { verdict: "ERROR", proposal: "", steps: 0, err: guard.msg }; }
+  }
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,
       "--provider", provider, "--model", model, "--steps", String(steps), "--root", root, "--no-apply", "--json",
     ], { encoding: "utf8", timeout: 300_000, env: { ...process.env, OLLAMAS_URL }, maxBuffer: 8 * 1024 * 1024 });
+    if (vendor) noteVendorOutcome(BUDGET_FILE, vendor, "success");
     writeFileSync(reportF, out);
     return parseReport(out);
   } catch (e: any) {
+    const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
+    // A real free-tier 429/quota → latch the vendor for the day (priority over the 0-step-DONE parse below).
+    if (vendor && isGeminiQuotaExhausted(blob)) {
+      noteVendorOutcome(BUDGET_FILE, vendor, "exhausted");
+      const err = blob.slice(0, 200);
+      try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: err })); } catch { /* ignore */ }
+      return { verdict: "ERROR", proposal: "", steps: 0, err };
+    }
     // ROOT-FIX (vO39): agent-dispatch EXITS 1 whenever the run isn't fully allOk — including a valid DONE
     // run that made ZERO tool steps (a PROPOSE answer is text, not tool calls). execFileSync throws on that
     // non-zero exit, but the JSON report is still on stdout. Parse it before discarding as ERROR.
     const stdout = typeof e?.stdout === "string" ? e.stdout : "";
     if (stdout) {
-      try { const r = parseReport(stdout); writeFileSync(reportF, stdout); return r; } catch { /* not JSON → real failure */ }
+      try { const r = parseReport(stdout); if (vendor) noteVendorOutcome(BUDGET_FILE, vendor, "success"); writeFileSync(reportF, stdout); return r; } catch { /* not JSON → real failure */ }
     }
     const err = String(e?.message ?? e).slice(0, 200);
     try { writeFileSync(reportF, JSON.stringify({ model, verdict: "ERROR", steps: [], error: err })); } catch { /* ignore */ }
