@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-03T03:10:48Z",
+  "ts": "2026-07-03T07:57:00Z",
   "rows": [
     {
       "stream": "concurrency-safety",
@@ -34,8 +34,8 @@
       "files": [
         "scripts/agent-dispatch.mjs"
       ],
-      "reason": "search/replace resolves cleanly against the current tree",
-      "tier": "safe-auto"
+      "reason": "search/replace resolves cleanly against the current tree · IMPORT-UNSAFE: adds a runtime import of a type-only file (./agent-dispatch.d.ts) → node crashes (ERR_MODULE_NOT_FOUND)",
+      "tier": "blocked"
     },
     {
       "stream": "shell-harden",
