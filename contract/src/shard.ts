@@ -159,7 +159,11 @@ export function listShardProcesses(): string[] {
 }
 
 /** TCP reachability probe — rpc-server speaks a binary protocol, connect is enough. */
-export function probeRpcPort(host: string, port: number, timeoutMs = 1000): Promise<boolean> {
+// vK18 D: unified probe timeout — mesh-safe default (council: max(500, p99_rtt×3);
+// a slow tailnet node needs headroom to avoid a false unreachable-drop at launch).
+export const PROBE_TIMEOUT_MS = 1500;
+
+export function probeRpcPort(host: string, port: number, timeoutMs = PROBE_TIMEOUT_MS): Promise<boolean> {
   return new Promise((resolve) => {
     const sock = connect({ host, port });
     const done = (ok: boolean) => { sock.destroy(); resolve(ok); };

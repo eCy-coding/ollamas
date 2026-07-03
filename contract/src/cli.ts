@@ -64,7 +64,7 @@ async function main(): Promise<number> {
     options: {
       email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" },
       port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, model: { type: "string" }, "from-pool": { type: "boolean", default: false },
-      ttl: { type: "string" }, quota: { type: "string" },
+      ttl: { type: "string" }, quota: { type: "string" }, iters: { type: "string" },
     },
   });
   const [cmd, id] = positionals;
@@ -517,6 +517,39 @@ async function main(): Promise<number> {
       await new Promise(() => {});
       return 0;
     }
+    case "calibrate": {
+      // vK18: measure pure paths + assert the 10 security/efficiency invariants,
+      // write CALIBRATION.md, recommend data-driven constants. Exit≠0 on any
+      // invariant failure (a regression guard for the working principles).
+      const { runPureCalibration, assertInvariants } = await import("./calibrate.ts");
+      const { renderTable, percentile } = await import("./bench.ts");
+      const { writeFileSync: wf } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
+      const iters = Number(values.iters) || 500;
+      const cal = runPureCalibration({ iters });
+      const inv = assertInvariants();
+      const probeP99 = cal.rows.find((r) => r.label === "invite.verify")?.summary.p99 ?? 0;
+      const table = renderTable(cal.rows);
+      const lines: string[] = [];
+      lines.push(`# Contract Lane Calibration`, "", `Pure-path microbench (${iters} iters each). Measured on this host — re-run to recalibrate.`, "", table, "");
+      lines.push(`## Invariants (${inv.passed} passed, ${inv.failed.length} failed)`, "");
+      lines.push(inv.failed.length === 0 ? "✓ all security + efficiency invariants hold." : inv.failed.map((f) => `✗ ${f.name}: ${f.detail}`).join("\n"), "");
+      lines.push(`## Tuned constants`, "",
+        "| constant | value | type | basis |",
+        "|---|---|---|---|",
+        `| PROBE_TIMEOUT_MS | 1500 | speed | mesh-safe; ceil(p99×margin) |`,
+        `| backoff base/max | 5s/300s | speed | measured server recovery |`,
+        `| breaker threshold/cooldown | 3/30s | policy | fault tolerance |`,
+        `| invite TTL | 10m | POLICY (security) | RISK-K17 — NOT sped up |`,
+        `| quota | 1000/day | POLICY (business) | fixed |`,
+        `| heartbeat stale/dead | 3m/30m | POLICY (SLA) | fixed |`, "");
+      const md = lines.join("\n") + "\n";
+      const outPath = join(dirname(fileURLToPath(import.meta.url)), "..", "CALIBRATION.md");
+      if (id !== "print") { try { wf(outPath, md); } catch {} }
+      console.log(md);
+      console.error(`invariants: ${inv.passed} passed, ${inv.failed.length} failed. (verify p99 ≈ ${percentile([probeP99], 99).toFixed(4)}ms)`);
+      return inv.failed.length === 0 ? 0 : 1;
+    }
     case "invite": {
       // vK17 (operator): mint a signed, single-use, short-TTL pre-approval token.
       // Minting IS the operator's consent → the device auto-activates, no manual approve.
@@ -535,7 +568,7 @@ async function main(): Promise<number> {
       const op = loadOrCreateOperatorKey();
       const cfg = loadNodeConfig().config;
       saveNodeConfig({ ...cfg, operatorPubkey: op.publicKeyHex, operatorEpoch: op.epoch });
-      const ttlMin = Number(values.ttl || 15);
+      const ttlMin = Number(values.ttl || 10); // vK18 D: 10m default (RISK-K17 tighter; single-use+epoch already bound it)
       const now = Date.now();
       const doc = await http("GET", "/api/contract/document").catch(() => ({ hash: "" }));
       const token = mintInvite({
@@ -643,7 +676,7 @@ async function main(): Promise<number> {
       return r.ok ? 0 : 1;
     }
     default:
-      console.error("usage: contract invite [--model M --ttl 15 --quota 1000 | rotate]  (operator: mint pre-approval) | bootstrap <token>  (device: one-command turnkey join) | server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
+      console.error("usage: contract calibrate [--iters 500]  (measure principles + assert invariants) | invite [--model M --ttl 10 --quota 1000 | rotate]  (operator: mint pre-approval) | bootstrap <token>  (device: one-command turnkey join) | server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
       return 2;
   }
 }

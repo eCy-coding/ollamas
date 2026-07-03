@@ -349,3 +349,25 @@ describe("vK17 auto-approve on operator invite", () => {
     expect(JSON.stringify(rows)).not.toContain("olm_");
   });
 });
+
+describe("vK18 A syncFleetFile dirty-check", () => {
+  test("re-heartbeat with same projection skips the disk write; new member flushes", async () => {
+    const hash = doc.currentContractHash();
+    const m = await contract.contractApply({ email: "dc@x.co", machinePubkey: "88".repeat(32), specs: { ramGB: 16, os: "linux", arch: "x64" }, contractHash: hash });
+    const g = await contract.contractApprove(m.id);
+    await contract.contractHeartbeat(g.tenantId, { ollamaUrl: "http://100.64.0.7:11434", models: ["x"] });
+    const mtime1 = fs.statSync(FLEET).mtimeMs;
+    // same heartbeat again → identical projection → no write (mtime unchanged)
+    await new Promise((r) => setTimeout(r, 5));
+    await contract.contractHeartbeat(g.tenantId, { ollamaUrl: "http://100.64.0.7:11434", models: ["x"] });
+    const mtime2 = fs.statSync(FLEET).mtimeMs;
+    expect(mtime2).toBe(mtime1); // dirty-check skipped the redundant write
+    // a NEW member changes the projection → write happens
+    const m2 = await contract.contractApply({ email: "dc2@x.co", machinePubkey: "99".repeat(32), specs: { ramGB: 8, os: "linux", arch: "x64" }, contractHash: hash });
+    const g2 = await contract.contractApprove(m2.id);
+    await new Promise((r) => setTimeout(r, 5));
+    await contract.contractHeartbeat(g2.tenantId, { ollamaUrl: "http://100.64.0.8:11434", models: ["y"] });
+    const fleet = JSON.parse(fs.readFileSync(FLEET, "utf8"));
+    expect(fleet.filter((b: any) => b.name.startsWith("contract:")).length).toBe(2);
+  });
+});

@@ -95,6 +95,18 @@
       "title": "bootstrap mesh-join skipped / run on the operator box",
       "detail": "bootstrap's mesh-join runs `tailscale up --authkey` ONLY when CONTRACT_TAILSCALE_AUTHKEY + CONTRACT_HEADSCALE_URL are set; otherwise it SKIPs (already-on-mesh or operator box). Running it on a machine already on the tailnet would be redundant/disruptive.",
       "prevention_rule": "Set the two mesh env vars ONLY on a fresh device joining a new tailnet; omit them when the machine is already meshed (SKIP is correct)."
+    },
+    {
+      "id": "ERR-CONTRACT-017",
+      "title": "ToS v2 hash bump invalidates old applies + outstanding invites",
+      "detail": "Updating renderContract text (v1→v2) changes canonicalHash. contractHash is checked ONLY at join/invite-redeem (not on heartbeat/quota), so ACTIVE members keep working; but a new apply / an outstanding invite minted against the old hash is rejected (re-accept required).",
+      "prevention_rule": "Safe on an empty/dev pool. After bumping the ToS, re-mint outstanding invites (they carry the old hash); new members fetch GET /api/contract/document for the current hash (cli/agent/doctor already accept-by-hash)."
+    },
+    {
+      "id": "ERR-CONTRACT-018",
+      "title": "syncFleetFile dirty-check skips the write when unchanged",
+      "detail": "vK18 A: syncFleetFile compares the projected backends.json to the last written content and SKIPS the disk write when identical — a re-heartbeat with the same url/models/freshness no longer rewrites the file every 60s. A fresh→stale freshness transition DOES change the projection and still flushes.",
+      "prevention_rule": "Tests that assert a write happened must change the projection (new member / freshness transition), not just re-send the same heartbeat. Reset the in-memory cache via _resetFleetCacheForTests / _resetContractStateForTests between test runs."
     }
   ]
 }

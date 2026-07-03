@@ -225,15 +225,27 @@ export function contractAuditLog(limit = 100) {
 /** Project fresh contract nodes into ~/.ollamas/backends.json so the EXISTING
  * fleet provider (server/providers.ts selectFleetBackend) schedules onto them.
  * Only `contract:` entries are owned/replaced; hand-pinned backends survive (RISK-K3). */
-export function syncFleetFile(): void {
+// vK18 A: skip the disk write when the projection is unchanged. A heartbeat with
+// the same url/models/freshness produces byte-identical output, so writing on every
+// beat (N members × 1/60s) is wasted I/O. A fresh→stale transition changes the
+// projection and still flushes. Returns true when it actually wrote.
+let lastFleetContent: string | null = null;
+export function syncFleetFile(): boolean {
   let existing: unknown = [];
   try { existing = JSON.parse(readFileSync(FLEET_PATH, "utf8")); } catch { /* fresh file */ }
   const merged = mergeFleetBackends(existing, toFleetBackends(getState(), Date.now()));
+  const content = JSON.stringify(merged, null, 2) + "\n";
+  if (content === lastFleetContent) return false; // unchanged → no disk write
   mkdirSync(dirname(FLEET_PATH), { recursive: true });
   const tmp = `${FLEET_PATH}.contract-tmp`;
-  writeFileSync(tmp, JSON.stringify(merged, null, 2) + "\n");
+  writeFileSync(tmp, content);
   renameSync(tmp, FLEET_PATH);
+  lastFleetContent = content;
+  return true;
 }
+
+/** Test hook: reset the dirty-check cache (fresh CONTRACT/FLEET path per test run). */
+export function _resetFleetCacheForTests(): void { lastFleetContent = null; }
 
 export function contractHeartbeat(tenantId: string, hb: HeartbeatInput): Promise<{ memberId: string }> {
   return withLock(() => {
@@ -344,6 +356,7 @@ export function contractList(): Array<ReturnType<typeof maskMember> & { email: s
 export function _resetContractStateForTests(): void {
   state = null;
   pendingRawKeys.clear();
+  lastFleetContent = null;
 }
 
 // --- Express wiring ---
