@@ -8,6 +8,7 @@ import {
   formatSseError,
   isSessionStalled,
   isStreamTimeout,
+  formatSseComment,
 } from "../server/agent-events";
 
 // Helper: build a session whose messages[] are the replayable steps.
@@ -170,5 +171,16 @@ describe("isStreamTimeout — hard stream-duration guard (no clock, caller passe
   test("elapsed < max → not timed out", () => {
     expect(isStreamTimeout(29_999, 30_000)).toBe(false);
     expect(isStreamTimeout(0, 30_000)).toBe(false);
+  });
+});
+
+// formatSseComment was authored by Gemini (gemini-2.5-flash) via the grounded fleet prompt and applied
+// through fleet-apply (safe-auto, gated). Its test — the model's own — makes it a used, verified helper.
+describe("formatSseComment — SSE comment (heartbeat/keep-alive) frame", () => {
+  test("frames a comment line per the SSE spec (`: text\\n\\n`)", () => {
+    expect(formatSseComment("keepalive")).toBe(": keepalive\n\n");
+  });
+  test("empty text still yields a valid comment frame", () => {
+    expect(formatSseComment("")).toBe(": \n\n");
   });
 });

@@ -91,3 +91,8 @@ export function isSessionStalled(prevCount: number, curCount: number, quietMs: n
 export function isStreamTimeout(elapsedMs: number, maxStreamMs: number): boolean {
   return elapsedMs >= maxStreamMs;
 }
+
+/** Frame a standard SSE comment (heartbeat/keep-alive ping) to prevent network gateway timeouts. */
+export function formatSseComment(text: string): string {
+  return `: ${text}\n\n`;
+}
