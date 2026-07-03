@@ -115,6 +115,14 @@ function detailFor(step: string): string {
     }
     return "fleet durum tazelendi (launch --go ile başlat)";
   }
+  if (step === "claude") {
+    const f = join(ORCH_DIR, "CLAUDE_DISPATCH.md");
+    if (existsSync(f)) {
+      const line = readFileSync(f, "utf8").split("\n").find((l) => /^##\s+(▶|\[dry\]|⏭)/.test(l));
+      if (line) return line.replace(/^#+\s*/, "").replace(/\s+/g, " ").trim().slice(0, 80);
+    }
+    return "claude-dispatch kararı tazelendi";
+  }
   if (step === "status") return "lane matrisi tazelendi";
   return "ok";
 }
@@ -182,6 +190,7 @@ function main(): void {
     runStep("think", "think.ts", []),     // vO22 THINK loop: finding → PROVEN-solution(registry) | NEEDS_RESEARCH (no-guess)
     runStep("next", "fleet-next.ts", []), // vO24 precompute next-task queue (safe-additive apply → edit → research) → FLEET_NEXT.md
     runStep("tasklist", "tasklist.ts", []), // vO29 persistent master task list → docs/MASTER_TASKLIST.md (auto-refresh)
+    runStep("claude", "claude-dispatch.ts", ["--go"]), // vO40 en-kritik gereksinimi Claude conductor oturumuna delege (marker .claude-dispatch-enabled YOKSA dry — tek-manuel aktivasyon)
     runStep("status", "status.ts", []),
     runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),

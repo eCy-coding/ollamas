@@ -79,6 +79,13 @@ Read-only DIŞINDA conductor'a izinli **TEK** yan-etki = **koordinasyon sinyali*
 `orchestration/seyir/nudge-log.jsonl`'e audit'lenir. **Lane FEATURE kodu yazmak HÂLÂ §3 ihlali** —
 bu istisna yalnız teşhis-dürtmesi + bildirim kapsar, kod/dosya mutasyonu DEĞİL.
 
+- **(c) claude-dispatch (vO40)** — fuse'un tespit ettiği EN KRİTİK gereksinimi YENİ bir Claude Code
+  conductor oturumuna delege: yeni Terminal.app/iTerm2 sekmesi + `claude --permission-mode plan`
+  (`bin/claude-dispatch.ts`). Conductor yine kod yazmaz — kodu spawn edilen oturum, PLAN-MODE insan
+  onayından sonra kendi lane'inde yazar. Güvenlik: dry-run DEFAULT · tek-manuel aktivasyon marker
+  `.claude-dispatch-enabled` · kill-switch `.claude-dispatch-off` · fingerprint idempotency · cap=1 ·
+  cooldown 4h · bayat-REQUIREMENTS'a spawn YOK · audit `seyir/dispatch-log.jsonl`.
+
 ---
 
 ## §4. Trigger Protokolü — "sıradaki versiyonu planla"

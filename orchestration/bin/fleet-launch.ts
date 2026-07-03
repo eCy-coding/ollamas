@@ -27,6 +27,7 @@ import { readyApiProviders } from "./lib/ready-api";
 import { buildMission, DEFAULT_DEPS, type AssignmentLike } from "./lib/mission";
 import { orderSlotsByMission, type OrderedSlot } from "./lib/fleet-order";
 import { selectWorkspaceRequest, parseWorkspaceResp } from "./lib/workspace";
+import { openTab } from "./lib/tab-spawn";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -103,16 +104,6 @@ log "✅ DONE report → ${report} (rc=$RC)"
   writeFileSync(wrapper, sh);
   chmodSync(wrapper, 0o755);
   return wrapper;
-}
-
-/** AppleScript to open a NEW tab and run a command. iTerm2: create a window if none is open (root-fix
- *  for silent skip when no window existed). The command itself keeps the tab alive (persistent agent). */
-function openTab(app: Assignment["app"], cmd: string): void {
-  const inner = cmd.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const script = app === "Terminal.app"
-    ? `tell application "Terminal"\n  activate\n  do script "${inner}"\nend tell`
-    : `tell application "iTerm"\n  activate\n  if (count of windows) = 0 then\n    create window with default profile\n    tell current session of current window to write text "${inner}"\n  else\n    tell current window\n      create tab with default profile\n      tell current session to write text "${inner}"\n    end tell\n  end if\nend tell`;
-  execFileSync("osascript", ["-e", script], { timeout: 15000 });
 }
 
 function renderPlanMd(plan: FleetPlan): string {
