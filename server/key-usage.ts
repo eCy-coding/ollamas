@@ -1,8 +1,11 @@
 // server/key-usage.ts — per-key rolling usage counters for PROACTIVE quota awareness.
 // SECURITY: a key is identified by a non-reversible `keyId` (sha256 prefix) — the raw key
-// is NEVER stored, logged, or surfaced. Counters are in-memory (reset on restart, by which
-// time the per-minute/day windows have rolled over anyway).
+// is NEVER stored, logged, or surfaced. Counters are in-memory; the router snapshots them
+// to the config (keyUsageSnapshot/hydrateKeyUsage via quota-persist) so a restart no longer
+// forgets the day's spent budget. Daily windows honor the provider's reset boundary
+// (Gemini = Pacific midnight, GitHub Models/Cloudflare = UTC midnight, rest = rolling 24h).
 import { createHash } from "node:crypto";
+import { bucketsToPersist, bucketsFromPersist, boundaryFor, dayWindowExpired, type UsageBucket } from "./quota-persist";
 
 const MIN_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -12,7 +15,7 @@ export function keyId(rawKey: string): string {
   return createHash("sha256").update(rawKey || "").digest("hex").slice(0, 12);
 }
 
-interface Bucket { minTs: number; minCount: number; dayTs: number; dayCount: number }
+type Bucket = UsageBucket;
 const buckets = new Map<string, Bucket>();
 const bk = (provider: string, id: string) => `${provider}::${id}`;
 
@@ -32,12 +35,13 @@ const SWEEP_EVERY = 256;
 let recordCount = 0;
 
 // Count one successful use of (provider, keyId), rolling the per-minute/day windows.
+// The day window resets by the provider's boundary (Pacific/UTC midnight or rolling 24h).
 export function recordKeyUse(provider: string, id: string, nowMs: number = Date.now()): void {
   const key = bk(provider, id);
   let b = buckets.get(key);
   if (!b) { b = { minTs: nowMs, minCount: 0, dayTs: nowMs, dayCount: 0 }; buckets.set(key, b); }
   if (nowMs - b.minTs >= MIN_MS) { b.minTs = nowMs; b.minCount = 0; }
-  if (nowMs - b.dayTs >= DAY_MS) { b.dayTs = nowMs; b.dayCount = 0; }
+  if (dayWindowExpired(b, boundaryFor(provider), nowMs)) { b.dayTs = nowMs; b.dayCount = 0; }
   b.minCount++; b.dayCount++;
   if (++recordCount % SWEEP_EVERY === 0) sweepKeyUsage(nowMs);
 }
@@ -48,8 +52,21 @@ export function keyWindows(provider: string, id: string, nowMs: number = Date.no
   if (!b) return { perMin: 0, perDay: 0 };
   return {
     perMin: nowMs - b.minTs >= MIN_MS ? 0 : b.minCount,
-    perDay: nowMs - b.dayTs >= DAY_MS ? 0 : b.dayCount,
+    perDay: dayWindowExpired(b, boundaryFor(provider), nowMs) ? 0 : b.dayCount,
   };
+}
+
+// ── Restart persistence (wired by the router; this module stays disk-free) ────────────────
+// Snapshot the live buckets for the config vault (expired dropped, keyId-only — safe to
+// persist next to the encrypted keys). Hydrate merges saved buckets on boot; corrupt or
+// stale payloads are ignored, and an existing in-memory bucket always wins (it is newer).
+export function keyUsageSnapshot(nowMs: number = Date.now()): Record<string, Bucket> {
+  return bucketsToPersist([...buckets], nowMs);
+}
+export function hydrateKeyUsage(saved: unknown, nowMs: number = Date.now()): void {
+  for (const [k, b] of bucketsFromPersist(saved, nowMs)) {
+    if (!buckets.has(k)) buckets.set(k, b);
+  }
 }
 
 // ── Per-call token + cost telemetry (vNEXT-D1) ─────────────────────────────────────────────

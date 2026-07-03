@@ -5,10 +5,11 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
 import { generateViaGeminiCli, geminiCliAvailable } from "./gemini-cli";
-import { keyId, recordKeyUse, keyWindows, recordCallCost } from "./key-usage";
+import { keyId, recordKeyUse, keyWindows, recordCallCost, keyUsageSnapshot, hydrateKeyUsage } from "./key-usage";
 import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
 import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catalog";
+import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_MS } from "./provider-errors";
 
 // Types
 export interface ProviderMessage {
@@ -340,7 +341,12 @@ export class ProviderRouter {
           this.recordLatency(prov, lastAttemptMs);
           // Per-key usage for proactive quota awareness (keyless providers skip). The key used is
           // the one getDecryptedKey resolved — recorded by its safe keyId, never the raw value.
-          if (cloudKeyed) { const used = this.getDecryptedKey(prov); if (used) recordKeyUse(prov, keyId(used)); }
+          // Hydrated once from the config + debounce-persisted back, so a restart keeps the
+          // day's spent budget (quota-persist.ts; boundary-aware windows in key-usage.ts).
+          if (cloudKeyed) {
+            const used = this.getDecryptedKey(prov);
+            if (used) { this.ensureUsageHydrated(); recordKeyUse(prov, keyId(used)); this.persistUsageDebounced(); }
+          }
           // vNEXT-D1 — per-call token + USD telemetry. Use the provider's real `usage` when present
           // (tokensIn/tokensOut), else estimate (~4 chars/token). Cost via the env-tunable table.
           {
@@ -359,12 +365,20 @@ export class ProviderRouter {
           const isAuth = m.includes("401") || m.includes("403") || m.includes("unauthorized") || m.includes("forbidden") || m.includes("api key");
           if (cloudKeyed && (isQuota || isAuth)) {
             const spent = this.getDecryptedKey(prov);
-            // Cool the spent key: quota recovers (6h), an invalid key stays out longer (24h).
-            if (spent) this.markKeyCooldown(prov, spent, isQuota ? 6 * 3600_000 : 24 * 3600_000);
+            // Cool the spent key: quota honors the server's Retry-After when present (else 6h);
+            // an invalid key stays out longer (24h). quotaCooldownTtl is pure → tested.
+            const retryAfterMs = err instanceof ProviderHttpError ? err.retryAfterMs : undefined;
+            if (spent) this.markKeyCooldown(prov, spent, quotaCooldownTtl(isQuota, retryAfterMs));
             const live = this.liveKeyCount(prov);
             // Token NAMES/positions ok to log; VALUES never.
             console.warn(`[KeyPool] ${prov} key#${attempt + 1} ${isQuota ? "quota" : "auth"}-exhausted → ${live} live key(s) remain`);
             if (live > 0 && attempt + 1 < attempts) { rotated = true; continue; } // retry same provider, next key
+          } else if (cloudKeyed) {
+            // Generic failure (network blip / 5xx / timeout): bench this provider's key 30s so
+            // the NEXT request skips a flapping endpoint instead of re-hitting it immediately
+            // (LiteLLM deployment-cooldown pattern). Real outages still surface via the chain.
+            const spent = this.getDecryptedKey(prov);
+            if (spent) this.markKeyCooldown(prov, spent, FAILURE_COOLDOWN_MS);
           }
           break; // not a key error, or pool exhausted → fall through to provider chain
         }
@@ -545,6 +559,25 @@ export class ProviderRouter {
   /** Test/observability helper — number of retained cooldown entries. */
   public static cooldownSize(): number { return this.keyCooldown.size; }
 
+  // ── Key-usage restart persistence (Faz 4) — same config vault as the cooldowns. ─────────
+  // Buckets are keyId-only (never raw keys). Saves are debounced (5s) and best-effort: a
+  // disk error must never break generation. No background timer — the hot path triggers it.
+  private static usageHydrated = false;
+  private static usageLastSaveMs = 0;
+  private static ensureUsageHydrated(): void {
+    if (this.usageHydrated) return;
+    this.usageHydrated = true;
+    try { hydrateKeyUsage((db.data as any).keyUsage); } catch { /* corrupt/absent → start cold */ }
+  }
+  private static persistUsageDebounced(nowMs: number = Date.now()): void {
+    if (nowMs - this.usageLastSaveMs < 5000) return;
+    this.usageLastSaveMs = nowMs;
+    try {
+      (db.data as any).keyUsage = keyUsageSnapshot(nowMs);
+      db.save();
+    } catch { /* persistence is best-effort */ }
+  }
+
   // All candidate keys for a provider: vault key first, then env `NAME`, `NAME_1..9`,
   // and comma-separated `NAMES`. Deduped, non-empty. Drop a new key into .env (e.g.
   // GEMINI_API_KEY_2=... or GEMINI_API_KEYS=k1,k2) and it joins the pool on next boot.
@@ -686,7 +719,13 @@ export class ProviderRouter {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI-compatible host returned error ${response.status}`);
+      // Typed failure: status + Retry-After survive to the router loop, where a 429's
+      // server-stated wait becomes the exact key-cooldown TTL instead of the blanket 6h.
+      throw new ProviderHttpError(
+        `OpenAI-compatible host returned error ${response.status}`,
+        response.status,
+        parseRetryAfter(response.headers.get("retry-after"), Date.now())
+      );
     }
 
     if (onStreamChunk && response.body) {
