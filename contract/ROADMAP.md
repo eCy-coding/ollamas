@@ -10,6 +10,7 @@
 | **vK6** | RPC sharding — private-only arg/plan (partition tabanlı), capability-gate + cli shard | ✅ DONE¹ |
 | **vK7** | CANLI shard kanıtı — GGML_RPC build, spawn/pid/probe/blob-resolve, cli shard up/down/status/proof | ✅ DONE |
 | **vK8** | Member agent 0-manuel — join tek-komut, launchd heartbeat daemon, quota görünürlük | ✅ DONE |
+| **vK9** | Shard sanal-backend — gateway shard-first dalı + fleet fallback + cockpit pool paneli | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`
@@ -23,4 +24,4 @@ GOTCHA'lar: cmake target `ggml-rpc-server` (rpc-server değil); default device B
 düşerse RMS_NORM abort → `--device` açık ver; `-ngl 99` şart (yoksa RPC boş durur);
 CPU-rpc memory raporlamaz → tensor-split açık ver; grep -q SIGPIPE exit141.
 
-## vK9 — NEXT (shard sanal-backend: gateway shard-first dalı + cockpit pool paneli)
+## vK10 — NEXT (aday: 2. fiziksel makine e2e — tunnel/mesh üstünden gerçek çok-makine shard + member rpc-port heartbeat)

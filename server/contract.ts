@@ -15,6 +15,7 @@ import {
 import { approveWithKey, revokeWithKey, type KeyBridge } from "../contract/src/keys.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
 import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, type HeartbeatInput } from "../contract/src/pool.ts";
+import { shardDir } from "../contract/src/shard.ts";
 import { ProviderRouter } from "./providers";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
@@ -113,6 +114,42 @@ export function contractConsumeQuota(tenantId: string): void {
   setState(consumeQuota(getState(), tenantId, new Date().toISOString().slice(0, 10)));
 }
 
+/** vK9: shard-first branch. When a healthy shard head (llama-server --rpc group,
+ * loopback-bound — gateway must run on the same machine) is registered in
+ * ~/.ollamas/shard/head.json, route the request there via OpenAI /v1; any failure
+ * falls through to the fleet chain (null return = not handled). */
+export async function tryShardGenerate(
+  body: { model?: string; messages: Array<{ role: string; content: string }>; temperature?: number },
+  fetchFn: typeof fetch = fetch,
+): Promise<{ content: string; model: string; source: string; latencyMs: number } | null> {
+  let head: { up?: boolean; url?: string; model?: string } = {};
+  try {
+    head = JSON.parse(readFileSync(join(shardDir(), "head.json"), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!head.up || !head.url) return null;
+  try {
+    const hc = await fetchFn(`${head.url}/health`, { signal: AbortSignal.timeout(1500) } as RequestInit);
+    if (!hc.ok) return null;
+    const t0 = Date.now();
+    const r = await fetchFn(`${head.url}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: body.messages, temperature: body.temperature, max_tokens: 1024 }),
+      signal: AbortSignal.timeout(120_000),
+    } as RequestInit);
+    if (!r.ok) return null;
+    const j = (await r.json()) as any;
+    const msg = j?.choices?.[0]?.message ?? {};
+    const content = String(msg.content || msg.reasoning_content || "");
+    if (!content) return null;
+    return { content, model: String(j?.model || head.model || "shard"), source: "shard:head", latencyMs: Date.now() - t0 };
+  } catch {
+    return null; // shard down/hung → fleet chain takes over
+  }
+}
+
 export function contractStatus(memberId: string): { member: ReturnType<typeof maskMember>; key?: string } | null {
   const m = getMember(getState(), memberId);
   if (!m) return null;
@@ -186,6 +223,10 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
       if (!Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ error: "messages (non-empty array) required" });
       }
+      // vK9: a healthy shard head (one model split across rpc-servers) takes the
+      // request first — the pool's "one big machine" path; fleet is the fallback.
+      const shardResult = await tryShardGenerate({ model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined });
+      if (shardResult) return res.json(shardResult);
       const ctrl = new AbortController();
       req.on("close", () => ctrl.abort());
       const result = await ProviderRouter.generate(

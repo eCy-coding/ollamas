@@ -51,6 +51,13 @@ export interface AdoptionSummary {
   violations: { repo: string; reason: string }[];
 }
 
+/** Contract lane pool özeti (vK9). SADECE sayaçlar — email/keyId ASLA sızmaz. */
+export interface ContractSummary {
+  members: { pending: number; active: number; rejected: number; revoked: number; suspended: number };
+  fleetContractNodes: number;
+  shardHeadUp: boolean;
+}
+
 export interface CockpitSnapshot {
   ts: string;
   expectedLanes: number;
@@ -58,6 +65,7 @@ export interface CockpitSnapshot {
   backend: BackendRuntime | null;
   totals: { live: number; idle: number; dirty: number; errors: number };
   adoptions: AdoptionSummary | null;
+  contract: ContractSummary | null;
 }
 
 // ── Saf çekirdek ─────────────────────────────────────────────────────────────
@@ -111,6 +119,7 @@ export function buildSnapshot(input: {
   lanes: LaneStatus[];
   backend: BackendRuntime | null;
   adoptions?: AdoptionSummary | null;
+  contract?: ContractSummary | null;
 }): CockpitSnapshot {
   const totals = { live: 0, idle: 0, dirty: 0, errors: 0 };
   for (const l of input.lanes) {
@@ -122,7 +131,32 @@ export function buildSnapshot(input: {
   return {
     ts: input.ts, expectedLanes: input.expectedLanes, lanes: input.lanes,
     backend: input.backend, totals, adoptions: input.adoptions ?? null,
+    contract: input.contract ?? null,
   };
+}
+
+/** PURE (vK9): contract.json + backends.json + shard/head.json → maskeli özet.
+ * Girdi bozuk/eksik olabilir — asla throw etmez; üçü de yoksa null. */
+export function contractStruct(stateJson: string | null, backendsJson: string | null, headJson: string | null): ContractSummary | null {
+  if (stateJson == null && backendsJson == null && headJson == null) return null;
+  const members = { pending: 0, active: 0, rejected: 0, revoked: 0, suspended: 0 };
+  try {
+    const s = JSON.parse(stateJson || "{}") as { members?: Array<{ status?: string }> };
+    for (const m of s.members || []) {
+      const k = String(m.status) as keyof typeof members;
+      if (k in members) members[k]++;
+    }
+  } catch { /* sayaçlar 0 kalır */ }
+  let fleetContractNodes = 0;
+  try {
+    const b = JSON.parse(backendsJson || "[]") as Array<{ name?: string }>;
+    fleetContractNodes = b.filter((x) => String(x?.name || "").startsWith("contract:")).length;
+  } catch { /* 0 */ }
+  let shardHeadUp = false;
+  try {
+    shardHeadUp = Boolean((JSON.parse(headJson || "{}") as { up?: boolean }).up);
+  } catch { /* false */ }
+  return { members, fleetContractNodes, shardHeadUp };
 }
 
 // ── Canlı sarmalayıcı ────────────────────────────────────────────────────────
@@ -254,5 +288,17 @@ export async function collect(opts: { tabMap?: Map<string, number> | null } = {}
 
   const backend = await fetchBackend();
   const adoptions = readAdoptions();
-  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend, adoptions });
+  const contract = readContractSummary();
+  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend, adoptions, contract });
+}
+
+/** Canlı okuyucu (vK9): env-override'lı contract dosyaları → contractStruct. READ-ONLY. */
+function readContractSummary(): ContractSummary | null {
+  const home = process.env.HOME || "";
+  const tryRead = (p: string): string | null => { try { return readFileSync(p, "utf8"); } catch { return null; } };
+  return contractStruct(
+    tryRead(process.env.CONTRACT_STATE_PATH || join(home, ".ollamas", "contract.json")),
+    tryRead(process.env.FLEET_BACKENDS_PATH || join(home, ".ollamas", "backends.json")),
+    tryRead(join(process.env.CONTRACT_SHARD_DIR || join(home, ".ollamas", "shard"), "head.json")),
+  );
 }

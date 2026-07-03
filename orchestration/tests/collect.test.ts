@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, liveTabMap, type LaneStatus } from "../bin/lib/collect";
+import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, liveTabMap, contractStruct, type LaneStatus } from "../bin/lib/collect";
 import { parseAdoptionRows, gate } from "../bin/adopt";
 
 describe("roadmapStruct", () => {
@@ -109,5 +109,31 @@ describe("liveTabMap — graceful (osascript'siz, deterministik)", () => {
       if (prev === undefined) delete process.env.ORCH_TAB_SIM;
       else process.env.ORCH_TAB_SIM = prev;
     }
+  });
+});
+
+describe("contractStruct (vK9) — maskeli pool özeti", () => {
+  it("state+backends+head → sayaçlar; email/keyId ASLA çıktıda yok", () => {
+    const state = JSON.stringify({ members: [
+      { id: "m_1", email: "a@b.co", status: "active", keyId: "key_x" },
+      { id: "m_2", email: "c@d.co", status: "pending" },
+      { id: "m_3", email: "e@f.co", status: "revoked" },
+    ]});
+    const backends = JSON.stringify([
+      { name: "windows-cuda", url: "http://x", priority: 10 },
+      { name: "contract:m_1", url: "http://y", priority: 30 },
+    ]);
+    const head = JSON.stringify({ up: true, url: "http://127.0.0.1:8085" });
+    const c = contractStruct(state, backends, head)!;
+    expect(c.members).toEqual({ pending: 1, active: 1, rejected: 0, revoked: 1, suspended: 0 });
+    expect(c.fleetContractNodes).toBe(1);
+    expect(c.shardHeadUp).toBe(true);
+    expect(JSON.stringify(c)).not.toMatch(/@|key_|olm_/); // maskeleme garantisi
+  });
+  it("bozuk girdi → throw yok, sıfır sayaçlar; hepsi null → null", () => {
+    const c = contractStruct("{not json", "garbage", "also bad")!;
+    expect(c.members.active).toBe(0);
+    expect(c.shardHeadUp).toBe(false);
+    expect(contractStruct(null, null, null)).toBeNull();
   });
 });

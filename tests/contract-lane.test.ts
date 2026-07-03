@@ -8,6 +8,7 @@ import os from "node:os";
 const DB = path.join(os.tmpdir(), `ollamas-contract-test-${process.pid}.db`);
 const STATE = path.join(os.tmpdir(), `ollamas-contract-state-${process.pid}.json`);
 const FLEET = path.join(os.tmpdir(), `ollamas-contract-fleet-${process.pid}.json`);
+const SHARD_DIR = path.join(os.tmpdir(), `ollamas-contract-shard-${process.pid}`);
 let store: typeof import("../server/store/index");
 let contract: typeof import("../server/contract");
 let doc: typeof import("../contract/src/contractdoc.ts");
@@ -16,6 +17,7 @@ beforeAll(async () => {
   process.env.SAAS_DB_PATH = DB;
   process.env.CONTRACT_STATE_PATH = STATE;
   process.env.FLEET_BACKENDS_PATH = FLEET;
+  process.env.CONTRACT_SHARD_DIR = SHARD_DIR;
   delete process.env.STRIPE_API_KEY;
   store = await import("../server/store/index");
   contract = await import("../server/contract");
@@ -25,6 +27,7 @@ beforeAll(async () => {
 });
 afterAll(() => {
   for (const f of [DB, `${DB}-wal`, `${DB}-shm`, STATE, FLEET]) try { fs.unlinkSync(f); } catch {}
+  try { fs.rmSync(SHARD_DIR, { recursive: true, force: true }); } catch {}
 });
 
 describe("contract lane service: apply → approve → key → revoke", () => {
@@ -84,6 +87,29 @@ describe("contract lane service: apply → approve → key → revoke", () => {
     expect(fleet.map((b: any) => b.name).sort()).toEqual([`contract:${memberId}`, "windows-cuda"]);
 
     expect(() => contract.contractHeartbeat("tnt_unknown", { ollamaUrl: "http://100.64.0.7:11434", models: [] })).toThrow(/active/i);
+  });
+
+  test("vK9 shard-first: healthy head serves; missing/dead head → null (fleet fallback)", async () => {
+    // no head.json → null
+    expect(await contract.tryShardGenerate({ messages: [{ role: "user", content: "x" }] })).toBeNull();
+
+    fs.mkdirSync(SHARD_DIR, { recursive: true });
+    fs.writeFileSync(path.join(SHARD_DIR, "head.json"), JSON.stringify({ up: true, url: "http://127.0.0.1:9", model: "m" }));
+    // dead head (port 9 unreachable) → null, no throw
+    expect(await contract.tryShardGenerate({ messages: [{ role: "user", content: "x" }] })).toBeNull();
+
+    // healthy head via fake fetch
+    const fakeFetch = (async (url: string) => {
+      if (String(url).endsWith("/health")) return { ok: true, status: 200, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ model: "tiny", choices: [{ message: { content: "FROM-SHARD" } }] }) };
+    }) as unknown as typeof fetch;
+    const r = await contract.tryShardGenerate({ messages: [{ role: "user", content: "x" }] }, fakeFetch);
+    expect(r?.source).toBe("shard:head");
+    expect(r?.content).toBe("FROM-SHARD");
+
+    // head marked down → null
+    fs.writeFileSync(path.join(SHARD_DIR, "head.json"), JSON.stringify({ up: false }));
+    expect(await contract.tryShardGenerate({ messages: [{ role: "user", content: "x" }] }, fakeFetch)).toBeNull();
   });
 
   test("revoke kills the key in the store too", async () => {
