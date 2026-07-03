@@ -8,6 +8,7 @@
 // without ollama; production uses embedText() against the local ollama daemon.
 import { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
+import { pickEmbedProvider, buildEmbedRequest, parseEmbedResponse } from "./embed-catalog";
 
 export type Embedder = (text: string) => Promise<number[]>;
 
@@ -29,6 +30,37 @@ export async function embedText(text: string): Promise<number[]> {
   return v;
 }
 
+/** Resolve the production embedder from the EMBED_PROVIDER pin (embed-catalog.ts).
+ *  Pinned cloud provider → OpenAI-compat /embeddings via fetch, falling back to the local
+ *  ollama embedder on ANY failure (quota/network/malformed) — the local tier is terminal
+ *  and never removed. No pin (or unusable pin) → local directly. `providerId` identifies
+ *  which provider the vectors come from so the store can enforce index consistency. */
+export function resolveEmbedder(
+  env: NodeJS.ProcessEnv = process.env,
+  deps: { fetchFn?: typeof fetch; localEmbed?: Embedder } = {},
+): { embed: Embedder; providerId: string } {
+  const local = deps.localEmbed ?? embedText;
+  const entry = pickEmbedProvider(env);
+  if (!entry) return { embed: local, providerId: "ollama-local" };
+  const fetchFn = deps.fetchFn ?? fetch;
+  const embed: Embedder = async (text) => {
+    try {
+      const req = buildEmbedRequest(entry, [text], (env[entry.envKey] || "").trim(), env);
+      const res = await fetchFn(req.url, {
+        method: "POST", headers: req.headers, body: req.body, signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`${entry.id} embeddings error ${res.status}`);
+      return parseEmbedResponse(await res.json())[0];
+    } catch (e: any) {
+      // Terminal fallback. Safe on an empty index; on a cloud-built index the store's
+      // dim/provider guards below stop a mixed-dim write before it can corrupt anything.
+      console.warn(`[RAG] ${entry.id} embed failed (${e?.message ?? e}) → local ollama fallback`);
+      return local(text);
+    }
+  };
+  return { embed, providerId: entry.id };
+}
+
 const f32 = (v: number[]) => new Uint8Array(new Float32Array(v).buffer);
 
 export interface RagStore {
@@ -43,9 +75,10 @@ export interface RagStore {
  * lazily on first index() using the embedding's dimension (so any embed model /
  * test fake works). `embed` is injectable for deterministic tests.
  */
-export function createRagStore(opts: { dbPath?: string; embed?: Embedder } = {}): RagStore {
+export function createRagStore(opts: { dbPath?: string; embed?: Embedder; embedProvider?: string } = {}): RagStore {
   const dbPath = opts.dbPath || process.env.RAG_DB_PATH || `${process.env.HOME}/.llm-mission-control/rag.db`;
   const embed = opts.embed || embedText;
+  const embedProvider = opts.embedProvider || "ollama-local";
   const db = new DatabaseSync(dbPath, { allowExtension: true });
   db.enableLoadExtension(true);
   sqliteVec.load(db);
@@ -61,6 +94,24 @@ export function createRagStore(opts: { dbPath?: string; embed?: Embedder } = {})
     return r?.v ? Number(r.v) : null;
   })();
 
+  // Embed-provider consistency (T2-F1): vectors from different providers/models are not
+  // comparable and usually differ in dims — an index is bound to the provider that built
+  // it. Legacy DBs (no stored provider) adopt the current one on first guarded call.
+  const ensureProvider = () => {
+    const r = db.prepare("SELECT v FROM rag_meta WHERE k='embed_provider'").get() as { v?: string } | undefined;
+    const stored = r?.v;
+    if (!stored) {
+      db.prepare("INSERT OR REPLACE INTO rag_meta(k,v) VALUES('embed_provider',?)").run(embedProvider);
+      return;
+    }
+    if (stored !== embedProvider) {
+      throw new Error(
+        `embed provider mismatch: store built with '${stored}', current EMBED_PROVIDER resolves to '${embedProvider}' ` +
+        `(pin EMBED_PROVIDER=${stored} or re-create the RAG db to switch)`,
+      );
+    }
+  };
+
   const ensureVec = (d: number) => {
     if (dim === null) {
       db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS rag_vec USING vec0(embedding float[${d}])`);
@@ -73,6 +124,7 @@ export function createRagStore(opts: { dbPath?: string; embed?: Embedder } = {})
 
   return {
     async index(docId, text) {
+      ensureProvider();
       const vec = await embed(text);
       ensureVec(vec.length);
       // Upsert: drop any prior vector for this doc id, then insert text + vector
@@ -88,6 +140,7 @@ export function createRagStore(opts: { dbPath?: string; embed?: Embedder } = {})
       return { id: docId, dim: vec.length };
     },
     async search(query, k = 5) {
+      ensureProvider();
       if (dim === null) return []; // nothing indexed yet
       const vec = await embed(query);
       ensureVec(vec.length);
@@ -109,10 +162,14 @@ export function createRagStore(opts: { dbPath?: string; embed?: Embedder } = {})
   };
 }
 
-// Default process-wide store for the tools (production path → embedText/ollama).
+// Default process-wide store for the tools. The embedder resolves from the EMBED_PROVIDER
+// pin (cloud free tier with local fallback); no pin keeps the prior embedText/ollama path.
 let _store: RagStore | null = null;
 function store(): RagStore {
-  if (!_store) _store = createRagStore();
+  if (!_store) {
+    const r = resolveEmbedder();
+    _store = createRagStore({ embed: r.embed, embedProvider: r.providerId });
+  }
   return _store;
 }
 export const ragIndex = (docId: string, text: string) => store().index(docId, text);
