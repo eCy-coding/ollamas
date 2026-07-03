@@ -7,7 +7,7 @@ import { MultiAgentPipeline } from "./components/MultiAgentPipeline";
 import { ReactAgentTab } from "./components/ReactAgentTab";
 import { WorkspaceTree } from "./components/WorkspaceTree";
 import { GoogleDriveBrowser } from "./components/GoogleDriveBrowser";
-import EcySearchPanel from "./components/EcySearchPanel";
+import GitHubSearchPanel from "./components/GitHubSearchPanel";
 import ECySearcherPanel from "./components/ECySearcherPanel";
 import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
 import { GoogleCalendarBrowser } from "./components/GoogleCalendarBrowser";
@@ -345,7 +345,7 @@ export default function App() {
 
           {activeTab === "search" && (
             <div className="animate-fade-in">
-              <EcySearchPanel onNotify={notify} />
+              <GitHubSearchPanel onNotify={notify} />
             </div>
           )}
 

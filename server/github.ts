@@ -257,6 +257,25 @@ export function dispatchWorkflow(owner: string, repo: string, workflowId: string
   return ghRequest<unknown>("POST", `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, token, body, signal, fetchImpl);
 }
 
+// ── Search API (GitHub Arama tab). repos/issues read anon; code REQUIRES auth. ──
+export interface RepoResult { full_name?: string; description?: string | null; stargazers_count?: number; language?: string | null; html_url?: string; updated_at?: string; }
+export interface IssueResult { title?: string; state?: string; html_url?: string; number?: number; repository_url?: string; user?: { login?: string }; pull_request?: unknown; }
+export interface CodeResult { name?: string; path?: string; html_url?: string; repository?: { full_name?: string }; }
+
+const searchPath = (kind: string, q: string, perPage: number) =>
+  `/search/${kind}?q=${encodeURIComponent(q)}&per_page=${Math.min(50, Math.max(1, perPage))}`;
+
+export function searchRepos(q: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch, perPage = 20) {
+  return ghRequestAnon<{ total_count: number; items: RepoResult[] }>("GET", searchPath("repositories", q, perPage), token, undefined, signal, fetchImpl);
+}
+export function searchIssues(q: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch, perPage = 20) {
+  return ghRequestAnon<{ total_count: number; items: IssueResult[] }>("GET", searchPath("issues", q, perPage), token, undefined, signal, fetchImpl);
+}
+export function searchCode(q: string, token: string, signal?: AbortSignal, fetchImpl?: GhFetch, perPage = 20) {
+  // Strict: code search 401s without auth. ghRequest hard-fails on empty token.
+  return ghRequest<{ total_count: number; items: CodeResult[] }>("GET", searchPath("code", q, perPage), token, undefined, signal, fetchImpl);
+}
+
 const LOG_MAX_BYTES = 64 * 1024;
 const LOG_MAX_LINES = 200;
 export interface JobLogResult { ok: boolean; text?: string; truncated?: boolean; error?: string }

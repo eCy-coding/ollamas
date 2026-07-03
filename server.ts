@@ -6,7 +6,7 @@ import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, unhandledRejectionTotal, ukpStageEventsTotal } from "./server/metrics";
 import { installProcessGuards } from "./server/process-guards";
 import { selftestProbePlan } from "./server/selftest-plan";
-import { ecySupervisor } from "./server/ecysearch";
+import { searchGitHub } from "./server/github-search";
 import { ecysearcherProxy } from "./server/ecysearcher-proxy";
 import { ecysearcherSupervisor } from "./server/ecysearcher";
 import { logger } from "./server/logger";
@@ -51,7 +51,7 @@ import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/w
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
-import { registerContractRoutes } from "./server/contract";
+import { registerContractRoutes, poolStatusReport as contractPoolStatus } from "./server/contract";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync, isLive as stripeIsLive, createAuditCheckout, dollarsToCents } from "./server/billing/stripe";
 
 const app = express();
@@ -179,10 +179,10 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
-    "/api/ecysearch", "/api/ecysearcher", "/api/threatfeed",
-    // NARROW prefix only: bare "/api/github" would also gate /api/github/webhook
+    "/api/ecysearcher", "/api/threatfeed",
+    // NARROW prefixes only: bare "/api/github" would also gate /api/github/webhook
     // (inbound FROM GitHub) and 403 it under SAAS_ENFORCE=1.
-    "/api/github/actions",
+    "/api/github/actions", "/api/github/search",
   ],
   localOwnerGuard,
 );
@@ -279,15 +279,17 @@ app.get("/api/ecysearcher/logs", async (req, res) => {
 // routes. See server/ecysearcher-proxy.ts.
 app.use("/api/ecysearcher", ecysearcherProxy);
 
-// ecysearch sub-service (supervised) — launch the external GitHub-search app under ollamas on its
-// own port, health-check + auto-restart it, surface it as the "Search" tab. Local-owner only
-// (gated above): the spawn surface is never exposed in SaaS mode.
-app.post("/api/ecysearch/start", (_req, res) => res.json(ecySupervisor.ensureRunning({ manual: true })));
-app.post("/api/ecysearch/stop", (_req, res) => res.json(ecySupervisor.stop()));
-app.get("/api/ecysearch/status", (_req, res) => res.json(ecySupervisor.status())); // ready kept live by the health loop
-app.get("/api/ecysearch/logs", (req, res) => {
-  const limit = Math.min(2000, Math.max(1, Number(req.query.limit) || 200));
-  res.json({ lines: ecySupervisor.recentLogs(limit) }); // persisted .log tail (survives restart)
+// GitHub Search (dalga-8) — first-party keyword search over the GitHub REST
+// Search API. Replaces the old ecysearch external-iframe supervisor (which
+// crash-looped when its separate checkout was missing). repos/issues read
+// unauthenticated; code search uses the vault token.
+app.get("/api/github/search", async (req, res) => {
+  const q = String(req.query.q || "");
+  const type = String(req.query.type || "repos");
+  if (!q.trim()) return res.status(400).json({ error: "'q' gerekli" });
+  try {
+    res.json(await searchGitHub({ type, q, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
+  } catch (e: any) { res.status(400).json({ error: e.message }); }
 });
 
 // Revenue Ops (Faz19) — local-owner-only personal income tooling (gated above). Produces
@@ -545,6 +547,7 @@ async function initializeServer() {
       hasBackupEnabled: db.data.backup.enabled,
       binaries: discoverBinaries(),
       db: dbUp ? "up" : "down",
+      contractPool: contractPoolStatus(), // vK16 G-A: compute-pool observability (masked counts)
     });
   });
 
