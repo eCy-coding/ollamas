@@ -46,3 +46,41 @@ describe("cloud-alt seat — free-tier API fallbacks", () => {
     expect(withoutKeys.seats.find((s) => s.capability === "cloud-alt")!.available).toBe(false);
   });
 });
+
+describe("capability-matched API fallbacks — every analysis seat survives an ollama outage", () => {
+  // embedding needs the /embed endpoint (chat façade can't serve it) and custom-review is a
+  // local fine-tune by definition — both stay local-only. Every OTHER seat must carry ≥1
+  // provider::model fallback so a failed `ollama list` (launchd PATH, GPU hiccup) can't
+  // collapse the council below full lane coverage while free-tier keys are live.
+  const LOCAL_ONLY = new Set(["embedding", "custom-review"]);
+
+  it("every non-local-only seat lists an API-routed fallback AFTER its local tags", () => {
+    for (const spec of SEAT_SPEC) {
+      if (LOCAL_ONLY.has(spec.capability)) continue;
+      const apiIdx = spec.models.findIndex((m) => parseApiModel(m));
+      expect(apiIdx, `${spec.capability} needs a provider::model fallback`).toBeGreaterThan(0);
+      // local-first: every entry before the first API fallback is a plain tag
+      for (const m of spec.models.slice(0, apiIdx)) expect(parseApiModel(m)).toBeNull();
+    }
+  });
+
+  it("ollama outage + live free-tier keys → full lane coverage, only local-only seats absent", () => {
+    const roster = buildRoster([], ["cerebras", "groq", "zai", "github-models"]);
+    for (const seat of roster.seats) {
+      if (LOCAL_ONLY.has(seat.capability)) continue;
+      expect(seat.available, `${seat.capability} should resolve via API fallback`).toBe(true);
+    }
+    expect(roster.lanesUncovered).toEqual([]);
+  });
+
+  it("local tags still win over API fallbacks when ollama answers", () => {
+    const roster = buildRoster(["qwen3-coder:30b"], ["cerebras", "groq", "zai", "github-models"]);
+    const deepCode = roster.seats.find((s) => s.capability === "deep-code")!;
+    expect(deepCode.model).toBe("qwen3-coder:30b");
+  });
+
+  it("zero keys + zero models → legacy all-absent behavior unchanged", () => {
+    const roster = buildRoster([], []);
+    expect(roster.present).toBe(0);
+  });
+});

@@ -26,6 +26,7 @@ import {
 } from "./lib/council";
 import { verify } from "../oracle/index";
 import { synthesize, renderCodePlan, type LangCount } from "./lib/synth";
+import { parseOllamaTags } from "./lib/dispatchdoctor";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -49,10 +50,21 @@ const EXT_LANG: Record<string, string> = {
 };
 
 /** Live pulled ollama models (exact tags). Falls back to empty on failure (roster surfaces gaps). */
-function liveModels(): string[] {
+/** Live model tags. Binary `ollama list` first; on failure fall back to the ollama-native
+ *  HTTP `/api/tags` — launchd's minimal PATH lacks /usr/local/bin, so under the autopilot
+ *  agent the binary is unreachable while the daemon itself is up. Without the HTTP path the
+ *  roster collapsed to API-only seats on every scheduled run (root cause, 2026-07-03). */
+async function liveModels(): Promise<string[]> {
   try {
     const out = execFileSync("ollama", ["list"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 8000 });
-    return out.split("\n").slice(1).map((l) => l.trim().split(/\s+/)[0]).filter((m) => m && m.includes(":"));
+    const models = out.split("\n").slice(1).map((l) => l.trim().split(/\s+/)[0]).filter((m) => m && m.includes(":"));
+    if (models.length) return models;
+  } catch { /* binary unreachable → HTTP fallback below */ }
+  try {
+    const host = (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
+    const r = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return [];
+    return parseOllamaTags(await r.text());
   } catch { return []; }
 }
 
@@ -256,7 +268,7 @@ function nowIso(): string {
 
 async function main(): Promise<void> {
   const ts = nowIso();
-  const models = liveModels();
+  const models = await liveModels();
   const roster = buildRoster(models, await readyApiProviders());
   writeRoster(roster, ts);
 

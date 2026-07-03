@@ -17,6 +17,10 @@ case "$ACTION" in
     # tsx shebang `env node` launchd'nin minimal PATH'inde çözülmez (mise/nvm/brew node) → exit 127.
     # node dizinini dinamik türet + plist EnvironmentVariables PATH'ine enjekte et (portable; sabit-path yok).
     NODE_DIR="$(dirname "$(command -v node)")"
+    # `ollama` binary aynı tuzağa düşer: /usr/local/bin (brew: /opt/homebrew/bin) minimal PATH'te
+    # yok → council `ollama list` boş → roster her zamanlanmış koşuda çöküyordu (kök neden 2026-07-03).
+    OLLAMA_DIR=""
+    if command -v ollama >/dev/null 2>&1; then OLLAMA_DIR="$(dirname "$(command -v ollama)"):"; fi
     cat > "$DEST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -30,7 +34,7 @@ case "$ACTION" in
     <string>--heal</string>
     <string>--quiet</string>
   </array>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>${NODE_DIR}:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>${NODE_DIR}:${OLLAMA_DIR}/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <key>WorkingDirectory</key><string>${WT}</string>
   <key>WatchPaths</key><array><string>${HOME}/.llm-mission-control</string></array>
   <key>StartInterval</key><integer>1800</integer>

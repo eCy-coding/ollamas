@@ -47,27 +47,43 @@ export const LANES = ["backend", "frontend", "cli", "scripts", "integrations", "
 
 // Capability→model preference. Ordered: strongest/cheapest-appropriate first, then fallbacks.
 // Cloud tags cost no local RAM (host is RAM-bound) so they lead where correctness matters.
+// Every analysis seat carries capability-matched FREE-tier `provider::model` fallbacks
+// (key-gated via /api/keys/pool) AFTER its local tags, so a failed `ollama list` (launchd
+// PATH, GPU hiccup) or true ollama outage cannot collapse the council while keys are live.
+// Provider load spread honors free-tier quotas: cerebras (1M tok/day) heavy code/reasoning,
+// groq (fast, ~1K RPD) short verify/triage, zai (200K ctx) long-context sweeps,
+// github-models (~50 RPD) sparse last-resort only.
 export const SEAT_SPEC: SeatSpec[] = [
   { capability: "deep-code", role: "architect", responsibility: "Derin kod-tasarım + mimari (server/backend, protocol)",
-    lanes: ["backend", "integrations"], models: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest"] },
+    lanes: ["backend", "integrations"], models: ["qwen3-coder:480b-cloud", "qwen3-coder:30b", "qwen3-coder-64k:latest",
+      "cerebras::gpt-oss-120b", "zai::glm-4.7-flash"] },
   { capability: "long-ctx-code", role: "analyst", responsibility: "Uzun/çok-dosya kod sweep (64k ctx whole-lane)",
-    lanes: ["backend", "orchestration"], models: ["qwen3-coder-64k:latest", "qwen3-coder:30b"] },
+    lanes: ["backend", "orchestration"], models: ["qwen3-coder-64k:latest", "qwen3-coder:30b",
+      "zai::glm-4.7-flash"] },
   { capability: "local-code", role: "coder", responsibility: "cli/scripts lane kod analizi + bug-detect",
-    lanes: ["cli", "scripts"], models: ["qwen3-coder:30b", "qwen3-coder-64k:latest"] },
+    lanes: ["cli", "scripts"], models: ["qwen3-coder:30b", "qwen3-coder-64k:latest",
+      "cerebras::gpt-oss-120b", "groq::llama-3.3-70b-versatile"] },
   { capability: "reasoning", role: "verifier", responsibility: "Root-cause + mantıksal invariant + algoritma doğrulama",
-    lanes: LANES, models: ["deepseek-r1:32b", "qwen3:30b-a3b"] },
+    lanes: LANES, models: ["deepseek-r1:32b", "qwen3:30b-a3b",
+      "cerebras::gpt-oss-120b", "github-models::openai/gpt-4o-mini"] },
   { capability: "vision", role: "analyst", responsibility: "web/frontend UI + diagram + screenshot analizi",
-    lanes: ["frontend"], models: ["qwen2.5vl:32b", "qwen2.5vl:7b"] },
+    lanes: ["frontend"], models: ["qwen2.5vl:32b", "qwen2.5vl:7b",
+      "github-models::openai/gpt-4o-mini"] },
   { capability: "moe-mid", role: "analyst", responsibility: "orchestration lane + cross-lane dep-graph",
-    lanes: ["orchestration"], models: ["qwen3:30b-a3b", "gpt-oss:20b"] },
+    lanes: ["orchestration"], models: ["qwen3:30b-a3b", "gpt-oss:20b",
+      "zai::glm-4.7-flash"] },
   { capability: "fast-verify", role: "reviewer", responsibility: "Hızlı review + council verifier koltuğu (champion)",
-    lanes: LANES, models: ["qwen3:8b", "qwen3:8b-16k", "qwen3:4b"] },
+    lanes: LANES, models: ["qwen3:8b", "qwen3:8b-16k", "qwen3:4b",
+      "groq::llama-3.3-70b-versatile"] },
   { capability: "cheap-triage", role: "triage", responsibility: "Bulgu sınıflandırma + önceliklendirme",
-    lanes: LANES, models: ["qwen3:4b", "phi4:latest"] },
+    lanes: LANES, models: ["qwen3:4b", "phi4:latest",
+      "groq::llama-3.3-70b-versatile"] },
   { capability: "adversarial", role: "adversary", responsibility: "Adversarial ikinci-görüş (best-of-N refute)",
-    lanes: LANES, models: ["gpt-oss:120b-cloud", "gpt-oss:20b", "gpt-oss:20b-cloud"] },
+    lanes: LANES, models: ["gpt-oss:120b-cloud", "gpt-oss:20b", "gpt-oss:20b-cloud",
+      "cerebras::gpt-oss-120b"] },
   { capability: "big-reasoning", role: "adversary", responsibility: "Bağımsız çapraz-kontrol (majority-vote üyesi)",
-    lanes: LANES, models: ["llama3.3:70b", "deepseek-r1:32b"] },
+    lanes: LANES, models: ["llama3.3:70b", "deepseek-r1:32b",
+      "cerebras::gpt-oss-120b"] },
   { capability: "cloud-alt", role: "analyst", responsibility: "Cloud yük dengeleme / paralel koltuk (bench)",
     lanes: ["bench"],
     // Ollama-cloud tags first (proven seats); then FREE-tier API providers (server
@@ -76,9 +92,12 @@ export const SEAT_SPEC: SeatSpec[] = [
     models: ["kimi-k2.5:cloud", "qwen3-coder:480b-cloud",
       "groq::llama-3.3-70b-versatile", "cerebras::gpt-oss-120b", "zai::glm-4.7-flash"] },
   { capability: "small-logic", role: "analyst", responsibility: "Hafif mantık kontrolü (scripts)",
-    lanes: ["scripts"], models: ["phi4:latest", "qwen3:4b"] },
+    lanes: ["scripts"], models: ["phi4:latest", "qwen3:4b",
+      "groq::llama-3.3-70b-versatile"] },
+  // embedding needs the /embed endpoint (chat façade can't serve it) → local-only by design.
   { capability: "embedding", role: "search", responsibility: "Semantik kod-arama + duplikat tespiti",
     lanes: LANES, models: ["nomic-embed-text:latest", "nomic-embed-text"] },
+  // custom-review is a local fine-tune by definition — remote can't be the fine-tune → local-only.
   { capability: "custom-review", role: "reviewer", responsibility: "Proje-özel fine-tuned review",
     lanes: LANES, models: ["ollamas-reviewer:latest", "qwen3:8b"] },
 ];
