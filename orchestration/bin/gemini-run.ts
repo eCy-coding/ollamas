@@ -21,7 +21,8 @@ import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted }
 import { focusFile, geminiGroundedPrompt } from "./lib/fleet-prompt";
 import { guardQuota, noteOutcome, loadQuota, remaining, todayKey } from "./lib/gemini-quota";
 import { loadBudget, remaining as vendorRemaining, defaultLimitFor, pickVendor, guardVendor, noteVendorOutcome, isVendorExhausted } from "./lib/vendor-budget";
-import { STREAMS } from "./lib/fleet-plan";
+import { apiVendorCandidates, isActionableProposal, extractProposalText } from "./lib/vendor-propose";
+import { isTransient, fullJitterDelay } from "./lib/backoff";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
@@ -96,60 +97,63 @@ function dispatch(prompt: string): { ok: boolean; model: string; text: string; e
   return { ok: false, model: MODEL, text: "", err: lastErr };
 }
 
-/** The stream's free-tier API-worker fallback vendors (its `provider::model` prefer-tails), in pref order. */
-function apiCandidates(stream: string): { vendor: string; model: string }[] {
-  const spec = STREAMS.find((s) => s.id === stream);
-  if (!spec) return [];
-  const seen = new Set<string>();
-  const out: { vendor: string; model: string }[] = [];
-  for (const p of spec.prefer) {
-    const [vendor, model] = p.split("::"); // "provider::model" — split, not slice (delimiter is 2 chars)
-    if (model && !seen.has(vendor)) { seen.add(vendor); out.push({ vendor, model }); }
-  }
-  return out;
-}
-
-/** Gemini's day is spent → produce the SAME grounded proposal from the best available free-tier API vendor.
- *  Reuses the fleet transport (scripts/agent-dispatch.mjs → server /api/agent/chat, read-only `--no-apply`)
- *  and the identical grounded prompt, so the output is apply-ready exactly like the gemini path. Budget-gated
- *  + recorded per vendor (429 latches it). Returns the written work-dir or an error. */
-function poolPropose(stream: string, prompt: string): { ok: boolean; vendor?: string; model?: string; dir?: string; text?: string; err?: string } {
-  const cands = apiCandidates(stream);
-  if (!cands.length) return { ok: false, err: `no free-tier API vendor configured for "${stream}"` };
-  const today = todayKey();
-  const pick = pickVendor(cands.map((c) => c.vendor), loadBudget(BUDGET_FILE), today, cands.map((c) => c.vendor));
-  if (!pick) return { ok: false, err: "whole free-tier pool exhausted — resets tomorrow" };
-  const model = cands.find((c) => c.vendor === pick)!.model;
-  const guard = guardVendor(BUDGET_FILE, pick, today);
-  if (!guard.allowed) return { ok: false, err: guard.msg };
-  const root = join(WORK, `${stream}.${pick}`);
-  mkdirSync(root, { recursive: true });
+/** One dispatch to an API vendor via the fleet transport (agent-dispatch → server /api/agent/chat, read-only).
+ *  Classifies the outcome so the caller can retry (transient), fail over (exhausted), or accept (text). */
+function dispatchVendorOnce(vendor: string, model: string, prompt: string, root: string): { text: string; exhausted: boolean; transient: boolean; err?: string } {
   try {
     const out = execFileSync("node", [
       join(REPO, "scripts", "agent-dispatch.mjs"), prompt,
-      "--provider", pick, "--model", model, "--steps", "1", "--root", root, "--no-apply", "--json",
+      "--provider", vendor, "--model", model, "--steps", "1", "--root", root, "--no-apply", "--json",
     ], { encoding: "utf8", timeout: 300_000, env: { ...process.env, OLLAMAS_URL }, maxBuffer: 8 * 1024 * 1024 });
-    const text = extractProposalText(out);
-    noteVendorOutcome(BUDGET_FILE, pick, "success", today);
-    return { ok: true, vendor: pick, model, dir: root, text };
+    return { text: extractProposalText(out), exhausted: false, transient: false };
   } catch (e: any) {
-    const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
-    if (isVendorExhausted(blob)) { noteVendorOutcome(BUDGET_FILE, pick, "exhausted", today); return { ok: false, err: `${pick} exhausted (429) — ${blob.slice(0, 120)}` }; }
     // agent-dispatch exits 1 on a valid 0-step PROPOSE answer; the JSON report is still on stdout → use it.
     const stdout = typeof e?.stdout === "string" ? e.stdout : "";
     const text = stdout ? extractProposalText(stdout) : "";
-    if (text) { noteVendorOutcome(BUDGET_FILE, pick, "success", today); return { ok: true, vendor: pick, model, dir: root, text }; }
-    return { ok: false, err: `${pick} dispatch failed — ${blob.slice(0, 160)}` };
+    if (text) return { text, exhausted: false, transient: false };
+    const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
+    if (isVendorExhausted(blob)) return { text: "", exhausted: true, transient: false, err: blob.slice(0, 160) };
+    return { text: "", exhausted: false, transient: isTransient(blob), err: blob.slice(0, 160) };
   }
 }
 
-/** Pull the model's proposal body out of an agent-dispatch --json report (messages joined; SR/Change text). */
-function extractProposalText(out: string): string {
-  try {
-    const j = JSON.parse(out);
-    const msgs = Array.isArray(j.messages) ? j.messages.map(String).join("\n").trim() : "";
-    return msgs;
-  } catch { return ""; }
+/** Gemini's day is spent → produce the SAME grounded proposal from the free-tier API pool, RELIABLY:
+ *  iterate the stream's vendors in most-remaining-budget order; per vendor retry transient failures with
+ *  jittered backoff; latch + fail over on a real 429; and — crucially — only ACCEPT an answer that is an
+ *  actionable SEARCH/REPLACE proposal (never write/return an empty or prose body → the vО60 empty-success bug).
+ *  Reuses the identical grounded prompt so the output is apply-ready exactly like the gemini path. */
+function poolPropose(stream: string, prompt: string): { ok: boolean; vendor?: string; model?: string; dir?: string; text?: string; err?: string } {
+  const cands = apiVendorCandidates(stream);
+  if (!cands.length) return { ok: false, err: `no free-tier API vendor configured for "${stream}"` };
+  const today = todayKey();
+  const tried = new Set<string>();
+  let lastErr = "no free-tier vendor produced an actionable proposal";
+  for (;;) {
+    const left = cands.filter((c) => !tried.has(c.vendor));
+    if (!left.length) break;
+    const pick = pickVendor(left.map((c) => c.vendor), loadBudget(BUDGET_FILE), today, left.map((c) => c.vendor));
+    if (!pick) { lastErr = "whole free-tier pool exhausted — resets tomorrow"; break; }
+    tried.add(pick);
+    if (!guardVendor(BUDGET_FILE, pick, today).allowed) { lastErr = `${pick} daily budget spent`; continue; }
+    const model = left.find((c) => c.vendor === pick)!.model;
+    const root = join(WORK, `${stream}.${pick}`);
+    mkdirSync(root, { recursive: true });
+    // transient-retry (503/timeout/network) with full-jitter backoff — a single hiccup must not sink the run.
+    let res = dispatchVendorOnce(pick, model, prompt, root);
+    for (let attempt = 0; res.transient && attempt < 2; attempt++) {
+      const d = fullJitterDelay(attempt, 1500, 20_000);
+      console.error(`[gemini-run] ${pick} transient (${(res.err ?? "").slice(0, 50)}) → backoff ${(d / 1000).toFixed(1)}s …`);
+      try { execFileSync("sleep", [String(Math.max(1, Math.ceil(d / 1000)))]); } catch { /* best-effort */ }
+      res = dispatchVendorOnce(pick, model, prompt, root);
+    }
+    if (res.exhausted) { noteVendorOutcome(BUDGET_FILE, pick, "exhausted", today); lastErr = `${pick} exhausted (429)`; continue; }
+    if (res.transient) { lastErr = `${pick} transient failures — ${res.err}`; continue; } // fail over (retries spent)
+    // A request completed (quota consumed) → count it truthfully; but ONLY accept + write an ACTIONABLE proposal.
+    noteVendorOutcome(BUDGET_FILE, pick, "success", today);
+    if (isActionableProposal(res.text)) return { ok: true, vendor: pick, model, dir: root, text: res.text };
+    lastErr = `${pick} returned a non-actionable proposal (no SEARCH/REPLACE)`;
+  }
+  return { ok: false, err: lastErr };
 }
 
 // ── --propose <stream>: grounded fleet proposal into the work-dir ─────────────────────────────────────
