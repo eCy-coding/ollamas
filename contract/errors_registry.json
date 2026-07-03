@@ -77,6 +77,24 @@
       "title": "Distinct-loopback cross-host sim needs a macOS lo0 alias (sudo)",
       "detail": "Simulating true cross-host (distinct HOSTS not just ports) on one macOS box needs `sudo ifconfig lo0 alias 127.0.0.2` — a one-time sudo, not a 2nd machine. Linux binds 127/8 freely.",
       "prevention_rule": "Cross-host ENDPOINT path is unit-proven (buildHeadPlan/preflight over mesh IPs); the distinct-host runtime sim is opt-in (SHARD_SIM_HOSTS) — real multi-host token generation still needs a 2nd device."
+    },
+    {
+      "id": "ERR-CONTRACT-014",
+      "title": "Invite expired or already redeemed",
+      "detail": "Invites are single-use + short-TTL (default 15m). apply-with-invite returns 403 (expired) or 409 (replay/already-redeemed). Not a code bug — mint a fresh invite.",
+      "prevention_rule": "Operator mints a fresh `contract invite` per device; the device runs bootstrap promptly. Invites are NOT reusable across devices."
+    },
+    {
+      "id": "ERR-CONTRACT-015",
+      "title": "apply-with-invite 401 after operator key rotation / no operator key",
+      "detail": "The server verifies invites with the operator key (~/.ollamas/contract-operator-key.json). If the key was rotated (epoch bumped) OR the invite was minted on a different machine, verify fails (stale epoch / bad signature → 401).",
+      "prevention_rule": "Mint invites on the SAME machine that runs the pool server (shared operator key file). Rotation is intentional (kill switch) — re-mint after rotating."
+    },
+    {
+      "id": "ERR-CONTRACT-016",
+      "title": "bootstrap mesh-join skipped / run on the operator box",
+      "detail": "bootstrap's mesh-join runs `tailscale up --authkey` ONLY when CONTRACT_TAILSCALE_AUTHKEY + CONTRACT_HEADSCALE_URL are set; otherwise it SKIPs (already-on-mesh or operator box). Running it on a machine already on the tailnet would be redundant/disruptive.",
+      "prevention_rule": "Set the two mesh env vars ONLY on a fresh device joining a new tailnet; omit them when the machine is already meshed (SKIP is correct)."
     }
   ]
 }

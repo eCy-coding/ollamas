@@ -41,6 +41,37 @@ curl -s $OLLAMAS_URL/api/pool/generate -H "Authorization: Bearer olm_…" \
 contract watch                            # live liveness monitor (member drop → re-run shard up)
 ```
 
+## Recipe 4 — Turnkey 2-command onboarding (vK17, minimum-manual)
+
+The fastest path: an operator-signed invite pre-authorizes the device, so it
+auto-activates (no async manual approve). TWO commands total.
+
+### Operator (one command → a token)
+```bash
+contract server install                      # pool always-up (once)
+contract invite --model qwen3:4b --ttl 15    # → prints a single-use, 15-min invite token
+# (mesh) run headscale + mint a tailnet authkey for the device:
+headscale preauthkeys create --user ollamas --reusable --expiration 1h
+```
+Hand the device: the invite token + the headscale URL + the tailnet authkey.
+
+### Device (one command → contributing)
+```bash
+export CONTRACT_HEADSCALE_URL=http://<operator>.local:8080
+export CONTRACT_TAILSCALE_AUTHKEY=<authkey>        # omit both if already on the mesh
+contract bootstrap <invite-token>
+#   → mesh-join → build-check (RPC llama.cpp) → apply-with-invite (AUTO-approved,
+#     key saved 0600) → offer (rpc + heartbeat daemons) → permanent pool member
+```
+The device is now active in the pool immediately — no operator approve step. The
+operator then `contract shard up --from-pool` includes it.
+
+### Kill switch (operator)
+```bash
+contract invite rotate    # new operator key + epoch → ALL outstanding invites invalid at once
+contract revoke <m_id>    # revoke a specific member
+```
+
 ## Recipe 2 — Single-machine split proof (no 2nd device)
 ```bash
 contract shard proof qwen3:4b   # 2 local rpc-servers + head; BOTH rpc logs grow = split live

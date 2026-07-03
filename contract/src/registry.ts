@@ -31,7 +31,26 @@ export type Member = {
   lastHeartbeat?: string;
 };
 
-export type RegistryState = { members: Member[] };
+export type RedeemedInvite = { jti: string; memberId: string; redeemedAt: string; expiresAt: string };
+export type RegistryState = { members: Member[]; usedInvites?: RedeemedInvite[] };
+
+/** vK17 single-use invite tracking (replay guard). Pure. */
+export function isInviteUsed(state: RegistryState, jti: string): boolean {
+  return (state.usedInvites || []).some((u) => u.jti === jti);
+}
+
+export function markInviteUsed(state: RegistryState, entry: RedeemedInvite): RegistryState {
+  return { ...state, usedInvites: [...(state.usedInvites || []), entry] };
+}
+
+/** Drop redeemed-invite records whose invite has expired — bounded growth (RISK-K19). */
+export function pruneExpiredInvites(state: RegistryState, nowMs: number): RegistryState {
+  const kept = (state.usedInvites || []).filter((u) => {
+    const exp = Date.parse(u.expiresAt);
+    return Number.isFinite(exp) && exp > nowMs;
+  });
+  return { ...state, usedInvites: kept };
+}
 
 export type ApplyInput = {
   email: string;

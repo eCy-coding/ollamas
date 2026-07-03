@@ -16,6 +16,8 @@ export type NodeConfig = {
   model?: string; // preferred model to offer/serve
   serverUrl?: string; // operator: the ollamas pool server URL (0-manual, no per-run env)
   headLayers?: number; // operator: default shard head layer count
+  operatorPubkey?: string; // operator: published invite-verify key (info; server uses opkey file)
+  operatorEpoch?: number; // operator: current invite epoch
 };
 
 /** Operator/member resolve the pool server URL: explicit env > persisted config >

@@ -286,3 +286,66 @@ describe("vK16 G-A observability", () => {
     expect(json).not.toContain("key_");
   });
 });
+
+describe("vK17 auto-approve on operator invite", () => {
+  let opkey: typeof import("../contract/src/opkey.ts");
+  let invite: typeof import("../contract/src/invite.ts");
+  const OP_PATH = path.join(os.tmpdir(), `ollamas-opkey-${process.pid}.json`);
+
+  beforeAll(async () => {
+    process.env.CONTRACT_OPERATOR_KEY = OP_PATH;
+    opkey = await import("../contract/src/opkey.ts");
+    invite = await import("../contract/src/invite.ts");
+  });
+  afterAll(() => { try { fs.unlinkSync(OP_PATH); } catch {} });
+
+  function mkToken(over: any = {}) {
+    const op = opkey.loadOrCreateOperatorKey(OP_PATH);
+    const now = Date.now();
+    const payload = {
+      v: 1 as const, jti: "j-" + Math.random().toString(36).slice(2), iat: new Date(now).toISOString(),
+      expiresAt: new Date(now + 15 * 60000).toISOString(), quotaReqPerDay: 500,
+      contractHash: doc.currentContractHash(), serverUrl: "http://127.0.0.1:3000", epoch: op.epoch, ...over,
+    };
+    return { token: invite.mintInvite(payload, op.privateKeyPem), payload };
+  }
+  const machine = (pk: string) => ({ email: `dev-${pk.slice(0, 4)}@x.co`, machinePubkey: pk, specs: { ramGB: 16, os: "darwin", arch: "arm64" } });
+
+  test("valid invite → auto-active + key (no manual approve); quota from invite; single-use", async () => {
+    const { token } = mkToken();
+    const r = await contract.contractApplyWithInvite(token, machine("a1".repeat(32)));
+    expect(r.rawKey).toMatch(/^olm_/);
+    const m = contract.contractList().find((x) => x.id === r.memberId);
+    expect(m?.status).toBe("active"); // auto-approved, no manual step
+    expect((await store.resolveKey(r.rawKey))?.keyId).toBe(r.keyId);
+    // replay same token → 409 single-use
+    await expect(contract.contractApplyWithInvite(token, machine("a2".repeat(32)))).rejects.toMatchObject({ status: 409 });
+  });
+
+  test("expired invite → 403; forged (wrong key) → 401; kill-switch → 503", async () => {
+    const expired = mkToken({ expiresAt: new Date(Date.now() - 1000).toISOString() });
+    await expect(contract.contractApplyWithInvite(expired.token, machine("b1".repeat(32)))).rejects.toMatchObject({ status: 403 });
+
+    const otherOp = (await import("../contract/src/identity.ts")).generateIdentity();
+    const forged = invite.mintInvite({ ...expired.payload, expiresAt: new Date(Date.now() + 60000).toISOString(), jti: "forge1" } as any, otherOp.privateKeyPem);
+    await expect(contract.contractApplyWithInvite(forged, machine("b2".repeat(32)))).rejects.toMatchObject({ status: 401 });
+
+    const prev = process.env.AUTO_APPROVE_INVITE;
+    process.env.AUTO_APPROVE_INVITE = "off";
+    try {
+      const { token } = mkToken();
+      await expect(contract.contractApplyWithInvite(token, machine("b3".repeat(32)))).rejects.toMatchObject({ status: 503 });
+    } finally {
+      if (prev === undefined) delete process.env.AUTO_APPROVE_INVITE; else process.env.AUTO_APPROVE_INVITE = prev;
+    }
+  });
+
+  test("audit records the invite-driven activation (actor:invite), secret-free", async () => {
+    const { token } = mkToken();
+    const r = await contract.contractApplyWithInvite(token, machine("c1".repeat(32)));
+    const rows = contract.contractAuditLog(1000).filter((e: any) => e.memberId === r.memberId);
+    expect(rows.map((e: any) => e.action)).toEqual(expect.arrayContaining(["apply", "approve"]));
+    expect(rows.every((e: any) => e.actor === "invite")).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain("olm_");
+  });
+});

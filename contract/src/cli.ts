@@ -64,6 +64,7 @@ async function main(): Promise<number> {
     options: {
       email: { type: "string" }, json: { type: "boolean", default: false }, timeout: { type: "string" },
       port: { type: "string" }, host: { type: "string" }, device: { type: "string" }, model: { type: "string" }, "from-pool": { type: "boolean", default: false },
+      ttl: { type: "string" }, quota: { type: "string" },
     },
   });
   const [cmd, id] = positionals;
@@ -516,6 +517,96 @@ async function main(): Promise<number> {
       await new Promise(() => {});
       return 0;
     }
+    case "invite": {
+      // vK17 (operator): mint a signed, single-use, short-TTL pre-approval token.
+      // Minting IS the operator's consent → the device auto-activates, no manual approve.
+      const { loadOrCreateOperatorKey } = await import("./opkey.ts");
+      const { mintInvite } = await import("./invite.ts");
+      const { saveNodeConfig, loadNodeConfig } = await import("./node-config.ts");
+      const { randomBytes } = await import("node:crypto");
+      if (id === "rotate") {
+        const { rotateOperatorKey } = await import("./opkey.ts");
+        const k = rotateOperatorKey();
+        const cfg = loadNodeConfig().config;
+        saveNodeConfig({ ...cfg, operatorPubkey: k.publicKeyHex, operatorEpoch: k.epoch });
+        console.log(`operator key rotated → epoch ${k.epoch}. ALL outstanding invites are now invalid (kill switch).`);
+        return 0;
+      }
+      const op = loadOrCreateOperatorKey();
+      const cfg = loadNodeConfig().config;
+      saveNodeConfig({ ...cfg, operatorPubkey: op.publicKeyHex, operatorEpoch: op.epoch });
+      const ttlMin = Number(values.ttl || 15);
+      const now = Date.now();
+      const doc = await http("GET", "/api/contract/document").catch(() => ({ hash: "" }));
+      const token = mintInvite({
+        v: 1, jti: randomBytes(8).toString("hex"), iat: new Date(now).toISOString(),
+        expiresAt: new Date(now + ttlMin * 60000).toISOString(),
+        quotaReqPerDay: Number(values.quota || 1000),
+        allowedModel: values.model ? String(values.model) : undefined,
+        contractHash: String((doc as any).hash || ""),
+        serverUrl: BASE, epoch: op.epoch,
+      }, op.privateKeyPem);
+      console.log(token);
+      console.error(`invite minted (TTL ${ttlMin}m, single-use). On the 2nd device:\n  contract bootstrap ${token.slice(0, 24)}…\nMesh: run headscale + 'headscale preauthkeys create --user ollamas --reusable --expiration 1h', hand that authkey to the device.`);
+      return 0;
+    }
+    case "bootstrap": {
+      // vK17 (device): ONE command — mesh-join + build + auto-approve + offer.
+      const token = id || "";
+      if (!token) { console.error("usage: contract bootstrap <invite-token>  (get it from the operator: contract invite)"); return 2; }
+      const { runBootstrap, decodeInviteServerUrl } = await import("./bootstrap.ts");
+      const os = await import("node:os");
+      const { writeFileSync: wf, mkdirSync: mk, existsSync } = await import("node:fs");
+      const { dirname: dn } = await import("node:path");
+      const shard = await import("./shard.ts");
+      const decoded = decodeInviteServerUrl(token);
+      if (!decoded) { console.error("malformed invite token"); return 1; }
+      const identity = loadOrCreateIdentity();
+      const result = await runBootstrap({
+        invite: token,
+        steps: {
+          // mesh-join: only when an authkey is provided (CONTRACT_TAILSCALE_AUTHKEY);
+          // on the operator box or when already on the mesh, SKIP (don't disrupt).
+          meshJoin: async () => {
+            const authkey = process.env.CONTRACT_TAILSCALE_AUTHKEY;
+            const loginServer = process.env.CONTRACT_HEADSCALE_URL;
+            if (!authkey || !loginServer) return "SKIP (already on mesh, or set CONTRACT_TAILSCALE_AUTHKEY + CONTRACT_HEADSCALE_URL)";
+            const { execFileSync } = await import("node:child_process");
+            execFileSync("tailscale", ["up", "--login-server", loginServer, "--authkey", authkey, "--accept-routes"], { stdio: "pipe" });
+            return `joined mesh via ${loginServer}`;
+          },
+          ensureRpc: async () => {
+            const { execFileSync } = await import("node:child_process");
+            const { fileURLToPath } = await import("node:url");
+            const bin = shard.resolveShardBinary("rpc-server");
+            let has = existsSync(bin);
+            if (!has) { try { execFileSync("which", ["rpc-server"], { stdio: "pipe" }); has = true; } catch { has = false; } }
+            if (has) return "rpc-server present";
+            const script = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "build-llamacpp.sh");
+            execFileSync("bash", [script], { stdio: "inherit" });
+            return "built RPC llama.cpp";
+          },
+          applyWithInvite: async (serverUrl, tok, _model) => {
+            const res = await fetch(`${serverUrl}/api/contract/apply-with-invite`, {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ invite: tok, email: values.email || `device-${identity.publicKeyHex.slice(0, 8)}@bootstrap.local`, machinePubkey: identity.publicKeyHex, specs: { ramGB: Math.round(os.totalmem() / 1024 ** 3), os: os.platform(), arch: os.arch() } }),
+            });
+            const j = (await res.json()) as { key?: string; error?: string };
+            if (!res.ok || !j.key) throw new Error(`apply-with-invite → ${res.status}: ${j.error || "no key"}`);
+            mk(dn(KEY_PATH), { recursive: true }); wf(KEY_PATH, j.key + "\n", { mode: 0o600 });
+            return j.key;
+          },
+          offer: async (model) => {
+            process.env.OLLAMAS_URL = decoded.serverUrl;
+            return runSelf(["offer", ...(model ? ["--model", model] : [])]);
+          },
+        },
+      });
+      for (const s of result.steps) console.error(`  ${s.name}: ${s.detail}`);
+      if (result.ok) console.log("bootstrap complete — this machine is now a permanent pool member (auto-approved via invite)");
+      else console.error(`bootstrap failed: ${result.reason}`);
+      return result.ok ? 0 : 1;
+    }
     case "server": {
       // G1 (operator): launchd daemon for the ollamas POOL SERVER so the pool is
       // always up (survives reboot) — the #1 0-manual gap. Also persists operator
@@ -552,7 +643,7 @@ async function main(): Promise<number> {
       return r.ok ? 0 : 1;
     }
     default:
-      console.error("usage: contract server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
+      console.error("usage: contract invite [--model M --ttl 15 --quota 1000 | rotate]  (operator: mint pre-approval) | bootstrap <token>  (device: one-command turnkey join) | server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | watch [once]  (liveness monitor) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
       return 2;
   }
 }

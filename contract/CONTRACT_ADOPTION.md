@@ -14,3 +14,14 @@ SPDX ids EXACT (kategori kelimesi 'permissive/free' GEÇERSİZ — RISK-ORCH-017
 
 Not: `backend/` altındaki p2p_network.go / hardware_orchestrator.rs / MultiLevelReward.sol
 stub'ları bu lane tarafından KULLANILMAZ (unwired, YAGNI).
+
+## vK17 invite-onboarding riskleri (auto-approve-on-signed-invite)
+- **RISK-K17** çalınmış-pre-redeem invite → süresi dolana kadar sahte node auto-active olabilir.
+  Azaltma: TTL ≤15dk (default) + single-use jti + quota-cap + revoke.
+- **RISK-K18** operatör-key compromise = tam admin (keyfi invite mint). Azaltma: 0600 dosya
+  (member-identity ile aynı seviye; passphrase/Keychain "0-manuel"i kırar — dürüst-limit);
+  `contract invite rotate` = kill-switch (epoch++, tüm invite'lar geçersiz).
+- **RISK-K19** usedInvites sınırsız büyüme → `pruneExpiredInvites` her redeem'de süresi-geçenleri düşer.
+- **RISK-K20** eski-epoch invite (sızmış key-backup'tan) → payload'da epoch gömülü, verify stale-epoch reddeder.
+Manuel-kalan (tasarım): invite-siz üyelik (async adminGuard yolu korunur), operatör-key rotation,
+suspend/rotate/revoke (adminGuard). Auto-approve YALNIZ geçerli-imzalı-invite ile.

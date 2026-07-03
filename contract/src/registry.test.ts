@@ -9,6 +9,9 @@ import {
   suspendMember,
   resumeMember,
   rotateMemberKey,
+  isInviteUsed,
+  markInviteUsed,
+  pruneExpiredInvites,
   getMember,
   listByStatus,
 } from "./registry.ts";
@@ -130,4 +133,15 @@ test("state is not mutated in place (pure)", () => {
   const s2 = approveMember(s1, member.id, { keyId: "k1", tenantId: "t1" }, NOW);
   assert.equal(getMember(s1, member.id)?.status, "pending");
   assert.equal(getMember(s2, member.id)?.status, "active");
+});
+
+test("usedInvites: mark → isInviteUsed true; prune drops expired (vK17)", () => {
+  const s0 = emptyState();
+  assert.equal(isInviteUsed(s0, "j1"), false);
+  const s1 = markInviteUsed(s0, { jti: "j1", memberId: "m_1", redeemedAt: NOW, expiresAt: "2026-07-03T10:15:00.000Z" });
+  assert.equal(isInviteUsed(s1, "j1"), true);
+  const s2 = markInviteUsed(s1, { jti: "j2", memberId: "m_2", redeemedAt: NOW, expiresAt: "2026-07-03T09:00:00.000Z" }); // already past
+  const pruned = pruneExpiredInvites(s2, Date.parse("2026-07-03T10:00:00.000Z"));
+  assert.equal(isInviteUsed(pruned, "j1"), true);  // still valid window
+  assert.equal(isInviteUsed(pruned, "j2"), false); // expired → pruned
 });

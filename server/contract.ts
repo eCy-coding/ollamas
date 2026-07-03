@@ -11,10 +11,15 @@ import {
   suspendMember,
   resumeMember,
   getMember,
+  isInviteUsed,
+  markInviteUsed,
+  pruneExpiredInvites,
   type RegistryState,
   type Member,
 } from "../contract/src/registry.ts";
 import { approveWithKey, revokeWithKey, rotateWithKey, type KeyBridge } from "../contract/src/keys.ts";
+import { verifyInvite } from "../contract/src/invite.ts";
+import { loadOrCreateOperatorKey } from "../contract/src/opkey.ts";
 import { recordContractAudit, readContractAudit, type AuditAction } from "../contract/src/audit.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
 import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota, type HeartbeatInput } from "../contract/src/pool.ts";
@@ -118,6 +123,49 @@ export function contractApprove(memberId: string): Promise<{ keyId: string; tena
     pendingRawKeys.set(memberId, r.rawKey); // picked up once via status poll
     audit("approve", memberId, "admin", r.keyId);
     return { keyId: r.keyId, tenantId: r.tenantId };
+  });
+}
+
+export class InviteError extends Error {
+  status: number;
+  constructor(status: number, msg: string) { super(msg); this.status = status; }
+}
+
+/** vK17: auto-activate a device from an operator-signed invite. Minting the invite
+ * (behind adminGuard) IS the operator's consent, so this needs no manual approve —
+ * but it is atomic (withLock, single-use jti) and fully validated (sig/expiry/hash/epoch).
+ * Kill switch: AUTO_APPROVE_INVITE=off, or rotate the operator key (stale epoch). */
+export function contractApplyWithInvite(
+  token: string,
+  input: { email: string; machinePubkey: string; specs: Member["specs"] },
+): Promise<{ memberId: string; keyId: string; tenantId: string; rawKey: string }> {
+  if (process.env.AUTO_APPROVE_INVITE === "off") {
+    return Promise.reject(new InviteError(503, "invite auto-approval disabled (AUTO_APPROVE_INVITE=off)"));
+  }
+  const op = loadOrCreateOperatorKey();
+  return withLock(async () => {
+    const now = Date.now();
+    const vr = verifyInvite(token, op.publicKeyHex, now, currentContractHash(), op.epoch);
+    if (!vr.valid || !vr.payload) {
+      const reason = vr.reason || "invalid invite";
+      const status = /expired/i.test(reason) ? 403 : /signature|epoch|version|malformed/i.test(reason) ? 401 : /contract/i.test(reason) ? 409 : 400;
+      throw new InviteError(status, reason);
+    }
+    const inv = vr.payload;
+    let state = pruneExpiredInvites(getState(), now);
+    if (isInviteUsed(state, inv.jti)) throw new InviteError(409, "invite already redeemed (single-use)");
+    // apply → immediately approve (pre-authorized). Quota comes from the invite.
+    const applied = applyForMembership(state, { ...input, contractHash: inv.contractHash }, currentContractHash(), new Date().toISOString());
+    const member = applied.member;
+    if (inv.quotaReqPerDay > 0) member.quota.reqPerDay = inv.quotaReqPerDay;
+    const r = await approveWithKey(applied.state, member.id, storeBridge, new Date().toISOString());
+    state = markInviteUsed(r.state, { jti: inv.jti, memberId: member.id, redeemedAt: new Date().toISOString(), expiresAt: inv.expiresAt });
+    setState(state);
+    // raw key returned directly to the device (below) — NOT via pendingRawKeys/status
+    // poll, so there is exactly one delivery path for the invite flow.
+    audit("apply", member.id, "invite");
+    audit("approve", member.id, "invite", r.keyId);
+    return { memberId: member.id, keyId: r.keyId, tenantId: r.tenantId, rawKey: r.rawKey };
   });
 }
 
@@ -408,6 +456,30 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
       res.status(202).json({ id: member.id, status: member.status });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
+    }
+  });
+
+  // vK17: turnkey onboarding — a device presents an operator-signed invite and is
+  // auto-activated (no manual approve). The invite IS the operator's consent.
+  app.post("/api/contract/apply-with-invite", rateLimit, async (req, res) => {
+    try {
+      const { invite, email, machinePubkey, specs } = req.body || {};
+      const r = await contractApplyWithInvite(String(invite || ""), {
+        email: String(email || ""),
+        machinePubkey: String(machinePubkey || ""),
+        specs: {
+          ramGB: Number(specs?.ramGB),
+          os: String(specs?.os || ""),
+          arch: String(specs?.arch || ""),
+          gpu: specs?.gpu ? String(specs.gpu) : undefined,
+          ollamaVersion: specs?.ollamaVersion ? String(specs.ollamaVersion) : undefined,
+        },
+      });
+      // raw key delivered ONCE, right here (device consumes immediately — no poll).
+      res.status(201).json({ id: r.memberId, status: "active", key: r.rawKey, keyId: r.keyId });
+    } catch (e: any) {
+      const status = e instanceof InviteError ? e.status : 400;
+      res.status(status).json({ error: e.message });
     }
   });
 
