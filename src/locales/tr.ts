@@ -12,6 +12,7 @@ export const messages: Record<string, string> = {
   'app.tab.gmail': 'Gmail Gelen Kutusu',
   'app.tab.search': 'GitHub Arama',
   'app.tab.github-actions': 'GitHub Actions',
+  'app.tab.integrations': 'Entegrasyonlar',
   'app.tab.threatintel': 'Tehdit İstihbaratı',
   'app.tab.terminal': 'Etkileşimli CLI',
   'app.tab.keys': 'Donanım Kasası',
