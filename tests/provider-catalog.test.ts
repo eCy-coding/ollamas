@@ -5,6 +5,9 @@ import {
   catalogBaseUrl,
   keyedCloudProviders,
   trainsOnData,
+  capabilitiesFor,
+  capabilityReport,
+  suggestRoles,
   type CatalogEntry,
 } from "../server/provider-catalog";
 import { limitFor } from "../server/key-limits";
@@ -84,5 +87,37 @@ describe("PROVIDER_CATALOG — free-tier cloud providers (zero-dep, OpenAI-compa
     expect(limitFor("groq", { KEY_LIMIT_GROQ_PERMIN: "5" } as any).perMin).toBe(5);
     // legacy defaults untouched
     expect(limitFor("gemini", {} as any)).toEqual({ perMin: 20, perDay: 1000 });
+  });
+});
+
+describe("capability model (T3-F1) — capability-based orchestra role assignment", () => {
+  it("every catalog + legacy provider declares non-empty capabilities", () => {
+    for (const id of IDS) expect(capabilitiesFor(id).length).toBeGreaterThan(0);
+    for (const p of ["gemini", "anthropic", "openai", "openrouter", "ollama-cloud"]) {
+      expect(capabilitiesFor(p).length).toBeGreaterThan(0);
+    }
+    expect(capabilitiesFor("unknown")).toEqual([]);
+  });
+
+  it("groq carries stt (whisper on the same key); cerebras is fast-coding; zai long-ctx", () => {
+    expect(capabilitiesFor("groq")).toContain("stt");
+    expect(capabilitiesFor("groq")).toContain("fast");
+    expect(capabilitiesFor("cerebras")).toContain("fast");
+    expect(capabilitiesFor("zai")).toContain("long-ctx");
+  });
+
+  it("capabilityReport inverts ready providers into capability → providers", () => {
+    const rep = capabilityReport(["groq", "zai"]);
+    expect(rep.code).toEqual(expect.arrayContaining(["groq", "zai"]));
+    expect(rep.stt).toEqual(["groq"]);
+    expect(rep["long-ctx"]).toEqual(["zai"]);
+    expect(capabilityReport([])).toEqual({});
+  });
+
+  it("suggestRoles maps ready providers onto council seat needs (report-only)", () => {
+    const roles = suggestRoles(["groq", "cerebras", "zai"]);
+    expect(roles["fast-verify"]).toEqual(expect.arrayContaining(["groq", "cerebras"]));
+    expect(roles["cloud-alt"].length).toBeGreaterThan(0);
+    expect(suggestRoles([])).toEqual({ "cloud-alt": [], "fast-verify": [], adversarial: [] });
   });
 });

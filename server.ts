@@ -19,7 +19,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
-import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor } from "./server/provider-catalog";
+import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm } from "./server/stt-catalog";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
@@ -813,7 +813,7 @@ async function initializeServer() {
   app.get("/api/keys/pool", (_req, res) => {
     const providers = keyedCloudProviders();
     // Per-provider pool health + proactive saturation (worst key burn %, all-approaching alert).
-    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean; trainsOnData: boolean; envKey: string; signupUrl: string; defaultModel: string }> = {};
+    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean; trainsOnData: boolean; envKey: string; signupUrl: string; defaultModel: string; capabilities: readonly string[] }> = {};
     for (const p of providers) {
       const s = ProviderRouter.keyPoolStatus(p);
       const sat = ProviderRouter.poolSaturation(p);
@@ -826,6 +826,7 @@ async function initializeServer() {
         // Guided-onboarding metadata (T2-F2): the KeyVault derives its provider rows from
         // this response, so a new catalog entry ships its own key form + signup link.
         envKey: envKeyFor(p), signupUrl: keySignupUrl(p), defaultModel: catalogEntry(p)?.defaultModel ?? "",
+        capabilities: capabilitiesFor(p),
       };
     }
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.

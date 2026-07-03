@@ -190,6 +190,64 @@ export function envKeyFor(provider: string): string {
   return PROVIDER_CATALOG[provider]?.envKey ?? LEGACY_ENV_KEY[provider] ?? "";
 }
 
+// ── Capability model (T3-F1) — what each connected provider is GOOD FOR, so the
+// orchestra can hand out roles automatically when a key goes live. Report-only surface:
+// council/fleet seats stay key-gated prefer-lists; MODEL_SELECTION champions stay
+// bench-driven. Capability vocabulary: code, fast, tools, long-ctx, stt, vision,
+// embed, image, reasoning.
+
+const CATALOG_CAPABILITIES: Record<string, readonly string[]> = {
+  groq: ["code", "fast", "tools", "stt"],           // whisper STT rides the same key
+  cerebras: ["code", "fast"],                        // 8K ctx cap → fast/short work
+  zai: ["code", "long-ctx"],                         // glm-4.7-flash, 200K ctx
+  sambanova: ["code"],
+  "nvidia-nim": ["code", "vision"],
+  "github-models": ["code", "tools"],
+  cloudflare: ["code", "embed", "image"],
+  mistral: ["code", "tools"],
+};
+
+const LEGACY_CAPABILITIES: Record<string, readonly string[]> = {
+  gemini: ["code", "tools", "long-ctx", "vision", "embed"],
+  anthropic: ["code", "tools", "reasoning", "long-ctx"],
+  openai: ["code", "tools", "reasoning"],
+  openrouter: ["code", "tools", "long-ctx"], // aggregator — capability of its :free pool
+  "ollama-cloud": ["code", "long-ctx"],
+};
+
+export function capabilitiesFor(provider: string): readonly string[] {
+  return CATALOG_CAPABILITIES[provider] ?? LEGACY_CAPABILITIES[provider] ?? [];
+}
+
+/** Invert ready providers into capability → providers (only capabilities actually live). */
+export function capabilityReport(readyProviders: string[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const p of readyProviders ?? []) {
+    for (const c of capabilitiesFor(p)) (out[c] ??= []).push(p);
+  }
+  return out;
+}
+
+// Council seat needs expressed as capability requirements (council-roster.ts semantics):
+// cloud-alt = parallel cloud analyst seats, fast-verify = quick reviewer/verifier,
+// adversarial = independent second-opinion. Report-only mapping.
+const SEAT_NEEDS: Record<"cloud-alt" | "fast-verify" | "adversarial", readonly string[]> = {
+  "cloud-alt": ["code"],
+  "fast-verify": ["fast"],
+  adversarial: ["reasoning", "code"], // any-of
+};
+
+/** Which ready providers could fill each council seat need (any-of capability match). */
+export function suggestRoles(readyProviders: string[]): Record<"cloud-alt" | "fast-verify" | "adversarial", string[]> {
+  const fill = (needs: readonly string[]) =>
+    (readyProviders ?? []).filter((p) => capabilitiesFor(p).some((c) => needs.includes(c)));
+  return {
+    "cloud-alt": fill(SEAT_NEEDS["cloud-alt"]),
+    "fast-verify": fill(SEAT_NEEDS["fast-verify"]),
+    adversarial: fill(SEAT_NEEDS.adversarial),
+  };
+}
+
 /** Parse a `provider::model` routed model string (same syntax as the council/fleet seats).
  *  Bare/malformed strings return {model} verbatim — callers keep their legacy behavior. */
 export function parseProviderModel(s: string): { provider?: string; model: string } {
