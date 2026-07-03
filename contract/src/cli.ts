@@ -84,8 +84,21 @@ async function main(): Promise<number> {
       out(await http("POST", `/api/contract/${id}/${cmd}`, {}, true));
       return 0;
     }
+    case "pool": {
+      const key = process.env.CONTRACT_API_KEY || "";
+      if (!key) { console.error("set CONTRACT_API_KEY=olm_… (member key) for pool view"); return 2; }
+      const res = await fetch(`${BASE}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` } });
+      out(await res.json());
+      return res.ok ? 0 : 1;
+    }
+    case "doctor": {
+      const { runDoctor, renderDoctor } = await import("./doctor.ts");
+      const result = await runDoctor(BASE, { adminToken: process.env.SAAS_ADMIN_TOKEN });
+      console.log(renderDoctor(result));
+      return result.ok ? 0 : 1;
+    }
     default:
-      console.error("usage: contract document | apply --email X | status <id> | list | approve <id> | reject <id> | revoke <id>");
+      console.error("usage: contract document | apply --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | doctor");
       return 2;
   }
 }

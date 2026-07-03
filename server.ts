@@ -2301,7 +2301,7 @@ content
 
   // --- Contract lane (vK2): machine onboarding — apply → T0 approve → API key.
   // Pure logic in contract/src; admin actions share the same adminGuard as /api/saas. ---
-  registerContractRoutes(app, adminGuard, rateLimitMiddleware());
+  registerContractRoutes(app, adminGuard, rateLimitMiddleware(), authMiddleware(true));
 
   // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. ---
   app.get("/api/saas/upstreams", authMiddleware(true), async (req, res) => res.json(await listUpstreamServers(req.tenant!.tenantId)));

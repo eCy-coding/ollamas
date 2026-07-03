@@ -14,8 +14,13 @@ import {
 } from "../contract/src/registry.ts";
 import { approveWithKey, revokeWithKey, type KeyBridge } from "../contract/src/keys.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
+import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, type HeartbeatInput } from "../contract/src/pool.ts";
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 const STATE_PATH = process.env.CONTRACT_STATE_PATH || defaultStatePath();
+const FLEET_PATH = process.env.FLEET_BACKENDS_PATH || join(homedir(), ".ollamas", "backends.json");
 
 let state: RegistryState | null = null;
 const pendingRawKeys = new Map<string, string>(); // memberId → raw key, one-time
@@ -74,6 +79,32 @@ export function contractReject(memberId: string): void {
 export async function contractRevoke(memberId: string): Promise<void> {
   pendingRawKeys.delete(memberId);
   setState(await revokeWithKey(getState(), memberId, storeBridge));
+  syncFleetFile(); // drop the node's contract:* fleet entry immediately
+}
+
+/** Project fresh contract nodes into ~/.ollamas/backends.json so the EXISTING
+ * fleet provider (server/providers.ts selectFleetBackend) schedules onto them.
+ * Only `contract:` entries are owned/replaced; hand-pinned backends survive (RISK-K3). */
+export function syncFleetFile(): void {
+  let existing: unknown = [];
+  try { existing = JSON.parse(readFileSync(FLEET_PATH, "utf8")); } catch { /* fresh file */ }
+  const merged = mergeFleetBackends(existing, toFleetBackends(getState(), Date.now()));
+  mkdirSync(dirname(FLEET_PATH), { recursive: true });
+  const tmp = `${FLEET_PATH}.contract-tmp`;
+  writeFileSync(tmp, JSON.stringify(merged, null, 2) + "\n");
+  renameSync(tmp, FLEET_PATH);
+}
+
+export function contractHeartbeat(tenantId: string, hb: HeartbeatInput): { memberId: string } {
+  const m = getState().members.find((x) => x.tenantId === tenantId && x.status === "active");
+  if (!m) throw new Error("no active membership for this key");
+  setState(recordHeartbeat(getState(), m.id, hb, new Date().toISOString()));
+  syncFleetFile();
+  return { memberId: m.id };
+}
+
+export function contractPoolNodes() {
+  return poolNodes(getState(), Date.now());
 }
 
 export function contractStatus(memberId: string): { member: ReturnType<typeof maskMember>; key?: string } | null {
@@ -88,8 +119,8 @@ export function contractStatus(memberId: string): { member: ReturnType<typeof ma
   return out;
 }
 
-export function contractList(): Array<ReturnType<typeof maskMember> & { email: string; keyId?: string }> {
-  return getState().members.map((m) => ({ ...maskMember(m), email: m.email, keyId: m.keyId }));
+export function contractList(): Array<ReturnType<typeof maskMember> & { email: string; keyId?: string; tenantId?: string }> {
+  return getState().members.map((m) => ({ ...maskMember(m), email: m.email, keyId: m.keyId, tenantId: m.tenantId }));
 }
 
 /** Test hook: drop the memory cache so a fresh CONTRACT_STATE_PATH is honored. */
@@ -102,7 +133,29 @@ export function _resetContractStateForTests(): void {
 
 type Middleware = (req: Request, res: Response, next: NextFunction) => unknown;
 
-export function registerContractRoutes(app: Express, adminGuard: Middleware, rateLimit: Middleware): void {
+export function registerContractRoutes(app: Express, adminGuard: Middleware, rateLimit: Middleware, requireAuth: Middleware): void {
+  app.post("/api/pool/heartbeat", requireAuth, (req, res) => {
+    try {
+      const tenantId = (req as any).tenant?.tenantId;
+      if (!tenantId) return res.status(401).json({ error: "key required" });
+      const { ollamaUrl, models, load, rpcPort } = req.body || {};
+      const r = contractHeartbeat(String(tenantId), {
+        ollamaUrl: String(ollamaUrl || ""),
+        models: Array.isArray(models) ? models.map(String) : [],
+        load: load != null ? Number(load) : undefined,
+        rpcPort: rpcPort != null ? Number(rpcPort) : undefined,
+      });
+      res.json({ ok: true, ...r });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/pool/nodes", requireAuth, (req, res) => {
+    if (!(req as any).tenant?.tenantId) return res.status(401).json({ error: "key required" });
+    res.json({ nodes: contractPoolNodes() });
+  });
+
   app.get("/api/contract/document", (_req, res) => {
     res.json({ version: CONTRACT_VERSION, hash: currentContractHash(), text: renderContract() });
   });

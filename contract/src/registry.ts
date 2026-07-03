@@ -25,7 +25,7 @@ export type Member = {
   keyId?: string;
   tenantId?: string;
   quota: Quota;
-  capabilities?: { models: string[]; rpcPort?: number };
+  capabilities?: { models: string[]; ollamaUrl?: string; rpcPort?: number; load?: number };
   appliedAt: string;
   approvedAt?: string;
   lastHeartbeat?: string;
