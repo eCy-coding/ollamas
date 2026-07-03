@@ -31,6 +31,18 @@ payload. **Gemini's free tier trains on your prompts** — send `privateMode: tr
 (local tiers always remain). Mistral's free tier requires a training opt-in and Cohere's
 trial forbids commercial use — both were deliberately left OUT of the catalog.
 
+## Zero-manual connection (key-doctor)
+
+`node scripts/key-doctor.mjs` scans this machine for candidate keys (process env + .env,
+macOS Keychain known service names, `gh` CLI token → GitHub Models), validates each with
+one real call, and reports what connecting it unlocks (capabilities → council roles).
+`--connect` saves validated keys to the encrypted vault; `--fix` also runs
+`gh auth refresh -s models:read` interactively when needed. The server repeats an
+env-only silent scan at every boot — dropping a key into `.env` connects it on the next
+restart with zero clicks. Endpoint: `POST /api/keys/doctor` (dryRun defaults true;
+report is fully masked). Autopilot-step integration deferred (orchestration WIP) — the
+boot scan covers the always-on path.
+
 ## Other modalities (same $0 keys)
 
 - **Speech-to-text**: `POST /api/ai/transcribe?filename=a.wav` (raw audio body, ≤25MB) →

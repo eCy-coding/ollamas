@@ -2954,6 +2954,16 @@ content
 
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Cockpit] Console backend is listening on http://0.0.0.0:${PORT}`);
+    // Boot-time key-doctor (T3-F5): env-only (no keychain prompts, no gh spawn at boot),
+    // fire-and-forget, ONE masked summary line. A key dropped into .env connects itself
+    // on the next restart with zero operator action. Full scan: scripts/key-doctor.mjs.
+    void runDoctor({ sources: ["env"], dryRun: false }, productionDoctorDeps())
+      .then((rep) => {
+        const s = (want: string) => Object.entries(rep.providers).filter(([, v]) => v.status === want).map(([p]) => p);
+        const connected = s("connected"), invalid = s("invalid");
+        console.log(`[KeyDoctor] boot scan: +${connected.length} connected${connected.length ? ` (${connected.join(",")})` : ""} · ${s("already").length} already · ${invalid.length} invalid${invalid.length ? ` (${invalid.join(",")})` : ""} · ${s("absent").length} absent`);
+      })
+      .catch((e) => console.warn(`[KeyDoctor] boot scan skipped: ${String(e?.message ?? e).slice(0, 80)}`));
   });
 
   // Graceful shutdown (Faz 13A): on SIGTERM/SIGINT (K8s rolling deploy) stop
