@@ -425,7 +425,7 @@ const TOOLS: Record<string, ToolDef> = {
       const id = String(args.memberId || "");
       if (!id) throw new Error("memberId required");
       if (action === "approve") return { id, status: "active", ...(await contractApprove(id)) }; // raw key NOT returned here — one-time status poll only
-      if (action === "reject") { contractReject(id); return { id, status: "rejected" }; }
+      if (action === "reject") { await contractReject(id); return { id, status: "rejected" }; }
       if (action === "revoke") { await contractRevoke(id); return { id, status: "revoked" }; }
       throw new Error(`unknown action: ${action}`);
     },

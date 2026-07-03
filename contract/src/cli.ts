@@ -134,14 +134,21 @@ async function main(): Promise<number> {
       if (id === "run" || id === "once") {
         const key = rf(KEY_PATH, "utf8").trim();
         const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+        // F1: advertise rpcPort ONLY when a local rpc-server is actually reachable —
+        // this is what lets the operator plan a shard group over real member nodes.
+        const { probeRpcPort } = await import("./shard.ts");
         const beat = async () => {
+          let rpcPort: number | undefined;
+          const declared = Number(process.env.CONTRACT_RPC_PORT || 0);
+          if (declared > 0 && (await probeRpcPort("127.0.0.1", declared, 500))) rpcPort = declared;
           const hb = await collectHeartbeat({
             osInfo: { totalmemBytes: os.totalmem(), loadavg1: os.loadavg()[0] ?? 0, cpuCount: os.cpus().length, platform: os.platform(), arch: os.arch() },
             fetchFn: fetch,
             ollamaUrl,
+            rpcPort,
           });
           const r = await heartbeatOnce({ baseUrl: BASE, key, fetchFn: fetch, hb });
-          console.error(`[agent] heartbeat → ${r.status} (${new Date().toISOString()})`);
+          console.error(`[agent] heartbeat → ${r.status}${rpcPort ? ` rpc:${rpcPort}` : ""} (${new Date().toISOString()})`);
           return r;
         };
         const first = await beat();
@@ -200,7 +207,7 @@ async function main(): Promise<number> {
         for (const name of ["head", ...RPC_PORTS.map((p) => `rpc-${p}`)]) {
           if (stopProcess(name, { kill: (pid) => { process.kill(pid); return true; } })) n++;
         }
-        try { writeFileSync(headJsonPath, JSON.stringify({ up: false }) + "\n"); } catch {}
+        try { writeFileSync(headJsonPath, JSON.stringify({ up: false }) + "\n", { mode: 0o600 }); } catch {}
         return n;
       };
       const upAll = async (modelArg?: string): Promise<string> => {
@@ -232,7 +239,7 @@ async function main(): Promise<number> {
           tensorSplit: process.env.SHARD_TS || "1,1",
         }), { exec });
         const url = `http://127.0.0.1:${HEAD_PORT}`;
-        writeFileSync(headJsonPath, JSON.stringify({ up: true, url, model: modelPath, rpc: RPC_PORTS.map((p) => `127.0.0.1:${p}`) }, null, 2) + "\n");
+        writeFileSync(headJsonPath, JSON.stringify({ up: true, url, model: modelPath, rpc: RPC_PORTS.map((p) => `127.0.0.1:${p}`) }, null, 2) + "\n", { mode: 0o600 });
         // model load can take a while — poll /health
         for (let i = 0; i < 120; i++) {
           try { const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(1000) }); if (r.ok) return url; } catch {}

@@ -4,6 +4,7 @@
 import type { Member, RegistryState } from "./registry.ts";
 import { getMember } from "./registry.ts";
 import { classifyFreshness, DEFAULT_STALE_MS, type Freshness } from "./heartbeat.ts";
+import { isPrivateHost } from "./shard.ts";
 
 export type HeartbeatInput = {
   ollamaUrl: string; // member's ollama endpoint as reachable from the operator (mesh/tunnel address)
@@ -32,10 +33,19 @@ export function recordHeartbeat(state: RegistryState, memberId: string, hb: Hear
   if (!m) throw new Error(`member not found: ${memberId}`);
   if (m.status !== "active") throw new Error(`heartbeat requires active membership (is: ${m.status})`);
   let url: string;
+  let host: string;
   try {
-    url = new URL(hb.ollamaUrl).toString().replace(/\/$/, "");
+    const u = new URL(hb.ollamaUrl);
+    url = u.toString().replace(/\/$/, "");
+    host = u.hostname;
   } catch {
     throw new Error(`invalid ollama url: ${hb.ollamaUrl}`);
+  }
+  // SSRF guard (RISK-K1): the gateway fetches this URL (probeFleet/generate).
+  // A member could otherwise point it at cloud metadata (169.254.169.254) or an
+  // internal host. Only loopback/private/mesh addresses are accepted.
+  if (!isPrivateHost(host)) {
+    throw new Error(`ollamaUrl must be a private/mesh host (SSRF guard, RISK-K1): ${host}`);
   }
   const next: Member = {
     ...m,
@@ -82,9 +92,20 @@ export function toFleetBackends(state: RegistryState, nowMs: number, staleMs = D
     .map((n, i) => ({ name: `contract:${n.memberId}`, url: n.url as string, priority: CONTRACT_FLEET_PRIORITY + i }));
 }
 
+/** vK10: read-only quota check (consume's reading half). True when the next
+ * request would exceed the daily cap — lets the gateway reject BEFORE doing work
+ * so a failed generate never burns quota (charge-on-success). */
+export function wouldExceedQuota(state: RegistryState, tenantId: string, todayUtc: string): boolean {
+  const m = state.members.find((x) => x.tenantId === tenantId && x.status === "active");
+  if (!m) throw new Error("no active membership for this key");
+  const used = m.quota.dayUtc === todayUtc ? m.quota.usedToday : 0;
+  return used >= m.quota.reqPerDay;
+}
+
 /** vK4 gateway quota (litellm principle): per-member request/day, enforced at
  * the OPERATOR gateway — member nodes are never trusted to self-limit.
- * UTC day rollover resets the counter (RISK-K2: caller persists the new state). */
+ * UTC day rollover resets the counter (RISK-K2: caller persists the new state).
+ * vK10: called ONLY after a successful generate (charge-on-success). */
 export function consumeQuota(state: RegistryState, tenantId: string, todayUtc: string): RegistryState {
   const m = state.members.find((x) => x.tenantId === tenantId && x.status === "active");
   if (!m) throw new Error("no active membership for this key");

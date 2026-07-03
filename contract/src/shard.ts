@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { connect } from "node:net";
-import { partitionLayers, type Slice } from "./partition.ts";
+import { partitionLayers, fitsModel, DEFAULT_OVERHEAD, type Slice } from "./partition.ts";
 
 export type RpcEndpoint = { host: string; port: number };
 
@@ -16,8 +16,10 @@ const PRIVATE_V4 = [
   /^192\.168\./, // RFC1918
   /^172\.(1[6-9]|2\d|3[01])\./, // RFC1918 172.16–31
   /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // CGNAT 100.64.0.0/10 (headscale/tailscale mesh)
-  /^169\.254\./, // link-local
 ];
+// NOTE: 169.254/16 link-local is deliberately NOT private here — 169.254.169.254 is
+// the cloud metadata endpoint (classic SSRF target) and link-local is never a
+// legitimate mesh/rpc advertise address (mesh uses CGNAT or ULA).
 
 export function isPrivateHost(host: string): boolean {
   const h = host.trim().toLowerCase();
@@ -71,8 +73,10 @@ export type ShardCandidate = { memberId: string; url: string; ramGB: number; rpc
 export type ShardPlan = { endpoints: RpcEndpoint[]; slices: Slice[] };
 
 /** Plan a shard group from pool nodes: rpc-capable nodes only, layer slices by
- * RAM (partition.ts). Endpoint hosts come from each member's ollama URL host. */
-export function planShardGroup(totalLayers: number, candidates: ShardCandidate[]): ShardPlan {
+ * RAM (partition.ts). Endpoint hosts come from each member's ollama URL host.
+ * When modelSizeGB is given, the pooled RAM must fit it (fitsModel guard) — a
+ * plan that cannot hold the model is refused rather than crashing at load. */
+export function planShardGroup(totalLayers: number, candidates: ShardCandidate[], modelSizeGB?: number): ShardPlan {
   const capable = candidates.filter((c) => c.rpcPort && c.rpcPort > 0);
   if (!capable.length) throw new Error("no rpc-capable nodes (members must heartbeat with rpcPort)");
   const endpoints = capable.map((c) => {
@@ -80,6 +84,9 @@ export function planShardGroup(totalLayers: number, candidates: ShardCandidate[]
     if (!isPrivateHost(host)) throw new Error(`rpc endpoint must be private/mesh, got: ${host} (RISK-K1)`);
     return { host, port: c.rpcPort as number };
   });
+  if (modelSizeGB && modelSizeGB > 0 && !fitsModel(modelSizeGB, capable.map((c) => ({ id: c.memberId, ramGB: c.ramGB })))) {
+    throw new Error(`pool RAM insufficient for a ${modelSizeGB}GB model (need ${(modelSizeGB * DEFAULT_OVERHEAD).toFixed(1)}GB across ${capable.length} node(s))`);
+  }
   const slices = partitionLayers(totalLayers, capable.map((c) => ({ id: c.memberId, ramGB: c.ramGB })));
   return { endpoints, slices };
 }

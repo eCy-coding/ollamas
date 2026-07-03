@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyForMembership, approveMember, emptyState, getMember } from "./registry.ts";
-import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota } from "./pool.ts";
+import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota } from "./pool.ts";
 
 const HASH = "c".repeat(64);
 const NOW = "2026-07-03T10:00:00.000Z";
@@ -42,6 +42,30 @@ test("recordHeartbeat rejects non-active member and non-private/loopback-unsafe 
 test("recordHeartbeat rejects malformed url", () => {
   const { state, id } = activeMember();
   assert.throws(() => recordHeartbeat(state, id, { ...HB, ollamaUrl: "not a url" }, NOW), /url/i);
+});
+
+test("recordHeartbeat SSRF guard: private ok, public/metadata rejected (F3)", () => {
+  const { state, id } = activeMember();
+  // private/mesh accepted
+  for (const u of ["http://127.0.0.1:11434", "http://192.168.1.9:11434", "http://100.64.0.7:11434", "http://10.0.0.5:11434"]) {
+    assert.doesNotThrow(() => recordHeartbeat(state, id, { ...HB, ollamaUrl: u }, NOW), u);
+  }
+  // public / cloud-metadata / external hostname rejected
+  for (const u of ["http://169.254.169.254/latest/meta-data", "http://8.8.8.8:11434", "http://example.com:11434", "http://0.0.0.0:11434"]) {
+    assert.throws(() => recordHeartbeat(state, id, { ...HB, ollamaUrl: u }, NOW), /private|SSRF/i, u);
+  }
+});
+
+test("wouldExceedQuota: read-only check, no mutation; day rollover; active-only (F2)", () => {
+  const { state: s0, id } = activeMember();
+  const withQuota = { members: s0.members.map((m) => (m.id === id ? { ...m, quota: { reqPerDay: 1, usedToday: 0, dayUtc: "2026-07-03" } } : m)) };
+  assert.equal(wouldExceedQuota(withQuota, "t1", "2026-07-03"), false);
+  const consumed = consumeQuota(withQuota, "t1", "2026-07-03");
+  assert.equal(wouldExceedQuota(consumed, "t1", "2026-07-03"), true); // cap reached
+  assert.equal(wouldExceedQuota(consumed, "t1", "2026-07-04"), false); // next day resets
+  // wouldExceedQuota did not mutate
+  assert.equal(getMember(withQuota, id)?.quota.usedToday, 0);
+  assert.throws(() => wouldExceedQuota(consumed, "tnt_nope", "2026-07-03"), /membership/i);
 });
 
 test("poolNodes reports freshness and sorts fresh-first then by score", () => {

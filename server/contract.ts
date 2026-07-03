@@ -14,7 +14,7 @@ import {
 } from "../contract/src/registry.ts";
 import { approveWithKey, revokeWithKey, type KeyBridge } from "../contract/src/keys.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
-import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, type HeartbeatInput } from "../contract/src/pool.ts";
+import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota, type HeartbeatInput } from "../contract/src/pool.ts";
 import { shardDir } from "../contract/src/shard.ts";
 import { ProviderRouter } from "./providers";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
@@ -41,6 +41,17 @@ function setState(next: RegistryState): void {
   saveState(STATE_PATH, next);
 }
 
+// F4: serialize ALL state mutations. approve/revoke await async store calls between
+// read and write; without a lock two concurrent requests interleave getState→setState
+// on the single cache and the later write drops the earlier (lost update → orphan key).
+// A promise chain runs mutations one-at-a-time in this single-writer process.
+let mutationChain: Promise<unknown> = Promise.resolve();
+function withLock<T>(fn: () => T | Promise<T>): Promise<T> {
+  const run = mutationChain.then(() => fn());
+  mutationChain = run.then(() => undefined, () => undefined); // never let a rejection break the chain
+  return run;
+}
+
 const storeBridge: KeyBridge = {
   createTenant: async (name) => createTenant(name, "free"),
   issueKey: async (tenantId, label) => issueApiKey(tenantId, label),
@@ -61,27 +72,35 @@ function maskMember(m: Member) {
 
 // --- service functions (shared by HTTP routes, contract_admin tool, CLI path) ---
 
-export function contractApply(input: { email: string; machinePubkey: string; specs: Member["specs"]; contractHash: string }): Member {
-  const { state: next, member } = applyForMembership(getState(), input, currentContractHash(), new Date().toISOString());
-  setState(next);
-  return member;
+export function contractApply(input: { email: string; machinePubkey: string; specs: Member["specs"]; contractHash: string }): Promise<Member> {
+  return withLock(() => {
+    const { state: next, member } = applyForMembership(getState(), input, currentContractHash(), new Date().toISOString());
+    setState(next);
+    return member;
+  });
 }
 
-export async function contractApprove(memberId: string): Promise<{ keyId: string; tenantId: string }> {
-  const r = await approveWithKey(getState(), memberId, storeBridge, new Date().toISOString());
-  setState(r.state);
-  pendingRawKeys.set(memberId, r.rawKey); // picked up once via status poll
-  return { keyId: r.keyId, tenantId: r.tenantId };
+export function contractApprove(memberId: string): Promise<{ keyId: string; tenantId: string }> {
+  return withLock(async () => {
+    const r = await approveWithKey(getState(), memberId, storeBridge, new Date().toISOString());
+    setState(r.state);
+    pendingRawKeys.set(memberId, r.rawKey); // picked up once via status poll
+    return { keyId: r.keyId, tenantId: r.tenantId };
+  });
 }
 
-export function contractReject(memberId: string): void {
-  setState(rejectMember(getState(), memberId, new Date().toISOString()));
+export function contractReject(memberId: string): Promise<void> {
+  return withLock(() => {
+    setState(rejectMember(getState(), memberId, new Date().toISOString()));
+  });
 }
 
-export async function contractRevoke(memberId: string): Promise<void> {
-  pendingRawKeys.delete(memberId);
-  setState(await revokeWithKey(getState(), memberId, storeBridge));
-  syncFleetFile(); // drop the node's contract:* fleet entry immediately
+export function contractRevoke(memberId: string): Promise<void> {
+  return withLock(async () => {
+    pendingRawKeys.delete(memberId);
+    setState(await revokeWithKey(getState(), memberId, storeBridge));
+    syncFleetFile(); // drop the node's contract:* fleet entry immediately
+  });
 }
 
 /** Project fresh contract nodes into ~/.ollamas/backends.json so the EXISTING
@@ -97,21 +116,30 @@ export function syncFleetFile(): void {
   renameSync(tmp, FLEET_PATH);
 }
 
-export function contractHeartbeat(tenantId: string, hb: HeartbeatInput): { memberId: string } {
-  const m = getState().members.find((x) => x.tenantId === tenantId && x.status === "active");
-  if (!m) throw new Error("no active membership for this key");
-  setState(recordHeartbeat(getState(), m.id, hb, new Date().toISOString()));
-  syncFleetFile();
-  return { memberId: m.id };
+export function contractHeartbeat(tenantId: string, hb: HeartbeatInput): Promise<{ memberId: string }> {
+  return withLock(() => {
+    const m = getState().members.find((x) => x.tenantId === tenantId && x.status === "active");
+    if (!m) throw new Error("no active membership for this key");
+    setState(recordHeartbeat(getState(), m.id, hb, new Date().toISOString()));
+    syncFleetFile();
+    return { memberId: m.id };
+  });
 }
 
 export function contractPoolNodes() {
   return poolNodes(getState(), Date.now());
 }
 
-/** vK4: gateway-side quota tick. Throws when exhausted (mapped to 429). */
-export function contractConsumeQuota(tenantId: string): void {
-  setState(consumeQuota(getState(), tenantId, new Date().toISOString().slice(0, 10)));
+/** vK10: read-only quota check BEFORE doing work (charge-on-success). */
+export function contractQuotaExceeded(tenantId: string): boolean {
+  return wouldExceedQuota(getState(), tenantId, new Date().toISOString().slice(0, 10));
+}
+
+/** vK4/vK10: gateway-side quota tick — called ONLY after a successful generate. */
+export function contractConsumeQuota(tenantId: string): Promise<void> {
+  return withLock(() => {
+    setState(consumeQuota(getState(), tenantId, new Date().toISOString().slice(0, 10)));
+  });
 }
 
 /** vK9: shard-first branch. When a healthy shard head (llama-server --rpc group,
@@ -177,12 +205,12 @@ export function _resetContractStateForTests(): void {
 type Middleware = (req: Request, res: Response, next: NextFunction) => unknown;
 
 export function registerContractRoutes(app: Express, adminGuard: Middleware, rateLimit: Middleware, requireAuth: Middleware): void {
-  app.post("/api/pool/heartbeat", requireAuth, (req, res) => {
+  app.post("/api/pool/heartbeat", requireAuth, async (req, res) => {
     try {
       const tenantId = (req as any).tenant?.tenantId;
       if (!tenantId) return res.status(401).json({ error: "key required" });
       const { ollamaUrl, models, load, rpcPort } = req.body || {};
-      const r = contractHeartbeat(String(tenantId), {
+      const r = await contractHeartbeat(String(tenantId), {
         ollamaUrl: String(ollamaUrl || ""),
         models: Array.isArray(models) ? models.map(String) : [],
         load: load != null ? Number(load) : undefined,
@@ -213,31 +241,39 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
   app.post("/api/pool/generate", requireAuth, rateLimit, async (req, res) => {
     const tenantId = (req as any).tenant?.tenantId;
     if (!tenantId) return res.status(401).json({ error: "key required" });
+    const { model, messages, temperature } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages (non-empty array) required" });
+    }
+    // F2: check quota BEFORE work (reject at cap) but CONSUME only after a
+    // successful generate — a failed inference must never burn a member's quota.
     try {
-      contractConsumeQuota(String(tenantId));
+      if (contractQuotaExceeded(String(tenantId))) return res.status(429).json({ error: "quota exceeded" });
     } catch (e: any) {
-      return res.status(429).json({ error: e.message });
+      return res.status(400).json({ error: e.message });
     }
     try {
-      const { model, messages, temperature } = req.body || {};
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ error: "messages (non-empty array) required" });
-      }
       // vK9: a healthy shard head (one model split across rpc-servers) takes the
       // request first — the pool's "one big machine" path; fleet is the fallback.
       const shardResult = await tryShardGenerate({ model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined });
-      if (shardResult) return res.json(shardResult);
-      const ctrl = new AbortController();
-      req.on("close", () => ctrl.abort());
-      const result = await ProviderRouter.generate(
-        { provider: "fleet", model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined } as any,
-        undefined,
-        undefined,
-        ctrl.signal,
-      );
-      res.json({ content: result.text, model: result.modelUsed, source: result.source, latencyMs: result.latencyMs });
+      let payload: { content: string; model: string; source: string; latencyMs: number };
+      if (shardResult) {
+        payload = shardResult;
+      } else {
+        const ctrl = new AbortController();
+        req.on("close", () => ctrl.abort());
+        const result = await ProviderRouter.generate(
+          { provider: "fleet", model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined } as any,
+          undefined,
+          undefined,
+          ctrl.signal,
+        );
+        payload = { content: result.text, model: result.modelUsed, source: result.source, latencyMs: result.latencyMs };
+      }
+      await contractConsumeQuota(String(tenantId)); // charge-on-success only
+      res.json(payload);
     } catch (e: any) {
-      res.status(502).json({ error: e.message });
+      res.status(502).json({ error: e.message }); // quota untouched on failure
     }
   });
 
@@ -245,10 +281,10 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
     res.json({ version: CONTRACT_VERSION, hash: currentContractHash(), text: renderContract() });
   });
 
-  app.post("/api/contract/apply", rateLimit, (req, res) => {
+  app.post("/api/contract/apply", rateLimit, async (req, res) => {
     try {
       const { email, machinePubkey, specs, contractHash } = req.body || {};
-      const member = contractApply({
+      const member = await contractApply({
         email: String(email || ""),
         machinePubkey: String(machinePubkey || ""),
         specs: {
@@ -282,9 +318,9 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
     }
   });
 
-  app.post("/api/contract/:id/reject", adminGuard, (req, res) => {
+  app.post("/api/contract/:id/reject", adminGuard, async (req, res) => {
     try {
-      contractReject(String(req.params.id));
+      await contractReject(String(req.params.id));
       res.json({ id: req.params.id, status: "rejected" });
     } catch (e: any) {
       res.status(400).json({ error: e.message });

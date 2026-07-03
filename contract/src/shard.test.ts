@@ -63,6 +63,17 @@ test("planShardGroup: partitions layers over rpc-capable fresh nodes", () => {
   assert.throws(() => planShardGroup(32, [{ memberId: "m", url: "http://10.0.0.1:11434", ramGB: 8 }]), /rpc/i);
 });
 
+test("planShardGroup fitsModel gate: refuses a model too big for pooled RAM (F1/dead-code)", () => {
+  const nodes = [
+    { memberId: "m_a", url: "http://100.64.0.7:11434", ramGB: 8, rpcPort: 50052 },
+    { memberId: "m_b", url: "http://100.64.0.8:11434", ramGB: 8, rpcPort: 50052 },
+  ];
+  // 16GB pooled ≥ 10×1.2=12 → fits
+  assert.doesNotThrow(() => planShardGroup(32, nodes, 10));
+  // 16GB pooled < 20×1.2=24 → refused
+  assert.throws(() => planShardGroup(32, nodes, 20), /insufficient/i);
+});
+
 test("start/stop process: pid file lifecycle with injected exec/kill (vK7)", () => {
   const dir = mkdtempSync(join(tmpdir(), "shard-"));
   process.env.CONTRACT_SHARD_DIR = dir;
