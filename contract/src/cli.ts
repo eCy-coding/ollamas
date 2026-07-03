@@ -84,6 +84,7 @@ async function main(): Promise<number> {
       return 0;
     case "approve":
     case "reject":
+    case "suspend":
     case "revoke": {
       if (!id) { console.error(`usage: contract ${cmd} <m_id>`); return 2; }
       out(await http("POST", `/api/contract/${id}/${cmd}`, {}, true));

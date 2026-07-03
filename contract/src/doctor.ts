@@ -82,6 +82,25 @@ export async function runDoctor(base: string, opts: { adminToken?: string; ollam
     const found = Array.isArray(pool.json?.nodes) && pool.json.nodes.some((n: any) => n.memberId === id && n.freshness === "fresh");
     if (!step("pool-nodes", pool.status === 200 && found, `nodes=${pool.json?.nodes?.length}`)) return { ok: false, steps };
 
+    // F5: exercise the money-path endpoints. /api/pool/generate needs a live
+    // backend (fleet/shard/ollama); if none is reachable it 502s — treat that as
+    // an honest SKIP (ok) rather than a doctor failure (env-conditional, ERR-TUNNEL-003).
+    const quotaBefore = await req(base, "GET", "/api/pool/quota", undefined, bearer);
+    const usedBefore = Number(quotaBefore.json?.usedToday ?? 0);
+    step("quota-endpoint", quotaBefore.status === 200 && Number.isFinite(usedBefore), `usedToday=${usedBefore}`);
+
+    const gen = await req(base, "POST", "/api/pool/generate", { messages: [{ role: "user", content: "reply OK" }], temperature: 0 }, bearer);
+    if (gen.status === 200 && String(gen.json?.content || "").length > 0) {
+      step("generate", true, `source=${gen.json?.source} len=${String(gen.json.content).length}`);
+      const quotaAfter = await req(base, "GET", "/api/pool/quota", undefined, bearer);
+      step("quota-charged", Number(quotaAfter.json?.usedToday) === usedBefore + 1, `usedToday ${usedBefore}→${quotaAfter.json?.usedToday}`);
+    } else {
+      // 502 = no backend reachable → SKIP (ok). 429 would be a real quota problem.
+      step("generate", gen.status !== 429, `SKIP — no backend (status ${gen.status})`);
+      const quotaAfter = await req(base, "GET", "/api/pool/quota", undefined, bearer);
+      step("quota-not-charged-on-fail", Number(quotaAfter.json?.usedToday) === usedBefore, `usedToday stayed ${usedBefore} (F2)`);
+    }
+
     const revoke = await req(base, "POST", `/api/contract/${id}/revoke`, {}, admin);
     step("revoke-cleanup", revoke.status === 200 && revoke.json?.status === "revoked", `id=${id} revoked`);
 

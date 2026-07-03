@@ -142,6 +142,27 @@ describe("F4 state lock: concurrent approvals do not lost-update", () => {
   });
 });
 
+describe("vK11 suspend wire (dead-code completed)", () => {
+  test("active→suspend leaves the schedulable pool + drops fleet entry; suspend→revoke works", async () => {
+    const hash = doc.currentContractHash();
+    const m = await contract.contractApply({ email: "s@x.co", machinePubkey: "44".repeat(32), specs: { ramGB: 16, os: "linux", arch: "x64" }, contractHash: hash });
+    const g = await contract.contractApprove(m.id);
+    await contract.contractHeartbeat(g.tenantId, { ollamaUrl: "http://100.64.0.7:11434", models: ["x"] });
+    expect(contract.contractPoolNodes().find((n) => n.memberId === m.id)?.freshness).toBe("fresh");
+
+    await contract.contractSuspend(m.id);
+    // suspended node is no longer active → not projected as a fleet backend
+    const suspended = contract.contractList().find((x) => x.id === m.id);
+    expect(suspended?.status).toBe("suspended");
+    const fleet = JSON.parse(fs.readFileSync(FLEET, "utf8"));
+    expect(fleet.some((b: any) => b.name === `contract:${m.id}`)).toBe(false);
+
+    // registry allows suspend→revoke
+    await contract.contractRevoke(m.id);
+    expect(contract.contractList().find((x) => x.id === m.id)?.status).toBe("revoked");
+  });
+});
+
 describe("F2 quota charge-on-success", () => {
   test("wouldExceed check + consume are separate; consume only bumps once", async () => {
     const hash = doc.currentContractHash();

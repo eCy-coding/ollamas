@@ -8,6 +8,7 @@ import { CONTRACT_VERSION, renderContract, currentContractHash } from "../contra
 import {
   applyForMembership,
   rejectMember,
+  suspendMember,
   getMember,
   type RegistryState,
   type Member,
@@ -92,6 +93,16 @@ export function contractApprove(memberId: string): Promise<{ keyId: string; tena
 export function contractReject(memberId: string): Promise<void> {
   return withLock(() => {
     setState(rejectMember(getState(), memberId, new Date().toISOString()));
+  });
+}
+
+/** vK11: suspend an active member (temporary — revoke is permanent). The key
+ * stays valid but the node leaves the schedulable pool until re-... (registry
+ * currently supports suspend→revoke; un-suspend is a future step). */
+export function contractSuspend(memberId: string): Promise<void> {
+  return withLock(() => {
+    setState(suspendMember(getState(), memberId));
+    syncFleetFile(); // suspended is not fresh, but drop the fleet entry explicitly
   });
 }
 
@@ -331,6 +342,15 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
     try {
       await contractRevoke(String(req.params.id));
       res.json({ id: req.params.id, status: "revoked" });
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/contract/:id/suspend", adminGuard, async (req, res) => {
+    try {
+      await contractSuspend(String(req.params.id));
+      res.json({ id: req.params.id, status: "suspended" });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }

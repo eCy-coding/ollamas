@@ -14,7 +14,7 @@ import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
 import { countTokens, estimateCost } from "./tokens";
 import { runTestgen, runAudit, generateStorefront } from "./revenue";
-import { contractApprove, contractReject, contractRevoke, contractList } from "./contract";
+import { contractApprove, contractReject, contractSuspend, contractRevoke, contractList } from "./contract";
 
 // outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
 // (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
@@ -411,11 +411,11 @@ const TOOLS: Record<string, ToolDef> = {
 
   contract_admin: {
     tier: "host",
-    schema: fn("contract_admin", "Contract lane: manage compute-pool membership. list pending/active members, approve (issues API key delivered once via the applicant's status poll), reject or revoke a member. Owner-gated.", {
+    schema: fn("contract_admin", "Contract lane: manage compute-pool membership. list pending/active members, approve (issues API key delivered once via the applicant's status poll), reject, suspend (temporary — leaves the pool, key stays) or revoke (permanent) a member. Owner-gated.", {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["list", "approve", "reject", "revoke"], description: "Admin action." },
-        memberId: { type: "string", description: "Member id (m_...); required for approve/reject/revoke." },
+        action: { type: "string", enum: ["list", "approve", "reject", "suspend", "revoke"], description: "Admin action." },
+        memberId: { type: "string", description: "Member id (m_...); required for approve/reject/suspend/revoke." },
       },
       required: ["action"],
     }),
@@ -426,6 +426,7 @@ const TOOLS: Record<string, ToolDef> = {
       if (!id) throw new Error("memberId required");
       if (action === "approve") return { id, status: "active", ...(await contractApprove(id)) }; // raw key NOT returned here — one-time status poll only
       if (action === "reject") { await contractReject(id); return { id, status: "rejected" }; }
+      if (action === "suspend") { await contractSuspend(id); return { id, status: "suspended" }; }
       if (action === "revoke") { await contractRevoke(id); return { id, status: "revoked" }; }
       throw new Error(`unknown action: ${action}`);
     },
