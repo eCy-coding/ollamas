@@ -98,11 +98,114 @@ async function main(): Promise<number> {
       return result.ok ? 0 : 1;
     }
     case "shard": {
-      const { detectShardCapability, planShardGroup } = await import("./shard.ts");
-      const { execFileSync } = await import("node:child_process");
-      const has = (bin: string) => { try { execFileSync("which", [bin], { stdio: "pipe" }); return true; } catch { return false; } };
-      const rpcFlag = (() => { try { return execFileSync("llama-server", ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
-      const cap = detectShardCapability({ "llama-server": has("llama-server"), "rpc-server": has("rpc-server"), rpcFlag });
+      const shard = await import("./shard.ts");
+      const { detectShardCapability, planShardGroup, resolveShardBinary, resolveOllamaModelBlob,
+              startProcess, stopProcess, probeRpcPort, shardDir, rpcServerArgs, shardServerArgs } = shard;
+      const { execFileSync, spawn } = await import("node:child_process");
+      const { existsSync, openSync, readFileSync, writeFileSync, mkdirSync } = await import("node:fs");
+      const { join } = await import("node:path");
+
+      const rpcBin = resolveShardBinary("rpc-server");
+      const headBin = resolveShardBinary("llama-server");
+      const has = (bin: string) => { try { execFileSync(bin.includes("/") ? "test" : "which", bin.includes("/") ? ["-x", bin] : [bin], { stdio: "pipe" }); return true; } catch { return false; } };
+      const rpcFlag = (() => { try { return execFileSync(headBin, ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
+      const cap = detectShardCapability({ "llama-server": has(headBin), "rpc-server": has(rpcBin), rpcFlag });
+
+      const RPC_PORTS = [50052, 50053];
+      const HEAD_PORT = Number(process.env.SHARD_HEAD_PORT || 8085);
+      const headJsonPath = join(shardDir(), "head.json");
+      const exec = (bin: string, args: string[], logPath: string): number => {
+        const fd = openSync(logPath, "w"); // fresh log per start — old crash lines poison evidence greps
+        const child = spawn(bin, args, { detached: true, stdio: ["ignore", fd, fd] });
+        child.unref();
+        return child.pid as number;
+      };
+      const downAll = () => {
+        let n = 0;
+        for (const name of ["head", ...RPC_PORTS.map((p) => `rpc-${p}`)]) {
+          if (stopProcess(name, { kill: (pid) => { process.kill(pid); return true; } })) n++;
+        }
+        try { writeFileSync(headJsonPath, JSON.stringify({ up: false }) + "\n"); } catch {}
+        return n;
+      };
+      const upAll = async (modelArg?: string): Promise<string> => {
+        if (!cap.capable) throw new Error(`shard NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`);
+        let modelPath = modelArg && existsSync(modelArg) ? modelArg : null;
+        if (!modelPath && modelArg) modelPath = resolveOllamaModelBlob(modelArg);
+        if (!modelPath) throw new Error("model not found — pass a GGUF path or an installed ollama model name (contract shard up <model>)");
+        mkdirSync(shardDir(), { recursive: true });
+        // Distinct devices per local rpc-server: default device selection can land
+        // on BLAS (aborts on RMS_NORM). Two Metal instances on unified memory mirror
+        // two real machines each with their own GPU. SHARD_DEVICES overridable.
+        const devices = (process.env.SHARD_DEVICES || "MTL0,MTL0").split(",");
+        RPC_PORTS.forEach((p, i) => {
+          startProcess(`rpc-${p}`, rpcBin, rpcServerArgs({ host: "127.0.0.1", port: p, device: devices[i % devices.length] }), { exec });
+        });
+        // Concurrent Metal init on one GPU is slow (residency sets) — allow 60s per port.
+        for (const p of RPC_PORTS) {
+          let ok = false;
+          for (let i = 0; i < 120 && !ok; i++) { ok = await probeRpcPort("127.0.0.1", p, 500); if (!ok) await new Promise((r) => setTimeout(r, 500)); }
+          if (!ok) { downAll(); throw new Error(`rpc-server on ${p} did not come up (log: ${shardDir()}/rpc-${p}.log)`); }
+        }
+        startProcess("head", headBin, shardServerArgs({
+          modelPath,
+          endpoints: RPC_PORTS.map((p) => ({ host: "127.0.0.1", port: p })),
+          port: HEAD_PORT,
+          ctxSize: Number(process.env.SHARD_CTX || 2048),
+          // even split by default so BOTH rpc-servers hold layers (CPU-rpc reports
+          // no memory → auto-fit would starve it); real ratios come from partition.ts
+          tensorSplit: process.env.SHARD_TS || "1,1",
+        }), { exec });
+        const url = `http://127.0.0.1:${HEAD_PORT}`;
+        writeFileSync(headJsonPath, JSON.stringify({ up: true, url, model: modelPath, rpc: RPC_PORTS.map((p) => `127.0.0.1:${p}`) }, null, 2) + "\n");
+        // model load can take a while — poll /health
+        for (let i = 0; i < 120; i++) {
+          try { const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(1000) }); if (r.ok) return url; } catch {}
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        downAll();
+        throw new Error(`head did not become healthy (log: ${shardDir()}/head.log)`);
+      };
+
+      if (id === "up") {
+        const url = await upAll(positionals[2] || process.env.SHARD_MODEL);
+        console.log(`shard head healthy at ${url} (rpc: ${RPC_PORTS.join(",")})`);
+        return 0;
+      }
+      if (id === "down") { console.log(`stopped ${downAll()} shard process(es)`); return 0; }
+      if (id === "status") {
+        const probes: Record<string, boolean> = {};
+        for (const p of RPC_PORTS) probes[`rpc-${p}`] = await probeRpcPort("127.0.0.1", p, 500);
+        let head: unknown = null;
+        try { head = JSON.parse(readFileSync(headJsonPath, "utf8")); } catch {}
+        out({ capability: cap, probes, head });
+        return 0;
+      }
+      if (id === "proof") {
+        const url = await upAll(positionals[2] || process.env.SHARD_MODEL);
+        try {
+          // Evidence = BOTH rpc-server logs grow during the completion: layers are
+          // genuinely computed in two separate processes over TCP RPC.
+          const logSize = (p: number) => { try { return readFileSync(join(shardDir(), `rpc-${p}.log`), "utf8").length; } catch { return 0; } };
+          const before = RPC_PORTS.map(logSize);
+          const t0 = Date.now();
+          const r = await fetch(`${url}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messages: [{ role: "user", content: "Reply with exactly: SHARD-OK /no_think" }], max_tokens: 64, temperature: 0 }),
+            signal: AbortSignal.timeout(120_000),
+          });
+          const j = (await r.json()) as any;
+          const msg = j?.choices?.[0]?.message ?? {};
+          const content = String(msg.content || msg.reasoning_content || ""); // thinking models fill reasoning_content
+          const growth = RPC_PORTS.map((p, i) => (logSize(p) - (before[i] ?? 0)));
+          const splitProven = growth.every((g) => g > 0);
+          out({ ok: r.ok && content.length > 0 && splitProven, content: content.slice(0, 120), latencyMs: Date.now() - t0, tokens: j?.usage?.completion_tokens, rpcLogGrowthBytes: Object.fromEntries(RPC_PORTS.map((p, i) => [p, growth[i]])), splitProven });
+          return r.ok && content.length > 0 && splitProven ? 0 : 1;
+        } finally {
+          downAll();
+        }
+      }
       if (id === "plan") {
         const key = process.env.CONTRACT_API_KEY || "";
         if (!key) { console.error("set CONTRACT_API_KEY=olm_… for shard plan"); return 2; }

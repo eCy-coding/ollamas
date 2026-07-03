@@ -3,7 +3,29 @@
 // health → document → apply → approve → key(once) → heartbeat → pool → revoke.
 // Operator-side tool: uses SAAS_ADMIN_TOKEN for admin steps when set.
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { generateIdentity } from "./identity.ts";
+import { detectShardCapability, resolveShardBinary, shardDir } from "./shard.ts";
+
+async function checkShardStep(): Promise<{ name: string; ok: boolean; detail: string }> {
+  try {
+    const { execFileSync } = await import("node:child_process");
+    const headBin = resolveShardBinary("llama-server");
+    const rpcBin = resolveShardBinary("rpc-server");
+    const has = (p: string) => { try { execFileSync("test", ["-x", p], { stdio: "pipe" }); return true; } catch { return p === "rpc-server" || p === "llama-server" ? false : false; } };
+    const rpcFlag = (() => { try { return execFileSync(headBin, ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
+    const cap = detectShardCapability({ "llama-server": has(headBin) || rpcFlag, "rpc-server": has(rpcBin), rpcFlag });
+    if (!cap.capable) return { name: "shard", ok: true, detail: `SKIP — not capable (${cap.missing.join(", ")})` };
+    let head: { up?: boolean; url?: string } = {};
+    try { head = JSON.parse(readFileSync(join(shardDir(), "head.json"), "utf8")); } catch {}
+    if (!head.up || !head.url) return { name: "shard", ok: true, detail: "capable; head down (run: contract shard proof <model>)" };
+    const r = await fetch(`${head.url}/health`, { signal: AbortSignal.timeout(3000) });
+    return { name: "shard", ok: r.ok, detail: `head ${head.url} /health → ${r.status}` };
+  } catch (e: any) {
+    return { name: "shard", ok: true, detail: `SKIP — ${String(e?.message || e)}` };
+  }
+}
 
 export type DoctorStep = { name: string; ok: boolean; detail: string };
 
@@ -65,6 +87,11 @@ export async function runDoctor(base: string, opts: { adminToken?: string; ollam
 
     const hbDead = await req(base, "POST", "/api/pool/heartbeat", { ollamaUrl: "http://127.0.0.1:11434", models: [] }, bearer);
     step("revoked-key-rejected", hbDead.status === 401 || hbDead.status === 400, `post-revoke heartbeat → ${hbDead.status}`);
+
+    // Optional shard check: SKIP (ok) when the RPC-enabled build is absent; when a
+    // shard head is up, verify its /health. Never spawns processes itself.
+    const shardStep = await checkShardStep();
+    step(shardStep.name, shardStep.ok, shardStep.detail);
   } catch (e: any) {
     steps.push({ name: "exception", ok: false, detail: String(e?.message || e) });
   }
