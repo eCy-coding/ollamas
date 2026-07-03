@@ -10,6 +10,7 @@ const SNAP: CockpitSnapshot = {
   totals: { live: 0, idle: 0, dirty: 0, errors: 0 },
   contract: null,
   adoptions: null,
+  providers: null,
 };
 
 const collector: Collector = async () => SNAP;
