@@ -19,7 +19,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
-import { keyedCloudProviders, catalogEntry } from "./server/provider-catalog";
+import { keyedCloudProviders, catalogEntry, trainsOnData } from "./server/provider-catalog";
 import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
@@ -564,7 +564,10 @@ async function initializeServer() {
               const sat = ProviderRouter.poolSaturation(p);
               return { name: p, ready: s.live > 0, live: s.live, total: s.total, keyless: false,
                 worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0,
-                allApproaching: s.total > 0 && sat.allApproaching };
+                allApproaching: s.total > 0 && sat.allApproaching,
+                // Sovereign privacy surface: free tier trains on prompts → UI can badge it,
+                // privateMode requests route around it.
+                trainsOnData: trainsOnData(p) };
             }),
           // keyless: no API key, uses the user's Google OAuth via the gemini CLI binary.
           { name: "gemini-cli", ready: geminiCliReady, live: geminiCliReady ? 1 : 0, total: 1, keyless: true, worstPct: 0, allApproaching: false },
@@ -734,14 +737,14 @@ async function initializeServer() {
   app.get("/api/keys/pool", (_req, res) => {
     const providers = keyedCloudProviders();
     // Per-provider pool health + proactive saturation (worst key burn %, all-approaching alert).
-    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean }> = {};
+    const pool: Record<string, { total: number; live: number; worstPct: number; allApproaching: boolean; trainsOnData: boolean }> = {};
     for (const p of providers) {
       const s = ProviderRouter.keyPoolStatus(p);
       const sat = ProviderRouter.poolSaturation(p);
       // Empty pool (no keys configured) has nothing to burn — report 0%, not the saturation
       // sentinel (poolSaturation returns worstPct=1 for "no live keys = saturated", which the
       // alert path below uses; the display must not paint an unconfigured provider full-red).
-      pool[p] = { total: s.total, live: s.live, worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0, allApproaching: s.total > 0 && sat.allApproaching };
+      pool[p] = { total: s.total, live: s.live, worstPct: s.total > 0 ? Math.round(sat.worstPct * 100) / 100 : 0, allApproaching: s.total > 0 && sat.allApproaching, trainsOnData: trainsOnData(p) };
     }
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
     const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));
@@ -987,7 +990,7 @@ async function initializeServer() {
    * Standard Prompt Proxy Endpoint with SSE Streaming Capability (M2)
    */
   app.post("/api/generate", async (req, res) => {
-    const { provider, model, messages, temperature, stream } = req.body;
+    const { provider, model, messages, temperature, stream, privateMode } = req.body;
     // Raw endpoint contract: messages[] required. (For a single-string prompt use
     // POST /api/ai/generate.) Reject malformed input with a clear 400, not a 500.
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -1007,7 +1010,7 @@ async function initializeServer() {
 
       try {
         const result = await ProviderRouter.generate(
-          { provider, model, messages, temperature, stream: true },
+          { provider, model, messages, temperature, stream: true, privateMode: !!privateMode },
           (chunk) => {
             res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
           },
@@ -1023,7 +1026,7 @@ async function initializeServer() {
     } else {
       try {
         const result = await ProviderRouter.generate(
-          { provider, model, messages, temperature, stream: false },
+          { provider, model, messages, temperature, stream: false, privateMode: !!privateMode },
           undefined,
           undefined,
           ctrl.signal,
@@ -1181,6 +1184,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           messages: activeHistory,
           tools: AGENT_TOOLS,
           stream: false,
+          privateMode: !!req.body.privateMode,
         }, undefined, undefined, ac.signal);
 
         // Meter LLM output tokens (Faz 6D) — a billing dimension distinct from

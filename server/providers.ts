@@ -10,6 +10,8 @@ import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
 import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catalog";
 import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_MS } from "./provider-errors";
+import { filterChain } from "./chain-policy";
+import { setToolSupport, toolSupportSnapshot, hydrateToolSupport } from "./capability-cache";
 
 // Types
 export interface ProviderMessage {
@@ -32,6 +34,9 @@ export interface GenerateConfig {
   // key-pool rotation. Used by /api/keys/test so a candidate's failure surfaces honestly instead
   // of a different provider/key answering and reporting a false "verified".
   singleAttempt?: boolean;
+  // Sovereign privacy: exclude every provider whose FREE tier trains on prompts (gemini
+  // free tier, …) from the fallback chain. Local tiers always remain available.
+  privateMode?: boolean;
 }
 
 export interface ToolCall {
@@ -296,7 +301,7 @@ export class ProviderRouter {
     signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
-    const providersToTry = config.singleAttempt ? [config.provider] : this.getFallbackChain(config.provider);
+    const providersToTry = this.effectiveChain(config);
     let lastError: Error | null = null;
 
     for (const prov of providersToTry) {
@@ -335,6 +340,8 @@ export class ProviderRouter {
         try {
           const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
           lastAttemptMs = Date.now() - attemptStart;
+          // Passive capability learning: a tools request that SUCCEEDED proves support.
+          if (config.tools?.length) { setToolSupport(prov, resolvedConfig.model || "", true); this.persistUsageDebounced(); }
           const elapsed = Date.now() - start; // total wall-clock incl. fallbacks (honest caller-facing number)
           // T2.2 (live): record the provider's OWN latency (not `elapsed`, which includes prior failed
           // attempts) so getFallbackChain learns the fastest proven-working cloud provider.
@@ -374,6 +381,13 @@ export class ProviderRouter {
             console.warn(`[KeyPool] ${prov} key#${attempt + 1} ${isQuota ? "quota" : "auth"}-exhausted → ${live} live key(s) remain`);
             if (live > 0 && attempt + 1 < attempts) { rotated = true; continue; } // retry same provider, next key
           } else if (cloudKeyed) {
+            // Passive capability learning: a 400/422 on a TOOLS request marks this
+            // provider::model tool-incapable — future tool work routes around it for free
+            // (free tiers don't guarantee function-calling; an active probe would burn quota).
+            if (config.tools?.length && err instanceof ProviderHttpError && (err.status === 400 || err.status === 422)) {
+              setToolSupport(prov, resolvedConfig.model || "", false);
+              this.persistUsageDebounced();
+            }
             // Generic failure (network blip / 5xx / timeout): bench this provider's key 30s so
             // the NEXT request skips a flapping endpoint instead of re-hitting it immediately
             // (LiteLLM deployment-cooldown pattern). Real outages still surface via the chain.
@@ -461,6 +475,23 @@ export class ProviderRouter {
     if (!pool.length) return null;
     const probes = probesOverride ?? await this.probeFleet(pool);
     return selectBackend(pool, probes, { required: [model] });
+  }
+
+  /**
+   * The provider list generate() actually walks: singleAttempt pins exactly the requested
+   * provider (key-test honesty); otherwise the fallback chain filtered by policy —
+   * privateMode (no training free tiers), free-tier context caps, tool capability.
+   * Public + pure(ish) so routing policy is directly testable.
+   */
+  public static effectiveChain(config: GenerateConfig): string[] {
+    if (config.singleAttempt) return [config.provider];
+    const inChars = (config.messages || []).reduce((n, m) => n + (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content ?? "").length), 0);
+    return filterChain(this.getFallbackChain(config.provider), {
+      privateMode: config.privateMode,
+      needTools: !!(config.tools && config.tools.length),
+      estTokensIn: Math.ceil(inChars / 4),
+      model: config.model,
+    });
   }
 
   // public for unit testing the chain order (pure helper, no side effects)
@@ -567,13 +598,17 @@ export class ProviderRouter {
   private static ensureUsageHydrated(): void {
     if (this.usageHydrated) return;
     this.usageHydrated = true;
-    try { hydrateKeyUsage((db.data as any).keyUsage); } catch { /* corrupt/absent → start cold */ }
+    try {
+      hydrateKeyUsage((db.data as any).keyUsage);
+      hydrateToolSupport((db.data as any).toolSupport);
+    } catch { /* corrupt/absent → start cold */ }
   }
   private static persistUsageDebounced(nowMs: number = Date.now()): void {
     if (nowMs - this.usageLastSaveMs < 5000) return;
     this.usageLastSaveMs = nowMs;
     try {
       (db.data as any).keyUsage = keyUsageSnapshot(nowMs);
+      (db.data as any).toolSupport = toolSupportSnapshot();
       db.save();
     } catch { /* persistence is best-effort */ }
   }
