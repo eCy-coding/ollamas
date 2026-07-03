@@ -14,6 +14,7 @@ import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
 import { countTokens, estimateCost } from "./tokens";
 import { runTestgen, runAudit, generateStorefront } from "./revenue";
+import { contractApprove, contractReject, contractRevoke, contractList } from "./contract";
 
 // outputSchema enforcement (v1.7-A). A tool may declare `schema.function.outputSchema`
 // (advertised over MCP since Faz 14B). When such a tool returns STRUCTURED (object)
@@ -408,6 +409,28 @@ const TOOLS: Record<string, ToolDef> = {
     invoke: async (args) => runAudit({ repo: String(args.repo), model: args.model, maxUnits: args.maxUnits }),
   },
 
+  contract_admin: {
+    tier: "host",
+    schema: fn("contract_admin", "Contract lane: manage compute-pool membership. list pending/active members, approve (issues API key delivered once via the applicant's status poll), reject or revoke a member. Owner-gated.", {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["list", "approve", "reject", "revoke"], description: "Admin action." },
+        memberId: { type: "string", description: "Member id (m_...); required for approve/reject/revoke." },
+      },
+      required: ["action"],
+    }),
+    invoke: async (args) => {
+      const action = String(args.action);
+      if (action === "list") return { members: contractList() };
+      const id = String(args.memberId || "");
+      if (!id) throw new Error("memberId required");
+      if (action === "approve") return { id, status: "active", ...(await contractApprove(id)) }; // raw key NOT returned here — one-time status poll only
+      if (action === "reject") { contractReject(id); return { id, status: "rejected" }; }
+      if (action === "revoke") { await contractRevoke(id); return { id, status: "revoked" }; }
+      throw new Error(`unknown action: ${action}`);
+    },
+  },
+
   storefront_generate: {
     tier: "host",
     schema: fn("storefront_generate", "Revenue Ops: fill the storefront landing-page template from config (brand/email/paymentLink) → local HTML artifact. No deploy, no money movement.", {
@@ -509,14 +532,14 @@ const TOOLS: Record<string, ToolDef> = {
 
   web_search: {
     tier: "safe",
-    schema: fn("web_search", "Web research. Pass query for DuckDuckGo results, OR url to fetch+extract a page's text.", {
+    schema: fn("web_search", "Web research tool. For ANY research, comparison, or question spanning more than one source, pass query and keep deep:true (the default): this runs the search AND fetches+extracts the top results' full content in a single call, so you never need repeated web_search calls. Two exceptions: pass url alone to fetch one specific known page, or set deep:false for a single quick fact a search snippet already answers.", {
       type: "object",
-      properties: { query: { type: "string" }, url: { type: "string", description: "If set, fetch this page's readable text instead of searching." } },
+      properties: { query: { type: "string", description: "The search query. Provide it for any information-seeking task. Do NOT issue multiple separate web_search calls for one topic — one deep query gathers all sources at once." }, url: { type: "string", description: "Fetch and extract the text of ONE specific known page. Use only when you already have the exact URL, and omit query. deep does not apply to url fetches (it is ignored). For open-ended research, use query instead of guessing URLs." }, render: { type: "boolean", description: "Set true to render with headless Chrome for JavaScript-heavy pages that return little or no text otherwise. Applies to both url fetches and deep result fetches; leave false for normal static pages (it is slower)." }, deep: { type: "boolean", description: "When true (the default), runs the search and fetches+extracts the top results in parallel in ONE call — the right choice for research, comparisons, and any compare/best/how/why/multi-source question, since it replaces 3-4 follow-up searches. Only set false for a single quick fact where a result snippet alone is enough. Has no effect when url is set." }, top: { type: "number", description: "Number of top results to fetch and extract when deep is true. Raise for broad or contested topics needing more sources; lower for a narrow question. Default 3." } },
       required: [],
     }),
     invoke: async (args, { deps, abortSignal }) => {
-      if (args.url) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs --fetch ${deps.shArg(String(args.url))}`, undefined, abortSignal);
-      if (args.query) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${deps.shArg(String(args.query))}`, undefined, abortSignal);
+      if (args.url) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${args.render ? "--render " : ""}--fetch ${deps.shArg(String(args.url))}`, undefined, abortSignal);
+      if (args.query) return deps.execOnHost(`node ${deps.HOST_TOOLS_DIR}/web_search.mjs ${args.render ? "--render " : ""}${args.deep === false ? "" : "--deep "}${args.top ? "--top " + Number(args.top) + " " : ""}${deps.shArg(String(args.query))}`, undefined, abortSignal);
       throw new Error("Missing 'query' or 'url'.");
     },
   },

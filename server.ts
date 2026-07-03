@@ -39,11 +39,13 @@ import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
+import { decorateCatalog } from "./server/mcp/catalog";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
+import { registerContractRoutes } from "./server/contract";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync, isLive as stripeIsLive, createAuditCheckout, dollarsToCents } from "./server/billing/stripe";
 
 const app = express();
@@ -2297,13 +2299,24 @@ content
     res.json(await listAudit(tenantId, limit));
   });
 
+  // --- Contract lane (vK2): machine onboarding — apply → T0 approve → API key.
+  // Pure logic in contract/src; admin actions share the same adminGuard as /api/saas. ---
+  registerContractRoutes(app, adminGuard, rateLimitMiddleware());
+
   // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. ---
   app.get("/api/saas/upstreams", authMiddleware(true), async (req, res) => res.json(await listUpstreamServers(req.tenant!.tenantId)));
+  // Curated catalog (dalga-2): vetted free MIT reference servers, one-click add.
+  app.get("/api/saas/catalog", authMiddleware(true), async (req, res) => {
+    const installed = new Set((await listUpstreamServers(req.tenant!.tenantId)).map((u) => u.name));
+    res.json(decorateCatalog(installed));
+  });
   app.post("/api/saas/upstreams", authMiddleware(true), async (req, res) => {
     try {
       const tId = req.tenant!.tenantId;
       const { name, transport, url, command, args, allowedTools } = req.body || {};
       if (!name || !transport) return res.status(400).json({ error: "Missing 'name' or 'transport'" });
+      // Duplicate names would double-supervise `<tenantId>_<name>` and clobber tools.
+      if ((await listUpstreamServers(tId)).some((u) => u.name === name)) return res.status(409).json({ error: "duplicate name" });
       const { id } = await addUpstreamServer(tId, { name, transport, url, command, args, allowed_tools: allowedTools });
       // Faz 27: supervised + tenant-owned (Faz 24) — reconnect preserves isolation.
       const connect = await superviseUpstream({ name: `${tId}_${name}`, transport, url, command, args, allowedTools }, tId);
