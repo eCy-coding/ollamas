@@ -1193,7 +1193,9 @@ export class ProviderRouter {
             "X-Title": "LLM Mission Control",
           },
           body: JSON.stringify({
-            model: config.model || "google/gemini-2.5-flash-lite:free",
+            // env-overridable: OpenRouter's :free roster rotates — the old hardcoded
+            // gemini-2.5-flash-lite:free now 404s, silently burning this fallback slot.
+            model: config.model || process.env.OPENROUTER_DEFAULT_MODEL || "google/gemma-4-26b-a4b-it:free",
             messages: toOpenAiMessages(config.messages),
             temperature: config.temperature ?? 0.7,
             stream: !!onStreamChunk,

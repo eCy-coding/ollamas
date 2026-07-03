@@ -1052,7 +1052,9 @@ async function initializeServer() {
   });
 
   app.post("/api/ai/generate", async (req, res) => {
-    const { prompt, model, stream, temperature } = req.body;
+    // `provider` optional: council API-routed seats (groq/cerebras/zai, …) dispatch here
+    // with an explicit provider; absent keeps the ollama-local Colab-faithful default.
+    const { prompt, model, stream, temperature, provider } = req.body;
     if (typeof prompt !== "string" || !prompt.trim()) {
       return res.status(400).json({ error: "prompt (non-empty string) is required" });
     }
@@ -1062,7 +1064,7 @@ async function initializeServer() {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       try {
-        for await (const chunk of aiGenerateTextStream(prompt, { model, temperature })) {
+        for await (const chunk of aiGenerateTextStream(prompt, { model, temperature, provider })) {
           res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
         }
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -1073,7 +1075,7 @@ async function initializeServer() {
       }
     } else {
       try {
-        const result = await aiGenerate(prompt, { model, temperature });
+        const result = await aiGenerate(prompt, { model, temperature, provider });
         res.json({ text: result.text, model: result.modelUsed, source: result.source, tokensPerSec: result.tokensPerSec });
       } catch (err: any) {
         res.status(500).json({ error: err?.message || "generation failure" });

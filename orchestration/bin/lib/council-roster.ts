@@ -69,7 +69,12 @@ export const SEAT_SPEC: SeatSpec[] = [
   { capability: "big-reasoning", role: "adversary", responsibility: "Bağımsız çapraz-kontrol (majority-vote üyesi)",
     lanes: LANES, models: ["llama3.3:70b", "deepseek-r1:32b"] },
   { capability: "cloud-alt", role: "analyst", responsibility: "Cloud yük dengeleme / paralel koltuk (bench)",
-    lanes: ["bench"], models: ["kimi-k2.5:cloud", "qwen3-coder:480b-cloud"] },
+    lanes: ["bench"],
+    // Ollama-cloud tags first (proven seats); then FREE-tier API providers (server
+    // PROVIDER_CATALOG) as key-gated fallbacks — `provider::model` entries resolve by key
+    // liveness (/api/keys/pool), not `ollama list`. Zero keys → behavior unchanged.
+    models: ["kimi-k2.5:cloud", "qwen3-coder:480b-cloud",
+      "groq::llama-3.3-70b-versatile", "cerebras::gpt-oss-120b", "zai::glm-4.7-flash"] },
   { capability: "small-logic", role: "analyst", responsibility: "Hafif mantık kontrolü (scripts)",
     lanes: ["scripts"], models: ["phi4:latest", "qwen3:4b"] },
   { capability: "embedding", role: "search", responsibility: "Semantik kod-arama + duplikat tespiti",
@@ -78,19 +83,35 @@ export const SEAT_SPEC: SeatSpec[] = [
     lanes: LANES, models: ["ollamas-reviewer:latest", "qwen3:8b"] },
 ];
 
-/** Resolve the first available model for a seat (exact tag match against live `ollama list`). */
-export function resolveSeat(spec: SeatSpec, available: Set<string>): Seat {
-  const model = spec.models.find((m) => available.has(m)) ?? null;
+/** Parse an API-routed model entry `provider::model` (free-tier catalog seats). Plain
+ *  ollama tags (single `:`; `hf.co/...` paths) return null. Both halves must be non-empty. */
+export function parseApiModel(entry: string): { provider: string; model: string } | null {
+  const i = entry.indexOf("::");
+  if (i <= 0) return null;
+  const provider = entry.slice(0, i);
+  const model = entry.slice(i + 2);
+  if (!provider || !model) return null;
+  return { provider, model };
+}
+
+/** Resolve the first available model for a seat: ollama tags match live `ollama list`;
+ *  `provider::model` entries match a KEY-LIVE provider (readyApiProviders ← /api/keys/pool). */
+export function resolveSeat(spec: SeatSpec, available: Set<string>, readyApiProviders: Set<string> = new Set()): Seat {
+  const model = spec.models.find((m) => {
+    const api = parseApiModel(m);
+    return api ? readyApiProviders.has(api.provider) : available.has(m);
+  }) ?? null;
   return {
     capability: spec.capability, role: spec.role, responsibility: spec.responsibility,
     lanes: spec.lanes, model, available: model !== null,
   };
 }
 
-/** Build the full roster from a list of pulled model tags (order-independent). */
-export function buildRoster(availableModels: string[]): Roster {
+/** Build the full roster from pulled model tags + key-live API providers (order-independent). */
+export function buildRoster(availableModels: string[], readyApiProviders: string[] = []): Roster {
   const available = new Set((availableModels ?? []).map((m) => String(m).trim()).filter(Boolean));
-  const seats = SEAT_SPEC.map((s) => resolveSeat(s, available));
+  const readyApi = new Set((readyApiProviders ?? []).map((p) => String(p).trim()).filter(Boolean));
+  const seats = SEAT_SPEC.map((s) => resolveSeat(s, available, readyApi));
   const present = seats.filter((s) => s.available).length;
   const absentCapabilities = seats.filter((s) => !s.available).map((s) => s.capability);
   const coveredSet = new Set<string>();

@@ -19,7 +19,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "
 import { execFileSync } from "node:child_process";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRoster, seatsForLane, LANES, type Roster, type Seat } from "./lib/council-roster";
+import { buildRoster, seatsForLane, parseApiModel, LANES, type Roster, type Seat } from "./lib/council-roster";
 import {
   buildLanePrompt, parseFindings, summarizeCouncil, checkableClaims,
   type LaneContext, type LaneResult, type Finding,
@@ -90,13 +90,27 @@ function laneContext(lane: string): LaneContext {
   return { lane, files, loc, langs, excerpt };
 }
 
-/** Dispatch a single prompt to a model via the live server (never-throw). */
+/** Key-live free-tier API providers (server /api/keys/pool). Empty on any failure —
+ *  API-routed seats then stay absent, exactly like a missing ollama tag. */
+async function readyApiProviders(): Promise<string[]> {
+  try {
+    const r = await fetch(`${OLLAMAS_URL}/api/keys/pool`, { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return [];
+    const j: any = await r.json();
+    return Object.entries(j?.pool ?? {}).filter(([, v]: [string, any]) => (v?.live ?? 0) > 0).map(([p]) => p);
+  } catch { return []; }
+}
+
+/** Dispatch a single prompt to a model via the live server (never-throw). API-routed seats
+ *  (`provider::model`) carry their provider; plain tags keep the ollama-local default. */
 async function dispatch(model: string, prompt: string): Promise<{ text: string; tokPerSec?: number; ms: number; error?: string }> {
   const t0 = process.hrtime.bigint();
   try {
+    const api = parseApiModel(model);
+    const body = api ? { prompt, model: api.model, provider: api.provider } : { prompt, model };
     const r = await fetch(`${OLLAMAS_URL}/api/ai/generate`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, model }), signal: AbortSignal.timeout(DISPATCH_TIMEOUT),
+      body: JSON.stringify(body), signal: AbortSignal.timeout(DISPATCH_TIMEOUT),
     });
     const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
     if (!r.ok) return { text: "", ms, error: `HTTP ${r.status}` };
@@ -243,7 +257,7 @@ function nowIso(): string {
 async function main(): Promise<void> {
   const ts = nowIso();
   const models = liveModels();
-  const roster = buildRoster(models);
+  const roster = buildRoster(models, await readyApiProviders());
   writeRoster(roster, ts);
 
   const heavy = ALL || !!laneArg;

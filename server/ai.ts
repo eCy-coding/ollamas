@@ -5,8 +5,11 @@
 // the ProviderRouter fallback chain (ollama-local → … → demo) is preserved.
 
 import { ProviderRouter, type GenerateConfig, type GenerateResult } from "./providers";
+import { catalogEntry } from "./provider-catalog";
 
-export type AiProvider = "ollama-local" | "gemini";
+// Literal hints kept for the common cases; any ProviderRouter provider id is valid
+// (free-tier catalog: groq/cerebras/zai/… — council API-routed seats dispatch these).
+export type AiProvider = "ollama-local" | "gemini" | (string & {});
 
 export interface AiOptions {
   /** Inference backend. Default "ollama-local" (Colab-faithful, zero-config). */
@@ -84,6 +87,9 @@ async function resolveTarget(opts: AiOptions): Promise<{ provider: AiProvider; m
   const provider = opts.provider ?? "ollama-local";
   if (opts.model) return { provider, model: opts.model };
   if (provider === "gemini") return { provider, model: GEMINI_DEFAULT_MODEL };
+  // Free-tier catalog providers resolve their own default in the router — an ollama tag
+  // here would 404 on the cloud API.
+  if (catalogEntry(provider)) return { provider, model: "" };
   return { provider, model: await resolveDefaultModel() };
 }
 
