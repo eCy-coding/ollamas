@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, liveTabMap, contractStruct, type LaneStatus } from "../bin/lib/collect";
+import { roadmapStruct, errorStruct, buildSnapshot, summarizeAdoptions, liveTabMap, contractStruct, providerHealthStruct, type LaneStatus } from "../bin/lib/collect";
 import { parseAdoptionRows, gate } from "../bin/adopt";
 
 describe("roadmapStruct", () => {
@@ -135,5 +135,34 @@ describe("contractStruct (vK9) — maskeli pool özeti", () => {
     expect(c.members.active).toBe(0);
     expect(c.shardHeadUp).toBe(false);
     expect(contractStruct(null, null, null)).toBeNull();
+  });
+});
+
+describe("providerHealthStruct — /api/keys/pool → cockpit provider headroom (vP2)", () => {
+  const POOL = JSON.stringify({ pool: {
+    cerebras: { total: 1, live: 1, worstPct: 0, allApproaching: false },
+    gemini: { total: 9, live: 0, worstPct: 1, allApproaching: true },
+    anthropic: { total: 0, live: 0, worstPct: 0, allApproaching: false },
+    groq: { total: 1, live: 1, worstPct: 0.2, allApproaching: false },
+  }});
+
+  it("keyed provider'ları döner, key'siz (total=0) satırlar elenir", () => {
+    const rows = providerHealthStruct(POOL)!;
+    expect(rows.map((r) => r.id)).not.toContain("anthropic");
+    expect(rows.length).toBe(3);
+  });
+  it("canlı-önce sıralar; tükenmiş (live=0) sona düşer", () => {
+    const rows = providerHealthStruct(POOL)!;
+    expect(rows[rows.length - 1].id).toBe("gemini");
+    expect(rows[0].live).toBeGreaterThan(0);
+  });
+  it("worstPct + allApproaching alanlarını taşır (headroom görünürlüğü)", () => {
+    const g = providerHealthStruct(POOL)!.find((r) => r.id === "gemini")!;
+    expect(g.worstPct).toBe(1);
+    expect(g.approaching).toBe(true);
+  });
+  it("bozuk/boş girdi → null (asla throw — cockpit down-satırı çizer)", () => {
+    expect(providerHealthStruct(null)).toBeNull();
+    expect(providerHealthStruct("not-json")).toBeNull();
   });
 });

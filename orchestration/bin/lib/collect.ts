@@ -58,6 +58,15 @@ export interface ContractSummary {
   shardHeadUp: boolean;
 }
 
+/** Ücretsiz/cloud provider key-headroom satırı (vP2 — /api/keys/pool). Ham key ASLA taşınmaz. */
+export interface ProviderHealth {
+  id: string;
+  live: number;         // cooldown'da olmayan key sayısı
+  total: number;        // vault'taki key sayısı
+  worstPct: number;     // en dolu key'in günlük kota kullanımı (0..1)
+  approaching: boolean; // tüm key'ler kota sınırına yaklaşıyor mu
+}
+
 export interface CockpitSnapshot {
   ts: string;
   expectedLanes: number;
@@ -66,6 +75,7 @@ export interface CockpitSnapshot {
   totals: { live: number; idle: number; dirty: number; errors: number };
   adoptions: AdoptionSummary | null;
   contract: ContractSummary | null;
+  providers: ProviderHealth[] | null;
 }
 
 // ── Saf çekirdek ─────────────────────────────────────────────────────────────
@@ -112,6 +122,24 @@ export function summarizeAdoptions(rows: AdoptionRow[], violations: Violation[])
   return s;
 }
 
+/** /api/keys/pool gövdesi → keyed provider headroom satırları (saf; canlı-önce sıralı).
+ *  total=0 (key'siz) satırlar elenir; bozuk/boş girdi → null (asla throw). */
+export function providerHealthStruct(poolJson: string | null): ProviderHealth[] | null {
+  if (!poolJson) return null;
+  try {
+    const j = JSON.parse(poolJson);
+    const pool = j?.pool;
+    if (!pool || typeof pool !== "object") return null;
+    return Object.entries(pool)
+      .map(([id, v]: [string, any]) => ({
+        id, live: Number(v?.live ?? 0), total: Number(v?.total ?? 0),
+        worstPct: Number(v?.worstPct ?? 0), approaching: !!v?.allApproaching,
+      }))
+      .filter((r) => r.total > 0)
+      .sort((a, b) => (b.live - a.live) || a.id.localeCompare(b.id));
+  } catch { return null; }
+}
+
 /** Lane'lerden toplamları türet + snapshot'ı paketle (saf; test edilebilir). */
 export function buildSnapshot(input: {
   ts: string;
@@ -120,6 +148,7 @@ export function buildSnapshot(input: {
   backend: BackendRuntime | null;
   adoptions?: AdoptionSummary | null;
   contract?: ContractSummary | null;
+  providers?: ProviderHealth[] | null;
 }): CockpitSnapshot {
   const totals = { live: 0, idle: 0, dirty: 0, errors: 0 };
   for (const l of input.lanes) {
@@ -131,7 +160,7 @@ export function buildSnapshot(input: {
   return {
     ts: input.ts, expectedLanes: input.expectedLanes, lanes: input.lanes,
     backend: input.backend, totals, adoptions: input.adoptions ?? null,
-    contract: input.contract ?? null,
+    contract: input.contract ?? null, providers: input.providers ?? null,
   };
 }
 
@@ -289,7 +318,19 @@ export async function collect(opts: { tabMap?: Map<string, number> | null } = {}
   const backend = await fetchBackend();
   const adoptions = readAdoptions();
   const contract = readContractSummary();
-  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend, adoptions, contract });
+  const providers = await fetchProviderHealth();
+  return buildSnapshot({ ts: new Date().toISOString(), expectedLanes: EXPECTED_TABS, lanes, backend, adoptions, contract, providers });
+}
+
+/** Provider key-headroom'u best-effort oku (/api/keys/pool — sayaç-only, ham key yok).
+ *  Backend kapalı/timeout → null (cockpit "—" çizer, asla bloke etmez). */
+async function fetchProviderHealth(): Promise<ProviderHealth[] | null> {
+  try {
+    const ctrl = AbortSignal.timeout(Number(process.env.ORCH_BACKEND_TIMEOUT_MS || 800));
+    const r = await fetch(`http://127.0.0.1:${BACKEND_PORT}/api/keys/pool`, { signal: ctrl });
+    if (!r.ok) return null;
+    return providerHealthStruct(await r.text());
+  } catch { return null; }
 }
 
 /** Canlı okuyucu (vK9): env-override'lı contract dosyaları → contractStruct. READ-ONLY. */

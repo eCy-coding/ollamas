@@ -68,6 +68,7 @@
 </header>
 <main>
   <div id="backend"></div>
+  <div id="providers"></div>
   <div id="adoption"></div>
   <div id="contract"></div>
   <div class="grid" id="grid"></div>
@@ -163,6 +164,22 @@
       +((m.pending||0)>0 ? '<div class="road" style="color:var(--amber);margin-top:6px">⚠ '+esc(m.pending)+' bekleyen onay — contract approve &lt;id&gt;</div>' : '');
   }
 
+  // vP2: ücretsiz/cloud provider key-headroom (sayaç-only — ham key asla gelmez).
+  function renderProviders(ps){
+    var el=$("providers");
+    if(!ps||!ps.length){ el.innerHTML=""; return; }
+    el.className="backend";
+    el.innerHTML='<div class="brow"><span class="badge live">API tier</span>'
+      +'<span class="sub">ücretsiz provider key-headroom (canlı/toplam · en-dolu kota)</span></div>'
+      +'<div class="metrics">'
+      +ps.map(function(p){
+        var pct=Math.round((p.worstPct||0)*100);
+        var color=p.live===0?'var(--rose)':(p.approaching?'var(--amber)':'var(--emerald)');
+        return '<span>'+esc(p.id)+' <b style="color:'+color+'">'+esc(p.live)+'/'+esc(p.total)+'</b> <span class="sub">%'+pct+'</span></span>';
+      }).join("")
+      +'</div>';
+  }
+
   function render(snap){
     $("conn").className="dot on";
     $("sub").textContent="canlı · "+new Date(snap.ts).toLocaleTimeString("tr-TR")+" · "+snap.lanes.length+"/"+snap.expectedLanes+" lane";
@@ -173,6 +190,7 @@
       +'<span class="chip">dirty <b>'+t.dirty+'</b></span>'
       +'<span class="chip err">hata <b>'+t.errors+'</b></span>';
     renderBackend(snap.backend);
+    renderProviders(snap.providers);
     renderAdoption(snap.adoptions);
     renderContract(snap.contract);
     $("grid").innerHTML=snap.lanes.map(laneCard).join("");
