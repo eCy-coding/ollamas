@@ -97,8 +97,31 @@ async function main(): Promise<number> {
       console.log(renderDoctor(result));
       return result.ok ? 0 : 1;
     }
+    case "shard": {
+      const { detectShardCapability, planShardGroup } = await import("./shard.ts");
+      const { execFileSync } = await import("node:child_process");
+      const has = (bin: string) => { try { execFileSync("which", [bin], { stdio: "pipe" }); return true; } catch { return false; } };
+      const rpcFlag = (() => { try { return execFileSync("llama-server", ["--help"], { stdio: "pipe" }).toString().includes("--rpc"); } catch { return false; } })();
+      const cap = detectShardCapability({ "llama-server": has("llama-server"), "rpc-server": has("rpc-server"), rpcFlag });
+      if (id === "plan") {
+        const key = process.env.CONTRACT_API_KEY || "";
+        if (!key) { console.error("set CONTRACT_API_KEY=olm_… for shard plan"); return 2; }
+        const res = await fetch(`${BASE}/api/pool/nodes`, { headers: { authorization: `Bearer ${key}` } });
+        const { nodes } = (await res.json()) as { nodes: Array<{ memberId: string; url?: string; ramGB: number; freshness: string; rpcPort?: number }> };
+        const candidates = (nodes || []).filter((n) => n.freshness === "fresh" && n.url).map((n) => ({ memberId: n.memberId, url: n.url as string, ramGB: n.ramGB, rpcPort: (n as any).rpcPort }));
+        try {
+          out({ capability: cap, plan: planShardGroup(Number(process.env.SHARD_LAYERS || 32), candidates) });
+        } catch (e: any) {
+          out({ capability: cap, plan: null, reason: e.message });
+        }
+        return 0;
+      }
+      out(cap);
+      if (!cap.capable) console.error(`shard NOT capable — missing: ${cap.missing.join(", ")}. ${cap.hint}`);
+      return 0;
+    }
     default:
-      console.error("usage: contract document | apply --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | doctor");
+      console.error("usage: contract document | apply --email X | status <id> | list | approve <id> | reject <id> | revoke <id> | pool | doctor | shard [plan]");
       return 2;
   }
 }

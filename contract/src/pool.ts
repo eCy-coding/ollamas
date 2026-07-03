@@ -20,6 +20,7 @@ export type PoolNode = {
   freshness: Freshness;
   lastHeartbeat?: string;
   score: number;
+  rpcPort?: number; // vK6: set when the member runs an rpc-server (shard candidate)
 };
 
 /** Priority slot for contract nodes in the fleet file: after hand-pinned
@@ -66,6 +67,7 @@ export function poolNodes(state: RegistryState, nowMs: number, staleMs = DEFAULT
       freshness: classifyFreshness(m.lastHeartbeat, nowMs, staleMs),
       lastHeartbeat: m.lastHeartbeat,
       score: capabilityScore(m),
+      rpcPort: m.capabilities?.rpcPort,
     }));
   const rank: Record<Freshness, number> = { fresh: 0, stale: 1, dead: 2 };
   return nodes.sort((a, b) => rank[a.freshness] - rank[b.freshness] || b.score - a.score);
