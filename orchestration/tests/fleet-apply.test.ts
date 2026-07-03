@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport } from "../bin/lib/fleet-apply";
+import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, proposalIsAdditive, type ShipResult } from "../bin/lib/fleet-apply";
 import { hasSearchReplace, parseSearchReplace, applyEdit } from "../bin/lib/search-replace";
 
 const NEW_FILE = `diff --git a/scripts/x.ts b/scripts/x.ts
@@ -85,6 +85,52 @@ VERDICT: DONE`;
     const r = applyEdit(content, parseSearchReplace(PROPOSAL)[0]);
     expect(r.ok).toBe(true);
     expect(r.content).toContain("require_env PORT");
+  });
+});
+
+describe("riskTier (batch auto-ship gate)", () => {
+  const SR_ADDITIVE = `## Edit:\n### file: server/x.ts\n<<<<<<< SEARCH\nexport function a(){return 1;}\n=======\nexport function a(){return 1;}\nexport function b(){return 2;}\n>>>>>>> REPLACE\nVERDICT: DONE`;
+  const SR_MODIFY = `## Edit:\n### file: server/x.ts\n<<<<<<< SEARCH\nconst a = t.entryPoint;\n=======\nconst a = path.basename(t.entryPoint);\n>>>>>>> REPLACE\nVERDICT: DONE`;
+  const SR_SHELL = `## Edit:\n### file: start.sh\n<<<<<<< SEARCH\ncd "$REPO"\n=======\nrequire_env PORT\ncd "$REPO"\n>>>>>>> REPLACE\nVERDICT: DONE`;
+
+  it("additive SEARCH/REPLACE in a gate-covered .ts → safe-auto", () => {
+    expect(proposalIsAdditive(SR_ADDITIVE)).toBe(true);
+    expect(riskTier(SR_ADDITIVE, "server/x.ts")).toBe("safe-auto");
+  });
+  it("a new-file diff (.ts) → safe-auto", () => {
+    expect(riskTier(NEW_FILE, "scripts/x.ts")).toBe("safe-auto");
+  });
+  it("modifies existing logic in a .ts → review (gate passes but semantics need a human)", () => {
+    expect(proposalIsAdditive(SR_MODIFY)).toBe(false);
+    expect(riskTier(SR_MODIFY, "server/x.ts")).toBe("review");
+  });
+  it("a shell target the gate cannot verify → blocked (even if additive)", () => {
+    expect(riskTier(SR_SHELL, "start.sh")).toBe("blocked");
+  });
+  it("unknown / missing target → blocked", () => {
+    expect(riskTier(SR_ADDITIVE, "")).toBe("blocked");
+    expect(riskTier(SR_ADDITIVE, "(unknown)")).toBe("blocked");
+  });
+  it("classifyProposal carries a tier", () => {
+    expect(classifyProposal("s", "t", "m", NEW_FILE, true).tier).toBe("safe-auto");
+  });
+});
+
+describe("renderShipReport (batch ledger)", () => {
+  const shipped: ShipResult[] = [{ target: "errors.terminal", model: "qwen3-coder:480b", tier: "safe-auto", ok: true, files: ["server/x.ts"], reason: "applied + gate GREEN" }];
+  const reverted: ShipResult[] = [];
+  const skipped: ShipResult[] = [
+    { target: "typescript.terminal", model: "m", tier: "review", ok: false, files: ["server/y.ts"], reason: "modifies existing logic — conductor must judge semantics" },
+    { target: "shell.terminal", model: "m", tier: "blocked", ok: false, files: ["start.sh"], reason: "gate can't verify" },
+  ];
+  const md = renderShipReport(shipped, reverted, skipped, "2026-07-03T00:00:00Z");
+  it("summarizes shipped/reverted/skipped and separates auto vs held", () => {
+    expect(md).toContain("# FLEET_SHIP.md");
+    expect(md).toContain("1 shipped · 0 reverted · 2 skipped");
+    expect(md).toContain("errors.terminal");
+    expect(md).toContain("Skipped (conductor must judge");
+    expect(md).toContain("`typescript.terminal` (review)");
+    expect(md).toContain("`shell.terminal` (blocked)");
   });
 });
 

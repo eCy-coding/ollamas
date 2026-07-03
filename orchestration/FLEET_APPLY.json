@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-03T02:57:33Z",
+  "ts": "2026-07-03T03:10:48Z",
   "rows": [
     {
       "stream": "concurrency-safety",
@@ -10,7 +10,8 @@
       "files": [
         "server/host-bridge.ts"
       ],
-      "reason": "search/replace resolves cleanly against the current tree"
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "review"
     },
     {
       "stream": "errors-resilience",
@@ -21,7 +22,8 @@
       "files": [
         "server/agent-events.ts"
       ],
-      "reason": "search/replace resolves cleanly against the current tree"
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "safe-auto"
     },
     {
       "stream": "mjs-migration",
@@ -32,7 +34,8 @@
       "files": [
         "scripts/agent-dispatch.mjs"
       ],
-      "reason": "search/replace resolves cleanly against the current tree"
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "safe-auto"
     },
     {
       "stream": "shell-harden",
@@ -43,7 +46,8 @@
       "files": [
         "start.sh"
       ],
-      "reason": "search/replace resolves cleanly against the current tree"
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "blocked"
     },
     {
       "stream": "test-coverage",
@@ -52,7 +56,8 @@
       "hasDiff": true,
       "applyReady": false,
       "files": [],
-      "reason": "target tests/cli-http.test.ts not found"
+      "reason": "target tests/cli-http.test.ts not found",
+      "tier": "blocked"
     },
     {
       "stream": "typescript-core",
@@ -61,7 +66,8 @@
       "hasDiff": true,
       "applyReady": false,
       "files": [],
-      "reason": "server/analyzer.ts: SEARCH snippet not found in target (stale / not an exact copy)"
+      "reason": "server/analyzer.ts: SEARCH snippet not found in target (stale / not an exact copy)",
+      "tier": "blocked"
     }
   ]
 }

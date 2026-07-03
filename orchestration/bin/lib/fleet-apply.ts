@@ -6,6 +6,38 @@
 // fail. This module extracts the diff, judges whether it even LOOKS applyable, and (with the CLI's dry
 // `git apply --check`) classifies each proposal apply-ready vs illustrative — so the conductor applies only
 // clean, correct patches, gated. No blind application of weak-model output.
+//
+// Risk-tier: apply-ready ≠ ship-ready. A shaped edit can still PASS the gate yet be semantically wrong (e.g.
+// wrapping POST calls in a single-flight collapses distinct side-effects — tsc/tests won't catch it). So the
+// batch ship auto-applies ONLY the `safe-auto` tier (purely additive edits in gate-covered TS/mjs); edits that
+// modify existing logic → `review` (conductor eyeballs), and non-gate-covered targets (.sh/.md/unknown) →
+// `blocked` (the gate can't verify them). Deterministic, IO-free.
+
+import { isAdditive } from "./fleet-next";
+import { hasSearchReplace, parseSearchReplace } from "./search-replace";
+
+export type RiskTier = "safe-auto" | "review" | "blocked";
+
+/** Files the tsc + vitest gate can actually verify (type-checked / test-covered). */
+const GATE_COVERED = /\.(tsx?|mjs|cts|mts)$/;
+
+/** Additive = nothing removed. Diff form: reuse fleet-next.isAdditive. SEARCH/REPLACE form: every block's
+ *  REPLACE keeps the SEARCH verbatim (new lines only) or SEARCH is empty (new file). */
+export function proposalIsAdditive(proposal: string): boolean {
+  if (hasSearchReplace(proposal)) {
+    const edits = parseSearchReplace(proposal);
+    return edits.length > 0 && edits.every((e) => e.search === "" || e.replace.includes(e.search));
+  }
+  return isAdditive(proposal);
+}
+
+/** Risk tier for auto-ship gating. `safe-auto` = additive AND gate-covered target; `review` = modifies
+ *  existing logic in a gate-covered file (gate catches type/test breaks, conductor judges semantics);
+ *  `blocked` = target the gate cannot verify (.sh/.md/unknown) → never auto-shipped. */
+export function riskTier(proposal: string, target: string): RiskTier {
+  if (!target || target === "(unknown)" || !GATE_COVERED.test(target)) return "blocked";
+  return proposalIsAdditive(proposal) ? "safe-auto" : "review";
+}
 
 /** Extract the FIRST fenced ```diff block from a PROPOSAL.md (workers sometimes duplicate it). */
 export function extractDiff(proposalMd: string): string {
@@ -41,6 +73,7 @@ export interface ApplyRow {
   applyReady: boolean;   // looksApplyable AND `git apply --check` passed (the CLI supplies applyOk)
   files: string[];
   reason: string;
+  tier: RiskTier;        // safe-auto (batch auto-ships) | review (conductor judges) | blocked (gate can't verify)
 }
 
 /** Classify one proposal. `applyOk` is the result of the CLI's `git apply --check` (null if not run). */
@@ -53,7 +86,35 @@ export function classifyProposal(stream: string, slot: string, model: string, di
       : applyOk === false ? "diff shaped but `git apply --check` failed (stale vs current tree)"
         : applyOk === null ? "shaped; not checked"
           : "clean — applies to the current tree";
-  return { stream, slot, model, hasDiff, applyReady, files: hasDiff ? targetFiles(diff) : [], reason };
+  const files = hasDiff ? targetFiles(diff) : [];
+  return { stream, slot, model, hasDiff, applyReady, files, reason, tier: riskTier(diff, files[0] ?? "") };
+}
+
+export interface ShipResult { target: string; model: string; tier: RiskTier; ok: boolean; files: string[]; reason: string }
+
+/** Render FLEET_SHIP.md: the batch gated-ship ledger — what auto-shipped (gate GREEN, left uncommitted for
+ *  conductor review), what reverted (gate RED), and what was skipped (review/blocked, needs a human). */
+export function renderShipReport(shipped: ShipResult[], reverted: ShipResult[], skipped: ShipResult[], ts: string): string {
+  const row = (r: ShipResult) => `| ${r.target} | \`${r.model}\` | ${r.tier} | ${r.files.join(", ") || "—"} | ${r.reason} |`;
+  return [
+    `# FLEET_SHIP.md — batch gated-ship ledger (auto-generated)`,
+    ``,
+    `> Auto: \`tsx orchestration/bin/fleet-apply.ts --apply-all\` · ${ts}. Applies every apply-ready **safe-auto**`,
+    `> proposal (additive, gate-covered), each gated independently (tsc + vitest): kept on GREEN, reverted on RED.`,
+    `> Left UNCOMMITTED — the conductor reviews \`git diff\` and commits. \`review\`/\`blocked\` tiers are NOT`,
+    `> auto-shipped (semantic risk / gate can't verify) — apply them one-by-one with \`--apply <stream>.<slot>\`.`,
+    ``,
+    `## Result: ${shipped.length} shipped · ${reverted.length} reverted · ${skipped.length} skipped`,
+    ``,
+    `| Target | Model | Tier | Files | Outcome |`,
+    `|--------|-------|------|-------|---------|`,
+    ...shipped.map(row),
+    ...reverted.map(row),
+    ...skipped.map(row),
+    ``,
+    ...(shipped.length ? [`## Shipped (uncommitted — review \`git diff\` then commit)`, ...shipped.map((r) => `- \`${r.target}\` → ${r.files.join(", ")}`)] : [`## Nothing auto-shipped this pass`]),
+    ...(skipped.length ? [``, `## Skipped (conductor must judge — \`--apply <stream>.<slot>\`)`, ...skipped.map((r) => `- \`${r.target}\` (${r.tier}) → ${r.reason}`)] : []),
+  ].join("\n");
 }
 
 /** Render FLEET_APPLY.md: which model proposals are apply-ready vs illustrative, with reasons. */
@@ -68,9 +129,9 @@ export function renderApplyReport(rows: ApplyRow[], ts: string): string {
     ``,
     `## Result: ${ready.length}/${rows.length} proposals apply-ready`,
     ``,
-    `| Stream/slot | Model | Diff | Apply-ready | Files | Reason |`,
-    `|-------------|-------|------|-------------|-------|--------|`,
-    ...rows.map((r) => `| ${r.stream}.${r.slot} | \`${r.model}\` | ${r.hasDiff ? "✅" : "—"} | ${r.applyReady ? "**✅**" : "—"} | ${r.files.join(", ") || "—"} | ${r.reason} |`),
+    `| Stream/slot | Model | Diff | Apply-ready | Tier | Files | Reason |`,
+    `|-------------|-------|------|-------------|------|-------|--------|`,
+    ...rows.map((r) => `| ${r.stream}.${r.slot} | \`${r.model}\` | ${r.hasDiff ? "✅" : "—"} | ${r.applyReady ? "**✅**" : "—"} | ${r.tier} | ${r.files.join(", ") || "—"} | ${r.reason} |`),
     ``,
     `## Apply-ready (conductor may \`--apply\`, gated)`,
     ...(ready.length ? ready.map((r) => `- \`${r.stream}.${r.slot}\` (${r.model}) → ${r.files.join(", ")} — \`tsx orchestration/bin/fleet-apply.ts --apply ${r.stream}.${r.slot}\``) : ["- (none — all proposals are illustrative; workers must emit clean unified diffs with real line numbers)"]),

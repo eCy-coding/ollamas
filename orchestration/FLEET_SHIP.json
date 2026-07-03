@@ -1,0 +1,48 @@
+{
+  "ts": "2026-07-03T03:11:46Z",
+  "shipped": [
+    {
+      "target": "errors-resilience.terminal",
+      "model": "qwen3-coder:480b-cloud",
+      "tier": "safe-auto",
+      "ok": true,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "applied + gate GREEN"
+    },
+    {
+      "target": "mjs-migration.terminal",
+      "model": "gpt-oss:120b-cloud",
+      "tier": "safe-auto",
+      "ok": true,
+      "files": [
+        "scripts/agent-dispatch.mjs"
+      ],
+      "reason": "applied + gate GREEN"
+    }
+  ],
+  "reverted": [],
+  "skipped": [
+    {
+      "target": "concurrency-safety.terminal",
+      "model": "gpt-oss:120b-cloud",
+      "tier": "review",
+      "ok": false,
+      "files": [
+        "server/host-bridge.ts"
+      ],
+      "reason": "modifies existing logic — conductor must judge semantics"
+    },
+    {
+      "target": "shell-harden.terminal",
+      "model": "gpt-oss:20b-cloud",
+      "tier": "blocked",
+      "ok": false,
+      "files": [
+        "start.sh"
+      ],
+      "reason": "gate can't verify (shell/unknown target)"
+    }
+  ]
+}

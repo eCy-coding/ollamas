@@ -20,6 +20,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { defaultStore, readClaims, activeClaims, closeClaim } from "./lib/claims";
+import { extractOneProposal } from "./lib/fleet-conduct-lib";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -45,14 +46,9 @@ function gate(r: WorkerReport): { ok: boolean; reason: string } {
   return { ok: true, reason: `${r.verdict} · ${r.steps} steps · proposal ${r.proposal.length}c` };
 }
 
-/** Extract the proposal text from a report's final messages (Change/Diff/Test shape). */
-function extractProposal(messages: unknown): string {
-  const arr = Array.isArray(messages) ? messages.map((m) => String(m)) : [];
-  const joined = arr.join("\n").trim();
-  // prefer the segment from the first "## Change" marker (the requested shape); else the last message
-  const i = joined.search(/##\s*Change/i);
-  return (i >= 0 ? joined.slice(i) : (arr[arr.length - 1] ?? "")).trim();
-}
+// Proposal extraction is the pure `extractOneProposal` (bin/lib/fleet-conduct-lib) — VERDICT-terminated so a
+// worker that repeats its whole block does NOT produce a duplicate proposal (root fix for the dup SR blocks).
+const extractProposal = extractOneProposal;
 
 function readReports(): WorkerReport[] {
   if (!existsSync(REPORTS)) return [];

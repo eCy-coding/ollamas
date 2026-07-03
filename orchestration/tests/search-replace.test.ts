@@ -22,6 +22,14 @@ describe("parseSearchReplace", () => {
     expect(parseSearchReplace(two)).toHaveLength(2);
   });
   it("returns [] with no blocks", () => { expect(parseSearchReplace("just prose")).toEqual([]); });
+  it("dedupes identical repeated blocks (living-worker dup-block)", () => {
+    // the same block emitted twice → only one edit survives (2nd identical copy dropped)
+    expect(parseSearchReplace(BLOCK + "\n\n" + BLOCK)).toHaveLength(1);
+  });
+  it("keeps two blocks that differ (not dedup false-positive)", () => {
+    const two = BLOCK + "\n\n### file: x.ts\n<<<<<<< SEARCH\nconst a = 1;\n=======\nconst a = 2;\n>>>>>>> REPLACE";
+    expect(parseSearchReplace(two)).toHaveLength(2);
+  });
 });
 
 describe("applyEdit — exact unique match", () => {

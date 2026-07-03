@@ -10,12 +10,12 @@
  * Run:  tsx orchestration/bin/fleet-apply.ts            # triage (safe, read-only)
  *       tsx orchestration/bin/fleet-apply.ts --apply mjs-migration.terminal   # opt-in gated apply
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { extractDiff, looksApplyable, classifyProposal, renderApplyReport, type ApplyRow } from "./lib/fleet-apply";
+import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, type ApplyRow, type ShipResult } from "./lib/fleet-apply";
 import { parseSearchReplace, applyEdit, hasSearchReplace, type Edit } from "./lib/search-replace";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -26,6 +26,7 @@ const WORK = join(homedir(), ".llm-mission-control", "fleet", "work");
 const argv = process.argv.slice(2);
 const flag = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
 const APPLY = flag("--apply");
+const APPLY_ALL = argv.includes("--apply-all");
 const JSON_OUT = argv.includes("--json");
 
 const nowIso = () => { try { return execFileSync("date", ["-u", "+%Y-%m-%dT%H:%M:%SZ"], { encoding: "utf8" }).trim(); } catch { return "unknown"; } };
@@ -73,7 +74,7 @@ function collect(): ApplyRow[] {
     let md = ""; try { md = readFileSync(pf, "utf8"); } catch { continue; }
     if (hasSearchReplace(md)) {
       const sr = drySearchReplace(parseSearchReplace(md));
-      rows.push({ stream, slot, model: modelOf(md), hasDiff: true, applyReady: sr.ready, files: sr.files, reason: sr.reason });
+      rows.push({ stream, slot, model: modelOf(md), hasDiff: true, applyReady: sr.ready, files: sr.files, reason: sr.reason, tier: riskTier(md, sr.files[0] ?? "") });
       continue;
     }
     const diff = extractDiff(md);
@@ -90,44 +91,77 @@ function gate(): void {
   execFileSync(join(REPO, "node_modules/.bin/vitest"), ["run"], { cwd: REPO, stdio: "inherit", timeout: 240000 });
 }
 
-/** --apply: apply ONE apply-ready proposal (git-diff OR SEARCH/REPLACE), gate it, keep on green else revert. */
-function doApply(target: string): void {
+/** Apply ONE apply-ready proposal (git-diff OR SEARCH/REPLACE), gate it, keep on GREEN else revert. Returns a
+ *  result (no process.exit) so the batch driver can loop. Reverts by restoring each touched file's PRE-APPLY
+ *  snapshot (not `git checkout`), so an earlier batch edit kept in the tree is never clobbered. */
+function applyOne(target: string): { target: string; ok: boolean; files: string[]; reason: string } {
   const [stream, slot] = target.split(".");
   const pf = join(WORK, `${stream}.${slot}`, "PROPOSAL.md");
-  if (!existsSync(pf)) { console.error(`fleet-apply: ${target} PROPOSAL.md yok.`); process.exit(2); }
+  if (!existsSync(pf)) return { target, ok: false, files: [], reason: "PROPOSAL.md yok" };
   const md = readFileSync(pf, "utf8");
 
   // SEARCH/REPLACE path — deterministic exact-match apply (the reliable worker format).
   if (hasSearchReplace(md)) {
     const edits = parseSearchReplace(md);
     const dry = drySearchReplace(edits);
-    if (!dry.ready) { console.error(`fleet-apply: ${target} apply-ready DEĞİL — ${dry.reason}`); process.exit(1); }
+    if (!dry.ready) return { target, ok: false, files: [], reason: `apply-ready değil — ${dry.reason}` };
     const touched = dry.files;
+    const snap = new Map<string, string | null>();
+    for (const f of touched) { const abs = join(REPO, f); snap.set(f, existsSync(abs) ? readFileSync(abs, "utf8") : null); }
     console.log(`[fleet-apply] applying ${target} (search/replace) → ${touched.join(", ")} …`);
     for (const e of edits) { const abs = join(REPO, e.file!); const cur = existsSync(abs) ? readFileSync(abs, "utf8") : ""; writeFileSync(abs, applyEdit(cur, e).content); }
-    try { gate(); console.log(`\n✅ ${target} applied + gate GREEN — review \`git diff\` and commit if correct.`); }
-    catch { console.error(`\n✗ gate FAILED — reverting (main tree stays clean).`); try { execFileSync("git", ["checkout", "--", ...touched], { cwd: REPO, stdio: "ignore" }); } catch { /* best-effort */ } process.exit(1); }
-    return;
+    try { gate(); return { target, ok: true, files: touched, reason: "applied + gate GREEN" }; }
+    catch {
+      for (const [f, c] of snap) { const abs = join(REPO, f); if (c === null) { try { unlinkSync(abs); } catch { /* was absent */ } } else writeFileSync(abs, c); }
+      return { target, ok: false, files: touched, reason: "gate RED → reverted (snapshot restore)" };
+    }
   }
 
-  // git-diff path (vO51).
+  // git-diff path (vO51). `git apply -R` reverses only this patch → other batch edits untouched.
   const diff = extractDiff(md);
-  if (!looksApplyable(diff) || !gitApplyCheck(diff)) { console.error(`fleet-apply: ${target} apply-ready DEĞİL (illustrative/stale). Triage: tsx orchestration/bin/fleet-apply.ts`); process.exit(1); }
-  const patch = join(tmpdir(), `fleet-apply-do.patch`);
+  if (!looksApplyable(diff) || !gitApplyCheck(diff)) return { target, ok: false, files: targetFiles(diff), reason: "apply-ready değil (illustrative/stale)" };
+  const patch = join(tmpdir(), `fleet-apply-${stream}-${slot}.patch`);
   writeFileSync(patch, diff + "\n");
-  console.log(`[fleet-apply] applying ${target} …`);
-  execFileSync("git", ["apply", patch], { cwd: REPO, stdio: "inherit" });
-  try {
-    gate();
-    console.log(`\n✅ ${target} applied + gate GREEN — review \`git diff\` and commit if correct.`);
-  } catch {
-    console.error(`\n✗ gate FAILED after applying ${target} — reverting (main tree stays clean).`);
-    try { execFileSync("git", ["apply", "-R", patch], { cwd: REPO, stdio: "ignore" }); } catch { /* best-effort reverse */ }
-    process.exit(1);
+  console.log(`[fleet-apply] applying ${target} (git-diff) …`);
+  try { execFileSync("git", ["apply", patch], { cwd: REPO, stdio: "ignore" }); }
+  catch { return { target, ok: false, files: targetFiles(diff), reason: "git apply failed (conflicts with tree)" }; }
+  try { gate(); return { target, ok: true, files: targetFiles(diff), reason: "applied + gate GREEN" }; }
+  catch { try { execFileSync("git", ["apply", "-R", patch], { cwd: REPO, stdio: "ignore" }); } catch { /* best-effort */ } return { target, ok: false, files: targetFiles(diff), reason: "gate RED → reverted" }; }
+}
+
+/** --apply: single proposal (opt-in), keep-green/revert-red, exit-coded. */
+function doApply(target: string): void {
+  const r = applyOne(target);
+  if (r.ok) { console.log(`\n✅ ${target} applied + gate GREEN — review \`git diff\` and commit if correct.`); return; }
+  console.error(`\n✗ ${target}: ${r.reason}`); process.exit(1);
+}
+
+/** --apply-all: batch gated-ship — every apply-ready SAFE-AUTO proposal, each independently gated, kept on
+ *  green / reverted on red. review/blocked tiers are surfaced, never auto-applied. Left UNCOMMITTED for the
+ *  conductor to review + commit. Writes FLEET_SHIP.md/.json. */
+function doApplyAll(): void {
+  const rows = collect();
+  const eligible = rows.filter((r) => r.applyReady && r.tier === "safe-auto");
+  const held = rows.filter((r) => r.applyReady && r.tier !== "safe-auto");
+  console.log(`\nFLEET SHIP (batch) — ${eligible.length} safe-auto apply-ready · ${held.length} held (review/blocked):`);
+  const shipped: ShipResult[] = [], reverted: ShipResult[] = [];
+  for (const r of eligible) {
+    const res = applyOne(`${r.stream}.${r.slot}`);
+    const sr: ShipResult = { target: res.target, model: r.model, tier: r.tier, ok: res.ok, files: res.files, reason: res.reason };
+    (res.ok ? shipped : reverted).push(sr);
+    console.log(`  ${res.ok ? "✅ shipped" : "✗ reverted"}  ${res.target.padEnd(28)} ${res.reason}`);
   }
+  const skipped: ShipResult[] = held.map((r) => ({ target: `${r.stream}.${r.slot}`, model: r.model, tier: r.tier, ok: false, files: r.files, reason: r.tier === "blocked" ? "gate can't verify (shell/unknown target)" : "modifies existing logic — conductor must judge semantics" }));
+  const ts = nowIso();
+  writeFileSync(join(ORCH_DIR, "FLEET_SHIP.md"), renderShipReport(shipped, reverted, skipped, ts) + "\n");
+  writeFileSync(join(ORCH_DIR, "FLEET_SHIP.json"), JSON.stringify({ ts, shipped, reverted, skipped }, null, 2) + "\n");
+  console.log(`\n${shipped.length} shipped (UNCOMMITTED) · ${reverted.length} reverted · ${skipped.length} skipped.`);
+  if (shipped.length) console.log(`Review: git diff — then commit. Ledger: orchestration/FLEET_SHIP.md`);
+  else console.log(`Ledger: orchestration/FLEET_SHIP.md`);
 }
 
 function main(): void {
+  if (APPLY_ALL) return doApplyAll();
   if (APPLY) return doApply(APPLY);
   const rows = collect();
   const ts = nowIso();

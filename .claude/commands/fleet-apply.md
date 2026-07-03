@@ -1,13 +1,14 @@
 ---
-description: Conductor apply-readiness triage for the fleet's gated proposals — extracts each PROPOSAL.md diff, dry-runs `git apply --check` (read-only), and reports which are apply-ready vs illustrative → orchestration/FLEET_APPLY.md. `--apply <stream>.<slot>` applies ONE apply-ready proposal, gates it (tsc + tests), and keeps it only if green (else reverts). The main tree is never left broken; illustrative/weak diffs are never blindly applied.
+description: Conductor apply-readiness triage for the fleet's gated proposals — extracts each PROPOSAL.md diff / SEARCH-REPLACE block, classifies a risk-tier (safe-auto | review | blocked), and reports which are apply-ready → orchestration/FLEET_APPLY.md. `--apply <stream>.<slot>` applies ONE, gates it (tsc + tests), keeps on green (else reverts). `--apply-all` batch-ships every apply-ready **safe-auto** proposal, each independently gated, left UNCOMMITTED for review → FLEET_SHIP.md. The main tree is never left broken; review/blocked tiers are never auto-applied.
 allowed-tools: Bash(./node_modules/.bin/tsx orchestration/bin/fleet-apply.ts:*), Bash(npx tsx orchestration/bin/fleet-apply.ts:*)
-argument-hint: "[--apply <stream>.<slot>] [--json]"
+argument-hint: "[--apply <stream>.<slot>] [--apply-all] [--json]"
 ---
 Run `./node_modules/.bin/tsx orchestration/bin/fleet-apply.ts $ARGUMENTS`.
 
 The fleet PRODUCES gated proposals (Change/Diff/Test) but nothing APPLIES them — this closes the produce→gate→APPLY loop safely. It reads every `~/.llm-mission-control/fleet/work/<stream>.<slot>/PROPOSAL.md`, extracts the first fenced diff, and dry-runs `git apply --check`. A proposal is **apply-ready** only when its diff is shaped (real `@@ -a,b +c,d @@` line numbers or a `new file` marker) AND applies cleanly to the current tree — most worker diffs are illustrative (no line numbers) and are surfaced, not applied.
 
-- (no args) — triage → `orchestration/FLEET_APPLY.md` (apply-ready vs illustrative + reason + target files).
-- `--apply <stream>.<slot>` — apply ONE apply-ready proposal to the tree, run the full gate (tsc + vitest), keep on green, `git apply -R` revert on red. The conductor reviews `git diff` and commits if correct.
+- (no args) — triage → `orchestration/FLEET_APPLY.md` (apply-ready + **risk-tier** + reason + target files).
+- `--apply <stream>.<slot>` — apply ONE apply-ready proposal, run the full gate (tsc + vitest), keep on green, revert on red. The conductor reviews `git diff` and commits if correct.
+- `--apply-all` — batch gated-ship: apply every apply-ready **safe-auto** (additive, gate-covered `.ts/.tsx/.mjs`) proposal, each independently gated (revert restores the pre-apply snapshot so earlier batch edits are never clobbered). `review` (modifies existing logic) and `blocked` (shell/unknown — gate can't verify) tiers are surfaced, NOT auto-applied. Green edits are left UNCOMMITTED → `orchestration/FLEET_SHIP.md`; the conductor reviews the aggregate `git diff` and commits.
 
-Never blindly applies weak-model output; the conductor (Claude) reviews + gates. See `.claude/BRAIN.md`.
+Never blindly applies weak-model output; the conductor (Claude) reviews + gates. **A `safe-auto` edit can still PASS the gate yet be semantically/runtime wrong (e.g. importing a non-existent module into a `node` entry-point) — so the conductor review of `git diff` before commit is load-bearing, not optional.** See `.claude/BRAIN.md`.
