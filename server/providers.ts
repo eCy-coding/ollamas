@@ -12,6 +12,8 @@ import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catal
 import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_MS } from "./provider-errors";
 import { filterChain } from "./chain-policy";
 import { setToolSupport, toolSupportSnapshot, hydrateToolSupport } from "./capability-cache";
+import { recordRequestEvent } from "./telemetry";
+import { randomUUID } from "node:crypto";
 
 // Types
 export interface ProviderMessage {
@@ -303,6 +305,8 @@ export class ProviderRouter {
     const start = Date.now();
     const providersToTry = this.effectiveChain(config);
     let lastError: Error | null = null;
+    const requestId = randomUUID();
+    let prevProv: string | undefined; // provider the current attempt fell back FROM (telemetry)
 
     for (const prov of providersToTry) {
       const resolvedConfig = { ...config, provider: prov };
@@ -337,8 +341,13 @@ export class ProviderRouter {
       let lastAttemptMs = 0; // this provider's OWN time (per-attempt) for the latency cache — NOT cumulative
       for (let attempt = 0; attempt < attempts; attempt++) {
         const attemptStart = Date.now();
+        // TTFT: wrap onStreamChunk so the first token's arrival is timed for telemetry.
+        let firstChunkAt = 0;
+        const wrappedChunk = onStreamChunk
+          ? (t: string) => { if (!firstChunkAt) firstChunkAt = Date.now(); onStreamChunk(t); }
+          : undefined;
         try {
-          const result = await this.executeProvider(resolvedConfig, onStreamChunk, signal);
+          const result = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
           lastAttemptMs = Date.now() - attemptStart;
           // Passive capability learning: a tools request that SUCCEEDED proves support.
           if (config.tools?.length) { setToolSupport(prov, resolvedConfig.model || "", true); this.persistUsageDebounced(); }
@@ -361,7 +370,22 @@ export class ProviderRouter {
             const estIn = Math.ceil(inChars / 4);
             const tokensIn = result.tokensIn ?? estIn;
             const tokensOut = result.tokensOut ?? result.tokens ?? Math.ceil((result.text || "").length / 4);
-            recordCallCost(prov, tokensIn, tokensOut, estimateCost(result.modelUsed || resolvedConfig.model || prov, tokensIn, tokensOut));
+            const costUsd = estimateCost(result.modelUsed || resolvedConfig.model || prov, tokensIn, tokensOut);
+            recordCallCost(prov, tokensIn, tokensOut, costUsd);
+            // Per-request telemetry (T5-F2): one event per model op, feeds the live cockpit.
+            // side-effect-safe — recordRequestEvent never throws into the model path.
+            const used = cloudKeyed ? this.getDecryptedKey(prov) : "";
+            recordRequestEvent({
+              ts: Date.now(), operation: "chat", providerName: prov,
+              requestModel: resolvedConfig.model || undefined,
+              responseModel: result.modelUsed || resolvedConfig.model || undefined,
+              inputTokens: tokensIn, outputTokens: tokensOut,
+              requestId, ttftMs: wrappedChunk && firstChunkAt ? firstChunkAt - attemptStart : undefined,
+              totalMs: elapsed, status: "ok", costUsd,
+              routeAttempt: providersToTry.indexOf(prov), fallbackFrom: prevProv,
+              retryCount: attempt, keyId: used ? keyId(used) : undefined,
+              stream: !!wrappedChunk, tokPerSec: lastAttemptMs > 0 ? tokensOut / (lastAttemptMs / 1000) : undefined,
+            });
           }
           return { ...result, latencyMs: elapsed };
         } catch (err: any) {
@@ -406,6 +430,18 @@ export class ProviderRouter {
       lastError = provErr;
       const lowercaseMsg = (provErr?.message || "").toLowerCase();
       const isQuotaErr = lowercaseMsg.includes("429") || lowercaseMsg.includes("quota") || lowercaseMsg.includes("resource_exhausted") || lowercaseMsg.includes("exceeded");
+      // Per-request telemetry (T5-F2): record this provider's FAILURE before falling through.
+      // errorType = HTTP status when typed, else a short classifier from the message.
+      recordRequestEvent({
+        ts: Date.now(), operation: "chat", providerName: prov,
+        requestModel: resolvedConfig.model || undefined,
+        inputTokens: 0, outputTokens: 0, requestId, totalMs: Date.now() - start,
+        status: "error",
+        errorType: provErr instanceof ProviderHttpError ? String(provErr.status) : (isQuotaErr ? "429" : "error"),
+        routeAttempt: providersToTry.indexOf(prov), fallbackFrom: prevProv,
+        retryCount: attempts - 1, quotaCooldownFlag: isQuotaErr, stream: !!onStreamChunk, costUsd: 0,
+      });
+      prevProv = prov; // the NEXT provider in the chain falls back FROM this one
       const isAuthError =
         lowercaseMsg.includes("401") ||
         lowercaseMsg.includes("403") ||
