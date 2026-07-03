@@ -71,11 +71,25 @@ export function poolNodes(state: RegistryState, nowMs: number, staleMs = DEFAULT
   return nodes.sort((a, b) => rank[a.freshness] - rank[b.freshness] || b.score - a.score);
 }
 
-/** Fleet projection: fresh active members with a URL, as backends.json entries. */
+/** Fleet projection: fresh active members with a URL, as backends.json entries.
+ * vK4: ranked — poolNodes is already score-sorted, so the strongest node gets
+ * the lowest priority number and selectFleetBackend tries it first. */
 export function toFleetBackends(state: RegistryState, nowMs: number, staleMs = DEFAULT_STALE_MS): Array<{ name: string; url: string; priority: number }> {
   return poolNodes(state, nowMs, staleMs)
     .filter((n) => n.freshness === "fresh" && n.url)
-    .map((n) => ({ name: `contract:${n.memberId}`, url: n.url as string, priority: CONTRACT_FLEET_PRIORITY }));
+    .map((n, i) => ({ name: `contract:${n.memberId}`, url: n.url as string, priority: CONTRACT_FLEET_PRIORITY + i }));
+}
+
+/** vK4 gateway quota (litellm principle): per-member request/day, enforced at
+ * the OPERATOR gateway — member nodes are never trusted to self-limit.
+ * UTC day rollover resets the counter (RISK-K2: caller persists the new state). */
+export function consumeQuota(state: RegistryState, tenantId: string, todayUtc: string): RegistryState {
+  const m = state.members.find((x) => x.tenantId === tenantId && x.status === "active");
+  if (!m) throw new Error("no active membership for this key");
+  const used = m.quota.dayUtc === todayUtc ? m.quota.usedToday : 0;
+  if (used >= m.quota.reqPerDay) throw new Error(`quota exceeded: ${m.quota.reqPerDay}/day`);
+  const next: Member = { ...m, quota: { ...m.quota, usedToday: used + 1, dayUtc: todayUtc } };
+  return { members: state.members.map((x) => (x.id === m.id ? next : x)) };
 }
 
 /** Merge into an existing backends.json array: foreign entries untouched,

@@ -14,7 +14,8 @@ import {
 } from "../contract/src/registry.ts";
 import { approveWithKey, revokeWithKey, type KeyBridge } from "../contract/src/keys.ts";
 import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts";
-import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, type HeartbeatInput } from "../contract/src/pool.ts";
+import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, type HeartbeatInput } from "../contract/src/pool.ts";
+import { ProviderRouter } from "./providers";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -107,6 +108,11 @@ export function contractPoolNodes() {
   return poolNodes(getState(), Date.now());
 }
 
+/** vK4: gateway-side quota tick. Throws when exhausted (mapped to 429). */
+export function contractConsumeQuota(tenantId: string): void {
+  setState(consumeQuota(getState(), tenantId, new Date().toISOString().slice(0, 10)));
+}
+
 export function contractStatus(memberId: string): { member: ReturnType<typeof maskMember>; key?: string } | null {
   const m = getMember(getState(), memberId);
   if (!m) return null;
@@ -154,6 +160,36 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
   app.get("/api/pool/nodes", requireAuth, (req, res) => {
     if (!(req as any).tenant?.tenantId) return res.status(401).json({ error: "key required" });
     res.json({ nodes: contractPoolNodes() });
+  });
+
+  // vK4 federated inference gateway — "one big machine" API surface for members.
+  // Quota is enforced HERE (nodes are never trusted to self-limit); the scheduler
+  // is the EXISTING fleet provider fed by our ranked backends.json projection.
+  app.post("/api/pool/generate", requireAuth, rateLimit, async (req, res) => {
+    const tenantId = (req as any).tenant?.tenantId;
+    if (!tenantId) return res.status(401).json({ error: "key required" });
+    try {
+      contractConsumeQuota(String(tenantId));
+    } catch (e: any) {
+      return res.status(429).json({ error: e.message });
+    }
+    try {
+      const { model, messages, temperature } = req.body || {};
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "messages (non-empty array) required" });
+      }
+      const ctrl = new AbortController();
+      req.on("close", () => ctrl.abort());
+      const result = await ProviderRouter.generate(
+        { provider: "fleet", model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined } as any,
+        undefined,
+        undefined,
+        ctrl.signal,
+      );
+      res.json({ content: result.text, model: result.modelUsed, source: result.source, latencyMs: result.latencyMs });
+    } catch (e: any) {
+      res.status(502).json({ error: e.message });
+    }
   });
 
   app.get("/api/contract/document", (_req, res) => {

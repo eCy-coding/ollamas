@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyForMembership, approveMember, emptyState, getMember } from "./registry.ts";
-import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends } from "./pool.ts";
+import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota } from "./pool.ts";
 
 const HASH = "c".repeat(64);
 const NOW = "2026-07-03T10:00:00.000Z";
@@ -76,6 +76,41 @@ test("mergeFleetBackends preserves foreign entries, replaces only contract:* (RI
   ];
   const merged = mergeFleetBackends(existing, [{ name: "contract:m_new", url: "http://100.64.0.7:11434", priority: 30 }]);
   assert.deepEqual(merged.map((b) => b.name).sort(), ["contract:m_new", "windows-cuda"]);
+});
+
+test("toFleetBackends ranks by capability score: better node gets lower priority number (vK4)", () => {
+  const a = applyForMembership(
+    emptyState(),
+    { email: "big@example.com", machinePubkey: "aa".repeat(32), specs: { ramGB: 64, os: "darwin", arch: "arm64" }, contractHash: HASH },
+    HASH,
+    NOW,
+  );
+  const b = applyForMembership(a.state, { email: "small@example.com", machinePubkey: "bb".repeat(32), specs: { ramGB: 8, os: "linux", arch: "x64" }, contractHash: HASH }, HASH, NOW);
+  let state = approveMember(b.state, a.member.id, { keyId: "k1", tenantId: "t1" }, NOW);
+  state = approveMember(state, b.member.id, { keyId: "k2", tenantId: "t2" }, NOW);
+  state = recordHeartbeat(state, a.member.id, { ...HB, ollamaUrl: "http://100.64.0.1:11434" }, NOW);
+  state = recordHeartbeat(state, b.member.id, { ...HB, ollamaUrl: "http://100.64.0.2:11434" }, NOW);
+  const backends = toFleetBackends(state, NOW_MS);
+  assert.equal(backends[0]?.name, `contract:${a.member.id}`); // 64GB first
+  assert.equal(backends[0]?.priority, 30);
+  assert.equal(backends[1]?.name, `contract:${b.member.id}`);
+  assert.equal(backends[1]?.priority, 31);
+});
+
+test("consumeQuota (vK4): counts, exhausts, day-rollover resets, active-only", () => {
+  const { state: s0, id } = activeMember();
+  const withQuota = {
+    members: s0.members.map((m) => (m.id === id ? { ...m, quota: { reqPerDay: 2, usedToday: 0, dayUtc: "2026-07-03" } } : m)),
+  };
+  const s1 = consumeQuota(withQuota, "t1", "2026-07-03");
+  const s2 = consumeQuota(s1, "t1", "2026-07-03");
+  assert.throws(() => consumeQuota(s2, "t1", "2026-07-03"), /quota/i);
+  // next day resets
+  const s3 = consumeQuota(s2, "t1", "2026-07-04");
+  assert.equal(getMember(s3, id)?.quota.usedToday, 1);
+  assert.equal(getMember(s3, id)?.quota.dayUtc, "2026-07-04");
+  // unknown tenant
+  assert.throws(() => consumeQuota(s2, "tnt_nope", "2026-07-03"), /membership/i);
 });
 
 test("mergeFleetBackends tolerates garbage existing file", () => {

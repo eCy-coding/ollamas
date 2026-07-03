@@ -414,7 +414,10 @@ export class ProviderRouter {
 
   private static loadFleetPool(): Backend[] {
     try {
-      const raw = JSON.parse(readFileSync(pathJoin(homedir(), ".ollamas", "backends.json"), "utf8"));
+      // FLEET_BACKENDS_PATH override keeps this consistent with the contract lane
+      // sync (server/contract.ts) and makes the pool test-isolatable.
+      const fleetPath = process.env.FLEET_BACKENDS_PATH || pathJoin(homedir(), ".ollamas", "backends.json");
+      const raw = JSON.parse(readFileSync(fleetPath, "utf8"));
       return parseBackendPool(raw);
     } catch { return []; }
   }
