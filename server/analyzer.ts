@@ -7,7 +7,7 @@ import path from 'path';
 // positives. Pure + exported so it can be unit-tested without the filesystem.
 export function computeGaps(tools: Record<string, any>, scripts: string[]): string[] {
   return Object.entries(tools)
-    .filter(([, t]) => typeof t?.entryPoint === "string" && t.entryPoint.endsWith(".py") && !scripts.includes(t.entryPoint))
+    .filter(([, t]) => typeof t?.entryPoint === "string" && t.entryPoint.endsWith(".py") && !scripts.includes(path.basename(t.entryPoint)))
     .map(([name]) => name);
 }
 
