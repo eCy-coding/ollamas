@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-03T07:57:00Z",
+  "ts": "2026-07-03T09:18:50Z",
   "rows": [
     {
       "stream": "concurrency-safety",
@@ -12,6 +12,18 @@
       ],
       "reason": "search/replace resolves cleanly against the current tree",
       "tier": "review"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "gemini",
+      "model": "gemini-2.5-flash",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "safe-auto"
     },
     {
       "stream": "errors-resilience",

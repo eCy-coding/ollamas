@@ -22,7 +22,8 @@ import { homedir } from "node:os";
 import { pullTicket, tryTurn, releaseTurn } from "./lib/gpu-lock";
 import { fullJitterDelay, isTransient } from "./lib/backoff";
 import { dispatchTarget } from "./lib/chrome-probe";
-import { geminiArgs, parseGeminiJson, isGeminiOverload } from "./lib/gemini";
+import { geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "./lib/gemini";
+import { focusFile as focusFileFor, streamTaskPrompt, geminiGroundedPrompt } from "./lib/fleet-prompt";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -34,16 +35,7 @@ const OLLAMAS_URL = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 const [stream, slot] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 if (!stream || !slot) { console.error("usage: fleet-agent.ts <stream> <slot>"); process.exit(2); }
 
-// Narrowed single-file focus per stream for retry (from docs/CODE_PLAN.md P1 items) — small scope = weak
-// models finish. The first attempt is lane-wide; retries focus here so the ReAct loop doesn't wander.
-const FOCUS: Record<string, string> = {
-  "typescript-core": "server/analyzer.ts — fix tool-implementation validation (entryPoint existence check)",
-  "errors-resilience": "server/agent-events.ts — add SSE stream error handling + timeout",
-  "concurrency-safety": "server/host-bridge.ts — guard concurrent MCP client connections",
-  "mjs-migration": "scripts/agent-dispatch.mjs — add a .ts type-def / migration shim",
-  "shell-harden": "start.sh — add set -euo pipefail + required-env guard",
-  "test-coverage": "cli/lib/client.ts — add a unit test for HTTP request handling",
-};
+// FOCUS map + prompt shapes live in bin/lib/fleet-prompt.ts (shared with the gemini vendor path).
 
 const reportF = join(FLEET_HOME, "reports", `${stream}.${slot}.json`);
 const logF = join(FLEET_HOME, "logs", `${stream}.${slot}.log`);
@@ -72,41 +64,6 @@ function releaseClaim(lane: string, version: string): void {
 }
 function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 
-// The per-stream target file (before the " — " description). Reading it DIRECTLY beats list_tree, which
-// floods the model with the whole repo tree so it describes the tree instead of proposing (proven live).
-function focusFile(): string {
-  const f = FOCUS[stream] ?? "";
-  return f.split(/\s+[—-]\s+/)[0].trim(); // e.g. "start.sh — add set -euo pipefail" → "start.sh"
-}
-
-function taskPrompt(_attempt: number): string {
-  const target = focusFile();
-  const goal = FOCUS[stream] ?? "one concrete high-value change for this stream";
-  const readLine = target
-    ? `The agent WORKSPACE is the ollamas repo. Call read_file "${target}" DIRECTLY (do NOT call list_tree — it floods context). Read that ONE file, then propose.`
-    : `The agent WORKSPACE is the ollamas repo. read_file the single most relevant workspace-relative file for this stream, then propose (avoid list_tree — it floods context).`;
-  return [
-    `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Goal: ${goal}.`,
-    readLine,
-    `NEVER call write_file or write_host_file — the conductor applies your edit. Do NOT edit any file yourself.`,
-    `Your FINAL MESSAGE must BE the proposal in this exact shape (nothing else — do NOT describe the repo).`,
-    `Express the change as a SEARCH/REPLACE block: the SEARCH must be an EXACT, VERBATIM copy of lines from the`,
-    `file you read (so it applies deterministically — do NOT use line numbers or a unified diff):`,
-    `## Plan: <1-line plan of the change>`,
-    `## Change: <one concrete high-value change to ${target || "the target file"}>`,
-    `## Edit:`,
-    `### file: ${target || "<workspace-relative path>"}`,
-    `<<<<<<< SEARCH`,
-    `<paste the exact existing lines to replace, copied verbatim from read_file>`,
-    `=======`,
-    `<the replacement lines>`,
-    `>>>>>>> REPLACE`,
-    `## Test: <the test that proves it>`,
-    `## Next: <precompute — the 1-line NEXT step for this stream after this change lands>`,
-    `Then end with: VERDICT: DONE. Keep the SEARCH minimal + unique. Evidence over prose.`,
-  ].join("\n");
-}
-
 // Parse a --json report string into {verdict, proposal, steps}. The proposal is the Change/Diff/Test text
 // from the model's messages (a PROPOSE run may make ZERO tool steps — the proposal lives in the message).
 function parseReport(out: string): { verdict: string; proposal: string; steps: number } {
@@ -122,11 +79,16 @@ function parseReport(out: string): { verdict: string; proposal: string; steps: n
  *  agent-dispatch-compatible report so the conduct pipeline is unchanged. */
 function geminiDispatch(model: string, prompt: string): { verdict: string; proposal: string; steps: number; err?: string } {
   const FLASH = "gemini-2.5-flash";
+  // Grounded prompt: inline the focus file's content so Gemini copies EXACT lines into SEARCH (deterministic,
+  // resolvable — proven to beat relying on the model's own read). Falls back to the read_file prompt.
+  const target = focusFileFor(stream);
+  let effective = prompt;
+  try { const abs = join(REPO, target); if (target && existsSync(abs)) effective = geminiGroundedPrompt(stream, target, readFileSync(abs, "utf8")); } catch { /* keep prompt */ }
   let lastErr = "";
   for (let attempt = 0; attempt < 4; attempt++) {
     const m = attempt < 2 ? model : FLASH; // requested model first, then fall back to the available flash tier
     try {
-      const out = execFileSync("gemini", geminiArgs(prompt, m), {
+      const out = execFileSync("gemini", geminiArgs(effective, m), {
         encoding: "utf8", timeout: 300_000, maxBuffer: 8 * 1024 * 1024,
         env: { ...process.env, GEMINI_CLI_TRUST_WORKSPACE: "true" },
       });
@@ -136,7 +98,7 @@ function geminiDispatch(model: string, prompt: string): { verdict: string; propo
     } catch (e: any) {
       const blob = `${e?.stdout ?? ""}${e?.stderr ?? ""}${e?.message ?? ""}`;
       lastErr = blob.slice(0, 200);
-      if (!isGeminiOverload(blob)) break; // non-transient (auth/usage) → stop retrying
+      if (isGeminiQuotaExhausted(blob) || !isGeminiOverload(blob)) break; // terminal quota / non-transient → stop
     }
     try { execFileSync("sleep", [String(Math.min(8, 2 ** attempt))]); } catch { /* best-effort backoff */ }
   }
@@ -211,7 +173,7 @@ async function main(): Promise<void> {
     // hardcoded ollama-local (which the local daemon can't serve → every cloud slot silently ERROR'd).
     // T2-F3: `provider::model` API workers dispatch with the BARE model + their catalog provider.
     const target = dispatchTarget(p.model);
-    const r = dispatch(target.model, taskPrompt(attempt), STEPS[attempt], target.provider);
+    const r = dispatch(target.model, streamTaskPrompt(stream), STEPS[attempt], target.provider);
     if (isLocal) releaseTurn(GPU_DIR, ticket);
     releaseClaim(stream, slot);
     const gated = (r.verdict === "DONE" || r.verdict === "OK") && /##\s*Change/i.test(r.proposal);

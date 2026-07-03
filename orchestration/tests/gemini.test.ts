@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isGeminiModel, geminiArgs, parseGeminiJson, isGeminiOverload } from "../bin/lib/gemini";
+import { isGeminiModel, geminiArgs, parseGeminiJson, isGeminiOverload, isGeminiQuotaExhausted } from "../bin/lib/gemini";
 
 describe("isGeminiModel", () => {
   it("matches gemini tags, not ollama", () => {
@@ -41,11 +41,27 @@ describe("parseGeminiJson", () => {
   });
 });
 
-describe("isGeminiOverload", () => {
-  it("detects transient overload signals", () => {
+describe("isGeminiOverload (transient → retry)", () => {
+  it("detects transient 503/overload signals only", () => {
     expect(isGeminiOverload('{"error":{"code":503,"status":"UNAVAILABLE"}}')).toBe(true);
     expect(isGeminiOverload("This model is currently experiencing high demand")).toBe(true);
-    expect(isGeminiOverload("RESOURCE_EXHAUSTED")).toBe(true);
     expect(isGeminiOverload("PONG")).toBe(false);
+  });
+  it("does NOT treat terminal quota as transient overload", () => {
+    expect(isGeminiOverload("You have exhausted your daily quota on this model")).toBe(false);
+    expect(isGeminiOverload("RESOURCE_EXHAUSTED")).toBe(false);
+  });
+});
+
+describe("isGeminiQuotaExhausted (terminal → fail fast)", () => {
+  it("detects daily-quota exhaustion (retry won't help)", () => {
+    expect(isGeminiQuotaExhausted("You have exhausted your daily quota on this model")).toBe(true);
+    expect(isGeminiQuotaExhausted("You exceeded your current quota")).toBe(true);
+    expect(isGeminiQuotaExhausted('{"code":429}')).toBe(true);
+    expect(isGeminiQuotaExhausted("RESOURCE_EXHAUSTED")).toBe(true);
+  });
+  it("false for transient overload + normal output", () => {
+    expect(isGeminiQuotaExhausted("503 high demand")).toBe(false);
+    expect(isGeminiQuotaExhausted("PONG")).toBe(false);
   });
 });

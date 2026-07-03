@@ -35,7 +35,14 @@ export function parseGeminiJson(stdout: string): { text: string; ok: boolean } {
   }
 }
 
-/** Transient vendor overload — Gemini returns 503 / UNAVAILABLE / "high demand" under load. Retry with backoff. */
+/** TRANSIENT vendor overload — Gemini returns 503 / UNAVAILABLE / "high demand" under momentary load. Retry
+ *  with backoff (it clears in seconds). NOT quota exhaustion (see isGeminiQuotaExhausted). */
 export function isGeminiOverload(text: string): boolean {
-  return /\b503\b|UNAVAILABLE|high demand|overloaded|RESOURCE_EXHAUSTED|\b429\b/i.test(text || "");
+  return /\b503\b|UNAVAILABLE|high demand|overloaded/i.test(text || "");
+}
+
+/** TERMINAL daily-quota exhaustion — 429 / RESOURCE_EXHAUSTED / "exhausted…quota". Retrying does NOT help (the
+ *  free-tier daily cap resets in hours), so the dispatcher must FAIL FAST instead of burning backoff attempts. */
+export function isGeminiQuotaExhausted(text: string): boolean {
+  return /\b429\b|RESOURCE_EXHAUSTED|exhausted.{0,20}quota|exceeded your current quota|daily quota/i.test(text || "");
 }
