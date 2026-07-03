@@ -1,0 +1,16 @@
+{
+  "errors": [
+    {
+      "id": "ERR-CONTRACT-001",
+      "title": "Shell glob in npm test silently skips tests",
+      "detail": "sh has no globstar; 'node --test src/**/*.test.ts' skips nested tests. Inherited from ERR-TUNNEL-002.",
+      "prevention_rule": "package.json test script MUST be bare 'node --test' (recursive auto-discovery)."
+    },
+    {
+      "id": "ERR-CONTRACT-002",
+      "title": "Raw API key persisted",
+      "detail": "Raw olm_ key must exist only in the one-time approval response. Ledger stores keyId reference only; server store keeps SHA-256 hash.",
+      "prevention_rule": "grep state.ts/registry.ts for 'olm_' before commit — must be zero matches; Member has keyId, never key."
+    }
+  ]
+}

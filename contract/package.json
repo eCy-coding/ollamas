@@ -1,0 +1,16 @@
+{
+  "name": "ollamas-contract",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ollamas contract lane — control + contract: machine onboarding, API key pool, federated compute",
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "contract": "node src/cli.ts",
+    "whoami": "bash scripts/whoami.sh"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
