@@ -20,6 +20,8 @@ import { loadState, saveState, defaultStatePath } from "../contract/src/state.ts
 import { recordHeartbeat, poolNodes, toFleetBackends, mergeFleetBackends, consumeQuota, wouldExceedQuota, type HeartbeatInput } from "../contract/src/pool.ts";
 import { shardDir } from "../contract/src/shard.ts";
 import { ProviderRouter } from "./providers";
+import { notify } from "./notify";
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -81,11 +83,30 @@ function audit(action: AuditAction, memberId: string, actor: string, keyId?: str
 
 // --- service functions (shared by HTTP routes, contract_admin tool, CLI path) ---
 
+// G2: notify the operator (T0) that a new applicant is waiting — approval stays
+// manual (sovereign) but is no longer silent-poll. macOS local notification is
+// zero-account/sovereign; Slack/Discord fire only if CONTRACT_NOTIFY_* is set.
+// Best-effort, fire-and-forget — never blocks or throws on the request path.
+export function notifyPendingApplicant(memberId: string, specs: Member["specs"], deps?: { osascript?: (script: string) => void; notifyFn?: typeof notify }): void {
+  const line = `New contract applicant ${memberId} (${specs.ramGB}GB ${specs.os}/${specs.arch}) — approve: contract approve ${memberId}`;
+  try {
+    const osascript = deps?.osascript ?? ((script: string) => { spawn("osascript", ["-e", script], { stdio: "ignore" }).on("error", () => {}); });
+    osascript(`display notification ${JSON.stringify(line)} with title "ollamas contract"`);
+  } catch { /* headless / no osascript → skip */ }
+  const cfg = { slackWebhookUrl: process.env.CONTRACT_NOTIFY_SLACK, discordWebhookUrl: process.env.CONTRACT_NOTIFY_DISCORD };
+  if (cfg.slackWebhookUrl || cfg.discordWebhookUrl) {
+    (deps?.notifyFn ?? notify)(line, cfg).catch(() => {});
+  }
+}
+
 export function contractApply(input: { email: string; machinePubkey: string; specs: Member["specs"]; contractHash: string }): Promise<Member> {
   return withLock(() => {
     const { state: next, member } = applyForMembership(getState(), input, currentContractHash(), new Date().toISOString());
     setState(next);
     audit("apply", member.id, "applicant");
+    return member;
+  }).then((member) => {
+    notifyPendingApplicant(member.id, member.specs); // after commit, outside the lock
     return member;
   });
 }

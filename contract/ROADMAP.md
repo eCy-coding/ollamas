@@ -16,6 +16,7 @@
 | **vK12** | Pool-kaynaklı çok-makine shard — shard up --from-pool (F1), serve-rpc (F3), modelSize gate (F2), listShardProcesses wire | ✅ DONE |
 | **vK13** | Governance — resume/unsuspend, lane-owned audit-log (secret-free), member-key rotation | ✅ DONE |
 | **vK14** | Kalıcı cross-host üye — node-config, mesh-host keşfi (tailscale), serve-rpc launchd daemon, launch preflight, tek-komut offer | ✅ DONE |
+| **vK15** | 0-manuel e2e eksiksizlik — server daemon (G1), operator node-config (G6), applicant notify (G2), audit rotation (G4), doctor env-health (G5), cockpit action-cue (G7), errors_registry+README (G3) | ✅ DONE |
 
 ¹ vK6 canlı çok-makine token-üretim kanıtı CAPABILITY-GATED: brew llama.cpp
 GGML_RPC'siz derlenmiş (rpc-server binary + --rpc flag YOK). `contract shard`
@@ -37,4 +38,6 @@ Hardcoded değil, canlı pool-verisinden. F4 (resume/audit/rotation) vK13'e erte
 
 ¹⁴ vK14 CANLI KANIT (loopback + CANLI tailscale): detectMeshHost → gerçek tailnet IP 100.108.67.76 (fallback DEĞİL); serve-rpc install → launchd com.ollamas.contract.rpc loaded (status host=mesh-IP) → uninstall temiz; node-config persist 0600; `offer` → node-config(meshHost+model) + 2 daemon(rpc+agent) "advertising 100.108.67.76:50052 over the mesh" → offer stop temiz; shard up --from-pool PREFLIGHT "2 reachable pool node" → source:shard:head → çift-log split (925B+624B). Kod+daemon+config+preflight cross-host-hazır. EXTENSIBLE: yeni transport CONTRACT_RPC_HOST env ile.
 
-## vK15 — NEXT (aday: gerçek 2-cihaz cross-host e2e — her iki makinede tailscale up + offer + shard up --from-pool; ya da un-suspend-resume-UX / audit-retention governance-2)
+¹⁵ vK15 CANLI KANIT (loopback): server install→launchd com.ollamas.server→pool :3000 GERÇEKTEN başladı (status healthy:true)→uninstall temiz; doctor env-health: ollama up + mesh 100.108.67.76 + daemons + "⚠ 1 pending T0-onay" exit0; apply→bildirim(crash yok); audit rotation ring (unit); operator node-config serverUrl; cockpit amber pending-cue. errors_registry ERR-003..010; README QUICKSTART. lane 84, contract-lane 13, orchestration 861.
+
+## vK16 — NEXT (gerçek 2-cihaz cross-host e2e — donanım; kod+daemon+config+preflight+doctor TAM hazır)

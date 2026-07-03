@@ -9,8 +9,56 @@
     {
       "id": "ERR-CONTRACT-002",
       "title": "Raw API key persisted",
-      "detail": "Raw olm_ key must exist only in the one-time approval response. Ledger stores keyId reference only; server store keeps SHA-256 hash.",
-      "prevention_rule": "grep state.ts/registry.ts for 'olm_' before commit — must be zero matches; Member has keyId, never key."
+      "detail": "Raw olm_ key must exist only in the one-time approval/rotation response. Ledger stores keyId reference only; server store keeps SHA-256 hash; audit log is whitelist-projected (no key/email).",
+      "prevention_rule": "grep state.ts/registry.ts/audit files for 'olm_' before commit — must be zero matches; Member has keyId, never key."
+    },
+    {
+      "id": "ERR-CONTRACT-003",
+      "title": "cmake target is ggml-rpc-server, not rpc-server",
+      "detail": "Building llama.cpp with GGML_RPC=ON: the make target is `ggml-rpc-server` (emits build/bin/rpc-server). `cmake --build -t rpc-server` fails 'No rule to make target'.",
+      "prevention_rule": "Build target `ggml-rpc-server llama-server`; copy build/bin/rpc-server (historic binary name)."
+    },
+    {
+      "id": "ERR-CONTRACT-004",
+      "title": "rpc-server default device lands on BLAS → RMS_NORM abort",
+      "detail": "When multiple rpc-servers share one machine, default device selection can pick BLAS, which aborts on the RMS_NORM op (proven crash) mid-completion.",
+      "prevention_rule": "Pass rpc-server --device explicitly (MTL0/CPU); SHARD_DEVICES overridable in cli shard up."
+    },
+    {
+      "id": "ERR-CONTRACT-005",
+      "title": "Head llama-server needs -ngl 99 or the RPC devices sit idle",
+      "detail": "Without GPU-layer offload the model stays on the head CPU and the RPC devices hold nothing — the 'split' is fake (rpc logs never grow).",
+      "prevention_rule": "shardServerArgs sets -ngl 99 by default; the split proof requires BOTH rpc-server logs to grow during a completion."
+    },
+    {
+      "id": "ERR-CONTRACT-006",
+      "title": "CPU-rpc reports no memory → auto-fit starves it; needs --tensor-split",
+      "detail": "An rpc-server on CPU reports no free memory, so llama.cpp auto-fit assigns it zero layers. One node ends up holding the whole model.",
+      "prevention_rule": "Pass --tensor-split (default even '1,1') so every rpc node holds layers; real ratios come from partition.ts."
+    },
+    {
+      "id": "ERR-CONTRACT-007",
+      "title": "grep -q on llama-server --help causes SIGPIPE exit 141",
+      "detail": "Piping a long --help into `grep -q` closes the pipe early; under `set -o pipefail` the producer dies with SIGPIPE → exit 141, failing the build script.",
+      "prevention_rule": "Use `grep -c` (consumes all input) instead of `grep -q` when the producer is long-running."
+    },
+    {
+      "id": "ERR-CONTRACT-008",
+      "title": ".local mDNS host rejected by isPrivateHost (and is a footgun)",
+      "detail": "isPrivateHost accepts IP literals + loopback but NOT `<host>.local`. An mDNS name can resolve off-mesh and the rpc-server binds/serves without auth (RISK-K1).",
+      "prevention_rule": "Members advertise the mesh IP (100.64/10), never `.local`. detectMeshHost returns the tailscale IP; .local is deliberately unsupported."
+    },
+    {
+      "id": "ERR-CONTRACT-009",
+      "title": "Parallel worker's uncommitted WIP reddens the whole-repo pre-commit gate",
+      "detail": "The pre-commit gate runs repo-wide tsc/vitest; another session's untracked WIP (e.g. server/embed-catalog.ts + rag.ts) that doesn't compile blocks ALL commits, including unrelated green work.",
+      "prevention_rule": "Verify your slice is independently green (lane tsc clean, zero tsc errors from your files, your tests pass). Then GATE_SKIP=1 is justified — document it in the commit message; NEVER touch the foreign WIP."
+    },
+    {
+      "id": "ERR-CONTRACT-010",
+      "title": "git add can swallow another worker's pre-staged files",
+      "detail": "`git add <dir>` commits whatever is ALREADY staged too. A parallel session's pre-staged files (provider-errors.ts, providers.ts) got swept into a contract commit.",
+      "prevention_rule": "git add file-by-file (never `git add -A`); ALWAYS `git diff --cached --name-only` before commit and unstage anything you did not author (git restore --staged)."
     }
   ]
 }

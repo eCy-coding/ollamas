@@ -14,7 +14,15 @@ export type NodeConfig = {
   device?: string; // rpc-server --device (e.g. MTL0)
   role: NodeRole;
   model?: string; // preferred model to offer/serve
+  serverUrl?: string; // operator: the ollamas pool server URL (0-manual, no per-run env)
+  headLayers?: number; // operator: default shard head layer count
 };
+
+/** Operator/member resolve the pool server URL: explicit env > persisted config >
+ * loopback default. Lets a configured operator run commands with no OLLAMAS_URL env. */
+export function resolveServerUrl(loadFn: () => { config: NodeConfig } = () => loadNodeConfig()): string {
+  return process.env.OLLAMAS_URL || loadFn().config.serverUrl || "http://127.0.0.1:3000";
+}
 
 export const DEFAULT_NODE_CONFIG: NodeConfig = { rpcPort: 50052, role: "member" };
 

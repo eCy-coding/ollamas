@@ -236,3 +236,36 @@ describe("vK13 governance: resume + rotation + audit", () => {
     expect(rawFile).not.toContain("@"); // no emails
   });
 });
+
+describe("G2 applicant notification", () => {
+  test("notifyPendingApplicant fires osascript + optional webhook; never throws", () => {
+    const calls: string[] = [];
+    let notified = 0;
+    // no throw with injected fakes
+    contract.notifyPendingApplicant("m_x", { ramGB: 16, os: "darwin", arch: "arm64" }, {
+      osascript: (s: string) => { calls.push(s); },
+      notifyFn: (async () => { notified++; return []; }) as any,
+    });
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toContain("m_x");
+    expect(calls[0]).toContain("approve");
+    // webhook only fires when env is set — not set here → notified stays 0
+    expect(notified).toBe(0);
+  });
+
+  test("notifyPendingApplicant with slack env → notifyFn called", () => {
+    const prev = process.env.CONTRACT_NOTIFY_SLACK;
+    process.env.CONTRACT_NOTIFY_SLACK = "https://hooks.slack.test/x";
+    let notified = 0;
+    try {
+      contract.notifyPendingApplicant("m_y", { ramGB: 8, os: "linux", arch: "x64" }, {
+        osascript: () => {},
+        notifyFn: (async () => { notified++; return ["slack"]; }) as any,
+      });
+      expect(notified).toBe(1);
+    } finally {
+      if (prev === undefined) delete process.env.CONTRACT_NOTIFY_SLACK;
+      else process.env.CONTRACT_NOTIFY_SLACK = prev;
+    }
+  });
+});

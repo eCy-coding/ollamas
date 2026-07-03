@@ -7,8 +7,10 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir, totalmem, platform, arch } from "node:os";
 import { dirname, join } from "node:path";
 import { generateIdentity, type Identity } from "./identity.ts";
+import { resolveServerUrl } from "./node-config.ts";
 
-const BASE = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
+// G6: server URL resolves env > persisted operator config > loopback → 0-manual operator runs.
+const BASE = resolveServerUrl();
 const IDENTITY_PATH = process.env.CONTRACT_IDENTITY_PATH || join(homedir(), ".ollamas", "contract-identity.json");
 const KEY_PATH = process.env.CONTRACT_KEY_PATH || join(homedir(), ".ollamas", "contract-key");
 
@@ -469,8 +471,43 @@ async function main(): Promise<number> {
       console.error(meshHost ? `advertising ${meshHost}:${port} over the mesh` : "no mesh address detected — bring up tailscale/headscale, then: contract offer");
       return rpc === 0 && agent === 0 ? 0 : 1;
     }
+    case "server": {
+      // G1 (operator): launchd daemon for the ollamas POOL SERVER so the pool is
+      // always up (survives reboot) — the #1 0-manual gap. Also persists operator
+      // node-config (serverUrl) so subsequent commands need no OLLAMAS_URL env (G6).
+      const { installAgent, uninstallAgent, agentLoaded } = await import("./agent.ts");
+      const { saveNodeConfig, loadNodeConfig } = await import("./node-config.ts");
+      const { fileURLToPath } = await import("node:url");
+      const { existsSync } = await import("node:fs");
+      const SERVER_LABEL = "com.ollamas.server";
+      // contract/src/cli.ts → repo root is two dirs up from contract/
+      const repo = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+      const tsxBin = join(repo, "node_modules", ".bin", "tsx");
+      if (id === "uninstall") { const r = uninstallAgent(SERVER_LABEL); console.error(r.reason); return r.ok ? 0 : 1; }
+      if (id === "status") {
+        let health = false;
+        try { health = (await fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(1500) })).ok; } catch {}
+        out({ label: SERVER_LABEL, loaded: agentLoaded(SERVER_LABEL), serverUrl: BASE, healthy: health });
+        return 0;
+      }
+      // install (default). The launchd plist has no env block → the server runs on
+      // its own default PORT (3000); serverUrl is persisted to match (a custom port
+      // would need plist EnvironmentVariables — deferred, not silently half-wired).
+      if (!existsSync(tsxBin)) { console.error(`tsx not found at ${tsxBin} — run npm install in ${repo}`); return 1; }
+      const serverUrl = "http://127.0.0.1:3000";
+      const cfg = loadNodeConfig().config;
+      saveNodeConfig({ ...cfg, role: "operator", serverUrl });
+      const plan = {
+        label: SERVER_LABEL, nodeBin: tsxBin, cliPath: join(repo, "server.ts"),
+        args: [] as string[], logPath: join(homeDir(), ".ollamas", "server.log"), workdir: repo,
+      };
+      const r = installAgent(plan);
+      console.error(r.reason);
+      console.log(r.ok ? `pool server daemon installed (${SERVER_LABEL}) → pool stays up across reboot; serverUrl=${serverUrl}` : "install failed");
+      return r.ok ? 0 : 1;
+    }
     default:
-      console.error("usage: contract document | apply --email X | join --email X | offer [--model M --port P | stop] | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop | --host H --port P --device D] | doctor | shard [up [--from-pool] <model> | down | status | proof | plan]");
+      console.error("usage: contract server [install|uninstall|status]  (operator: pool always-up) | offer [--model M --port P | stop]  (member: permanent contribution) | document | apply --email X | join --email X | status <id> | list | approve|reject|suspend|resume|rotate|revoke <id> | audit [limit] | pool | quota | agent <install|uninstall|status|run|once> | serve-rpc [run|install|uninstall|status|stop] | doctor | shard [up [--from-pool] <model>|down|status|proof|plan]");
       return 2;
   }
 }

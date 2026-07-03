@@ -7,6 +7,46 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { generateIdentity } from "./identity.ts";
 import { detectShardCapability, resolveShardBinary, shardDir } from "./shard.ts";
+import { detectMeshHost } from "./mesh.ts";
+import { agentLoaded, AGENT_LABEL } from "./agent.ts";
+
+/** G5: environment readiness (all SKIP-friendly ok:true) — ollama, mesh, daemons,
+ * pending approvals. Surfaces what the operator should act on without failing. */
+async function envHealthSteps(
+  base: string,
+  admin: Record<string, string>,
+  step: (name: string, ok: boolean, detail: string) => boolean,
+): Promise<void> {
+  // ollama upstream reachable (the actual inference engine)
+  const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+  try {
+    const r = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(2000) });
+    step("ollama", true, r.ok ? `${ollamaUrl} up` : `${ollamaUrl} → ${r.status} (SKIP)`);
+  } catch {
+    step("ollama", true, `${ollamaUrl} unreachable (SKIP — start ollama for local inference)`);
+  }
+  // mesh address (cross-host readiness)
+  const mesh = detectMeshHost();
+  step("mesh", true, mesh ? `advertising ${mesh}` : "no mesh addr (loopback-only; bring up tailscale for cross-host)");
+  // member daemons loaded (permanent contribution)
+  const rpcLoaded = agentLoaded("com.ollamas.contract.rpc");
+  const hbLoaded = agentLoaded(AGENT_LABEL);
+  const srvLoaded = agentLoaded("com.ollamas.server");
+  step("daemons", true, `server:${srvLoaded ? "on" : "off"} rpc:${rpcLoaded ? "on" : "off"} heartbeat:${hbLoaded ? "on" : "off"}`);
+  // pending approvals awaiting T0 (min-manual: surface the action)
+  try {
+    const m = await fetch(`${base}/api/contract/members`, { headers: admin, signal: AbortSignal.timeout(2000) });
+    if (m.ok) {
+      const list = (await m.json()) as Array<{ status?: string }>;
+      const pending = (list || []).filter((x) => x.status === "pending").length;
+      step("pending-approvals", true, pending > 0 ? `⚠ ${pending} awaiting T0 approval (contract list; contract approve <id>)` : "none pending");
+    } else {
+      step("pending-approvals", true, `members → ${m.status} (SKIP — set SAAS_ADMIN_TOKEN)`);
+    }
+  } catch {
+    step("pending-approvals", true, "SKIP");
+  }
+}
 
 async function checkShardStep(): Promise<{ name: string; ok: boolean; detail: string }> {
   try {
@@ -50,6 +90,10 @@ export async function runDoctor(base: string, opts: { adminToken?: string; ollam
   try {
     const health = await req(base, "GET", "/api/health");
     if (!step("health", health.status === 200, `GET /api/health → ${health.status}`)) return { ok: false, steps };
+
+    // G5: environment health (0-manual readiness) — all SKIP-friendly (ok:true),
+    // so doctor never fails on an env-conditional check; they surface state to act on.
+    await envHealthSteps(base, admin, step);
 
     const doc = await req(base, "GET", "/api/contract/document");
     const hash = doc.json?.hash;

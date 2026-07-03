@@ -158,7 +158,9 @@
       +'<span>bekleyen <b style="color:var(--amber)">'+esc(m.pending||0)+'</b></span>'
       +'<span>revoked <b>'+esc(m.revoked||0)+'</b></span>'
       +'<span>fleet node <b>'+esc(c.fleetContractNodes)+'</b></span>'
-      +'<span>shard head <b style="color:'+(c.shardHeadUp?'var(--emerald)':'inherit')+'">'+(c.shardHeadUp?'UP':'down')+'</b></span></div>';
+      +'<span>shard head <b style="color:'+(c.shardHeadUp?'var(--emerald)':'inherit')+'">'+(c.shardHeadUp?'UP':'down')+'</b></span></div>'
+      // G7: pending applicants need T0 action — surface as an amber action cue, not just a count
+      +((m.pending||0)>0 ? '<div class="road" style="color:var(--amber);margin-top:6px">⚠ '+esc(m.pending)+' bekleyen onay — contract approve &lt;id&gt;</div>' : '');
   }
 
   function render(snap){
