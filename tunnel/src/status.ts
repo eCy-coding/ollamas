@@ -17,6 +17,12 @@ export interface TransportStatus {
   score: number;
 }
 
+/** vT14: live gateway status surfaced alongside transports (secret-free). */
+export interface GatewayStatus {
+  running: boolean;
+  publicUrl: string | null;
+}
+
 export interface StatusReport {
   ts: number;
   active: string | null;
@@ -25,10 +31,15 @@ export interface StatusReport {
   transports: TransportStatus[];
   /** Per-transport latency series (finite samples only), oldest→newest. */
   history: Record<string, number[]>;
+  /** Live proxy gateway + ephemeral public URL (vT14), when known. */
+  gateway?: GatewayStatus;
 }
 
 /** PURE: fold the decision log into a status snapshot. */
-export function statusReport(decisions: DecisionRecord[], opts: { now?: number } = {}): StatusReport {
+export function statusReport(
+  decisions: DecisionRecord[],
+  opts: { now?: number; gateway?: GatewayStatus } = {},
+): StatusReport {
   const last = decisions.at(-1) ?? null;
   const history: Record<string, number[]> = {};
   for (const d of decisions) {
@@ -52,6 +63,7 @@ export function statusReport(decisions: DecisionRecord[], opts: { now?: number }
         }))
       : [],
     history,
+    ...(opts.gateway ? { gateway: opts.gateway } : {}),
   };
 }
 
@@ -75,7 +87,9 @@ export function sparkline(values: number[]): string {
 
 /** PURE: human-readable status table (best score first, active marked ►). */
 export function renderStatusTable(r: StatusReport): string {
-  if (r.transports.length === 0) return "no active transport (no decisions yet — run `tunnel auto`)";
+  if (r.transports.length === 0 && !r.gateway) {
+    return "no active transport (no decisions yet — run `tunnel auto`)";
+  }
   const lines = [`active: ${r.active ?? "none"}  ·  ${r.reason}`, ""];
   const rows = [...r.transports].sort((a, b) => a.score - b.score);
   for (const t of rows) {
@@ -86,6 +100,12 @@ export function renderStatusTable(r: StatusReport): string {
     lines.push(
       `${mark} ${t.name.padEnd(10)} ${lat.padStart(7)}  ${t.breaker.padEnd(9)} score=${score.padStart(4)}  ${spark}`,
     );
+  }
+  if (r.gateway) {
+    lines.push("");
+    if (!r.gateway.running) lines.push("gateway: DOWN");
+    else if (r.gateway.publicUrl) lines.push(`gateway: UP  ·  public: ${r.gateway.publicUrl}`);
+    else lines.push("gateway: UP  (LAN/mesh only — no public URL)");
   }
   return lines.join("\n");
 }

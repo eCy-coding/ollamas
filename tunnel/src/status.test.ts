@@ -97,3 +97,25 @@ test("appendDecision + readDecisions round-trip; bad lines skipped; limit honore
 test("readDecisions on missing file → [] (graceful)", () => {
   assert.deepEqual(readDecisions("/nonexistent/path/decisions.jsonl"), []);
 });
+
+// ---------- vT14: gateway surface in status ----------
+test("statusReport threads gateway through (pure passthrough)", () => {
+  const r = statusReport([rec()], { gateway: { running: true, publicUrl: "https://x.trycloudflare.com" } });
+  assert.deepEqual(r.gateway, { running: true, publicUrl: "https://x.trycloudflare.com" });
+});
+
+test("renderStatusTable shows public URL when gateway present", () => {
+  const r = statusReport([rec()], { gateway: { running: true, publicUrl: "https://x.trycloudflare.com" } });
+  assert.match(renderStatusTable(r), /public: https:\/\/x\.trycloudflare\.com/);
+});
+
+test("renderStatusTable shows gateway DOWN when running=false", () => {
+  const r = statusReport([rec()], { gateway: { running: false, publicUrl: null } });
+  assert.match(renderStatusTable(r), /gateway: DOWN/);
+});
+
+test("renderStatusTable omits gateway line when absent", () => {
+  const r = statusReport([rec()]);
+  assert.ok(!renderStatusTable(r).includes("gateway:"));
+  assert.ok(!renderStatusTable(r).includes("public:"));
+});
