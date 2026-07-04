@@ -133,3 +133,23 @@ standalone tsx. vitest glob'u GENİŞLETME (signal.test'i kırardı); yeni vites
 parse et + lane bazında "hangi repo hangi versiyonda çekildi" durum + lisans-disiplini gate (GPL→ref-only
 uyarısı). Cockpit'e adoption paneli (snapshot'a `adoptions[]` alanı + cockpit.html sekmesi). Test: parse
 + gate pure fn. Oturum başı `git branch --show-current`==`feat/orchestration-v3` doğrula (ERR-ORCH-004).
+
+---
+
+## Araç–Versiyon İzlenebilirlik (roadmap-coherence)
+
+> DoD `roadmap-coherence` sözleşmesi: her `bin/*.ts` aracı roadmap'te anılır (izlenebilirlik).
+> Yukarıdaki vO satırlarında adı geçmeyen araçların eşlemesi (amaç + kanıt hash'i SEYIR "Araç Sicili"nde):
+
+| Araç | Ait olduğu iş | Araç | Ait olduğu iş |
+|------|---------------|------|---------------|
+| `council` | model-council analiz hattı | `fleet-agent` | fleet kalıcı per-tab worker |
+| `fleet-conduct` | fleet conductor (gate+convergence) | `fleet-apply` | gated proposal apply-triage |
+| `fleet-next` | fleet sonrası NEXT-TASK kuyruğu | `fleet-run` | fleet uçtan-uca tek komut |
+| `fleet-watch` | fleet canlı takip konsolu | `oracle-serve` | doğruluk oracle daemon'u |
+| `think` | THINK problem-çözme döngüsü | `tasklist` | master task list üretici |
+| `term-exec` | görünür terminal komut koşturucu | `completion-scan` | uçtan-uca tamamlanmışlık taraması |
+| `build-plan` | completion-gap → build planı | `provider-smoke` | canlı provider e2e kanıtı (vP5) |
+| `automator-best` | model otomasyon sentezi | `automator-probe` | model artifact probu |
+| `chrome-probe` | model Chrome-yetenek probu | `gemini-run` | Gemini CLI PROPOSE worker |
+| `align` | Constitutional Alignment harness (vO62) | | |

@@ -1,47 +1,27 @@
 # REQUIREMENTS — Birleşik Kritik Gereksinimler (füzyon)
 
 > READ-ONLY `fuse.ts`: tüm analizör (conduct/critic/dod/quality) → tek critical-first liste.
-> **Proje hazırlık: 78/100** · 10 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
+> **Proje hazırlık: 97/100** · 1 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
 
 ## 🎯 EN KRİTİK GEREKSİNİM
-**Criticality:** COMPLETENESS · **Kaynak:** conduct+dod
+**Criticality:** COMPLETENESS · **Kaynak:** dod
 
-**Gereksinim:** Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…
+**Gereksinim:** Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…
 
 **Eylem:** yeşil parçayı commit'le (per-file git add + conventional)
 
 ## Tüm gereksinimler (critical-first)
-### COMPLETENESS (2)
-- **dod:uncommitted-green:47 dosya** [conduct+dod]: Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…
+### COMPLETENESS (1)
+- **dod:uncommitted-green:9 dosya** [dod]: Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…
   → yeşil parçayı commit'le (per-file git add + conventional)
-- **stale:quality** [quality(stale)]: quality verisi 73 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)
-  → quality.ts yeniden koş (taze quality üret)
-
-### STALE (8)
-- **stale:(detached)** [conduct]: (detached) 240s commitsiz (idle)
-  → (detached): sıradaki versiyonu planla (durağan)
-- **stale:claude/cool-cohen-b245ee** [conduct]: claude/cool-cohen-b245ee 240s commitsiz (idle)
-  → claude/cool-cohen-b245ee: sıradaki versiyonu planla (durağan)
-- **stale:claude/determined-bartik-0090ba** [conduct]: claude/determined-bartik-0090ba 214s commitsiz (idle)
-  → claude/determined-bartik-0090ba: sıradaki versiyonu planla (durağan)
-- **stale:claude/loving-varahamihira-77d4a9** [conduct]: claude/loving-varahamihira-77d4a9 372s commitsiz (idle)
-  → claude/loving-varahamihira-77d4a9: sıradaki versiyonu planla (durağan)
-- **stale:claude/naughty-kowalevski-2ccc35** [conduct]: claude/naughty-kowalevski-2ccc35 327s commitsiz (idle)
-  → claude/naughty-kowalevski-2ccc35: sıradaki versiyonu planla (durağan)
-- **stale:fix/audit-security** [conduct]: fix/audit-security 210s commitsiz (idle)
-  → fix/audit-security: sıradaki versiyonu planla (durağan)
-- **stale:fix/binary-architecture-calibration** [conduct]: fix/binary-architecture-calibration 314s commitsiz (idle)
-  → fix/binary-architecture-calibration: sıradaki versiyonu planla (durağan)
-- **stale:verify/gwv2-all-lanes** [conduct]: verify/gwv2-all-lanes 326s commitsiz (idle)
-  → verify/gwv2-all-lanes: sıradaki versiyonu planla (durağan)
 
 ## Kaynak tazelik (eşik 60dk)
 | Kaynak | ts | Durum |
 |---|---|---|
 | conduct | (canlı exec) | ✓ taze |
-| critic | 2026-07-04T10:59:54.268Z | ✓ taze |
-| dod | 2026-07-04T10:59:54.809Z | ✓ taze |
-| quality | 2026-07-04T09:47:04.222Z | ⚠️ BAYAT (füzyon-dışı) |
+| critic | 2026-07-04T11:05:13.622Z | ✓ taze |
+| dod | 2026-07-04T11:05:13.895Z | ✓ taze |
+| quality | 2026-07-04T11:05:42.316Z | ✓ taze |
 
 ## Optimal working-prompt (en-kritik eyleme)
 # OLLAMAS — OPTIMAL WORKING PROMPT (self-optimizing, portable)

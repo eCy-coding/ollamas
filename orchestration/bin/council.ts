@@ -19,7 +19,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "
 import { execFileSync } from "node:child_process";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRoster, seatsForLane, parseApiModel, LANES, type Roster, type Seat } from "./lib/council-roster";
+import { buildRoster, seatsForLane, parseApiModel, LANES, renderRosterTable, injectRosterBlock, type Roster, type Seat } from "./lib/council-roster";
 import {
   buildLanePrompt, parseFindings, summarizeCouncil, checkableClaims,
   type LaneContext, type LaneResult, type Finding,
@@ -220,25 +220,12 @@ function writeRoster(roster: Roster, ts: string): void {
     })),
   };
   writeFileSync(join(ORCH_DIR, "COUNCIL_ROSTER.json"), JSON.stringify(payload, null, 2) + "\n");
-  syncPromptRoster(roster);
-}
-
-/** COUNCIL_PROMPT.md §3 roster tablosunu canlı seat verisiyle senkronlar (ROSTER:AUTO marker'ları arası; never-throw — light mode'u asla bloklamaz). */
-function syncPromptRoster(roster: Roster): void {
+  // COUNCIL_PROMPT.md §3 canlı roster bloğu (orphan kök-fix: doc'un "canlı türetilir" iddiası gerçek).
   try {
-    const p = join(ORCH_DIR, "COUNCIL_PROMPT.md");
-    if (!existsSync(p)) return;
-    const md = readFileSync(p, "utf8");
-    const open = md.indexOf("<!-- ROSTER:AUTO");
-    const openEnd = open >= 0 ? md.indexOf("-->", open) : -1;
-    const close = md.indexOf("<!-- /ROSTER:AUTO -->");
-    if (open < 0 || openEnd < 0 || close <= openEnd) return;
-    const rows = roster.seats.map((s) =>
-      `| ${s.capability} | ${s.role} | ${s.model}${s.available ? "" : " *(absent)*"} | ${s.lanes.join(", ")} |`);
-    const table = ["| Seat (yetenek) | Rol | Tercih modeli | Lane |", "|----------------|-----|---------------|------|", ...rows].join("\n");
-    const next = md.slice(0, openEnd + 3) + "\n" + table + "\n" + md.slice(close);
-    if (next !== md) writeFileSync(p, next);
-  } catch { /* asla throw etme */ }
+    const promptPath = join(ORCH_DIR, "COUNCIL_PROMPT.md");
+    const updated = injectRosterBlock(readFileSync(promptPath, "utf8"), renderRosterTable(roster.seats));
+    if (updated) writeFileSync(promptPath, updated);
+  } catch { /* fail-soft: COUNCIL_PROMPT.md yoksa/okunamıyorsa dokunma */ }
 }
 
 function sysChip(): string {

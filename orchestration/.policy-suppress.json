@@ -7,6 +7,7 @@
     { "detector": "critic", "kindPattern": "duplication:conduct.ts↔serve.ts", "reason": "false-positive: conduct lane-durumu ANALİZ eder, serve HTTP/SSE ile GÖSTERİR — farklı katman (analyzer vs UI)" },
     { "detector": "critic", "kindPattern": "duplication:doctor.ts↔model-hook.ts", "reason": "false-positive: doctor readiness DENETLER, model-hook Claude-prompt'u YAKALAR — farklı scope" },
     { "detector": "critic", "kindPattern": "duplication:model-hook.ts↔role-hook.ts", "reason": "false-positive: model-hook model-sorusuna MODEL_PROMPT enjekte, role-hook kimlik-sorusuna role-cevap — farklı tetik/payload, ikisi de UserPromptSubmit ama amaç-ayrı" },
-    { "detector": "critic", "kindPattern": "duplication:fleet-conduct.ts↔fleet-launch.ts", "reason": "false-positive: fleet-launch plan+wrapper ÜRETİR ve tab AÇAR (producer), fleet-conduct rapor OKUR + gate + convergence (supervisor/consumer) — producer→consumer sözleşmesi, kod örtüşmesi yok; overlap = domain kelimeleri (local/model/fleet)" }
+    { "detector": "critic", "kindPattern": "duplication:fleet-conduct.ts↔fleet-launch.ts", "reason": "false-positive: fleet-launch plan+wrapper ÜRETİR ve tab AÇAR (producer), fleet-conduct rapor OKUR + gate + convergence (supervisor/consumer) — producer→consumer sözleşmesi, kod örtüşmesi yok; overlap = domain kelimeleri (local/model/fleet)" },
+    { "detector": "critic", "kindPattern": "duplication:oracle-serve.ts↔oracle.ts", "reason": "false-positive: ikisi de AYNI oracle/index.ts motorunun ön-yüzü — oracle one-shot CLI, oracle-serve unix-socket sıcak daemon (memo cache, cold-start eliminasyonu) — conduct↔serve emsaliyle aynı sınıf (CLI vs daemon katmanı), kod örtüşmesi yok" }
   ]
 }

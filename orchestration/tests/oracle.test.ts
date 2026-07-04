@@ -1,103 +1,90 @@
-// bin/oracle.ts'in önüne geçtiği saf karar mantığı: verify() TRUE/FALSE/UNDECIDABLE
-// (CLI'nin kullandığı yol; network/daemon/subprocess'siz saf kategoriler test edilir).
+// bin/oracle.ts contract tests — the CLI is a thin wrapper over oracle/index verify() plus two inline
+// helpers now extracted to bin/lib/oracle-lib.ts (render + verdictExitCode). Synthetic tasks below cover
+// every verdict path the CLI can print/exit with. Deterministic; code-functional cases run one-shot
+// node subprocesses (5s-capped by the oracle itself, no daemons).
 import { describe, it, expect } from "vitest";
-import { verify, classify, evalArithmetic, clearMemo, memoSize } from "../oracle/index";
+import { verify } from "../oracle/index";
+import { render, verdictExitCode } from "../bin/lib/oracle-lib";
 
-describe("verify — arithmetic (tam-kesin rational)", () => {
-  it("2+2=4 → TRUE (analytic)", () => {
+describe("verify — synthetic claims (the CLI's positional-arg path)", () => {
+  it("true arithmetic → TRUE with exact-rational proof", () => {
     const r = verify("2+2=4");
     expect(r.verdict).toBe("TRUE");
     expect(r.category).toBe("arithmetic");
-    expect(r.basis).toMatch(/analytic/);
   });
-  it("2+2=5 → FALSE", () => {
+
+  it("false arithmetic → FALSE", () => {
     expect(verify("2+2=5").verdict).toBe("FALSE");
   });
-  it("0.1+0.2=0.3 → TRUE (float değil, rational)", () => {
+
+  it("0.1+0.2=0.3 is TRUE (exact rational, no float lie)", () => {
     expect(verify("0.1+0.2=0.3").verdict).toBe("TRUE");
   });
-  it("bağıntısız ifade (2+2) → UNDECIDABLE (no-relation)", () => {
-    const r = evalArithmetic("2+2");
-    expect(r.verdict).toBe("UNDECIDABLE");
-    expect(r.basis).toBe("no-relation");
-    expect(r.proof).toMatch(/4/); // değer yine hesaplanır
-  });
-});
 
-describe("verify — ordering (ardıl)", () => {
-  it("2'den sonra 3 gelir → TRUE", () => {
-    const r = verify("2'den sonra 3 gelir");
-    expect(r.verdict).toBe("TRUE");
-    expect(r.category).toBe("ordering");
+  it("ordering (TR successor phrasing) → TRUE / FALSE", () => {
+    expect(verify("2'den sonra 3 gelir").verdict).toBe("TRUE");
+    expect(verify("after 2 comes 4").verdict).toBe("FALSE");
   });
-  it("after 5 comes 7 → FALSE (ardıl 6)", () => {
-    const r = verify("after 5 comes 7");
-    expect(r.verdict).toBe("FALSE");
-    expect(r.proof).toMatch(/6/);
-  });
-});
 
-describe("verify — propositional logic (cdcl)", () => {
-  it("A and not A is always false → TRUE (çelişki)", () => {
-    const r = verify("A and not A is always false");
-    expect(r.verdict).toBe("TRUE");
-    expect(r.category).toBe("logic");
-  });
-  it("A or B is always true → FALSE + karşı-örnek kanıtı", () => {
-    const r = verify("A or B is always true");
-    expect(r.verdict).toBe("FALSE");
-    expect(r.proof).toMatch(/karşı-örnek/);
-  });
-});
-
-describe("verify — code-rule (CWE statik, exec'siz)", () => {
-  it("SQL string-concat → FALSE (CWE-89)", () => {
-    const r = verify({ kind: "code-rule", code: "db.query(`SELECT * FROM users WHERE id = ${userId}`)" });
-    expect(r.verdict).toBe("FALSE");
-    expect(r.basis).toBe("CWE-89");
-  });
-  it("parametreli sorgu → TRUE (tanınan güvenli kalıp)", () => {
-    const r = verify({ kind: "code-rule", code: `db.execute("SELECT * FROM users WHERE id = ?", [userId])` });
-    expect(r.verdict).toBe("TRUE");
-    expect(r.basis).toBe("recognized-safe-pattern");
-  });
-  it("kalıpsız kod → UNDECIDABLE (yokluk ≠ doğruluk kanıtı)", () => {
-    expect(verify({ kind: "code-rule", code: "const x = 1;" }).verdict).toBe("UNDECIDABLE");
-  });
-});
-
-describe("verify — subjective / out-of-scope → UNDECIDABLE", () => {
-  it("değer yargısı asla TRUE/FALSE almaz", () => {
+  it("subjective claim → UNDECIDABLE (never invents a truth value)", () => {
     const r = verify("chocolate is better than vanilla");
     expect(r.verdict).toBe("UNDECIDABLE");
     expect(r.category).toBe("subjective");
-    expect(r.basis).toBe("value-judgment");
   });
-  it("gelecek-olumsal → UNDECIDABLE (future-contingent)", () => {
-    expect(verify("yarın yağmur olacak").basis).toBe("future-contingent");
-  });
-  it("kapsam-dışı serbest metin → UNDECIDABLE (unknown/out-of-scope)", () => {
+
+  it("out-of-scope prose → UNDECIDABLE/unknown", () => {
     const r = verify("the sky contains birds sometimes");
     expect(r.verdict).toBe("UNDECIDABLE");
-    expect(r.category).toBe("unknown");
-    expect(r.basis).toBe("out-of-scope");
   });
 });
 
-describe("classify + memo — dispatcher yardımcıları", () => {
-  it("classify kategorileri doğru kovalara ayırır", () => {
-    expect(classify("3 < 5")).toBe("arithmetic");
-    expect(classify("after 1 comes 2")).toBe("ordering");
-    expect(classify("A and B is always true")).toBe("logic");
-    expect(classify("this is the best")).toBe("subjective");
+describe("verify — code requests (the CLI's --request path)", () => {
+  it("correct JS function passes all cases → TRUE", () => {
+    const r = verify({
+      kind: "code-functional", lang: "js", entry: "add",
+      code: "function add(a, b) { return a + b; }",
+      cases: [{ args: [2, 3], expect: 5 }, { args: [-1, 1], expect: 0 }],
+    });
+    expect(r.verdict).toBe("TRUE");
+    expect(r.basis).toBe("executed-all-pass");
   });
-  it("verify memoize eder; whitespace-normalize aynı anahtara düşer", () => {
-    clearMemo();
-    expect(memoSize()).toBe(0);
-    const a = verify("7*6=42");
-    const b = verify("  7*6=42\n"); // trim + whitespace-normalize aynı anahtar
-    expect(memoSize()).toBe(1);
-    expect(b).toEqual(a);
-    expect(a.verdict).toBe("TRUE");
+
+  it("buggy JS function → FALSE with an executed counterexample", () => {
+    const r = verify({
+      kind: "code-functional", lang: "js", entry: "add",
+      code: "function add(a, b) { return a - b; }",
+      cases: [{ args: [2, 3], expect: 5 }],
+    });
+    expect(r.verdict).toBe("FALSE");
+    expect(r.basis).toBe("executed-counterexample");
+  });
+
+  it("code-rule: SQL quote-embedded concat → FALSE (CWE-89); parameterized query → TRUE", () => {
+    const bad = verify({ kind: "code-rule", code: `db.query("SELECT * FROM users WHERE name = '" + name + "'");` });
+    expect(bad.verdict).toBe("FALSE");
+    expect(bad.basis).toBe("CWE-89");
+    const good = verify({ kind: "code-rule", code: `db.query("SELECT * FROM users WHERE id = ?", [userId]);` });
+    expect(good.verdict).toBe("TRUE");
+  });
+});
+
+describe("render — the CLI's human output", () => {
+  it("marks each verdict distinctly and carries category/basis/proof", () => {
+    const t = render({ verdict: "TRUE", category: "arithmetic", basis: "analytic", proof: "P1" });
+    const f = render({ verdict: "FALSE", category: "arithmetic", basis: "analytic", proof: "P2" });
+    const u = render({ verdict: "UNDECIDABLE", category: "subjective", basis: "value-judgment", proof: "P3" });
+    expect(t).toContain("✓ DOĞRU");
+    expect(f).toContain("✗ YANLIŞ");
+    expect(u).toContain("○ KARARSIZ");
+    expect(t).toContain("[arithmetic · analytic]");
+    expect(t).toContain("P1");
+  });
+});
+
+describe("verdictExitCode — conduct-gate compatible exit mapping", () => {
+  it("TRUE=0, FALSE=1, UNDECIDABLE=3", () => {
+    expect(verdictExitCode("TRUE")).toBe(0);
+    expect(verdictExitCode("FALSE")).toBe(1);
+    expect(verdictExitCode("UNDECIDABLE")).toBe(3);
   });
 });

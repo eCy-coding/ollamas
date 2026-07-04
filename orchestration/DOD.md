@@ -7,7 +7,7 @@
 - _temiz_
 
 ### 📦 Commit'siz yeşil iş (1)
-- **[med]** 47 dosya: Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…
+- **[med]** 9 dosya: Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…
   → yeşil parçayı commit'le (per-file git add + conventional)
 
 ### 🔗 Eş-zamanlı gereken (concurrent) (0)

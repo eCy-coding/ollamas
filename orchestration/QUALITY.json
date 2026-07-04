@@ -1,20 +1,20 @@
 {
-  "ts": "2026-07-04T09:47:04.222Z",
+  "ts": "2026-07-04T11:05:42.316Z",
   "lanes": [
     {
       "lane": "backend",
       "branch": "chore/p1-hardening",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "passed",
       "testTs": "2026-06-29T00:24:20.336Z",
       "testStale": true,
-      "dirty": 75
+      "dirty": 52
     },
     {
       "lane": "colab",
       "branch": "feat/colab-gpu",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -24,7 +24,7 @@
     {
       "lane": "fix/audit-security",
       "branch": "fix/audit-security",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "passed",
       "testTs": "2026-06-25T16:32:03.445Z",
@@ -34,7 +34,7 @@
     {
       "lane": "verify/gwv2-all-lanes",
       "branch": "verify/gwv2-all-lanes",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -44,7 +44,7 @@
     {
       "lane": "fix/binary-architecture-calibration",
       "branch": "fix/binary-architecture-calibration",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -54,7 +54,7 @@
     {
       "lane": "fix/audit-cont",
       "branch": "fix/audit-cont",
-      "tsc": "skip",
+      "tsc": "pass",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -102,6 +102,16 @@
       "dirty": 566
     },
     {
+      "lane": "req-sweep",
+      "branch": "req-sweep",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 10
+    },
+    {
       "lane": "(detached)",
       "branch": "(detached)",
       "tsc": "skip",
@@ -114,8 +124,8 @@
   ],
   "redLanes": [],
   "totals": {
-    "green": 0,
+    "green": 2,
     "red": 0,
-    "unknown": 11
+    "unknown": 10
   }
 }

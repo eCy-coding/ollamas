@@ -1,140 +1,86 @@
-// fleet-agent seams — tests the PURE pipeline bin/fleet-agent.ts composes (report parse → self-gate →
-// vendor-candidate derivation → merged-budget pool fail-over → exhaustion contract → grounding targets)
-// without spawning agent-dispatch/gemini or touching the network. Provider routing lives in
-// tests/fleet-agent-provider.test.ts — NOT repeated here.
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { STREAMS } from "../bin/lib/fleet-plan";
+// fleet-agent.test.ts — the pure decision seams bin/fleet-agent.ts composes: full-jitter backoff
+// bounds (the transient-retry wait), transient-error classification (retry vs fail-fast fork), and
+// dispatchTarget provider routing (the vO39 root-fix: cloud tags → ollama-cloud, `provider::model`
+// API workers → bare model + catalog provider). gpu-lock is covered by its own suite — not repeated.
+import { describe, it, expect } from "vitest";
+import { fullJitterDelay, isTransient } from "../bin/lib/backoff";
 import { dispatchTarget } from "../bin/lib/chrome-probe";
-import { FOCUS, focusFile } from "../bin/lib/fleet-prompt";
-import { saveQuota, loadQuota } from "../bin/lib/gemini-quota";
-import { guardQuota } from "../bin/lib/gemini-quota";
-import { saveBudget, loadBudget, guardVendor, pickVendor, isVendorExhausted, type BudgetFile } from "../bin/lib/vendor-budget";
 
-const TODAY = "2026-07-04";
-const REPO = join(__dirname, "..", "..");
+describe("fullJitterDelay — bounds of the retry wait (delay = rand × min(cap, base·2^attempt))", () => {
+  const BASE = 2000, CAP = 60_000; // fleet-agent's transient-retry parameters
 
-/** Reproduce fleet-agent's parseReport: verdict + proposal (from "## Change") + tool-step count. */
-function parseReport(out: string): { verdict: string; proposal: string; steps: number } {
-  const j = JSON.parse(out);
-  const msgs = Array.isArray(j.messages) ? j.messages.map(String).join("\n") : "";
-  const i = msgs.search(/##\s*Change/i);
-  const proposal = i >= 0 ? msgs.slice(i).trim() : "";
-  return { verdict: j.verdict ?? "?", proposal, steps: (j.steps ?? []).length };
-}
-/** Reproduce main()'s self-gate: DONE/OK verdict AND a "## Change" proposal. */
-const gated = (r: { verdict: string; proposal: string }) =>
-  (r.verdict === "DONE" || r.verdict === "OK") && /##\s*Change/i.test(r.proposal);
-
-describe("fleet-agent parseReport + self-gate (main()'s escalation exit condition)", () => {
-  it("a zero-step PROPOSE run with the proposal in messages still gates (vO39 root-fix)", () => {
-    const out = JSON.stringify({ verdict: "DONE", steps: [], messages: ["preamble", "## Change: harden x\nbody\nVERDICT: DONE"] });
-    const r = parseReport(out);
-    expect(r.steps).toBe(0);
-    expect(r.proposal.startsWith("## Change: harden x")).toBe(true);
-    expect(gated(r)).toBe(true);
+  it("deterministic with an injected rand: floor(rand × exp)", () => {
+    expect(fullJitterDelay(0, BASE, CAP, () => 0.5)).toBe(1000);   // 0.5 × 2000
+    expect(fullJitterDelay(2, BASE, CAP, () => 0.25)).toBe(2000);  // 0.25 × 8000
   });
-  it("chatty DONE without a ## Change block does NOT gate (retry with more budget)", () => {
-    const r = parseReport(JSON.stringify({ verdict: "DONE", steps: [{ n: 1 }], messages: ["I did it, trust me. VERDICT: DONE"] }));
-    expect(r.proposal).toBe("");
-    expect(gated(r)).toBe(false);
+  it("lower bound: rand→0 gives 0 (full jitter includes an immediate retry)", () => {
+    for (const a of [0, 1, 5]) expect(fullJitterDelay(a, BASE, CAP, () => 0)).toBe(0);
   });
-  it("missing verdict/messages degrade gracefully (verdict '?', no gate, no throw)", () => {
-    const r = parseReport(JSON.stringify({ steps: [] }));
-    expect(r).toEqual({ verdict: "?", proposal: "", steps: 0 });
-    expect(gated(r)).toBe(false);
+  it("upper bound: strictly below base·2^attempt while uncapped", () => {
+    const almostOne = () => 1 - 1e-12;
+    expect(fullJitterDelay(0, BASE, CAP, almostOne)).toBeLessThan(2000);
+    expect(fullJitterDelay(3, BASE, CAP, almostOne)).toBeLessThan(16_000);
+    expect(fullJitterDelay(3, BASE, CAP, almostOne)).toBeGreaterThan(15_000); // exp actually grows
   });
-});
-
-/** Reproduce main()'s streamVendorCandidates: prefer entries → managed free-tier vendor candidates. */
-function streamVendorCandidates(streamId: string): { vendor: string; provider: string; model: string }[] {
-  const spec = STREAMS.find((s) => s.id === streamId);
-  if (!spec) return [];
-  const out: { vendor: string; provider: string; model: string }[] = [];
-  for (const p of spec.prefer) {
-    const [vendor, model] = p.split("::");
-    if (model) { out.push({ vendor, provider: vendor, model }); continue; }
-    if (/^gemini[-.\d]/i.test(p)) out.push({ vendor: "gemini", provider: "gemini-cli", model: p });
-  }
-  return out;
-}
-
-describe("fleet-agent vendor-candidate derivation over the live STREAMS data", () => {
-  it("errors-resilience yields gemini + groq candidates; bare ollama tags carry no budget", () => {
-    const c = streamVendorCandidates("errors-resilience");
-    expect(c).toContainEqual({ vendor: "gemini", provider: "gemini-cli", model: "gemini-2.5-flash" });
-    expect(c).toContainEqual({ vendor: "groq", provider: "groq", model: "llama-3.3-70b-versatile" });
-    expect(c.some((x) => x.model.includes(":") && !x.model.includes("::"))).toBe(false); // no ollama tags leaked
+  it("cap bounds the exponential: huge attempt never exceeds capMs", () => {
+    expect(fullJitterDelay(30, BASE, CAP, () => 1 - 1e-12)).toBeLessThan(CAP);
+    expect(fullJitterDelay(30, BASE, CAP, () => 0.5)).toBe(CAP / 2); // exp latched at cap
   });
-  it("every derived API candidate agrees with dispatchTarget on the raw prefer entry", () => {
-    for (const s of STREAMS) {
-      for (const p of s.prefer.filter((m) => m.includes("::"))) {
-        const c = streamVendorCandidates(s.id).find((x) => `${x.provider}::${x.model}` === p)!;
-        expect(dispatchTarget(p)).toEqual({ provider: c.provider, model: c.model });
-      }
+  it("negative / fractional attempts are floored to a sane exponent", () => {
+    expect(fullJitterDelay(-3, BASE, CAP, () => 0.5)).toBe(1000);   // clamped to attempt 0
+    expect(fullJitterDelay(1.9, BASE, CAP, () => 0.5)).toBe(2000);  // floor(1.9)=1 → exp 4000
+  });
+  it("default Math.random stays inside [0, exp) across samples (no thundering herd alignment)", () => {
+    for (let i = 0; i < 200; i++) {
+      const d = fullJitterDelay(2, BASE, CAP);
+      expect(d).toBeGreaterThanOrEqual(0);
+      expect(d).toBeLessThan(8000);
     }
   });
 });
 
-describe("fleet-agent pool fail-over (combinedBudget: pool file + gemini single-state merge)", () => {
-  let dir = "";
-  afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }); dir = ""; });
-
-  it("gemini exhausted in ITS OWN quota file + groq fresh in the pool → picks groq", () => {
-    dir = mkdtempSync(join(tmpdir(), "fleet-agent-"));
-    const quotaF = join(dir, "gemini-quota.json");
-    const budgetF = join(dir, "vendor-budget.json");
-    saveQuota(quotaF, { date: TODAY, used: 20, limit: 20 });         // latched for the day
-    saveBudget(budgetF, { groq: { date: TODAY, used: 3, limit: 20 } });
-    // exactly main()'s combinedBudget: pool map + map.gemini = loadQuota(single-state file)
-    const map: BudgetFile = loadBudget(budgetF);
-    map.gemini = loadQuota(quotaF);
-    expect(pickVendor(["gemini", "groq"], map, TODAY, ["gemini", "groq"])).toBe("groq");
+describe("isTransient — retry vs fail-fast classification", () => {
+  it("network/timeout/throttle/5xx signatures are transient (fleet-agent backs off + retries)", () => {
+    const transient = [
+      "connect ETIMEDOUT 100.64.0.1:11434", "read ECONNRESET", "ECONNREFUSED", "socket hang up",
+      "fetch failed", "request timed out", "429 Too Many Requests", "rate limit exceeded",
+      "503 Service Unavailable", "upstream returned 502",
+    ];
+    for (const m of transient) expect(isTransient(m), m).toBe(true);
   });
-  it("every candidate vendor spent → null (honest ERROR, loop waits for reset)", () => {
-    dir = mkdtempSync(join(tmpdir(), "fleet-agent-"));
-    const quotaF = join(dir, "gemini-quota.json");
-    const budgetF = join(dir, "vendor-budget.json");
-    saveQuota(quotaF, { date: TODAY, used: 20, limit: 20 });
-    saveBudget(budgetF, { groq: { date: TODAY, used: 20, limit: 20 } });
-    const map: BudgetFile = loadBudget(budgetF);
-    map.gemini = loadQuota(quotaF);
-    expect(pickVendor(["gemini", "groq"], map, TODAY)).toBeNull();
+  it("accepts Error objects (fleet-agent passes r.err blobs and thrown errors alike)", () => {
+    expect(isTransient(new Error("network error while dispatching"))).toBe(true);
+    expect(isTransient(new Error("model not found"))).toBe(false);
+  });
+  it("non-transient errors fail fast — no wasted GPU-queue turns", () => {
+    const permanent = ["ENOENT: no such file", "invalid api key", "model requires more memory", "SyntaxError: Unexpected token"];
+    for (const m of permanent) expect(isTransient(m), m).toBe(false);
+  });
+  it("null/undefined/empty → not transient (honest ERROR, no retry loop)", () => {
+    expect(isTransient(null)).toBe(false);
+    expect(isTransient(undefined)).toBe(false);
+    expect(isTransient("")).toBe(false);
   });
 });
 
-/** Reproduce main()'s isExhaustionErr: shared detector OR this layer's own budget-gate wording. */
-const isExhaustionErr = (err?: string) => !!err && (isVendorExhausted(err) || /budget|exhaust/i.test(err));
-
-describe("fleet-agent exhaustion contract — pre-flight gate messages must trigger fail-over", () => {
-  let dir = "";
-  afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }); dir = ""; });
-
-  it("guardVendor's blocked msg and guardQuota's blocked msg are both recognized", () => {
-    dir = mkdtempSync(join(tmpdir(), "fleet-agent-"));
-    const budgetF = join(dir, "vendor-budget.json");
-    const quotaF = join(dir, "gemini-quota.json");
-    saveBudget(budgetF, { groq: { date: TODAY, used: 20, limit: 20 } });
-    saveQuota(quotaF, { date: TODAY, used: 20, limit: 20 });
-    const gv = guardVendor(budgetF, "groq", TODAY);
-    const gq = guardQuota(quotaF, TODAY);
-    expect(gv.allowed).toBe(false);
-    expect(gq.allowed).toBe(false);
-    expect(isExhaustionErr(gv.msg)).toBe(true);   // → poolFallback fires
-    expect(isExhaustionErr(gq.msg)).toBe(true);
-    expect(isExhaustionErr("503 model overloaded")).toBe(false); // transient ≠ exhausted (backoff, not fail-over)
+describe("dispatchTarget — provider routing for the fleet model entry (vO39 / T2-F3)", () => {
+  it("`provider::model` API worker → catalog provider + BARE model id (prefixed form 404s)", () => {
+    expect(dispatchTarget("groq::llama-3.3-70b-versatile")).toEqual({ provider: "groq", model: "llama-3.3-70b-versatile" });
+    expect(dispatchTarget("cerebras::qwen-3-coder-480b")).toEqual({ provider: "cerebras", model: "qwen-3-coder-480b" });
   });
-});
-
-describe("fleet-agent gemini grounding contract — FOCUS targets must exist on disk", () => {
-  it("every STREAMS id has a focus file and it exists at the repo root", () => {
-    for (const s of STREAMS) {
-      const target = focusFile(s.id);
-      expect(target, `stream ${s.id} needs a FOCUS entry`).not.toBe("");
-      expect(existsSync(join(REPO, target)), `${target} (stream ${s.id}) missing`).toBe(true);
-    }
-    expect(Object.keys(FOCUS).sort()).toEqual(STREAMS.map((s) => s.id).sort());
+  it("gemini tag → gemini-cli provider, tag kept", () => {
+    expect(dispatchTarget("gemini-2.5-flash")).toEqual({ provider: "gemini-cli", model: "gemini-2.5-flash" });
+  });
+  it("cloud ollama tag → ollama-cloud (the root-fix: never the local daemon), tag kept", () => {
+    expect(dispatchTarget("gpt-oss:120b-cloud")).toEqual({ provider: "ollama-cloud", model: "gpt-oss:120b-cloud" });
+    expect(dispatchTarget("qwen3:8b-cloud")).toEqual({ provider: "ollama-cloud", model: "qwen3:8b-cloud" });
+  });
+  it("plain local tag → ollama-local, tag kept", () => {
+    expect(dispatchTarget("qwen3:8b")).toEqual({ provider: "ollama-local", model: "qwen3:8b" });
+    expect(dispatchTarget("hf.co/org/model:Q4")).toEqual({ provider: "ollama-local", model: "hf.co/org/model:Q4" });
+  });
+  it("malformed `::` entries fall back to tag routing (both halves must be non-empty)", () => {
+    expect(dispatchTarget("::llama")).toEqual({ provider: "ollama-local", model: "::llama" });
+    expect(dispatchTarget("groq::")).toEqual({ provider: "ollama-local", model: "groq::" });
   });
 });

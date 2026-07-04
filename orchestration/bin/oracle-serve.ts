@@ -17,7 +17,7 @@ import { createServer } from "node:net";
 import { unlinkSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { verify, verifyMany, clearMemo, memoSize, type OracleInput } from "../oracle/index";
+import { handleOracleLine } from "./lib/oracle-lib";
 
 const SOCK = process.env.ORACLE_SOCK || join(tmpdir(), "ollamas-oracle.sock");
 if (existsSync(SOCK)) { try { unlinkSync(SOCK); } catch { /* yoksay */ } }
@@ -31,16 +31,7 @@ const server = createServer((sock) => {
       const line = buf.slice(0, nl).trim();
       buf = buf.slice(nl + 1);
       if (!line) continue;
-      let resp: unknown;
-      try {
-        const msg = JSON.parse(line) as { batch?: OracleInput[]; cmd?: string };
-        if (msg && Array.isArray(msg.batch)) resp = { results: await verifyMany(msg.batch) };
-        else if (msg && msg.cmd === "ping") resp = { ok: true, memo: memoSize() };
-        else if (msg && msg.cmd === "clear") { clearMemo(); resp = { ok: true }; }
-        else resp = verify(msg as OracleInput);
-      } catch (e) {
-        resp = { verdict: "UNDECIDABLE", basis: "daemon-error", proof: String((e as Error).message) };
-      }
+      const resp = await handleOracleLine(line);
       sock.write(JSON.stringify(resp) + "\n");
     }
   });

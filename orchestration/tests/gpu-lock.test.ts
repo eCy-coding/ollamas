@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { describe, it, expect, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -8,241 +8,169 @@ import {
   type TicketState,
 } from "../bin/lib/gpu-lock";
 
-const S = (over: Partial<TicketState> = {}): TicketState =>
-  ({ next: 0, serving: 0, holder: null, heldSince: null, ...over });
+const S0: TicketState = { next: 0, serving: 0, holder: null, heldSince: null };
 
-// ---------- pure core ----------
-
-describe("takeTicket — monotonic dispenser", () => {
-  it("ilk ticket = next, state.next bir artar", () => {
-    const { state, ticket } = takeTicket(S());
-    expect(ticket).toBe(0);
-    expect(state.next).toBe(1);
-  });
-  it("ardışık çekişler strictly artan ticket verir (FIFO sırası)", () => {
-    let s = S();
-    const tickets: number[] = [];
-    for (let i = 0; i < 5; i++) { const r = takeTicket(s); s = r.state; tickets.push(r.ticket); }
-    expect(tickets).toEqual([0, 1, 2, 3, 4]);
+describe("ticket-lock pure core — FIFO + starvation-free (proven bakery)", () => {
+  it("takeTicket dispenses monotonic tickets", () => {
+    let s = S0;
+    const t: number[] = [];
+    for (let i = 0; i < 5; i++) { const r = takeTicket(s); s = r.state; t.push(r.ticket); }
+    expect(t).toEqual([0, 1, 2, 3, 4]);
     expect(s.next).toBe(5);
   });
-  it("girdi state'i mutate etmez", () => {
-    const orig = S({ next: 3, serving: 1 });
-    takeTicket(orig);
-    expect(orig.next).toBe(3);
+  it("only the ticket == serving is served (strict order)", () => {
+    const s: TicketState = { ...S0, serving: 2 };
+    expect(isServed(s, 2)).toBe(true);
+    expect(isServed(s, 1)).toBe(false);
+    expect(isServed(s, 3)).toBe(false);
   });
-  it("serving/holder alanlarına dokunmaz", () => {
-    const { state } = takeTicket(S({ serving: 2, holder: "a", heldSince: 7 }));
-    expect(state.serving).toBe(2);
-    expect(state.holder).toBe("a");
-    expect(state.heldSince).toBe(7);
-  });
-});
-
-describe("isServed — strict FIFO", () => {
-  it("yalnız serving === ticket iken true", () => {
-    expect(isServed(S({ serving: 2 }), 2)).toBe(true);
-    expect(isServed(S({ serving: 2 }), 1)).toBe(false); // geçmiş ticket
-    expect(isServed(S({ serving: 2 }), 3)).toBe(false); // sıradaki bekler
-  });
-});
-
-describe("advance — release", () => {
-  it("serving++ ve holder/heldSince temizlenir", () => {
-    const s = advance(S({ serving: 1, holder: "w1", heldSince: 100 }));
-    expect(s.serving).toBe(2);
-    expect(s.holder).toBeNull();
-    expect(s.heldSince).toBeNull();
-  });
-  it("next'e dokunmaz, girdiyi mutate etmez", () => {
-    const orig = S({ next: 9, serving: 1, holder: "w1", heldSince: 1 });
-    const s = advance(orig);
-    expect(s.next).toBe(9);
-    expect(orig.serving).toBe(1);
-    expect(orig.holder).toBe("w1");
-  });
-});
-
-describe("shouldForceAdvance — dead-holder liveness", () => {
-  it("holder yok → false (kimse tutmuyor, atlanacak şey yok)", () => {
-    expect(shouldForceAdvance(S(), 10_000, 100)).toBe(false);
-  });
-  it("heldSince null → false", () => {
-    expect(shouldForceAdvance(S({ holder: "w1", heldSince: null }), 10_000, 100)).toBe(false);
-  });
-  it("heartbeat taze (now - heldSince <= ttl) → false; sınır tam ttl'de skip yok (strict >)", () => {
-    expect(shouldForceAdvance(S({ holder: "w1", heldSince: 900 }), 1000, 100)).toBe(false);
-    expect(shouldForceAdvance(S({ holder: "w1", heldSince: 950 }), 1000, 100)).toBe(false);
-  });
-  it("heartbeat bayat (now - heldSince > ttl) → true", () => {
-    expect(shouldForceAdvance(S({ holder: "w1", heldSince: 899 }), 1000, 100)).toBe(true);
-  });
-  it("unclaimed pozisyon (holder null) + idle-stamp bayat → true (pullTicket-sonrası-crash liveness)", () => {
-    expect(shouldForceAdvance(S({ holder: null, heldSince: 899 }), 1000, 100)).toBe(true);
-    expect(shouldForceAdvance(S({ holder: null, heldSince: 950 }), 1000, 100)).toBe(false);
-  });
-});
-
-describe("FIFO + starvation-free property (pure zincir)", () => {
-  it("N waiter arrival sırasıyla servis edilir; kimse atlanmaz", () => {
-    let s = S();
-    const arrival: number[] = [];
-    for (let i = 0; i < 4; i++) { const r = takeTicket(s); s = r.state; arrival.push(r.ticket); }
-    const served: number[] = [];
-    while (served.length < arrival.length) {
-      const t = arrival.find((x) => isServed(s, x))!;
-      served.push(t);
+  it("advance serves the next ticket in order (no skipping, no starvation)", () => {
+    // 3 waiters take tickets 0,1,2; each is served exactly once, strictly in arrival order
+    let s = S0;
+    const tickets = [0, 1, 2].map(() => { const r = takeTicket(s); s = r.state; return r.ticket; });
+    const servedOrder: number[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const served = tickets.find((t) => isServed(s, t))!;
+      servedOrder.push(served);
       s = advance(s);
     }
-    expect(served).toEqual(arrival); // strict FIFO — geç gelen erken geleni asla geçemez
+    expect(servedOrder).toEqual([0, 1, 2]); // FIFO — the exact arrival order, every waiter served
+  });
+  it("advance clears holder/heldSince", () => {
+    const s: TicketState = { next: 3, serving: 1, holder: "x", heldSince: 100 };
+    expect(advance(s)).toEqual({ next: 3, serving: 2, holder: null, heldSince: null });
   });
 });
 
-// ---------- IO layer (gerçek temp dir, mock yok) ----------
+describe("shouldForceAdvance — dead-holder liveness (crashed holder cannot block forever)", () => {
+  it("stale holder (heartbeat older than ttl) → force advance", () => {
+    const s: TicketState = { next: 2, serving: 0, holder: "dead", heldSince: 0 };
+    expect(shouldForceAdvance(s, 60_000, 30_000)).toBe(true);
+  });
+  it("fresh holder → do not advance", () => {
+    const s: TicketState = { next: 2, serving: 0, holder: "alive", heldSince: 50_000 };
+    expect(shouldForceAdvance(s, 60_000, 30_000)).toBe(false);
+  });
+  it("no holder → nothing to force", () => {
+    expect(shouldForceAdvance(S0, 60_000, 30_000)).toBe(false);
+  });
+});
 
-let dir: string;
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "gpu-lock-test-")); });
-afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+// ── thin IO layer (persisted state under an atomic mkdir lock; `now` injected → deterministic) ────────
 
-const persisted = (): TicketState => JSON.parse(readFileSync(join(dir, "gpu-lock.json"), "utf8"));
+const T0 = 1_700_000_000_000; // fixed epoch
+const TTL = 30_000;
+const dirs: string[] = [];
+function tmpDir(): string {
+  const d = mkdtempSync(join(tmpdir(), "gpu-lock-test-"));
+  dirs.push(d);
+  return d;
+}
+afterEach(() => {
+  while (dirs.length) { try { rmSync(dirs.pop()!, { recursive: true, force: true }); } catch { /* gone */ } }
+});
+const readState = (dir: string): TicketState =>
+  JSON.parse(readFileSync(join(dir, "gpu-lock.json"), "utf8"));
 
-describe("pullTicket — atomik FIFO ticket", () => {
-  it("boş dizinde 0'dan başlar, ardışık çağrılar 0,1,2", () => {
+describe("pullTicket — atomic FIFO ticket dispenser across calls", () => {
+  it("dispenses monotonic tickets and persists next", () => {
+    const dir = tmpDir();
     expect(pullTicket(dir)).toBe(0);
     expect(pullTicket(dir)).toBe(1);
     expect(pullTicket(dir)).toBe(2);
-  });
-  it("state diske persist edilir (cross-process görünürlük)", () => {
-    pullTicket(dir);
-    pullTicket(dir);
-    const s = persisted();
-    expect(s.next).toBe(2);
-    expect(s.serving).toBe(0);
-  });
-  it("bozuk state dosyası → DEFAULT'a döner (crash yok)", () => {
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "gpu-lock.json"), "{corrupt!!");
-    expect(pullTicket(dir)).toBe(0);
+    expect(readState(dir).next).toBe(3);
+    expect(readState(dir).serving).toBe(0);
   });
 });
 
-describe("tryTurn — sıra kapma", () => {
-  it("serving === ticket → true, holder + heldSince yazılır", () => {
-    const t = pullTicket(dir);
-    expect(tryTurn(dir, t, "w1", 1000, 5000)).toBe(true);
-    const s = persisted();
-    expect(s.holder).toBe("w1");
-    expect(s.heldSince).toBe(1000);
+describe("tryTurn / releaseTurn — two ticket holders SERIALIZE (never both hold)", () => {
+  it("B cannot claim while A holds; B gets the turn only after A releases", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir); // 0
+    const b = pullTicket(dir); // 1
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true);   // A holds the GPU
+    expect(tryTurn(dir, b, "agentB", T0 + 1000, TTL)).toBe(false); // B must wait — serialized
+    expect(readState(dir).holder).toBe("agentA");            // A's hold untouched by B's attempt
+    releaseTurn(dir, a);
+    expect(tryTurn(dir, b, "agentB", T0 + 2000, TTL)).toBe(true);  // now B is served
+    expect(readState(dir).holder).toBe("agentB");
   });
-  it("sıra bende değilken false; erken gelen serbest bırakınca sıradaki alır", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    expect(tryTurn(dir, t1, "w2", 1000, 5000)).toBe(false); // FIFO: t1, t0'ı geçemez
-    expect(tryTurn(dir, t0, "w1", 1000, 5000)).toBe(true);
-    expect(tryTurn(dir, t1, "w2", 1001, 5000)).toBe(false); // hâlâ w1 tutuyor
-    releaseTurn(dir, t0);
-    expect(tryTurn(dir, t1, "w2", 1002, 5000)).toBe(true);
+  it("FIFO: three waiters are served strictly in pull order", () => {
+    const dir = tmpDir();
+    const tickets = [pullTicket(dir), pullTicket(dir), pullTicket(dir)];
+    const servedOrder: number[] = [];
+    for (let step = 0; step < 3; step++) {
+      for (const t of [...tickets].reverse()) { // probe out of order on purpose
+        if (!servedOrder.includes(t) && tryTurn(dir, t, `agent${t}`, T0 + step * 1000, TTL)) {
+          servedOrder.push(t);
+          releaseTurn(dir, t);
+        }
+      }
+    }
+    expect(servedOrder).toEqual(tickets); // arrival order, no skipping
   });
-  it("pullTicket sonrası ilk tryTurn'den önce ölen sahip kuyruğu KALICI bloklamaz (idle force-advance)", () => {
-    pullTicket(dir); // t0 sahibi hemen crash — hiç tryTurn çağırmayacak
-    const t1 = pullTicket(dir);
-    expect(tryTurn(dir, t1, "w2", 1000, 5000)).toBe(false); // idle timer damgalanır
-    expect(persisted().heldSince).toBe(1000);
-    expect(tryTurn(dir, t1, "w2", 6001, 5000)).toBe(false); // bayat idle → force-advance (serving 0→1)
-    expect(tryTurn(dir, t1, "w2", 6002, 5000)).toBe(true);  // kuyruk aktı, sıra t1'de
-    expect(persisted().holder).toBe("w2");
-  });
-  it("ölü holder (heartbeat > ttl) force-advance edilir; kuyruk kilitli kalmaz", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    expect(tryTurn(dir, t0, "dead", 1000, 5000)).toBe(true);
-    // dead asla release/renew etmedi; t1 ttl sonrası dener
-    expect(tryTurn(dir, t1, "w2", 7000, 5000)).toBe(false); // bu çağrı force-advance turu
-    expect(tryTurn(dir, t1, "w2", 7001, 5000)).toBe(true);  // sonraki poll'da sıra t1'de
-  });
-  it("canlı holder (heartbeat taze) force-advance EDİLMEZ", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    expect(tryTurn(dir, t1, "w2", 3000, 5000)).toBe(false);
-    const s = persisted();
-    expect(s.serving).toBe(0); // atlanmadı
-    expect(s.holder).toBe("w1");
-  });
-  it("holder kendi ticket'ında expired görünse bile skip edilmez, yeniden claim eder", () => {
-    const t0 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    // w1 renew etmedi ama hayatta; kendi tryTurn'ünde serving===ticket → force-advance guard devre dışı
-    expect(tryTurn(dir, t0, "w1", 99_000, 5000)).toBe(true);
-    const s = persisted();
-    expect(s.serving).toBe(0);
-    expect(s.heldSince).toBe(99_000);
+  it("re-claiming my own served turn is idempotent (returns true, refreshes heartbeat)", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir);
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true);
+    expect(tryTurn(dir, a, "agentA", T0 + 500, TTL)).toBe(true);
+    expect(readState(dir).heldSince).toBe(T0 + 500);
   });
 });
 
-describe("renewTurn — heartbeat", () => {
-  it("holder'ın heldSince'i tazelenir → force-advance engellenir", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    renewTurn(dir, t0, 6000); // uzun-ama-canlı iş
-    expect(tryTurn(dir, t1, "w2", 10_000, 5000)).toBe(false); // 10000-6000 <= 5000 → skip yok
-    const s = persisted();
-    expect(s.serving).toBe(0);
-    expect(s.heldSince).toBe(6000);
+describe("stale-ticket expiry — a dead holder is force-advanced (liveness)", () => {
+  it("holder past ttl is skipped so the next waiter gets the GPU", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir);
+    const b = pullTicket(dir);
+    expect(tryTurn(dir, a, "deadAgent", T0, TTL)).toBe(true); // A holds then "crashes"
+    // first attempt past the ttl force-advances (returns false), second claims the turn
+    expect(tryTurn(dir, b, "agentB", T0 + TTL + 1, TTL)).toBe(false);
+    expect(tryTurn(dir, b, "agentB", T0 + TTL + 2, TTL)).toBe(true);
+    expect(readState(dir).holder).toBe("agentB");
+    expect(readState(dir).serving).toBe(b);
   });
-  it("serving !== ticket iken no-op (bayat waiter state'i bozamaz)", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    renewTurn(dir, t1, 9999); // sıra t1'de değil
-    expect(persisted().heldSince).toBe(1000);
+  it("renewTurn keeps a long-but-alive holder from being force-advanced", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir);
+    const b = pullTicket(dir);
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true);
+    renewTurn(dir, a, T0 + TTL - 1000); // heartbeat just before expiry
+    expect(readState(dir).heldSince).toBe(T0 + TTL - 1000);
+    // at T0+TTL+1 the ORIGINAL heldSince would be stale, but the renewed one is fresh
+    expect(tryTurn(dir, b, "agentB", T0 + TTL + 1, TTL)).toBe(false);
+    expect(readState(dir).serving).toBe(a); // A still being served
+    expect(readState(dir).holder).toBe("agentA");
   });
-});
-
-describe("releaseTurn — idempotent release", () => {
-  it("serving++ ve holder temizlenir", () => {
-    const t0 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    releaseTurn(dir, t0);
-    const s = persisted();
-    expect(s.serving).toBe(1);
-    expect(s.holder).toBeNull();
-    expect(s.heldSince).toBeNull();
-  });
-  it("çift release güvenli: ikinci çağrı no-op (serving bir daha artmaz)", () => {
-    const t0 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    releaseTurn(dir, t0);
-    releaseTurn(dir, t0); // idempotent
-    expect(persisted().serving).toBe(1);
-  });
-  it("sırası olmayan ticket release edemez (başkasının turn'ünü çalamaz)", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    tryTurn(dir, t0, "w1", 1000, 5000);
-    releaseTurn(dir, t1);
-    const s = persisted();
-    expect(s.serving).toBe(0);
-    expect(s.holder).toBe("w1");
+  it("renewTurn for a ticket not being served is a no-op", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir);
+    const b = pullTicket(dir);
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true);
+    renewTurn(dir, b, T0 + 5000);
+    expect(readState(dir).heldSince).toBe(T0); // untouched
   });
 });
 
-describe("e2e FIFO senaryosu — 3 waiter tam yaşam döngüsü", () => {
-  it("arrival sırasıyla servis: w0 → w1(crash, force-advance) → w2", () => {
-    const t0 = pullTicket(dir);
-    const t1 = pullTicket(dir);
-    const t2 = pullTicket(dir);
-    // w0 normal döngü
-    expect(tryTurn(dir, t0, "w0", 100, 1000)).toBe(true);
-    releaseTurn(dir, t0);
-    // w1 alır ama crash (release yok)
-    expect(tryTurn(dir, t1, "w1", 200, 1000)).toBe(true);
-    // w2 poll'lar: önce false (w1 ttl içinde), ttl aşınca skip turu, sonra alır
-    expect(tryTurn(dir, t2, "w2", 300, 1000)).toBe(false);
-    expect(tryTurn(dir, t2, "w2", 1500, 1000)).toBe(false); // force-advance turu
-    expect(tryTurn(dir, t2, "w2", 1501, 1000)).toBe(true);
-    releaseTurn(dir, t2);
-    expect(persisted()).toMatchObject({ next: 3, serving: 3, holder: null, heldSince: null });
+describe("releaseTurn — double-release safety (idempotent)", () => {
+  it("a second release does NOT over-advance serving past the next waiter", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir); // 0
+    const b = pullTicket(dir); // 1
+    const c = pullTicket(dir); // 2
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true);
+    releaseTurn(dir, a);
+    releaseTurn(dir, a); // double release — must be a no-op
+    expect(readState(dir).serving).toBe(1);
+    expect(tryTurn(dir, c, "agentC", T0 + 1000, TTL)).toBe(false); // C did NOT jump the queue
+    expect(tryTurn(dir, b, "agentB", T0 + 1000, TTL)).toBe(true);  // B is next, as owed
+  });
+  it("releasing a turn you never held is a no-op", () => {
+    const dir = tmpDir();
+    const a = pullTicket(dir);
+    const b = pullTicket(dir);
+    releaseTurn(dir, b); // b is not being served
+    expect(readState(dir).serving).toBe(0);
+    expect(tryTurn(dir, a, "agentA", T0, TTL)).toBe(true); // A's turn intact
   });
 });

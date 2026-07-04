@@ -1,70 +1,69 @@
-// fleet-watch seams — tests the PURE rendering inputs bin/fleet-watch.ts composes: tail-parsing of
-// worker .log files, the report-verdict cell format, and the RUN/idle decision (log basename ↔ active
-// claim key). No alt-screen, no watch loop, no ~/.llm-mission-control — everything runs on temp dirs.
-import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+// bin/fleet-watch.ts contract tests — the watcher's claims-view: it derives the 🟢RUN/⚪idle flag from
+// activeClaims(readClaims(defaultStore(SEYIR_DIR)), now) keyed as `${lane}.${version}` (stream.slot).
+// The render/tail helpers are thin IO; the testable contract is the ts/TTL/LWW filtering below.
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { defaultStore, readClaims, activeClaims, acquireClaim } from "../bin/lib/claims";
+import { join, dirname } from "node:path";
+import { defaultStore, readClaims, activeClaims, type ClaimEvent, type ClaimStore } from "../bin/lib/claims";
 
-let dir = "";
-const tmp = () => { dir = mkdtempSync(join(tmpdir(), "fleet-watch-")); return dir; };
-afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }); dir = ""; });
-
-/** Reproduce main()'s lastLines: last n non-empty lines of a log (missing file → []). */
-function lastLines(file: string, n: number): string[] {
-  try { return readFileSync(file, "utf8").split("\n").filter(Boolean).slice(-n); } catch { return []; }
-}
-/** Reproduce main()'s reportVerdict cell: `verdict·Nst`, "—" when absent, "partial" on bad JSON. */
-function reportVerdict(reportsDir: string, stream: string, slot: string): string {
-  const f = join(reportsDir, `${stream}.${slot}.json`);
-  if (!existsSync(f)) return "—";
-  try { const j = JSON.parse(readFileSync(f, "utf8")); return `${j.verdict ?? "?"}·${(j.steps ?? []).length}st`; }
-  catch { return "partial"; }
-}
-
-describe("fleet-watch tail-parsing (lastLines)", () => {
-  it("returns the last N NON-EMPTY lines — blank lines and the trailing newline never render", () => {
-    const f = join(tmp(), "typescript-core.terminal.log");
-    writeFileSync(f, "[10:00:01] start\n\n[10:00:02] GPU queue\n[10:00:03] verdict=DONE\n\n");
-    expect(lastLines(f, 2)).toEqual(["[10:00:02] GPU queue", "[10:00:03] verdict=DONE"]);
-    expect(lastLines(f, 10)).toHaveLength(3); // asking for more than exists is safe
-  });
-  it("missing log file → [] (worker not started yet, no throw)", () => {
-    expect(lastLines(join(tmp(), "nope.log"), 2)).toEqual([]);
-  });
+const T0 = 1_700_000_000_000; // fixed epoch (deterministic)
+const ev = (o: Partial<ClaimEvent>): ClaimEvent => ({
+  ts: T0, tab: "fleet-worker", pid: 1, lane: "typescript-core", version: "terminal",
+  status: "claimed", ttlMs: 1_200_000, fence: 1, ...o,
 });
 
-describe("fleet-watch report-verdict cell", () => {
-  it("renders `verdict·Nst` from a worker report; missing fields degrade to `?·0st`", () => {
-    const d = tmp();
-    writeFileSync(join(d, "shell-harden.iterm2.json"), JSON.stringify({ verdict: "DONE", steps: [{ n: 1 }, { n: 2 }] }));
-    writeFileSync(join(d, "test-coverage.terminal.json"), JSON.stringify({ error: "boom" }));
-    expect(reportVerdict(d, "shell-harden", "iterm2")).toBe("DONE·2st");
-    expect(reportVerdict(d, "test-coverage", "terminal")).toBe("?·0st");
-  });
-  it("no report yet → '—'; truncated/partial JSON → 'partial' (mid-write is expected live)", () => {
-    const d = tmp();
-    writeFileSync(join(d, "mjs-migration.terminal.json"), '{"verdict":"DO'); // torn write
-    expect(reportVerdict(d, "never-ran", "terminal")).toBe("—");
-    expect(reportVerdict(d, "mjs-migration", "terminal")).toBe("partial");
-  });
-});
+// exactly the bin's derivation (fleet-watch.ts render()):
+const runningKeys = (store: ClaimStore, now: number): Set<string> =>
+  new Set(activeClaims(readClaims(store), now).map((c) => `${c.lane}.${c.version}`));
 
-describe("fleet-watch RUN/idle decision (log basename ↔ claim key join)", () => {
-  it("an active claim for the slot marks its log 🟢RUN: basename parse matches `lane.version`", () => {
-    const store = defaultStore(tmp());
-    acquireClaim(store, { lane: "typescript-core", version: "terminal", tab: "fleet-typescript-core-terminal", pid: 1 });
-    const activeKey = new Set(activeClaims(readClaims(store), Date.now()).map((c) => `${c.lane}.${c.version}`));
-    const [stream, slot] = "typescript-core.terminal.log".replace(/\.log$/, "").split(".");
-    expect(activeKey.has(`${stream}.${slot}`)).toBe(true);   // 🟢RUN
-    expect(activeKey.has("shell-harden.iterm2")).toBe(false); // other slot stays ⚪idle
+describe("fleet-watch — RUN/idle derivation from the claim ledger", () => {
+  let dir: string;
+  let store: ClaimStore;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "fleet-watch-"));
+    store = defaultStore(dir);
+    mkdirSync(dirname(store.ledgerPath), { recursive: true });
   });
-  it("an expired (TTL-blown) claim reads as ⚪idle — dead workers don't show as running", () => {
-    const store = defaultStore(tmp());
-    const T0 = 1_700_000_000_000;
-    acquireClaim(store, { lane: "shell-harden", version: "iterm2", tab: "t", pid: 1, ttlMs: 1000, now: T0 });
-    const activeKey = new Set(activeClaims(readClaims(store), T0 + 5000).map((c) => `${c.lane}.${c.version}`));
-    expect(activeKey.has("shell-harden.iterm2")).toBe(false);
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const writeLedger = (events: ClaimEvent[]) =>
+    writeFileSync(store.ledgerPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
+
+  it("no ledger file yet → no active claims → every slot shows idle", () => {
+    expect(readClaims(store)).toEqual([]);
+    expect(runningKeys(store, T0).size).toBe(0);
+  });
+
+  it("fresh claimed → 🟢RUN; TTL-expired and done claims → ⚪idle", () => {
+    writeLedger([
+      ev({ lane: "typescript-core", version: "terminal", ts: T0 }),                    // fresh
+      ev({ lane: "shell-harden", version: "iterm2", ts: T0 - 10_000, ttlMs: 1000 }),   // expired
+      ev({ lane: "test-coverage", version: "terminal", status: "done", ts: T0 }),      // finished
+    ]);
+    const keys = runningKeys(store, T0 + 1000);
+    expect(keys.has("typescript-core.terminal")).toBe(true);
+    expect(keys.has("shell-harden.iterm2")).toBe(false);
+    expect(keys.has("test-coverage.terminal")).toBe(false);
+    expect(keys.size).toBe(1);
+  });
+
+  it("the SAME slot flips RUN → idle as the clock passes its TTL (live-loop behavior)", () => {
+    writeLedger([ev({ ts: T0, ttlMs: 5000 })]);
+    expect(runningKeys(store, T0 + 1000).has("typescript-core.terminal")).toBe(true);
+    expect(runningKeys(store, T0 + 6000).has("typescript-core.terminal")).toBe(false);
+  });
+
+  it("LWW: a later released event beats the earlier claimed one (worker finished → idle)", () => {
+    writeLedger([
+      ev({ ts: T0, fence: 1 }),
+      ev({ ts: T0 + 2000, fence: 2, status: "released" }),
+    ]);
+    expect(runningKeys(store, T0 + 3000).size).toBe(0);
+  });
+
+  it("a corrupt ledger line is skipped gracefully (watcher never crashes mid-fleet)", () => {
+    writeFileSync(store.ledgerPath, JSON.stringify(ev({})) + "\n{corrupt json\n");
+    expect(runningKeys(store, T0 + 1000).has("typescript-core.terminal")).toBe(true);
   });
 });

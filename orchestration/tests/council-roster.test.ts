@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildRoster, resolveSeat, seatsForLane, SEAT_SPEC, LANES,
+  renderRosterTable, injectRosterBlock, ROSTER_BLOCK_BEGIN, ROSTER_BLOCK_END,
   type SeatSpec,
 } from "../bin/lib/council-roster";
 
@@ -87,5 +88,34 @@ describe("seatsForLane — present seats per lane", () => {
   it("absent seats never returned", () => {
     const r2 = buildRoster(["qwen3:8b"]); // vision absent
     expect(seatsForLane(r2, "frontend").every((s) => s.available)).toBe(true);
+  });
+});
+
+describe("renderRosterTable + injectRosterBlock (COUNCIL_PROMPT canlı §3 bloğu)", () => {
+  const roster = buildRoster(LIVE);
+
+  it("renders one row per seat with model or absent", () => {
+    const t = renderRosterTable(roster.seats);
+    expect(t).toContain("| Seat (yetenek) |");
+    for (const s of roster.seats) expect(t).toContain(`| ${s.capability} |`);
+    const absent = buildRoster([]).seats;
+    expect(renderRosterTable(absent)).toContain("**absent**");
+  });
+
+  it("injects between markers, idempotent, preserves surroundings", () => {
+    const md = `# Doc\n\nönce\n\n${ROSTER_BLOCK_BEGIN}\nESKİ TABLO\n${ROSTER_BLOCK_END}\n\nsonra\n`;
+    const table = renderRosterTable(roster.seats);
+    const once = injectRosterBlock(md, table);
+    expect(once).not.toBeNull();
+    expect(once!).toContain("önce");
+    expect(once!).toContain("sonra");
+    expect(once!).not.toContain("ESKİ TABLO");
+    expect(once!).toContain(table);
+    expect(injectRosterBlock(once!, table)).toBe(once); // idempotent
+  });
+
+  it("returns null when markers missing or malformed (fail-soft, dosyaya dokunma)", () => {
+    expect(injectRosterBlock("no markers here", "T")).toBeNull();
+    expect(injectRosterBlock(`${ROSTER_BLOCK_END}\nters\n${ROSTER_BLOCK_BEGIN}`, "T")).toBeNull();
   });
 });

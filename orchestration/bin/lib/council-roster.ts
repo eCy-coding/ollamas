@@ -144,3 +144,29 @@ export function buildRoster(availableModels: string[], readyApiProviders: string
 export function seatsForLane(roster: Roster, lane: string): Seat[] {
   return roster.seats.filter((s) => s.available && s.lanes.includes(lane));
 }
+
+// COUNCIL_PROMPT.md §3 canlı roster bloğu — doc'un "canlı türetilir" sözleşmesini gerçek kılar
+// (orphan-artifact kök-fix: council.ts her light koşuda bu bloğu tazeler).
+export const ROSTER_BLOCK_BEGIN = "<!-- AUTO-ROSTER:BEGIN — council.ts canlı üretir, elle düzenleme -->";
+export const ROSTER_BLOCK_END = "<!-- AUTO-ROSTER:END -->";
+
+/** Seat listesini COUNCIL_PROMPT §3 markdown tablosuna çevirir (absent gizlenmez). */
+export function renderRosterTable(seats: Seat[]): string {
+  const L = [
+    "| Seat (yetenek) | Rol | Model | Lane |",
+    "|----------------|-----|-------|------|",
+  ];
+  for (const s of seats) {
+    const model = s.available && s.model ? `\`${s.model}\`` : "**absent**";
+    L.push(`| ${s.capability} | ${s.role} | ${model} | ${s.lanes.join(", ")} |`);
+  }
+  return L.join("\n");
+}
+
+/** Marker'lar arasındaki bloğu değiştirir. Marker yok/bozuk → null (fail-soft: dosyaya dokunma). */
+export function injectRosterBlock(md: string, table: string): string | null {
+  const i = md.indexOf(ROSTER_BLOCK_BEGIN);
+  const j = md.indexOf(ROSTER_BLOCK_END);
+  if (i < 0 || j < 0 || j < i) return null;
+  return md.slice(0, i + ROSTER_BLOCK_BEGIN.length) + "\n" + table + "\n" + md.slice(j);
+}

@@ -33,27 +33,28 @@ Claude Code (kondüktör + denetçi)
 
 ## 3. Yetenek → sorumluluk (seat spec — canlı ROSTER özeti)
 
-<!-- ROSTER:AUTO — council.ts her koşuda canlı roster'dan yeniden yazar; elle düzenleme -->
-| Seat (yetenek) | Rol | Tercih modeli | Lane |
-|----------------|-----|---------------|------|
-| deep-code | architect | qwen3-coder:480b-cloud | backend, integrations |
-| long-ctx-code | analyst | qwen3-coder-64k:latest | backend, orchestration |
-| local-code | coder | qwen3-coder:30b | cli, scripts |
-| reasoning | verifier | deepseek-r1:32b | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| vision | analyst | qwen2.5vl:32b | frontend |
-| moe-mid | analyst | qwen3:30b-a3b | orchestration |
-| fast-verify | reviewer | qwen3:8b | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| cheap-triage | triage | qwen3:4b | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| adversarial | adversary | gpt-oss:120b-cloud | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| big-reasoning | adversary | llama3.3:70b | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| cloud-alt | analyst | kimi-k2.5:cloud | bench |
-| small-logic | analyst | phi4:latest | scripts |
-| embedding | search | nomic-embed-text:latest | backend, frontend, cli, scripts, integrations, bench, orchestration |
-| custom-review | reviewer | ollamas-reviewer:latest | backend, frontend, cli, scripts, integrations, bench, orchestration |
-<!-- /ROSTER:AUTO -->
+<!-- AUTO-ROSTER:BEGIN — council.ts canlı üretir, elle düzenleme -->
+| Seat (yetenek) | Rol | Model | Lane |
+|----------------|-----|-------|------|
+| deep-code | architect | `qwen3-coder:480b-cloud` | backend, integrations |
+| long-ctx-code | analyst | `qwen3-coder-64k:latest` | backend, orchestration |
+| local-code | coder | `qwen3-coder:30b` | cli, scripts |
+| reasoning | verifier | `deepseek-r1:32b` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| vision | analyst | `qwen2.5vl:32b` | frontend |
+| moe-mid | analyst | `qwen3:30b-a3b` | orchestration |
+| fast-verify | reviewer | `qwen3:8b` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| cheap-triage | triage | `qwen3:4b` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| adversarial | adversary | `gpt-oss:120b-cloud` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| big-reasoning | adversary | `llama3.3:70b` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| cloud-alt | analyst | `kimi-k2.5:cloud` | bench |
+| small-logic | analyst | `phi4:latest` | scripts |
+| embedding | search | `nomic-embed-text:latest` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+| custom-review | reviewer | `ollamas-reviewer:latest` | backend, frontend, cli, scripts, integrations, bench, orchestration |
+<!-- AUTO-ROSTER:END -->
 
 > Bir tercih modeli yüklü değilse seat sıradaki modele düşer; hiçbiri yoksa **absent** olarak
-> raporlanır (gizlenmez). Canlı doğru tablo: `COUNCIL_ROSTER.json`.
+> raporlanır (gizlenmez). Canlı doğru tablo: `COUNCIL_ROSTER.json` (bu blok her
+> `tsx orchestration/bin/council.ts` koşusunda oradan tazelenir).
 
 ## 4. Lane analist görevi (dispatch prompt sözleşmesi)
 
