@@ -64,6 +64,8 @@ export function classify(i: ClassifyInput): Finding[] {
     out.push({ tier: "REGRESSION", lane: "bench", kind: `reg:${reg.model}`, detail: `${reg.model} tok/s baseline'dan -%${reg.dropPct} düştü`, action: `bench: ${reg.model} regresyonunu araştır (config/thermal)`, severity: 50 });
   }
   for (const l of i.lanes) {
+    // "(detached)" = branch-siz ghost worktree — "sıradaki versiyonu planla" anlamsız, STALE üretme.
+    if (l.lane === "(detached)") continue;
     if (l.idle && Number.isFinite(l.ageHours) && l.ageHours > idleH) {
       out.push({ tier: "STALE", lane: l.lane, kind: `stale:${l.lane}`, detail: `${l.lane} ${Math.round(l.ageHours)}s commitsiz (idle)`, action: `${l.lane}: sıradaki versiyonu planla (durağan)`, severity: Math.min(49, Math.round(l.ageHours)) });
     }

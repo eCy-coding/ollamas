@@ -33,6 +33,16 @@ describe("classify — sinyal → Finding tier", () => {
     const fresh = classify(baseInput({ lanes: [{ lane: "frontend", idle: true, ageHours: 2, dirtyFiles: 0, roadmapNext: "" }] }));
     expect(fresh.find((x) => x.tier === "STALE")).toBeUndefined();
   });
+  it("(detached) lane → STALE üretilmez (branch-siz ghost lane); adlı lane STALE kalır", () => {
+    const f = classify(baseInput({
+      lanes: [
+        { lane: "(detached)", idle: true, ageHours: 244, dirtyFiles: 0, roadmapNext: "" },
+        { lane: "feat/x", idle: true, ageHours: 244, dirtyFiles: 0, roadmapNext: "" },
+      ],
+    }));
+    expect(f.find((x) => x.tier === "STALE" && x.kind === "stale:(detached)")).toBeUndefined();
+    expect(f.find((x) => x.tier === "STALE" && x.kind === "stale:feat/x")).toBeTruthy();
+  });
   it("roadmap next → ROADMAP", () => {
     const f = classify(baseInput({ lanes: [{ lane: "cli", idle: false, ageHours: 1, dirtyFiles: 0, roadmapNext: "v11 Keychain" }] }));
     expect(f.find((x) => x.tier === "ROADMAP")?.detail).toMatch(/v11 Keychain/);
