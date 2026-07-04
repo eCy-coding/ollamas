@@ -220,6 +220,25 @@ function writeRoster(roster: Roster, ts: string): void {
     })),
   };
   writeFileSync(join(ORCH_DIR, "COUNCIL_ROSTER.json"), JSON.stringify(payload, null, 2) + "\n");
+  syncPromptRoster(roster);
+}
+
+/** COUNCIL_PROMPT.md §3 roster tablosunu canlı seat verisiyle senkronlar (ROSTER:AUTO marker'ları arası; never-throw — light mode'u asla bloklamaz). */
+function syncPromptRoster(roster: Roster): void {
+  try {
+    const p = join(ORCH_DIR, "COUNCIL_PROMPT.md");
+    if (!existsSync(p)) return;
+    const md = readFileSync(p, "utf8");
+    const open = md.indexOf("<!-- ROSTER:AUTO");
+    const openEnd = open >= 0 ? md.indexOf("-->", open) : -1;
+    const close = md.indexOf("<!-- /ROSTER:AUTO -->");
+    if (open < 0 || openEnd < 0 || close <= openEnd) return;
+    const rows = roster.seats.map((s) =>
+      `| ${s.capability} | ${s.role} | ${s.model}${s.available ? "" : " *(absent)*"} | ${s.lanes.join(", ")} |`);
+    const table = ["| Seat (yetenek) | Rol | Tercih modeli | Lane |", "|----------------|-----|---------------|------|", ...rows].join("\n");
+    const next = md.slice(0, openEnd + 3) + "\n" + table + "\n" + md.slice(close);
+    if (next !== md) writeFileSync(p, next);
+  } catch { /* asla throw etme */ }
 }
 
 function sysChip(): string {
