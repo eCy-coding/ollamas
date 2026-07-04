@@ -83,6 +83,10 @@ import {
 } from "./setup.ts";
 import { existsSync } from "node:fs";
 import { renderMobileConfig } from "./mobileconfig.ts";
+import { randomBytes } from "node:crypto";
+import { addKey, listKeys, revokeKey, type PxyVault } from "./proxy.ts";
+import { createGateway } from "./proxy-server.ts";
+import { createLimiter } from "./ratelimit.ts";
 
 const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
 
@@ -506,6 +510,174 @@ async function cmdDaemon(): Promise<void> {
   }
 }
 
+// ---------- proxy gateway (vT12) ----------
+
+export const PROXY_DAEMON_LABEL = "com.ollamas.tunnel.proxy";
+
+export interface ProxyArgs {
+  port: number;
+  tls: boolean;
+}
+
+/** PURE: parse `proxy up` flags. Defaults: :8443 with mkcert TLS. */
+export function parseProxyArgs(argv: string[]): ProxyArgs {
+  let port = 8443;
+  const pIdx = argv.indexOf("--port");
+  if (pIdx >= 0) {
+    port = Number(argv[pIdx + 1]);
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+      throw new Error(`proxy: invalid port ${argv[pIdx + 1] ?? "(missing)"}`);
+    }
+  }
+  return { port, tls: !argv.includes("--no-tls") };
+}
+
+/** PURE: launchd plan for the always-on gateway (label ≠ autopilot's). */
+export function proxyDaemonPlan(): DaemonPlan {
+  return {
+    label: PROXY_DAEMON_LABEL,
+    nodeBin: process.execPath,
+    cliPath: join(import.meta.dirname, "cli.ts"),
+    args: ["proxy", "up"],
+    logPath: join(KEYS_DIR, "proxy-daemon.log"),
+    workdir: join(import.meta.dirname, ".."),
+  };
+}
+
+const PROXY_VAULT_PATH = () => join(KEYS_DIR, "proxy-vault.json");
+const PROXY_KEYFILE_PATH = () => join(KEYS_DIR, "proxy-keyfile");
+const PROXY_PID_PATH = () => join(KEYS_DIR, "proxy.pid");
+const PROXY_ACCESS_LOG = () => join(KEYS_DIR, "proxy-access.jsonl");
+
+async function loadProxyVault(): Promise<PxyVault> {
+  await mkdir(KEYS_DIR, { recursive: true });
+  const master = loadOrCreateKeyfile(PROXY_KEYFILE_PATH());
+  return openFromFile<PxyVault>(PROXY_VAULT_PATH(), master) ?? { keys: [] };
+}
+
+function saveProxyVault(vault: PxyVault): void {
+  const master = loadOrCreateKeyfile(PROXY_KEYFILE_PATH());
+  sealToFile(PROXY_VAULT_PATH(), vault, master);
+}
+
+async function cmdProxyUp(argv: string[]): Promise<void> {
+  const args = parseProxyArgs(argv);
+  const vault = await loadProxyVault();
+  const active = vault.keys.filter((k) => k.revoked !== true);
+  if (active.length === 0) {
+    console.error("proxy: no active pxy_ key — run `tunnel proxy key add <label>` first.");
+    process.exitCode = 1;
+    return;
+  }
+  const certPath = join(KEYS_DIR, "cert.pem");
+  const keyPath = join(KEYS_DIR, "key.pem");
+  let tls: { certPath: string; keyPath: string } | undefined;
+  if (args.tls) {
+    if (existsSync(certPath) && existsSync(keyPath)) {
+      tls = { certPath, keyPath };
+    } else {
+      console.error("proxy: no mkcert cert in keys/ — run `tunnel tls` first, or pass --no-tls (cloudflared/loopback only).");
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const gw = createGateway({
+    port: args.port,
+    tls,
+    keys: vault.keys,
+    limiter: createLimiter({ capacity: 60, ratePerSec: 10 }),
+    accessLogPath: PROXY_ACCESS_LOG(),
+  });
+  const port = await gw.listen();
+  await writeFile(PROXY_PID_PATH(), String(process.pid), { mode: 0o600 });
+  const scheme = tls ? "https" : "http";
+  console.log(`proxy gateway up → ${scheme}://0.0.0.0:${port}  (routes: /v1→ollama:11434, /api|/mcp→ollamas:3000)`);
+  console.log(`auth: ${active.length} active pxy_ key(s); public path: GET ${HEALTH_PATH} only`);
+  // Foreground process (launchd KeepAlive supervises it). SIGINT/SIGTERM → clean close.
+  const stop = async (): Promise<void> => {
+    await gw.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void stop());
+  process.on("SIGTERM", () => void stop());
+  await new Promise(() => {}); // hold forever
+}
+
+async function cmdProxy(): Promise<void> {
+  const sub = process.argv[3] ?? "status";
+  const rest = process.argv.slice(4);
+  switch (sub) {
+    case "up":
+      return cmdProxyUp(rest);
+    case "down": {
+      try {
+        const pid = Number(await readFile(PROXY_PID_PATH(), "utf8"));
+        process.kill(pid, "SIGTERM");
+        console.log(`proxy: sent SIGTERM to ${pid}`);
+      } catch {
+        console.log("proxy: not running (no live pidfile)");
+      }
+      return;
+    }
+    case "status": {
+      const vault = await loadProxyVault();
+      let running = false;
+      let pid = 0;
+      try {
+        pid = Number(await readFile(PROXY_PID_PATH(), "utf8"));
+        process.kill(pid, 0); // signal 0 = liveness probe
+        running = true;
+      } catch {
+        running = false;
+      }
+      console.log(JSON.stringify({ running, pid: running ? pid : null, keys: listKeys(vault) }, null, 2));
+      return;
+    }
+    case "key": {
+      const op = process.argv[4] ?? "list";
+      const vault = await loadProxyVault();
+      if (op === "add") {
+        const label = process.argv[5] ?? "default";
+        const { vault: v2, raw } = addKey(vault, label, randomBytes(16).toString("hex"));
+        saveProxyVault(v2);
+        console.log(`new key (${label}) — SHOWN ONCE, store it now:`);
+        console.log(raw);
+        return;
+      }
+      if (op === "revoke") {
+        const prefix = process.argv[5];
+        if (!prefix) throw new Error("proxy key revoke <prefix>");
+        saveProxyVault(revokeKey(vault, prefix));
+        console.log(`revoked ${prefix}`);
+        return;
+      }
+      console.log(JSON.stringify(listKeys(vault), null, 2));
+      return;
+    }
+    case "daemon": {
+      const op = process.argv[4] ?? "status";
+      const plan = proxyDaemonPlan();
+      if (op === "install") {
+        await mkdir(KEYS_DIR, { recursive: true });
+        const r = installAgent(plan);
+        console.log(JSON.stringify({ ...r, plist: agentPath(plan.label) }, null, 2));
+        process.exitCode = r.ok ? 0 : 1;
+        return;
+      }
+      if (op === "uninstall") {
+        const r = uninstallAgent(plan.label);
+        console.log(JSON.stringify(r, null, 2));
+        process.exitCode = r.ok ? 0 : 1;
+        return;
+      }
+      console.log(JSON.stringify({ ...agentStatus(plan.label), log: plan.logPath }, null, 2));
+      return;
+    }
+    default:
+      console.log("usage: tunnel proxy <up|down|status|key add <label>|key list|key revoke <prefix>|daemon install|uninstall|status> [--port N] [--no-tls]");
+  }
+}
+
 async function main(): Promise<void> {
   const cmd = process.argv[2] ?? "help";
   switch (cmd) {
@@ -539,9 +711,11 @@ async function main(): Promise<void> {
       return cmdTeardown();
     case "doctor":
       return cmdDoctor();
+    case "proxy":
+      return cmdProxy();
     default:
       console.log(
-        "usage: tunnel <setup|teardown|doctor|config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench> [install|uninstall|status] [--daemon|--watch|--json|--force|--samples N]",
+        "usage: tunnel <setup|teardown|doctor|config|up|down|tls|mesh|select|auto|rotate|status|daemon|bench|proxy> [install|uninstall|status] [--daemon|--watch|--json|--force|--samples N]",
       );
   }
 }
