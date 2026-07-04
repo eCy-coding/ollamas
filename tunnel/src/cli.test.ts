@@ -86,3 +86,22 @@ test("namedDaemonPlan: dedicated label runs `proxy cloudflare named up`", () => 
   assert.equal(plan.label, "com.ollamas.tunnel.cloudflared");
   assert.deepEqual(plan.args, ["proxy", "cloudflare", "named", "up"]);
 });
+
+// ---------- vT15: three-daemon setup + named transport register ----------
+test("daemonLabelsForSetup: adds named agent when named vault exists (3 agents)", () => {
+  const labels = daemonLabelsForSetup(
+    { autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL, named: NAMED_DAEMON_LABEL },
+    true,
+    true,
+  );
+  assert.deepEqual(labels, [DEFAULT_LABEL, PROXY_DAEMON_LABEL, NAMED_DAEMON_LABEL]);
+});
+
+test("daemonLabelsForSetup: no named when named vault absent (back-compat 2 agents)", () => {
+  const labels = daemonLabelsForSetup(
+    { autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL, named: NAMED_DAEMON_LABEL },
+    true,
+    false,
+  );
+  assert.deepEqual(labels, [DEFAULT_LABEL, PROXY_DAEMON_LABEL]);
+});

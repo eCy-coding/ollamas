@@ -61,14 +61,19 @@ export function kindsToConfigure(steps: SetupStep[]): SetupKind[] {
 }
 
 /**
- * PURE (vT14): which launchd agents `setup --daemon` installs. Always the autopilot agent;
- * the proxy gateway agent too when its vault exists (so one command = truly always-on everywhere).
+ * PURE (vT14/vT15): which launchd agents `setup --daemon` installs. Always the autopilot agent;
+ * the proxy gateway agent too when its vault exists; the named cloudflare tunnel agent when a
+ * named tunnel is configured (so one command = truly always-on everywhere, stable URL).
  */
 export function daemonLabelsForSetup(
-  labels: { autopilot: string; proxy: string },
+  labels: { autopilot: string; proxy: string; named?: string },
   proxyVaultExists: boolean,
+  namedVaultExists = false,
 ): string[] {
-  return proxyVaultExists ? [labels.autopilot, labels.proxy] : [labels.autopilot];
+  const out = [labels.autopilot];
+  if (proxyVaultExists) out.push(labels.proxy);
+  if (namedVaultExists && labels.named) out.push(labels.named);
+  return out;
 }
 
 /** PURE: human-readable plan table. */

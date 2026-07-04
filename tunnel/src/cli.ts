@@ -331,6 +331,20 @@ function buildSwitch(): { sw: TunnelSwitch; transports: Transport[] } {
         writeGatewayState(GATEWAY_STATE_PATH(), { running: true, publicUrl: url, ts: Date.now() }),
     }),
   ];
+  // vT15: register the stable-URL named tunnel when configured — preferred REVERSE over quick.
+  const named = existsSync(NAMED_VAULT_PATH()) ? readNamed(NAMED_VAULT_PATH(), PROXY_KEYFILE_PATH()) : null;
+  if (named) {
+    transports.push(
+      new NamedCloudflareTransport({
+        hostname: named.hostname,
+        mode: named.mode,
+        ...(named.token ? { token: named.token } : {}),
+        tunnelName: "ollamas",
+        hasActiveKey: proxyHasActiveKey,
+        gatewayHealthy,
+      }),
+    );
+  }
   const sw = new TunnelSwitch();
   for (const t of transports) sw.register(t);
   return { sw, transports };
@@ -386,8 +400,10 @@ async function cmdStatus(): Promise<void> {
       ...(gwState ? { gateway: { running: gwState.running, publicUrl: gwState.publicUrl } } : {}),
     });
     const conn = classify({ lan: report.active !== null, internet: await internetReachable() });
-    if (json) return JSON.stringify({ ...report, connectivity: conn }, null, 2);
-    return `${renderStatusTable(report)}\nconnectivity: ${conn}`;
+    const named = loadNamed();
+    if (json) return JSON.stringify({ ...report, connectivity: conn, ...(named ? { named: describeNamed(named) } : {}) }, null, 2);
+    const namedLine = named ? `\n${describeNamed(named)}` : "";
+    return `${renderStatusTable(report)}${namedLine}\nconnectivity: ${conn}`;
   };
 
   if (watch) {
@@ -467,14 +483,19 @@ async function cmdSetup(): Promise<void> {
     // vT14: one command installs BOTH agents — autopilot (transport self-heal) AND the proxy
     // gateway — so REVERSE never points at a dead gateway. gap #2 closed.
     const labels = daemonLabelsForSetup(
-      { autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL },
+      { autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL, named: NAMED_DAEMON_LABEL },
       existsSync(PROXY_VAULT_PATH()),
+      existsSync(NAMED_VAULT_PATH()),
     );
     const dr = installAgent(daemonPlan());
     console.log(`daemon (autopilot): ${dr.reason}`);
     if (labels.includes(PROXY_DAEMON_LABEL)) {
       const pr = installAgent(proxyDaemonPlan());
       console.log(`daemon (proxy gateway): ${pr.reason}`);
+    }
+    if (labels.includes(NAMED_DAEMON_LABEL)) {
+      const nr = installAgent(namedDaemonPlan());
+      console.log(`daemon (named tunnel, stable URL): ${nr.reason}`);
     }
   } else {
     console.log("tip: `setup --daemon` to keep it always-on (login + crash-restart, gateway + transport).");
