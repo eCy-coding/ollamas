@@ -86,9 +86,14 @@ bu istisna yalnız teşhis-dürtmesi + bildirim kapsar, kod/dosya mutasyonu DEĞ
   REQUIREMENTS'tan kaybolursa oturum otomatik `done` (kanıt-bazlı, honor-system'e bağımlılık yok) →
   sıradaki gereksinim ANINDA dispatch. Güvenlik: dry-run DEFAULT · tek-manuel aktivasyon marker
   `.claude-dispatch-enabled` · kill-switch `.claude-dispatch-off` · target idempotency · cap=1 ·
-  24h bütçe 6 spawn · failure-backoff 4h (yalnız stale sonrası; done anında zincirler) · 2× stale →
-  blocked + notify (asla sonsuz respawn) · bayat-REQUIREMENTS'a spawn YOK · audit dedup
-  `seyir/dispatch-log.jsonl` · spawn dosyaları `~/.ollamas/` (WatchPaths self-retrigger kök-fix).
+  24h bütçe 6 spawn (`ORCH_CLAUDE_MAX_PER_DAY`) · failure-backoff 4h (yalnız stale sonrası; done anında
+  zincirler) · 2× stale → blocked + notify (asla sonsuz respawn) · bayat-REQUIREMENTS'a spawn YOK ·
+  audit dedup `seyir/dispatch-log.jsonl` · spawn dosyaları `~/.ollamas/` (WatchPaths self-retrigger kök-fix).
+  vO42 sıfır-soru otonomi (Emre'nin açık talimatı): spawn edilen oturum `--permission-mode
+  bypassPermissions` (env `ORCH_CLAUDE_PERMISSION_MODE=plan|acceptEdits` ile geri dönülür) — onay yerine
+  kalite kapısı (tsc→vitest→conventional commit) + completion'da `autopilot --quiet` (saniyeler içinde
+  zincir); paralel ön-hesap: aktif görev koşarken SIRADAKİ gereksinimin prompt+wrapper'ı prefetch edilir
+  (`nextPending`, CLAUDE_DISPATCH.md "sıradaki" satırı).
 
 ---
 

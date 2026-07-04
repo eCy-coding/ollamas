@@ -187,8 +187,17 @@ export function planDispatch(i: DispatchPlanInput): DispatchPlan {
   return { go: true, mode: "spawn", reason: `spawn: ${i.req.criticality}:${i.req.target}`, fingerprint: fp };
 }
 
-/** Conductor task prompt (plan mode). Anthropic lead-agent pattern: objective / output format /
- *  boundaries / success criterion explicit. Build EN (fleet doctrine). */
+/**
+ * vO42: next-up queue — first ranked requirement whose target is not already an active/blocked
+ * session target. Prefetched IN PARALLEL while the current task runs (zero-gap chaining).
+ */
+export function nextPending(reqs: Requirement[], sessions: DispatchSession[]): Requirement | null {
+  const busy = new Set(sessions.filter((s) => s.status === "active" || s.status === "blocked").map(sessionTarget));
+  return reqs.find((r) => !busy.has(r.target)) ?? null;
+}
+
+/** Conductor task prompt (autonomous, vO42 zero-question). Anthropic lead-agent pattern: objective /
+ *  output format / boundaries / success criterion explicit. Build EN (fleet doctrine). */
 export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo: string): string {
   const fp = taskFingerprint(req);
   const sel = modelSelection?.selection;
@@ -212,8 +221,9 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
     ``,
     `DOCTRINE (non-negotiable):`,
     `1. Invoke the \`fleet-orchestrator\` skill FIRST. You CONDUCT — you do not write feature code yourself.`,
-    `2. You are in PLAN MODE: research the requirement (read orchestration/REQUIREMENTS.md + CONDUCTOR.md +`,
-    `   QUALITY.md for context), then present a plan for approval before any change.`,
+    `2. AUTONOMOUS MODE (zero-question, operator's standing order): plan internally FIRST (research →`,
+    `   plan → execute; read orchestration/REQUIREMENTS.md + CONDUCTOR.md + QUALITY.md for context).`,
+    `   NEVER ask the operator anything — no confirmations, no yes/no. The quality gate replaces approval.`,
     `3. Distribute subtasks to the local model fleet: \`/council --debate\` for analysis decisions,`,
     `   \`/fleet --go\` for living agent-tabs, \`/think\` for recurring problems. ≤2 tasks/model, single-GPU FIFO.`,
     `4. ${runtime}.`,
@@ -227,9 +237,11 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
     `longer lists target "${req.target}" in REQUIREMENTS.json — the pipeline auto-detects completion and`,
     `chains to the next requirement even if you forget the protocol below.`,
     ``,
-    `COMPLETION PROTOCOL (fast path) — when verified resolved, append exactly one line to`,
-    `orchestration/seyir/claude-dispatch-state.jsonl:`,
+    `COMPLETION PROTOCOL (fast path) — when verified resolved:`,
+    `1. Append exactly one line to orchestration/seyir/claude-dispatch-state.jsonl:`,
     `{"fingerprint":"${fp}","task":"${req.criticality}:${req.target}","target":"${req.target}","app":"-","startedTs":"<now ISO>","status":"done"}`,
+    `2. Then run \`npx tsx orchestration/bin/autopilot.ts --quiet\` as your LAST action — this refreshes`,
+    `REQUIREMENTS at the completion moment so the pipeline chains to the next task within seconds.`,
   ].join("\n");
 }
 
@@ -237,7 +249,7 @@ export function buildDispatchPrompt(req: Requirement, modelSelection: any, repo:
 export function renderDispatchMd(i: {
   ts: string; plan: DispatchPlan; req: Requirement | null; sessions: DispatchSession[];
   killSwitch: boolean; goEnabled: boolean; app: SpawnApp; reqStale?: boolean;
-  spawns24h?: number; maxPerDay?: number;
+  spawns24h?: number; maxPerDay?: number; nextUp?: Requirement | null;
 }): string {
   const icon = i.plan.mode === "spawn" ? "▶" : i.plan.mode === "dry" ? "[dry]" : i.plan.mode === "blocked" ? "🛑" : "⏭";
   const blocked = i.sessions.filter((s) => s.status === "blocked");
@@ -256,6 +268,7 @@ export function renderDispatchMd(i: {
       ? `- top requirement: **${i.req.criticality}:${i.req.target}** — ${i.req.detail.slice(0, 100)} (fingerprint ${i.plan.fingerprint ?? "-"})`
       : `- top requirement: yok`,
   ];
+  if (i.nextUp) L.push(`- ⏭ sıradaki (prefetched, paralel ön-hesap): **${i.nextUp.criticality}:${i.nextUp.target}**`);
   if (blocked.length) L.push(`- 🛑 blocked (insan gerekli): ${blocked.map((b) => `${sessionTarget(b)} (${b.fingerprint})`).join(", ")}`);
   L.push(``, `## Oturumlar`);
   if (!i.sessions.length) L.push(`- (henüz oturum yok)`);

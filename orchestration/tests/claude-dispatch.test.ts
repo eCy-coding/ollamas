@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   taskFingerprint, sessionTarget, foldSessions, reconcileSessions, autoCompleteSessions,
   staleCounts, spawnsInWindow, shouldAudit, planDispatch, buildDispatchPrompt, renderDispatchMd,
+  nextPending,
   type DispatchSession,
 } from "../bin/lib/claude-dispatch";
 import { buildSpawnScript, openTab, type SpawnRunner } from "../bin/lib/tab-spawn";
@@ -179,17 +180,58 @@ describe("buildDispatchPrompt — Anthropic lead-agent deseni", () => {
   const SEL = { selection: { model: "qwen3-coder:30b", tokS: 114.6, config: { num_ctx: 8192 } }, champions: { combination: { implementer: { model: "qwen3-coder:480b-cloud" }, verifier: { model: "qwen3:8b" } } } };
   it("OBJECTIVE/BOUNDARIES/OUTPUT FORMAT/SUCCESS CRITERION + doktrin + completion", () => {
     const p = buildDispatchPrompt(REQ, SEL, "/repo");
-    for (const marker of ["OBJECTIVE", "BOUNDARIES", "OUTPUT FORMAT", "SUCCESS CRITERION", "fleet-orchestrator", "PLAN MODE", "red:backend", "qwen3-coder:30b", "claude-dispatch-state.jsonl"]) {
+    for (const marker of ["OBJECTIVE", "BOUNDARIES", "OUTPUT FORMAT", "SUCCESS CRITERION", "fleet-orchestrator", "AUTONOMOUS MODE", "red:backend", "qwen3-coder:30b", "claude-dispatch-state.jsonl"]) {
       expect(p).toContain(marker);
     }
     expect(p).toContain(taskFingerprint(REQ));
+  });
+  it("vO42 zero-question: onay/plan-approval metni YOK; completion autopilot-refresh adımı VAR", () => {
+    const p = buildDispatchPrompt(REQ, SEL, "/repo");
+    expect(p).not.toContain("present a plan for approval");
+    expect(p).toContain("NEVER ask the operator");
+    expect(p).toContain("autopilot.ts --quiet");
   });
   it("MODEL_SELECTION yoksa benchprompt tazeleme talimatı", () => {
     expect(buildDispatchPrompt(REQ, null, "/repo")).toContain("benchprompt");
   });
 });
 
+describe("nextPending — vO42 paralel ön-hesap kuyruğu", () => {
+  const R2: typeof REQ = { ...REQ, criticality: "COMPLETENESS", target: "crit:x", score: 45 };
+  const R3: typeof REQ = { ...REQ, criticality: "ROADMAP", target: "next:y", score: 10 };
+  it("aktif/blocked target atlanır, sıradaki rank'lı gereksinim döner", () => {
+    const active = sess({ target: "red:backend" });
+    expect(nextPending([REQ, R2, R3], [active])?.target).toBe("crit:x");
+    const blocked = sess({ fingerprint: "bbbbbbbbbbbb", target: "crit:x", status: "blocked" });
+    expect(nextPending([REQ, R2, R3], [active, blocked])?.target).toBe("next:y");
+  });
+  it("hiç oturum yoksa ilk gereksinim; boş liste → null", () => {
+    expect(nextPending([REQ, R2], [])?.target).toBe("red:backend");
+    expect(nextPending([], [sess({})])).toBeNull();
+  });
+  it("done oturum busy sayılmaz", () => {
+    expect(nextPending([REQ], [sess({ status: "done" })])?.target).toBe("red:backend");
+  });
+});
+
+describe("planDispatch maxPerDay override (ORCH_CLAUDE_MAX_PER_DAY)", () => {
+  it("maxPerDay=2 iken 2 spawn → skip; default 6'da geçer", () => {
+    const base = { sessions: [] as DispatchSession[], req: REQ, nowMs: NOW, killSwitch: false, goEnabled: true };
+    expect(planDispatch({ ...base, spawns24h: 2, maxPerDay: 2 }).reason).toContain("bütçe");
+    expect(planDispatch({ ...base, spawns24h: 2 }).mode).toBe("spawn");
+  });
+});
+
 describe("renderDispatchMd", () => {
+  it("vO42 nextUp satırı görünür", () => {
+    const md = renderDispatchMd({
+      ts: "t", plan: { go: false, mode: "skip", reason: "aktif" }, req: REQ, sessions: [sess({})],
+      killSwitch: false, goEnabled: true, app: "Terminal.app", spawns24h: 1,
+      nextUp: { ...REQ, criticality: "COMPLETENESS", target: "crit:x" },
+    });
+    expect(md).toContain("sıradaki (prefetched");
+    expect(md).toContain("COMPLETENESS:crit:x");
+  });
   it("karar + bütçe satırı + blocked listesi + oturum tablosu", () => {
     const md = renderDispatchMd({
       ts: "2026-07-03T12:00:00Z", plan: { go: true, mode: "spawn", reason: "spawn: CRITICAL:red:backend", fingerprint: "abc" },
@@ -230,5 +272,53 @@ describe("tab-spawn", () => {
     expect(calls[0].file).toBe("osascript");
     expect(calls[0].args[0]).toBe("-e");
     expect(calls[0].args[1]).toContain("wrapper.sh");
+  });
+});
+
+describe("kenar durumları — şekil koruması + override'lar", () => {
+  it("foldSessions: geçerli JSON ama fingerprint/status eksik → atlanır (tip koruması)", () => {
+    const lines = [
+      JSON.stringify({ task: "x", startedTs: "t" }),            // fingerprint yok
+      JSON.stringify({ fingerprint: "abcabcabcabc" }),          // status yok
+      JSON.stringify({ fingerprint: 42, status: "active" }),    // fingerprint string değil
+      "null",
+      JSON.stringify(sess({})),
+    ];
+    expect(foldSessions(lines)).toHaveLength(1);
+  });
+  it("reconcileSessions: default staleH=8 sınırı — 7h59m aktif kalır, 9h stale olur", () => {
+    const justUnder = sess({ fingerprint: "111111111111", startedTs: "2026-07-03T04:01:00Z" }); // 7h59m
+    const over = sess({ fingerprint: "222222222222", startedTs: "2026-07-03T03:00:00Z" });      // 9h
+    const changed = reconcileSessions([justUnder, over], NOW); // staleH verilmedi → default
+    expect(changed.map((s) => s.fingerprint)).toEqual(["222222222222"]);
+  });
+  it("spawnsInWindow: özel windowH daraltır + geçersiz startedTs sayılmaz", () => {
+    const lines = [
+      JSON.stringify(sess({ status: "active", startedTs: "2026-07-03T11:30:00Z" })), // 30dk önce
+      JSON.stringify(sess({ status: "active", startedTs: "2026-07-03T09:00:00Z" })), // 3h önce
+      JSON.stringify(sess({ status: "active", startedTs: "geçersiz-ts" })),
+    ];
+    expect(spawnsInWindow(lines, NOW, 1)).toBe(1);
+    expect(spawnsInWindow(lines, NOW, 24)).toBe(2);
+  });
+  it("planDispatch: maxActive=2 override — 1 farklı-target aktifken ikinci spawn'a izin verir", () => {
+    const other = sess({ fingerprint: "ffffffffffff", target: "red:frontend", task: "CRITICAL:red:frontend" });
+    const base = { sessions: [other], req: REQ, nowMs: NOW, killSwitch: false, goEnabled: true };
+    expect(planDispatch(base).mode).toBe("skip");                    // default cap=1
+    expect(planDispatch({ ...base, maxActive: 2 }).mode).toBe("spawn");
+  });
+  it("planDispatch: maxStale=1 override — tek stale bile blocked'a yükseltir", () => {
+    const base = { sessions: [] as DispatchSession[], req: REQ, nowMs: NOW, killSwitch: false, goEnabled: true };
+    expect(planDispatch({ ...base, staleCountForReq: 1 }).mode).toBe("spawn");            // default maxStale=2
+    expect(planDispatch({ ...base, staleCountForReq: 1, maxStale: 1 }).mode).toBe("blocked");
+  });
+  it("shouldAudit: fingerprint undefined ↔ null normalize edilir (aynı sayılır)", () => {
+    const last = JSON.stringify({ action: "skip", reason: "r" }); // fingerprint alanı hiç yok
+    expect(shouldAudit(last, { action: "skip", fingerprint: null, reason: "r" })).toBe(false);
+    expect(shouldAudit(last, { action: "skip", fingerprint: "abc", reason: "r" })).toBe(true);
+  });
+  it("nextPending: eski-format (target'sız) aktif oturum da busy sayılır — task'tan türetilir", () => {
+    const oldFormat = sess({ target: undefined, task: "CRITICAL:red:backend" });
+    expect(nextPending([REQ], [oldFormat])).toBeNull();
   });
 });
