@@ -22,13 +22,17 @@ const ORCH_DIR = join(HERE, "..");
 const TSX = join(ANCHOR, "node_modules", ".bin", "tsx");
 const QUIET = process.argv.includes("--quiet");
 const HEAL = process.argv.includes("--heal"); // vO-AUTO.2: bayatsa otonom tazele (launchd; SessionStart'ta KAPALI=hızlı)
+// vO45 fleet-autonomy: alt-modeller aldığım iznin GÜVENLİ eşdeğerini alır — gate-geçen safe-auto önerileri
+// manuel conductor-onayı OLMADAN uygula+commit'le (tsc+vitest kapısı KORUNUR). Tek-manuel aktivasyon:
+// marker .fleet-autoship-enabled + env ORCH_FLEET_AUTOSHIP=1 (claude-dispatch marker deseniyle aynı).
+const FLEET_AUTOSHIP = existsSync(join(ORCH_DIR, ".fleet-autoship-enabled")) && process.env.ORCH_FLEET_AUTOSHIP === "1";
 
 /** Bir adımı read-only spawn et; never-throw → StepResult. Süreyi process.hrtime ile ölç (Date.now yok). */
-function runStep(step: string, script: string, args: string[]): StepResult {
+function runStep(step: string, script: string, args: string[], timeoutMs = 60_000): StepResult {
   const t0 = process.hrtime.bigint();
   try {
     execFileSync(TSX, [join(HERE, script), ...args], {
-      stdio: ["ignore", "ignore", "pipe"], timeout: 60_000, cwd: ORCH_DIR,
+      stdio: ["ignore", "ignore", "pipe"], timeout: timeoutMs, cwd: ORCH_DIR,
     });
     const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
     return { step, ok: true, ms, detail: detailFor(step) };
@@ -120,6 +124,11 @@ function detailFor(step: string): string {
     }
     return "fleet durum tazelendi (launch --go ile başlat)";
   }
+  if (step === "fleetship") {
+    const s = readJson(join(ORCH_DIR, "FLEET_SHIP.json"));
+    if (s) { const c = (s.shipped ?? []).filter((x: any) => /committed \(/.test(x.reason || "")).length; return `alt-model oto-ship: ${c} commit / ${(s.shipped ?? []).length} shipped · ${(s.reverted ?? []).length} revert`; }
+    return "fleet auto-ship tazelendi";
+  }
   if (step === "claude") {
     const f = join(ORCH_DIR, "CLAUDE_DISPATCH.md");
     if (existsSync(f)) {
@@ -188,6 +197,7 @@ function main(): void {
     runStep("benchprompt", "benchprompt.ts", []),
     runStep("council", "council.ts", []),  // model-council light: roster tazele (ollama list) → COUNCIL_ROSTER.json (ağır --all opt-in)
     runStep("fleet", "fleet-conduct.ts", []),  // local model-fleet supervise: reports+claims → FLEET_STATUS.md (launch --go opt-in)
+    ...(FLEET_AUTOSHIP ? [runStep("fleetship", "fleet-apply.ts", ["--apply-all", "--commit"], 900_000)] : []), // vO45 alt-model otonomi: gate-geçen safe-auto önerileri oto-uygula+commit (marker+env ile açık; gate/proposal başına dakikalar → 15dk timeout)
     // vO41: QUALITY.json'u HER koşuda tazele (bayat roll-up → phantom-CRITICAL kökü). SessionStart'ta
     // --no-tsc (hızlı: lane listesi + vitest cache), launchd --heal'de tam tsc taraması.
     runStep("quality", "quality.ts", HEAL ? [] : ["--no-tsc"]),

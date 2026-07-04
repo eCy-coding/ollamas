@@ -92,6 +92,24 @@ export function classifyProposal(stream: string, slot: string, model: string, di
 
 export interface ShipResult { target: string; model: string; tier: RiskTier; ok: boolean; files: string[]; reason: string }
 
+/**
+ * vO45 fleet-autonomy: conventional commit message attributing a gate-passing sub-model proposal to its
+ * author model. The sub-models' equivalent of the conductor's own tsc→vitest→commit gate — they now ship
+ * without a manual approval step, but only after the automated gate proved green (keep-green/revert-red).
+ */
+export function buildFleetCommitMsg(stream: string, model: string, files: string[]): string {
+  const scope = stream.replace(/[^a-z0-9-]/gi, "-").slice(0, 24);
+  const fileList = files.length ? files.join(", ") : "(no files)";
+  return [
+    `feat(fleet:${scope}): ${model} proposal — tsc+vitest green`,
+    ``,
+    `Autonomous sub-model proposal, applied through the fleet-apply gate`,
+    `(tsc --noEmit + vitest, keep-green/revert-red) with no manual conductor`,
+    `approval step (vO45 fleet-autonomy). Author model: ${model}.`,
+    `Files: ${fileList}`,
+  ].join("\n");
+}
+
 /** Render FLEET_SHIP.md: the batch gated-ship ledger — what auto-shipped (gate GREEN, left uncommitted for
  *  conductor review), what reverted (gate RED), and what was skipped (review/blocked, needs a human). */
 export function renderShipReport(shipped: ShipResult[], reverted: ShipResult[], skipped: ShipResult[], ts: string): string {

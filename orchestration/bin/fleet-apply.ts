@@ -15,7 +15,7 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, type ApplyRow, type ShipResult } from "./lib/fleet-apply";
+import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, buildFleetCommitMsg, type ApplyRow, type ShipResult } from "./lib/fleet-apply";
 import { parseSearchReplace, applyEdit, hasSearchReplace, type Edit } from "./lib/search-replace";
 import { addedImportSpecifiers, importSpecifiers, isTypeOnlyRuntimeImport, isRelative } from "./lib/import-guard";
 
@@ -29,6 +29,10 @@ const flag = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i 
 const APPLY = flag("--apply");
 const APPLY_ALL = argv.includes("--apply-all");
 const JSON_OUT = argv.includes("--json");
+// vO45 fleet-autonomy: auto-commit each gate-passing safe-auto proposal (sub-models' equivalent of the
+// conductor grant — act without manual approval; the tsc+vitest gate stays). Race-safe: stage ONLY the
+// proposal's own files, git reset first, NEVER `git add -A`.
+const COMMIT = argv.includes("--commit");
 
 const nowIso = () => { try { return execFileSync("date", ["-u", "+%Y-%m-%dT%H:%M:%SZ"], { encoding: "utf8" }).trim(); } catch { return "unknown"; } };
 
@@ -193,6 +197,26 @@ function doApply(target: string): void {
   console.error(`\n✗ ${target}: ${r.reason}`); process.exit(1);
 }
 
+/**
+ * vO45: commit ONE gate-passing proposal race-safely. `git reset` clears the index (drops any foreign
+ * staged files — the race that bit the conductor twice), stages ONLY this proposal's own files, then
+ * commits with author attribution. Returns the short hash on success, null if nothing committed / blocked.
+ * NEVER `git add -A`.
+ */
+function commitShipped(stream: string, model: string, files: string[]): string | null {
+  try {
+    execFileSync("git", ["reset", "-q"], { cwd: REPO, stdio: "ignore" });
+    const existing = files.filter((f) => existsSync(join(REPO, f)));
+    if (!existing.length) return null;
+    execFileSync("git", ["add", "--", ...existing], { cwd: REPO, stdio: "ignore" });
+    // Nothing actually staged (e.g. no net change) → skip.
+    const staged = execFileSync("git", ["diff", "--cached", "--name-only"], { cwd: REPO, encoding: "utf8" }).trim();
+    if (!staged) return null;
+    execFileSync("git", ["commit", "-m", buildFleetCommitMsg(stream, model, existing)], { cwd: REPO, stdio: "ignore" });
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: REPO, encoding: "utf8" }).trim();
+  } catch { return null; } // pre-commit gate red / foreign-tree issue → leave applied-uncommitted, honest
+}
+
 /** --apply-all: batch gated-ship — every apply-ready SAFE-AUTO proposal, each independently gated, kept on
  *  green / reverted on red. review/blocked tiers are surfaced, never auto-applied. Left UNCOMMITTED for the
  *  conductor to review + commit. Writes FLEET_SHIP.md/.json. */
@@ -205,15 +229,20 @@ function doApplyAll(): void {
   for (const r of eligible) {
     const res = applyOne(`${r.stream}.${r.slot}`);
     const sr: ShipResult = { target: res.target, model: r.model, tier: r.tier, ok: res.ok, files: res.files, reason: res.reason };
+    if (res.ok && COMMIT && res.files.length) {
+      const committed = commitShipped(r.stream, r.model, res.files);
+      sr.reason = committed ? `applied + gate GREEN + committed (${committed})` : "applied + gate GREEN (commit blocked — pre-commit gate/other)";
+    }
     (res.ok ? shipped : reverted).push(sr);
-    console.log(`  ${res.ok ? "✅ shipped" : "✗ reverted"}  ${res.target.padEnd(28)} ${res.reason}`);
+    console.log(`  ${res.ok ? "✅ shipped" : "✗ reverted"}  ${res.target.padEnd(28)} ${sr.reason}`);
   }
   const skipped: ShipResult[] = held.map((r) => ({ target: `${r.stream}.${r.slot}`, model: r.model, tier: r.tier, ok: false, files: r.files, reason: r.tier === "blocked" ? "gate can't verify (shell/unknown target)" : "modifies existing logic — conductor must judge semantics" }));
   const ts = nowIso();
   writeFileSync(join(ORCH_DIR, "FLEET_SHIP.md"), renderShipReport(shipped, reverted, skipped, ts) + "\n");
   writeFileSync(join(ORCH_DIR, "FLEET_SHIP.json"), JSON.stringify({ ts, shipped, reverted, skipped }, null, 2) + "\n");
-  console.log(`\n${shipped.length} shipped (UNCOMMITTED) · ${reverted.length} reverted · ${skipped.length} skipped.`);
-  if (shipped.length) console.log(`Review: git diff — then commit. Ledger: orchestration/FLEET_SHIP.md`);
+  const committedN = COMMIT ? shipped.filter((s) => /committed \(/.test(s.reason)).length : 0;
+  console.log(`\n${shipped.length} shipped${COMMIT ? ` (${committedN} committed)` : " (UNCOMMITTED)"} · ${reverted.length} reverted · ${skipped.length} skipped.`);
+  if (shipped.length && !COMMIT) console.log(`Review: git diff — then commit. Ledger: orchestration/FLEET_SHIP.md`);
   else console.log(`Ledger: orchestration/FLEET_SHIP.md`);
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, proposalIsAdditive, type ShipResult } from "../bin/lib/fleet-apply";
+import { extractDiff, looksApplyable, targetFiles, classifyProposal, renderApplyReport, renderShipReport, riskTier, proposalIsAdditive, buildFleetCommitMsg, type ShipResult } from "../bin/lib/fleet-apply";
 import { hasSearchReplace, parseSearchReplace, applyEdit } from "../bin/lib/search-replace";
 
 const NEW_FILE = `diff --git a/scripts/x.ts b/scripts/x.ts
@@ -146,5 +146,24 @@ describe("renderApplyReport", () => {
     expect(md).toContain("`gpt-oss:120b-cloud`");
     expect(md).toContain("--apply mjs-migration.terminal");
     expect(md).toContain("illustrative");
+  });
+});
+
+describe("buildFleetCommitMsg — vO45 fleet-autonomy", () => {
+  it("conventional feat(fleet:<stream>) + model attribution + files", () => {
+    const m = buildFleetCommitMsg("errors-resilience", "qwen3-coder:480b-cloud", ["server/agent-events.ts"]);
+    expect(m.split("\n")[0]).toBe("feat(fleet:errors-resilience): qwen3-coder:480b-cloud proposal — tsc+vitest green");
+    expect(m).toContain("Author model: qwen3-coder:480b-cloud");
+    expect(m).toContain("server/agent-events.ts");
+    expect(m).toContain("no manual conductor");
+  });
+  it("stream scope sanitize + boş dosya listesi", () => {
+    const m = buildFleetCommitMsg("weird/stream name!", "m", []);
+    expect(m.split("\n")[0]).toMatch(/^feat\(fleet:weird-stream-name-\): m/);
+    expect(m).toContain("(no files)");
+  });
+  it("subject satırı ≤ ~72 char makul", () => {
+    const subj = buildFleetCommitMsg("s", "gpt-oss:20b-cloud", ["a.ts"]).split("\n")[0];
+    expect(subj.length).toBeLessThan(80);
   });
 });
