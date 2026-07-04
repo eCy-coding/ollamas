@@ -115,7 +115,9 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     id: "cloudflare",
     baseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
     envKey: "CLOUDFLARE_API_TOKEN",
-    signupUrl: "https://dash.cloudflare.com/profile/api-tokens",
+    // Account-scoped Workers-AI page: "Use REST API" → pre-scoped token template (fewer clicks
+    // than the generic token list). account_id is the operator's own (public URL identifier).
+    signupUrl: "https://dash.cloudflare.com/819aa0a41224d1f4de1f71e1d897e00b/ai/workers-ai",
     defaultModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     limits: { perMin: 20, perDay: 300 }, // 10K neurons/day ≈ a few hundred chat calls — conservative
     trainsOnData: false,
