@@ -19,7 +19,7 @@ const doctorReport = {
 
 beforeEach(() => {
   vi.spyOn(window, "open").mockImplementation(() => null);
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any, init?: any) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input: any) => {
     const url = typeof input === "string" ? input : (input && input.href) || (input && input.url) || "";
     let body: unknown = {};
     if (url.includes("/api/keys/doctor")) body = doctorReport;
@@ -36,9 +36,7 @@ describe("KeyVault — Scan & Connect (T6-F1)", () => {
     const scanBtn = await screen.findByRole("button", { name: /scan.*connect|tara.*ba/i });
     fireEvent.click(scanBtn);
     await waitFor(() => expect(screen.getByText(/connected/i)).toBeInTheDocument());
-    // masked key surfaced, never raw
     expect(screen.getByText(/…TRQB/)).toBeInTheDocument();
-    // absent provider offers its signup anchor
     const link = screen.getByRole("link", { name: /get key/i });
     expect(link).toHaveAttribute("href", expect.stringContaining("console.mistral.ai"));
   });
