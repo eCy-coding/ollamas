@@ -77,3 +77,18 @@ test("DEFAULT_MESH_PLAN has sane sovereign defaults", () => {
   assert.equal(DEFAULT_MESH_PLAN.servicePort, 3000);
   assert.match(DEFAULT_MESH_PLAN.ipPrefix, /^100\.64/);
 });
+
+// ---------- vT14: DNS root-cause — global nameservers (MagicDNS forwarding) ----------
+test("config emits global nameservers so MagicDNS forwards *.trycloudflare.com (RISK-TUNNEL-027)", () => {
+  const c = renderHeadscaleConfig(plan);
+  assert.match(c, /nameservers:/);
+  assert.match(c, /global:/);
+  assert.match(c, /- 1\.1\.1\.1/);
+  assert.match(c, /- 1\.0\.0\.1/);
+});
+
+test("config honors custom globalNameservers", () => {
+  const c = renderHeadscaleConfig({ ...plan, globalNameservers: ["9.9.9.9"] });
+  assert.match(c, /- 9\.9\.9\.9/);
+  assert.ok(!c.includes("1.1.1.1"));
+});

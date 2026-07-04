@@ -25,6 +25,12 @@ export interface HeadscalePlan {
   servicePort: number;
   /** headscale user (namespace) that owns the nodes. */
   user: string;
+  /**
+   * Public resolvers MagicDNS forwards non-tailnet queries to (vT14, RISK-TUNNEL-027).
+   * Without this, MagicDNS NXDOMAINs *.trycloudflare.com → the cloudflare REVERSE path
+   * can't resolve from a mesh client. Clients pick these up automatically on next sync.
+   */
+  globalNameservers?: string[];
 }
 
 export const DEFAULT_MESH_PLAN: HeadscalePlan = {
@@ -64,6 +70,11 @@ export function renderHeadscaleConfig(plan: HeadscalePlan): string {
     `  paths: []`,
     `dns:`,
     `  base_domain: ollamas.mesh`,
+    // Global resolvers: MagicDNS forwards unknown domains here instead of NXDOMAIN,
+    // so *.trycloudflare.com (cloudflare REVERSE, vT13) resolves from mesh clients.
+    `  nameservers:`,
+    `    global:`,
+    ...(plan.globalNameservers ?? ["1.1.1.1", "1.0.0.1"]).map((ns) => `      - ${ns}`),
     ``,
   ].join("\n");
 }
