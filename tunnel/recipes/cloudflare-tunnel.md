@@ -69,3 +69,56 @@ Sabit URL `https://ollamas.<domain>` — değişmez, split-DNS gerektirmez, Magi
 - Cihaz kaybı → `tunnel proxy key revoke pxy_<prefix>` (anında iptal, tünel açık kalsa bile erişim ölür).
 - Rate-limit key başına 60 burst / 10 rps; access-log secret-free (`keys/proxy-access.jsonl`).
 - Public exposure yalnız path-allowlist (`/v1|/api|/mcp`); admin/SaaS yolları key'le bile 404 (gateway katmanı).
+
+---
+
+# Named Tunnel — STABİL URL (ollamas.<domain>, restart'ta değişmez) (vT15)
+
+Quick-tunnel URL her başlatmada değişir. **Named tunnel** kalıcı URL verir — ama Cloudflare'de bir **domain** ister.
+
+## Adım 0 — Domain al (tek-seferlik, ~$2–9/yıl)
+
+| Öneri | Registrar | 1.yıl / yenileme | Neden | Link |
+|---|---|---|---|---|
+| **`.dev` / `.app`** ⭐ | **Cloudflare Registrar** | ~$8.75 / ~$12.87 | At-cost (yenileme tuzağı yok), ücretsiz WHOIS privacy + 1-tık DNSSEC, **HSTS-preloaded → zorunlu HTTPS**, **zaten Cloudflare NS'de** → tünel anında çalışır (nameserver adımı yok) | https://domains.cloudflare.com/ |
+| `.com` | Cloudflare Registrar | ~$10.44 sabit | En tanınır TLD, at-cost sabit | https://domains.cloudflare.com/ |
+| **`.top` en ucuz** | **Porkbun** | **$1.63 / $4.63** | En düşük yenileme; sonra Cloudflare free plan'a ekle + nameserver değiştir | https://porkbun.com/products/domains |
+
+**Öneri:** Cloudflare Registrar `.dev` (zaten CF NS → sıfır nameserver adımı, zorunlu-HTTPS). Salt-ucuz: Porkbun `.top`.
+Başka yerden alındıysa: Cloudflare free plan'a site ekle → nameserver'ları Cloudflare'in verdiği 2 NS'e çevir → "Active" bekle.
+
+## Adım 1 — İKİ yöntemden birini seç (CLI ikisini de destekler)
+
+### Yöntem A — Dash token (en basit, cert.pem gerekmez)
+1. Cloudflare dash → **Zero Trust → Networks → Tunnels → Create a tunnel** → "ollamas" → **Save**.
+2. **Public Hostname** ekle: hostname `ollamas.<domain>`, Service **HTTP** = `127.0.0.1:8443`.
+3. Kurulum ekranındaki **token**'ı kopyala (`cloudflared service install eyJ...` içindeki `eyJ...`).
+4. Mac'te:
+```bash
+node src/cli.ts proxy cloudflare named token eyJ...TOKEN... --hostname ollamas.<domain>
+```
+
+### Yöntem B — CLI login (locally-managed)
+```bash
+! cloudflared tunnel login                                   # tarayıcı: domain'i seç → cert.pem yazar
+node src/cli.ts proxy cloudflare named create ollamas --hostname ollamas.<domain>
+# ↑ CLI otomatik: tunnel create + route dns (CNAME) + config.yml render + şifreli sakla
+```
+
+## Adım 2 — Always-on (0-manuel)
+```bash
+node src/cli.ts setup --daemon      # autopilot + gateway + named-tunnel = 3 LaunchAgent, login'de oto-başlar
+# ya da yalnız named: node src/cli.ts proxy cloudflare named daemon install
+```
+
+## Doğrula
+```bash
+node src/cli.ts proxy cloudflare named status     # named: https://ollamas.<domain> · mode=... (token SIZMAZ)
+node src/cli.ts status                            # named satırı + gateway
+curl -H "X-Proxy-Key: pxy_..." https://ollamas.<domain>/api/health    # → 200, her ağdan, URL STABİL
+```
+
+iPhone/herhangi cihaz: OpenAI-uyumlu app → Base URL `https://ollamas.<domain>/v1`, API Key `pxy_...`.
+
+**Güvenlik:** token keystore AES-256-GCM ile şifreli (RISK-TUNNEL-028), status/log'da asla görünmez; named tünel de
+aktif `pxy_` key + canlı gateway olmadan açılmaz (RISK-TUNNEL-024 + dead-gateway guard). `.dev`/`.app` = zorunlu HTTPS.

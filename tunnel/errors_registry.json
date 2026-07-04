@@ -203,6 +203,12 @@
       "category": "environment",
       "severity": "resolved",
       "note": "[RESOLVED vT14] cloudflared quick-tunnel URL çözülemiyordu: sistem DNS mesh MagicDNS'e (100.100.100.100) pinli, *.trycloudflare.com NXDOMAIN. İKİ-KATLI FİX: (1) KÖK-NEDEN headscale config `dns.nameservers.global: [1.1.1.1, 1.0.0.1]` (renderHeadscaleConfig) → MagicDNS bilinmeyen domainleri forward eder; (2) BELT probeHttps `lookup` opsiyonu = node:dns Resolver instance (1.1.1.1) → doctor --full mesh-dışı Mac'te de çözer. KANIT: doctor --full public /api/health OK 413ms (önce FAIL). Global dns.setServers() YANLIŞ (lookup'ı etkilemez), Resolver-instance izole doğru yol."
+    },
+    {
+      "id": "RISK-TUNNEL-028",
+      "category": "security",
+      "severity": "medium",
+      "note": "Named-tunnel token (remotely-managed cloudflared) uzun-ömürlü sırdır → public tünel çalıştırma yetkisi verir. FIX: keystore AES-256-GCM ile diskte ŞİFRELİ saklanır (cf-named.vault, keystore.sealToFile), plaintext ASLA diske yazılmaz/loglanmaz; describeNamed() secret-free (yalnız hostname+mode), status/whoami token göstermez; vault 0600. CLI-login yöntemi cert.pem/<UUID>.json'a dayanır (cloudflared kendi 0600 yazar). KANIT: named token store → grep vault plaintext=0, readNamed decrypt=eşleşti, status çıktısı token içermez."
     }
   ],
   "errors": [

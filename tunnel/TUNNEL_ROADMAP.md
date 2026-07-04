@@ -19,8 +19,9 @@
 | **vT12** | **Proxy Gateway ("use everywhere" core)** | zero-dep streaming reverse-proxy: `proxy.ts` pure core (route/auth/rewrite/vault) + `proxy-server.ts` IO shell + `ratelimit.ts` token-bucket; pxy_ auth (timing-safe) + secret-free access-log + path-allowlist; `/v1`→ollama:11434 (OpenAI-compat), `/api`+`/mcp`→ollamas:3000 (Host/Origin rewrite); `cli proxy up/down/status/key/daemon` + setup/doctor wiring; **T0-kararı: mesh + Cloudflare ikisi birden** | node built-ins only | ✅ DONE |
 | **vT13** | **Cloudflare REVERSE transport** | `transports/cloudflare.ts` (Transport, PRIORITY.REVERSE=30, injected exec): quick-tunnel (hesapsız, ephemeral trycloudflare URL) + named-tunnel (ops., stabil host); **auth-gate: aktif pxy_ key yoksa up() reddeder (RISK-TUNNEL-024)**; selectAuto/autopilot/status/bench oto-entegre; doctor --full public e2e | cloudflared(Apache-2.0) binary-only | ✅ DONE |
 | **vT14** | **Zero-Touch Everywhere (0-manuel tamamlama)** | 5 boşluk kapatıldı: dead-gateway guard (CloudflareTransport gatewayHealthy) + tek-komut both-daemon (`setup --daemon`→autopilot+proxy agent) + RISK-TUNNEL-027 DNS İKİ-KATLI FİX (headscale global-NS kök-neden + probeHttps Resolver-lookup belt) + status gateway/public-URL yüzeyi + ephemeral-URL persist (gateway-state.ts urlSink) | node built-ins only | ✅ DONE |
-| vT15 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
-| vT15+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
+| **vT15** | **Named Tunnel (STABLE URL) + domain rehberi** | `cloudflared-named.ts` (parseTunnelCreate + argv-builders + `NamedCloudflareTransport` REVERSE-1=29 stabil-URL, auth+gateway gated) + `cf-named.ts` (token ŞİFRELİ vault RISK-TUNNEL-028) + `cli proxy cloudflare named token\|login\|create\|up\|status\|daemon` + setup 3-daemon + buildSwitch register + status named-satırı; **İKİ yöntem** (token remotely-managed / cli locally-managed); domain-satın-alma rehberi (Cloudflare Registrar .dev / Porkbun .top) | cloudflared(Apache-2.0) binary-only | ✅ DONE |
+| vT16 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
+| vT16+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF named-tunnel (vT15) stabil-URL, quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -270,9 +271,37 @@
   URL hepsi always-on. Kalan dürüst-manuel: named-tunnel `cloudflared login` (1x), iPhone mkcert-CA trust (1x),
   ephemeral-URL rotasyonu (status'ta yüzeyde, gizli değil).
 
-## vT15 — NEXT (parked, precompute) — Ecosystem-2
+## vT15 — DONE (kanıt) — Named Tunnel (STABLE URL) + domain rehberi
 
-1. `src/qr.ts` PURE QR (ANSI/SVG) — gateway URL + pxy_ key tek-tarama iPhone onboarding; `cli qr [endpoint]`.
-2. iOS Shortcut: `status --json` → aktif endpoint (+ public URL) Shortcut'a besle.
-3. named-tunnel otomasyonu (config.yml render → `cloudflared tunnel run` daemon wiring, stabil URL).
-4. connectivity-routing (reachVia: hangi ağda hangi transport).
+> Kullanıcı stabil URL istedi (quick-tunnel ephemeral). Named tunnel domain ister → araştırma:
+> en ucuz+güvenli domain (Cloudflare Registrar .dev ~$8.75 at-cost HSTS-forced-HTTPS zaten-CF-NS /
+> Porkbun .top $1.63). HER İKİ yöntem kodlandı (kullanıcı duruma göre seçer).
+
+- **`src/transports/cloudflared-named.ts`**: PURE `parseTunnelCreate` (UUID+credFile regex, gerçek stdout),
+  `tokenRunArgs`/`namedRunArgs`/`createArgs`/`routeDnsArgs`/`loginArgs`; **`NamedCloudflareTransport`**
+  (Transport, priority REVERSE-1=**29 quick'ten öncelikli**, endpoint=stabil `https://<hostname>` parse-yok,
+  up() token/cli mode injected-spawn + **vT14 auth-gate + dead-gateway guard reuse**, probe=probeHttps+1.1.1.1
+  belt). 16 test.
+- **`src/cf-named.ts`**: token ŞİFRELİ vault (keystore AES-256-GCM, **RISK-TUNNEL-028**), graceful-null read,
+  `describeNamed` secret-free. 6 test.
+- **`cli proxy cloudflare named`**: `token <TOKEN> --hostname` (şifreli sakla), `login` (interaktif cert.pem),
+  `create <name> --hostname` (create→parse→route-dns→config.yml render→sakla), `up` (spawn+gateway-state),
+  `status`, `daemon install/uninstall` (3. LaunchAgent `com.ollamas.tunnel.cloudflared`, node-supervises-cloudflared
+  no-sudo). `parseNamedArgs`+`namedDaemonPlan` pure. 6 test.
+- **Wiring:** `daemonLabelsForSetup` 3-agent (named vault varsa) → `setup --daemon` autopilot+proxy+named TEK komut;
+  `buildSwitch` named transport register (configured ise); `cmdStatus` named-satırı. 4 test.
+- **CANLI KANIT (domain gerekmeyen kısım):** `named token … --hostname` → vault ŞİFRELİ (grep plaintext=**0**),
+  `readNamed` decrypt=**eşleşti**, `named status`=`named: https://… · mode=token` (**token sızmadı**),
+  `parseTunnelCreate` gerçek-format UUID+credFile çıkardı, `status` named-satırı gösterdi. VERSION 15.0.0.
+- **Kanıt:** `node --test` **271/271 GREEN** (242→271), tsc 0. RISK-TUNNEL-028 kayıtlı.
+- **DOMAIN-SONRASI (kullanıcı adımı, dürüst-manuel):** domain al (~$2-9) → EITHER dash-token yapıştır
+  `named token <TOKEN> --hostname ollamas.<domain>` OR `cloudflared tunnel login` + `named create ollamas
+  --hostname ollamas.<domain>` → `setup --daemon` → `curl https://ollamas.<domain>/api/health -H "X-Proxy-Key:
+  pxy_…"` = 200, URL STABİL (restart'ta değişmez). recipes/cloudflare-tunnel.md tam adımlar + domain tablosu.
+
+## vT16 — NEXT (parked, precompute) — Ecosystem-2
+
+1. `src/qr.ts` PURE QR (ANSI/SVG) — stabil URL + pxy_ key tek-tarama iPhone onboarding; `cli qr [endpoint]`.
+2. iOS Shortcut: `status --json` → named/public endpoint Shortcut'a besle.
+3. connectivity-routing (reachVia: hangi ağda hangi transport).
+4. named-tunnel `down` gerçek supervisor-signal (şu an launchctl-unload/Ctrl-C).
