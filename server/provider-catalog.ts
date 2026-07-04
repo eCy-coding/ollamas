@@ -129,13 +129,22 @@ export function catalogEntry(provider: string): CatalogEntry | undefined {
   return PROVIDER_CATALOG[provider];
 }
 
-/** Resolve the entry's base URL; cloudflare needs CLOUDFLARE_ACCOUNT_ID composed into the path.
+// A vault-stored account id (server-derived from the Cloudflare token) can be injected here
+// so catalogBaseUrl resolves without an env var — the operator never copies the account id.
+let cloudflareAccountIdOverride: string | null = null;
+export function setCloudflareAccountId(id: string | null): void { cloudflareAccountIdOverride = id && id.trim() ? id.trim() : null; }
+export function getCloudflareAccountId(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.CLOUDFLARE_ACCOUNT_ID || "").trim() || cloudflareAccountIdOverride || "";
+}
+
+/** Resolve the entry's base URL; cloudflare needs an account id composed into the path.
+ *  Resolution order: CLOUDFLARE_ACCOUNT_ID env → server-derived override (from the token).
  *  Missing account id → "" so the caller raises an honest config error instead of a bogus fetch. */
 export function catalogBaseUrl(provider: string, env: NodeJS.ProcessEnv = process.env): string {
   const e = PROVIDER_CATALOG[provider];
   if (!e) return "";
   if (!e.baseUrl.includes("{account_id}")) return e.baseUrl;
-  const acct = (env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const acct = getCloudflareAccountId(env);
   return acct ? e.baseUrl.replace("{account_id}", acct) : "";
 }
 

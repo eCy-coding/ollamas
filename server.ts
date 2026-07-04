@@ -23,6 +23,8 @@ import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
+import { deriveCloudflareAccountId } from "./server/cloudflare";
+import { setCloudflareAccountId, getCloudflareAccountId } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
 import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
 import { recentEvents, rollup, onRequestEvent, redactDeep } from "./server/telemetry";
@@ -911,7 +913,7 @@ async function initializeServer() {
     }
   });
 
-  app.post("/api/keys", (req, res) => {
+  app.post("/api/keys", async (req, res) => {
     const { provider, key, customEndpoint } = req.body;
     if (!provider) return res.status(400).json({ error: "Provider name requested" });
 
@@ -927,6 +929,12 @@ async function initializeServer() {
       db.data.keys[provider] = db.encrypt(key);
       if (provider === "custom-openai" && customEndpoint) {
         db.data.keys["custom-openai-endpoint"] = customEndpoint;
+      }
+      // Cloudflare minimum-manual (T7): derive the account_id from the token so the operator
+      // never copies it, and persist it (encrypted) so it survives a restart.
+      if (provider === "cloudflare" && !getCloudflareAccountId()) {
+        const acct = await deriveCloudflareAccountId(key);
+        if (acct) { setCloudflareAccountId(acct); db.data.keys["cloudflare-account-id"] = db.encrypt(acct); }
       }
       db.logSecurity("permission_change", `Key vault configured: ${provider}`, "Decrypted credentials saved securely at rest", "info");
     }
@@ -970,6 +978,12 @@ async function initializeServer() {
       ProviderRouter.testKeyOverride = { provider, key };
       if (provider === "custom-openai" && customEndpoint) {
         db.data.keys["custom-openai-endpoint"] = customEndpoint; // in-memory only, restored below
+      }
+      // Cloudflare minimum-manual: derive the account_id from the token so the operator never
+      // copies it. The REST base URL needs it; catalogBaseUrl reads the runtime override.
+      if (provider === "cloudflare" && !getCloudflareAccountId()) {
+        const acct = await deriveCloudflareAccountId(key);
+        if (acct) setCloudflareAccountId(acct);
       }
     }
 
@@ -3013,6 +3027,9 @@ content
 
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Cockpit] Console backend is listening on http://0.0.0.0:${PORT}`);
+    // Hydrate the vault-stored Cloudflare account id (T7) so the Workers AI base URL resolves
+    // after a restart without the operator re-entering it (env still wins if set).
+    try { const a = db.decrypt((db.data.keys || {})["cloudflare-account-id"] || ""); if (a) setCloudflareAccountId(a); } catch { /* absent → env/derive path */ }
     // Boot-time key-doctor (T3-F5): env-only (no keychain prompts, no gh spawn at boot),
     // fire-and-forget, ONE masked summary line. A key dropped into .env connects itself
     // on the next restart with zero operator action. Full scan: scripts/key-doctor.mjs.
