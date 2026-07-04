@@ -2,35 +2,32 @@
   "chip": "Apple M4 Max",
   "ramGb": 52,
   "cores": 16,
-  "ts": "2026-06-24T10:00:00.000Z",
+  "ts": "2026-07-03T09:42:45.070Z",
   "stale": false,
   "selection": {
-    "model": "qwen3-coder:480b-cloud",
-    "provider": "ollama-local(cloud-proxy)",
-    "tokS": null,
+    "model": "qwen3-coder:30b",
+    "score": 0.913,
+    "tokS": 114.6,
+    "reason": "correct 1 + tok 114.6/114.6 + vram-fit 0.57",
     "config": {
-      "num_ctx": null
-    },
-    "source": "agent-bench correctness-gated 2026-06-24",
-    "score": "3/3",
-    "fastestMs": 4000
+      "num_ctx": 8192,
+      "num_gpu": 999,
+      "num_thread": 12,
+      "keep_alive": "30m",
+      "quant": "Q4_K_M"
+    }
   },
   "champions": {
-    "overall": {
-      "model": "qwen3-coder:480b-cloud",
-      "score": "3/3",
-      "note": "fastest correct (fact 4s, monitor 6s)"
-    },
-    "local": {
-      "model": "qwen3:8b",
-      "score": "3/3",
-      "note": "best local; no cloud dep; combo-bench also 100%"
-    },
-    "coding": {
-      "model": "qwen3-coder:480b-cloud"
-    },
-    "monitor": {
-      "model": "qwen3-coder:480b-cloud"
+    "mac": {
+      "model": "qwen3-coder:30b",
+      "device": "mac",
+      "n": 1,
+      "medianTokS": 114.6,
+      "p95": 114.6,
+      "mad": 0,
+      "min": 114.6,
+      "max": 114.6,
+      "correctRatio": 1
     },
     "combination": {
       "policy": "implementer-verifier",
@@ -69,14 +66,52 @@
       "source": "~/.llm-mission-control/combo-bench.json"
     }
   },
-  "regressions": [],
-  "agentBench": {
-    "source": "~/.llm-mission-control/agent-bench-2026-06-24.json",
-    "comboSource": "~/.llm-mission-control/combo-bench.json",
-    "deferred": [
-      "gpt-oss:20b",
-      "qwen3-coder:30b",
-      "qwen3:30b-a3b"
-    ]
-  }
+  "regressions": [
+    {
+      "model": "qwen3:4b",
+      "device": "mac",
+      "baseTokS": 111,
+      "medianTokS": 92.3,
+      "dropPct": 16.8
+    }
+  ],
+  "freeApiTier": [
+    {
+      "id": "groq",
+      "model": "llama-3.3-70b-versatile",
+      "caps": [
+        "code",
+        "fast",
+        "tools",
+        "stt"
+      ],
+      "trainsOnData": false
+    },
+    {
+      "id": "cerebras",
+      "model": "gpt-oss-120b",
+      "caps": [
+        "code",
+        "fast"
+      ],
+      "trainsOnData": false
+    },
+    {
+      "id": "sambanova",
+      "model": "Meta-Llama-3.3-70B-Instruct",
+      "caps": [
+        "code"
+      ],
+      "trainsOnData": false
+    },
+    {
+      "id": "github-models",
+      "model": "openai/gpt-4o-mini",
+      "caps": [
+        "code",
+        "tools"
+      ],
+      "trainsOnData": false
+    }
+  ]
 }

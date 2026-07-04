@@ -1,0 +1,59 @@
+{"ts":"2026-07-03T13:31:28.447Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:32:12.229Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:32:26.893Z","action":"skip","fingerprint":null,"reason":"kill-switch aktif (.claude-dispatch-off)"}
+{"ts":"2026-07-03T13:32:31.204Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:32:42.572Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:33:44.925Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:34:58.540Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:34:58.863Z","action":"dry","fingerprint":"d54a73f349ac","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T13:35:59.654Z","action":"spawn","fingerprint":"d54a73f349ac","target":"red:integration/v17-core","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.llm-mission-control/claude-dispatch/d54a73f349ac.sh"}
+{"ts":"2026-07-03T13:35:59.869Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:36:06.440Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:36:07.504Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:37:24.244Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:38:29.407Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:39:36.619Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:40:44.849Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:41:51.755Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:43:01.576Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:44:08.566Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:45:21.453Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:46:32.618Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:48:02.041Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:49:29.822Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:50:57.599Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:52:36.484Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:53:59.810Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:55:21.185Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:56:34.560Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:57:52.270Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T13:59:10.775Z","action":"skip","fingerprint":"d54a73f349ac","reason":"aynı görev zaten aktif (fingerprint d54a73f349ac)"}
+{"ts":"2026-07-03T14:00:41.101Z","action":"skip","fingerprint":"d2f5ae3bf993","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-03T14:05:35.545Z","action":"skip","fingerprint":"585874ff190c","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-03T14:07:59.696Z","action":"dry","fingerprint":"585874ff190c","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T14:23:58.889Z","action":"dry","fingerprint":"d2f5ae3bf993","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-03T14:42:53.858Z","action":"spawn","fingerprint":"d2f5ae3bf993","target":"crit:done-no-evidence:vO16","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.ollamas/claude-dispatch/d2f5ae3bf993.sh"}
+{"ts":"2026-07-03T14:43:02.445Z","action":"skip","fingerprint":"d2f5ae3bf993","reason":"aynı görev zaten aktif (crit:done-no-evidence:vO16)"}
+{"ts":"2026-07-03T14:49:28.634Z","action":"skip","fingerprint":"ff70564a1393","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-03T14:51:39.659Z","action":"skip","fingerprint":"d2f5ae3bf993","reason":"aynı görev zaten aktif (crit:done-no-evidence:vO16)"}
+{"ts":"2026-07-03T14:53:59.797Z","action":"skip","fingerprint":"ff70564a1393","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-03T14:56:33.052Z","action":"spawn","fingerprint":"ff70564a1393","target":"crit:duplication:automator-probe.ts↔chrome-probe.ts","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.ollamas/claude-dispatch/ff70564a1393.sh"}
+{"ts":"2026-07-03T14:56:42.042Z","action":"skip","fingerprint":"ff70564a1393","reason":"aynı görev zaten aktif (crit:duplication:automator-probe.ts↔chrome-probe.ts)"}
+{"ts":"2026-07-03T22:56:56.263Z","action":"stale-reconcile","fingerprint":"ff70564a1393","reason":"COMPLETENESS:crit:duplication:automator-probe.ts↔chrome-probe.ts"}
+{"ts":"2026-07-03T22:56:56.263Z","action":"spawn","fingerprint":"ff70564a1393","target":"crit:duplication:automator-probe.ts↔chrome-probe.ts","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.ollamas/claude-dispatch/ff70564a1393.sh"}
+{"ts":"2026-07-03T22:57:05.509Z","action":"skip","fingerprint":"ff70564a1393","reason":"aynı görev zaten aktif (crit:duplication:automator-probe.ts↔chrome-probe.ts)"}
+{"ts":"2026-07-04T00:42:19.915Z","action":"auto-complete","fingerprint":"ff70564a1393","reason":"hedef taze REQUIREMENTS'ta artık yok — çözüldü"}
+{"ts":"2026-07-04T00:42:19.915Z","action":"spawn","fingerprint":"d2e3910e008d","target":"crit:duplication:dispatchdoctor.ts↔doctor.ts","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.ollamas/claude-dispatch/d2e3910e008d.sh"}
+{"ts":"2026-07-04T00:42:28.928Z","action":"skip","fingerprint":"d2e3910e008d","reason":"aynı görev zaten aktif (crit:duplication:dispatchdoctor.ts↔doctor.ts)"}
+{"ts":"2026-07-04T01:01:50.735Z","action":"skip","fingerprint":"616b99a85568","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-04T01:03:08.361Z","action":"skip","fingerprint":"9244c75cafde","reason":"aktif oturum limiti dolu (1/1)"}
+{"ts":"2026-07-04T01:13:33.235Z","action":"auto-complete","fingerprint":"d2e3910e008d","reason":"hedef taze REQUIREMENTS'ta artık yok — çözüldü"}
+{"ts":"2026-07-04T01:13:33.235Z","action":"spawn","fingerprint":"9244c75cafde","target":"crit:duplication:fleet-conduct.ts↔fleet-launch.ts","app":"Terminal.app","wrapper":"/Users/emrecnyngmail.com/.ollamas/claude-dispatch/9244c75cafde.sh"}
+{"ts":"2026-07-04T01:13:42.306Z","action":"skip","fingerprint":"9244c75cafde","reason":"aynı görev zaten aktif (crit:duplication:fleet-conduct.ts↔fleet-launch.ts)"}
+{"ts":"2026-07-04T08:48:44.839Z","action":"auto-complete","fingerprint":"9244c75cafde","reason":"hedef taze REQUIREMENTS'ta artık yok — çözüldü"}
+{"ts":"2026-07-04T08:48:44.839Z","action":"skip","fingerprint":"391223dacf93","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-04T10:00:06.179Z","action":"skip","fingerprint":"dfa37261636b","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-04T10:27:10.720Z","action":"skip","fingerprint":"946c0f825ba1","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-04T10:38:49.619Z","action":"skip","fingerprint":"0efa8b219f3d","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-04T10:41:18.827Z","action":"skip","fingerprint":"bf0f0a906760","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-04T10:56:11.458Z","action":"skip","fingerprint":"6e173ff61ee2","reason":"24h bütçe dolu (6/6 spawn)"}

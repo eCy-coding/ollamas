@@ -1,6 +1,18 @@
 {
-  "ts": "2026-07-03T09:18:50Z",
+  "ts": "2026-07-04T08:56:12Z",
   "rows": [
+    {
+      "stream": "concurrency-safety",
+      "slot": "cerebras",
+      "model": "gpt-oss-120b",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/host-bridge.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "review"
+    },
     {
       "stream": "concurrency-safety",
       "slot": "terminal",
@@ -17,6 +29,18 @@
       "stream": "errors-resilience",
       "slot": "gemini",
       "model": "gemini-2.5-flash",
+      "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "safe-auto"
+    },
+    {
+      "stream": "errors-resilience",
+      "slot": "groq",
+      "model": "llama-3.3-70b-versatile",
       "hasDiff": true,
       "applyReady": true,
       "files": [
@@ -46,8 +70,8 @@
       "files": [
         "scripts/agent-dispatch.mjs"
       ],
-      "reason": "search/replace resolves cleanly against the current tree · IMPORT-UNSAFE: adds a runtime import of a type-only file (./agent-dispatch.d.ts) → node crashes (ERR_MODULE_NOT_FOUND)",
-      "tier": "blocked"
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "safe-auto"
     },
     {
       "stream": "shell-harden",
@@ -62,23 +86,25 @@
       "tier": "blocked"
     },
     {
-      "stream": "test-coverage",
-      "slot": "terminal",
-      "model": "gpt-oss:20b-cloud",
-      "hasDiff": true,
-      "applyReady": false,
-      "files": [],
-      "reason": "target tests/cli-http.test.ts not found",
-      "tier": "blocked"
-    },
-    {
       "stream": "typescript-core",
       "slot": "terminal",
       "model": "qwen3-coder:480b-cloud",
       "hasDiff": true,
+      "applyReady": true,
+      "files": [
+        "server/analyzer.ts"
+      ],
+      "reason": "search/replace resolves cleanly against the current tree",
+      "tier": "review"
+    },
+    {
+      "stream": "test-coverage",
+      "slot": "terminal",
+      "model": "gpt-oss:20b-cloud",
+      "hasDiff": false,
       "applyReady": false,
       "files": [],
-      "reason": "server/analyzer.ts: SEARCH snippet not found in target (stale / not an exact copy)",
+      "reason": "no diff block",
       "tier": "blocked"
     }
   ]

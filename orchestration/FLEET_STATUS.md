@@ -1,7 +1,7 @@
 # FLEET_STATUS.md — conductor view (report to Claude, not user)
 
-> Auto: `tsx orchestration/bin/fleet-conduct.ts` · reports 6 · active 1
-> Convergence: ⏳ in-progress
+> Auto: `tsx orchestration/bin/fleet-conduct.ts` · reports 6 · active 0
+> Convergence: ✅ CONVERGED
 
 | Stream | Ensemble | Gated | Detay |
 |--------|----------|-------|-------|

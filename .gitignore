@@ -35,3 +35,6 @@ dist-plugin/
 .claude/harness-ops.out.log
 .claude/harness-ops.err.log
 .claude/.harness-ops-state
+
+# orchestration runtime state (regenerated per run; not source)
+orchestration/seyir/gpu-lock.json

@@ -1,14 +1,13 @@
 # CRITIC — Orchestration Öz-Denetim (completeness)
 
 > READ-ONLY `critic.ts` üretti. Sistem kendi açığını bulur (deterministik, self-improving).
-> **Kapsamlılık skoru: 94/100** · 1 gap (27 araç, 32 artefakt).
+> **Kapsamlılık skoru: 100/100** · 0 gap (56 araç, 90 artefakt).
 
 ### 🔴 Roadmap-vs-Gerçek Drift (0)
 - _temiz_
 
-### DONE ama kanıt-yok (1)
-- **[med]** vO16: vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok
-  → vO16 kanıtını doğrula ya da DONE'ı geri al
+### DONE ama kanıt-yok (0)
+- _temiz_
 
 ### Orphan artefakt (0)
 - _temiz_
@@ -23,7 +22,7 @@
 - `crit:coverage-gap:lib/signal.ts` — notify = terminal-notifier IO-wrapper; signal.test 28-case zaten isAllowedCmd+mocked-nudge/notify kapsar
 - `crit:duplication:autopilot.ts↔horizon.ts` — false-positive: autopilot adımları KOŞAR, horizon roadmap ÜRETİR — farklı girdi/çıktı/amaç (shared-import heuristic gürültüsü)
 - `crit:duplication:conduct.ts↔serve.ts` — false-positive: conduct lane-durumu ANALİZ eder, serve HTTP/SSE ile GÖSTERİR — farklı katman (analyzer vs UI)
-- `crit:duplication:doctor.ts↔model-hook.ts` — false-positive: doctor readiness DENETLER, model-hook Claude-prompt'u YAKALAR — farklı scope
+- `crit:duplication:fleet-conduct.ts↔fleet-launch.ts` — false-positive: fleet-launch plan+wrapper ÜRETİR ve tab AÇAR (producer), fleet-conduct rapor OKUR + gate + convergence (supervisor/consumer) — producer→consumer sözleşmesi, kod örtüşmesi yok; overlap = domain kelimeleri (local/model/fleet)
 - `crit:duplication:model-hook.ts↔role-hook.ts` — false-positive: model-hook model-sorusuna MODEL_PROMPT enjekte, role-hook kimlik-sorusuna role-cevap — farklı tetik/payload, ikisi de UserPromptSubmit ama amaç-ayrı
 
 ---

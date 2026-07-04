@@ -23,15 +23,17 @@
 - İzlenen lane'ler (11): `chore/p1-hardening` · `feat/colab-gpu` · `fix/audit-security` · `verify/gwv2-all-lanes` · `fix/binary-architecture-calibration` · `fix/audit-cont` · `claude/cool-cohen-b245ee` · `(detached)` · `claude/loving-varahamihira-77d4a9` · `claude/naughty-kowalevski-2ccc35` · `(detached)`
 - 🏆 **Optimal runtime (0-manuel):** `qwen3-coder:480b-cloud` @ Apple M4 Max (null tok/s) — `MODEL_PROMPT.md`
 - 🩺 **Lane health (vO9):** 0🟢 / 2🔴 / 4⚪ — `QUALITY.md` (tsc canlı + vitest cache)
-- 🧭 **Öz-denetim (vO10-12):** completeness 5 açık · DoD 18 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
-- 🎯 **Kritik gereksinim (vO14 füzyon):** CRITICAL:red:integration/v17-core · proje hazırlık 0/100 — `REQUIREMENTS.md` (tüm-gate birleşik)
+- 🧭 **Öz-denetim (vO10-12):** completeness 6 açık · DoD 24 yarım-iş — `CRITIC.md`/`DOD.md` (autopilot→conduct tüketir)
+- 🎯 **Kritik gereksinim (vO14 füzyon):** COMPLETENESS:crit:done-no-evidence:vO16 · proje hazırlık 7/100 — `REQUIREMENTS.md` (tüm-gate birleşik)
 - 🎭 **Model-council:** roster 0/14 seat · lane coverage 0/7 · ⚠️ uncovered: backend,frontend,cli,scripts,integrations,bench,orchestration — `COUNCIL_ROSTER.json` (yetenek→model→lane)
 - 🛰 **Model-fleet:** 12 slot (local 6/cloud 6) · ≤2/model ✅ — `FLEET_PLAN.md` (Terminal.app+iTerm2; `fleet-launch --go`, `fleet-conduct`)
+- 🧠 **Think-loop (vO22):** 10 kanıtlı-çözüm registry · problem→proven|NEEDS_RESEARCH (no-guess) — `PROBLEM_REGISTRY.json`/`THINK.md` (autopilot sürekli çağırır)
+- ⏭️ **Next-task (vO24):** 2 safe-additive (P1) · 26 kuyrukta — `FLEET_NEXT.md` (`/fleet-next`; worker'lar `## Next:` precompute eder)
 
 ## Şu anki ollamas aşaması (canlı — her lane shipped → geliştirilebilir)
 | Lane | Şu an (shipped) | → Geliştirilebilir sonraki | dirty |
 |------|-----------------|----------------------------|-------|
-| `chore/p1-hardening` | P4 Migration drift fix — migrations.t… | → — | 73△ |
+| `chore/p1-hardening` | P4 Migration drift fix — migrations.t… | → — | 77△ |
 | `colab-gpu` | P4 Migration drift fix — migrations.t… | → — | 13△ |
 | `fix/audit-security` | P4 Migration drift fix — migrations.t… | → — | 3△ |
 | `verify/gwv2-all-lanes` | P4 Migration drift fix — migrations.t… | → — | 0△ |
@@ -49,7 +51,7 @@
 ### Lane bazında geliştirilebilir sonraki (canlı NEXT sinyalleri)
 - (lane NEXT sinyali okunamadı)
 
-## Araç envanteri (34 bin/)
+## Araç envanteri (38 bin/)
 - `adopt-gate.ts` — adopt-gate.ts — vO4 OSS Adoption License-Discipline Gate
 - `adopt.ts` — OSS adoption tracker + lisans-disiplini GATE
 - `autofix.ts` — Self-healing remediation
@@ -69,8 +71,11 @@
 - `doctor.ts` — vO-AUTO.1 readiness doctor
 - `dod.ts` — Definition-of-Done + Concurrent-Task detector
 - `driftguard.ts` — vO8 Drift-Guard CLI: deterministik tutarlılık GATE
+- `fleet-agent.ts` — a PERSISTENT, living per-tab worker
 - `fleet-conduct.ts` — the CONDUCTOR side of the local model-fleet.
 - `fleet-launch.ts` — open the local model-fleet across Terminal.app + iTerm2.
+- `fleet-next.ts` — compute the prioritized NEXT-TASK queue after a fleet round.
+- `fleet-watch.ts` — LIVE follow-along console for the model-fleet
 - `fuse.ts` — Unified Critical Requirements
 - `heartbeat.ts` — Otonom sürdürülebilir tick
 - `horizon.ts` — vO12 Roadmap Horizon Auto-Generator CLI
@@ -84,6 +89,7 @@
 - `scan.ts` — scan.ts — vO4 panel "parallel review" fazı: persona-başı DETERMİNİSTİK
 - `serve.ts` — serve.ts — vO3 canlı cockpit sunucusu. ZERO-DEP
 - `status.ts` — ollamas lane'lerinin READ-ONLY birleşik durum matrisi.
+- `think.ts` — the THINK loop CLI
 
 ## Tetik
 **"sıradaki versiyonu planla [lane]"** → kesintisiz plan+prompt (READ→CROSS-THINK→EMIT). Sözleşme: `ORCHESTRATION_AGENTS.md` + `~/Desktop/plan.md`.

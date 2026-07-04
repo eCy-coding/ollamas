@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-03T03:11:46Z",
+  "ts": "2026-07-04T08:56:41Z",
   "shipped": [
     {
       "target": "errors-resilience.terminal",
@@ -10,20 +10,51 @@
         "server/agent-events.ts"
       ],
       "reason": "applied + gate GREEN"
+    }
+  ],
+  "reverted": [
+    {
+      "target": "errors-resilience.gemini",
+      "model": "gemini-2.5-flash",
+      "tier": "safe-auto",
+      "ok": false,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "gate RED → reverted (snapshot restore)"
+    },
+    {
+      "target": "errors-resilience.groq",
+      "model": "llama-3.3-70b-versatile",
+      "tier": "safe-auto",
+      "ok": false,
+      "files": [
+        "server/agent-events.ts"
+      ],
+      "reason": "gate RED → reverted (snapshot restore)"
     },
     {
       "target": "mjs-migration.terminal",
       "model": "gpt-oss:120b-cloud",
       "tier": "safe-auto",
-      "ok": true,
+      "ok": false,
       "files": [
         "scripts/agent-dispatch.mjs"
       ],
-      "reason": "applied + gate GREEN"
+      "reason": "gate RED → reverted (snapshot restore)"
     }
   ],
-  "reverted": [],
   "skipped": [
+    {
+      "target": "concurrency-safety.cerebras",
+      "model": "gpt-oss-120b",
+      "tier": "review",
+      "ok": false,
+      "files": [
+        "server/host-bridge.ts"
+      ],
+      "reason": "modifies existing logic — conductor must judge semantics"
+    },
     {
       "target": "concurrency-safety.terminal",
       "model": "gpt-oss:120b-cloud",
@@ -43,6 +74,16 @@
         "start.sh"
       ],
       "reason": "gate can't verify (shell/unknown target)"
+    },
+    {
+      "target": "typescript-core.terminal",
+      "model": "qwen3-coder:480b-cloud",
+      "tier": "review",
+      "ok": false,
+      "files": [
+        "server/analyzer.ts"
+      ],
+      "reason": "modifies existing logic — conductor must judge semantics"
     }
   ]
 }

@@ -1,0 +1,59 @@
+{
+  "chip": "Apple M4 Max",
+  "ramGb": 52,
+  "cores": 16,
+  "ts": "2026-07-04T10:39:48.050Z",
+  "constitution": "1.0.0",
+  "selection": {
+    "model": "qwen3-8b-ca",
+    "score": 0.975,
+    "tokS": 28.032397092391506,
+    "conformance": 1,
+    "reason": "correct 1 + tok 28.032397092391506/28.032397092391506 + vram-fit 0.88",
+    "config": {
+      "num_ctx": 8192,
+      "num_gpu": 999,
+      "num_thread": 12,
+      "keep_alive": "30m",
+      "quant": "Q4_K_M"
+    }
+  },
+  "variants": [
+    {
+      "base": "qwen3:8b",
+      "aligned": "qwen3-8b-ca",
+      "baseMean": 1,
+      "alignedMean": 1,
+      "delta": 0,
+      "tokS": 28.032397092391506,
+      "regression": {
+        "ok": true,
+        "reason": "parity"
+      }
+    },
+    {
+      "base": "gpt-oss:20b",
+      "aligned": "gpt-oss-20b-ca",
+      "baseMean": 0.675,
+      "alignedMean": 0.675,
+      "delta": 0,
+      "tokS": 36.23278422603535,
+      "regression": {
+        "ok": false,
+        "reason": "conformance 68% < floor 70%"
+      }
+    },
+    {
+      "base": "phi4:latest",
+      "aligned": "phi4-latest-ca",
+      "baseMean": 0.9125,
+      "alignedMean": 0.7875,
+      "delta": -0.125,
+      "tokS": 18.23285395930445,
+      "regression": {
+        "ok": false,
+        "reason": "regressed vs base (79% < 91%)"
+      }
+    }
+  ]
+}

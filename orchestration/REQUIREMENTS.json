@@ -1,100 +1,60 @@
 {
-  "ts": "2026-06-24T10:43:31.732Z",
-  "readiness": 40,
+  "ts": "2026-07-04T11:00:20.530Z",
+  "readiness": 78,
   "top": {
-    "criticality": "CRITICAL",
-    "source": "conduct",
-    "target": "red:integration/v17-core",
-    "detail": "tsc 18 hata",
-    "action": "integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)",
-    "score": 100
+    "criticality": "COMPLETENESS",
+    "source": "conduct+dod",
+    "target": "dod:uncommitted-green:47 dosya",
+    "detail": "Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…",
+    "action": "yeşil parçayı commit'le (per-file git add + conventional)",
+    "score": 40
   },
   "requirements": [
     {
-      "criticality": "CRITICAL",
-      "source": "conduct",
-      "target": "red:integration/v17-core",
-      "detail": "tsc 18 hata",
-      "action": "integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)",
-      "score": 100
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+critic",
-      "target": "crit:done-no-evidence:vO16",
-      "detail": "vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok",
-      "action": "vO16 kanıtını doğrula ya da DONE'ı geri al",
-      "score": 45
-    },
-    {
       "criticality": "COMPLETENESS",
       "source": "conduct+dod",
-      "target": "dod:concurrent-task:adopt-gate",
-      "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
-      "action": "adopt-gate için test aynı anda tamamla",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:concurrent-task:claim",
-      "detail": "claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry",
-      "action": "claim için test + SEYIR-entry aynı anda tamamla",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:concurrent-task:driftguard",
-      "detail": "driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry",
-      "action": "driftguard için SEYIR-entry aynı anda tamamla",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:concurrent-task:scan",
-      "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
-      "action": "scan için test aynı anda tamamla",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:concurrent-task:status",
-      "detail": "status kısmen tamam — eksik eş-zamanlı: test",
-      "action": "status için test aynı anda tamamla",
-      "score": 40
-    },
-    {
-      "criticality": "COMPLETENESS",
-      "source": "conduct+dod",
-      "target": "dod:uncommitted-green:20 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json, CRITIC.md…",
+      "target": "dod:uncommitted-green:47 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "score": 40
     },
     {
       "criticality": "COMPLETENESS",
-      "source": "conduct(stale)",
-      "target": "red:backend",
-      "detail": "test failed — testTs bayat, güvenilmez (phantom-critical önlendi)",
-      "action": "backend: testi taze koş; gerçekten kırıksa CRITICAL olur",
-      "score": 35
-    },
-    {
-      "criticality": "COMPLETENESS",
       "source": "quality(stale)",
       "target": "stale:quality",
-      "detail": "quality verisi 124 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)",
+      "detail": "quality verisi 73 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)",
       "action": "quality.ts yeniden koş (taze quality üret)",
       "score": 35
     },
     {
       "criticality": "STALE",
       "source": "conduct",
+      "target": "stale:(detached)",
+      "detail": "(detached) 240s commitsiz (idle)",
+      "action": "(detached): sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:claude/cool-cohen-b245ee",
+      "detail": "claude/cool-cohen-b245ee 240s commitsiz (idle)",
+      "action": "claude/cool-cohen-b245ee: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:claude/determined-bartik-0090ba",
+      "detail": "claude/determined-bartik-0090ba 214s commitsiz (idle)",
+      "action": "claude/determined-bartik-0090ba: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
       "target": "stale:claude/loving-varahamihira-77d4a9",
-      "detail": "claude/loving-varahamihira-77d4a9 132s commitsiz (idle)",
+      "detail": "claude/loving-varahamihira-77d4a9 372s commitsiz (idle)",
       "action": "claude/loving-varahamihira-77d4a9: sıradaki versiyonu planla (durağan)",
       "score": 49
     },
@@ -102,15 +62,23 @@
       "criticality": "STALE",
       "source": "conduct",
       "target": "stale:claude/naughty-kowalevski-2ccc35",
-      "detail": "claude/naughty-kowalevski-2ccc35 87s commitsiz (idle)",
+      "detail": "claude/naughty-kowalevski-2ccc35 327s commitsiz (idle)",
       "action": "claude/naughty-kowalevski-2ccc35: sıradaki versiyonu planla (durağan)",
       "score": 49
     },
     {
       "criticality": "STALE",
       "source": "conduct",
+      "target": "stale:fix/audit-security",
+      "detail": "fix/audit-security 210s commitsiz (idle)",
+      "action": "fix/audit-security: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
       "target": "stale:fix/binary-architecture-calibration",
-      "detail": "fix/binary-architecture-calibration 74s commitsiz (idle)",
+      "detail": "fix/binary-architecture-calibration 314s commitsiz (idle)",
       "action": "fix/binary-architecture-calibration: sıradaki versiyonu planla (durağan)",
       "score": 49
     },
@@ -118,7 +86,7 @@
       "criticality": "STALE",
       "source": "conduct",
       "target": "stale:verify/gwv2-all-lanes",
-      "detail": "verify/gwv2-all-lanes 86s commitsiz (idle)",
+      "detail": "verify/gwv2-all-lanes 326s commitsiz (idle)",
       "action": "verify/gwv2-all-lanes: sıradaki versiyonu planla (durağan)",
       "score": 49
     }
