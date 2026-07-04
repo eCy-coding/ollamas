@@ -33,6 +33,15 @@ const PROVIDER_LABELS: Record<string, string> = {
   mistral: "Mistral",
 };
 
+// One-click endpoint presets for the custom-OpenAI row — the common local OpenAI-compatible
+// hosts. Filling the endpoint is the only manual step; the key field stays optional (local
+// hosts usually need none). OpenAI-compat = the "/v1" base the shared caller already speaks.
+const CUSTOM_OPENAI_PRESETS: ReadonlyArray<{ id: string; label: string; endpoint: string }> = [
+  { id: "ollama-local", label: "local Ollama", endpoint: "http://localhost:11434/v1" },
+  { id: "lm-studio", label: "LM Studio", endpoint: "http://localhost:1234/v1" },
+  { id: "vllm", label: "vLLM", endpoint: "http://localhost:8000/v1" },
+];
+
 interface PoolEntry {
   total: number; live: number; worstPct: number; allApproaching: boolean;
   // Guided-onboarding metadata (T2-F2, server-driven; optional for old servers/SSE frames).
@@ -457,15 +466,31 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
               </div>
 
               <div className="flex-grow flex flex-col gap-2 md:flex-row md:items-center">
-                {/* Custom Base URL Field */}
+                {/* Custom Base URL Field + one-click presets for the common local hosts, so
+                    the operator wires LM Studio / local Ollama / vLLM without typing a URL. */}
                 {prov.id === "custom-openai" && (
-                  <input
-                    type="text"
-                    placeholder="Custom Base API Endpoint (e.g. http://localhost:1234/v1)"
-                    value={inputs["custom-openai-endpoint"]}
-                    onChange={(e) => setInputs((p) => ({ ...p, "custom-openai-endpoint": e.target.value }))}
-                    className="flex-1 bg-immersive-bg border border-immersive-border rounded px-3 py-1.5 text-xs text-immersive-text-bright placeholder-slate-700 focus:outline-none focus:border-indigo-500/40 font-mono transition-colors"
-                  />
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {CUSTOM_OPENAI_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setInputs((p) => ({ ...p, "custom-openai-endpoint": preset.endpoint }))}
+                          title={`Fill endpoint: ${preset.endpoint}`}
+                          className="bg-white/5 hover:bg-indigo-500/20 text-immersive-text-muted hover:text-status-accent border border-immersive-border-strong font-mono text-[9px] rounded px-2 py-1 cursor-pointer transition"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Custom Base API Endpoint (e.g. http://localhost:1234/v1)"
+                      value={inputs["custom-openai-endpoint"]}
+                      onChange={(e) => setInputs((p) => ({ ...p, "custom-openai-endpoint": e.target.value }))}
+                      className="bg-immersive-bg border border-immersive-border rounded px-3 py-1.5 text-xs text-immersive-text-bright placeholder-slate-700 focus:outline-none focus:border-indigo-500/40 font-mono transition-colors"
+                    />
+                  </div>
                 )}
 
                 <input
