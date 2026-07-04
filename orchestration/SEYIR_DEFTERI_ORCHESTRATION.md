@@ -581,3 +581,57 @@ GOTCHA (N): sandbox içinde `tsx` IPC unix-socket `listen EPERM` (allowUnixSocke
 komutları sandbox-dışı koşuldu. GOTCHA (E): `git stash` sandbox'ta `.claude/settings.json` unlink-EPERM
 ile YARIM kalır (index reset fail + pop abort) — kurtarma: `git checkout stash@{0} -- <settings.json
 hariç tüm dosyalar>` + içerik-diff doğrula + drop; bu repo'da stash KULLANMA.
+
+---
+
+## vO43 — Governance reconcile: tool-traceability sweep (2026-07-04)
+
+**Tetik:** DoD denetçisi (dod.ts) 49 açık finding biriktirmişti — concurrent-task (20 araç roadmap/SEYIR/test
+bacağı eksik) + roadmap-coherence (19) + done-without-governance (9 versiyon) + marker FP (3). Bu girdi + ROADMAP
+vO43 satırı + yeni testler borcu eş-zamanlı kapatır (yeni-araç kuralı: test+roadmap+SEYIR ÜÇÜ BİRDEN).
+
+**Araç rol tablosu (izlenebilirlik tek-kaynak):**
+
+| Araç | Rol | Test |
+|------|-----|------|
+| `align` | Constitutional Alignment harness CLI — lokal modeli etik yoldan Claude-benzeri davranışa kalibre eder | conformance.test.ts |
+| `automator-best` | daily-loop per-model otomasyonlarını tek en-iyi sete sentezler | automator-best.test.ts |
+| `automator-probe` | ARTIFACT tracker probe: model Automator artifact'i ÜRETTİ mi (dizin taraması) | automator-probe.test.ts |
+| `build-plan` | COMPLETION_GAPS.json → yürütülebilir faz planı üretir | build-plan.test.ts |
+| `chrome-probe` | CAPABILITY verdict probe: model Chrome'u shell-tool ile AÇABİLDİ mi | chrome-probe.test.ts |
+| `claim` | vO7 Work-Claim CLI: sekme başına görev claim (lane\|version) | claim.test.ts |
+| `claude-dispatch` | vO41 otonom Claude Code conductor zinciri (IO shell) | claude-dispatch.test.ts |
+| `completion-scan` | ollamas uçtan-uca eksik-tarama → COMPLETION_GAPS raporu | completion.test.ts |
+| `council` | Hibrit model-council: yetenek-eşlemeli fleet analizi | council-roster.test.ts |
+| `dispatchbench` | vO18 distributed-dispatch research→test→update harness | dispatchbench.test.ts |
+| `dispatchdoctor` | vO21 uzak worker havuzu ağ-yoklama GO/NO-GO probu | dispatchdoctor.test.ts |
+| `dispatchsim` | vO20 dispatch-akışı simülatörü (deterministik, canlı makinesiz) | dispatchsim.test.ts |
+| `driftguard` | vO8 deterministik tutarlılık GATE (0-manuel) | driftguard.test.ts |
+| `fleet-agent` | kalıcı, yaşayan per-tab worker (one-shot değil) | fleet-agent-provider.test.ts |
+| `fleet-apply` | conductor'ın gated-proposal apply-readiness triyajı | fleet-apply.test.ts |
+| `fleet-conduct` | CONDUCTOR/supervisor: worker raporları → gate → FLEET_STATUS | fleet-conduct-lib.test.ts |
+| `fleet-launch` | Terminal.app+iTerm2 sekmelerinde fleet worker'larını açar (≤2/model, dry default) | fleet-launch.test.ts (YENİ, 10) |
+| `fleet-next` | fleet turu sonrası öncelikli NEXT-TASK kuyruğu | fleet-next.test.ts |
+| `fleet-run` | fleet'i uçtan-uca koşturan TEK komut | fleet-run.test.ts |
+| `fleet-watch` | operatör için canlı fleet takip konsolu | fleet-plan.test.ts (plan katmanı) |
+| `gemini-run` | Gemini CLI'ı read-only PROPOSE worker olarak koşturur | gemini.test.ts |
+| `oracle` | önermeyi kanıtla yargılayan tek-atım CLI: TRUE/FALSE/UNDECIDABLE | oracle.test.ts (YENİ, 16) |
+| `oracle-serve` | sıcak-cache verdict daemon'u (Unix-socket NDJSON) | oracle.test.ts (verdict çekirdeği ortak) |
+| `provider-smoke` | canlı free-API provider e2e kanıtı (vP5) | provider-smoke.test.ts |
+| `tasklist` | kalıcı master task list üretici (docs/MASTER_TASKLIST.md) | tasklist.test.ts |
+| `term-exec` | görünür Terminal.app/iTerm2'de gerçek komut koşturucu | term-exec.test.ts |
+| `think` | THINK loop CLI (kanıt-bazlı problem-çözme registry'si) | think.test.ts |
+
+**Retro-governance (DONE-ama-SEYIR'siz versiyonlar kapanışı):** vO17 (SPEC_DISPATCH), vO19 (dispatch
+hardening), vO20 (dispatchsim), vO21 (dispatchdoctor), vO22 (dispatch bench chain), vO23 (dispatch
+verify), vO40 (claude-dispatch spawn), vO41 (continuous conductor chain), vO42 (zero-question autonomy +
+prefetch) — her birinin kapsam+kanıtı ROADMAP satırında; bu girdi SEYIR governance bacağını tamamlar.
+
+**dod R5 kök-fix:** marker sayacı artık `realMarkerCount` (isRealMarkerLine, vO46 kuralı) — yalnız gerçek
+`// TODO` yorum-marker'ları; pattern-string/grep-arg mention'ları (completion-scan.ts, lib/completion.ts,
+lib/build-plan.ts) FP üretmez. Suppress edilmedi, KÖKten çözüldü (+3 dod.test case).
+
+**Kanıt:** tsc 0 · vitest 90 dosya / 1120 test yeşil · critic 100/100 (0 finding) · commit 1201852 +
+b7c86e8. GOTCHA (E): eşzamanlı karargah committer add↔commit arasına girip index'i tüketebiliyor —
+commit'i add'den AYRI çağrıda yap; ayrıca PreToolUse gate-before-commit `git add && git commit` tek-komut
+zincirini "nothing staged" ile reddediyor (hook komut-öncesi index'e bakar) — add ve commit'i ayır.

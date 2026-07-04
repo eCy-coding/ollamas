@@ -30,10 +30,12 @@ export function isServed(s: TicketState, ticket: number): boolean {
 export function advance(s: TicketState): TicketState {
   return { ...s, serving: s.serving + 1, holder: null, heldSince: null };
 }
-/** Force-advance guard: the current holder died without releasing (heartbeat older than ttl) → skip it,
- *  so a crashed holder can never permanently block the queue (liveness). */
+/** Force-advance guard: the current serving position went stale (heartbeat/idle-stamp older than ttl) → skip
+ *  it, so neither a crashed HOLDER nor a ticket owner that died BEFORE its first claim (holder null, idle
+ *  timer stamped by tryTurn) can permanently block the queue (liveness). heldSince doubles as the position
+ *  age: claim time while held, first-observed-unclaimed time while idle. */
 export function shouldForceAdvance(s: TicketState, now: number, ttlMs: number): boolean {
-  return s.holder != null && s.heldSince != null && now - s.heldSince > ttlMs;
+  return s.heldSince != null && now - s.heldSince > ttlMs;
 }
 
 const DEFAULT: TicketState = { next: 0, serving: 0, holder: null, heldSince: null };
@@ -62,6 +64,9 @@ export function pullTicket(dir: string): number {
 export function tryTurn(dir: string, ticket: number, id: string, now: number, ttlMs: number): boolean {
   return withLock(lockDir(dir), () => {
     let s = read(dir);
+    // Unclaimed serving position (owner may have died between pullTicket and its first tryTurn): start the
+    // idle timer so the queue can force-advance past it after ttl instead of blocking forever.
+    if (s.holder == null && s.heldSince == null && s.next > s.serving) { s = { ...s, heldSince: now }; write(dir, s); }
     if (shouldForceAdvance(s, now, ttlMs) && s.serving !== ticket) { s = advance(s); write(dir, s); return false; }
     if (isServed(s, ticket)) { s = { ...s, holder: id, heldSince: now }; write(dir, s); return true; }
     return false;
