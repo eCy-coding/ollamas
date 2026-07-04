@@ -1,3 +1,27 @@
+# ollamas launchd agents
+
+Two LaunchAgents: the **always-running :3000 server** (below) and the **system-monitor heartbeat**.
+
+## Always-running server — `com.ollamas.server.plist`
+
+Keeps :3000 (LLM Mission Control + its key-health autonomy loop) alive across login and crashes
+(`RunAtLoad` + `KeepAlive`, throttled to avoid crash-thrash). This is the "always running" leg of
+the hardware-vault key autonomy: after one install the server self-restarts with zero action.
+
+```sh
+ops/launchd/install-server.sh          # one-time, operator-privileged (agents can't load launchd)
+```
+- **Status:** `launchctl list | grep ollamas.server` (3rd col = last exit code)
+- **Log:** `tail -f ~/.llm-mission-control/server.log`
+- **Run now / restart:** `launchctl kickstart -k gui/$(id -u)/com.ollamas.server`
+- **Stop (kill switch):** `launchctl unload ~/Library/LaunchAgents/com.ollamas.server.plist`
+
+> Stop any foreground dev server on :3000 first, or the daemon's bind EADDRINUSE-thrashes.
+> Enable the Secure-Enclave key vault by adding `OLLAMAS_MASTER_KEY_KEYCHAIN=1` to the plist's
+> `EnvironmentVariables` (default OFF = file-backed master key, unchanged).
+
+---
+
 # ollamas system-monitor heartbeat (launchd)
 
 Sustainable, deterministic self-monitor. Runs `scripts/system-monitor.mjs --heartbeat`

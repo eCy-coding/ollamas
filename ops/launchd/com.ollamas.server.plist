@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ollamas :3000 server — always-running LaunchAgent (RunAtLoad + KeepAlive).
+  Keeps LLM Mission Control (and its always-running key-health autonomy loop) alive across
+  login and crashes. Restart-on-exit is throttled to avoid crash-thrash.
+
+  Install (one-time, operator-privileged — an agent cannot load launchd):
+      ops/launchd/install-server.sh
+  or manually:
+      cp ops/launchd/com.ollamas.server.plist ~/Library/LaunchAgents/
+      launchctl unload ~/Library/LaunchAgents/com.ollamas.server.plist 2>/dev/null
+      launchctl load -w ~/Library/LaunchAgents/com.ollamas.server.plist
+  Status:  launchctl list | grep ollamas.server         (3rd col = last exit code)
+  Log:     tail -f ~/.llm-mission-control/server.log
+  Stop:    launchctl unload ~/Library/LaunchAgents/com.ollamas.server.plist   (kill switch)
+
+  NOTE: stop any foreground dev server on :3000 first, or the daemon's bind will EADDRINUSE.
+  The <string> node path is machine-specific (mise); regenerate with `which node` if it changes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ollamas.server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/ops/launchd/run-server.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/.llm-mission-control/server.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/.llm-mission-control/server.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/emrecnyngmail.com/.local/share/mise/installs/node/24.16.0/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/emrecnyngmail.com</string>
+    <key>PORT</key>
+    <string>3000</string>
+  </dict>
+</dict>
+</plist>
