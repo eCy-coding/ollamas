@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink, Radar } from "lucide-react";
 import { api } from "../lib/apiClient";
 
 interface KeyVaultProps {
@@ -37,6 +37,24 @@ interface PoolEntry {
   total: number; live: number; worstPct: number; allApproaching: boolean;
   // Guided-onboarding metadata (T2-F2, server-driven; optional for old servers/SSE frames).
   trainsOnData?: boolean; envKey?: string; signupUrl?: string; defaultModel?: string;
+  capabilities?: readonly string[];
+}
+
+// POST /api/keys/doctor response (server/key-doctor.ts). Every field is masked server-side —
+// keyMasked is …last4, never the raw key.
+interface DoctorVerdict {
+  status: "connected" | "already" | "invalid" | "connected-unverified" | "absent";
+  source?: "env" | "keychain" | "gh" | "vault";
+  keyMasked?: string;
+  capabilitiesActivated: readonly string[];
+  nextManualUrl?: string;
+  note?: string;
+}
+interface DoctorReport {
+  providers: Record<string, DoctorVerdict>;
+  capabilityReport: Record<string, string[]>;
+  roleSuggestions: Record<string, string[]>;
+  dryRun: boolean;
 }
 
 export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
@@ -46,6 +64,9 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string }>>({});
   const [pool, setPool] = useState<Record<string, PoolEntry>>({});
   const [alerts, setAlerts] = useState<Array<{ provider: string; worstPct: number; live: number }>>([]);
+  // "Scan & Connect" (T6): one click harvests machine keys via /api/keys/doctor.
+  const [scanning, setScanning] = useState(false);
+  const [doctorReport, setDoctorReport] = useState<DoctorReport | null>(null);
 
   // Form Inputs
   const [inputs, setInputs] = useState<Record<string, string>>({
@@ -215,6 +236,30 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     }
   };
 
+  // "Scan & Connect" (T6-F1): one click drives the server key-doctor — discover candidate
+  // keys already on this machine (env/.env + gh CLI token → GitHub Models; "deep" adds the
+  // macOS Keychain), validate each, and connect the valid ones to the vault. The result is
+  // masked (keyMasked = …last4) — no raw key ever reaches the browser. Then refresh the pool
+  // + masks so the newly-connected providers light up in the rows.
+  const runScan = async (sources: string[]) => {
+    setScanning(true);
+    try {
+      const report = await api.post<DoctorReport>("/api/keys/doctor", { sources, dryRun: false });
+      setDoctorReport(report);
+      const connected = Object.values(report.providers).filter((v) => v.status === "connected").length;
+      onNotify(
+        connected > 0 ? `Scan connected ${connected} new provider${connected > 1 ? "s" : ""}.` : "Scan complete — no new machine keys to connect.",
+        connected > 0 ? "success" : "info",
+      );
+      loadMasks();
+      loadPool();
+    } catch (e: any) {
+      onNotify(`Scan failed: ${e?.message ?? e}`, "error");
+    } finally {
+      setScanning(false);
+    }
+  };
+
   // Base rows: the legacy five with their rich descriptions. Every OTHER provider in the
   // /api/keys/pool response (the free-tier catalog: groq/cerebras/zai/…) gets a row derived
   // from its server-side metadata — a new catalog entry ships its own onboarding form with
@@ -246,6 +291,28 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
       <div className="flex items-center gap-2.5 mb-4">
         <Key className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Cryptographic API Key Vault</h2>
+        <div className="ml-auto flex items-center gap-1.5">
+          {/* One-click harvest: connect every key already on this machine (env + gh token). */}
+          <button
+            type="button"
+            onClick={() => runScan(["env", "gh"])}
+            disabled={scanning}
+            title="Discover + connect API keys already on this machine (env + GitHub CLI token)"
+            className="bg-indigo-500/15 hover:bg-indigo-500/25 text-status-accent border border-indigo-500/25 font-mono font-bold text-[10px] rounded px-3 py-1.5 disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5"
+          >
+            {scanning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Radar className="w-3 h-3" />}
+            Scan &amp; Connect
+          </button>
+          <button
+            type="button"
+            onClick={() => runScan(["env", "gh", "keychain"])}
+            disabled={scanning}
+            title="Deep scan — also queries the macOS Keychain (may prompt per known service)"
+            className="bg-white/5 hover:bg-white/10 text-immersive-text-muted border border-immersive-border-strong font-mono text-[10px] rounded px-2.5 py-1.5 disabled:opacity-50 transition cursor-pointer"
+          >
+            Deep
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-3.5 rounded mb-6 text-[10px] text-immersive-text-muted font-mono leading-relaxed">
@@ -255,6 +322,53 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
           AES-256-GCM. Unencrypted plaintext keys are never embedded in client bundles or public responses.
         </p>
       </div>
+
+      {/* Scan & Connect result (T6): masked per-provider verdicts + capability→orchestra-role
+          suggestions + one-click signup anchors for the providers still missing a key. */}
+      {doctorReport && (
+        <div className="bg-immersive-inset border border-immersive-border rounded p-3.5 mb-6">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Radar className="w-3.5 h-3.5 text-status-accent" />
+            <span className="text-[10px] font-mono font-bold text-immersive-text-bright uppercase tracking-wider">Scan Result</span>
+            <span className="text-[9px] font-mono text-immersive-text-dim ml-auto">metadata only · keys stay server-side</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Object.entries(doctorReport.providers)
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([prov, v]) => {
+                const tone = v.status === "connected" ? "bg-emerald-500/15 border-emerald-500/25 text-status-ok"
+                  : v.status === "already" ? "bg-indigo-500/10 border-indigo-500/20 text-status-accent"
+                  : v.status === "invalid" ? "bg-red-500/10 border-red-500/20 text-status-err"
+                  : v.status === "connected-unverified" ? "bg-amber-500/10 border-amber-500/25 text-status-warn"
+                  : "bg-immersive-bg border-immersive-border text-immersive-text-dim";
+                return (
+                  <span key={prov} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${tone} flex items-center gap-1`}>
+                    <strong>{prov}</strong> {v.status}{v.source ? `·${v.source}` : ""}{v.keyMasked ? ` ${v.keyMasked}` : ""}
+                    {v.status === "absent" && v.nextManualUrl && (
+                      <a href={v.nextManualUrl} target="_blank" rel="noopener noreferrer"
+                        onClick={() => onNotify(`Opened ${prov} key page.`, "info")}
+                        className="text-status-accent hover:underline inline-flex items-center gap-0.5 no-underline">
+                        <ExternalLink className="w-2.5 h-2.5" /> get key
+                      </a>
+                    )}
+                  </span>
+                );
+              })}
+          </div>
+          {Object.keys(doctorReport.roleSuggestions).length > 0 && (
+            <div className="border-t border-immersive-border pt-2">
+              <span className="text-[9px] font-mono text-immersive-text-dim uppercase tracking-wider">Orchestra roles (capability-matched)</span>
+              <div className="mt-1 flex flex-col gap-0.5">
+                {Object.entries(doctorReport.roleSuggestions).map(([role, provs]) => (
+                  <div key={role} className="text-[9px] font-mono text-immersive-text-muted">
+                    <span className="text-status-accent">{role}</span> ← {provs.length ? provs.join(", ") : "—"}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* P3 — approaching-limit alert: the whole live pool of a provider is saturating → act */}
       {alerts.length > 0 && (
