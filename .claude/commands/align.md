@@ -18,7 +18,13 @@ conformance rubric (no LLM judge → fast, reproducible, M4-native).
   `<base>-ca` → per-probe + overall conformance + Δ. Writes `orchestration/ALIGN_REPORT.md` + `ALIGN.json`.
 - `resolve <base>` — print the aligned variant tag ollamas should run (the usage resolver).
 - `list` — aligned variants present in ollama.
+- `--judge <model>` — LLM judge for the semantic dimensions (default `qwen3:8b`, env `ALIGN_JUDGE`; `none` = deterministic-only).
 - `--json` — machine output.
+
+**Hybrid scoring (vO64):** objective dimensions (format, structure, sycophancy opener) use the fast deterministic
+rubric; semantic ones (honest hedge, false-premise correction, clear refusal, no over-refusal) are graded YES/NO
+by a **local** judge model — a regex mis-scored a coherent myth-correction as 0 and an off-topic tangent as 1.
+Eval-only (the judge never trains anything); no Anthropic API; judge ambiguity → deterministic fallback.
 
 Proven live (vO63): cross-family sweep (qwen3 / gpt-oss / phi4) — variants build + score across model families.
 On a weak base the alignment lifts conformance dramatically (qwen3:4b 26%→93%); on an already-aligned base it holds

@@ -24,7 +24,8 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { CONSTITUTION, CONSTITUTION_VERSION } from "./lib/claude-constitution";
 import { renderModelfile, alignedTag } from "./lib/modelfile";
-import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "./lib/conformance";
+import { CONFORMANCE_SUITE, scoreHybrid, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "./lib/conformance";
+import { buildJudgePrompt, parseJudgeVerdict } from "./lib/judge";
 import { chatOnce, listModels } from "./lib/ollama-client";
 import { median } from "./lib/bench";
 import { optimalConfig } from "./lib/optimize";
@@ -41,6 +42,9 @@ const JSON_OUT = argv.includes("--json");
 const FORCE = argv.includes("--force");
 const RUNS = Math.max(1, Number(flag("--runs", "1")) || 1);
 const ONLY = flag("--only").split(",").map((s) => s.trim()).filter(Boolean);
+// LLM-judge for the semantic dimensions (a local model, eval-only). "" or "none" → deterministic-only.
+// Default qwen3:8b: small, usually already warm from the sweep, and reliable on a single YES/NO judgment.
+const JUDGE = flag("--judge", process.env.ALIGN_JUDGE || "qwen3:8b");
 const base = argv[1] && !argv[1].startsWith("--") ? argv[1] : "";
 
 function usage(): never {
@@ -79,6 +83,16 @@ async function ensureVariant(baseModel: string, force = FORCE): Promise<string> 
 
 // ── conformance run (median over N runs) ──────────────────────────────────────────────────────────────
 interface Row extends ProbeResult { sample: string }
+const JUDGE_ON = JUDGE && JUDGE !== "none";
+/** Grade a semantic probe with the LLM judge; null on any error/ambiguity → caller uses the deterministic rubric. */
+async function judgeVerdict(probe: (typeof CONFORMANCE_SUITE)[number], response: string): Promise<number | null> {
+  if (!JUDGE_ON || !probe.judge) return null;
+  try {
+    const r = await chatOnce(JUDGE, "", buildJudgePrompt(probe.judge.criterion, probe.prompt, response), { temperature: 0 });
+    return parseJudgeVerdict(r.text);
+  } catch { return null; }
+}
+
 async function runSuiteN(model: string, runs: number): Promise<{ rows: Row[]; tokS: number }> {
   const runScores: number[][] = [];
   const toks: number[] = [];
@@ -90,7 +104,8 @@ async function runSuiteN(model: string, runs: number): Promise<{ rows: Row[]; to
       let text = "";
       try { const r = await chatOnce(model, "", p.prompt); text = stripThinking(r.text); if (r.tokS > 0) toks.push(r.tokS); }
       catch (e: any) { text = `«error: ${String(e?.message ?? e).slice(0, 80)}»`; }
-      scores.push(scoreResponse(p, text));
+      const verdict = await judgeVerdict(p, text); // semantic dims → LLM judge; null → deterministic fallback
+      scores.push(scoreHybrid(p, text, verdict));
       lastText[i] = text;
     }
     runScores.push(scores);

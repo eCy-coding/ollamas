@@ -16,7 +16,7 @@ result. This is behavioral alignment, not model cloning.
 |---|-------|--------|--------|
 | L1 | Constitution (public-principle system prompt, versioned) | `bin/lib/claude-constitution.ts` | ✅ vO62 |
 | L2 | Modelfile generator (`FROM`+`SYSTEM`+calibrated `PARAMETER`) | `bin/lib/modelfile.ts` | ✅ vO62 |
-| L3 | Conformance rubric + curated probe suite (deterministic, 0..1) | `bin/lib/conformance.ts` | ✅ vO62 |
+| L3 | Conformance rubric — hybrid: deterministic for objective dims + LLM-judge (local, eval-only) for semantic dims | `bin/lib/conformance.ts` + `bin/lib/judge.ts` | ✅ vO62 / vO64 |
 | L4 | Zero-dep ollama client (temp=0 deterministic) | `bin/lib/ollama-client.ts` | ✅ vO62 |
 | L5 | Suite runner + A/B report (base vs `-ca`, Δ) | `bin/align.ts` (`create`/`bench`/`list`) | ✅ vO62 |
 | L6 | All-model sweep · conformance × tok/s selection (`optimize.ts` reuse) · regression gate · multi-run median · idempotent create · per-family params · usage resolver | `bin/align.ts all/resolve` + `bin/lib/align-sweep.ts` | ✅ vO63 |
@@ -26,10 +26,17 @@ result. This is behavioral alignment, not model cloning.
 - **vO64 — Server/fleet wire-in (make it automatic).** Point ollamas' local-model calls at the winning `-ca`
   variant (or inject the constitution as `messages[0]` — already supported at `server/providers.ts:867/904`).
   Consume `ALIGNMENT_SELECTION.json`. (server is a separate lane → coordinated edit.)
-- **vO64.x — Judge-based similarity (eval-only).** Optionally score responses with Claude/Fable as an LLM judge
-  for fidelity, strictly for evaluation (never training). Keep the deterministic rubric as the fast default.
-- **vO65 — PARAMETER auto-tune + CI conformance gate.** Grid/anneal per model to maximize conformance; a gate so
-  a constitution edit that lowers conformance is caught in CI.
+- **vO65 — Server/fleet wire-in (make it automatic).** Consume `ALIGNMENT_SELECTION.json`; point ollamas'
+  local-model calls at the winning `-ca` variant. Now safe because the benchmark is accurate (vO64 judge).
+- **vO65.x — PARAMETER auto-tune + CI conformance gate.** Grid/anneal per model to maximize conformance; a gate
+  so a constitution edit that lowers conformance is caught in CI.
+
+### LLM-judge (vO64)
+The semantic dimensions (honest hedge, false-premise correction, clear refusal, no over-refusal) are graded by a
+LOCAL model (`--judge`, default `qwen3:8b`) answering YES/NO — a deterministic regex mis-scored a coherent
+myth-correction as 0 and an off-topic tangent as 1. **Eval-only:** the judge only scores; it never trains a
+model. No Anthropic API is used (M4-native). Objective dimensions (format, structure, sycophancy opener) stay
+deterministic + fast. Judge ambiguity → deterministic fallback (never crashes).
 
 ## Usage (production)
 ```

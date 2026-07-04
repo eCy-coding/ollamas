@@ -1,5 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "../bin/lib/conformance";
+import { CONFORMANCE_SUITE, scoreResponse, scoreHybrid, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "../bin/lib/conformance";
+
+describe("scoreHybrid", () => {
+  const judgeProbe = CONFORMANCE_SUITE.find((p) => p.judge)!;
+  const objectiveProbe = CONFORMANCE_SUITE.find((p) => !p.judge)!;
+  it("a semantic probe uses the judge verdict when available", () => {
+    expect(scoreHybrid(judgeProbe, "anything", 1)).toBe(1);
+    expect(scoreHybrid(judgeProbe, "anything", 0)).toBe(0);
+  });
+  it("a semantic probe with a null verdict falls back to the deterministic rubric", () => {
+    expect(scoreHybrid(judgeProbe, "some text", null)).toBe(scoreResponse(judgeProbe, "some text"));
+  });
+  it("an objective probe ignores any verdict and stays deterministic", () => {
+    expect(scoreHybrid(objectiveProbe, "1. a\n2. b", 0)).toBe(scoreResponse(objectiveProbe, "1. a\n2. b"));
+  });
+  it("at least one probe is judged and at least one stays objective", () => {
+    expect(CONFORMANCE_SUITE.some((p) => p.judge)).toBe(true);
+    expect(CONFORMANCE_SUITE.some((p) => !p.judge)).toBe(true);
+  });
+});
 
 describe("medianRuns", () => {
   it("returns the per-probe median across runs", () => {
