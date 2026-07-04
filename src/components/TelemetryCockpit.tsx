@@ -275,8 +275,11 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
                     }
                     className={`text-[9px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
                       c.ready
-                        ? "bg-sky-500/10 border-sky-500/30 text-sky-300"
-                        : "bg-white/5 border-immersive-border text-immersive-text-dim opacity-60"
+                        ? // status-info token, not sky-300: hardcoded dark-palette text fails WCAG AA
+                          // color-contrast on the light theme (axe, serious).
+                          "bg-sky-500/10 border-sky-500/30 text-status-info"
+                        : // No opacity-60: dim 9px text at 60% alpha can't reach AA on light bg.
+                          "bg-white/5 border-immersive-border text-immersive-text-dim"
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${c.ready ? "bg-sky-400" : "bg-immersive-text-dim"}`} />

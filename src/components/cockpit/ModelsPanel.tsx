@@ -42,7 +42,14 @@ export function ModelsPanel({
           querying models…
         </div>
       ) : (
-        <div className="max-h-44 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+        /* Scroll container must be keyboard-reachable once the model list overflows
+           (axe scrollable-region-focusable, serious — only fires with enough models). */
+        <div
+          className="max-h-44 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2"
+          role="region"
+          aria-label="Detected local models"
+          tabIndex={0}
+        >
           {list.map((m) => (
             <div
               key={m.name}

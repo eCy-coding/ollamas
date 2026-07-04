@@ -21,7 +21,7 @@
     },
     "status": {
       "accent": { "value": "#4f46e5" },
-      "ok":     { "value": "#047857" },
+      "ok":     { "value": "#065f46" },
       "warn":   { "value": "#92400e" },
       "err":    { "value": "#be123c" },
       "info":   { "value": "#155e75" }

@@ -2,8 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 // Frontend lane (vF2) e2e harness. Isolated from Vitest: e2e files are *.spec.ts
 // under tests/e2e; Vitest only globs *.test.{ts,tsx}. Boots the real app on a
-// dedicated port (3100) so it never collides with a dev server on 3000.
-const PORT = Number(process.env.E2E_PORT) || 3100;
+// dedicated port so it never collides with a dev server on 3000. 3100 is NOT
+// safe on this machine: ~/Desktop/ecysearch listens on 127.0.0.1:3100 long-term
+// and reuseExistingServer adopts whatever answers on the port → every spec ran
+// against the wrong app (19 red, snapshot rendered "ecysearch", not ollamas).
+const PORT = Number(process.env.E2E_PORT) || 3170;
 const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
