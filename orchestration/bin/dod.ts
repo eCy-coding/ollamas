@@ -18,6 +18,7 @@ import {
 } from "./lib/dod";
 import { parseVersions } from "./plan-next";
 import { loadSuppress, applySuppress, suppressedBlock } from "./lib/suppress";
+import { isRealMarkerLine } from "./lib/completion";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -48,10 +49,12 @@ function main(): void {
   const porcelain = git(["status", "--porcelain"]).split("\n").filter(Boolean);
   const lapsesR3 = auditUncommitted(porcelain);
 
-  // R5: markerlar.
+  // R5: markerlar. Ham \bTODO\b sayımı scanner dosyalarının kendi grep-arg/regex string'lerini de
+  // sayıyordu (self-referential FP: completion-scan/build-plan/completion). isRealMarkerLine REUSE
+  // (yeni skorlayıcı yazma kuralı): yalnız gerçek yorum-marker'ı sayılır.
   const markerCounts = [...binFiles, ...libFiles.map((f) => "lib/" + f)].map((rel) => {
     const path = rel.startsWith("lib/") ? join(LIB, rel.slice(4)) : join(BIN, rel);
-    const count = (read(path).match(/\b(TODO|FIXME|HACK|XXX)\b/g) || []).length;
+    const count = read(path).split("\n").filter((l) => isRealMarkerLine(l)).length;
     return { file: rel, count };
   });
   const lapsesR5 = auditMarkers(markerCounts);
