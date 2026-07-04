@@ -56,3 +56,33 @@ test("daemonLabelsForSetup: only autopilot when no proxy vault", () => {
   const labels = daemonLabelsForSetup({ autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL }, false);
   assert.deepEqual(labels, [DEFAULT_LABEL]);
 });
+
+// ---------- vT15: named-tunnel cli helpers ----------
+import { parseNamedArgs, namedDaemonPlan, NAMED_DAEMON_LABEL } from "./cli.ts";
+
+test("parseNamedArgs: token subcommand", () => {
+  const p = parseNamedArgs(["token", "eyJhbG.SECRET", "--hostname", "ollamas.example.dev"]);
+  assert.deepEqual(p, { op: "token", token: "eyJhbG.SECRET", hostname: "ollamas.example.dev", name: undefined });
+});
+
+test("parseNamedArgs: create subcommand", () => {
+  const p = parseNamedArgs(["create", "ollamas", "--hostname", "ollamas.example.dev"]);
+  assert.deepEqual(p, { op: "create", name: "ollamas", hostname: "ollamas.example.dev", token: undefined });
+});
+
+test("parseNamedArgs: bare op (up/down/status/login)", () => {
+  assert.equal(parseNamedArgs(["up"]).op, "up");
+  assert.equal(parseNamedArgs(["status"]).op, "status");
+  assert.equal(parseNamedArgs([]).op, "status"); // default
+});
+
+test("parseNamedArgs: token requires --hostname (throws)", () => {
+  assert.throws(() => parseNamedArgs(["token", "eyJ"]), /hostname/);
+});
+
+test("namedDaemonPlan: dedicated label runs `proxy cloudflare named up`", () => {
+  const plan = namedDaemonPlan();
+  assert.equal(plan.label, NAMED_DAEMON_LABEL);
+  assert.equal(plan.label, "com.ollamas.tunnel.cloudflared");
+  assert.deepEqual(plan.args, ["proxy", "cloudflare", "named", "up"]);
+});

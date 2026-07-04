@@ -92,6 +92,15 @@ import { probeHttps } from "./health.ts";
 import { resolverLookup } from "./health.ts";
 import { writeGatewayState, readGatewayState } from "./gateway-state.ts";
 import { daemonLabelsForSetup } from "./setup.ts";
+import {
+  NamedCloudflareTransport,
+  parseTunnelCreate,
+  createArgs,
+  routeDnsArgs,
+  loginArgs,
+} from "./transports/cloudflared-named.ts";
+import { writeNamed, readNamed, describeNamed, type NamedConfig } from "./cf-named.ts";
+import { renderNamedConfig } from "./transports/cloudflare.ts";
 
 const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
 
@@ -726,12 +735,161 @@ async function cmdProxyUp(argv: string[]): Promise<void> {
   await new Promise(() => {}); // hold forever
 }
 
+// ---------- named tunnel (vT15) ----------
+
+export const NAMED_DAEMON_LABEL = "com.ollamas.tunnel.cloudflared";
+const NAMED_VAULT_PATH = () => join(KEYS_DIR, "cf-named.vault");
+const NAMED_CONFIG_YML = () => join(KEYS_DIR, "cf-config.yml");
+
+export interface NamedArgs {
+  op: string;
+  token?: string;
+  name?: string;
+  hostname?: string;
+}
+
+/** PURE: parse `named <op> [args] --hostname <h>`. token/create require --hostname. */
+export function parseNamedArgs(argv: string[]): NamedArgs {
+  const op = argv[0] ?? "status";
+  const hIdx = argv.indexOf("--hostname");
+  const hostname = hIdx >= 0 ? argv[hIdx + 1] : undefined;
+  const positional = argv.slice(1).filter((a, i, arr) => a !== "--hostname" && arr[i - 1] !== "--hostname");
+  if (op === "token") {
+    if (!hostname) throw new Error("named token <TOKEN> --hostname <host> (missing --hostname)");
+    return { op, token: positional[0], hostname, name: undefined };
+  }
+  if (op === "create") {
+    if (!hostname) throw new Error("named create <name> --hostname <host> (missing --hostname)");
+    return { op, name: positional[0], hostname, token: undefined };
+  }
+  return { op, hostname };
+}
+
+/** PURE: launchd plan for the always-on named tunnel (3rd agent, no sudo — node supervises cloudflared). */
+export function namedDaemonPlan(): DaemonPlan {
+  return {
+    label: NAMED_DAEMON_LABEL,
+    nodeBin: process.execPath,
+    cliPath: join(import.meta.dirname, "cli.ts"),
+    args: ["proxy", "cloudflare", "named", "up"],
+    logPath: join(KEYS_DIR, "cloudflared-named.log"),
+    workdir: join(import.meta.dirname, ".."),
+  };
+}
+
+function loadNamed(): NamedConfig | null {
+  return existsSync(NAMED_VAULT_PATH()) ? readNamed(NAMED_VAULT_PATH(), PROXY_KEYFILE_PATH()) : null;
+}
+
+async function cmdNamed(argv: string[]): Promise<void> {
+  const a = parseNamedArgs(argv);
+  await mkdir(KEYS_DIR, { recursive: true });
+  switch (a.op) {
+    case "token": {
+      if (!a.token || !a.hostname) throw new Error("named token <TOKEN> --hostname <host>");
+      writeNamed(NAMED_VAULT_PATH(), PROXY_KEYFILE_PATH(), { mode: "token", hostname: a.hostname, token: a.token });
+      console.log(`named tunnel (token) stored for https://${a.hostname}. Next: \`tunnel proxy cloudflare named daemon install\` (always-on) or \`… named up\`.`);
+      return;
+    }
+    case "login": {
+      // Interactive browser login (writes ~/.cloudflared/cert.pem). stdio inherited.
+      const { spawnSync } = await import("node:child_process");
+      const r = spawnSync("cloudflared", loginArgs(), { stdio: "inherit" });
+      process.exitCode = r.status ?? 0;
+      return;
+    }
+    case "create": {
+      if (!a.name || !a.hostname) throw new Error("named create <name> --hostname <host>");
+      const created = parseTunnelCreate(run("cloudflared", createArgs(a.name)));
+      if (!created) throw new Error("named: could not parse `cloudflared tunnel create` output (is `cloudflared tunnel login` done?)");
+      run("cloudflared", routeDnsArgs(a.name, a.hostname));
+      const yml = renderNamedConfig({ tunnelId: created.id, credFile: created.credFile, hostname: a.hostname, localPort: 8443 });
+      await writeFile(NAMED_CONFIG_YML(), yml, { mode: 0o600 });
+      writeNamed(NAMED_VAULT_PATH(), PROXY_KEYFILE_PATH(), {
+        mode: "cli",
+        hostname: a.hostname,
+        tunnelId: created.id,
+        credFile: created.credFile,
+      });
+      console.log(`named tunnel '${a.name}' created → https://${a.hostname} (id ${created.id.slice(0, 8)}…). Next: \`… named daemon install\`.`);
+      return;
+    }
+    case "up": {
+      const cfg = loadNamed();
+      if (!cfg) {
+        console.error("named: not configured — run `named token <TOKEN> --hostname <h>` or `named create <name> --hostname <h>` first.");
+        process.exitCode = 1;
+        return;
+      }
+      const t = new NamedCloudflareTransport({
+        hostname: cfg.hostname,
+        mode: cfg.mode,
+        ...(cfg.token ? { token: cfg.token } : {}),
+        tunnelName: "ollamas",
+        hasActiveKey: proxyHasActiveKey,
+        gatewayHealthy,
+      });
+      await t.up();
+      writeGatewayState(GATEWAY_STATE_PATH(), { running: true, publicUrl: `https://${cfg.hostname}`, ts: Date.now() });
+      console.log(`named tunnel up → https://${cfg.hostname} (${cfg.mode})`);
+      const stop = async (): Promise<void> => {
+        await t.down();
+        process.exit(0);
+      };
+      process.on("SIGINT", () => void stop());
+      process.on("SIGTERM", () => void stop());
+      await new Promise(() => {}); // hold forever (launchd supervises)
+      return;
+    }
+    case "down": {
+      // cloudflared child dies with the `named up` process; signal our supervisor if daemonized.
+      console.log("named: stop via `launchctl unload` (daemon) or Ctrl-C the foreground `named up`.");
+      return;
+    }
+    case "status": {
+      const cfg = loadNamed();
+      console.log(cfg ? describeNamed(cfg) : "named: not configured");
+      return;
+    }
+    case "daemon": {
+      const op = argv[1] ?? "status";
+      const plan = namedDaemonPlan();
+      if (op === "install") {
+        if (!loadNamed()) {
+          console.error("named daemon: configure first (`named token …` or `named create …`).");
+          process.exitCode = 1;
+          return;
+        }
+        const r = installAgent(plan);
+        console.log(JSON.stringify({ ...r, plist: agentPath(plan.label) }, null, 2));
+        process.exitCode = r.ok ? 0 : 1;
+        return;
+      }
+      if (op === "uninstall") {
+        const r = uninstallAgent(plan.label);
+        console.log(JSON.stringify(r, null, 2));
+        process.exitCode = r.ok ? 0 : 1;
+        return;
+      }
+      console.log(JSON.stringify({ ...agentStatus(plan.label), log: plan.logPath }, null, 2));
+      return;
+    }
+    default:
+      console.log("usage: tunnel proxy cloudflare named <token <TOKEN> --hostname <h>|login|create <name> --hostname <h>|up|down|status|daemon install|uninstall|status>");
+  }
+}
+
 async function cmdProxy(): Promise<void> {
   const sub = process.argv[3] ?? "status";
   const rest = process.argv.slice(4);
   switch (sub) {
     case "up":
       return cmdProxyUp(rest);
+    case "cloudflare": {
+      if (process.argv[4] === "named") return cmdNamed(process.argv.slice(5));
+      console.log("usage: tunnel proxy cloudflare named …");
+      return;
+    }
     case "down": {
       try {
         const pid = Number(await readFile(PROXY_PID_PATH(), "utf8"));
