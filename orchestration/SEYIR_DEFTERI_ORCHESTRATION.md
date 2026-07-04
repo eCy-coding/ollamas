@@ -581,3 +581,56 @@ GOTCHA (N): sandbox içinde `tsx` IPC unix-socket `listen EPERM` (allowUnixSocke
 komutları sandbox-dışı koşuldu. GOTCHA (E): `git stash` sandbox'ta `.claude/settings.json` unlink-EPERM
 ile YARIM kalır (index reset fail + pop abort) — kurtarma: `git checkout stash@{0} -- <settings.json
 hariç tüm dosyalar>` + içerik-diff doğrula + drop; bu repo'da stash KULLANMA.
+
+---
+
+## 2026-07-04 — Araç Sicili backfill: DoD governance kanalları kapandı (concurrent-task + done-without-governance)
+
+DoD denetçisi (`bin/dod.ts`) 27 aracın SEYIR kanalını, 19'unun roadmap kanalını ve 8 DONE vO'nun SEYIR
+kanıt girdisini eksik raporluyordu (`dod:concurrent-task` + `dod:done-without-governance` +
+`dod:roadmap-coherence`, toplam 47 bulgu). Araçlar gerçekte ship'li ve commit'li — eksik olan
+izlenebilirlik satırlarıydı. Bu girdi sicili kapatır: her satır amaç + git kanıt hash'i taşır
+(hash'ler `git log -1 -- <dosya>` / `git log --grep=<vO>` ile canlı türetildi, uydurma yok).
+
+### vO DONE-kanıt girdileri (done-without-governance kapanışı)
+
+- **vO17** distributed dispatch spec + ledger schema — Evidence `44f7d51`
+- **vO19** master-dispatch prompt + horizon wiring + self-update loop — Evidence `a68bb0b`
+- **vO20** dispatch flow simulator + executable spec (`dispatchsim`) — Evidence `e5f512a`
+- **vO21** fleet dispatch readiness doctor (`dispatchdoctor`) — Evidence `1df7cea`
+- **vO22** formal invariants + property-based verification — Evidence `ac3bef8`
+- **vO23** autonomous fleet reconcile loop — Evidence `6594a04`
+- **vO40** claude-dispatch otonom conductor spawn (`claude-dispatch`) — Evidence `d619703`
+- **vO41** continuous conductor chain (kesintisiz görev→görev döngü) — Evidence `06ac83a`
+
+### Araç sicili (`bin/*.ts` amaç + kanıt)
+
+| Araç | Amaç | Evidence |
+|------|------|----------|
+| `align` | Constitutional Alignment harness CLI (vO62) | `62f6442` |
+| `automator-best` | daily-loop per-model recurring automation sentezi | `19adbfe` |
+| `automator-probe` | ARTIFACT tracker probe — model başına üretilen çıktı | `a1fec2c` |
+| `build-plan` | COMPLETION_GAPS.json → yürütülebilir build planı | `857d9c8` |
+| `chrome-probe` | CAPABILITY verdict probe — lokal model Chrome açabiliyor mu | `a1fec2c` |
+| `claim` | vO7 work-claim CLI — sekme (lane\|version) claim eder | `6c1e96f` |
+| `claude-dispatch` | vO41 otonom Claude Code conductor zinciri (IO shell) | `6b5bec4` |
+| `completion-scan` | ollamas uçtan-uca tamamlanmışlık taraması | `4736002` |
+| `council` | hibrit model-council — yetenek-eşlemeli fleet analizi | `921988a` |
+| `dispatchbench` | vO18 distributed-dispatch research→test→update harness | `82489e4` |
+| `dispatchdoctor` | vO21 uzak worker havuzu GO/NO-GO ağ probu | `4f20f63` |
+| `dispatchsim` | vO20 dispatch flow simulator (deterministik, canlı makinesiz) | `e5f512a` |
+| `driftguard` | vO8 deterministik tutarlılık GATE | `1f1f1ca` |
+| `fleet-agent` | kalıcı per-tab living worker (one-shot değil) | `2ac3df5` |
+| `fleet-apply` | conductor apply-readiness triage (gated proposal'lar) | `891719a` |
+| `fleet-conduct` | fleet'in CONDUCTOR tarafı — rapor+gate+convergence | `08f8294` |
+| `fleet-launch` | fleet'i Terminal.app + iTerm2'de açan producer | `d619703` |
+| `fleet-next` | fleet turu sonrası öncelikli NEXT-TASK kuyruğu | `665945c` |
+| `fleet-run` | fleet'i uçtan-uca koşturan TEK komut | `ec419eb` |
+| `fleet-watch` | fleet canlı takip konsolu (operatör izler) | `d298177` |
+| `gemini-run` | Gemini CLI'ı read-only PROPOSE worker olarak koşturur | `857e0c4` |
+| `oracle` | Doğruluk Oracle'ı CLI (deterministik verify) | `921988a` |
+| `oracle-serve` | kalıcı Doğruluk Oracle daemon'u | `921988a` |
+| `provider-smoke` | CANLI provider e2e kanıtı (vP5) | `3effd11` |
+| `tasklist` | kalıcı master task list üretici (docs/MASTER_TASKLIST.md) | `a6f3d54` |
+| `term-exec` | gerçek görünür Terminal.app/iTerm2'de komut koşturucu | `f8471cd` |
+| `think` | THINK loop CLI (sürdürülebilir problem-çözme mekanizması) | `0ddcde3` |
