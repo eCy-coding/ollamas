@@ -179,6 +179,24 @@
       "severity": "low",
       "note": "`tunnel setup` çok-adımlı (configure×N + autoUp + daemon); bir adım yarıda kalırsa (ör. mkcert -install başarısız) kısmi-kurulum. ÇÖZÜM: setup IDEMPOTENT — var-olan config'ler skip-exists ile atlanır, re-run yalnız eksiği tamamlar; her configure adımı try/catch (biri patlarsa diğerleri sürer) + net rapor. Crash/prompt yok.",
       "applies_version": "vT9"
+    },
+    {
+      "id": "RISK-TUNNEL-024",
+      "category": "security",
+      "severity": "high",
+      "note": "Public-exposure-without-auth: REVERSE transport (cloudflared) public URL verir; gateway auth'suz açılırsa ollamas TÜM internete açık olur. Kural: CloudflareTransport.up() aktif pxy_ key yoksa THROW (uyarı değil, fatal); cli proxy up de key'siz başlamayı reddeder. Doctor 401-without-key canlı kontrolü bu invariant'ı sürekli doğrular."
+    },
+    {
+      "id": "RISK-TUNNEL-025",
+      "category": "security",
+      "severity": "medium",
+      "note": "Token sızıntısı: pxy_ raw key yalnız üretim anında BİR KEZ gösterilir; vault sha256+8-char-prefix saklar (keystore AES-256-GCM). Access-log/status/hata mesajları yalnız keyPrefix içerir; Authorization/X-Proxy-Key değerleri hiçbir log'a yazılmaz. Karşılaştırma timingSafeEqual (digest üzerinde)."
+    },
+    {
+      "id": "RISK-TUNNEL-026",
+      "category": "security",
+      "severity": "high",
+      "note": "Open-relay: gateway upstream'leri UPSTREAMS sabitine hard-pin (127.0.0.1:3000 / 127.0.0.1:11434); istekten türetilen host'a ASLA proxy yapılmaz. Inbound X-Forwarded-* ve X-Proxy-Key forward öncesi strip edilir; Host/Origin pinned-localhost'a yeniden yazılır (ollamas /mcp origin-allowlist gereği). Path-allowlist (/v1|/api|/mcp) blast-radius'u küçültür."
     }
   ],
   "errors": [

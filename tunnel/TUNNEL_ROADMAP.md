@@ -16,8 +16,10 @@
 | **vT9** | **Ecosystem Onboarding** | tek-komut `tunnel setup [--daemon]` (capability-detect → configure-capable → autoUp → daemon, idempotent) + `teardown`; **0-manuel onboarding capstone** | tailscale-up zero-config (fikir) + cmd-reuse | ✅ DONE |
 | **vT10** | **Live Integration Fix + `doctor`** | health-path /healthz→**/api/health** (ERR-TUNNEL-003, gerçek ollamas'a karşı tünel kırıktı) + `tunnel doctor` canlı e2e self-test; **CANLI 200 kanıtı** | ollamas-introspection | ✅ DONE |
 | **vT11** | **Konsolidasyon Adaptasyonu + Canlı E2E** | lane `ollamas-tunnel-wt`→`ollamas/tunnel` (integration/all-lanes), 10-dosya path-fix + whoami branch-guard + ERR-TUNNEL-004; **entegre-tree'de canlı doctor OK** | — | ✅ DONE |
-| vT12 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | NEXT |
-| vT12+ | Connectivity-routing + Remote reverse-tunnel | reachVia routing (reverse geldiğinde değerli) + FRP/Bore. **⚠️ PARKED**: reverse VPS+dış-hesap+manuel → "0 manuel"+egemen-zero-account ihlali; routing marjinal (probe-timeout yeter) | FRP(Apache,107k)/Bore(MIT,11k) | parked |
+| **vT12** | **Proxy Gateway ("use everywhere" core)** | zero-dep streaming reverse-proxy: `proxy.ts` pure core (route/auth/rewrite/vault) + `proxy-server.ts` IO shell + `ratelimit.ts` token-bucket; pxy_ auth (timing-safe) + secret-free access-log + path-allowlist; `/v1`→ollama:11434 (OpenAI-compat), `/api`+`/mcp`→ollamas:3000 (Host/Origin rewrite); `cli proxy up/down/status/key/daemon` + setup/doctor wiring; **T0-kararı: mesh + Cloudflare ikisi birden** | node built-ins only | ✅ DONE |
+| vT13 | Cloudflare REVERSE transport | `transports/cloudflare.ts` (Transport, PRIORITY.REVERSE=30, injected exec): quick-tunnel (hesapsız, ephemeral trycloudflare URL) + named-tunnel (ops., stabil host); **auth-gate: aktif pxy_ key yoksa up() reddeder (RISK-TUNNEL-024)**; selectAuto/autopilot/status/bench oto-entegre; doctor --full public e2e | cloudflared(Apache-2.0) binary-only | NEXT |
+| vT14 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
+| vT14+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -184,11 +186,45 @@
 - **CANLI E2E (entegre tree):** `node src/cli.ts doctor` → ollamas upstream OK ~22ms /api/health; whoami →
   integration/all-lanes (hijack-uyarısı yok); node --test 148/148; tsc 0. VERSION 11.0.0.
 
-## vT12 — NEXT (önceden-hesaplanmış ilk todo'lar) — Ecosystem-2
+## vT12 — DONE (kanıt) — Proxy Gateway ("use everywhere" core)
 
-1. `src/qr.ts` — PURE QR (ANSI/SVG) endpoint/onboarding-URL render (zero-dep, qrencode binary opsiyonel) →
-   iPhone tek-tarama. `cli.ts qr [endpoint]`.
-2. iOS Shortcut reçetesi: `status --json` tüket → aktif endpoint'i Shortcut'a besle (cross-lane scripts/CLI doc).
-3. integrations-gateway federation doc: tunnel endpoint → integrations lane MCP_PUBLIC_URL devri (server.ts edit YOK).
-4. multi-tenant exposure policy notu (hangi transport hangi tenant'a; tunnel yalnız taşır, policy integrations'da).
-5. errors_registry ecosystem riskleri; ADOPTION qrcode-zero-dep (MIT).
+> T0 (Emre) "her yerde kullanılabilir proxy server" istedi + AskUser kararı: **mesh + Cloudflare ikisi birden**,
+> tam gateway, tunnel lane. Eski vT12(QR/Ecosystem-2) → vT14'e kaydırıldı (silinmedi). Plan:
+> `~/.claude/plans/ollamas-projesini-focuslan-isteklerimi-robust-stardust.md`.
+
+- **P1 `src/ratelimit.ts`** — pure token bucket (injected clock, LRU-bound maxKeys=10k → sınırsız-IP guard). 10 test.
+- **P2 `src/proxy.ts`** — PURE core: `routeRequest` path-allowlist (`/v1`→ollama, `/mcp`+`/api`→ollamas, gerisi
+  404; lexical `..`-normalize), `authorize` (Bearer/X-Proxy-Key `pxy_`, SHA-256 + timingSafeEqual, revoked-reject),
+  `rewriteHeaders` (Host/Origin→localhost — ollamas `/mcp` origin-allowlist şartı; inbound x-forwarded-*/x-proxy-key
+  strip; authorization DOKUNULMAZ upstream'e), vault ops (addKey raw-BİR-KEZ, revokeKey, listKeys sha256-sızdırmaz).
+  UPSTREAMS 127.0.0.1'e hard-pin (RISK-TUNNEL-026). 19 test.
+- **P3 `src/proxy-server.ts`** — IO shell: node:http(s) `pipe()` streaming (SSE buffersız — testte gerçek
+  ephemeral-port stub, chunk-1 stream-bitmeden gözlendi), gate sırası route(404)→health-public→auth(401,
+  body-öncesi)→ratelimit(429)→forward; upstream-down→jenerik 502 (errno/url sızmaz); JSONL access-log
+  secret-free (keyPrefix-only, RISK-TUNNEL-025) + rotateIfNeeded reuse. requestTimeout=0 (uzun stream). 12 test.
+- **P4 `cli.ts proxy`** — up/down/status/key add|list|revoke/daemon install|uninstall|status;
+  `parseProxyArgs` (default :8443 + mkcert TLS; `--no-tls` cloudflared/loopback için), `proxyDaemonPlan`
+  (label com.ollamas.tunnel.proxy, renderLaunchAgent REUSE). 4 test.
+- **P5 setup/doctor wiring** — planSetup `proxy` kind (binary'siz, idempotent vault+default-key; readiness'e
+  sayılmaz — gateway katmandır, transport değil); doctor proxy fazı (canlı 401-without-key + keyed health). 6 test.
+- **CANLI KANIT (gerçek ollamas :3000 + ollama :11434):** `proxy up --no-tls` → no-key `/api/agent/chat`=**401**,
+  public `/api/health`=**200**, keyed health=**200**, `/admin`=**404**, keyed `/v1/models`=**200** (ollama model
+  listesi gateway'den aktı); `doctor` → `proxy gateway: UP / 401 without key: OK / keyed /api/health: OK 3ms`,
+  exit 0. `/v1/chat/completions` canlı LLM turu upstream-doygunluğunda takıldı (fleet qwen3:8b'yi kullanıyordu;
+  gateway'siz direkt :11434 de AYNI şekilde asıldı = parite kanıtı, darboğaz gateway değil; SSE geçişi P3
+  gerçek-soket testiyle kanıtlı).
+- **Kanıt:** `node --test` **199/199 GREEN** (148→199), tsc 0. VERSION 12.0.0. RISK-TUNNEL-024/025/026 kayıtlı.
+  `recipes/proxy-gateway.md`. Commits: 9452cc9, bfca3fd, 86b05da, 60bfbc0, e8985fb (+bookkeeping).
+
+## vT13 — NEXT (önceden-hesaplanmış ilk todo'lar) — Cloudflare REVERSE transport
+
+1. `src/transports/cloudflare.ts` + test (TDD): `parseQuickTunnelUrl` (cloudflared stderr'den
+   `https://*.trycloudflare.com` yakala), injected-Exec `up()` (`cloudflared tunnel --url http://127.0.0.1:8443
+   --no-autoupdate`; **aktif pxy_ key yoksa THROW — RISK-TUNNEL-024 auth-gate**), `down()` idempotent,
+   `probe()`=probeHttps(publicUrl+HEALTH_PATH), `endpoint()`; binary-yok → `brew install cloudflared` hint.
+2. Named-tunnel: `renderNamedConfig({tunnelId, credFile, hostname, localPort})` pure YAML (tek manuel adım
+   `cloudflared login` DÜRÜST belgelenir).
+3. cli transport-registry wiring → selectAuto/autopilot/status/bench oto; `detectCapable` cloudflared.
+4. `doctor --full`: quick-tunnel aç → public URL keyed `/api/health` → (ops.) `/v1/chat` tek-token → kapat.
+5. ADOPTIONS: cloudflared **SPDX `Apache-2.0`** binary-only (RISK-ORCH-017: kategori-kelimesi değil);
+   `recipes/cloudflare-tunnel.md`; VERSION 13.0.0.
