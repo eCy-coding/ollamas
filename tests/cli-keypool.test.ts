@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import crypto from "node:crypto";
 import { pickPoolKey, unsealDisk, sealDisk } from "../cli/lib/config";
-import { redactOlm, summarizeProvision } from "../cli/commands/keys";
+import { redactOlm, summarizeProvision, onboardTargets } from "../cli/commands/keys";
 
 describe("cli key-pool — pickPoolKey rotation (client-side)", () => {
   it("picks a pool member; spreads across the pool with the injected rng", () => {
@@ -40,5 +40,31 @@ describe("cli keys command — pure helpers", () => {
   });
   it("summarizeProvision reports counts, no secrets", () => {
     expect(summarizeProvision(3, 3, 5)).toBe("Provisioned 3/3 olm_ key(s). Pool now: 5 key(s) (rotated per call).");
+  });
+});
+
+describe("cli keys onboard — onboardTargets (pool → guided signup sırası)", () => {
+  const POOL = {
+    "nvidia-nim": { total: 0, live: 0, signupUrl: "https://build.nvidia.com", envKey: "NVIDIA_API_KEY" },
+    gemini: { total: 9, live: 0, signupUrl: "https://aistudio.google.com/apikey", envKey: "GEMINI_API_KEY" },
+    cerebras: { total: 1, live: 1, signupUrl: "https://cloud.cerebras.ai", envKey: "CEREBRAS_API_KEY" },
+    weird: { total: 0, live: 0, signupUrl: "", envKey: "" }, // signupUrl yok → elenir
+  };
+
+  it("missing → exhausted → live sırasıyla döner; signupUrl'süz elenir", () => {
+    const t = onboardTargets(POOL);
+    expect(t.map((x) => x.id)).toEqual(["nvidia-nim", "gemini", "cerebras"]);
+    expect(t[0].state).toBe("missing");
+    expect(t[1].state).toBe("exhausted");
+    expect(t[2].state).toBe("live");
+  });
+  it("signupUrl + envKey satırda taşınır (rehber çıktı için)", () => {
+    const t = onboardTargets(POOL);
+    expect(t[0].signupUrl).toContain("nvidia");
+    expect(t[0].envKey).toBe("NVIDIA_API_KEY");
+  });
+  it("boş/bozuk pool → boş liste (asla throw)", () => {
+    expect(onboardTargets({})).toEqual([]);
+    expect(onboardTargets(null as any)).toEqual([]);
   });
 });
