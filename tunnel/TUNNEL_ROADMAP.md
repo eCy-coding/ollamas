@@ -17,7 +17,7 @@
 | **vT10** | **Live Integration Fix + `doctor`** | health-path /healthz→**/api/health** (ERR-TUNNEL-003, gerçek ollamas'a karşı tünel kırıktı) + `tunnel doctor` canlı e2e self-test; **CANLI 200 kanıtı** | ollamas-introspection | ✅ DONE |
 | **vT11** | **Konsolidasyon Adaptasyonu + Canlı E2E** | lane `ollamas-tunnel-wt`→`ollamas/tunnel` (integration/all-lanes), 10-dosya path-fix + whoami branch-guard + ERR-TUNNEL-004; **entegre-tree'de canlı doctor OK** | — | ✅ DONE |
 | **vT12** | **Proxy Gateway ("use everywhere" core)** | zero-dep streaming reverse-proxy: `proxy.ts` pure core (route/auth/rewrite/vault) + `proxy-server.ts` IO shell + `ratelimit.ts` token-bucket; pxy_ auth (timing-safe) + secret-free access-log + path-allowlist; `/v1`→ollama:11434 (OpenAI-compat), `/api`+`/mcp`→ollamas:3000 (Host/Origin rewrite); `cli proxy up/down/status/key/daemon` + setup/doctor wiring; **T0-kararı: mesh + Cloudflare ikisi birden** | node built-ins only | ✅ DONE |
-| vT13 | Cloudflare REVERSE transport | `transports/cloudflare.ts` (Transport, PRIORITY.REVERSE=30, injected exec): quick-tunnel (hesapsız, ephemeral trycloudflare URL) + named-tunnel (ops., stabil host); **auth-gate: aktif pxy_ key yoksa up() reddeder (RISK-TUNNEL-024)**; selectAuto/autopilot/status/bench oto-entegre; doctor --full public e2e | cloudflared(Apache-2.0) binary-only | NEXT |
+| **vT13** | **Cloudflare REVERSE transport** | `transports/cloudflare.ts` (Transport, PRIORITY.REVERSE=30, injected exec): quick-tunnel (hesapsız, ephemeral trycloudflare URL) + named-tunnel (ops., stabil host); **auth-gate: aktif pxy_ key yoksa up() reddeder (RISK-TUNNEL-024)**; selectAuto/autopilot/status/bench oto-entegre; doctor --full public e2e | cloudflared(Apache-2.0) binary-only | ✅ DONE |
 | vT14 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
 | vT14+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
@@ -216,15 +216,34 @@
 - **Kanıt:** `node --test` **199/199 GREEN** (148→199), tsc 0. VERSION 12.0.0. RISK-TUNNEL-024/025/026 kayıtlı.
   `recipes/proxy-gateway.md`. Commits: 9452cc9, bfca3fd, 86b05da, 60bfbc0, e8985fb (+bookkeeping).
 
-## vT13 — NEXT (önceden-hesaplanmış ilk todo'lar) — Cloudflare REVERSE transport
+## vT13 — DONE (kanıt) — Cloudflare REVERSE transport
 
-1. `src/transports/cloudflare.ts` + test (TDD): `parseQuickTunnelUrl` (cloudflared stderr'den
-   `https://*.trycloudflare.com` yakala), injected-Exec `up()` (`cloudflared tunnel --url http://127.0.0.1:8443
-   --no-autoupdate`; **aktif pxy_ key yoksa THROW — RISK-TUNNEL-024 auth-gate**), `down()` idempotent,
-   `probe()`=probeHttps(publicUrl+HEALTH_PATH), `endpoint()`; binary-yok → `brew install cloudflared` hint.
-2. Named-tunnel: `renderNamedConfig({tunnelId, credFile, hostname, localPort})` pure YAML (tek manuel adım
-   `cloudflared login` DÜRÜST belgelenir).
-3. cli transport-registry wiring → selectAuto/autopilot/status/bench oto; `detectCapable` cloudflared.
-4. `doctor --full`: quick-tunnel aç → public URL keyed `/api/health` → (ops.) `/v1/chat` tek-token → kapat.
-5. ADOPTIONS: cloudflared **SPDX `Apache-2.0`** binary-only (RISK-ORCH-017: kategori-kelimesi değil);
-   `recipes/cloudflare-tunnel.md`; VERSION 13.0.0.
+> "her yerden erişim" ikinci ayağı: mesh KENDİ cihazlarını bağlar, cloudflared HERHANGİ ağdan
+> (cellular, yabancı WiFi, CGNAT arkası) hesapsız public URL verir — router-port/sabit-IP gerekmez.
+
+- **`src/transports/cloudflare.ts`** (Transport, PRIORITY.REVERSE=30, injected spawn+probe):
+  `parseQuickTunnelUrl` (anchored regex, attacker-suffix reddi), `quickTunnelArgs` (loopback-pin
+  `--no-autoupdate`), `renderNamedConfig` (ingress + 404-catchall pure YAML), `up()` stderr/stdout'tan
+  URL yakalayınca resolve (timeout-guard) — **aktif pxy_ key yoksa THROW (RISK-TUNNEL-024)**, spawn bile
+  etmez; `down()` SIGTERM idempotent; `probe()`=probeHttps(publicUrl+/api/health, 10s edge-budget);
+  ENOENT→`brew install cloudflared` hint. **19 test** (pure + fake-child + auth-gate + timeout).
+- **Wiring:** `autopilot.TRANSPORT_BINARY.cloudflare=cloudflared`; `cli.buildSwitch` CloudflareTransport
+  register (proxyHasActiveKey sync auth-gate); selectAuto LAN_TLS(10)>MESH(20)>REVERSE(30) — fallback
+  kanıtlı; detectCapable cloudflared. **4 entegrasyon testi.**
+- **`doctor --full`:** quick-tunnel aç → public /api/health (4x retry, edge-propagasyon) → down; PublicTunnelDoctor
+  raporu. **2 test.**
+- **CANLI KANIT:** cloudflared 2026.2.0; `doctor --full` → cloudflared **URL üretti**
+  (`https://<slug>.trycloudflare.com`), gateway UP + 401-without-key OK + keyed health 3ms. Public roundtrip
+  **FAIL — ama KÖK-NEDEN ortam, kod değil**: bu Mac'in DNS'i mesh MagicDNS'e (100.100.100.100, vT3 Headscale)
+  pinli → `*.trycloudflare.com` NXDOMAIN (kanıt: `host <slug>.trycloudflare.com`=NXDOMAIN,
+  `trycloudflare.com`=çözülüyor). **RISK-TUNNEL-027** kayıtlı + recipe'de bypass (public-resolver / named-tunnel).
+  doctor DÜRÜST FAIL raporlar, gizlemez (ERR-TUNNEL-003 dersi).
+- **Kanıt:** `node --test` **219/219 GREEN** (199→219), tsc 0. VERSION 13.0.0. cloudflared SPDX `Apache-2.0`
+  binary-only (TUNNEL_ADOPTION). `recipes/cloudflare-tunnel.md` (quick + named, dürüst tek-manuel-adım).
+
+## vT14 — NEXT (parked, precompute) — Ecosystem-2
+
+1. `src/qr.ts` PURE QR (ANSI/SVG) — gateway URL + pxy_ key tek-tarama iPhone onboarding; `cli qr [endpoint]`.
+2. iOS Shortcut: `status --json` → aktif endpoint Shortcut'a besle.
+3. named-tunnel otomasyonu (config.yml render → `cloudflared tunnel run` daemon wiring).
+4. connectivity-routing (reachVia: hangi ağda hangi transport) — CF quick-tunnel geldiğinden artık değerli.

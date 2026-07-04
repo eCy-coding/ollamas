@@ -497,12 +497,39 @@ async function cmdDoctor(): Promise<void> {
     proxy = { running, authRejects, authOkMs };
   }
 
+  // vT13 `doctor --full`: real public e2e — quick tunnel up → edge URL /api/health → down.
+  // Requires the gateway running + an active pxy_ key (auth-gate throws otherwise, by design).
+  let publicTunnel: import("./doctor.ts").PublicTunnelDoctor | undefined;
+  if (process.argv.includes("--full")) {
+    const cf = new CloudflareTransport({ localPort: 8443, hasActiveKey: proxyHasActiveKey });
+    try {
+      await cf.up();
+      // Edge/DNS propagation for a fresh quick tunnel takes seconds — retry before verdict.
+      let reachablePub = false;
+      let msPub = 0;
+      for (let attempt = 0; attempt < 4 && !reachablePub; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 3000));
+        const t0 = performance.now();
+        reachablePub = await cf.probe();
+        msPub = performance.now() - t0;
+      }
+      publicTunnel = { up: true, reachable: reachablePub, ms: reachablePub ? msPub : null };
+      console.log(`public URL (ephemeral): ${cf.endpoint().url}`);
+    } catch (e) {
+      console.log(`public tunnel: ${e instanceof Error ? e.message : String(e)}`);
+      publicTunnel = { up: false, reachable: false, ms: null };
+    } finally {
+      await cf.down();
+    }
+  }
+
   const report = buildDoctorReport({
     ollamasUpstream: { url: `${upstreamBase}${HEALTH_PATH}`, reachable, ms },
     active: sw.activeName(),
     connectivity,
     capable,
     ...(proxy ? { proxy } : {}),
+    ...(publicTunnel ? { publicTunnel } : {}),
   });
   console.log(json ? JSON.stringify(report, null, 2) : renderDoctorReport(report));
   process.exitCode = report.ok ? 0 : 1;

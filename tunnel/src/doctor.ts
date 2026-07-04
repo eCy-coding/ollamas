@@ -11,12 +11,19 @@ export interface ProxyDoctor {
   authOkMs: number | null; // keyed /api/health roundtrip through the gateway, null if not run
 }
 
+export interface PublicTunnelDoctor {
+  up: boolean; // quick tunnel came up (URL obtained)
+  reachable: boolean; // public URL → edge → gateway → ollamas /api/health == 200
+  ms: number | null; // public roundtrip, null if not reachable
+}
+
 export interface DoctorReport {
   ollamasUpstream: { url: string; reachable: boolean; ms: number };
   active: string | null; // selected transport, if any
   connectivity: Connectivity;
   capable: string[]; // transports whose binary is installed
   proxy?: ProxyDoctor; // vT12 gateway phase (absent when gateway not configured)
+  publicTunnel?: PublicTunnelDoctor; // vT13 `doctor --full` cloudflare e2e (absent otherwise)
   ok: boolean; // true iff ollamas upstream is reachable
 }
 
@@ -38,6 +45,14 @@ export function renderDoctorReport(r: DoctorReport): string {
           `proxy gateway    : ${r.proxy.running ? "UP" : "DOWN"}`,
           `  401 without key: ${r.proxy.authRejects ? "OK" : "FAIL — gateway is OPEN, fix before exposing (RISK-TUNNEL-024)"}`,
           `  keyed ${"/api/health"}: ${r.proxy.authOkMs === null ? "not run" : `OK ${r.proxy.authOkMs.toFixed(0)}ms`}`,
+        ]
+      : []),
+    ...(r.publicTunnel
+      ? [
+          `public tunnel    : ${r.publicTunnel.up ? "UP (cloudflare quick tunnel)" : "DOWN"}`,
+          `  public /api/health: ${
+            r.publicTunnel.reachable ? `OK ${(r.publicTunnel.ms ?? 0).toFixed(0)}ms` : "FAIL — edge up but end-to-end broken"
+          }`,
         ]
       : []),
     "",

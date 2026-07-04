@@ -197,6 +197,12 @@
       "category": "security",
       "severity": "high",
       "note": "Open-relay: gateway upstream'leri UPSTREAMS sabitine hard-pin (127.0.0.1:3000 / 127.0.0.1:11434); istekten türetilen host'a ASLA proxy yapılmaz. Inbound X-Forwarded-* ve X-Proxy-Key forward öncesi strip edilir; Host/Origin pinned-localhost'a yeniden yazılır (ollamas /mcp origin-allowlist gereği). Path-allowlist (/v1|/api|/mcp) blast-radius'u küçültür."
+    },
+    {
+      "id": "RISK-TUNNEL-027",
+      "category": "environment",
+      "severity": "low",
+      "note": "cloudflared quick-tunnel (vT13) public URL bu Mac'te çözülemeyebilir: sistem DNS resolver 100.100.100.100'e (mesh/MagicDNS koordinatörü, vT3 Headscale) pinli ve *.trycloudflare.com wildcard'ını NXDOMAIN'liyor → `doctor --full` public/api/health=FAIL verir. KÖK-NEDEN ortam (kod değil): cloudflared URL üretir, gateway lokal olarak tam kanıtlı (401/200/404/stream). Çözüm: quick-tunnel için mesh-DNS'i geçici bypass (resolver 1.1.1.1) ya da named-tunnel (kendi hostname, split-DNS). doctor --full 4x retry + dürüst FAIL raporlar, gizlemez (ERR-TUNNEL-003 dersi: canlı-e2e varsayım yapamaz)."
     }
   ],
   "errors": [

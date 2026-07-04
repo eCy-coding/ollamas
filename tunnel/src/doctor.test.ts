@@ -83,3 +83,36 @@ test("doctor: report without proxy section renders unchanged (back-compat)", () 
   });
   assert.ok(!renderDoctorReport(r).includes("proxy gateway"));
 });
+
+// ---------- vT13: public tunnel (doctor --full) ----------
+
+test("doctor: publicTunnel section rendered (reachable through cloudflare edge)", () => {
+  const r = buildDoctorReport({
+    ollamasUpstream: { url: "u", reachable: true, ms: 1 },
+    active: null,
+    connectivity: "online",
+    capable: ["cloudflare"],
+    publicTunnel: { up: true, reachable: true, ms: 210 },
+  });
+  const out = renderDoctorReport(r);
+  assert.match(out, /public tunnel {2,}: UP/);
+  assert.match(out, /public \/api\/health: OK 210ms/);
+});
+
+test("doctor: publicTunnel unreachable = flagged, absent = omitted", () => {
+  const r = buildDoctorReport({
+    ollamasUpstream: { url: "u", reachable: true, ms: 1 },
+    active: null,
+    connectivity: "online",
+    capable: [],
+    publicTunnel: { up: true, reachable: false, ms: null },
+  });
+  assert.match(renderDoctorReport(r), /public \/api\/health: FAIL/);
+  const r2 = buildDoctorReport({
+    ollamasUpstream: { url: "u", reachable: true, ms: 1 },
+    active: null,
+    connectivity: "online",
+    capable: [],
+  });
+  assert.ok(!renderDoctorReport(r2).includes("public tunnel"));
+});

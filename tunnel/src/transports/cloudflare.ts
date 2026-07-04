@@ -92,7 +92,8 @@ export class CloudflareTransport implements Transport {
     this.localPort = opts.localPort;
     this.hasActiveKey = opts.hasActiveKey;
     this.spawnFn = opts.spawnFn ?? ((cmd, args) => spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] }));
-    this.probeFn = opts.probeFn ?? ((base, path) => probeHttps(base, path));
+    // Public edge roundtrip ≫ LAN: cold trycloudflare DNS+edge can take seconds — 10s budget.
+    this.probeFn = opts.probeFn ?? ((base, path) => probeHttps(base, path, { timeoutMs: 10_000 }));
     this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
 

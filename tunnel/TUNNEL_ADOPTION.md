@@ -31,7 +31,8 @@
 | percentile nearest-rank (Last9/OneUptime) | — | (reference) | vT8 | p50/p90 sort→ceil(p/100×n) → bench.ts | ✅ fikir-port |
 | `rogerc/file-stream-rotator` + `Zelgadis87/simple-file-rotator` | ~0.5k | MIT | vT8 | size→.1/.2 ring rotate(file,N) → logrotate.ts | ✅ pattern-port |
 | Tailscale `up` zero-config onboarding | — | (reference) | vT9 | tek-komut idempotent detect→configure→up → setup.ts/`cli setup` | ✅ fikir-port |
-| `fatedier/frp` | 107k | Apache-2.0 | vT6 | reverse TCP tunnel (kendi VPS) — ⚠️ ertelendi (VPS/manuel) | deferred |
+| `cloudflare/cloudflared` | ~25k | **Apache-2.0** | vT13 | quick+named tunnel → public URL, 0 inbound-port, hesapsız — `transports/cloudflare.ts` binary-invoke | ✅ binary-only |
+| `fatedier/frp` | 107k | Apache-2.0 | vT6 | reverse TCP tunnel (kendi VPS) — ⚠️ ertelendi (VPS/manuel; CF quick-tunnel yerini aldı) | deferred |
 | `ekzhang/bore` | 11k | MIT | vT6 | minimal Rust tunnel (alt) | deferred |
 
 ## Notlar
@@ -48,3 +49,4 @@
 - https://github.com/FiloSottile/mkcert (MIT) · https://github.com/caddyserver/caddy (Apache-2.0)
 - https://github.com/juanfont/headscale (BSD-3) · https://github.com/fatedier/frp (Apache-2.0) · https://github.com/ekzhang/bore (MIT)
 - https://github.com/anderspitman/awesome-tunneling
+- https://github.com/cloudflare/cloudflared (Apache-2.0) — SPDX: `Apache-2.0`, binary-invoke only (RISK-TUNNEL-005 ailesi: kaynak kopyalanmaz)
