@@ -333,7 +333,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
             <span className="text-[9px] font-mono text-immersive-text-dim ml-auto">metadata only · keys stay server-side</span>
           </div>
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {Object.entries(doctorReport.providers)
+            {(Object.entries(doctorReport.providers) as Array<[string, DoctorVerdict]>)
               .sort((a, b) => a[0].localeCompare(b[0]))
               .map(([prov, v]) => {
                 const tone = v.status === "connected" ? "bg-emerald-500/15 border-emerald-500/25 text-status-ok"
@@ -359,7 +359,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
             <div className="border-t border-immersive-border pt-2">
               <span className="text-[9px] font-mono text-immersive-text-dim uppercase tracking-wider">Orchestra roles (capability-matched)</span>
               <div className="mt-1 flex flex-col gap-0.5">
-                {Object.entries(doctorReport.roleSuggestions).map(([role, provs]) => (
+                {(Object.entries(doctorReport.roleSuggestions) as Array<[string, string[]]>).map(([role, provs]) => (
                   <div key={role} className="text-[9px] font-mono text-immersive-text-muted">
                     <span className="text-status-accent">{role}</span> ← {provs.length ? provs.join(", ") : "—"}
                   </div>
