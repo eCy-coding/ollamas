@@ -56,6 +56,7 @@ import { validateUpstreamConfig } from "./server/mcp/upstream-guard";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
+import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "./server/key-health";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { registerContractRoutes, poolStatusReport as contractPoolStatus } from "./server/contract";
@@ -501,6 +502,10 @@ async function initializeServer() {
   startWebhookWorker();
   // Periodic OAuth retention sweeper — delete expired codes/tokens (Faz 26).
   startOAuthGc();
+  // Always-running API-key autonomy loop: periodically re-discover/reconnect keys (env+gh) and
+  // sweep recovered cooldowns, so the vaulted key supply self-heals with zero operator action.
+  // Feeds the GET /api/keys/health convergence signal. Opt-widen via KEY_HEALTH_SOURCES.
+  startKeyHealth();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -914,6 +919,14 @@ async function initializeServer() {
     // alerts = providers that HAVE keys and whose whole live pool is saturating → operator action.
     const alerts = Object.entries(pool).filter(([, v]) => v.total > 0 && v.allApproaching).map(([provider, v]) => ({ provider, worstPct: v.worstPct, live: v.live }));
     res.json({ pool, alerts });
+  });
+
+  // Key autonomy convergence signal: per-provider live/cooled/absent + the 0-manual keyless set,
+  // and for any non-live provider its single signup URL (the one manual step). Cheap — served
+  // from the always-running key-health loop's cached snapshot (falls back to a pool+catalog
+  // snapshot before the first tick). NEVER exposes a key value.
+  app.get("/api/keys/health", (_req, res) => {
+    res.json(getKeyHealth() ?? liveCheapSnapshot());
   });
 
   /**
@@ -3080,6 +3093,7 @@ content
     try {
       stopWebhookWorker();
       stopOAuthGc();
+      stopKeyHealth();
       stopSupervisor();
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
       await new Promise<void>((resolve) => server.close(() => resolve()));
