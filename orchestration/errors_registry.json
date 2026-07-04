@@ -193,6 +193,17 @@
       "prevention_rule": "ADOPTIONS lisans hücresi NE adopt edildiğini yansıtmalı: native scripting API/property → 'native' (kaynak kopyası değil), 'GPL→...' gibi karışık etiket yazma. Gate-ihlali çıkarsa önce niyeti doğrula; etiket yanlışsa düzelt, gate'i suppress etme.",
       "test_added": "orchestration/tests/adopt.test.ts (gate GPL+ADOPT→ihlal) + canlı adopt-gate.ts temiz koşu",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-ORCH-006",
+      "ts": "2026-07-04",
+      "version": "vO45",
+      "file": "orchestration/bin/fleet-apply.ts (commitShipped)",
+      "category": "coordination",
+      "severity": "high",
+      "root_cause": "Coklu-sekme paylasilan checkout'ta 'git add -A' baska lane'in eszamanli dirty dosyalarini da stage'ledi — 2x yasanan race. Otonom fleet-apply ayni deseni kullansaydi alt-model commit'leri yabanci-lane WIP'ini yutardi.",
+      "evidence": "vO45 commit 1520285: commitShipped 'git reset' -> YALNIZ o onerinin dosyalarini stage'ler; fleet-apply test 23 yesil; SEYIR_DEFTERI_ORCHESTRATION.md vO45 girdisi.",
+      "prevention": "Otonom/coklu-sekme ortamda commit her zaman targeted 'git add <dosya>' — 'git add -A' YASAK. Otonom committer'lar oneri-scope dosya listesiyle stage'lemeli; commit oncesi git status kontrolu."
     }
   ]
 }

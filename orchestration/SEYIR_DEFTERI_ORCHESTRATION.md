@@ -715,3 +715,28 @@ canlı-doğrulandı (top=stale:(detached) tek-tick'te değişti).
 **GOTCHA (N):** audit-log'un churn-dedup'u sightings BİRİKTİREMEZ (dedup tasarımı gereği aynı hedefin
 tekrar gözlemlerini yutar) — stabilite ölçümü için AYRI dedup'suz ledger şart. Gözlem sayacını asla
 dedup'lu bir loga bağlama.
+
+---
+
+## vO45 — Fleet Autonomy: alt-modeller güvenli-eşdeğer izin (2026-07-04, geriye-dönük governance kaydı)
+
+**Tetik:** Emre "verdiğin izinleri tüm ollamas modellerine ver". DOĞRU EŞLEME: conductor'ın
+`bypassPermissions` izni ONAY-PROMPT'unu kaldırır, kalite kapısını (tsc→vitest→commit) DEĞİL →
+alt-model eşdeğeri = manuel conductor-onayını (elle `fleet-apply` koşma) kaldır, otomatik
+tsc+vitest kapısını AYNEN KORU. Körlemesine `autoApply=true` YAPILMADI — canlı converged-fleet
+kanıtı: 8 öneri, 0 ship-değer (4 gate-RED, 1 orphan, 1 sessiz-veri-kaybı bug, 1 no-op) → repo bozardı.
+
+**Nasıl:** `fleet-apply.ts --commit` commitShipped: `git reset` → YALNIZ o önerinin dosyaları
+(asla `add -A` — 2× yaşanan race kodlandı, bkz. ERR-ORCH-006) → conventional commit (author
+sub-model attribution) + `buildFleetCommitMsg` (lib+test) + autopilot `fleetship` adımı
+(`--apply-all --commit`; marker `.fleet-autoship-enabled` + env `ORCH_FLEET_AUTOSHIP=1` ile açık,
+default KAPALI, 15dk timeout). Guardrail'ler: autoApply=false (worker repo'ya asla yazmaz),
+safe-auto tier-only (review/blocked conductor'a düşer), keep-green/revert-red, tek-marker geri-alınır.
+
+**Kanıt:** commit `1520285` · fleet-apply test 23 · full suite 99 dosya/1186 yeşil · autopilot
+15/15 fleetship default-YOK doğru. Aktivasyon: `touch orchestration/.fleet-autoship-enabled` +
+`ORCH_FLEET_AUTOSHIP=1`.
+
+**Not (governance):** Bu girdi DOD "done-without-governance" lapse kapanışı — vO45 ROADMAP'te
+DONE işaretliydi ama SEYIR kanıt-girdisi eksikti; içerik ROADMAP satırı + commit 1520285'ten
+geriye-dönük derlendi (yeni iş değil, kayıt borcu).
