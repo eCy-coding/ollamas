@@ -692,3 +692,26 @@ izlenebilirlik satırlarıydı. Bu girdi sicili kapatır: her satır amaç + git
 | `tasklist` | kalıcı master task list üretici (docs/MASTER_TASKLIST.md) | `a6f3d54` |
 | `term-exec` | gerçek görünür Terminal.app/iTerm2'de komut koşturucu | `f8471cd` |
 | `think` | THINK loop CLI (sürdürülebilir problem-çözme mekanizması) | `0ddcde3` |
+
+---
+
+## vO44 — Churn-Guard: stable-target dispatch (2026-07-04)
+
+**Tetik (canlı bulgu):** dispatch-log her ~15dk tick'te FARKLI fingerprint skip'liyordu — critic/dod
+COMPLETENESS bulguları her autopilot geçişinde yeniden sıralanıyor (top-requirement churn). 24s bütçe
+penceresi açıldığında zincir O tick'in gelgeç top-hedefine conductor oturumu açıyor → 30dk sonra hedef
+"vanished" auto-complete = boşa oturum + boşa bütçe slotu ("en iyi/en önemli seçimi ÖNCEDEN tespit" ihlali).
+
+**Fix:** `seyir/candidate-log.jsonl` — her tick top-aday `{ts,fingerprint,target}` DEDUP'SUZ append
+(400→200 basit rotasyon) + `isStableCandidate` (pure: ≥3 gözlem, ≥10dk yayılım, 90dk pencere,
+bozuk-satır atla) → `planDispatch` guard'ı (bütçe-SONRA, failure-backoff-ÖNCE): stabil değil →
+skip "churn-guard: hedef stabilite bekliyor"; `candidateStable` default true (geriye uyumlu).
+CLAUDE_DISPATCH.md "🎯 hedef stabilite" satırı eklendi.
+
+**Kanıt:** commit `36efb4a` · dispatch-test 56 · full suite 99 dosya / 1179 test yeşil · canlı 3-tick
+dry-run: candidate-log 3 satır, "3 gözlem/0dk → ⏳ bekliyor" (yayılım şartı doğru çalıştı), churn
+canlı-doğrulandı (top=stale:(detached) tek-tick'te değişti).
+
+**GOTCHA (N):** audit-log'un churn-dedup'u sightings BİRİKTİREMEZ (dedup tasarımı gereği aynı hedefin
+tekrar gözlemlerini yutar) — stabilite ölçümü için AYRI dedup'suz ledger şart. Gözlem sayacını asla
+dedup'lu bir loga bağlama.
