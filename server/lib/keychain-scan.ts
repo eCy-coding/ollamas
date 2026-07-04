@@ -16,11 +16,14 @@ export function buildFindArgs(service: string): string[] {
 }
 
 /** Pure argv builder for a guarded write. `-U` updates an existing item in place instead of
- *  erroring on a duplicate; service+account scope the item. NOTE: the value travels in argv
- *  (briefly visible to `ps` on the local host) — `security` offers no stdin path for
- *  add-generic-password; an honest, accepted trade-off for a personal-Mac hardware vault. */
+ *  erroring on a duplicate; service+account scope the item; `-T /usr/bin/security` pre-trusts
+ *  the READER (the same `security` CLI that later runs `find-generic-password`) so subsequent
+ *  reads are PROMPT-FREE — without this, a launchd daemon reading the migrated master key would
+ *  block on a macOS keychain prompt at every boot and silently fall back to the file key.
+ *  NOTE: the value travels in argv (briefly visible to `ps` on the local host) — `security`
+ *  offers no stdin path for add-generic-password; an honest trade-off for a personal-Mac vault. */
 export function buildAddArgs(service: string, account: string, value: string): string[] {
-  return ["add-generic-password", "-U", "-s", service, "-a", account, "-w", value];
+  return ["add-generic-password", "-U", "-s", service, "-a", account, "-T", SECURITY, "-w", value];
 }
 
 /** Write one generic password (guarded: caller passes only KNOWN service names). Returns

@@ -21,9 +21,9 @@ describe("keychain-scan — pure argv builder", () => {
   it("find-generic-password by service with -w (value never echoed to args beyond -w mode)", () => {
     expect(buildFindArgs("GROQ_API_KEY")).toEqual(["find-generic-password", "-s", "GROQ_API_KEY", "-w"]);
   });
-  it("add-generic-password uses -U (update-in-place) + scoped service/account", () => {
+  it("add-generic-password uses -U + scoped service/account + -T reader-trust (prompt-free reads)", () => {
     expect(buildAddArgs("OLLAMAS_MASTER_KEY", "ollamas", "v")).toEqual([
-      "add-generic-password", "-U", "-s", "OLLAMAS_MASTER_KEY", "-a", "ollamas", "-w", "v",
+      "add-generic-password", "-U", "-s", "OLLAMAS_MASTER_KEY", "-a", "ollamas", "-T", "/usr/bin/security", "-w", "v",
     ]);
   });
 });
