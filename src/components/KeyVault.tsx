@@ -123,12 +123,21 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
         try {
           const t = JSON.parse(ev.data) as { cloudProviders?: Array<{ name: string; total: number; live: number; worstPct?: number; allApproaching?: boolean; keyless?: boolean }>; keyAlerts?: typeof alerts };
           if (Array.isArray(t.cloudProviders)) {
-            const next: Record<string, PoolEntry> = {};
-            for (const c of t.cloudProviders) {
-              if (c.keyless) continue; // gemini-cli has no key pool
-              next[c.name] = { total: c.total, live: c.live, worstPct: c.worstPct ?? 0, allApproaching: !!c.allApproaching };
-            }
-            setPool(next);
+            // MERGE the live burn-counts into the REST-loaded pool — never REPLACE it. The SSE
+            // frame only carries {total,live,worstPct}; replacing would strip the rich metadata
+            // (envKey/signupUrl/defaultModel/capabilities) that loadPool() fetched, killing the
+            // Key↗ links + row descriptions a couple seconds after paint. Preserve prior entries.
+            setPool((prev) => {
+              const merged: Record<string, PoolEntry> = { ...prev };
+              for (const c of t.cloudProviders!) {
+                if (c.keyless) continue; // gemini-cli has no key pool
+                merged[c.name] = {
+                  ...prev[c.name],
+                  total: c.total, live: c.live, worstPct: c.worstPct ?? 0, allApproaching: !!c.allApproaching,
+                };
+              }
+              return merged;
+            });
           }
           if (Array.isArray(t.keyAlerts)) setAlerts(t.keyAlerts);
         } catch { /* ignore malformed frame — poll fallback covers it */ }
@@ -279,6 +288,10 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     { id: "openai", label: "OpenAI GPT", placeholder: "Key: OPENAI_API_KEY", desc: "Native GPT chat completions access" },
     { id: "openrouter", label: "OpenRouter.ai", placeholder: "Key: OPENROUTER_API_KEY", desc: "Aggregated cloud providers; filterable to FREE models" },
     { id: "ollama-cloud", label: "Ollama Cloud", placeholder: "Key: OLLAMA_CLOUD_KEY", desc: "ollama.com cloud models — guided: Key ↗ opens ollama.com/settings/keys" },
+    // Cloudflare is a guaranteed row (not pool-derived) so its onboarding form is always visible
+    // even before/independent of the /api/keys/pool fetch — account_id is pinned server-side, so
+    // pasting the Workers-AI token here is the only step. Kept in baseIds → no catalog-row dup.
+    { id: "cloudflare", label: "Cloudflare Workers AI", placeholder: "Key: CLOUDFLARE_API_TOKEN", desc: "Workers AI — free ~10K neurons/day · paste the Workers-AI token (account_id auto-resolved)" },
   ];
   const baseIds = new Set(BASE_ROWS.map((r) => r.id));
   const catalogRows = (Object.entries(pool) as Array<[string, PoolEntry]>)
