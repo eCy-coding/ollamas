@@ -407,6 +407,7 @@ async function cmdSetup(): Promise<void> {
     wireguard: existsSync(join(KEYS_DIR, "wg0.conf")),
     lanTls: existsSync(join(KEYS_DIR, "Caddyfile")),
     mesh: existsSync(join(KEYS_DIR, "headscale.yaml")),
+    proxy: existsSync(PROXY_VAULT_PATH()),
   };
   const steps = planSetup(caps, existing);
   console.log(renderSetupPlan(steps));
@@ -417,6 +418,15 @@ async function cmdSetup(): Promise<void> {
       if (kind === "wireguard") await cmdConfig();
       else if (kind === "lan-tls") await cmdTls();
       else if (kind === "mesh") await cmdMesh();
+      else if (kind === "proxy") {
+        // vT12: first-run vault + one default key (printed ONCE — RISK-TUNNEL-025).
+        const vault = await loadProxyVault();
+        const { vault: v2, raw } = addKey(vault, "default", randomBytes(16).toString("hex"));
+        saveProxyVault(v2);
+        console.log(`  proxy: default pxy_ key created — SHOWN ONCE, store it now:`);
+        console.log(`  ${raw}`);
+        console.log(`  start the gateway: \`tunnel proxy up\` (or \`tunnel proxy daemon install\`)`);
+      }
     } catch (e) {
       console.log(`  ${kind} setup failed (skipped): ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -459,11 +469,37 @@ async function cmdDoctor(): Promise<void> {
   const capable = (await detectCapable(transports)).map((t) => t.name);
   const connectivity = classify({ lan: sw.activeName() !== null, internet: await internetReachable() });
 
+  // vT12: gateway phase — only when a proxy vault exists (configured). Live checks:
+  // (a) unauthenticated non-health request must 401; (b) keyed /api/health must 200.
+  let proxy: import("./doctor.ts").ProxyDoctor | undefined;
+  if (existsSync(PROXY_VAULT_PATH())) {
+    // Gateway may serve https (mkcert, system-trusted CA) or plain http (--no-tls / behind
+    // cloudflared). Try both schemes with the same live checks — first responder wins.
+    let running = false;
+    let authRejects = false;
+    let authOkMs: number | null = null;
+    for (const base of ["https://localhost:8443", "http://127.0.0.1:8443"]) {
+      try {
+        const r = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(2000) });
+        running = true;
+        authRejects = r.status === 401; // no key sent → MUST be 401 (RISK-TUNNEL-024)
+        const t0 = performance.now();
+        const h = await fetch(`${base}${HEALTH_PATH}`, { signal: AbortSignal.timeout(2000) });
+        if (h.ok) authOkMs = performance.now() - t0;
+        break;
+      } catch {
+        // scheme not answering — try the next
+      }
+    }
+    proxy = { running, authRejects, authOkMs };
+  }
+
   const report = buildDoctorReport({
     ollamasUpstream: { url: `${upstreamBase}${HEALTH_PATH}`, reachable, ms },
     active: sw.activeName(),
     connectivity,
     capable,
+    ...(proxy ? { proxy } : {}),
   });
   console.log(json ? JSON.stringify(report, null, 2) : renderDoctorReport(report));
   process.exitCode = report.ok ? 0 : 1;

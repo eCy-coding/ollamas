@@ -5,11 +5,18 @@
 
 import type { Connectivity } from "./connectivity.ts";
 
+export interface ProxyDoctor {
+  running: boolean; // gateway process answering on its port
+  authRejects: boolean; // unauthenticated non-health request → 401 (RISK-TUNNEL-024 live check)
+  authOkMs: number | null; // keyed /api/health roundtrip through the gateway, null if not run
+}
+
 export interface DoctorReport {
   ollamasUpstream: { url: string; reachable: boolean; ms: number };
   active: string | null; // selected transport, if any
   connectivity: Connectivity;
   capable: string[]; // transports whose binary is installed
+  proxy?: ProxyDoctor; // vT12 gateway phase (absent when gateway not configured)
   ok: boolean; // true iff ollamas upstream is reachable
 }
 
@@ -26,6 +33,13 @@ export function renderDoctorReport(r: DoctorReport): string {
     `active transport : ${r.active ?? "none"}`,
     `connectivity     : ${r.connectivity}`,
     `capable transport: ${r.capable.length ? r.capable.join(", ") : "none (install wg-quick/caddy+mkcert/headscale)"}`,
+    ...(r.proxy
+      ? [
+          `proxy gateway    : ${r.proxy.running ? "UP" : "DOWN"}`,
+          `  401 without key: ${r.proxy.authRejects ? "OK" : "FAIL — gateway is OPEN, fix before exposing (RISK-TUNNEL-024)"}`,
+          `  keyed ${"/api/health"}: ${r.proxy.authOkMs === null ? "not run" : `OK ${r.proxy.authOkMs.toFixed(0)}ms`}`,
+        ]
+      : []),
     "",
     r.ok
       ? "✓ ollamas is reachable — tunnels can forward to it."
