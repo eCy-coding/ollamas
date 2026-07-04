@@ -18,8 +18,9 @@
 | **vT11** | **Konsolidasyon Adaptasyonu + Canlı E2E** | lane `ollamas-tunnel-wt`→`ollamas/tunnel` (integration/all-lanes), 10-dosya path-fix + whoami branch-guard + ERR-TUNNEL-004; **entegre-tree'de canlı doctor OK** | — | ✅ DONE |
 | **vT12** | **Proxy Gateway ("use everywhere" core)** | zero-dep streaming reverse-proxy: `proxy.ts` pure core (route/auth/rewrite/vault) + `proxy-server.ts` IO shell + `ratelimit.ts` token-bucket; pxy_ auth (timing-safe) + secret-free access-log + path-allowlist; `/v1`→ollama:11434 (OpenAI-compat), `/api`+`/mcp`→ollamas:3000 (Host/Origin rewrite); `cli proxy up/down/status/key/daemon` + setup/doctor wiring; **T0-kararı: mesh + Cloudflare ikisi birden** | node built-ins only | ✅ DONE |
 | **vT13** | **Cloudflare REVERSE transport** | `transports/cloudflare.ts` (Transport, PRIORITY.REVERSE=30, injected exec): quick-tunnel (hesapsız, ephemeral trycloudflare URL) + named-tunnel (ops., stabil host); **auth-gate: aktif pxy_ key yoksa up() reddeder (RISK-TUNNEL-024)**; selectAuto/autopilot/status/bench oto-entegre; doctor --full public e2e | cloudflared(Apache-2.0) binary-only | ✅ DONE |
-| vT14 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
-| vT14+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
+| **vT14** | **Zero-Touch Everywhere (0-manuel tamamlama)** | 5 boşluk kapatıldı: dead-gateway guard (CloudflareTransport gatewayHealthy) + tek-komut both-daemon (`setup --daemon`→autopilot+proxy agent) + RISK-TUNNEL-027 DNS İKİ-KATLI FİX (headscale global-NS kök-neden + probeHttps Resolver-lookup belt) + status gateway/public-URL yüzeyi + ephemeral-URL persist (gateway-state.ts urlSink) | node built-ins only | ✅ DONE |
+| vT15 | Ecosystem-2 | QR onboarding (`tunnel qr`) + iOS Shortcut `status --json` tüketimi + integrations-gateway endpoint handoff doc | — | parked |
+| vT15+ | Connectivity-routing + FRP/Bore reverse | reachVia routing + FRP/Bore. **⚠️ PARKED**: VPS+dış-hesap+manuel ihlal; CF quick-tunnel (vT13) hesapsız reverse ihtiyacını karşılar | FRP(Apache,107k)/Bore(MIT,11k) | parked |
 
 ---
 
@@ -241,9 +242,37 @@
 - **Kanıt:** `node --test` **219/219 GREEN** (199→219), tsc 0. VERSION 13.0.0. cloudflared SPDX `Apache-2.0`
   binary-only (TUNNEL_ADOPTION). `recipes/cloudflare-tunnel.md` (quick + named, dürüst tek-manuel-adım).
 
-## vT14 — NEXT (parked, precompute) — Ecosystem-2
+## vT14 — DONE (kanıt) — Zero-Touch Everywhere
+
+> Kullanıcı "0-manuel eksik-tespit + uçtan-uca tamamla" dedi. Denetim shipped-gateway'de "shipped"
+> ile "0-manuel her yerde çalışır" arasında **5 somut boşluk** buldu — hepsi kapatıldı.
+
+- **Boşluk-1 dead-gateway (kritik):** `CloudflareTransport` `gatewayHealthy?` precondition — public tünel
+  ölü :8443 gateway'e işaret ederse `up()` REDDEDER (canlı kanıt: "REFUSED: gateway 127.0.0.1:8443 not
+  answering"). Sıra: key-gate → gateway-gate → spawn. 4 test.
+- **Boşluk-2 iki-daemon:** `setup.daemonLabelsForSetup` (pure) + `cmdSetup --daemon` artık autopilot AND
+  proxy LaunchAgent'ı TEK komutla kurar (vault varsa). Canlı: `proxy daemon install` → `launchctl list`
+  `com.ollamas.tunnel.proxy` GÖSTERDİ → uninstall temiz. 3 test.
+- **Boşluk-3 RISK-TUNNEL-027 DNS İKİ-KATLI FİX:** (a) KÖK-NEDEN `renderHeadscaleConfig` →
+  `dns.nameservers.global: [1.1.1.1,1.0.0.1]` (MagicDNS forward); (b) BELT `probeHttps({lookup})` =
+  node:dns `Resolver` instance (1.1.1.1). **CANLI ERR-TUNNEL-005 yakaladı**: node:https lookup'ı `{all:true}`
+  ile çağırır, ARRAY bekler → ilk impl tek-string → "Invalid IP address: undefined" 56ms fast-fail; fake-IO
+  test yakalamadı, CANLI koşu yakaladı (ERR-TUNNEL-003 dersi tekrar). FIX: `options.all` onurlandır. 6 test.
+- **Boşluk-4 status yüzeyi:** `StatusReport.gateway?` (pure passthrough) + `renderStatusTable` → `gateway: UP
+  · public: https://<slug>.trycloudflare.com`. 4 test.
+- **Boşluk-5 ephemeral URL persist:** `gateway-state.ts` (write/read/render, secret-free, graceful-null) +
+  `CloudflareTransport.urlSink` + `cmdProxyUp`/`doctor --full` yazar, `cmdStatus` okur. 5 test.
+- **CANLI KANIT (gerçek ollamas + cloudflared 2026.2.0):** `doctor --full` → **`public /api/health: OK 413ms`**
+  (önce FAIL — belt trycloudflare'i 1.1.1.1'den çözdü); `status` → `gateway: UP · public: <url>`;
+  dead-gateway guard reddetti; both-daemon launchctl'de göründü.
+- **Kanıt:** `node --test` **242/242 GREEN** (219→242), tsc 0. VERSION 14.0.0. RISK-TUNNEL-027 RESOLVED +
+  ERR-TUNNEL-005 kayıtlı. **Tek-komut 0-manuel:** `tunnel setup --daemon` → gateway + transport + DNS + public
+  URL hepsi always-on. Kalan dürüst-manuel: named-tunnel `cloudflared login` (1x), iPhone mkcert-CA trust (1x),
+  ephemeral-URL rotasyonu (status'ta yüzeyde, gizli değil).
+
+## vT15 — NEXT (parked, precompute) — Ecosystem-2
 
 1. `src/qr.ts` PURE QR (ANSI/SVG) — gateway URL + pxy_ key tek-tarama iPhone onboarding; `cli qr [endpoint]`.
-2. iOS Shortcut: `status --json` → aktif endpoint Shortcut'a besle.
-3. named-tunnel otomasyonu (config.yml render → `cloudflared tunnel run` daemon wiring).
-4. connectivity-routing (reachVia: hangi ağda hangi transport) — CF quick-tunnel geldiğinden artık değerli.
+2. iOS Shortcut: `status --json` → aktif endpoint (+ public URL) Shortcut'a besle.
+3. named-tunnel otomasyonu (config.yml render → `cloudflared tunnel run` daemon wiring, stabil URL).
+4. connectivity-routing (reachVia: hangi ağda hangi transport).

@@ -201,8 +201,8 @@
     {
       "id": "RISK-TUNNEL-027",
       "category": "environment",
-      "severity": "low",
-      "note": "cloudflared quick-tunnel (vT13) public URL bu Mac'te çözülemeyebilir: sistem DNS resolver 100.100.100.100'e (mesh/MagicDNS koordinatörü, vT3 Headscale) pinli ve *.trycloudflare.com wildcard'ını NXDOMAIN'liyor → `doctor --full` public/api/health=FAIL verir. KÖK-NEDEN ortam (kod değil): cloudflared URL üretir, gateway lokal olarak tam kanıtlı (401/200/404/stream). Çözüm: quick-tunnel için mesh-DNS'i geçici bypass (resolver 1.1.1.1) ya da named-tunnel (kendi hostname, split-DNS). doctor --full 4x retry + dürüst FAIL raporlar, gizlemez (ERR-TUNNEL-003 dersi: canlı-e2e varsayım yapamaz)."
+      "severity": "resolved",
+      "note": "[RESOLVED vT14] cloudflared quick-tunnel URL çözülemiyordu: sistem DNS mesh MagicDNS'e (100.100.100.100) pinli, *.trycloudflare.com NXDOMAIN. İKİ-KATLI FİX: (1) KÖK-NEDEN headscale config `dns.nameservers.global: [1.1.1.1, 1.0.0.1]` (renderHeadscaleConfig) → MagicDNS bilinmeyen domainleri forward eder; (2) BELT probeHttps `lookup` opsiyonu = node:dns Resolver instance (1.1.1.1) → doctor --full mesh-dışı Mac'te de çözer. KANIT: doctor --full public /api/health OK 413ms (önce FAIL). Global dns.setServers() YANLIŞ (lookup'ı etkilemez), Resolver-instance izole doğru yol."
     }
   ],
   "errors": [
@@ -261,6 +261,12 @@
       "prevention_rule": "Yol-referanslarını mümkünse repo-göreli tut. Konsolidasyon/taşımada absolute-path + branch-sabit referansları TOPLU güncelle (grep -rl doğrula). zsh gotcha: for f in $FILES word-split YAPMAZ → xargs/while-read kullan.",
       "test_added": "grep -rl ollamas-tunnel-wt tunnel/ == boş; canlı doctor + whoami integration/all-lanes",
       "recurrence_count": 0
+    },
+    {
+      "id": "ERR-TUNNEL-005",
+      "category": "dns",
+      "note": "resolverLookup(lookup) ilk implementasyon tek-string döndürdü; node:https lookup'ı `{all:true}` ile çağırır ve ARRAY [{address,family}] bekler → canlı hata 'Invalid IP address: undefined', probe 56ms hızlı-fail. Unit-test (fake requestImpl) `all` geçmediği için yakalamadı — CANLI koşu yakaladı (ERR-TUNNEL-003 dersi tekrar: fake-IO gerçek-protokol varsayamaz). FIX: options.all onurlandır → wantsAll ise addresses.map(a=>({address:a,family:4})), değilse addresses[0]. + 2 test (all=true array + all-error empty-array).",
+      "fix": "resolverLookup honors options.all → array vs single; live-e2e mandatory for DNS/protocol code"
     }
   ]
 }
