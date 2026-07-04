@@ -25,6 +25,7 @@ interface KeyHealthSnapshot {
   updatedAt: number;
   degraded: boolean;
   lastError?: string;
+  allCloudCooled: boolean;
 }
 
 const STATUS_TONE: Record<ProviderHealth["status"], string> = {
@@ -64,6 +65,11 @@ export function KeyHealthPanel(): React.ReactElement {
 
       {snap?.degraded && (
         <div className="text-[10px] font-mono text-status-warn mb-2">⚠ heal loop degraded — snapshot stale{snap.lastError ? `: ${snap.lastError}` : ""}</div>
+      )}
+      {snap?.allCloudCooled && (
+        <div className="text-[10px] font-mono text-status-err bg-red-500/10 border border-red-500/20 rounded px-2 py-1 mb-2">
+          ⛑ all cloud keys cooled — serving from the keyless + local-Ollama terminal tier (auto-recovers as cooldowns expire)
+        </div>
       )}
 
       {!snap ? (

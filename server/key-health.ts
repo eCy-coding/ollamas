@@ -41,6 +41,9 @@ export interface KeyHealthSnapshot {
   /** True when the last refresh failed (circuit open) — snapshot is stale but served. */
   degraded: boolean;
   lastError?: string;
+  /** Autonomous escalation signal: every keyed cloud provider is cooled/invalid/absent, so the
+   *  system is serving from the keyless + local-Ollama terminal tier only. Surfaced in the cockpit. */
+  allCloudCooled: boolean;
 }
 
 const LIVE_VERDICTS: ReadonlySet<CandidateStatus> = new Set([
@@ -114,6 +117,11 @@ export function cheapHealthFromPool(
 function finalize(rows: ProviderHealth[], nowMs: number): KeyHealthSnapshot {
   rows.sort((a, b) => a.provider.localeCompare(b.provider));
   const liveRows = rows.filter((p) => p.status === "live");
+  // Escalation: a keyed provider is one that needs a pooled key (not keyless). If at least one
+  // keyed provider exists and NONE are live, every cloud key is cooled/invalid → the system is
+  // riding the keyless + local-Ollama terminal tier alone.
+  const keyed = rows.filter((p) => !p.keyless);
+  const allCloudCooled = keyed.length > 0 && keyed.every((p) => p.status !== "live");
   return {
     providers: rows,
     total: rows.length,
@@ -123,7 +131,23 @@ function finalize(rows: ProviderHealth[], nowMs: number): KeyHealthSnapshot {
     keylessLive: liveRows.filter((p) => p.keyless).map((p) => p.provider),
     updatedAt: nowMs,
     degraded: false,
+    allCloudCooled,
   };
+}
+
+/** Pure: when should the next heal tick fire? If a cooldown will expire before the steady-state
+ *  interval, schedule the sweep right after it (min-floor guards against a hot loop) so a recovered
+ *  key rejoins the snapshot within seconds; otherwise use the steady-state base. */
+export function nextTickDelay(
+  nextExpiryMs: number | null,
+  baseMs: number,
+  nowMs: number,
+  minFloorMs = 1_000,
+): number {
+  if (nextExpiryMs === null) return baseMs;
+  const untilExpiry = nextExpiryMs - nowMs + 250; // small ε so the cooldown is actually past
+  if (untilExpiry >= baseMs) return baseMs;
+  return Math.max(minFloorMs, untilExpiry);
 }
 
 /** Pure: circuit-breaker backoff — consecutive failures widen the delay (capped). Mirrors the
@@ -184,7 +208,9 @@ export function startKeyHealth(): void {
     try {
       await tick();
       consecutiveFailures = 0;
-      schedule(base);
+      // Expiry-aware: if a key's cooldown lapses before the steady-state interval, re-sweep right
+      // after it so the recovered key rejoins the snapshot in seconds, not up to `base` later.
+      schedule(nextTickDelay(ProviderRouter.nextCooldownExpiry(), base, Date.now()));
     } catch (e: any) {
       consecutiveFailures++;
       if (snapshot) snapshot = { ...snapshot, degraded: true, lastError: String(e?.message ?? e).slice(0, 120) };

@@ -638,6 +638,18 @@ export class ProviderRouter {
   }
   /** Test/observability helper — number of retained cooldown entries. */
   public static cooldownSize(): number { return this.keyCooldown.size; }
+  /** Earliest cooldown-expiry timestamp (ms) across all cooled keys, or null if none. Lets the
+   *  key-health loop schedule its next sweep right after a key recovers instead of waiting the
+   *  full steady-state interval — a recovered key rejoins the health snapshot within seconds. */
+  public static nextCooldownExpiry(nowMs: number = Date.now()): number | null {
+    this.ensureHydrated();
+    let min: number | null = null;
+    for (const exp of this.keyCooldown.values()) {
+      if (exp <= nowMs) continue; // already expired — swept on next access
+      if (min === null || exp < min) min = exp;
+    }
+    return min;
+  }
 
   // ── Key-usage restart persistence (Faz 4) — same config vault as the cooldowns. ─────────
   // Buckets are keyId-only (never raw keys). Saves are debounced (5s) and best-effort: a
