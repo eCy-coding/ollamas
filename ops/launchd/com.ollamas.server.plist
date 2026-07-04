@@ -47,6 +47,10 @@
     <string>/Users/emrecnyngmail.com</string>
     <key>PORT</key>
     <string>3000</string>
+    <!-- To enable the Secure-Enclave hardware vault, FIRST seed the keychain item (see
+         ops/launchd/enable-hardware-vault.sh), THEN uncomment the next two lines and reload. -->
+    <!-- <key>OLLAMAS_MASTER_KEY_KEYCHAIN</key>
+    <string>1</string> -->
   </dict>
 </dict>
 </plist>
