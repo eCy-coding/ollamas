@@ -10,6 +10,7 @@
  * Exit: high gap varsa --strict → 1.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditAll, scoreCompleteness, type Gap } from "./lib/critic";
@@ -68,7 +69,20 @@ function main(): void {
 
   const roadmapMd = read(join(ORCH_DIR, "ROADMAP_ORCHESTRATION.md"));
 
-  const allGaps: Gap[] = auditAll({ roadmapMd, toolNames, artifactNames, allSourceText, exportsByFile, testText, tools });
+  // Kanıt kanalı 2: "Evidence" satırlarındaki hash adaylarını git ile doğrula (fail-closed: git yoksa boş).
+  const verifiedHashes: string[] = [];
+  try {
+    const candidates = new Set<string>();
+    for (const line of roadmapMd.split("\n")) {
+      if (!/evidence/i.test(line)) continue;
+      for (const h of line.toLowerCase().match(/\b[0-9a-f]{7,40}\b/g) || []) candidates.add(h);
+    }
+    for (const h of [...candidates].slice(0, 50)) { // patolojik roadmap'e karşı üst sınır
+      try { execSync(`git cat-file -e ${h}^{commit}`, { cwd: ORCH_DIR, stdio: "ignore" }); verifiedHashes.push(h); } catch { /* doğrulanamadı → kanıt sayılmaz */ }
+    }
+  } catch { verifiedHashes.length = 0; }
+
+  const allGaps: Gap[] = auditAll({ roadmapMd, toolNames, artifactNames, allSourceText, exportsByFile, testText, tools, verifiedHashes });
 
   // vO14 detector precision: IO-wrapper + false-pos duplication suppress (gerekçeli, silent-değil).
   const findingKind = (g: Gap) => `crit:${g.kind}:${g.target}`;

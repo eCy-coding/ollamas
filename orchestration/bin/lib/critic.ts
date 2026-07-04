@@ -29,14 +29,31 @@ function hasEvidence(v: VersionEntry, names: string[]): boolean {
 }
 
 /**
- * Roadmap-vs-gerçek: DONE ama kanıt-yok + yapıldı-görünüyor-ama-planned drift.
- * names = tool + artefakt adları (kanıt havuzu).
+ * Versiyonun roadmap satır(lar)ında "Evidence" işaretiyle atıf edilen commit hash'leri
+ * (7-40 hex, küçük harf, dedupe). Evidence işareti yoksa [] (entegrasyon-milestone kanıt kanalı 2).
  */
-export function auditRoadmapSync(roadmapMd: string, names: string[]): Gap[] {
+export function citedHashes(roadmapMd: string, ver: string): string[] {
+  const esc = ver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const lineRe = new RegExp(`^(?:#{1,4}\\s*${esc}\\b|\\|\\s*\\*{0,2}${esc}\\*{0,2}\\s*\\|)`, "i");
+  const out = new Set<string>();
+  for (const line of roadmapMd.split("\n")) {
+    if (!lineRe.test(line.trim()) || !/evidence/i.test(line)) continue;
+    for (const h of line.toLowerCase().match(/\b[0-9a-f]{7,40}\b/g) || []) out.add(h);
+  }
+  return [...out];
+}
+
+/**
+ * Roadmap-vs-gerçek: DONE ama kanıt-yok + yapıldı-görünüyor-ama-planned drift.
+ * names = tool + artefakt adları (kanıt havuzu 1); verifiedHashes = git-doğrulanmış
+ * commit hash'leri (kanıt havuzu 2, yalnız DONE branch'i — planned drift keyword-only kalır).
+ */
+export function auditRoadmapSync(roadmapMd: string, names: string[], verifiedHashes: string[] = []): Gap[] {
   const out: Gap[] = [];
   for (const v of parseVersions(roadmapMd)) {
     const evid = hasEvidence(v, names);
-    if (v.status === "done" && !evid) {
+    const hashEvid = citedHashes(roadmapMd, v.ver).some((h) => verifiedHashes.includes(h));
+    if (v.status === "done" && !evid && !hashEvid) {
       out.push({ kind: "done-no-evidence", severity: "med", target: v.ver, detail: `${v.ver} (${v.title}) DONE ama eşleşen araç/artefakt yok`, action: `${v.ver} kanıtını doğrula ya da DONE'ı geri al` });
     }
     if (v.status === "planned" && evid) {
@@ -111,9 +128,10 @@ export function auditAll(input: {
   roadmapMd: string; toolNames: string[]; artifactNames: string[];
   allSourceText: string; exportsByFile: { file: string; fns: string[] }[];
   testText: string; tools: { name: string; purpose: string }[];
+  verifiedHashes?: string[];
 }): Gap[] {
   return [
-    ...auditRoadmapSync(input.roadmapMd, [...input.toolNames, ...input.artifactNames]),
+    ...auditRoadmapSync(input.roadmapMd, [...input.toolNames, ...input.artifactNames], input.verifiedHashes ?? []),
     ...auditOrphans(input.artifactNames, input.allSourceText),
     ...auditCoverage(input.exportsByFile, input.testText),
     ...auditDuplication(input.tools),

@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/chrome-probe.ts — hand every model the SAME task ("open Google Chrome") one-by-one
- * (sequential; single-GPU truth) and record which models are actually capable of it.
+ * orchestration/bin/chrome-probe.ts — CAPABILITY verdict probe: can a local model actually OPEN Google
+ * Chrome by driving a shell tool? Dispatches the open-Chrome job to every model sequentially (single-GPU
+ * truth) and records which are capable.
  *
  * For each model it invokes scripts/agent-dispatch.mjs (reuse — POST /api/agent/chat, SSE, --json report),
  * then classifies the run (chrome-probe lib) into a capability verdict. Writes CHROME_PROBE.md/.json.

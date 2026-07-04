@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  keywords, auditRoadmapSync, auditOrphans, auditCoverage, auditDuplication, scoreCompleteness, auditAll,
+  keywords, citedHashes, auditRoadmapSync, auditOrphans, auditCoverage, auditDuplication, scoreCompleteness, auditAll,
 } from "../bin/lib/critic";
 
 describe("keywords", () => {
@@ -31,6 +31,20 @@ describe("auditRoadmapSync — roadmap-vs-gerçek", () => {
   it("DONE + kanıt-yok → done-no-evidence", () => {
     const gaps = auditRoadmapSync("| **vO5** | ✅ DONE | hayalet özellik |", ["status.ts"]);
     expect(gaps.find((g) => g.kind === "done-no-evidence")?.target).toBe("vO5");
+  });
+  it("DONE + Evidence hash git-doğrulanmış → temiz (kanıt kanalı 2)", () => {
+    const row = "| **vO16** | ✅ DONE | hayalet entegrasyon — **Evidence:** commit `abc1234def` |";
+    const gaps = auditRoadmapSync(row, ["status.ts"], ["abc1234def"]);
+    expect(gaps.find((g) => g.kind === "done-no-evidence")).toBeUndefined();
+  });
+  it("DONE + Evidence hash doğrulanMAMIŞ → done-no-evidence kalır", () => {
+    const row = "| **vO16** | ✅ DONE | hayalet entegrasyon — **Evidence:** commit `abc1234def` |";
+    const gaps = auditRoadmapSync(row, ["status.ts"], []);
+    expect(gaps.find((g) => g.kind === "done-no-evidence")?.target).toBe("vO16");
+  });
+  it("citedHashes: Evidence işareti yoksa hex-benzeri token olsa da []", () => {
+    const row = "| **vO16** | ✅ DONE | hayalet entegrasyon `abc1234def` |";
+    expect(citedHashes(row, "vO16")).toEqual([]);
   });
 });
 

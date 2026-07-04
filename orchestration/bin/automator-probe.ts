@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/automator-probe.ts — hand every model the SAME task one-by-one (sequential; single-GPU
- * truth): author macOS Automator-compatible artifacts (Quick Action / Run Shell Script / AppleScript /
- * shell) that SUPPORT the ollamas project, into its own ~/Desktop/ollamas-automator/<model>/ directory.
- * Then track WHAT EACH MODEL PRODUCED by scanning its directory. Writes AUTOMATOR_PROBE.md/.json.
+ * orchestration/bin/automator-probe.ts — ARTIFACT tracker probe: WHAT did each model PRODUCE when asked
+ * to author macOS Automator-compatible artifacts (Quick Action / Run Shell Script / AppleScript / shell)
+ * supporting ollamas, into its own ~/Desktop/ollamas-automator/<model>/ dir? Tracked by directory scan
+ * (each model gets the same task sequentially; single-GPU truth). Writes AUTOMATOR_PROBE.md/.json.
  *
  * Reuses scripts/agent-dispatch.mjs (POST /api/agent/chat) + the chrome-probe lib (providerFor, types).
  * Sibling of chrome-probe (that one = "can it open Chrome"; this one = "what did it produce").

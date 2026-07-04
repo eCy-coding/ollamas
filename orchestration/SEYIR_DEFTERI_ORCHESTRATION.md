@@ -565,3 +565,19 @@ Kullanıcı 1-kez → 0-manuel sürekli-operasyon AKTİF (launchd periyodik + Se
 
 **Next precomputed (→vO16):** ops-tool (worker WIP `ops.ts` RED — summarizeOps test) konsolide; sürekli-operasyon
 metrik-trend (AUTOPILOT.md run-to-run readiness delta); RED:backend gibi lane-bulgularını signal.ts ile lane'e route.
+
+---
+
+## 2026-07-03 — crit:done-no-evidence:vO16 DURABLE FIX (kanıt kanalı 2: cited+verified commit hash)
+
+Seyir:451 tespitinin ertelenen durable fix'i ship edildi: critic artık roadmap satırında `/evidence/i`
+işaretiyle atıf edilen commit hash'lerini (7-40 hex) `git cat-file -e <h>^{commit}` ile DOĞRULAYIP
+kanıt sayar (`lib/critic.ts citedHashes` + `auditRoadmapSync(verifiedHashes)`; fail-closed: git yok /
+hash uydurma → kanıt sayılmaz, fabrikasyon koruması test'li). vO16 gibi tool-üretmeyen integration
+milestone'lar artık FP üretmez; DONE geri alınmadı (kanıt gerçek: `f9ed527`, `f777c22` git'te var).
+**Kanıt:** critic canlı → "DONE ama kanıt-yok (0)", skor 58→64; autopilot 15/15 → REQUIREMENTS.json'da
+`crit:done-no-evidence:vO16` YOK; vitest orchestration 971/971 yeşil (19/19 critic, +3 yeni case).
+GOTCHA (N): sandbox içinde `tsx` IPC unix-socket `listen EPERM` (allowUnixSockets boş) → pipeline
+komutları sandbox-dışı koşuldu. GOTCHA (E): `git stash` sandbox'ta `.claude/settings.json` unlink-EPERM
+ile YARIM kalır (index reset fail + pop abort) — kurtarma: `git checkout stash@{0} -- <settings.json
+hariç tüm dosyalar>` + içerik-diff doğrula + drop; bu repo'da stash KULLANMA.
