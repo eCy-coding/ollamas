@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/oracle-serve.ts — kalıcı Doğruluk Oracle daemon'u.
+ * orchestration/bin/oracle-serve.ts — sıcak-cache verdict daemon'u: Unix socket NDJSON servisi, tsx cold-start'ı ortadan kaldırır.
  *
  * Uzun-ömürlü süreç; Unix domain socket üzerinde NDJSON (satır başına bir JSON istek → bir JSON yanıt).
  * Yüklü modülü + memo cache'i SICAK tutar → her çağrıda tsx+modül cold-start (~1-2s) ORTADAN KALKAR.

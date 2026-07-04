@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/oracle.ts — Doğruluk Oracle'ı CLI.
+ * orchestration/bin/oracle.ts — önermeyi kanıtla yargılayan tek-atım CLI: TRUE/FALSE/UNDECIDABLE (LLM'siz yer-gerçeği).
  *
  * Bir önermeyi/kodu deterministik olarak TRUE / FALSE / UNDECIDABLE'a bağlar; KANIT yazdırır.
  * LLM kullanmaz — yer-gerçeğini hesaplar/çalıştırır. Bkz. orchestration/oracle/index.ts.

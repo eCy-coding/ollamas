@@ -14,6 +14,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   auditTests, auditUncommitted, auditMarkers, auditConcurrent, auditGovernance, auditRoadmapCoherence, scoreDoD,
+  realMarkerCount,
   type Lapse,
 } from "./lib/dod";
 import { parseVersions } from "./plan-next";
@@ -48,11 +49,10 @@ function main(): void {
   const porcelain = git(["status", "--porcelain"]).split("\n").filter(Boolean);
   const lapsesR3 = auditUncommitted(porcelain);
 
-  // R5: markerlar.
+  // R5: markerlar — yalnız gerçek yorum-marker satırları (pattern-string mention'ları FP, vO46 kuralı).
   const markerCounts = [...binFiles, ...libFiles.map((f) => "lib/" + f)].map((rel) => {
     const path = rel.startsWith("lib/") ? join(LIB, rel.slice(4)) : join(BIN, rel);
-    const count = (read(path).match(/\b(TODO|FIXME|HACK|XXX)\b/g) || []).length;
-    return { file: rel, count };
+    return { file: rel, count: realMarkerCount(read(path)) };
   });
   const lapsesR5 = auditMarkers(markerCounts);
 

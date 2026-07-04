@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   auditTests, auditUncommitted, auditMarkers, auditConcurrent, auditGovernance, auditRoadmapCoherence, scoreDoD,
+  realMarkerCount,
   type Lapse,
 } from "../bin/lib/dod";
 
@@ -36,6 +37,24 @@ describe("auditMarkers — R5", () => {
     const l = auditMarkers([{ file: "a.ts", count: 2 }, { file: "b.ts", count: 0 }]);
     expect(l).toHaveLength(1);
     expect(l[0].target).toBe("a.ts");
+  });
+});
+
+describe("realMarkerCount — R5 precision (detector-self-reference FP fix)", () => {
+  it("gerçek yorum-marker'ları sayar", () => {
+    expect(realMarkerCount("// TODO: implement retry\nconst x = 1;\n# FIXME broken")).toBe(2);
+  });
+  it("pattern-string/grep-arg mention'ları SAYMAZ (marker-detektörü dosyaları temiz)", () => {
+    const detectorSrc = [
+      'const lines = grep(["-E", "TODO|FIXME|HACK|XXX"], "src");',
+      "const count = (src.match(/\\b(TODO|FIXME|HACK|XXX)\\b/g) || []).length;",
+      "stubFiles: string[]; // files with TODO/FIXME markers",
+      'approach: "is it real unfinished logic or an incidental occurrence of TODO/FIXME?",',
+    ].join("\n");
+    expect(realMarkerCount(detectorSrc)).toBe(0);
+  });
+  it("karışık dosya: yalnız gerçek marker sayılır", () => {
+    expect(realMarkerCount('// TODO real one\nconst re = /(TODO|FIXME)/g;')).toBe(1);
   });
 });
 

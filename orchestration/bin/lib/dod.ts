@@ -6,6 +6,8 @@
  * ML YOK. Pattern ref: danger.js (DoD-as-rule), leasot (marker), git co-change coupling, spec-kit traceability.
  */
 
+import { isRealMarkerLine } from "./completion";
+
 export type LapseRule = "code-without-test" | "roadmap-coherence" | "uncommitted-green" | "done-without-governance" | "marker" | "concurrent-task";
 export interface Lapse { rule: LapseRule; severity: "high" | "med" | "low"; target: string; detail: string; action: string; concurrent?: boolean; }
 
@@ -29,6 +31,12 @@ export function auditUncommitted(porcelainLines: string[]): Lapse[] {
   const files = porcelainLines.map((l) => l.trim().replace(/^\S+\s+/, "")).filter((f) => /orchestration\/.*\.(ts|md|json)$/.test(f) && !/\.(bak|tmp)$/.test(f));
   if (!files.length) return [];
   return [{ rule: "uncommitted-green", severity: "med", target: `${files.length} dosya`, detail: `Commit'siz yeşil iş (built-not-shipped): ${files.slice(0, 6).map(baseName).join(", ")}${files.length > 6 ? "…" : ""}`, action: `yeşil parçayı commit'le (per-file git add + conventional)` }];
+}
+
+/** R5 hassasiyet: yalnız GERÇEK yorum-marker satırları (`// TODO`) sayılır — pattern-string/grep-arg
+ *  mention'ları (marker-detektörü dosyalarının kendi kaynağı) sayılmaz (isRealMarkerLine, vO46 kuralı). */
+export function realMarkerCount(src: string): number {
+  return src.split("\n").filter(isRealMarkerLine).length;
 }
 
 /** R5: marker grep sonuçları (her satır "file: count"). */
