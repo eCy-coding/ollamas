@@ -501,7 +501,14 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
   // vK19 one-click: serve the signed CLI bundle + a self-contained installer. The
   // device reaches these over the mesh (post-join, pre-key) → public, but the
   // install.sh only renders for a VALID invite token (token = authorization).
-  const REPO_ROOT = join(dirname(new URL(import.meta.url).pathname), "..");
+  // CJS constraint: the prod bundle (esbuild --format=cjs → dist/server.cjs) has no
+  // import.meta.url (undefined → crash at boot). In CJS __dirname === <repo>/dist, so
+  // repo root is one hop up; in dev (tsx/ESM) this file is <repo>/server/contract.ts,
+  // so import.meta.url + ".." also lands on repo root.
+  const REPO_ROOT =
+    typeof __dirname !== "undefined"
+      ? join(__dirname, "..")
+      : join(dirname(new URL(import.meta.url).pathname), "..");
   const CLI_BUNDLE = join(REPO_ROOT, "dist", "contract-cli.mjs");
   const CLI_SIG = join(REPO_ROOT, "dist", "contract-cli.sig");
 
