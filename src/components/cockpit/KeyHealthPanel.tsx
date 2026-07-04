@@ -14,6 +14,16 @@ interface ProviderHealth {
   keyless: boolean;
   source?: string;
   signupUrl?: string;
+  cooledUntilMs?: number;
+}
+
+// "recovers in 4m" / "…8s" — how long until a cooled provider's cooldown lapses.
+function recoversIn(untilMs: number, nowMs: number): string {
+  const s = Math.max(0, Math.round((untilMs - nowMs) / 1000));
+  if (s <= 0) return "recovering…";
+  if (s < 60) return `recovers in ${s}s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `recovers in ${m}m` : `recovers in ${Math.round(m / 60)}h`;
 }
 interface KeyHealthSnapshot {
   providers: ProviderHealth[];
@@ -82,6 +92,9 @@ export function KeyHealthPanel(): React.ReactElement {
           {rows.map((p) => (
             <span key={p.provider} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${STATUS_TONE[p.status]} flex items-center gap-1`}>
               <strong>{p.provider}</strong> {p.status}
+              {p.status === "cooled" && p.cooledUntilMs && (
+                <span>· {recoversIn(p.cooledUntilMs, Date.now())}</span>
+              )}
               {/* No opacity here: 70% alpha on status-colored 9px text can't reach WCAG AA
                   contrast on the light badge background (axe color-contrast, serious). */}
               {p.keyless && <span>·0-manual</span>}

@@ -651,6 +651,18 @@ export class ProviderRouter {
     }
     return min;
   }
+  /** Earliest cooldown-expiry for ONE provider's keys (cooldown map keys are `provider::keyId`),
+   *  or null if none are cooled. Powers the cockpit's per-provider "recovers in N" countdown. */
+  public static providerCooldownExpiry(provider: string, nowMs: number = Date.now()): number | null {
+    this.ensureHydrated();
+    const prefix = `${provider}::`;
+    let min: number | null = null;
+    for (const [k, exp] of this.keyCooldown) {
+      if (!k.startsWith(prefix) || exp <= nowMs) continue;
+      if (min === null || exp < min) min = exp;
+    }
+    return min;
+  }
 
   // ── Key-usage restart persistence (Faz 4) — same config vault as the cooldowns. ─────────
   // Buckets are keyId-only (never raw keys). Saves are debounced (5s) and best-effort: a

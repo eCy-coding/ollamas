@@ -25,6 +25,9 @@ export interface ProviderHealth {
   source?: CandidateSource;
   /** Present only when NOT live — the single manual step left to activate this provider. */
   signupUrl?: string;
+  /** For a "cooled" provider: the earliest ms timestamp its rate-limit cooldown expires (a key
+   *  auto-rejoins the live pool then). Drives the cockpit "recovers in N" countdown. */
+  cooledUntilMs?: number;
 }
 
 export interface KeyHealthSnapshot {
@@ -65,6 +68,7 @@ export function summarizeFromDoctor(
   report: DoctorReport,
   nowMs: number,
   poolLive: (provider: string) => number = () => 1,
+  cooledUntil: (provider: string) => number | null = () => null,
 ): KeyHealthSnapshot {
   const providers: ProviderHealth[] = [];
   for (const [provider, v] of Object.entries(report.providers)) {
@@ -83,6 +87,7 @@ export function summarizeFromDoctor(
       keyless,
       source: v.source,
       signupUrl: status !== "live" ? v.nextManualUrl || keySignupUrl(provider) || undefined : undefined,
+      cooledUntilMs: status === "cooled" ? cooledUntil(provider) ?? undefined : undefined,
     });
   }
   return finalize(providers, nowMs);
@@ -96,6 +101,7 @@ export function cheapHealthFromPool(
   keyless: (provider: string) => boolean,
   signupUrl: (provider: string) => string,
   nowMs: number,
+  cooledUntil: (provider: string) => number | null = () => null,
 ): KeyHealthSnapshot {
   const rows: ProviderHealth[] = providers.map((provider) => {
     const s = poolStatus(provider);
@@ -109,6 +115,7 @@ export function cheapHealthFromPool(
       status,
       keyless: kl,
       signupUrl: status !== "live" ? signupUrl(provider) || undefined : undefined,
+      cooledUntilMs: status === "cooled" ? cooledUntil(provider) ?? undefined : undefined,
     };
   });
   return finalize(rows, nowMs);
@@ -190,7 +197,12 @@ async function tick(): Promise<void> {
     { sources: parseSources(process.env.KEY_HEALTH_SOURCES), dryRun: false },
     productionDoctorDeps(),
   );
-  snapshot = summarizeFromDoctor(report, Date.now(), (p) => ProviderRouter.keyPoolStatus(p).live);
+  snapshot = summarizeFromDoctor(
+    report,
+    Date.now(),
+    (p) => ProviderRouter.keyPoolStatus(p).live,
+    (p) => ProviderRouter.providerCooldownExpiry(p),
+  );
 }
 
 /** Start the always-running key-health loop. Idempotent. Reschedules with circuit-breaker
@@ -236,5 +248,6 @@ export function liveCheapSnapshot(): KeyHealthSnapshot {
     (p) => isKeyless(p),
     keySignupUrl,
     Date.now(),
+    (p) => ProviderRouter.providerCooldownExpiry(p),
   );
 }

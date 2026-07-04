@@ -63,3 +63,31 @@ describe("cheapHealthFromPool — allCloudCooled escalation (T9-F2)", () => {
     expect(snap.allCloudCooled).toBe(false); // no keyed providers → not an escalation
   });
 });
+
+describe("cheapHealthFromPool — cooldown-recovery visibility (T10-F1)", () => {
+  const signup = () => "https://example.com/key";
+  it("stamps cooledUntilMs on a cooled provider from the injected expiry", () => {
+    const snap = cheapHealthFromPool(
+      ["groq"],
+      () => ({ total: 1, live: 0 }), // cooled
+      () => false,
+      signup,
+      1000,
+      (p) => (p === "groq" ? 999_000 : null),
+    );
+    const row = snap.providers.find((r) => r.provider === "groq")!;
+    expect(row.status).toBe("cooled");
+    expect(row.cooledUntilMs).toBe(999_000);
+  });
+  it("leaves cooledUntilMs undefined for a live provider", () => {
+    const snap = cheapHealthFromPool(
+      ["groq"],
+      () => ({ total: 1, live: 1 }), // live
+      () => false,
+      signup,
+      1000,
+      () => 999_000,
+    );
+    expect(snap.providers[0]!.cooledUntilMs).toBeUndefined();
+  });
+});

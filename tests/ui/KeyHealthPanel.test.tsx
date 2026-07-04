@@ -11,7 +11,7 @@ const snapshot = {
   providers: [
     { provider: "cerebras", status: "live", keyless: false, source: "vault" },
     { provider: "github-models", status: "live", keyless: true, source: "gh" },
-    { provider: "groq", status: "cooled", keyless: false },
+    { provider: "groq", status: "cooled", keyless: false, cooledUntilMs: Date.now() + 240_000 }, // ~4m
     { provider: "cloudflare", status: "absent", keyless: false, signupUrl: "https://dash.cloudflare.com/819aa0/ai/workers-ai" },
   ],
 };
@@ -33,6 +33,8 @@ describe("KeyHealthPanel — autonomous failover surface (T9-F1)", () => {
     expect(screen.getByText("groq")).toBeInTheDocument();
     // github-models is keyless (0-manual)
     expect(screen.getByText(/0-manual/)).toBeInTheDocument();
+    // the cooled provider shows when it auto-recovers
+    expect(screen.getByText(/recovers in \dm/)).toBeInTheDocument();
   });
 
   it("shows a signup link only for non-live providers", async () => {
