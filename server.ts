@@ -50,6 +50,7 @@ import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
+import { memoryUsage } from "./server/memory-stats";
 import { decorateCatalog } from "./server/mcp/catalog";
 import { getFeedItems } from "./server/threatfeed";
 import { validateUpstreamConfig } from "./server/mcp/upstream-guard";
@@ -522,7 +523,10 @@ async function initializeServer() {
       const r = await superviseUpstream(cfg);
       console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
     }));
-    for (const u of await allUpstreamServers()) {
+    // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
+    // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
+    const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
+    for (const u of eagerTenants ? await allUpstreamServers() : []) {
       // Defense-in-depth: re-validate persisted tenant rows in case a row was
       // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
       const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
@@ -530,6 +534,7 @@ async function initializeServer() {
       const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
       console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
     }
+    if (!eagerTenants) console.log(`[MCP-Consume] eager tenant connect deferred (MCP_CONSUME_EAGER=0)`);
     startSupervisor(); // periodic health/reconnect (opt-in via MCP_HEALTH_INTERVAL_MS)
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
@@ -554,11 +559,9 @@ async function initializeServer() {
 
     // Live system metrics querying CPU load and memories
     const cpuLoads = os.loadavg();
-    const systemMemory = {
-      total: os.totalmem(),
-      free: os.freemem(),
-      percentageUsed: Number(((1 - os.freemem() / os.totalmem()) * 100).toFixed(1)),
-    };
+    // macOS-correct available memory (free+inactive+purgeable+speculative); os.freemem()
+    // alone reads ~99% on macOS. Non-darwin / vm_stat failure → falls back to os.freemem().
+    const systemMemory = memoryUsage();
 
     let loadedModels: any[] = [];
     let ollamaVersion = "unavailable";
@@ -702,7 +705,7 @@ async function initializeServer() {
         os: { platform: os.platform(), release: os.release(), arch: os.arch(), uptime: os.uptime() },
         metrics: {
           cpuLoad1Min: Number(cpu[0].toFixed(2)),
-          memory: { total: os.totalmem(), free: os.freemem(), percentageUsed: Number(((1 - os.freemem() / os.totalmem()) * 100).toFixed(1)) },
+          memory: memoryUsage(),
           ollamaVersion: ollama.version,
           loadedModels: ollama.loadedModels,
         },
