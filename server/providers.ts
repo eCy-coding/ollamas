@@ -333,7 +333,8 @@ export class ProviderRouter {
       }
       // If specific provider key isn't set, skip unless it's ollama-local or we are in DEMO fallback mode.
       // gemini-cli + vllm/llamacpp are KEYLESS local backends (own auth / no auth) → never key-gated.
-      if (prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp" && !this.hasKey(prov)) {
+      // catalog-keyless providers (e.g. pollinations, per-IP) are attempted with NO key.
+      if (prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp" && !catalogEntry(prov)?.keyless && !this.hasKey(prov)) {
         continue;
       }
 
@@ -341,7 +342,7 @@ export class ProviderRouter {
       // quota (429) or auth (401) failure, cool the spent key and retry the SAME
       // provider with the next live key before falling through the provider chain.
       // (Rotation across user keys only — the system never auto-acquires new keys.)
-      const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp";
+      const cloudKeyed = prov !== "ollama-local" && prov !== "fleet" && prov !== "demo" && prov !== "gemini-cli" && prov !== "vllm" && prov !== "llamacpp" && !catalogEntry(prov)?.keyless;
       // singleAttempt (key test): exactly one try — no rotation across the pool, so the candidate's
       // own auth failure is the verdict (rotation would mask it and trip the fallthrough-as-success).
       const attempts = config.singleAttempt ? 1 : (cloudKeyed ? Math.max(1, this.keyPool(prov).length) : 1);
@@ -895,8 +896,8 @@ export class ProviderRouter {
       const baseUrl = catalogBaseUrl(cat.id);
       if (!baseUrl) throw new Error(`${cat.id}: CLOUDFLARE_ACCOUNT_ID not set (required to compose the API base URL)`);
       const apiKey = this.getDecryptedKey(cat.id);
-      if (!apiKey) throw new Error(`${cat.id} API key not set (${cat.envKey})`);
-      return this.openAiCompatCall(baseUrl, apiKey, `cloud:${cat.id}`, cat.defaultModel, config, onStreamChunk, signal);
+      if (!apiKey && !cat.keyless) throw new Error(`${cat.id} API key not set (${cat.envKey})`);
+      return this.openAiCompatCall(baseUrl, apiKey || "", `cloud:${cat.id}`, cat.defaultModel, config, onStreamChunk, signal);
     }
 
     switch (config.provider) {

@@ -12,7 +12,7 @@
 // verdicts and the pool's count-only status. Nothing here can leak a secret.
 import type { DoctorReport, CandidateStatus, CandidateSource } from "./key-doctor";
 import { runDoctor, productionDoctorDeps } from "./key-doctor";
-import { keySignupUrl, keyedCloudProviders } from "./provider-catalog";
+import { keySignupUrl, keyedCloudProviders, catalogEntry } from "./provider-catalog";
 import { ProviderRouter } from "./providers";
 
 export type HealthStatus = "live" | "cooled" | "invalid" | "absent";
@@ -55,7 +55,7 @@ const LIVE_VERDICTS: ReadonlySet<CandidateStatus> = new Set([
 /** A provider is keyless-reachable when its live key came from the gh OAuth token, or it is the
  *  inherently keyless gemini-cli (Google OAuth free tier). */
 function isKeyless(provider: string, source?: CandidateSource): boolean {
-  return source === "gh" || provider === "gemini-cli" || provider === "github-models";
+  return source === "gh" || provider === "gemini-cli" || provider === "github-models" || !!catalogEntry(provider)?.keyless;
 }
 
 /** Pure: fold a DoctorReport into a health snapshot. `poolLive(p)` (optional) is the count of

@@ -37,6 +37,9 @@ const STATUS_TONE: Record<ProviderHealth["status"], string> = {
 
 export function KeyHealthPanel(): React.ReactElement {
   const [snap, setSnap] = useState<KeyHealthSnapshot | null>(null);
+  // Defensive: a partial/empty response (or the empty-ok test stub) has no `providers` array —
+  // treat it as "not ready yet" instead of crashing the render on `.map` of undefined.
+  const rows = Array.isArray(snap?.providers) ? snap!.providers : null;
 
   useEffect(() => {
     let alive = true;
@@ -56,9 +59,9 @@ export function KeyHealthPanel(): React.ReactElement {
       <div className="flex items-center gap-2.5 mb-4">
         <HeartPulse className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Key Health — Autonomous Failover</h2>
-        {snap && (
-          <span className={`ml-auto text-[9px] font-mono px-2 py-0.5 rounded border ${snap.converged ? "bg-emerald-500/15 border-emerald-500/25 text-status-ok" : "bg-immersive-bg border-immersive-border text-immersive-text-dim"}`}>
-            {snap.live}/{snap.total} live{snap.keylessLive.length > 0 ? ` · ${snap.keylessLive.length} keyless` : ""}
+        {rows && (
+          <span className={`ml-auto text-[9px] font-mono px-2 py-0.5 rounded border ${snap!.converged ? "bg-emerald-500/15 border-emerald-500/25 text-status-ok" : "bg-immersive-bg border-immersive-border text-immersive-text-dim"}`}>
+            {snap!.live}/{snap!.total} live{(snap!.keylessLive?.length ?? 0) > 0 ? ` · ${snap!.keylessLive.length} keyless` : ""}
           </span>
         )}
       </div>
@@ -72,14 +75,16 @@ export function KeyHealthPanel(): React.ReactElement {
         </div>
       )}
 
-      {!snap ? (
+      {!rows ? (
         <div className="text-[11px] text-immersive-text-dim font-mono py-4 text-center">Loading key-health snapshot…</div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          {snap.providers.map((p) => (
+          {rows.map((p) => (
             <span key={p.provider} className={`text-[9px] font-mono px-2 py-0.5 rounded border ${STATUS_TONE[p.status]} flex items-center gap-1`}>
               <strong>{p.provider}</strong> {p.status}
-              {p.keyless && <span className="opacity-70">·0-manual</span>}
+              {/* No opacity here: 70% alpha on status-colored 9px text can't reach WCAG AA
+                  contrast on the light badge background (axe color-contrast, serious). */}
+              {p.keyless && <span>·0-manual</span>}
               {p.status !== "live" && p.signupUrl && (
                 <a href={p.signupUrl} target="_blank" rel="noopener noreferrer"
                   className="text-status-accent hover:underline inline-flex items-center gap-0.5 no-underline">

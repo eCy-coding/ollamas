@@ -22,6 +22,9 @@ export interface CatalogEntry {
   toolCalling: "native" | "probe" | "none";
   /** Daily-quota reset semantics (persisted quota windows, quota-persist.ts). */
   resetBoundary?: "rolling" | "utc-midnight" | "pt-midnight";
+  /** Reachable with NO key (e.g. Pollinations, per-IP) — the router attempts it without a key
+   *  and the health snapshot marks it 0-manual. A key, if present, still lifts the rate limit. */
+  keyless?: boolean;
 }
 
 export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
@@ -125,6 +128,31 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     toolCalling: "probe",
     resetBoundary: "utc-midnight",
   },
+  scaleway: {
+    id: "scaleway",
+    baseUrl: "https://api.scaleway.ai/v1",
+    envKey: "SCALEWAY_API_KEY",
+    signupUrl: "https://console.scaleway.com/generative-apis/api-keys",
+    defaultModel: "llama-3.3-70b-instruct",
+    limits: { perMin: 60, perDay: 0, tokensPerDay: 1_000_000 }, // ~1M tok free (beta), EU-hosted
+    trainsOnData: false, // Scaleway does not train on API data
+    maxContext: 128_000,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+  },
+  pollinations: {
+    id: "pollinations",
+    baseUrl: "https://gen.pollinations.ai/v1",
+    envKey: "POLLINATIONS_TOKEN", // optional — a token lifts the per-IP limit but is NOT required
+    signupUrl: "https://pollinations.ai", // no signup needed; page documents optional token tiers
+    defaultModel: "openai", // Pollinations' default OpenAI-compat pooled model alias
+    limits: { perMin: 15, perDay: 0 }, // per-IP hourly throttle, opaque — the 429 cooldown backstops
+    trainsOnData: false,
+    maxContext: 32_000,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+    keyless: true, // reachable with NO key (per-IP) → true 0-manual fallback tier
+  },
 };
 
 export function catalogEntry(provider: string): CatalogEntry | undefined {
@@ -216,6 +244,8 @@ const CATALOG_CAPABILITIES: Record<string, readonly string[]> = {
   "github-models": ["code", "tools"],
   cloudflare: ["code", "embed", "image"],
   mistral: ["code", "tools"],
+  scaleway: ["code", "long-ctx"],   // 128K ctx, EU-hosted, no-train
+  pollinations: ["code", "fast"],   // keyless per-IP fallback tier
 };
 
 const LEGACY_CAPABILITIES: Record<string, readonly string[]> = {
