@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   taskFingerprint, sessionTarget, foldSessions, reconcileSessions, autoCompleteSessions,
   staleCounts, spawnsInWindow, shouldAudit, planDispatch, buildDispatchPrompt, renderDispatchMd,
-  nextPending,
+  nextPending, isStableCandidate,
   type DispatchSession,
 } from "../bin/lib/claude-dispatch";
 import { buildSpawnScript, openTab, type SpawnRunner } from "../bin/lib/tab-spawn";
@@ -211,6 +211,42 @@ describe("nextPending — vO42 paralel ön-hesap kuyruğu", () => {
   });
   it("done oturum busy sayılmaz", () => {
     expect(nextPending([REQ], [sess({ status: "done" })])?.target).toBe("red:backend");
+  });
+});
+
+describe("isStableCandidate — vO44 churn-guard", () => {
+  const cand = (min: number, fp = "ffff00000001") => JSON.stringify({ ts: new Date(NOW - min * 60_000).toISOString(), fingerprint: fp, target: "t" });
+  it("3 gözlem 15dk yayılım → stabil", () => {
+    expect(isStableCandidate([cand(15), cand(8), cand(1)], "ffff00000001", NOW)).toBe(true);
+  });
+  it("tek gözlem (churn) → stabil DEĞİL", () => {
+    expect(isStableCandidate([cand(1)], "ffff00000001", NOW)).toBe(false);
+  });
+  it("3 gözlem ama yayılım <10dk → stabil DEĞİL", () => {
+    expect(isStableCandidate([cand(5), cand(3), cand(1)], "ffff00000001", NOW)).toBe(false);
+  });
+  it("90dk penceresi dışındaki gözlemler sayılmaz", () => {
+    expect(isStableCandidate([cand(120), cand(100), cand(1)], "ffff00000001", NOW)).toBe(false);
+  });
+  it("farklı fingerprint gözlemleri karışmaz + bozuk satır atlanır", () => {
+    const lines = [cand(15, "aaaa00000000"), "bozuk{", cand(15), cand(8), cand(1)];
+    expect(isStableCandidate(lines, "ffff00000001", NOW)).toBe(true);
+    expect(isStableCandidate(lines, "aaaa00000000", NOW)).toBe(false);
+  });
+});
+
+describe("planDispatch churn-guard (vO44)", () => {
+  const base = { sessions: [] as DispatchSession[], req: REQ, nowMs: NOW, killSwitch: false, goEnabled: true };
+  it("candidateStable=false → skip churn-guard nedeniyle", () => {
+    const p = planDispatch({ ...base, candidateStable: false });
+    expect(p.mode).toBe("skip");
+    expect(p.reason).toContain("churn-guard");
+  });
+  it("candidateStable verilmezse (default) spawn — geriye-uyumlu", () => {
+    expect(planDispatch(base).mode).toBe("spawn");
+  });
+  it("guard sırası: bütçe churn-guard'dan önce", () => {
+    expect(planDispatch({ ...base, spawns24h: 6, candidateStable: false }).reason).toContain("bütçe");
   });
 });
 

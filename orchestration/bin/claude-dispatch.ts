@@ -29,7 +29,7 @@ import { openTab, type SpawnApp } from "./lib/tab-spawn";
 import { notify } from "./lib/signal";
 import {
   foldSessions, reconcileSessions, autoCompleteSessions, staleCounts, spawnsInWindow, shouldAudit,
-  planDispatch, buildDispatchPrompt, renderDispatchMd, taskFingerprint, nextPending,
+  planDispatch, buildDispatchPrompt, renderDispatchMd, taskFingerprint, nextPending, isStableCandidate,
   type DispatchSession,
 } from "./lib/claude-dispatch";
 
@@ -40,6 +40,7 @@ const GO = process.argv.includes("--go");
 const APP: SpawnApp = (() => { const i = process.argv.indexOf("--app"); return i >= 0 && /iterm/i.test(process.argv[i + 1] ?? "") ? "iTerm2" : "Terminal.app"; })();
 const STATE_F = join(ORCH_DIR, "seyir", "claude-dispatch-state.jsonl");
 const AUDIT_F = join(ORCH_DIR, "seyir", "dispatch-log.jsonl");
+const CANDIDATE_F = join(ORCH_DIR, "seyir", "candidate-log.jsonl"); // vO44 churn-guard sightings
 const KILL_F = join(ORCH_DIR, ".claude-dispatch-off");
 const MARKER_F = join(ORCH_DIR, ".claude-dispatch-enabled");
 // vO41 KÖK-FIX: launchd WatchPaths ~/.llm-mission-control'ü izler; vO40 spawn dosyalarını ORAYA
@@ -110,7 +111,24 @@ function main(): void {
     applyChange(s, "auto-complete", "hedef taze REQUIREMENTS'ta artık yok — çözüldü");
   }
 
-  // 4) Karar (pure) — zincir girdileri: lastStatus / 24h bütçe / escalation sayacı
+  // 4) vO44 churn-guard: her tick top-adayı candidate-log'a yaz (dedup'suz — sightings birikir),
+  //    400 satırı aşınca son 200'e döndür (basit rotasyon).
+  if (req) {
+    appendJsonl(CANDIDATE_F, { ts, fingerprint: taskFingerprint(req), target: req.target });
+    const cLines = readLines(CANDIDATE_F);
+    if (cLines.length > 400) { try { writeFileSync(CANDIDATE_F, cLines.slice(-200).join("\n") + "\n"); } catch { /* best-effort */ } }
+  }
+  const candLines = readLines(CANDIDATE_F);
+  const fpNow = req ? taskFingerprint(req) : "";
+  const sightTs = candLines.map((l) => { try { const c = JSON.parse(l); return c?.fingerprint === fpNow ? Date.parse(c.ts) : NaN; } catch { return NaN; } })
+    .filter((t) => Number.isFinite(t) && (nowMs - t) / 60_000 <= 90);
+  const stability = {
+    sightings: sightTs.length,
+    spanMin: sightTs.length ? Math.round((Math.max(...sightTs) - Math.min(...sightTs)) / 60_000) : 0,
+    stable: req ? isStableCandidate(candLines, fpNow, nowMs) : false,
+  };
+
+  // 5) Karar (pure) — zincir girdileri: lastStatus / 24h bütçe / escalation / churn-guard
   const killSwitch = existsSync(KILL_F);
   const goEnabled = GO && (existsSync(MARKER_F) || process.env.ORCH_CLAUDE_GO === "1");
   const lastSession = [...sessions].sort((a, b) => Date.parse(b.startedTs) - Date.parse(a.startedTs))[0];
@@ -119,6 +137,7 @@ function main(): void {
     sessions, req, nowMs, killSwitch, goEnabled, maxPerDay: MAX_PER_DAY,
     lastStatus: lastSession?.status, spawns24h,
     staleCountForReq: req ? (staleCounts(rawLines).get(taskFingerprint(req)) ?? 0) : 0,
+    candidateStable: req ? stability.stable : true,
   });
   if (reqStale && plan.mode === "skip" && !req) plan.reason = "REQUIREMENTS.json bayat (>60 dk) — önce autopilot/fuse taze koş";
 
@@ -161,7 +180,7 @@ function main(): void {
   }
 
   // 7) Rapor (her koşuda)
-  const md = renderDispatchMd({ ts, plan, req, sessions, killSwitch, goEnabled, app: APP, reqStale, spawns24h, maxPerDay: MAX_PER_DAY, nextUp });
+  const md = renderDispatchMd({ ts, plan, req, sessions, killSwitch, goEnabled, app: APP, reqStale, spawns24h, maxPerDay: MAX_PER_DAY, nextUp, stability: req ? stability : undefined });
   writeFileSync(join(ORCH_DIR, "CLAUDE_DISPATCH.md"), md + "\n");
 }
 

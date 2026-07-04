@@ -140,6 +140,7 @@ export interface DispatchPlanInput {
   maxPerDay?: number;           // rolling-24h budget (default 6)
   staleCountForReq?: number;    // staleCounts().get(fingerprint) for THIS requirement
   maxStale?: number;            // escalation threshold (default 2)
+  candidateStable?: boolean;    // vO44 churn-guard: isStableCandidate() result (default true)
 }
 export interface DispatchPlan {
   go: boolean;
@@ -174,6 +175,9 @@ export function planDispatch(i: DispatchPlanInput): DispatchPlan {
   if ((i.spawns24h ?? 0) >= maxPerDay) {
     return { go: false, mode: "skip", reason: `24h bütçe dolu (${i.spawns24h}/${maxPerDay} spawn)`, fingerprint: fp };
   }
+  if (i.candidateStable === false) {
+    return { go: false, mode: "skip", reason: `churn-guard: hedef stabilite bekliyor (${i.req.target} birkaç bağımsız değerlendirmede kalıcı olmalı)`, fingerprint: fp };
+  }
   if (i.lastStatus === "stale") {
     const lastMs = Math.max(0, ...i.sessions.map((s) => Date.parse(s.startedTs)).filter(Number.isFinite));
     if (lastMs && (i.nowMs - lastMs) / 3_600_000 < cooldownH) {
@@ -185,6 +189,33 @@ export function planDispatch(i: DispatchPlanInput): DispatchPlan {
     return { go: false, mode: "dry", reason: "dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go", fingerprint: fp };
   }
   return { go: true, mode: "spawn", reason: `spawn: ${i.req.criticality}:${i.req.target}`, fingerprint: fp };
+}
+
+/**
+ * vO44 churn-guard: a requirement is dispatch-worthy only if it SURVIVED several independent
+ * pipeline re-evaluations (critic/dod re-rank COMPLETENESS findings every pass — a target that is
+ * top for a single tick is noise; spawning on it burns a session + a budget slot). Lines are
+ * candidate-log JSONL `{ts, fingerprint, target}` appended EVERY tick (separate from the deduped
+ * audit log, which cannot accumulate sightings by design).
+ */
+export function isStableCandidate(
+  lines: string[], fp: string, nowMs: number,
+  o?: { minSightings?: number; minSpanMin?: number; windowMin?: number },
+): boolean {
+  const minSightings = o?.minSightings ?? 3;
+  const minSpanMin = o?.minSpanMin ?? 10;
+  const windowMin = o?.windowMin ?? 90;
+  const ts: number[] = [];
+  for (const line of lines) {
+    try {
+      const c = JSON.parse(line);
+      if (c?.fingerprint !== fp) continue;
+      const t = Date.parse(c.ts);
+      if (Number.isFinite(t) && (nowMs - t) / 60_000 <= windowMin) ts.push(t);
+    } catch { /* skip malformed */ }
+  }
+  if (ts.length < minSightings) return false;
+  return (Math.max(...ts) - Math.min(...ts)) / 60_000 >= minSpanMin;
 }
 
 /**
@@ -250,6 +281,7 @@ export function renderDispatchMd(i: {
   ts: string; plan: DispatchPlan; req: Requirement | null; sessions: DispatchSession[];
   killSwitch: boolean; goEnabled: boolean; app: SpawnApp; reqStale?: boolean;
   spawns24h?: number; maxPerDay?: number; nextUp?: Requirement | null;
+  stability?: { sightings: number; spanMin: number; stable: boolean };
 }): string {
   const icon = i.plan.mode === "spawn" ? "▶" : i.plan.mode === "dry" ? "[dry]" : i.plan.mode === "blocked" ? "🛑" : "⏭";
   const blocked = i.sessions.filter((s) => s.status === "blocked");
@@ -269,6 +301,7 @@ export function renderDispatchMd(i: {
       : `- top requirement: yok`,
   ];
   if (i.nextUp) L.push(`- ⏭ sıradaki (prefetched, paralel ön-hesap): **${i.nextUp.criticality}:${i.nextUp.target}**`);
+  if (i.stability) L.push(`- 🎯 hedef stabilite (churn-guard): ${i.stability.sightings} gözlem / ${i.stability.spanMin} dk → ${i.stability.stable ? "✅ stabil" : "⏳ bekliyor"}`);
   if (blocked.length) L.push(`- 🛑 blocked (insan gerekli): ${blocked.map((b) => `${sessionTarget(b)} (${b.fingerprint})`).join(", ")}`);
   L.push(``, `## Oturumlar`);
   if (!i.sessions.length) L.push(`- (henüz oturum yok)`);

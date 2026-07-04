@@ -93,7 +93,9 @@ bu istisna yalnız teşhis-dürtmesi + bildirim kapsar, kod/dosya mutasyonu DEĞ
   bypassPermissions` (env `ORCH_CLAUDE_PERMISSION_MODE=plan|acceptEdits` ile geri dönülür) — onay yerine
   kalite kapısı (tsc→vitest→conventional commit) + completion'da `autopilot --quiet` (saniyeler içinde
   zincir); paralel ön-hesap: aktif görev koşarken SIRADAKİ gereksinimin prompt+wrapper'ı prefetch edilir
-  (`nextPending`, CLAUDE_DISPATCH.md "sıradaki" satırı).
+  (`nextPending`, CLAUDE_DISPATCH.md "sıradaki" satırı). vO44 churn-guard: hedef yalnız birkaç bağımsız
+  pipeline-değerlendirmesinde kalıcıysa spawn edilir (`isStableCandidate` ≥3 gözlem/≥10dk,
+  `seyir/candidate-log.jsonl`) — tek-tick churn hedefine oturum/bütçe yakılmaz.
 
 ---
 
