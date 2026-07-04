@@ -15,6 +15,7 @@ export const TRANSPORT_BINARY: Record<string, string> = {
   wireguard: "wg-quick",
   "caddy-tls": "caddy",
   headscale: "headscale",
+  cloudflare: "cloudflared", // vT13 REVERSE (Apache-2.0, binary-only)
 };
 
 /** True if `cmd` is on PATH (via `which`, never throws). */

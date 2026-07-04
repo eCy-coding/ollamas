@@ -186,3 +186,59 @@ test("cloudflare: probe() false when not up (no URL yet)", async () => {
   const { t } = makeTransport();
   assert.equal(await t.probe(), false);
 });
+
+// ---------- integration: switch/autopilot wiring ----------
+import { TunnelSwitch } from "../switch.ts";
+import { TRANSPORT_BINARY, detectCapable } from "../autopilot.ts";
+import type { Transport } from "../transport.ts";
+
+function fakeTransport(name: string, priority: number, healthy: boolean): Transport {
+  return {
+    name,
+    priority,
+    async up() {},
+    async down() {},
+    async probe() {
+      return healthy;
+    },
+    endpoint() {
+      return { url: `http://${name}`, transport: name, healthy };
+    },
+  };
+}
+
+test("cloudflare: TRANSPORT_BINARY maps cloudflare → cloudflared (autopilot capability)", () => {
+  assert.equal(TRANSPORT_BINARY["cloudflare"], "cloudflared");
+});
+
+test("cloudflare: selectAuto falls back to REVERSE when nothing else is healthy", async () => {
+  const { t, child } = makeTransport();
+  const upP = t.up();
+  queueMicrotask(() => child.stderr.emit("data", Buffer.from("https://d.trycloudflare.com\n")));
+  await upP;
+  const sw = new TunnelSwitch();
+  sw.register(fakeTransport("caddy-tls", PRIORITY.LAN_TLS, false));
+  sw.register(t);
+  const ep = await sw.selectAuto();
+  assert.equal(ep?.transport, "cloudflare");
+});
+
+test("cloudflare: selectAuto prefers healthy LAN_TLS(10) over healthy REVERSE(30)", async () => {
+  const { t, child } = makeTransport();
+  const upP = t.up();
+  queueMicrotask(() => child.stderr.emit("data", Buffer.from("https://e.trycloudflare.com\n")));
+  await upP;
+  const sw = new TunnelSwitch();
+  sw.register(fakeTransport("caddy-tls", PRIORITY.LAN_TLS, true));
+  sw.register(t);
+  const ep = await sw.selectAuto();
+  assert.equal(ep?.transport, "caddy-tls");
+});
+
+test("cloudflare: detectCapable includes cloudflare when its binary exists (injected)", async () => {
+  const { t } = makeTransport();
+  const capable = await detectCapable([t, fakeTransport("caddy-tls", PRIORITY.LAN_TLS, true)], (tr) =>
+    Promise.resolve(tr.name === "cloudflare"),
+  );
+  assert.deepEqual(capable.map((c) => c.name), ["cloudflare"]);
+});

@@ -87,6 +87,7 @@ import { randomBytes } from "node:crypto";
 import { addKey, listKeys, revokeKey, type PxyVault } from "./proxy.ts";
 import { createGateway } from "./proxy-server.ts";
 import { createLimiter } from "./ratelimit.ts";
+import { CloudflareTransport } from "./transports/cloudflare.ts";
 
 const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
 
@@ -303,11 +304,13 @@ function buildSwitch(): { sw: TunnelSwitch; transports: Transport[] } {
   const tlsPlan: CaddyTlsPlan = { ...DEFAULT_TLS_PLAN, host };
   const meshPlan: HeadscalePlan = { ...DEFAULT_MESH_PLAN, serverUrl: `http://${host}:8080` };
   // Priority bands: LAN-TLS (10) on home WiFi → WireGuard p2p (20, same-LAN direct) →
-  // Headscale mesh (20, multi-device/remote). selectAuto scores by measured latency within bands.
+  // Headscale mesh (20, multi-device/remote) → Cloudflare REVERSE (30, public fallback, vT13).
+  // selectAuto scores by measured latency within bands.
   const transports: Transport[] = [
     new CaddyTlsTransport(tlsPlan),
     new WireGuardTransport(wgPlan),
     new HeadscaleTransport(meshPlan),
+    new CloudflareTransport({ localPort: 8443, hasActiveKey: proxyHasActiveKey }),
   ];
   const sw = new TunnelSwitch();
   for (const t of transports) sw.register(t);
@@ -584,6 +587,18 @@ const PROXY_VAULT_PATH = () => join(KEYS_DIR, "proxy-vault.json");
 const PROXY_KEYFILE_PATH = () => join(KEYS_DIR, "proxy-keyfile");
 const PROXY_PID_PATH = () => join(KEYS_DIR, "proxy.pid");
 const PROXY_ACCESS_LOG = () => join(KEYS_DIR, "proxy-access.jsonl");
+
+/** SYNC auth-gate for CloudflareTransport (RISK-TUNNEL-024): ≥1 non-revoked pxy_ key in the vault. */
+function proxyHasActiveKey(): boolean {
+  try {
+    if (!existsSync(PROXY_VAULT_PATH()) || !existsSync(PROXY_KEYFILE_PATH())) return false;
+    const master = loadOrCreateKeyfile(PROXY_KEYFILE_PATH());
+    const vault = openFromFile<PxyVault>(PROXY_VAULT_PATH(), master);
+    return (vault?.keys ?? []).some((k) => k.revoked !== true);
+  } catch {
+    return false; // unreadable vault = NOT authorized to expose
+  }
+}
 
 async function loadProxyVault(): Promise<PxyVault> {
   await mkdir(KEYS_DIR, { recursive: true });
