@@ -470,6 +470,32 @@ async function runUp(args: string[]): Promise<number> {
   return new Promise<number>((resolve) => {
     let pendingTick: ReturnType<typeof setTimeout> | undefined;
     let tickCount = 0;
+    // Crash-durability (always-running): if the gateway server dies unexpectedly (crash / OOM /
+    // external kill), respawn it so :3000 recovers with ZERO operator action — the fleet is the
+    // always-running owner, so its child must be self-healing. Suppressed during a deliberate
+    // backend switch (which spawns its own replacement) and on shutdown; throttled 2s to avoid a
+    // hot crash-loop (e.g. a persistent EADDRINUSE just backs off instead of spinning).
+    let switching = false;
+    let respawnTimer: ReturnType<typeof setTimeout> | undefined;
+    const onGatewayExit = (code: number | null) => {
+      if (shuttingDown) { resolve(code ?? 0); return; }
+      if (switching) return;
+      process.stderr.write(`[fleet] gateway exited (${code}) — respawning (crash-durable)\n`);
+      if (respawnTimer) clearTimeout(respawnTimer);
+      respawnTimer = setTimeout(async () => {
+        if (shuttingDown || switching) return;
+        // War-avoidance: if :3000 is ALREADY served (another owner took the port, or the exit was
+        // an EADDRINUSE bind conflict), do NOT respawn a competitor — defer to the live owner.
+        // This turns the classic fleet restart-war into a clean single-owner defer.
+        try {
+          const r = await fetch("http://localhost:3000/api/health", { signal: AbortSignal.timeout(2000) });
+          if (r.ok) { process.stderr.write("[fleet] :3000 already served — deferring (no respawn)\n"); schedule(intervalMs); return; }
+        } catch { /* not served → safe to respawn */ }
+        child = spawnChild(state.current);
+        child.once("exit", onGatewayExit);
+        schedule(intervalMs);
+      }, 2000);
+    };
     const tick = async () => {
       if (shuttingDown) return;
       tickCount++;
@@ -499,7 +525,8 @@ async function runUp(args: string[]): Promise<number> {
       if (transition.action === "switch") {
         const next = transition.to;
         process.stderr.write(`[fleet] switching backend: ${state.current ?? "none"} → ${next.url}\n`);
-        // Kill current child gracefully
+        // Deliberate switch: suppress crash-respawn while we kill + replace the child.
+        switching = true;
         child.kill("SIGTERM");
         await new Promise<void>((res) => {
           const force = setTimeout(() => { child.kill("SIGKILL"); res(); }, 5000);
@@ -507,14 +534,8 @@ async function runUp(args: string[]): Promise<number> {
         });
         state = { current: next.url, attempt: 0, lastSwitchMs: Date.now() };
         child = spawnChild(next.url);
-        child.once("exit", (code) => {
-          if (!shuttingDown) {
-            process.stderr.write(`[fleet] child exited (${code}); restarting tick\n`);
-            schedule(intervalMs);
-          } else {
-            resolve(code ?? 0);
-          }
-        });
+        child.once("exit", onGatewayExit);
+        switching = false;
       }
 
       // Keep probing after a switch too, so a recovered higher-priority backend
@@ -528,9 +549,7 @@ async function runUp(args: string[]): Promise<number> {
       pendingTick = setTimeout(tick, ms);
     };
 
-    child.once("exit", (code) => {
-      if (shuttingDown) resolve(code ?? 0);
-    });
+    child.once("exit", onGatewayExit);
 
     // First tick after intervalMs
     schedule(intervalMs);
