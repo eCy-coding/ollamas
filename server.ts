@@ -414,41 +414,65 @@ app.post("/api/revenue/storefront", (req, res) => {
 });
 
 /**
+ * Every way ollama might be reachable — try each until one answers. `host.docker.internal` only resolves
+ * INSIDE a container; on the host `127.0.0.1`/`localhost` work. Trying all makes the health/models/detect
+ * paths reach ollama regardless of a docker-oriented `OLLAMA_HOST` (the generate path in providers.ts already
+ * did this; the health path did not — root cause of the "degraded-live / fetch failed" gap when
+ * OLLAMA_HOST=host.docker.internal is used by a host-run server).
+ */
+function ollamaCandidates(): string[] {
+  const configured = process.env.OLLAMA_HOST;
+  return [...new Set([
+    configured, "http://127.0.0.1:11434", "http://localhost:11434", "http://host.docker.internal:11434",
+  ].filter(Boolean) as string[])];
+}
+
+/** Fetch `path` from the first reachable ollama candidate; pins `OLLAMA_HOST` to the winner so every other
+ *  caller (providers.ts generate path included) converges on the reachable host. Returns null if none answer. */
+async function reachOllama(path: string, timeoutMs = 3000): Promise<{ base: string; res: Response } | null> {
+  for (const base of ollamaCandidates()) {
+    try {
+      const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(timeoutMs) });
+      if (res.ok) { process.env.OLLAMA_HOST = base; return { base, res }; }
+    } catch { /* unreachable candidate → try the next */ }
+  }
+  return null;
+}
+
+/**
  * L1: Dynamic Environment Detection
  */
 async function detectMode(): Promise<"live" | "degraded-live" | "demo"> {
   const isHardCloud = !!(
-    process.env.K_SERVICE || 
-    process.env.GOOGLE_CLOUD_RUN || 
+    process.env.K_SERVICE ||
+    process.env.GOOGLE_CLOUD_RUN ||
     process.env.CODESANDBOX_SSE
   );
-  
+
   if (isHardCloud) {
     return "demo";
   }
 
-  // Probe local Ollama host
-  const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
-  try {
-    const res = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(2000) });
-    if (res.ok) {
-      return "live";
-    }
-  } catch (e) {
-    // Attempt docker-internal fallback probe too before degrading
-    try {
-      const fallbackRes = await fetch("http://host.docker.internal:11434/api/version", { signal: AbortSignal.timeout(1000) });
-      if (fallbackRes.ok) {
-        process.env.OLLAMA_HOST = "http://host.docker.internal:11434";
-        return "live";
-      }
-    } catch (_) {}
-  }
-
-  return "degraded-live";
+  // Probe local Ollama across ALL candidate hosts (incl. 127.0.0.1) before degrading.
+  return (await reachOllama("/api/version", 2000)) ? "live" : "degraded-live";
 }
 
 let CURRENT_MODE: "live" | "degraded-live" | "demo" = "demo";
+let modeCheckedAt = 0; // for the /api/health self-heal re-probe (mode was previously boot-locked forever)
+
+/** Re-detect the environment mode at most every `ttlMs` — so once ollama becomes reachable again the server
+ *  recovers from "degraded-live" on its own instead of staying stuck until a restart. Cheap (a single probe). */
+async function refreshMode(ttlMs = 10_000): Promise<void> {
+  if (Date.now() - modeCheckedAt < ttlMs) return;
+  modeCheckedAt = Date.now();
+  if (CURRENT_MODE === "demo") return; // demo is a deliberate hard-cloud state, never auto-upgraded
+  const next = await detectMode();
+  if (next !== CURRENT_MODE) {
+    CURRENT_MODE = next;
+    ProviderRouter.demoFallbackAllowed = CURRENT_MODE === "demo";
+    console.log(`[Cockpit] environment mode re-detected: ${CURRENT_MODE.toUpperCase()}`);
+  }
+}
 
 // Dynamic start wrapper
 async function initializeServer() {
@@ -520,9 +544,9 @@ async function initializeServer() {
    * Health & Telemetry API (L1, L11)
    */
   app.get("/api/health", async (req, res) => {
+    await refreshMode(); // self-heal: recover from a stale "degraded-live" once ollama is reachable again
     const isLive = CURRENT_MODE === "live";
-    const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
-    
+
     // Live system metrics querying CPU load and memories
     const cpuLoads = os.loadavg();
     const systemMemory = {
@@ -539,15 +563,14 @@ async function initializeServer() {
 
     if (CURRENT_MODE !== "demo") {
       try {
-        const verRes = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(3000) });
-        if (verRes.ok) {
-          const verJson = await verRes.json();
+        const ver = await reachOllama("/api/version", 3000);
+        if (ver) {
+          const verJson = await ver.res.json();
           ollamaVersion = verJson?.version || "unknown";
         }
-
-        const psRes = await fetch(`${ollamaHost}/api/ps`, { signal: AbortSignal.timeout(3000) });
-        if (psRes.ok) {
-          const psJson = await psRes.json();
+        const ps = await reachOllama("/api/ps", 3000);
+        if (ps) {
+          const psJson = await ps.res.json();
           loadedModels = psJson?.models || [];
         }
       } catch (e) {}
@@ -1011,7 +1034,6 @@ async function initializeServer() {
   const modelsCache = new Map<string, { at: number; list: string[] }>();
   app.get("/api/models/:provider", async (req, res) => {
     const prov = req.params.provider;
-    const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
 
     // C1 — short-TTL cache: the UI model dropdown polls this; without it every poll re-fetches
     // ollama tags / vLLM-llamacpp /v1/models / openrouter / gemini. 8s TTL (mirrors the fleet/
@@ -1036,9 +1058,9 @@ async function initializeServer() {
             "qwen3:8b", "qwen3:4b", "qwen3-coder:30b", "deepseek-r1:32b", "llama3.3:70b"
           ]);
         }
-        const response = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3000) });
-        if (response.ok) {
-          const list = await response.json();
+        const tags = await reachOllama("/api/tags", 3000); // tries 127.0.0.1 too (not just OLLAMA_HOST)
+        if (tags) {
+          const list = await tags.res.json();
           const names = (list.models || []).map((m: any) => m.name);
           return res.json(names);
         }
@@ -1421,7 +1443,8 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         if (result.toolCalls && result.toolCalls.length > 0) {
           // Zero-leak (T5-F5): tool_call args go to the client SSE — a model may have echoed a
           // key into them. Deep-redact secret-shaped substrings before they leave the server.
-          sendEvent("thought", { text: `Evaluating tool activation...`, toolCalls: redactDeep(result.toolCalls) });
+          // Telemetry is non-load-bearing: a redaction/serialize hiccup must never break the agent request.
+          try { sendEvent("thought", { text: `Evaluating tool activation...`, toolCalls: redactDeep(result.toolCalls) }); } catch { /* skip this thought frame */ }
 
           for (const tc of result.toolCalls) {
             const toolName = tc.name;

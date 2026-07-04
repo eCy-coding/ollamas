@@ -43,4 +43,15 @@ describe("redactDeep — walks objects/arrays and scrubs string leaves", () => {
     expect(redactDeep("gsk_LEAKED1234567890abcd")).not.toContain("gsk_LEAKED");
     expect(redactDeep(null)).toBe(null);
   });
+  it("survives a CIRCULAR tool_call arg without a stack overflow (still redacts, breaks the cycle)", () => {
+    const circular: any = { name: "leak", token: "gsk_LEAKED1234567890abcd" };
+    circular.self = circular;          // cycle: without a guard this overflows the stack
+    circular.kids = [{ parent: circular, k: "sk-abcdefghijklmnop1234" }];
+    const red = redactDeep(circular);  // must NOT throw
+    const s = JSON.stringify(red);     // must NOT throw (no circular in the output)
+    expect(s).not.toContain("gsk_LEAKED1234567890abcd");
+    expect(s).not.toContain("sk-abcdefghijklmnop1234");
+    expect(s).toContain("[Circular]");
+    expect(red.name).toBe("leak");
+  });
 });

@@ -87,12 +87,16 @@ export function redactString(s: string): string {
 /** Deep-redact any value: scrubs every string leaf in objects/arrays, preserves structure
  *  and non-secret content. Non-string primitives pass through unchanged. Zero-leak choke
  *  point for arbitrary payloads (e.g. tool_call arguments the model may have echoed a key into). */
-export function redactDeep<T>(value: T): T {
+export function redactDeep<T>(value: T, seen: WeakSet<object> = new WeakSet()): T {
   if (typeof value === "string") return scrub(value) as unknown as T;
-  if (Array.isArray(value)) return value.map((v) => redactDeep(v)) as unknown as T;
   if (value && typeof value === "object") {
+    // Cycle guard: tool_call arguments can be circular (e.g. a node referencing its parent); without this the
+    // recursion overflows the stack and crashes the /api/agent/chat SSE handler. Break the cycle, keep redacting.
+    if (seen.has(value as object)) return "[Circular]" as unknown as T;
+    seen.add(value as object);
+    if (Array.isArray(value)) return value.map((v) => redactDeep(v, seen)) as unknown as T;
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = redactDeep(v);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = redactDeep(v, seen);
     return out as unknown as T;
   }
   return value;
