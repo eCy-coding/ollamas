@@ -6,11 +6,18 @@ import type { IncomingMessage, ClientRequest } from "node:http";
 import { Resolver } from "node:dns";
 import { assertPrivateUrl } from "./guard.ts";
 
-/** dns.lookup-shaped fn (the subset https.request's `lookup` option needs). */
+/**
+ * dns.lookup-shaped fn. `callback` overloads: single (address, family) or, when the caller
+ * passed `options.all === true` (node:https ALWAYS does), an array of {address, family}.
+ */
 export type LookupFn = (
   hostname: string,
-  options: unknown,
-  callback: (err: Error | null, address: string, family: number) => void,
+  options: { all?: boolean } | unknown,
+  callback: (
+    err: Error | null,
+    address: string | { address: string; family: number }[],
+    family?: number,
+  ) => void,
 ) => void;
 
 /** Minimal Resolver surface so tests can inject a fake (vT14). */
@@ -24,16 +31,24 @@ export interface ResolverLike {
  * bypassing the system resolver. Fixes RISK-TUNNEL-027: MagicDNS (100.100.100.100) NXDOMAINs
  * *.trycloudflare.com, so the cloudflare REVERSE probe fails on a mesh Mac. A node:dns `Resolver`
  * INSTANCE is isolated — unlike global dns.setServers(), which doesn't even affect dns.lookup.
+ *
+ * CRITICAL (ERR-TUNNEL-005 family, caught live): node:https calls lookup with `{all:true}` and then
+ * REQUIRES an array back — returning a bare string gives "Invalid IP address: undefined". Honor `all`.
  */
 export function resolverLookup(
   servers: string[] = ["1.1.1.1", "1.0.0.1"],
   resolver: ResolverLike = new Resolver(),
 ): LookupFn {
   resolver.setServers(servers);
-  return (hostname, _options, callback) => {
+  return (hostname, options, callback) => {
+    const wantsAll = typeof options === "object" && options !== null && (options as { all?: boolean }).all === true;
     resolver.resolve4(hostname, (err, addresses) => {
-      if (err) return callback(err, "", 4);
-      callback(null, addresses[0] ?? "", 4);
+      if (err) return wantsAll ? callback(err, [], 4) : callback(err, "", 4);
+      if (wantsAll) {
+        callback(null, addresses.map((address) => ({ address, family: 4 })));
+      } else {
+        callback(null, addresses[0] ?? "", 4);
+      }
     });
   };
 }

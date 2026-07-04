@@ -88,6 +88,10 @@ import { addKey, listKeys, revokeKey, type PxyVault } from "./proxy.ts";
 import { createGateway } from "./proxy-server.ts";
 import { createLimiter } from "./ratelimit.ts";
 import { CloudflareTransport } from "./transports/cloudflare.ts";
+import { probeHttps } from "./health.ts";
+import { resolverLookup } from "./health.ts";
+import { writeGatewayState, readGatewayState } from "./gateway-state.ts";
+import { daemonLabelsForSetup } from "./setup.ts";
 
 const LOG_CAP = { maxBytes: 1_000_000, keep: 3 } as const;
 
@@ -310,7 +314,13 @@ function buildSwitch(): { sw: TunnelSwitch; transports: Transport[] } {
     new CaddyTlsTransport(tlsPlan),
     new WireGuardTransport(wgPlan),
     new HeadscaleTransport(meshPlan),
-    new CloudflareTransport({ localPort: 8443, hasActiveKey: proxyHasActiveKey }),
+    new CloudflareTransport({
+      localPort: 8443,
+      hasActiveKey: proxyHasActiveKey,
+      gatewayHealthy, // dead-gateway guard (vT14)
+      urlSink: (url) => // persist ephemeral URL so status/whoami/iPhone find it (vT14)
+        writeGatewayState(GATEWAY_STATE_PATH(), { running: true, publicUrl: url, ts: Date.now() }),
+    }),
   ];
   const sw = new TunnelSwitch();
   for (const t of transports) sw.register(t);
@@ -362,7 +372,10 @@ async function cmdStatus(): Promise<void> {
     await sw.selectAuto(); // live probe round
     await persistDecision(sw);
     const persisted = readDecisions(DECISIONS_PATH(), { limit: 50 });
-    const report = statusReport([...persisted, ...sw.decisions()]);
+    const gwState = readGatewayState(GATEWAY_STATE_PATH());
+    const report = statusReport([...persisted, ...sw.decisions()], {
+      ...(gwState ? { gateway: { running: gwState.running, publicUrl: gwState.publicUrl } } : {}),
+    });
     const conn = classify({ lan: report.active !== null, internet: await internetReachable() });
     if (json) return JSON.stringify({ ...report, connectivity: conn }, null, 2);
     return `${renderStatusTable(report)}\nconnectivity: ${conn}`;
@@ -442,10 +455,20 @@ async function cmdSetup(): Promise<void> {
   console.log(`autopilot: ${r.reason}${r.endpoint ? ` → ${r.endpoint.url}` : ""}`);
 
   if (wantDaemon) {
+    // vT14: one command installs BOTH agents — autopilot (transport self-heal) AND the proxy
+    // gateway — so REVERSE never points at a dead gateway. gap #2 closed.
+    const labels = daemonLabelsForSetup(
+      { autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL },
+      existsSync(PROXY_VAULT_PATH()),
+    );
     const dr = installAgent(daemonPlan());
-    console.log(`daemon: ${dr.reason}`);
+    console.log(`daemon (autopilot): ${dr.reason}`);
+    if (labels.includes(PROXY_DAEMON_LABEL)) {
+      const pr = installAgent(proxyDaemonPlan());
+      console.log(`daemon (proxy gateway): ${pr.reason}`);
+    }
   } else {
-    console.log("tip: `setup --daemon` to keep it always-on (login + crash-restart).");
+    console.log("tip: `setup --daemon` to keep it always-on (login + crash-restart, gateway + transport).");
   }
 }
 
@@ -501,7 +524,17 @@ async function cmdDoctor(): Promise<void> {
   // Requires the gateway running + an active pxy_ key (auth-gate throws otherwise, by design).
   let publicTunnel: import("./doctor.ts").PublicTunnelDoctor | undefined;
   if (process.argv.includes("--full")) {
-    const cf = new CloudflareTransport({ localPort: 8443, hasActiveKey: proxyHasActiveKey });
+    // vT14: resolve *.trycloudflare.com via 1.1.1.1 (belt) so the public probe works even when
+    // system DNS is MagicDNS (RISK-TUNNEL-027); persist the ephemeral URL for status.
+    const lookup = resolverLookup();
+    const cf = new CloudflareTransport({
+      localPort: 8443,
+      hasActiveKey: proxyHasActiveKey,
+      gatewayHealthy,
+      probeFn: (base, path) => probeHttps(base, path, { timeoutMs: 10_000, lookup }),
+      urlSink: (url) =>
+        writeGatewayState(GATEWAY_STATE_PATH(), { running: true, publicUrl: url, ts: Date.now() }),
+    });
     try {
       await cf.up();
       // Edge/DNS propagation for a fresh quick tunnel takes seconds — retry before verdict.
@@ -614,6 +647,14 @@ const PROXY_VAULT_PATH = () => join(KEYS_DIR, "proxy-vault.json");
 const PROXY_KEYFILE_PATH = () => join(KEYS_DIR, "proxy-keyfile");
 const PROXY_PID_PATH = () => join(KEYS_DIR, "proxy.pid");
 const PROXY_ACCESS_LOG = () => join(KEYS_DIR, "proxy-access.jsonl");
+export const GATEWAY_STATE_PATH = () => join(KEYS_DIR, "gateway-state.json");
+
+/** Gateway-health check for the cloudflare dead-gateway guard (vT14): https then http on :8443. */
+function gatewayHealthy(): Promise<boolean> {
+  return probeHttps("https://127.0.0.1:8443", HEALTH_PATH, { timeoutMs: 2000, insecure: true }).then(
+    (ok) => ok || probeHttp("http://127.0.0.1:8443", HEALTH_PATH, { timeoutMs: 2000 }),
+  );
+}
 
 /** SYNC auth-gate for CloudflareTransport (RISK-TUNNEL-024): ≥1 non-revoked pxy_ key in the vault. */
 function proxyHasActiveKey(): boolean {
@@ -668,11 +709,15 @@ async function cmdProxyUp(argv: string[]): Promise<void> {
   });
   const port = await gw.listen();
   await writeFile(PROXY_PID_PATH(), String(process.pid), { mode: 0o600 });
+  // vT14: mark gateway running (preserve any public URL a live cloudflare transport set).
+  const prev = readGatewayState(GATEWAY_STATE_PATH());
+  writeGatewayState(GATEWAY_STATE_PATH(), { running: true, publicUrl: prev?.publicUrl ?? null, ts: Date.now() });
   const scheme = tls ? "https" : "http";
   console.log(`proxy gateway up → ${scheme}://0.0.0.0:${port}  (routes: /v1→ollama:11434, /api|/mcp→ollamas:3000)`);
   console.log(`auth: ${active.length} active pxy_ key(s); public path: GET ${HEALTH_PATH} only`);
   // Foreground process (launchd KeepAlive supervises it). SIGINT/SIGTERM → clean close.
   const stop = async (): Promise<void> => {
+    writeGatewayState(GATEWAY_STATE_PATH(), { running: false, publicUrl: null, ts: Date.now() });
     await gw.close();
     process.exit(0);
   };

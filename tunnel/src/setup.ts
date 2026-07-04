@@ -60,6 +60,17 @@ export function kindsToConfigure(steps: SetupStep[]): SetupKind[] {
   return steps.filter((s) => s.status === "configure").map((s) => s.kind);
 }
 
+/**
+ * PURE (vT14): which launchd agents `setup --daemon` installs. Always the autopilot agent;
+ * the proxy gateway agent too when its vault exists (so one command = truly always-on everywhere).
+ */
+export function daemonLabelsForSetup(
+  labels: { autopilot: string; proxy: string },
+  proxyVaultExists: boolean,
+): string[] {
+  return proxyVaultExists ? [labels.autopilot, labels.proxy] : [labels.autopilot];
+}
+
 /** PURE: human-readable plan table. */
 export function renderSetupPlan(steps: SetupStep[]): string {
   const lines = ["transport    status          detail"];

@@ -10,7 +10,7 @@ function fakeHttps(behavior: { status?: number; error?: boolean; hang?: boolean 
   lastOpts: () => Record<string, unknown>;
 } {
   let captured: Record<string, unknown> = {};
-  const impl = ((url, options, callback) => {
+  const impl = ((_url, options, callback) => {
     captured = options as Record<string, unknown>;
     const req = new EventEmitter() as unknown as {
       setTimeout: (ms: number, cb: () => void) => void;
@@ -205,6 +205,26 @@ test("resolverLookup resolves via Resolver → first A record, family 4", async 
       assert.equal(err, null);
       assert.equal(addr, "104.16.1.1");
       assert.equal(fam, 4);
+      resolve();
+    });
+  });
+});
+
+test("resolverLookup returns an ARRAY when options.all=true (node:https requires it)", async () => {
+  const fakeResolver = {
+    setServers(_s: string[]) {},
+    resolve4(_host: string, cb: (e: Error | null, a: string[]) => void) {
+      cb(null, ["104.16.1.1", "104.16.2.2"]);
+    },
+  };
+  const lookup = resolverLookup(["1.1.1.1"], fakeResolver as never);
+  await new Promise<void>((resolve) => {
+    lookup("x", { all: true }, (err, addr) => {
+      assert.equal(err, null);
+      assert.deepEqual(addr, [
+        { address: "104.16.1.1", family: 4 },
+        { address: "104.16.2.2", family: 4 },
+      ]);
       resolve();
     });
   });

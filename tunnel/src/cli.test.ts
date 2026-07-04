@@ -37,3 +37,22 @@ test("proxyDaemonPlan: dedicated label, runs `proxy up`", () => {
   assert.deepEqual(plan.args, ["proxy", "up"]);
   assert.ok(plan.cliPath.endsWith("cli.ts"));
 });
+
+// ---------- vT14: gateway-state path + both-daemon wiring ----------
+import { GATEWAY_STATE_PATH } from "./cli.ts";
+import { DEFAULT_LABEL } from "./daemon.ts";
+import { daemonLabelsForSetup } from "./setup.ts";
+
+test("GATEWAY_STATE_PATH lives under keys/", () => {
+  assert.match(GATEWAY_STATE_PATH(), /keys\/gateway-state\.json$/);
+});
+
+test("daemonLabelsForSetup: both agents when proxy vault present", () => {
+  const labels = daemonLabelsForSetup({ autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL }, true);
+  assert.deepEqual(labels, [DEFAULT_LABEL, PROXY_DAEMON_LABEL]);
+});
+
+test("daemonLabelsForSetup: only autopilot when no proxy vault", () => {
+  const labels = daemonLabelsForSetup({ autopilot: DEFAULT_LABEL, proxy: PROXY_DAEMON_LABEL }, false);
+  assert.deepEqual(labels, [DEFAULT_LABEL]);
+});
