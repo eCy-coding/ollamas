@@ -4,10 +4,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   rollover, canDispatch, remaining, recordSuccess, recordExhausted,
-  pickVendor, defaultLimitFor, isVendorExhausted,
+  pickVendor, defaultLimitFor, isVendorExhausted, todayKey,
   loadBudget, saveBudget, guardVendor, noteVendorOutcome,
   type VendorState, type BudgetFile,
 } from "../bin/lib/vendor-budget";
+
+// ── todayKey: the ONLY Date use — injectable, UTC, "YYYY-MM-DD" ───────────────────────────────────────
+describe("todayKey", () => {
+  it("formats an injected Date as YYYY-MM-DD (deterministic, no Date.now flakiness)", () => {
+    expect(todayKey(new Date("2026-07-03T12:34:56Z"))).toBe("2026-07-03");
+  });
+  it("uses UTC — just before midnight UTC stays on the same day", () => {
+    expect(todayKey(new Date("2026-01-01T23:59:59.999Z"))).toBe("2026-01-01");
+    expect(todayKey(new Date("2026-01-02T00:00:00.000Z"))).toBe("2026-01-02");
+  });
+  it("defaults to the current day in the right shape when no Date is injected", () => {
+    expect(todayKey()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
 
 const v = (date: string, used: number, limit = 20): VendorState => ({ date, used, limit });
 

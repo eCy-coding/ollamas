@@ -13,7 +13,8 @@
  *   echo '{"kind":"code-functional","lang":"python","entry":"factorial","code":"def factorial(n):\n result=1\n for i in range(1,n):\n  result*=i\n return result","cases":[{"args":[5],"expect":120}]}' | tsx orchestration/bin/oracle.ts --request
  */
 import { readFileSync } from "node:fs";
-import { verify, type OracleInput, type OracleResult } from "../oracle/index";
+import { verify, type OracleInput } from "../oracle/index";
+import { render, verdictExitCode } from "./lib/oracle-lib";
 
 const argv = process.argv.slice(2);
 const jsonOut = argv.includes("--json");
@@ -22,11 +23,6 @@ const positional = argv.filter((a) => !a.startsWith("--"));
 
 function readStdin(): string {
   try { return readFileSync(0, "utf8"); } catch { return ""; }
-}
-
-function render(r: OracleResult): string {
-  const mark = r.verdict === "TRUE" ? "✓ DOĞRU" : r.verdict === "FALSE" ? "✗ YANLIŞ" : "○ KARARSIZ (öznel/kapsam-dışı)";
-  return `${mark}  [${r.category} · ${r.basis}]\n  ${r.proof}`;
 }
 
 let input: OracleInput;
@@ -51,4 +47,4 @@ if (jsonOut) {
   console.log(render(result));
 }
 // exit-code: DOĞRU=0, YANLIŞ=1, KARARSIZ=3 (conduct-gate uyumlu)
-process.exit(result.verdict === "TRUE" ? 0 : result.verdict === "FALSE" ? 1 : 3);
+process.exit(verdictExitCode(result.verdict));
