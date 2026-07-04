@@ -219,6 +219,66 @@ export function recipeMcpCall(gateway: string, auth: string): Recipe {
   };
 }
 
+// --- Siri local Run-Shell action builders (pure) --------------------------
+// These build the three WFActions the on-device "ollamas sor" Shortcut needs.
+// Unlike the gateway recipes, siri runs a LOCAL shell (no server) — the brain is
+// bin/siri-ask.mjs. Exported individually so the generator + tests can assert them.
+
+// "Ask for Input" — prompts the user for the question (Siri speaks/types this).
+export function askAction(question: string): WFAction {
+  return wfAction("is.workflow.actions.ask", { WFAskActionPrompt: question, WFInputType: "Text" });
+}
+
+// "Run Shell Script" — runs `script` with the provided input passed AS ARGUMENTS
+// ("$@" = the question). The generator reads WFShellScript verbatim to build the card.
+export function runShellAction(script: string): WFAction {
+  return wfAction("is.workflow.actions.runshellscript", {
+    WFShellScript: script,
+    WFInputType: "asArguments",
+    WFShell: "/bin/bash",
+  });
+}
+
+// "Speak Text" — reads a result aloud in `voice`. Exported for a future spoken
+// variant; recipeSiri deliberately omits it (text-only output).
+export function speakAction(voice: string): WFAction {
+  return wfAction("is.workflow.actions.speaktext", { WFSpeakTextVoice: voice });
+}
+
+// The load-bearing shell for the Siri Shortcut. Self-contained (absolute node +
+// repo paths — Shortcuts' Run-Shell has a minimal PATH), hardened: pins ORACLE_SOCK
+// to the warm daemon socket and self-ensures the daemon (fast deterministic path)
+// before delegating the question ("$@") to the standalone brain.
+function siriShellScript(repo: string): string {
+  return [
+    "#!/bin/bash",
+    "export ORACLE_SOCK=/tmp/ollamas-oracle.sock",
+    `# daemon self-ensure: start the warm truth-oracle if its socket is absent (ms-path).`,
+    `if [ ! -S "$ORACLE_SOCK" ]; then`,
+    `  "${repo}/node_modules/.bin/tsx" "${repo}/orchestration/bin/oracle-serve.ts" >/dev/null 2>&1 &`,
+    `  sleep 1`,
+    `fi`,
+    `exec /opt/homebrew/bin/node "${repo}/bin/siri-ask.mjs" "$@"`,
+  ].join("\n");
+}
+
+// "ollamas sor" — the on-device Siri search assistant. Ask → local shell (siri-ask
+// brain: Oracle verdict / deep web + fleet synth) → show result AS TEXT (no speech).
+// `voice` is accepted for signature symmetry with the spoken variant but unused here.
+export function recipeSiri(repo: string, voice: string): Recipe {
+  void voice; // text-only surface — speakAction intentionally omitted (see plist assertion)
+  return {
+    slug: "siri",
+    name: "ollamas sor",
+    description: "Siri yerel arama yardımcısı: soru → siri-ask beyni → metin yanıt (server gerekmez).",
+    actions: [
+      askAction("Ne sormak istersin?"),
+      runShellAction(siriShellScript(repo)),
+      showResultAction(),
+    ],
+  };
+}
+
 // The full pack, in stable slug order.
 export function allRecipes(gateway: string, auth: string, model: string, provider: string): Recipe[] {
   return [
