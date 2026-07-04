@@ -6,6 +6,15 @@ import { join as pathJoin } from "node:path";
 import { parseBackendPool, selectBackend, type Backend, type BackendProbe } from "../cli/lib/remote";
 import { generateViaGeminiCli, geminiCliAvailable } from "./gemini-cli";
 import { keyId, recordKeyUse, keyWindows, recordCallCost, keyUsageSnapshot, hydrateKeyUsage } from "./key-usage";
+import { loadAlignmentSelection, resolveAlignedModel, alignmentEnabled, type AlignmentSelection } from "./alignment";
+
+// Constitutional-Alignment runtime wiring (vO65): lazily load ALIGNMENT_SELECTION.json once, then map a local
+// model tag to its regression-clean "-ca" variant — but ONLY when OLLAMAS_ALIGN is on (default OFF = no-op).
+let _alignSel: AlignmentSelection | null = null;
+function alignSelection(): AlignmentSelection {
+  if (!_alignSel) _alignSel = loadAlignmentSelection(pathJoin(process.cwd(), "orchestration", "ALIGNMENT_SELECTION.json"));
+  return _alignSel;
+}
 import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
 import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catalog";
@@ -898,7 +907,10 @@ export class ProviderRouter {
         // The model actually used. After a provider fallback config.model is nulled
         // so each provider self-defaults; reporting config.model in the returns would
         // surface modelUsed:undefined — resolve it once here and reuse everywhere.
-        const usedModel = config.model || "qwen3:8b";
+        const requestedModel = config.model || "qwen3:8b";
+        // vO65 alignment wiring: swap to the regression-clean "-ca" variant when OLLAMAS_ALIGN is on (else no-op).
+        const usedModel = resolveAlignedModel(requestedModel, alignSelection(), { enabled: alignmentEnabled(process.env) });
+        if (usedModel !== requestedModel) console.log(`[align] ${requestedModel} → ${usedModel}`);
         const reqBody = JSON.stringify({
           model: usedModel,
           messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args, not stringified

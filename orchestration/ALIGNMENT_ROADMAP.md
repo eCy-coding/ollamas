@@ -20,12 +20,18 @@ result. This is behavioral alignment, not model cloning.
 | L4 | Zero-dep ollama client (temp=0 deterministic) | `bin/lib/ollama-client.ts` | ✅ vO62 |
 | L5 | Suite runner + A/B report (base vs `-ca`, Δ) | `bin/align.ts` (`create`/`bench`/`list`) | ✅ vO62 |
 | L6 | All-model sweep · conformance × tok/s selection (`optimize.ts` reuse) · regression gate · multi-run median · idempotent create · per-family params · usage resolver | `bin/align.ts all/resolve` + `bin/lib/align-sweep.ts` | ✅ vO63 |
-| L7 | Server/fleet system-prompt wire-in · optional LLM-judge similarity (eval-only) · PARAMETER auto-tune · CI conformance gate | — | ▶ vO64+ |
+| L7 | Runtime wire-in — server dispatches the regression-clean `-ca` variant (env-gated `OLLAMAS_ALIGN`, default-OFF) | `server/alignment.ts`; `server/providers.ts` ollama-local | ✅ vO65 |
+| L8 | optional LLM-judge similarity (eval-only) · PARAMETER auto-tune · CI conformance gate · per-family constitution | — | ▶ vO66+ |
+
+## Runtime wiring (vO65 — SHIPPED)
+Set `OLLAMAS_ALIGN=1` (default OFF). When on, `server/providers.ts` maps a requested local model to its
+regression-clean `-ca` variant via `server/alignment.ts resolveAlignedModel` (reads `ALIGNMENT_SELECTION.json`).
+Three gates keep it safe: env-gated (off = pure no-op), regression-gated (only a variant that passed the
+conformance check), existence-gated (a variant not installed falls back to the base — never dispatch a missing
+tag). Live-proven: with the flag on, a `qwen3:8b` request dispatches `qwen3-8b-ca` (server log `[align] …`);
+off, it dispatches `qwen3:8b` unchanged; `gpt-oss:20b` (regression-failed) stays on the base even when on.
 
 ## Roadmap (next versions)
-- **vO64 — Server/fleet wire-in (make it automatic).** Point ollamas' local-model calls at the winning `-ca`
-  variant (or inject the constitution as `messages[0]` — already supported at `server/providers.ts:867/904`).
-  Consume `ALIGNMENT_SELECTION.json`. (server is a separate lane → coordinated edit.)
 - **vO65 — Server/fleet wire-in (make it automatic).** Consume `ALIGNMENT_SELECTION.json`; point ollamas'
   local-model calls at the winning `-ca` variant. Now safe because the benchmark is accurate (vO64 judge).
 - **vO65.x — PARAMETER auto-tune + CI conformance gate.** Grid/anneal per model to maximize conformance; a gate

@@ -33,6 +33,10 @@ parity (qwen3:8b 100%→100%). Variants are directly runnable: `ollama run <base
 The rubric (`bin/lib/conformance.ts`) scores 5 behavioral dimensions: honesty/calibration, harmlessness
 (clear refusal without over-refusing benign requests), structure, directness (anti-sycophancy), format obedience.
 
+**Runtime use (vO65):** set `OLLAMAS_ALIGN=1` and the server dispatches the regression-clean `-ca` variant for
+a matching local model (`server/alignment.ts` reads `ALIGNMENT_SELECTION.json`; `server/providers.ts` swaps the
+tag). Default OFF = no change. Only regression-clean, installed variants are used; anything else stays on the base.
+
 **Ethical boundary:** behavioral alignment via a public-principle system prompt + params only. NOT weight/data
 extraction, NOT fine-tuning on Claude/Fable outputs (Anthropic ToS), NOT impersonation (`-ca` is openly named).
 See `bin/lib/claude-constitution.ts` and `orchestration/ALIGNMENT_ROADMAP.md`.
