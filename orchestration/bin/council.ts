@@ -19,7 +19,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "
 import { execFileSync } from "node:child_process";
 import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildRoster, seatsForLane, parseApiModel, LANES, type Roster, type Seat } from "./lib/council-roster";
+import { buildRoster, seatsForLane, parseApiModel, LANES, renderRosterTable, injectRosterBlock, type Roster, type Seat } from "./lib/council-roster";
 import {
   buildLanePrompt, parseFindings, summarizeCouncil, checkableClaims,
   type LaneContext, type LaneResult, type Finding,
@@ -220,6 +220,12 @@ function writeRoster(roster: Roster, ts: string): void {
     })),
   };
   writeFileSync(join(ORCH_DIR, "COUNCIL_ROSTER.json"), JSON.stringify(payload, null, 2) + "\n");
+  // COUNCIL_PROMPT.md §3 canlı roster bloğu (orphan kök-fix: doc'un "canlı türetilir" iddiası gerçek).
+  try {
+    const promptPath = join(ORCH_DIR, "COUNCIL_PROMPT.md");
+    const updated = injectRosterBlock(readFileSync(promptPath, "utf8"), renderRosterTable(roster.seats));
+    if (updated) writeFileSync(promptPath, updated);
+  } catch { /* fail-soft: COUNCIL_PROMPT.md yoksa/okunamıyorsa dokunma */ }
 }
 
 function sysChip(): string {
