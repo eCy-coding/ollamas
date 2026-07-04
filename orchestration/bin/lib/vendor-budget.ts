@@ -88,7 +88,9 @@ export function pickVendor(candidates: string[], b: BudgetFile, today: string, p
 // (retry-worthy, handled by backoff), NOT an exhausted budget — latching it would wrongly abandon the vendor.
 // Bare "exceeded" is deliberately NOT matched: 400-class request errors ("maximum context length exceeded",
 // "size limit exceeded") carry it too and would falsely latch a healthy vendor for the whole day.
-const VENDOR_EXHAUSTED = /\b429\b|too many requests|rate.?limit|resource_exhausted|insufficient_quota|quota|daily limit|usage limit/i;
+// "requests limit" IS matched: cerebras/zai 429 bodies say "exceeded your current requests limit" with no
+// 429/quota literal — narrow enough to never hit the size/context wordings above.
+const VENDOR_EXHAUSTED = /\b429\b|too many requests|rate.?limit|resource_exhausted|insufficient_quota|quota|daily limit|usage limit|requests? limit/i;
 
 /** True when an error/response blob signals the vendor's rate/quota is spent (latch + fail over, not retry). */
 export function isVendorExhausted(text: string): boolean {
