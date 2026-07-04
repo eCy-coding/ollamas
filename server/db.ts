@@ -227,8 +227,14 @@ export class SecureDB {
     // Migration into the hardware vault: when the opt-in is on and the keychain does not yet
     // hold the active key, mirror the EXISTING file/minted key into the keychain (same bytes, so
     // decrypt stays consistent). The file remains as a fallback. Best-effort; never blocks boot.
+    let migrated = false;
     if (keychainVaultEnabled() && !keychainKey && decision.source !== "env") {
-      writeGenericPassword(masterKeyService(), this.masterKey.toString("base64"));
+      migrated = writeGenericPassword(masterKeyService(), this.masterKey.toString("base64"));
+    }
+    // Observability (source NAME only, never a key value): confirms which store the master key
+    // came from — "keychain" proves the Secure-Enclave hardware vault is the live source.
+    if (keychainVaultEnabled()) {
+      console.log(`[db] master key source: ${decision.source}${migrated ? " (mirrored → keychain)" : ""}`);
     }
 
     // 3. Load or initiate data
