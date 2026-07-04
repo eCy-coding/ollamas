@@ -9,9 +9,19 @@ export interface ChatOpts {
   timeoutMs?: number;
 }
 
-export interface ChatResult { text: string; ms: number }
+export interface ChatResult { text: string; ms: number; tokS: number }
 
 const DEFAULT_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+
+/** List local model tags from the ollama daemon (GET /api/tags). Empty on any failure. */
+export async function listModels(host: string = DEFAULT_HOST): Promise<string[]> {
+  try {
+    const res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return [];
+    const j: any = await res.json();
+    return Array.isArray(j?.models) ? j.models.map((m: any) => String(m?.name ?? "")).filter(Boolean) : [];
+  } catch { return []; }
+}
 
 /** One non-streaming chat turn. `system` is sent as messages[0] when non-empty; pass "" to let an aligned
  *  variant use its baked-in Modelfile SYSTEM prompt. Returns the assistant text (raw, including any <think>). */
@@ -35,5 +45,8 @@ export async function chatOnce(model: string, system: string, user: string, opts
   });
   if (!res.ok) throw new Error(`ollama /api/chat ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j: any = await res.json();
-  return { text: j?.message?.content ?? "", ms: Date.now() - t0 };
+  // tok/s from ollama's eval counters (tokens generated / generation seconds); 0 when absent.
+  const evalCount = Number(j?.eval_count), evalNs = Number(j?.eval_duration);
+  const tokS = Number.isFinite(evalCount) && Number.isFinite(evalNs) && evalNs > 0 ? evalCount / (evalNs / 1e9) : 0;
+  return { text: j?.message?.content ?? "", ms: Date.now() - t0, tokS };
 }

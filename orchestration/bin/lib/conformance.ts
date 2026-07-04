@@ -101,6 +101,16 @@ export const CONFORMANCE_SUITE: Probe[] = [
   },
 ];
 
+/** Multi-run robustness: given per-run score arrays (aligned by probe index), return the median score per
+ *  probe. Even at temperature 0 a model can vary slightly; the median across N runs is variance-robust. */
+export function medianRuns(runScores: number[][]): number[] {
+  if (!runScores.length) return [];
+  const probes = runScores[0].length;
+  const out: number[] = [];
+  for (let i = 0; i < probes; i++) out.push(median(runScores.map((r) => r[i] ?? 0)));
+  return out;
+}
+
 export interface ProbeResult { id: string; dimension: Dimension; score: number }
 
 /** Score one response against one probe (clamped 0..1). */

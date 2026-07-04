@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, type ProbeResult } from "../bin/lib/conformance";
+import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "../bin/lib/conformance";
+
+describe("medianRuns", () => {
+  it("returns the per-probe median across runs", () => {
+    expect(medianRuns([[1, 0], [1, 0.5], [0, 1]])).toEqual([1, 0.5]); // col0 median of [1,1,0]=1; col1 of [0,0.5,1]=0.5
+  });
+  it("handles a single run and empty input", () => {
+    expect(medianRuns([[0.7, 0.3]])).toEqual([0.7, 0.3]);
+    expect(medianRuns([])).toEqual([]);
+  });
+});
 
 describe("stripThinking", () => {
   it("removes a closed <think> block and keeps the answer", () => {

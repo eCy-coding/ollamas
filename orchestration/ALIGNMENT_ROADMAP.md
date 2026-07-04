@@ -19,24 +19,26 @@ result. This is behavioral alignment, not model cloning.
 | L3 | Conformance rubric + curated probe suite (deterministic, 0..1) | `bin/lib/conformance.ts` | ✅ vO62 |
 | L4 | Zero-dep ollama client (temp=0 deterministic) | `bin/lib/ollama-client.ts` | ✅ vO62 |
 | L5 | Suite runner + A/B report (base vs `-ca`, Δ) | `bin/align.ts` (`create`/`bench`/`list`) | ✅ vO62 |
-| L6 | Best-variant selection + routing wire-in (`optimize.ts` reuse) | — | ▶ vO63 |
-| L7 | All-model sweep · optional LLM-judge similarity (eval-only) · per-model PARAMETER auto-tune · CI conformance gate · multi-run stability | — | ▶ vO63+ |
+| L6 | All-model sweep · conformance × tok/s selection (`optimize.ts` reuse) · regression gate · multi-run median · idempotent create · per-family params · usage resolver | `bin/align.ts all/resolve` + `bin/lib/align-sweep.ts` | ✅ vO63 |
+| L7 | Server/fleet system-prompt wire-in · optional LLM-judge similarity (eval-only) · PARAMETER auto-tune · CI conformance gate | — | ▶ vO64+ |
 
 ## Roadmap (next versions)
-- **vO63 — All-model sweep + selection.** Run `create`+`bench` across the M4 inventory (qwen3:8b, qwen3:30b-a3b,
-  qwen3-coder:30b, deepseek-r1:32b, gpt-oss:20b, phi4). Rank aligned variants by conformance × tok/s (reuse
-  `optimize.ts scoreModel` with a conformance gate). Emit `ALIGNMENT_SELECTION.json` = best aligned variant per role.
-- **vO63.x — Routing wire-in.** Register the winning `-ca` variants so the server/fleet use the aligned variant
-  where a local model is called (per-request `messages[0]` system already supported — `server/providers.ts`).
-- **vO64 — Judge-based similarity (eval-only).** Optionally score responses with Claude/Fable as an LLM judge for
-  fidelity, strictly for evaluation (never training). Keep the deterministic rubric as the fast default.
-- **vO64.x — PARAMETER auto-tune.** Grid/anneal temperature/top_p/repeat_penalty per model to maximize conformance.
-- **vO65 — CI conformance gate + multi-run stability.** N-run median per probe (variance-robust), regression gate
-  in the harness so a constitution edit that lowers conformance is caught.
+- **vO64 — Server/fleet wire-in (make it automatic).** Point ollamas' local-model calls at the winning `-ca`
+  variant (or inject the constitution as `messages[0]` — already supported at `server/providers.ts:867/904`).
+  Consume `ALIGNMENT_SELECTION.json`. (server is a separate lane → coordinated edit.)
+- **vO64.x — Judge-based similarity (eval-only).** Optionally score responses with Claude/Fable as an LLM judge
+  for fidelity, strictly for evaluation (never training). Keep the deterministic rubric as the fast default.
+- **vO65 — PARAMETER auto-tune + CI conformance gate.** Grid/anneal per model to maximize conformance; a gate so
+  a constitution edit that lowers conformance is caught in CI.
 
-## Usage
+## Usage (production)
 ```
-tsx orchestration/bin/align.ts create qwen3:8b     # build qwen3-8b-ca
+tsx orchestration/bin/align.ts all                 # sweep ALL local models → ALIGNMENT_MATRIX.md + ALIGNMENT_SELECTION.json
+tsx orchestration/bin/align.ts all --only qwen3:8b,gpt-oss:20b --runs 2   # subset, multi-run median
+tsx orchestration/bin/align.ts create qwen3:8b     # build qwen3-8b-ca (idempotent; --force rebuilds)
 tsx orchestration/bin/align.ts bench  qwen3:8b     # base vs aligned conformance → ALIGN_REPORT.md
+tsx orchestration/bin/align.ts resolve qwen3:8b    # → qwen3-8b-ca (the variant ollamas should run)
 tsx orchestration/bin/align.ts list                # aligned variants present
 ```
+`ALIGNMENT_SELECTION.json` (mirrors `MODEL_SELECTION.json`) names the best aligned variant per hardware — the
+production hand-off any consumer reads. Variants are directly runnable: `ollama run <base>-ca`.

@@ -2,15 +2,20 @@
 /**
  * orchestration/bin/align.ts — Constitutional Alignment harness CLI.
  *
- *   align create <base>   Build an ethically-aligned variant `<base>-ca` (Ollama Modelfile: FROM <base> +
- *                         SYSTEM <public-principle constitution> + calibrated PARAMs). No weights copied, no
- *                         fine-tuning — behavioral alignment via system prompt.
- *   align bench  <base>   A/B the conformance suite: base (raw) vs `<base>-ca` (constitution-baked) at
- *                         temperature 0 → per-probe + overall Claude-conformance scores + Δ. Writes
- *                         orchestration/ALIGN_REPORT.md + ALIGN.json.
- *   align list            List aligned variants present in ollama.
+ *   align create <base>            Build the aligned variant `<base>-ca` (Ollama Modelfile: FROM <base> +
+ *                                  SYSTEM <public-principle constitution> + family-calibrated PARAMs).
+ *                                  Idempotent (skips if it exists; `--force` rebuilds). No weights copied,
+ *                                  no fine-tuning — behavioral alignment via system prompt.
+ *   align bench  <base> [--runs N] A/B the conformance suite: base (raw) vs `<base>-ca` at temperature 0,
+ *                                  median over N runs → per-probe + overall conformance + Δ. → ALIGN_REPORT.md.
+ *   align all [--runs N] [--only a,b]  Sweep every alignable local model: create (idempotent) + bench + rank
+ *                                  by conformance × tok/s (optimize.ts) + regression-check → ALIGNMENT_MATRIX.md
+ *                                  + ALIGNMENT_SELECTION.json (the production selection).
+ *   align resolve <base>           Print the aligned variant tag ollamas should run for a base model.
+ *   align list                     List aligned variants present in ollama.
  *
- * Ethical boundary: see bin/lib/claude-constitution.ts. Variants are openly named "-ca"; no impersonation.
+ * Ethical boundary: see bin/lib/claude-constitution.ts. Variants are openly named "-ca"; no impersonation,
+ * no weight/data extraction, no fine-tuning on Claude/Fable outputs.
  */
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -19,77 +24,147 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { CONSTITUTION, CONSTITUTION_VERSION } from "./lib/claude-constitution";
 import { renderModelfile, alignedTag } from "./lib/modelfile";
-import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, type ProbeResult } from "./lib/conformance";
-import { chatOnce } from "./lib/ollama-client";
+import { CONFORMANCE_SUITE, scoreResponse, aggregateConformance, stripThinking, medianRuns, type ProbeResult } from "./lib/conformance";
+import { chatOnce, listModels } from "./lib/ollama-client";
+import { median } from "./lib/bench";
+import { optimalConfig } from "./lib/optimize";
+import {
+  isAlignableBase, paramProfileFor, selectBestAligned, regressionCheck, renderMatrix,
+  alignedModelFor, type SweepRow,
+} from "./lib/align-sweep";
 
 const ORCH = join(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
 const cmd = argv[0];
+const flag = (n: string, d = ""): string => { const i = argv.indexOf(n); return i >= 0 ? (argv[i + 1] ?? d) : d; };
 const JSON_OUT = argv.includes("--json");
+const FORCE = argv.includes("--force");
+const RUNS = Math.max(1, Number(flag("--runs", "1")) || 1);
+const ONLY = flag("--only").split(",").map((s) => s.trim()).filter(Boolean);
 const base = argv[1] && !argv[1].startsWith("--") ? argv[1] : "";
 
-function usage(): never { console.error("usage: align create <base> | bench <base> | list [--json]"); process.exit(2); }
+function usage(): never {
+  console.error("usage: align create <base> | bench <base> [--runs N] | all [--runs N] [--only a,b] | resolve <base> | list [--json]");
+  process.exit(2);
+}
+function log(m: string): void { if (!JSON_OUT) console.error(m); }
 
-function cmdCreate(baseModel: string): void {
-  if (!baseModel) usage();
+// ── system RAM (GB) for the VRAM-fit term of the selection ────────────────────────────────────────────
+function sysRamGb(): number {
+  try { return Math.round(Number(execFileSync("sysctl", ["-n", "hw.memsize"], { encoding: "utf8" }).trim()) / 1e9); }
+  catch { return 16; }
+}
+function sysInfo(): { chip: string; cores: number } {
+  try {
+    const chip = execFileSync("sysctl", ["-n", "machdep.cpu.brand_string"], { encoding: "utf8" }).trim();
+    const cores = Number(execFileSync("sysctl", ["-n", "hw.physicalcpu"], { encoding: "utf8" }).trim()) || 8;
+    return { chip, cores };
+  } catch { return { chip: "?", cores: 8 }; }
+}
+
+// ── create (idempotent) ───────────────────────────────────────────────────────────────────────────────
+async function ensureVariant(baseModel: string, force = FORCE): Promise<string> {
   const tag = alignedTag(baseModel);
-  const mf = renderModelfile({ base: baseModel, system: CONSTITUTION });
+  if (!force) {
+    const have = await listModels();
+    if (have.some((m) => m === tag || m === `${tag}:latest` || m.startsWith(`${tag}:`))) { log(`[align] ${tag} exists — skip (use --force to rebuild)`); return tag; }
+  }
+  const mf = renderModelfile({ base: baseModel, system: CONSTITUTION, params: paramProfileFor(baseModel) });
   const tmp = join(tmpdir(), `Modelfile.${tag}`);
   writeFileSync(tmp, mf);
   execFileSync("ollama", ["create", tag, "-f", tmp], { stdio: JSON_OUT ? "ignore" : "inherit", timeout: 180_000 });
-  if (JSON_OUT) console.log(JSON.stringify({ ok: true, base: baseModel, aligned: tag, constitution: CONSTITUTION_VERSION }));
-  else console.error(`[align] created ${tag}  (constitution v${CONSTITUTION_VERSION}, from ${baseModel})`);
+  log(`[align] created ${tag}  (constitution v${CONSTITUTION_VERSION}, from ${baseModel})`);
+  return tag;
 }
 
-interface Row extends ProbeResult { ms: number; sample: string }
-async function runSuite(model: string): Promise<Row[]> {
-  const rows: Row[] = [];
-  for (const p of CONFORMANCE_SUITE) {
-    let text = "", ms = 0;
-    try { const r = await chatOnce(model, "", p.prompt); text = stripThinking(r.text); ms = r.ms; }
-    catch (e: any) { text = `«error: ${String(e?.message ?? e).slice(0, 80)}»`; }
-    rows.push({ id: p.id, dimension: p.dimension, score: scoreResponse(p, text), ms, sample: text.replace(/\s+/g, " ").slice(0, 100) });
+// ── conformance run (median over N runs) ──────────────────────────────────────────────────────────────
+interface Row extends ProbeResult { sample: string }
+async function runSuiteN(model: string, runs: number): Promise<{ rows: Row[]; tokS: number }> {
+  const runScores: number[][] = [];
+  const toks: number[] = [];
+  const lastText: string[] = new Array(CONFORMANCE_SUITE.length).fill("");
+  for (let run = 0; run < runs; run++) {
+    const scores: number[] = [];
+    for (let i = 0; i < CONFORMANCE_SUITE.length; i++) {
+      const p = CONFORMANCE_SUITE[i];
+      let text = "";
+      try { const r = await chatOnce(model, "", p.prompt); text = stripThinking(r.text); if (r.tokS > 0) toks.push(r.tokS); }
+      catch (e: any) { text = `«error: ${String(e?.message ?? e).slice(0, 80)}»`; }
+      scores.push(scoreResponse(p, text));
+      lastText[i] = text;
+    }
+    runScores.push(scores);
   }
-  return rows;
+  const med = medianRuns(runScores);
+  const rows: Row[] = CONFORMANCE_SUITE.map((p, i) => ({ id: p.id, dimension: p.dimension, score: med[i] ?? 0, sample: lastText[i].replace(/\s+/g, " ").slice(0, 100) }));
+  return { rows, tokS: toks.length ? median(toks) : 0 };
 }
 
 function pct(n: number): string { return (n * 100).toFixed(0) + "%"; }
 
-function renderReport(baseModel: string, tag: string, baseRows: Row[], alignRows: Row[]): string {
-  const bSum = aggregateConformance(baseRows), aSum = aggregateConformance(alignRows);
-  const delta = aSum.mean - bSum.mean;
-  const lines: string[] = [];
-  lines.push(`# Alignment conformance — ${baseModel} vs ${tag}`, "");
-  lines.push(`Constitution v${CONSTITUTION_VERSION} · temperature 0 · ${CONFORMANCE_SUITE.length} probes · behavioral rubric (no LLM judge)`, "");
-  lines.push(`**Overall Claude-conformance:** base ${pct(bSum.mean)} → aligned ${pct(aSum.mean)}  ·  **Δ ${delta >= 0 ? "+" : ""}${pct(delta)}**`, "");
-  lines.push("| Probe | Dimension | base | aligned |", "|---|---|---|---|");
-  for (let i = 0; i < baseRows.length; i++) {
-    const b = baseRows[i], a = alignRows[i];
-    lines.push(`| ${b.id} | ${b.dimension} | ${pct(b.score)} | ${pct(a.score)} |`);
-  }
-  lines.push("", "### Per-dimension (aligned)", "");
-  for (const [d, v] of Object.entries(aSum.byDimension)) lines.push(`- ${d}: ${pct(v)}`);
-  lines.push("", "_Ethical: behavioral alignment via a public-principle system prompt + calibrated params. No weights/data cloned, no fine-tuning on Claude outputs, no impersonation._");
-  return lines.join("\n") + "\n";
+// ── create ────────────────────────────────────────────────────────────────────────────────────────────
+async function cmdCreate(baseModel: string): Promise<void> {
+  if (!baseModel) usage();
+  const tag = await ensureVariant(baseModel);
+  if (JSON_OUT) console.log(JSON.stringify({ ok: true, base: baseModel, aligned: tag, constitution: CONSTITUTION_VERSION }));
 }
 
+// ── bench ─────────────────────────────────────────────────────────────────────────────────────────────
 async function cmdBench(baseModel: string): Promise<void> {
   if (!baseModel) usage();
   const tag = alignedTag(baseModel);
-  if (!JSON_OUT) console.error(`[align] benchmarking ${baseModel} (raw) vs ${tag} (aligned) — ${CONFORMANCE_SUITE.length} probes × 2 …`);
-  const baseRows = await runSuite(baseModel);
-  const alignRows = await runSuite(tag);
-  const bSum = aggregateConformance(baseRows), aSum = aggregateConformance(alignRows);
+  log(`[align] benchmarking ${baseModel} (raw) vs ${tag} (aligned) — ${CONFORMANCE_SUITE.length} probes × ${RUNS} run(s) × 2 …`);
+  const b = await runSuiteN(baseModel, RUNS), a = await runSuiteN(tag, RUNS);
+  const bSum = aggregateConformance(b.rows), aSum = aggregateConformance(a.rows);
   const delta = aSum.mean - bSum.mean;
-  const report = renderReport(baseModel, tag, baseRows, alignRows);
-  writeFileSync(join(ORCH, "ALIGN_REPORT.md"), report);
-  writeFileSync(join(ORCH, "ALIGN.json"), JSON.stringify({
-    base: baseModel, aligned: tag, constitution: CONSTITUTION_VERSION,
-    baseMean: bSum.mean, alignedMean: aSum.mean, delta,
-    baseRows, alignRows,
-  }, null, 2) + "\n");
+  const lines = [`# Alignment conformance — ${baseModel} vs ${tag}`, "",
+    `Constitution v${CONSTITUTION_VERSION} · temperature 0 · ${CONFORMANCE_SUITE.length} probes × ${RUNS} run(s) · behavioral rubric (no LLM judge)`, "",
+    `**Overall Claude-conformance:** base ${pct(bSum.mean)} → aligned ${pct(aSum.mean)}  ·  **Δ ${delta >= 0 ? "+" : ""}${pct(delta)}**`, "",
+    "| Probe | Dimension | base | aligned |", "|---|---|---|---|",
+    ...b.rows.map((r, i) => `| ${r.id} | ${r.dimension} | ${pct(r.score)} | ${pct(a.rows[i].score)} |`),
+    "", "_Ethical: behavioral alignment via a public-principle system prompt + calibrated params. No weights/data cloned, no fine-tuning, no impersonation._"];
+  writeFileSync(join(ORCH, "ALIGN_REPORT.md"), lines.join("\n") + "\n");
+  writeFileSync(join(ORCH, "ALIGN.json"), JSON.stringify({ base: baseModel, aligned: tag, constitution: CONSTITUTION_VERSION, baseMean: bSum.mean, alignedMean: aSum.mean, delta, baseRows: b.rows, alignRows: a.rows }, null, 2) + "\n");
   if (JSON_OUT) console.log(JSON.stringify({ ok: true, base: baseModel, aligned: tag, baseMean: bSum.mean, alignedMean: aSum.mean, delta }));
-  else { process.stdout.write("\n" + report); console.error(`[align] report → ${join(ORCH, "ALIGN_REPORT.md")}`); }
+  else { process.stdout.write("\n" + lines.join("\n") + "\n"); console.error(`[align] report → ${join(ORCH, "ALIGN_REPORT.md")}`); }
+}
+
+// ── all: sweep every alignable local model → matrix + production selection ─────────────────────────────
+async function cmdAll(): Promise<void> {
+  const inv = await listModels();
+  const matches = (b: string) => !ONLY.length || ONLY.some((o) => b === o || b.split(":")[0] === o || b.startsWith(`${o}:`));
+  const bases = [...new Set(inv.filter(isAlignableBase).filter(matches))];
+  if (!bases.length) { console.error("align all: no alignable local models found (is ollama running?)"); process.exit(1); }
+  log(`[align] sweeping ${bases.length} model(s): ${bases.join(", ")}  (${RUNS} run(s) each)`);
+  const rows: (SweepRow & { regression: { ok: boolean; reason: string } })[] = [];
+  for (const b of bases) {
+    const tag = await ensureVariant(b);
+    log(`[align] · ${b} → ${tag} …`);
+    const baseR = await runSuiteN(b, RUNS), alignR = await runSuiteN(tag, RUNS);
+    const bSum = aggregateConformance(baseR.rows), aSum = aggregateConformance(alignR.rows);
+    rows.push({ base: b, aligned: tag, baseMean: bSum.mean, alignedMean: aSum.mean, delta: aSum.mean - bSum.mean, tokS: alignR.tokS, byDimension: aSum.byDimension, regression: regressionCheck(bSum.mean, aSum.mean) });
+  }
+  const ramGb = sysRamGb();
+  const { chip, cores } = sysInfo();
+  const best = selectBestAligned(rows, ramGb);
+  const matrix = renderMatrix(rows) +
+    (best ? `\n**Selected (conformance × tok/s):** ${best.model}  ·  conformance ${pct(best.correctRatio)}  ·  ${best.tokS.toFixed(0)} tok/s  ·  score ${best.score}\n` : "\n_No variant cleared the conformance gate._\n") +
+    "\n### Regression check\n" + rows.map((r) => `- ${r.aligned}: ${r.regression.ok ? "✅" : "❌"} ${r.regression.reason}`).join("\n") + "\n";
+  writeFileSync(join(ORCH, "ALIGNMENT_MATRIX.md"), matrix);
+  const selection = {
+    chip, ramGb, cores, ts: new Date().toISOString(), constitution: CONSTITUTION_VERSION,
+    selection: best ? { model: best.model, score: best.score, tokS: best.tokS, conformance: best.correctRatio, reason: best.reason, config: optimalConfig(ramGb, cores, best.model) } : null,
+    variants: rows.map((r) => ({ base: r.base, aligned: r.aligned, baseMean: r.baseMean, alignedMean: r.alignedMean, delta: r.delta, tokS: r.tokS, regression: r.regression })),
+  };
+  writeFileSync(join(ORCH, "ALIGNMENT_SELECTION.json"), JSON.stringify(selection, null, 2) + "\n");
+  if (JSON_OUT) console.log(JSON.stringify({ ok: true, swept: bases.length, best: best?.model ?? null, variants: selection.variants }));
+  else { process.stdout.write("\n" + matrix); console.error(`[align] → ${join(ORCH, "ALIGNMENT_MATRIX.md")} + ALIGNMENT_SELECTION.json`); }
+}
+
+function cmdResolve(baseModel: string): void {
+  if (!baseModel) usage();
+  const tag = alignedModelFor(baseModel);
+  console.log(JSON_OUT ? JSON.stringify({ base: baseModel, aligned: tag }) : tag);
 }
 
 function cmdList(): void {
@@ -100,8 +175,10 @@ function cmdList(): void {
 }
 
 (async () => {
-  if (cmd === "create") cmdCreate(base);
+  if (cmd === "create") await cmdCreate(base);
   else if (cmd === "bench") await cmdBench(base);
+  else if (cmd === "all") await cmdAll();
+  else if (cmd === "resolve") cmdResolve(base);
   else if (cmd === "list") cmdList();
   else usage();
 })().catch((e) => { console.error(`align: ${e?.message ?? e}`); process.exit(1); });
