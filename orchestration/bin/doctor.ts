@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/doctor.ts — vO-AUTO.1 readiness doctor (READ-ONLY denetim).
+ * orchestration/bin/doctor.ts — vO-AUTO.1 autopilot kurulum sağlık denetimi: hook+launchd+artefakt tazeliği (GO/NO-GO gate).
  *
  * "0-manuel autopilot gerçekten CANLI + TAZE mi?" denetler → DOCTOR.md + stdout + exit-code
  * (NO-GO→1, conduct-gate uyumlu). `--fix`: yalnız selfHealable uyarıları güvenle giderir

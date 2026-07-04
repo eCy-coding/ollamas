@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/dispatchdoctor.ts — vO21 Fleet dispatch readiness doctor CLI (read-only probe).
+ * orchestration/bin/dispatchdoctor.ts — vO21 uzak worker havuzunu ağdan yoklayan fleet offload GO/NO-GO probu (network probe CLI).
  *
  * Reads ~/.ollamas/backends.json (Backend pool) + the implicit mac control gateway, probes each worker's
  * /api/health (ollamas gateway marker) + /api/tags (ollama-native) → classify (gateway|inference-only|down)
