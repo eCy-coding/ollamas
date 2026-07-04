@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import os from "os";
+import { readGenericPassword, writeGenericPassword } from "./lib/keychain-scan";
 
 // Atomic file write: write a temp sibling then rename over the target. rename(2) is atomic on
 // POSIX within the same directory, so a crash / power loss mid-write can never leave the target
@@ -118,21 +119,44 @@ const DEFAULT_CONFIG: DBConfig = {
 // else (truly fresh) mint a new one. This is what prevents a silent secret-wipe on restart.
 export type MasterKeyDecision =
   | { source: "env"; key: Buffer }
+  | { source: "keychain"; key: Buffer }
   | { source: "file" }
   | { source: "mint" }
   | { source: "fail"; reason: string };
 
-export function decideMasterKeySource(o: { envB64?: string; keyFileExists: boolean; configExists: boolean }): MasterKeyDecision {
+// Priority: injected env key (stable Cloud-Run/Docker secret) > hardware Keychain (Secure
+// Enclave-backed, opt-in) > on-disk key file > (existing store → fail-closed | fresh → mint).
+// The keychain slot sits ABOVE the file so a machine that has migrated its key into the
+// hardware vault boots from it, while a machine that hasn't still reads the file unchanged.
+export function decideMasterKeySource(o: {
+  envB64?: string;
+  /** 32-byte key already read from the hardware keychain, when the opt-in is enabled + present. */
+  keychainKey?: Buffer;
+  keyFileExists: boolean;
+  configExists: boolean;
+}): MasterKeyDecision {
   if (o.envB64) {
     const key = Buffer.from(o.envB64, "base64");
     if (key.length !== 32) return { source: "fail", reason: "MASTER_KEY_B64 must be base64 of exactly 32 bytes" };
     return { source: "env", key };
   }
+  if (o.keychainKey && o.keychainKey.length === 32) return { source: "keychain", key: o.keychainKey };
   if (o.keyFileExists) return { source: "file" };
   if (o.configExists) {
     return { source: "fail", reason: "encrypted store exists but no master key — set MASTER_KEY_B64 (the original 32-byte key, base64) to decrypt it" };
   }
   return { source: "mint" };
+}
+
+/** Service name under which the vault master key lives in the macOS Keychain (hardware vault). */
+export function masterKeyService(): string {
+  return process.env.OLLAMAS_MASTER_KEY_SERVICE || "OLLAMAS_MASTER_KEY";
+}
+
+/** The Secure-Enclave-backed hardware vault is opt-in (default OFF → zero behavior change).
+ *  Enable with OLLAMAS_MASTER_KEY_KEYCHAIN=1 once the keychain ACL is granted. */
+export function keychainVaultEnabled(): boolean {
+  return process.env.OLLAMAS_MASTER_KEY_KEYCHAIN === "1" && os.platform() === "darwin";
 }
 
 export class SecureDB {
@@ -163,13 +187,28 @@ export class SecureDB {
     // secret (provider keys, Stripe/GitHub, OAuth) to undecryptable ciphertext (decrypt → "").
     // On Cloud Run / multi-replica, inject the stable 32-byte key (base64) via MASTER_KEY_B64.
     const keyPath = path.join(dir, ".master_key");
+    // Hardware vault (Secure Enclave-backed macOS Keychain) — opt-in, default OFF. When enabled,
+    // read the master key from the keychain; a best-effort, timeout-guarded read that never
+    // blocks boot (falls through to the file/mint path on any failure).
+    let keychainKey: Buffer | undefined;
+    if (keychainVaultEnabled()) {
+      const b64 = readGenericPassword(masterKeyService());
+      if (b64) {
+        const buf = Buffer.from(b64.trim(), "base64");
+        if (buf.length === 32) keychainKey = buf;
+      }
+    }
     const decision = decideMasterKeySource({
       envB64: process.env.MASTER_KEY_B64,
+      keychainKey,
       keyFileExists: fs.existsSync(keyPath),
       configExists: fs.existsSync(this.filePath),
     });
     switch (decision.source) {
       case "env":
+        this.masterKey = decision.key;
+        break;
+      case "keychain":
         this.masterKey = decision.key;
         break;
       case "file":
@@ -184,6 +223,12 @@ export class SecureDB {
       }
       case "fail":
         throw new Error("[db] " + decision.reason);
+    }
+    // Migration into the hardware vault: when the opt-in is on and the keychain does not yet
+    // hold the active key, mirror the EXISTING file/minted key into the keychain (same bytes, so
+    // decrypt stays consistent). The file remains as a fallback. Best-effort; never blocks boot.
+    if (keychainVaultEnabled() && !keychainKey && decision.source !== "env") {
+      writeGenericPassword(masterKeyService(), this.masterKey.toString("base64"));
     }
 
     // 3. Load or initiate data

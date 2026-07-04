@@ -9,9 +9,9 @@
 import { keyedCloudProviders, envKeyFor, capabilitiesFor, capabilityReport, suggestRoles, keySignupUrl, catalogEntry } from "./provider-catalog";
 import { EMBED_CATALOG, buildEmbedRequest } from "./embed-catalog";
 import { ProviderRouter } from "./providers";
-import { db } from "./db";
+import { db, keychainVaultEnabled } from "./db";
 import { keyId } from "./key-usage";
-import { readGenericPassword, keychainAvailable } from "./lib/keychain-scan";
+import { readGenericPassword, writeGenericPassword, keychainAvailable } from "./lib/keychain-scan";
 import { execFileSync } from "node:child_process";
 
 export type CandidateSource = "env" | "keychain" | "gh" | "vault";
@@ -155,6 +155,16 @@ export interface DoctorReport {
 
 const GH_REFRESH_CMD = "gh auth refresh -h github.com -s models:read";
 
+/** Mirror a freshly-connected provider key into the hardware keychain (opt-in, default OFF) so
+ *  it survives a vault/reinstall and is rediscovered from the Secure-Enclave-backed store. The
+ *  service name matches the provider's env key, so the keychain reader finds it on the next scan.
+ *  Best-effort — a keychain failure never breaks the vault connect. */
+function mirrorToKeychain(provider: string, key: string): void {
+  if (!keychainVaultEnabled()) return;
+  const service = envKeyFor(provider);
+  if (service) writeGenericPassword(service, key);
+}
+
 /** Production deps: chat validation = /api/keys/test semantics IN-PROCESS
  *  (testKeyOverride + singleAttempt, finally-reset); embed/tavily = one cheap real call;
  *  vault = encrypted db (primary/pool), with knownKeyIds spanning the WHOLE active pool
@@ -192,11 +202,12 @@ export function productionDoctorDeps(): DoctorDeps {
     vault: {
       hasPrimary: (p) => !!db.data.keys?.[p],
       knownKeyIds: (p) => new Set(ProviderRouter.keyPool(p).map((k) => keyId(k))),
-      savePrimary: (p, key) => { db.data.keys[p] = db.encrypt(key); db.save(); },
+      savePrimary: (p, key) => { db.data.keys[p] = db.encrypt(key); db.save(); mirrorToKeychain(p, key); },
       addToPool: (p, key) => {
         const pool = ((db.data as any).keyPool ??= {});
         (pool[p] ??= []).push(db.encrypt(key));
         db.save();
+        mirrorToKeychain(p, key);
       },
     },
   };

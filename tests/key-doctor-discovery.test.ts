@@ -2,7 +2,7 @@
 // (env / macOS keychain / gh CLI), keyId dedup, source precedence, and the hard
 // SECURITY invariant that a raw key value never appears in any maskable field.
 import { describe, it, expect } from "vitest";
-import { buildFindArgs } from "../server/lib/keychain-scan";
+import { buildFindArgs, buildAddArgs } from "../server/lib/keychain-scan";
 import {
   discoveryTargets,
   discoverCandidates,
@@ -20,6 +20,11 @@ const readers = (over: Partial<SourceReaders> = {}): SourceReaders => ({
 describe("keychain-scan — pure argv builder", () => {
   it("find-generic-password by service with -w (value never echoed to args beyond -w mode)", () => {
     expect(buildFindArgs("GROQ_API_KEY")).toEqual(["find-generic-password", "-s", "GROQ_API_KEY", "-w"]);
+  });
+  it("add-generic-password uses -U (update-in-place) + scoped service/account", () => {
+    expect(buildAddArgs("OLLAMAS_MASTER_KEY", "ollamas", "v")).toEqual([
+      "add-generic-password", "-U", "-s", "OLLAMAS_MASTER_KEY", "-a", "ollamas", "-w", "v",
+    ]);
   });
 });
 

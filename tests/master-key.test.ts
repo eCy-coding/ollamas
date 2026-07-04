@@ -31,6 +31,23 @@ describe("decideMasterKeySource (pure)", () => {
   it("no env + no key file + no store → mint (fresh install)", () => {
     expect(decideMasterKeySource({ keyFileExists: false, configExists: false }).source).toBe("mint");
   });
+
+  it("keychain key (32B) wins over the file, below env", () => {
+    const kc = randomBytes(32);
+    const d = decideMasterKeySource({ keychainKey: kc, keyFileExists: true, configExists: true });
+    expect(d.source).toBe("keychain");
+    if (d.source === "keychain") expect(d.key.equals(kc)).toBe(true);
+    // env still outranks keychain
+    expect(decideMasterKeySource({ envB64: key32B64, keychainKey: kc, keyFileExists: true, configExists: true }).source).toBe("env");
+  });
+  it("wrong-length keychain key is ignored → falls through to file", () => {
+    const d = decideMasterKeySource({ keychainKey: randomBytes(16), keyFileExists: true, configExists: true });
+    expect(d.source).toBe("file");
+  });
+  it("keychain key rescues an existing store that would otherwise fail-closed", () => {
+    const d = decideMasterKeySource({ keychainKey: randomBytes(32), keyFileExists: false, configExists: true });
+    expect(d.source).toBe("keychain");
+  });
 });
 
 describe("SecureDB end-to-end — env key survives a restart, fail-closed without it", () => {
