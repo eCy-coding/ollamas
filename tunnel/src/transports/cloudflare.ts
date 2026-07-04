@@ -73,6 +73,13 @@ export interface CloudflareOptions {
   probeFn?: (base: string, path: string) => Promise<boolean>;
   /** How long up() waits for the quick-tunnel URL before failing. */
   timeoutMs?: number;
+  /** Called with the parsed public URL (vT14) — persist it so status/whoami/iPhone find it. */
+  urlSink?: (url: string) => void;
+  /**
+   * Dead-gateway guard (vT14, gap #1): probe the local gateway before exposing it. If provided and
+   * it resolves false, up() refuses — a public tunnel to a dead :8443 gateway serves nobody.
+   */
+  gatewayHealthy?: () => Promise<boolean>;
 }
 
 export class CloudflareTransport implements Transport {
@@ -86,6 +93,8 @@ export class CloudflareTransport implements Transport {
   private readonly spawnFn: SpawnFn;
   private readonly probeFn: (base: string, path: string) => Promise<boolean>;
   private readonly timeoutMs: number;
+  private readonly urlSink: ((url: string) => void) | undefined;
+  private readonly gatewayHealthy: (() => Promise<boolean>) | undefined;
 
   // Explicit fields — no TS parameter properties (ERR-TUNNEL-001, Node strip-only).
   constructor(opts: CloudflareOptions) {
@@ -95,6 +104,8 @@ export class CloudflareTransport implements Transport {
     // Public edge roundtrip ≫ LAN: cold trycloudflare DNS+edge can take seconds — 10s budget.
     this.probeFn = opts.probeFn ?? ((base, path) => probeHttps(base, path, { timeoutMs: 10_000 }));
     this.timeoutMs = opts.timeoutMs ?? 30_000;
+    this.urlSink = opts.urlSink;
+    this.gatewayHealthy = opts.gatewayHealthy;
   }
 
   /** Quick tunnel up. Idempotent. THROWS without an active pxy_ key (RISK-TUNNEL-024). */
@@ -104,6 +115,13 @@ export class CloudflareTransport implements Transport {
       throw new Error(
         "cloudflare: refusing to expose an UNAUTHENTICATED gateway to the public internet " +
           "(RISK-TUNNEL-024). Create a key first: `tunnel proxy key add <label>`.",
+      );
+    }
+    // Dead-gateway guard (vT14): a public tunnel to a dead :8443 gateway serves nobody.
+    if (this.gatewayHealthy && !(await this.gatewayHealthy())) {
+      throw new Error(
+        "cloudflare: gateway 127.0.0.1:8443 not answering — refusing REVERSE tunnel to a dead gateway. " +
+          "Start it first: `tunnel proxy up` (or `tunnel proxy daemon install`).",
       );
     }
     const child = this.spawnFn("cloudflared", quickTunnelArgs(this.localPort));
@@ -126,6 +144,7 @@ export class CloudflareTransport implements Transport {
           if (url) {
             clearTimeout(timer);
             this.publicUrl = url;
+            this.urlSink?.(url); // persist ephemeral URL (vT14) for status/whoami/iPhone
             resolve();
             return;
           }

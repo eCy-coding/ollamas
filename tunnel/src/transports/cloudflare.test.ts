@@ -242,3 +242,70 @@ test("cloudflare: detectCapable includes cloudflare when its binary exists (inje
   );
   assert.deepEqual(capable.map((c) => c.name), ["cloudflare"]);
 });
+
+// ---------- vT14: url-sink + dead-gateway precondition ----------
+
+test("cloudflare: urlSink receives the parsed public URL on up()", async () => {
+  const sunk: string[] = [];
+  const child = makeFakeChild();
+  const t = new CloudflareTransport({
+    localPort: 8443,
+    hasActiveKey: () => true,
+    spawnFn: () => child,
+    probeFn: async () => true,
+    timeoutMs: 200,
+    urlSink: (u) => sunk.push(u),
+  });
+  const upP = t.up();
+  queueMicrotask(() => child.stderr.emit("data", Buffer.from("https://sink-me.trycloudflare.com\n")));
+  await upP;
+  assert.deepEqual(sunk, ["https://sink-me.trycloudflare.com"]);
+});
+
+test("cloudflare: up() REFUSES when gatewayHealthy resolves false (dead-gateway guard)", async () => {
+  const spawned: string[] = [];
+  const child = makeFakeChild();
+  const t = new CloudflareTransport({
+    localPort: 8443,
+    hasActiveKey: () => true,
+    gatewayHealthy: async () => false,
+    spawnFn: (cmd) => {
+      spawned.push(cmd);
+      return child;
+    },
+    timeoutMs: 200,
+  });
+  await assert.rejects(() => t.up(), /dead gateway|not answering/);
+  assert.equal(spawned.length, 0); // never spawns cloudflared at a dead gateway
+});
+
+test("cloudflare: up() proceeds when gatewayHealthy resolves true", async () => {
+  const child = makeFakeChild();
+  const t = new CloudflareTransport({
+    localPort: 8443,
+    hasActiveKey: () => true,
+    gatewayHealthy: async () => true,
+    spawnFn: () => child,
+    timeoutMs: 200,
+  });
+  const upP = t.up();
+  queueMicrotask(() => child.stderr.emit("data", Buffer.from("https://ok.trycloudflare.com\n")));
+  await upP;
+  assert.equal(t.endpoint().url, "https://ok.trycloudflare.com");
+});
+
+test("cloudflare: key-gate checked BEFORE gateway-gate (order)", async () => {
+  let gatewayChecked = false;
+  const t = new CloudflareTransport({
+    localPort: 8443,
+    hasActiveKey: () => false,
+    gatewayHealthy: async () => {
+      gatewayChecked = true;
+      return true;
+    },
+    spawnFn: () => makeFakeChild(),
+    timeoutMs: 200,
+  });
+  await assert.rejects(() => t.up(), /RISK-TUNNEL-024/);
+  assert.equal(gatewayChecked, false); // never reached the gateway check
+});
