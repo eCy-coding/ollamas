@@ -150,9 +150,9 @@ export interface DispatchPlan {
 }
 
 /**
- * Single spawn/dry/skip decision. Guard order (vO41):
+ * Single spawn/dry/skip decision. Guard order (vO41 + vO44 churn-guard):
  * kill → no-req → escalation(blocked) → dup-active(by TARGET) → cap → 24h-budget →
- * cooldown(ONLY after stale = failure backoff; done chains instantly) → activation.
+ * churn-guard(candidateStable) → cooldown(ONLY after stale = failure backoff; done chains instantly) → activation.
  */
 export function planDispatch(i: DispatchPlanInput): DispatchPlan {
   const maxActive = i.maxActive ?? 1;
