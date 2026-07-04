@@ -200,7 +200,9 @@ function main(): void {
     ...(FLEET_AUTOSHIP ? [runStep("fleetship", "fleet-apply.ts", ["--apply-all", "--commit"], 900_000)] : []), // vO45 alt-model otonomi: gate-geçen safe-auto önerileri oto-uygula+commit (marker+env ile açık; gate/proposal başına dakikalar → 15dk timeout)
     // vO41: QUALITY.json'u HER koşuda tazele (bayat roll-up → phantom-CRITICAL kökü). SessionStart'ta
     // --no-tsc (hızlı: lane listesi + vitest cache), launchd --heal'de tam tsc taraması.
-    runStep("quality", "quality.ts", HEAL ? [] : ["--no-tsc"]),
+    // HEAL modda quality 12 worktree'de CANLI tsc koşar (~2s/lane değil, worktree başına tsc cold-start
+    // dakikalar sürebilir) → default 60s garanti aşımdı (son koşu 15/16). Canlı-tsc yoluna 300s ver.
+    runStep("quality", "quality.ts", HEAL ? [] : ["--no-tsc"], HEAL ? 300_000 : 60_000),
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
     runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
