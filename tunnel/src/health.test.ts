@@ -174,3 +174,54 @@ test("https requirePrivateHost: allows .local host", async () => {
     true,
   );
 });
+
+// ---------- vT14: custom DNS resolver (RISK-TUNNEL-027 belt) ----------
+import { resolverLookup } from "./health.ts";
+
+test("probeHttps passes an injected lookup into request options", async () => {
+  const { impl, lastOpts } = fakeHttps({ status: 200 });
+  const lookup = ((_h: string, _o: unknown, cb: (e: null, a: string, f: number) => void) =>
+    cb(null, "1.2.3.4", 4)) as never;
+  await probeHttps("https://x.trycloudflare.com", "/api/health", { requestImpl: impl, lookup });
+  assert.equal(typeof lastOpts()["lookup"], "function");
+});
+
+test("probeHttps omits lookup when not provided (default resolver)", async () => {
+  const { impl, lastOpts } = fakeHttps({ status: 200 });
+  await probeHttps("https://m.local", "/api/health", { requestImpl: impl });
+  assert.equal(lastOpts()["lookup"], undefined);
+});
+
+test("resolverLookup resolves via Resolver → first A record, family 4", async () => {
+  const fakeResolver = {
+    setServers(_s: string[]) {},
+    resolve4(_host: string, cb: (e: Error | null, a: string[]) => void) {
+      cb(null, ["104.16.1.1", "104.16.2.2"]);
+    },
+  };
+  const lookup = resolverLookup(["1.1.1.1"], fakeResolver as never);
+  await new Promise<void>((resolve) => {
+    lookup("x.trycloudflare.com", {}, (err, addr, fam) => {
+      assert.equal(err, null);
+      assert.equal(addr, "104.16.1.1");
+      assert.equal(fam, 4);
+      resolve();
+    });
+  });
+});
+
+test("resolverLookup propagates resolver error (never throws)", async () => {
+  const fakeResolver = {
+    setServers(_s: string[]) {},
+    resolve4(_host: string, cb: (e: Error | null, a: string[]) => void) {
+      cb(new Error("SERVFAIL"), []);
+    },
+  };
+  const lookup = resolverLookup(["1.1.1.1"], fakeResolver as never);
+  await new Promise<void>((resolve) => {
+    lookup("x", {}, (err) => {
+      assert.match(String(err), /SERVFAIL/);
+      resolve();
+    });
+  });
+});

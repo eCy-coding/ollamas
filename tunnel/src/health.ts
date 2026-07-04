@@ -3,7 +3,40 @@
 
 import { request as httpsRequest, type RequestOptions } from "node:https";
 import type { IncomingMessage, ClientRequest } from "node:http";
+import { Resolver } from "node:dns";
 import { assertPrivateUrl } from "./guard.ts";
+
+/** dns.lookup-shaped fn (the subset https.request's `lookup` option needs). */
+export type LookupFn = (
+  hostname: string,
+  options: unknown,
+  callback: (err: Error | null, address: string, family: number) => void,
+) => void;
+
+/** Minimal Resolver surface so tests can inject a fake (vT14). */
+export interface ResolverLike {
+  setServers(servers: string[]): void;
+  resolve4(hostname: string, cb: (err: Error | null, addresses: string[]) => void): void;
+}
+
+/**
+ * Build a `lookup` fn that resolves via specific public DNS servers (default 1.1.1.1/1.0.0.1),
+ * bypassing the system resolver. Fixes RISK-TUNNEL-027: MagicDNS (100.100.100.100) NXDOMAINs
+ * *.trycloudflare.com, so the cloudflare REVERSE probe fails on a mesh Mac. A node:dns `Resolver`
+ * INSTANCE is isolated — unlike global dns.setServers(), which doesn't even affect dns.lookup.
+ */
+export function resolverLookup(
+  servers: string[] = ["1.1.1.1", "1.0.0.1"],
+  resolver: ResolverLike = new Resolver(),
+): LookupFn {
+  resolver.setServers(servers);
+  return (hostname, _options, callback) => {
+    resolver.resolve4(hostname, (err, addresses) => {
+      if (err) return callback(err, "", 4);
+      callback(null, addresses[0] ?? "", 4);
+    });
+  };
+}
 
 /**
  * ollamas health endpoint. The real server exposes `/api/health` (200, public) — NOT `/healthz`
@@ -74,6 +107,11 @@ export interface HttpsProbeOptions {
   insecure?: boolean;
   /** Refuse non-private hosts (DNS-rebind guard, RISK-TUNNEL-016). Default false. */
   requirePrivateHost?: boolean;
+  /**
+   * Custom DNS lookup (vT14): resolve the host via specific servers, bypassing the system
+   * resolver. Pass `resolverLookup()` to reach *.trycloudflare.com despite MagicDNS (RISK-TUNNEL-027).
+   */
+  lookup?: LookupFn;
   /** Injected for tests; defaults to node:https request. */
   requestImpl?: HttpsRequestImpl;
 }
@@ -87,7 +125,7 @@ export function probeHttps(
   path = HEALTH_PATH,
   opts: HttpsProbeOptions = {},
 ): Promise<boolean> {
-  const { timeoutMs = 2000, okStatuses, insecure = false, requirePrivateHost = false, requestImpl = httpsRequest } = opts;
+  const { timeoutMs = 2000, okStatuses, insecure = false, requirePrivateHost = false, lookup, requestImpl = httpsRequest } = opts;
   const url = `${baseUrl.replace(/\/$/, "")}${path}`;
   if (requirePrivateHost && !assertPrivateUrl(url)) return Promise.resolve(false); // DNS-rebind guard
   return new Promise((resolve) => {
@@ -98,7 +136,9 @@ export function probeHttps(
       resolve(ok);
     };
     try {
-      const req = requestImpl(url, { rejectUnauthorized: !insecure, method: "GET" }, (res) => {
+      const reqOpts: RequestOptions = { rejectUnauthorized: !insecure, method: "GET" };
+      if (lookup) (reqOpts as RequestOptions & { lookup: LookupFn }).lookup = lookup;
+      const req = requestImpl(url, reqOpts, (res) => {
         const status = res.statusCode ?? 0;
         res.resume(); // drain so the socket frees
         if (okStatuses) return done(okStatuses.includes(status));
