@@ -30,6 +30,18 @@ describe("auditUncommitted — R3", () => {
     expect(auditUncommitted(["?? orchestration/x.bak"])).toEqual([]);
     expect(auditUncommitted([])).toEqual([]);
   });
+  it("üretilmiş pipeline artefaktları muaf (ölçüm egzozu ≠ built-not-shipped; kalıcı-phantom önlenir)", () => {
+    expect(auditUncommitted([
+      " M orchestration/AUTOPILOT.md", " M orchestration/CONDUCTOR.md", " M orchestration/CRITIC.json",
+      " M orchestration/DOD.json", " M orchestration/FLEET_STATUS.md", " M orchestration/MODEL_SELECTION.json",
+      " M orchestration/.autopilot-refresh.json", "?? orchestration/seyir/dispatch-log.jsonl",
+      " M orchestration/COUNCIL_PROMPT.md",
+    ])).toEqual([]);
+    // el-yazımı governance + kaynak SAYILMAYA devam eder
+    const l = auditUncommitted([" M orchestration/SEYIR_DEFTERI_ORCHESTRATION.md", " M orchestration/bin/x.ts"]);
+    expect(l).toHaveLength(1);
+    expect(l[0].target).toBe("2 dosya");
+  });
 });
 
 describe("auditMarkers — R5", () => {

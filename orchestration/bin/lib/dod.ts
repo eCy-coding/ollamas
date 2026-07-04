@@ -26,9 +26,18 @@ export function auditTests(modules: { file: string; fnCount: number }[], testTex
   return out;
 }
 
-/** R3: git porcelain satırları (orchestration) → unshipped. */
+// Pipeline'ın HER koşuda yeniden yazdığı üretilmiş artefaktlar (autopilot adımlarının writeFileSync
+// hedefleri + seyir ledger'ları). Bunlar "built-not-shipped iş" değil ölçümün kendi egzozudur: dod'dan
+// önceki adımlar onları her koşuda kirletir, dolayısıyla sayılırlarsa uncommitted-green HİÇ kapanamaz
+// (kalıcı-phantom lapse). El-yazımı governance dokümanları (SEYIR_DEFTERI, ROADMAP) ve bin/tests
+// kaynakları sayılmaya DEVAM eder.
+const GENERATED_ARTIFACT = new RegExp(
+  "^orchestration/(?:\\.autopilot-refresh\\.json$|seyir/|(?:AUTOPILOT|CLAUDE_DISPATCH|CONDUCTOR|COUNCIL|COUNCIL_PROMPT|COUNCIL_ROSTER|CRITIC|DISPATCH_DOCTOR|DOCTOR|DOD|FLEET_[A-Z]+|MISSION|MODEL_PROMPT|MODEL_SELECTION|QUALITY|RECONCILE|REQUIREMENTS|ROLE|STATUS|THINK)\\.(?:md|json)$)"
+);
+
+/** R3: git porcelain satırları (orchestration) → unshipped. Üretilmiş pipeline artefaktları muaf. */
 export function auditUncommitted(porcelainLines: string[]): Lapse[] {
-  const files = porcelainLines.map((l) => l.trim().replace(/^\S+\s+/, "")).filter((f) => /orchestration\/.*\.(ts|md|json)$/.test(f) && !/\.(bak|tmp)$/.test(f));
+  const files = porcelainLines.map((l) => l.trim().replace(/^\S+\s+/, "")).filter((f) => /orchestration\/.*\.(ts|md|json)$/.test(f) && !/\.(bak|tmp)$/.test(f) && !GENERATED_ARTIFACT.test(f));
   if (!files.length) return [];
   return [{ rule: "uncommitted-green", severity: "med", target: `${files.length} dosya`, detail: `Commit'siz yeşil iş (built-not-shipped): ${files.slice(0, 6).map(baseName).join(", ")}${files.length > 6 ? "…" : ""}`, action: `yeşil parçayı commit'le (per-file git add + conventional)` }];
 }
