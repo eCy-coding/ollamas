@@ -1,60 +1,15 @@
 {
-  "ts": "2026-06-24T10:43:11.106Z",
-  "score": 70,
+  "ts": "2026-07-04T11:05:13.895Z",
+  "score": 95,
   "findings": [
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
-      "kind": "dod:uncommitted-green:20 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json, CRITIC.md…",
+      "kind": "dod:uncommitted-green:9 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "severity": 40,
       "concurrent": false
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:adopt-gate",
-      "detail": "adopt-gate kısmen tamam — eksik eş-zamanlı: test",
-      "action": "adopt-gate için test aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:claim",
-      "detail": "claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry",
-      "action": "claim için test + SEYIR-entry aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:driftguard",
-      "detail": "driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry",
-      "action": "driftguard için SEYIR-entry aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:scan",
-      "detail": "scan kısmen tamam — eksik eş-zamanlı: test",
-      "action": "scan için test aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
-    },
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "dod:concurrent-task:status",
-      "detail": "status kısmen tamam — eksik eş-zamanlı: test",
-      "action": "status için test aynı anda tamamla",
-      "severity": 40,
-      "concurrent": true
     }
   ]
 }

@@ -1,27 +1,11 @@
 {
-  "ts": "2026-07-01T10:22:16Z",
+  "ts": "2026-07-04T10:32:39Z",
   "chip": "Apple M4 Max",
   "source": "council.ts (canlı ollama list)",
-  "present": 0,
+  "present": 14,
   "total": 14,
-  "absentCapabilities": [
-    "deep-code",
-    "long-ctx-code",
-    "local-code",
-    "reasoning",
-    "vision",
-    "moe-mid",
-    "fast-verify",
-    "cheap-triage",
-    "adversarial",
-    "big-reasoning",
-    "cloud-alt",
-    "small-logic",
-    "embedding",
-    "custom-review"
-  ],
-  "lanesCovered": [],
-  "lanesUncovered": [
+  "absentCapabilities": [],
+  "lanesCovered": [
     "backend",
     "frontend",
     "cli",
@@ -30,12 +14,13 @@
     "bench",
     "orchestration"
   ],
+  "lanesUncovered": [],
   "seats": [
     {
       "capability": "deep-code",
       "role": "architect",
-      "model": null,
-      "available": false,
+      "model": "qwen3-coder:480b-cloud",
+      "available": true,
       "responsibility": "Derin kod-tasarım + mimari (server/backend, protocol)",
       "lanes": [
         "backend",
@@ -45,8 +30,8 @@
     {
       "capability": "long-ctx-code",
       "role": "analyst",
-      "model": null,
-      "available": false,
+      "model": "qwen3-coder-64k:latest",
+      "available": true,
       "responsibility": "Uzun/çok-dosya kod sweep (64k ctx whole-lane)",
       "lanes": [
         "backend",
@@ -56,8 +41,8 @@
     {
       "capability": "local-code",
       "role": "coder",
-      "model": null,
-      "available": false,
+      "model": "qwen3-coder:30b",
+      "available": true,
       "responsibility": "cli/scripts lane kod analizi + bug-detect",
       "lanes": [
         "cli",
@@ -67,8 +52,8 @@
     {
       "capability": "reasoning",
       "role": "verifier",
-      "model": null,
-      "available": false,
+      "model": "deepseek-r1:32b",
+      "available": true,
       "responsibility": "Root-cause + mantıksal invariant + algoritma doğrulama",
       "lanes": [
         "backend",
@@ -83,8 +68,8 @@
     {
       "capability": "vision",
       "role": "analyst",
-      "model": null,
-      "available": false,
+      "model": "qwen2.5vl:32b",
+      "available": true,
       "responsibility": "web/frontend UI + diagram + screenshot analizi",
       "lanes": [
         "frontend"
@@ -93,8 +78,8 @@
     {
       "capability": "moe-mid",
       "role": "analyst",
-      "model": null,
-      "available": false,
+      "model": "qwen3:30b-a3b",
+      "available": true,
       "responsibility": "orchestration lane + cross-lane dep-graph",
       "lanes": [
         "orchestration"
@@ -103,8 +88,8 @@
     {
       "capability": "fast-verify",
       "role": "reviewer",
-      "model": null,
-      "available": false,
+      "model": "qwen3:8b",
+      "available": true,
       "responsibility": "Hızlı review + council verifier koltuğu (champion)",
       "lanes": [
         "backend",
@@ -119,8 +104,8 @@
     {
       "capability": "cheap-triage",
       "role": "triage",
-      "model": null,
-      "available": false,
+      "model": "qwen3:4b",
+      "available": true,
       "responsibility": "Bulgu sınıflandırma + önceliklendirme",
       "lanes": [
         "backend",
@@ -135,8 +120,8 @@
     {
       "capability": "adversarial",
       "role": "adversary",
-      "model": null,
-      "available": false,
+      "model": "gpt-oss:120b-cloud",
+      "available": true,
       "responsibility": "Adversarial ikinci-görüş (best-of-N refute)",
       "lanes": [
         "backend",
@@ -151,8 +136,8 @@
     {
       "capability": "big-reasoning",
       "role": "adversary",
-      "model": null,
-      "available": false,
+      "model": "llama3.3:70b",
+      "available": true,
       "responsibility": "Bağımsız çapraz-kontrol (majority-vote üyesi)",
       "lanes": [
         "backend",
@@ -167,8 +152,8 @@
     {
       "capability": "cloud-alt",
       "role": "analyst",
-      "model": null,
-      "available": false,
+      "model": "kimi-k2.5:cloud",
+      "available": true,
       "responsibility": "Cloud yük dengeleme / paralel koltuk (bench)",
       "lanes": [
         "bench"
@@ -177,8 +162,8 @@
     {
       "capability": "small-logic",
       "role": "analyst",
-      "model": null,
-      "available": false,
+      "model": "phi4:latest",
+      "available": true,
       "responsibility": "Hafif mantık kontrolü (scripts)",
       "lanes": [
         "scripts"
@@ -187,8 +172,8 @@
     {
       "capability": "embedding",
       "role": "search",
-      "model": null,
-      "available": false,
+      "model": "nomic-embed-text:latest",
+      "available": true,
       "responsibility": "Semantik kod-arama + duplikat tespiti",
       "lanes": [
         "backend",
@@ -203,8 +188,8 @@
     {
       "capability": "custom-review",
       "role": "reviewer",
-      "model": null,
-      "available": false,
+      "model": "ollamas-reviewer:latest",
+      "available": true,
       "responsibility": "Proje-özel fine-tuned review",
       "lanes": [
         "backend",

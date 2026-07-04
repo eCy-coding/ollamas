@@ -1,63 +1,69 @@
 # REQUIREMENTS — Birleşik Kritik Gereksinimler (füzyon)
 
 > READ-ONLY `fuse.ts`: tüm analizör (conduct/critic/dod/quality) → tek critical-first liste.
-> **Proje hazırlık: 40/100** · 14 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
+> **Proje hazırlık: 97/100** · 1 gereksinim (dedupe edilmiş). Kaynak: yeni analiz yok, mevcut füzyon.
 
 ## 🎯 EN KRİTİK GEREKSİNİM
-**Criticality:** CRITICAL · **Kaynak:** conduct
+**Criticality:** COMPLETENESS · **Kaynak:** dod
 
-**Gereksinim:** tsc 18 hata
+**Gereksinim:** Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…
 
-**Eylem:** integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
+**Eylem:** yeşil parçayı commit'le (per-file git add + conventional)
 
 ## Tüm gereksinimler (critical-first)
-### CRITICAL (1)
-- **red:integration/v17-core** [conduct]: tsc 18 hata
-  → integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
-
-### COMPLETENESS (9)
-- **crit:done-no-evidence:vO16** [conduct+critic]: vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok
-  → vO16 kanıtını doğrula ya da DONE'ı geri al
-- **dod:concurrent-task:adopt-gate** [conduct+dod]: adopt-gate kısmen tamam — eksik eş-zamanlı: test
-  → adopt-gate için test aynı anda tamamla
-- **dod:concurrent-task:claim** [conduct+dod]: claim kısmen tamam — eksik eş-zamanlı: test, SEYIR-entry
-  → claim için test + SEYIR-entry aynı anda tamamla
-- **dod:concurrent-task:driftguard** [conduct+dod]: driftguard kısmen tamam — eksik eş-zamanlı: SEYIR-entry
-  → driftguard için SEYIR-entry aynı anda tamamla
-- **dod:concurrent-task:scan** [conduct+dod]: scan kısmen tamam — eksik eş-zamanlı: test
-  → scan için test aynı anda tamamla
-- **dod:concurrent-task:status** [conduct+dod]: status kısmen tamam — eksik eş-zamanlı: test
-  → status için test aynı anda tamamla
-- **dod:uncommitted-green:20 dosya** [conduct+dod]: Commit'siz yeşil iş (built-not-shipped): AUTOPILOT.md, BENCH.json, BENCH.md, CONDUCTOR.md, CRITIC.json, CRITIC.md…
+### COMPLETENESS (1)
+- **dod:uncommitted-green:9 dosya** [dod]: Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…
   → yeşil parçayı commit'le (per-file git add + conventional)
-- **red:backend** [conduct(stale)]: test failed — testTs bayat, güvenilmez (phantom-critical önlendi)
-  → backend: testi taze koş; gerçekten kırıksa CRITICAL olur
-- **stale:quality** [quality(stale)]: quality verisi 124 dk bayat — füzyondan ÇIKARILDI (phantom-critical önlendi)
-  → quality.ts yeniden koş (taze quality üret)
-
-### STALE (4)
-- **stale:claude/loving-varahamihira-77d4a9** [conduct]: claude/loving-varahamihira-77d4a9 132s commitsiz (idle)
-  → claude/loving-varahamihira-77d4a9: sıradaki versiyonu planla (durağan)
-- **stale:claude/naughty-kowalevski-2ccc35** [conduct]: claude/naughty-kowalevski-2ccc35 87s commitsiz (idle)
-  → claude/naughty-kowalevski-2ccc35: sıradaki versiyonu planla (durağan)
-- **stale:fix/binary-architecture-calibration** [conduct]: fix/binary-architecture-calibration 74s commitsiz (idle)
-  → fix/binary-architecture-calibration: sıradaki versiyonu planla (durağan)
-- **stale:verify/gwv2-all-lanes** [conduct]: verify/gwv2-all-lanes 86s commitsiz (idle)
-  → verify/gwv2-all-lanes: sıradaki versiyonu planla (durağan)
 
 ## Kaynak tazelik (eşik 60dk)
 | Kaynak | ts | Durum |
 |---|---|---|
 | conduct | (canlı exec) | ✓ taze |
-| critic | 2026-06-24T10:43:10.592Z | ✓ taze |
-| dod | 2026-06-24T10:43:11.106Z | ✓ taze |
-| quality | 2026-06-24T08:39:50.000Z | ⚠️ BAYAT (füzyon-dışı) |
+| critic | 2026-07-04T11:05:13.622Z | ✓ taze |
+| dod | 2026-07-04T11:05:13.895Z | ✓ taze |
+| quality | 2026-07-04T11:05:42.316Z | ✓ taze |
 
 ## Optimal working-prompt (en-kritik eyleme)
-_(bench verisi yok)_
+# OLLAMAS — OPTIMAL WORKING PROMPT (self-optimizing, portable)
+
+> Bu blok nereye yapıştırılırsa orada ollamas için EN-VERİMLİ seçimle çalışmaya başlar.
+> `optimize.ts` üretti — benchmark-driven, deterministik. Bench/calibration değişince seçim otomatik güncellenir.
+
+<context>
+Donanım: Apple M4 Max · 52GB unified · 16 core · arm64.
+Proje: ollamas (yerel MCP gateway + tools-as-SaaS). Çalışma prensipleri: choke-point, TDD, evidence-first, no-vibe-code, zero-dep, correctness>hız.
+</context>
+
+<selected-runtime>
+Model: **qwen3-coder:30b** — benchmark-seçili (114.6 tok/s, doğru; correctness-gate ✓; skor 0.913).
+Gerekçe: correct 1 + tok 114.6/114.6 + vram-fit 0.57
+Optimal Ollama/MLX config:
+  num_ctx=8192  num_gpu=999  num_thread=12  keep_alive=30m  quant=Q4_K_M
+Runtime: Apple Silicon → Ollama ≥0.19 MLX backend (num_gpu=999 tüm-Metal); warm-model (keep_alive) reload latency'yi siler.
+</selected-runtime>
+
+<task>
+Verilen görevi bu model+config ile yürüt. Yeni görev gelince önce `tsx orchestration/bin/optimize.ts` koş → o anki en-verimli seçimi al.
+</task>
+
+<constraints>
+- Kod-bütünlüğü: ollamas choke-point (ToolRegistry.execute) tek-dispatch; TDD (test önce); evidence-first (çalışıyor=komut çıktısı göster).
+- No vibe-code: hazır OSS adopt (MIT/Apache kopya+attribution, GPL ref-only); zero-dep tercih.
+- Correctness > hız: yanlış-ama-hızlı model diskalifiye (correctness-gate 0.7).
+- Kalite kapısı: typecheck + lint + test taze koşu → conventional commit.
+</constraints>
+
+<format>
+Sıra: READ → PLAN → TDD → BUILD → VERIFY(kanıt) → SHIP. Çıktı net, token-yalın.
+</format>
+
+<example>
+İyi: "qwen3-coder:30b num_ctx=8192 ile koştum → test 12/12 yeşil (çıktı altta)."
+Kötü: "Çalışıyor." (kanıtsız — reddet.)
+</example>
 
 <next-action>
-integration/v17-core: kırık gate/testi düzelt (her şeyi bloklar)
+yeşil parçayı commit'le (per-file git add + conventional)
 </next-action>
 
 ---

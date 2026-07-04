@@ -1,15 +1,35 @@
 {
-  "ts": "2026-06-24T08:39:50.000Z",
+  "ts": "2026-07-04T11:05:42.316Z",
   "lanes": [
     {
       "lane": "backend",
       "branch": "chore/p1-hardening",
       "tsc": "pass",
       "tscErrors": 0,
-      "testLast": "failed",
-      "testTs": "2026-06-20T20:57:19.210Z",
+      "testLast": "passed",
+      "testTs": "2026-06-29T00:24:20.336Z",
       "testStale": true,
-      "dirty": 23
+      "dirty": 52
+    },
+    {
+      "lane": "colab",
+      "branch": "feat/colab-gpu",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 13
+    },
+    {
+      "lane": "fix/audit-security",
+      "branch": "fix/audit-security",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "passed",
+      "testTs": "2026-06-25T16:32:03.445Z",
+      "testStale": true,
+      "dirty": 3
     },
     {
       "lane": "verify/gwv2-all-lanes",
@@ -22,16 +42,6 @@
       "dirty": 0
     },
     {
-      "lane": "integration/v17-core",
-      "branch": "integration/v17-core",
-      "tsc": "fail",
-      "tscErrors": 18,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 35
-    },
-    {
       "lane": "fix/binary-architecture-calibration",
       "branch": "fix/binary-architecture-calibration",
       "tsc": "pass",
@@ -40,6 +50,36 @@
       "testTs": "",
       "testStale": false,
       "dirty": 12
+    },
+    {
+      "lane": "fix/audit-cont",
+      "branch": "fix/audit-cont",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "claude/cool-cohen-b245ee",
+      "branch": "claude/cool-cohen-b245ee",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "claude/determined-bartik-0090ba",
+      "branch": "claude/determined-bartik-0090ba",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 4
     },
     {
       "lane": "claude/loving-varahamihira-77d4a9",
@@ -59,22 +99,33 @@
       "testLast": "unknown",
       "testTs": "",
       "testStale": false,
-      "dirty": 540
-    }
-  ],
-  "redLanes": [
-    {
-      "lane": "backend",
-      "detail": "test failed"
+      "dirty": 566
     },
     {
-      "lane": "integration/v17-core",
-      "detail": "tsc 18 hata"
+      "lane": "req-sweep",
+      "branch": "req-sweep",
+      "tsc": "pass",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 10
+    },
+    {
+      "lane": "(detached)",
+      "branch": "(detached)",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
     }
   ],
+  "redLanes": [],
   "totals": {
-    "green": 0,
-    "red": 2,
-    "unknown": 4
+    "green": 2,
+    "red": 0,
+    "unknown": 10
   }
 }

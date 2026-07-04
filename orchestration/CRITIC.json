@@ -1,14 +1,5 @@
 {
-  "ts": "2026-06-24T10:43:10.592Z",
-  "score": 94,
-  "findings": [
-    {
-      "tier": "COMPLETENESS",
-      "lane": "orchestration",
-      "kind": "crit:done-no-evidence:vO16",
-      "detail": "vO16 (E2E Integration Run, Diagnose, Repair & Publish lane'ler int) DONE ama eşleşen araç/artefakt yok",
-      "action": "vO16 kanıtını doğrula ya da DONE'ı geri al",
-      "severity": 45
-    }
-  ]
+  "ts": "2026-07-04T11:05:13.622Z",
+  "score": 100,
+  "findings": []
 }
