@@ -53,6 +53,13 @@ describe("chaos — joker failover", () => {
     run(["--once"], { ORCHESTRA_FAKE_HEALTHY: "0", ORCHESTRA_FAKE_HEALTHY_MODELS: "" });
     expect(state().failover_count).toBe(0); // never swapped to a dead model
   });
+
+  it("return-to-preferred: a pinned joker → back to the local $0 conductor once it's available", () => {
+    run(["--once"], { ORCHESTRA_CONDUCTOR: "cloud-joker", ORCHESTRA_FAKE_HEALTHY_MODELS: "cloud-joker" });
+    expect(state().conductor_model).toBe("cloud-joker"); // pinned to the failover model
+    run(["--once"], { ORCHESTRA_CONDUCTOR: "qwen3-coder:30b", ORCHESTRA_FAKE_HEALTHY_MODELS: "qwen3-coder:30b,cloud-joker" });
+    expect(state().conductor_model).toBe("qwen3-coder:30b"); // returned to preferred local
+  });
 });
 
 describe("chaos — bounded retry → ESCALATE (no infinite loop)", () => {

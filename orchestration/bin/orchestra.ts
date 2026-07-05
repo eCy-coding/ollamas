@@ -224,9 +224,20 @@ async function tick(): Promise<OrchestraState> {
 
   // 1) HEALTH GATE → live joker failover (JUstdoit STEP 5).
   const { healthy, healthyModels } = await probeHealth(state.conductor_model);
-  const fo = maybeFailover(state, healthy, healthyModels, ts, roster);
-  state = fo.state;
-  if (fo.swapped) log(`⚠ FAILOVER: conductor down → joker=${fo.joker} (failover #${state.failover_count})`);
+  // Return-to-preferred: after a transient failover the state pins the joker (possibly a cloud model). When the
+  // benchmark-preferred $0-local conductor is installed again, switch back — the joker is a fallback, not a home.
+  // Skip this tick's failover after returning (the probe above was for the OLD model; next tick re-probes cleanly).
+  let returnedToPreferred = false;
+  if (state.conductor_model !== conductor && healthyModels.includes(conductor)) {
+    log(`↩ return to preferred conductor: ${state.conductor_model} → ${conductor} (local $0)`);
+    state = { ...state, conductor_model: conductor };
+    returnedToPreferred = true;
+  }
+  if (!returnedToPreferred) {
+    const fo = maybeFailover(state, healthy, healthyModels, ts, roster);
+    state = fo.state;
+    if (fo.swapped) log(`⚠ FAILOVER: conductor down → joker=${fo.joker} (failover #${state.failover_count})`);
+  }
 
   // 2) OBSERVE read-only signals.
   const { actionTier, converged } = observe();
