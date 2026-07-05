@@ -6,10 +6,18 @@
 #
 #   bash orchestration/bin/install-ollamas-cmd.sh            # symlink + ~/.zshrc alias
 #   bash orchestration/bin/install-ollamas-cmd.sh --print    # show what it WOULD do, mutate nothing
-#   bash orchestration/bin/install-ollamas-cmd.sh --uninstall # remove symlink + alias block
+#   bash orchestration/bin/install-ollamas-cmd.sh --uninstall # remove symlink + alias block (+ daemon)
+#   bash orchestration/bin/install-ollamas-cmd.sh --daemon     # load the persistent conductor LaunchAgent
+#   bash orchestration/bin/install-ollamas-cmd.sh --daemon-off # unload it
+#   bash orchestration/bin/install-ollamas-cmd.sh --full       # command + daemon in one shot (turnkey)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
+TSX="$REPO/node_modules/.bin/tsx"
+CONDUCTOR="$HERE/orchestra.ts"
+DAEMON_LABEL="com.ollamas.orchestra.conductor"
+DAEMON_PLIST="$HOME/Library/LaunchAgents/$DAEMON_LABEL.plist"
 LAUNCHER="$HERE/ollamas-launch.sh"
 MARK_BEGIN="# >>> ollamas command (orchestra) >>>"
 MARK_END="# <<< ollamas command (orchestra) <<<"
@@ -25,31 +33,82 @@ alias_block() {
   printf '%s\n' "$MARK_END"
 }
 
+# Generate the persistent conductor LaunchAgent (KeepAlive → survives crash/close/reboot). Mirrors
+# orchestration/bin/autopilot.plist but KeepAlive (long-running --watch) instead of StartInterval.
+write_daemon_plist() {
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.ollamas"
+  cat > "$DAEMON_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$DAEMON_LABEL</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$TSX</string>
+    <string>$CONDUCTOR</string>
+    <string>--watch</string>
+    <string>600</string>
+  </array>
+  <key>WorkingDirectory</key><string>$REPO</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>$HOME/.ollamas/conductor.out.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.ollamas/conductor.err.log</string>
+</dict>
+</plist>
+PLIST
+}
+daemon_load() {
+  write_daemon_plist
+  plutil -lint "$DAEMON_PLIST" >/dev/null
+  launchctl unload "$DAEMON_PLIST" 2>/dev/null || true
+  launchctl load -w "$DAEMON_PLIST"
+  echo "✓ conductor daemon loaded ($DAEMON_LABEL) — KeepAlive, survives reboot · logs ~/.ollamas/conductor.{out,err}.log"
+}
+daemon_off() {
+  launchctl unload "$DAEMON_PLIST" 2>/dev/null || true
+  [ -f "$DAEMON_PLIST" ] && rm -f "$DAEMON_PLIST" && echo "✓ conductor daemon unloaded + plist removed" || echo "conductor daemon not present"
+}
+install_cmd() {
+  chmod +x "$LAUNCHER" "$HERE/ollamas-boot.sh"
+  mkdir -p "$TARGET_DIR"
+  ln -sf "$LAUNCHER" "$TARGET" && echo "✓ symlink $TARGET -> $LAUNCHER"
+  if [ -f "$ZSHRC" ] && grep -qF "$MARK_BEGIN" "$ZSHRC"; then
+    echo "✓ ~/.zshrc alias already present (idempotent)"
+  else
+    { echo ""; alias_block; } >> "$ZSHRC"
+    echo "✓ appended alias block to $ZSHRC"
+  fi
+}
+
 case "$MODE" in
   --print)
     echo "launcher : $LAUNCHER"
     echo "symlink  : $TARGET -> $LAUNCHER"
     echo "zshrc    : append idempotent alias block to $ZSHRC"
+    echo "daemon   : $DAEMON_PLIST (--daemon to load: KeepAlive conductor --watch)"
     alias_block
     ;;
   --uninstall)
+    daemon_off
     [ -L "$TARGET" ] && rm -f "$TARGET" && echo "removed symlink $TARGET" || true
     if [ -f "$ZSHRC" ]; then
       /usr/bin/sed -i '' "/$(printf '%s' "$MARK_BEGIN" | sed 's/[.[\*^$()+?{|]/\\&/g')/,/$(printf '%s' "$MARK_END" | sed 's/[.[\*^$()+?{|]/\\&/g')/d" "$ZSHRC" 2>/dev/null || true
       echo "removed alias block from $ZSHRC"
     fi
     ;;
-  install|"")
-    chmod +x "$LAUNCHER" "$HERE/ollamas-boot.sh"
-    mkdir -p "$TARGET_DIR"
-    ln -sf "$LAUNCHER" "$TARGET" && echo "✓ symlink $TARGET -> $LAUNCHER"
-    if [ -f "$ZSHRC" ] && grep -qF "$MARK_BEGIN" "$ZSHRC"; then
-      echo "✓ ~/.zshrc alias already present (idempotent)"
-    else
-      { echo ""; alias_block; } >> "$ZSHRC"
-      echo "✓ appended alias block to $ZSHRC"
-    fi
-    echo "→ open a new terminal (or 'source $ZSHRC'), then type: ollamas"
+  --daemon)     daemon_load ;;
+  --daemon-off) daemon_off ;;
+  --full)
+    install_cmd
+    daemon_load
+    echo "→ turnkey done: yeni terminal (veya 'source $ZSHRC') → 'ollamas'. Şef daemon zaten canlı + kalıcı."
     ;;
-  *) echo "usage: $0 [--print|--uninstall]"; exit 2 ;;
+  install|"")
+    install_cmd
+    echo "→ open a new terminal (or 'source $ZSHRC'), then type: ollamas   ·   kalıcı şef için: $0 --daemon"
+    ;;
+  *) echo "usage: $0 [--print|--uninstall|--daemon|--daemon-off|--full]"; exit 2 ;;
 esac

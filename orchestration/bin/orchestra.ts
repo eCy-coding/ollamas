@@ -48,7 +48,10 @@ const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 const FLEET_WORK = join(homedir(), ".llm-mission-control", "fleet", "work"); // where fleet-apply triages proposals
 
 const DRY = process.env.ORCHESTRA_DRY === "1";
-const APPLY = process.env.ORCHESTRA_APPLY === "1";
+// Autonomous gated apply (0-manual): the env flag OR the opt-in marker `.orchestra-apply-enabled` (mirrors
+// claude-dispatch's `.claude-dispatch-enabled` safety pattern) — so the persistent daemon closes fixes
+// without a per-invocation env. Still gated (tsc+tests, revert-on-red) and never auto-commits.
+const APPLY = process.env.ORCHESTRA_APPLY === "1" || existsSync(join(ORCH_DIR, ".orchestra-apply-enabled"));
 const CHILD_MS = Number(process.env.ORCHESTRA_CHILD_MS || 25_000);
 const PROBE_MS = Number(process.env.ORCHESTRA_PROBE_MS || 12_000);
 

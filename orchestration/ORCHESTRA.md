@@ -46,6 +46,21 @@ healthy alternative exists (degrade, don't spin).
 `council --debate` now tallies a **weighted-majority quorum**: a lane clears quorum when >0.6 of responding
 seats emit actionable findings → `decision: EXECUTE`, else `HOLD` (silence/tie → safe Orchestrator override).
 
+## Turnkey 0-manual (continuous)
+
+One command makes it self-sustaining:
+```bash
+bash orchestration/bin/install-ollamas-cmd.sh --full   # command (symlink+alias) + persistent conductor daemon
+```
+- **Persistent daemon:** `--daemon` writes `~/Library/LaunchAgents/com.ollamas.orchestra.conductor.plist`
+  (`KeepAlive` → `orchestra.ts --watch`; survives crash, terminal-close, reboot). Logs
+  `~/.ollamas/conductor.{out,err}.log`. Off with `--daemon-off`. Loading a LaunchAgent is a T0 system change.
+- **`ollamas ready`** — preflight self-heal (`scripts/ready.mjs`: ollama/model/deps/gate detect + auto-fix).
+  `ollamas` boot runs it as STEP 0 so a fixable prereq never blocks the boot (`--no-ready` skips).
+- **Autonomous apply:** `touch orchestration/.orchestra-apply-enabled` → REPAIR applies gated fixes
+  (tsc+tests, revert-on-red, no auto-commit) with no per-invocation env — so the daemon closes fixes
+  0-manual. Remove the marker → propose-only (default).
+
 ## Parity (STEP 6): orchestra = default, claude-dispatch = opt-in
 
 `orchestra.ts` is the **default, always-on $0 conductor** (local model, via `ollamas`/`--watch`).

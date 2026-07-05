@@ -22,10 +22,11 @@ REPO="$(cd "$HERE/../.." && pwd)"
 TSX="$REPO/node_modules/.bin/tsx"
 CONDUCTOR="$HERE/orchestra.ts"
 WATCH_SEC="600"
-DRY=0; NO_TABS=0
+DRY=0; NO_TABS=0; NO_READY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-tabs) NO_TABS=1 ;;
+    --no-ready) NO_READY=1 ;;
     --dry) DRY=1 ;;
     --watch-sec) WATCH_SEC="${2:-600}"; shift ;;
     *) ;;
@@ -35,6 +36,13 @@ done
 
 say() { printf '\033[36m[ollamas]\033[0m %s\n' "$*"; }
 run() { if [ "$DRY" = 1 ]; then printf '\033[35m[DRY]\033[0m %s\n' "$*"; else eval "$*"; fi; }
+
+# 0) PREFLIGHT self-heal (0-manual): detect + auto-fix missing prereqs (ollama/model/deps) BEFORE boot so
+#    start.sh never fails on a fixable prerequisite. Best-effort — never blocks (--no-ready to skip).
+if [ "$NO_READY" != 1 ] && [ -f "$REPO/scripts/ready.mjs" ]; then
+  say "STEP 0 · preflight self-heal (npm run ready)…"
+  run "(cd '$REPO' && npm run ready) || true"
+fi
 
 # 1) BOOT infra (idempotent; start.sh already guards ports + ollama + bridge). Best-effort: a degraded
 #    boot must NOT block the conductor (it self-heals + fails over).

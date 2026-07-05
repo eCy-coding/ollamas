@@ -32,6 +32,7 @@ case "${1:-}" in
   ""|up|boot)       exec bash "$HERE/ollamas-boot.sh" "${@:2}" ;;
   do)               exec "$TSX" "$CONDUCTOR" "${*:2}" ;;   # enqueue the rest as one task string
   status)           exec "$TSX" "$CONDUCTOR" --status ;;
+  ready)            cd "$REPO" && exec npm run ready ;;    # preflight self-heal (scripts/ready.mjs)
   conductor|watch)  exec "$TSX" "$CONDUCTOR" --watch "${2:-600}" ;;
   *)                cli "$@" ;;
 esac
