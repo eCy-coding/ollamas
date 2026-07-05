@@ -322,6 +322,7 @@ async function main(): Promise<void> {
 
   if (JSON_OUT) { process.stdout.write(JSON.stringify({ mode: "heavy", debate: DEBATE, ts, summary, audits, plan }) + "\n"); return; }
   process.stdout.write(`🎭 council [${DEBATE ? "debate" : "heavy"}] · ${lanes.length} lane · ${results.length} dispatch · ${summary.totalFindings} bulgu · ${audits.length} oracle-denetim\n`);
+  process.stdout.write(`  🗳 karar: ${summary.decision}${summary.decision === "EXECUTE" ? ` — quorum>${0.6}: ${summary.votes.filter((v) => v.decision === "EXECUTE").map((v) => v.lane).join(",")}` : " (hiçbir lane quorum'u geçmedi)"}\n`);
   for (const r of results) process.stdout.write(`  ${r.ok ? "✓" : "✗"} ${r.lane} (${r.model}): ${r.findings.length} bulgu${r.error ? ` — ${r.error}` : ""}\n`);
   if (summary.silentLanes.length) process.stdout.write(`  ⚠️ sessiz lane: ${summary.silentLanes.join(", ")}\n`);
   if (plan) {

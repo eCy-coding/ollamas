@@ -76,15 +76,46 @@ export function parseFindings(lane: string, model: string, response: string): Fi
   return out;
 }
 
+/** Per-lane consensus vote: how many responding seats agree there is actionable work here. */
+export interface LaneVote {
+  lane: string;
+  participating: number;  // seats that responded (ok) for this lane
+  agreeing: number;       // seats that produced ≥1 TASK/RISK (i.e. "there is work")
+  confidence: number;     // agreeing / participating (0 when no participants)
+  decision: "EXECUTE" | "HOLD";
+}
+
+/** Weighted-majority quorum threshold (JUstdoit STEP 2): >0.6 responding seats agree → EXECUTE. */
+export const COUNCIL_QUORUM = 0.6;
+
 export interface CouncilSummary {
   lanes: string[];
   totalFindings: number;
   byLane: { lane: string; tasks: number; risks: number; langs: string[]; models: string[] }[];
   respondedModels: string[];
   silentLanes: string[];  // lanes where NO model produced a finding (surfaced, not hidden)
+  votes: LaneVote[];      // per-lane consensus tally
+  decision: "EXECUTE" | "HOLD"; // global: EXECUTE if any lane clears quorum, else HOLD (Orchestrator override-safe)
 }
 
-/** Aggregate lane results into a synthesis summary. */
+/**
+ * Per-lane weighted vote. A seat "agrees there is work" when it produced ≥1 TASK/RISK finding. A lane clears
+ * quorum when the agreeing fraction of RESPONDING seats exceeds COUNCIL_QUORUM. No participants → HOLD (a tie
+ * or an all-silent lane defaults to HOLD, i.e. the Chief Orchestrator's safe override — never act on silence).
+ */
+export function tallyVotes(results: LaneResult[]): LaneVote[] {
+  const rs = Array.isArray(results) ? results : [];
+  const lanes = [...new Set(rs.map((r) => r.lane))];
+  return lanes.map((lane) => {
+    const forLane = rs.filter((r) => r.lane === lane && r.ok);
+    const participating = forLane.length;
+    const agreeing = forLane.filter((r) => r.findings.some((f) => f.kind === "TASK" || f.kind === "RISK")).length;
+    const confidence = participating > 0 ? agreeing / participating : 0;
+    return { lane, participating, agreeing, confidence, decision: confidence > COUNCIL_QUORUM ? "EXECUTE" : "HOLD" };
+  });
+}
+
+/** Aggregate lane results into a synthesis summary + consensus decision. */
 export function summarizeCouncil(results: LaneResult[]): CouncilSummary {
   const rs = Array.isArray(results) ? results : [];
   const lanes = [...new Set(rs.map((r) => r.lane))];
@@ -103,7 +134,9 @@ export function summarizeCouncil(results: LaneResult[]): CouncilSummary {
   const totalFindings = rs.reduce((n, r) => n + r.findings.length, 0);
   const respondedModels = [...new Set(rs.filter((r) => r.ok).map((r) => r.model))];
   const silentLanes = byLane.filter((l) => l.tasks + l.risks === 0).map((l) => l.lane);
-  return { lanes, totalFindings, byLane, respondedModels, silentLanes };
+  const votes = tallyVotes(rs);
+  const decision: "EXECUTE" | "HOLD" = votes.some((v) => v.decision === "EXECUTE") ? "EXECUTE" : "HOLD";
+  return { lanes, totalFindings, byLane, respondedModels, silentLanes, votes, decision };
 }
 
 /** Extract oracle-checkable claims from findings (arithmetic/logic/ordering only). RISK/TASK prose
