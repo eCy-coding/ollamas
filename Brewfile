@@ -45,4 +45,5 @@ brew "uv"
 
 # === TIER: cask ===
 # Container runtime for the dockerized gateway (or use colima as a lighter alternative).
-cask "docker"
+# (Homebrew renamed the `docker` cask → `docker-desktop`.)
+cask "docker-desktop"
