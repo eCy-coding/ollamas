@@ -11,7 +11,7 @@
 // Network touched is intentional only: npm registry (npm ci), the model pull, and
 // localhost health — never speculative web fetches.
 
-import { existsSync, copyFileSync } from "node:fs";
+import { existsSync, copyFileSync, readFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -119,6 +119,26 @@ const AGENT_URL = (process.env.OLLAMAS_URL || "http://127.0.0.1:8090").replace(/
 let agentUp = false;
 try { await fetch(`${AGENT_URL}/api/agent/chat`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}", signal: AbortSignal.timeout(2500) }); agentUp = true; } catch { /* unreachable */ }
 add("agent-endpoint", agentUp ? "ok" : "start", agentUp ? AGENT_URL : `unreachable ${AGENT_URL}`, agentUp ? "" : "start the agent server: `npm run dev`");
+
+// 5b) brew/macOS deps advisory (iter-10) — parse the root Brewfile inline (no tsx dep), check presence.
+// core-missing blocks; dev/lane-optional missing just warns with the `ollamas deps --install` hint.
+try {
+  const bf = join(REPO, "Brewfile");
+  if (existsSync(bf)) {
+    const BIN = { librsvg: "rsvg-convert", imagemagick: "magick", "wireguard-tools": "wg" };
+    let tier = "core"; const deps = [];
+    for (const raw of readFileSync(bf, "utf8").split("\n")) {
+      const l = raw.trim();
+      const t = l.match(/^#\s*===\s*TIER:\s*([a-z]+)/i); if (t) { tier = t[1].toLowerCase(); continue; }
+      const m = l.match(/^(brew|cask)\s+"([^"]+)"/); if (m) deps.push({ name: m[2], tier });
+    }
+    const missing = deps.filter((d) => !have(BIN[d.name] || d.name));
+    const coreMissing = missing.filter((d) => d.tier === "core");
+    if (!missing.length) add("brew-deps", "ok", `${deps.length}/${deps.length} present`);
+    else if (coreMissing.length) add("brew-deps", "BLOCK", `${coreMissing.map((d) => d.name).join(",")} missing`, "install: `ollamas deps --install` (or `brew bundle`)");
+    else add("brew-deps", "warn", `${missing.length} optional missing (${missing.map((d) => d.name).join(",")})`, "install: `ollamas deps --install`");
+  }
+} catch { /* Brewfile advisory is best-effort */ }
 
 // 6) authoritative deep audit — reuse doctor.mjs (do NOT re-implement its checks)
 let doctor = null;

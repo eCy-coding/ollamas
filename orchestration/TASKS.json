@@ -1694,6 +1694,13 @@
     "acceptance": "new assertion passes; tsc clean"
   },
   {
+    "id": "orchestration-deps",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/deps.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
     "id": "orchestration-detectors",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/detectors.ts",

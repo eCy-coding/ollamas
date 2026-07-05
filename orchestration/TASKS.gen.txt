@@ -200,6 +200,7 @@ orchestration|orchestration/bin/lib/conformance.ts|add a unit test for a pure ex
 orchestration|orchestration/bin/lib/council-roster.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/council.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/critic.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/deps.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/detectors.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/dispatchbench.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/dispatchdoctor.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
