@@ -20,6 +20,7 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 
 | Mechanism | What | Entry point | Slash |
 |-----------|------|-------------|-------|
+| **Orchestra** | The $0 Claude-Code-free conductor: local-model FSM loop (BOOTSTRAP→COUNCIL→BENCHMARK→{DEPLOY\|REPAIR}→MONITORING) + live joker failover + count-agnostic catalog (TASKS.json) + autonomous drain + gated apply (revert-on-red) + completion ledger. Default conductor; turnkey `ollamas` command + KeepAlive daemon. | `orchestration/bin/orchestra.ts` + `bin/lib/{orchestra-fsm,joker,task-catalog,task-progress,orchestra-repair}.ts` | `/orchestra` `/do` `/tasks` `/progress` `/drain` `/calibrate` |
 | **Council** | 18-model capability-matched project analysis + oracle verify + debate | `orchestration/bin/council.ts` | `/council` |
 | **Fleet** | Terminal.app + iTerm2 living agent-tabs, ≤2/model, single-GPU FIFO, PROPOSE-only. `--sequenced` = ethical mission order (T1→Tn, tier-tagged). Workers read the REPO (fleet-launch sets `POST /api/workspace/select`=repo) read-only (`agent-dispatch --no-apply`, no repo mutation) via DIRECT `read_file` of the per-stream target → real gated Change/Diff/Test proposals (6/6 CONVERGED) | `orchestration/bin/fleet-launch.ts` + `bin/lib/{fleet-order,workspace}.ts` | `/fleet` |
 | **Fleet-agent** | Persistent per-tab worker: PLAN→claim→GPU-ticket→dispatch(escalate+backoff)→self-gate→idle-heartbeat | `orchestration/bin/fleet-agent.ts` | (opened by `/fleet --go`) |
@@ -80,6 +81,11 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 6. **Report TR, build EN.** · **Kill-switch exists** (`/fleet-stop`) — sustainable ≠ unstoppable.
 
 ## 4. Skill
+
+`.claude/skills/orchestra-conductor/SKILL.md` packages the **$0 Claude-Code-free conductor** — the local-model
+FSM loop (`orchestra.ts`) + live joker failover + the count-agnostic task catalog (`TASKS.json`) + autonomous
+backlog-drain + gated apply + completion progress + turnkey `ollamas` command/daemon. Slash: `/orchestra`
+`/do` `/tasks` `/progress` `/calibrate` `/drain`. This is the DEFAULT conductor; claude-dispatch is opt-in escalation.
 
 `.claude/skills/fleet-orchestrator/SKILL.md` packages this whole workflow (when-to-use + the loop + the
 slash commands). Sub-agent `.claude/agents/fleet-lieutenant.md` = the "emir eri" that relays conductor
