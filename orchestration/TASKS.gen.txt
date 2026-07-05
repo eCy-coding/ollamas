@@ -250,6 +250,7 @@ orchestration|orchestration/bin/lib/suppress.ts|add a unit test for a pure expor
 orchestration|orchestration/bin/lib/synth.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/tab-spawn.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/task-catalog.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/task-progress.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/tasklist.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/term-exec.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/think.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean

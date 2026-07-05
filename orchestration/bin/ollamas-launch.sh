@@ -32,7 +32,8 @@ case "${1:-}" in
   ""|up|boot)       exec bash "$HERE/ollamas-boot.sh" "${@:2}" ;;
   do)               exec "$TSX" "$CONDUCTOR" "${*:2}" ;;   # enqueue the rest as one task string
   status)           exec "$TSX" "$CONDUCTOR" --status ;;
-  tasks)            exec "$TSX" "$CONDUCTOR" --tasks ;;    # list the 100-task catalog
+  tasks)            [ "${2:-}" = "--progress" ] && exec "$TSX" "$CONDUCTOR" --progress || exec "$TSX" "$CONDUCTOR" --tasks ;;
+  progress)         exec "$TSX" "$CONDUCTOR" --progress ;;  # X/N completion + per-lane breakdown
   ready)            cd "$REPO" && exec npm run ready ;;    # preflight self-heal (scripts/ready.mjs)
   conductor|watch)  exec "$TSX" "$CONDUCTOR" --watch "${2:-600}" ;;
   *)                cli "$@" ;;

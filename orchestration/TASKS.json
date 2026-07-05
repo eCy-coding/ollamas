@@ -2016,6 +2016,13 @@
     "acceptance": "new assertion passes; tsc clean"
   },
   {
+    "id": "orchestration-task-progress",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/task-progress.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
     "id": "orchestration-tasklist",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/tasklist.ts",

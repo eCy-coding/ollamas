@@ -37,6 +37,7 @@ import { FOCUS, focusFile, groundedPrompt } from "./lib/fleet-prompt";
 import { hasSearchReplace } from "./lib/search-replace";
 import { orderStreams, proposalHeader, applyToken, ORCHESTRA_SLOT } from "./lib/orchestra-repair";
 import { resolveTask, type Task } from "./lib/task-catalog";
+import { nextPending, mark, summary, laneSummary, type Progress } from "./lib/task-progress";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -47,12 +48,16 @@ const LOG = join(STATE_DIR, "orchestra.log");
 const TSX = join(REPO, "node_modules", ".bin", "tsx");
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
 const FLEET_WORK = join(homedir(), ".llm-mission-control", "fleet", "work"); // where fleet-apply triages proposals
+const PROGRESS = join(STATE_DIR, "tasks-progress.json"); // completion ledger (iter-8)
 
 const DRY = process.env.ORCHESTRA_DRY === "1";
 // Autonomous gated apply (0-manual): the env flag OR the opt-in marker `.orchestra-apply-enabled` (mirrors
 // claude-dispatch's `.claude-dispatch-enabled` safety pattern) — so the persistent daemon closes fixes
 // without a per-invocation env. Still gated (tsc+tests, revert-on-red) and never auto-commits.
 const APPLY = process.env.ORCHESTRA_APPLY === "1" || existsSync(join(ORCH_DIR, ".orchestra-apply-enabled"));
+// Autonomous backlog-drain (iter-8): when idle, auto-pull the next PENDING catalog task so the daemon works
+// through the whole project 0-manual. Opt-in marker (mirrors apply) — off by default → reactive to `ollamas do`.
+const AUTODRAIN = process.env.ORCHESTRA_AUTODRAIN === "1" || existsSync(join(ORCH_DIR, ".orchestra-autodrain-enabled"));
 const CHILD_MS = Number(process.env.ORCHESTRA_CHILD_MS || 25_000);
 const PROBE_MS = Number(process.env.ORCHESTRA_PROBE_MS || 12_000);
 
@@ -136,12 +141,22 @@ function loadCatalog(): Task[] {
   return Array.isArray(c) ? (c as Task[]) : [];
 }
 
+/** Completion ledger IO (iter-8). Malformed → empty (every task defaults to pending). */
+function loadProgress(): Progress {
+  const p = readJson(PROGRESS);
+  return p && typeof p === "object" && !Array.isArray(p) ? (p as Progress) : {};
+}
+function saveProgress(p: Progress): void {
+  try { mkdirSync(STATE_DIR, { recursive: true }); writeFileSync(PROGRESS, JSON.stringify(p, null, 2) + "\n"); } catch { /* best-effort */ }
+}
+
 async function repairPropose(state: OrchestraState): Promise<void> {
   // Resolve the target: (1) the 100-task catalog (task's OWN real target + goal), else (2) a FOCUS stream.
-  let slot = "", target = "", content = "", goalText = "";
+  let slot = "", target = "", content = "", goalText = "", catalogId = "";
   const task = resolveTask(state.current_task ?? "", loadCatalog());
   if (task && existsSync(join(REPO, task.target))) {
     slot = task.id; target = task.target; goalText = task.goal; content = readFileSync(join(REPO, task.target), "utf8");
+    catalogId = task.id; // ledger only tracks catalog tasks (iter-8)
   } else {
     for (const s of orderStreams(state.current_task, Object.keys(FOCUS))) {
       const tf = focusFile(s), abs = join(REPO, tf);
@@ -158,10 +173,12 @@ async function repairPropose(state: OrchestraState): Promise<void> {
     const dir = join(FLEET_WORK, `${slot}.${ORCHESTRA_SLOT}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "PROPOSAL.md"), `${proposalHeader(slot, state.conductor_model)}\n\n${r.text}\n`);
+    if (catalogId) saveProgress(mark(loadProgress(), catalogId, "proposed"));
     log(`  ↳ REPAIR: ${state.conductor_model} → ${slot}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
     if (APPLY) {
       try {
         const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(slot)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
+        if (catalogId) saveProgress(mark(loadProgress(), catalogId, "done")); // gated apply landed green → done
         log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
       } catch (e) { log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`); }
     }
@@ -229,6 +246,13 @@ async function tick(): Promise<OrchestraState> {
     log(`  ↳ council HOLD (uzlaşı yok) → MONITORING (repair yakma)`);
     next = "MONITORING";
   }
+  // I2 (iter-8): autonomous backlog-drain — idle + AUTODRAIN marker → pull the next PENDING catalog task so the
+  // daemon works through the whole project 0-manual. Reopens the loop this same tick (dequeued below).
+  if (next === "MONITORING" && !hasTask && AUTODRAIN) {
+    const cat = loadCatalog();
+    const t = nextPending(cat, loadProgress());
+    if (t) { state = enqueueTask(state, t.id); next = "COUNCIL_DEBATE"; const s = summary(cat, loadProgress()); log(`↻ auto-drain: ${t.id} (done ${s.done}/${s.total})`); }
+  }
   if (shouldResetRetry(next)) state.retry_count = 0;
   if (next === "COUNCIL_DEBATE" && state.pending_actions.length) state = dequeueTask(state);
   state.history = pruneHistory(state.history, { ts, phase: next, note: `action=${actionTier ?? "clean"}${isBlocking(actionTier) ? "!" : ""} conv=${converged ? 1 : 0}` });
@@ -251,6 +275,12 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (argv.includes("--status")) {
     process.stdout.write(statusLine(loadState(conductorModel())) + "\n");
+    return;
+  }
+  if (argv.includes("--progress")) {
+    const cat = loadCatalog(), prog = loadProgress(), s = summary(cat, prog);
+    process.stdout.write(`📊 tamamlama: done ${s.done}/${s.total} · proposed ${s.proposed} · pending ${s.pending}\n`);
+    for (const l of laneSummary(cat, prog)) process.stdout.write(`  ${l.lane.padEnd(14)} ${l.done}/${l.total}\n`);
     return;
   }
   if (argv.includes("--tasks")) {

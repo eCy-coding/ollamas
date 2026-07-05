@@ -32,6 +32,7 @@ const FLEET_AUTOSHIP = existsSync(join(ORCH_DIR, ".fleet-autoship-enabled")) && 
 const STEP_ARTEFACT: Record<string, string> = {
   quality: "QUALITY.json", conduct: "CONDUCTOR.md", status: "STATUS.md",
   critic: "CRITIC.json", dod: "DOD.json", fuse: "REQUIREMENTS.json", council: "COUNCIL_ROSTER.json",
+  catalog: "TASKS.json",
 };
 
 /** execFileSync throws with `killed:true` (+ SIGTERM) when the timeout fires — distinct from a real error. */
@@ -215,6 +216,7 @@ function main(): void {
   const results: StepResult[] = [
     ...(HEAL ? [runHeal()] : []),  // launchd --heal: bayatsa önce tazele; SessionStart'ta atlanır (hızlı)
     runStep("benchprompt", "benchprompt.ts", []),
+    runStep("catalog", "refresh-catalog.ts", [], 90_000), // iter-8: TASKS.json'u kaynak-yüzeyinden tazele (stale-fallback korumalı)
     runStep("council", "council.ts", []),  // model-council light: roster tazele (ollama list) → COUNCIL_ROSTER.json (ağır --all opt-in)
     runStep("fleet", "fleet-conduct.ts", []),  // local model-fleet supervise: reports+claims → FLEET_STATUS.md (launch --go opt-in)
     ...(FLEET_AUTOSHIP ? [runStep("fleetship", "fleet-apply.ts", ["--apply-all", "--commit"], 900_000)] : []), // vO45 alt-model otonomi: gate-geçen safe-auto önerileri oto-uygula+commit (marker+env ile açık; gate/proposal başına dakikalar → 15dk timeout)

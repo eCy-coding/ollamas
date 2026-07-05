@@ -81,6 +81,23 @@ describe("G2 — council HOLD short-circuit", () => {
   });
 });
 
+describe("I2 — autonomous backlog-drain (iter-8)", () => {
+  it("idle + AUTODRAIN → auto-pulls a catalog task into current_task", () => {
+    // drive to MONITORING (converged + clean), then the drain enqueues the next pending catalog task
+    const drain = { ORCHESTRA_AUTODRAIN: "1", ORCHESTRA_FAKE_CONVERGED: "1" };
+    for (let i = 0; i < 5; i++) run(["--once"], drain);
+    const s = state();
+    expect(s.current_task).toBeTruthy();          // a catalog id was drained in
+    expect(typeof s.current_task).toBe("string");
+  });
+  it("without the marker, idle stays idle (reactive default)", () => {
+    for (let i = 0; i < 5; i++) run(["--once"], { ORCHESTRA_FAKE_CONVERGED: "1" });
+    const s = state();
+    expect(s.current_task).toBeNull();            // no autonomous pull
+    expect(s.pending_actions).toEqual([]);
+  });
+});
+
 describe("chaos — task lifecycle", () => {
   it("enqueue → dequeue into current_task as the loop reopens", () => {
     run(["fix the thing"]);
