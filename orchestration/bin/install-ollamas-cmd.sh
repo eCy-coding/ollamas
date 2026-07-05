@@ -34,9 +34,12 @@ alias_block() {
 }
 
 # Generate the persistent conductor LaunchAgent (KeepAlive → survives crash/close/reboot). Mirrors
-# orchestration/bin/autopilot.plist but KeepAlive (long-running --watch) instead of StartInterval.
+# orchestration/bin/autopilot.plist including the EnvironmentVariables/PATH — launchd runs with a minimal
+# PATH that omits node (mise/nvm/homebrew), so `tsx`'s `#!/usr/bin/env node` shebang would exit 127 without it.
 write_daemon_plist() {
   mkdir -p "$HOME/Library/LaunchAgents" "$HOME/.ollamas"
+  local node_dir; node_dir="$(dirname "$(command -v node 2>/dev/null || echo /usr/local/bin/node)")"
+  local daemon_path="$node_dir:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   cat > "$DAEMON_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -50,6 +53,7 @@ write_daemon_plist() {
     <string>--watch</string>
     <string>600</string>
   </array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$daemon_path</string></dict>
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
