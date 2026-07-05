@@ -60,17 +60,17 @@ export function streamTaskPrompt(stream: string): string {
   ].join("\n");
 }
 
-/** Grounded prompt: the target file's content is inlined (bounded to `maxLines`) so the model copies EXACT
- *  lines into SEARCH — deterministic + resolvable, no file-read round-trip. Used for the Gemini vendor. */
-export function geminiGroundedPrompt(stream: string, target: string, fileContent: string, opts: { maxLines?: number } = {}): string {
+/** Grounded prompt (generic, explicit goal): the target file's content is inlined (bounded to `maxLines`) so
+ *  the model copies EXACT lines into SEARCH — deterministic + resolvable. Used by the 100-task catalog and
+ *  the Gemini vendor alike. `goalText` is the concrete change to make on `target`. */
+export function groundedPrompt(goalText: string, target: string, fileContent: string, opts: { maxLines?: number } = {}): string {
   const maxLines = opts.maxLines ?? 400;
   const lines = (fileContent ?? "").split("\n");
   const window = lines.length > maxLines ? lines.slice(0, maxLines).join("\n") + "\n… (truncated)" : (fileContent ?? "");
-  const goal = FOCUS[stream] ?? "one concrete high-value change for this stream";
   return [
-    `You are a PROPOSE-only worker for the ollamas project, stream "${stream}". Goal: ${goal}.`,
+    `You are a PROPOSE-only worker for the ollamas project. Task: ${goalText || "one concrete high-value change"}.`,
     `Below is the EXACT current content of ${target}. Propose ONE small, high-value, behavior-preserving`,
-    `additive change. Do NOT write any file — output ONLY the proposal in this exact shape:`,
+    `additive change toward that task. Do NOT write any file — output ONLY the proposal in this exact shape:`,
     ...srShapeLines(target),
     `The SEARCH block MUST be an EXACT, VERBATIM copy of lines from the content below (no line numbers).`,
     ``,
@@ -78,4 +78,9 @@ export function geminiGroundedPrompt(stream: string, target: string, fileContent
     window,
     `--- END ${target} ---`,
   ].join("\n");
+}
+
+/** Stream-flavored grounded prompt (goal from the FOCUS map). Thin wrapper over groundedPrompt. */
+export function geminiGroundedPrompt(stream: string, target: string, fileContent: string, opts: { maxLines?: number } = {}): string {
+  return groundedPrompt(FOCUS[stream] ?? "one concrete high-value change for this stream", target, fileContent, opts);
 }

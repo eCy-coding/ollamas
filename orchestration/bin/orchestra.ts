@@ -33,9 +33,10 @@ import {
 import { resolveConductor, maybeFailover, DEFAULT_JOKER } from "./lib/joker";
 import { chatOnce, listModels } from "./lib/ollama-client";
 import type { Tier } from "./lib/conduct";
-import { FOCUS, focusFile, geminiGroundedPrompt } from "./lib/fleet-prompt";
+import { FOCUS, focusFile, groundedPrompt } from "./lib/fleet-prompt";
 import { hasSearchReplace } from "./lib/search-replace";
 import { orderStreams, proposalHeader, applyToken, ORCHESTRA_SLOT } from "./lib/orchestra-repair";
+import { resolveTask, type Task } from "./lib/task-catalog";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -129,27 +130,38 @@ function observe(): { actionTier: Tier | null; converged: boolean } {
  * `<stream>.orchestra/PROPOSAL.md`. With ORCHESTRA_APPLY=1 it is then gated + applied via `fleet-apply.ts
  * --apply` (tsc + tests; reverted on red — the tree is never left broken). $0, local, no Claude Code.
  */
+/** Load the 100-task catalog (TASKS_100.json). Empty on any failure — caller falls back to FOCUS streams. */
+function loadCatalog(): Task[] {
+  const c = readJson(join(ORCH_DIR, "TASKS_100.json"));
+  return Array.isArray(c) ? (c as Task[]) : [];
+}
+
 async function repairPropose(state: OrchestraState): Promise<void> {
-  // Pick a grounded stream whose focus file actually exists (task-named streams first).
-  let stream = "", target = "", content = "";
-  for (const s of orderStreams(state.current_task, Object.keys(FOCUS))) {
-    const tf = focusFile(s), abs = join(REPO, tf);
-    if (tf && existsSync(abs)) { stream = s; target = tf; content = readFileSync(abs, "utf8"); break; }
+  // Resolve the target: (1) the 100-task catalog (task's OWN real target + goal), else (2) a FOCUS stream.
+  let slot = "", target = "", content = "", goalText = "";
+  const task = resolveTask(state.current_task ?? "", loadCatalog());
+  if (task && existsSync(join(REPO, task.target))) {
+    slot = task.id; target = task.target; goalText = task.goal; content = readFileSync(join(REPO, task.target), "utf8");
+  } else {
+    for (const s of orderStreams(state.current_task, Object.keys(FOCUS))) {
+      const tf = focusFile(s), abs = join(REPO, tf);
+      if (tf && existsSync(abs)) { slot = s; target = tf; goalText = FOCUS[s] ?? ""; content = readFileSync(abs, "utf8"); break; }
+    }
   }
-  if (!stream) { log("  ↳ REPAIR: no grounded stream target available — skip"); return; }
-  if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${stream} (${target})`); return; }
+  if (!slot) { log("  ↳ REPAIR: no grounded target (catalog/FOCUS) — skip"); return; }
+  if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${slot} (${target})`); return; }
 
   try {
-    const prompt = geminiGroundedPrompt(stream, target, content);
+    const prompt = groundedPrompt(goalText, target, content);
     const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: CHILD_MS, num_ctx: 8192 });
     if (!hasSearchReplace(r.text)) { log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`); return; }
-    const dir = join(FLEET_WORK, `${stream}.${ORCHESTRA_SLOT}`);
+    const dir = join(FLEET_WORK, `${slot}.${ORCHESTRA_SLOT}`);
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "PROPOSAL.md"), `${proposalHeader(stream, state.conductor_model)}\n\n${r.text}\n`);
-    log(`  ↳ REPAIR: ${state.conductor_model} → ${stream}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
+    writeFileSync(join(dir, "PROPOSAL.md"), `${proposalHeader(slot, state.conductor_model)}\n\n${r.text}\n`);
+    log(`  ↳ REPAIR: ${state.conductor_model} → ${slot}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
     if (APPLY) {
       try {
-        const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(stream)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
+        const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(slot)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
         log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
       } catch (e) { log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`); }
     }
@@ -239,6 +251,12 @@ async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (argv.includes("--status")) {
     process.stdout.write(statusLine(loadState(conductorModel())) + "\n");
+    return;
+  }
+  if (argv.includes("--tasks")) {
+    const cat = loadCatalog();
+    process.stdout.write(`🗂  ${cat.length} kritik görev (ollamas do "<id>"):\n`);
+    for (const t of cat) process.stdout.write(`  ${t.id.padEnd(34)} ${t.goal}\n`);
     return;
   }
   const watchIdx = argv.indexOf("--watch");

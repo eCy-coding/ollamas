@@ -46,6 +46,13 @@ healthy alternative exists (degrade, don't spin).
 `council --debate` now tallies a **weighted-majority quorum**: a lane clears quorum when >0.6 of responding
 seats emit actionable findings → `decision: EXECUTE`, else `HOLD` (silence/tie → safe Orchestrator override).
 
+## 100 critical tasks (`ollamas do`)
+
+`ollamas tasks` lists the 100-task catalog (`orchestration/TASKS_100.json`); `ollamas do "<id|text>"`
+resolves to the task's real target file (`lib/task-catalog.ts`) and grounds the conductor's REPAIR on it.
+Calibrate with `tsx orchestration/bin/calibrate-100.ts` (or `--dry` for the fast integrity gate). See
+`docs/TASKS_100.md`. Correctness = gate + revert-on-red; the harness proves 100/100 process with 0 crashes.
+
 ## Turnkey 0-manual (continuous)
 
 One command makes it self-sustaining:

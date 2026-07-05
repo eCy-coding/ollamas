@@ -1,0 +1,103 @@
+backend|server/tokens.ts|Add a guard at the top of countTokens that returns 0 when text is empty or not a string|countTokens('') returns 0 without calling encoder
+backend|server/tokens.ts|Add JSDoc to exported estimateCost describing model/inTokens/outTokens params and USD return|JSDoc block present above estimateCost
+backend|server/analyzer.ts|Add a null/empty guard in computeGaps returning [] when tools is null or scripts is empty|computeGaps(null, []) returns []
+backend|server/ai.ts|Add JSDoc to exported resolveDefaultModel explaining cache and return value|JSDoc present, no behavior change
+backend|server/ai.ts|Add a guard in generateText that throws a clear Error when prompt is empty string|generateText('') rejects with descriptive message
+backend|server/council.ts|Add input validation in checkAnswer returning false when response or answer is empty|checkAnswer('','x') returns false
+backend|server/notify.ts|Add a guard in slackPayload that trims text and falls back to a default when blank|blank text yields non-empty payload
+backend|server/alignment.ts|Add JSDoc to alignmentEnabled documenting which env vars are checked|JSDoc present
+backend|server/capability-cache.ts|Add a unit test for setToolSupport/getToolSupport round-trip and resetToolSupport clearing|test passes + tsc clean
+backend|server/provider-errors.ts|Add a guard in parseRetryAfter returning undefined for null/blank header before parsing|parseRetryAfter('',0) returns undefined
+backend|server/key-limits.ts|Add JSDoc to approaching describing pct/threshold and boolean meaning|JSDoc present
+backend|server/key-limits.ts|Add a unit test for pctOfLimit with perMin/perDay ratio selection|test passes + tsc clean
+backend|server/key-usage.ts|Add a guard in keyId returning empty string when rawKey is empty|keyId('') returns ''
+backend|server/quota-persist.ts|Add JSDoc to dayWindowExpired explaining boundary and expiry logic|JSDoc present
+backend|server/telemetry.ts|Add a null-check in redactString returning the input unchanged when not a string|redactString handles non-string via early return
+backend|server/chain-policy.ts|Add a guard in filterChain returning [] when chain is null or undefined|filterChain(null, opts) returns []
+backend|server/files.ts|Add a null-check in flattenTreeFiles returning [] when items is null or undefined|flattenTreeFiles(null) returns []
+backend|server/files.ts|Add JSDoc to parseGitPorcelain describing the porcelain-to-map parsing|JSDoc present
+backend|server/providers.ts|Add a guard in repairJson returning null immediately for empty or whitespace input|repairJson('  ') returns null
+backend|server/providers.ts|Add JSDoc to latencyForFailure describing penalty semantics|JSDoc present
+backend|server/cockpit-metrics.ts|Add a length-mismatch guard in coreUtilization returning [] when prev/now lengths differ|mismatched arrays return []
+backend|server/stt-catalog.ts|Add JSDoc to sttEntryFor documenting env lookup and null return|JSDoc present
+backend|server/provider-catalog.ts|Add a guard in catalogEntry that lowercases and trims the provider key before lookup|catalogEntry(' OpenAI ') resolves same as openai
+backend|server/lib/single-flight.ts|Add JSDoc to the exported single-flight helper explaining dedupe behavior|JSDoc present
+backend|server/rag.ts|Add a guard in embedText that throws a clear Error when text is empty|embedText('') rejects with descriptive message
+backend|server/cockpit-metrics.ts|Add JSDoc to coreUtilization documenting prev/now delta computation|JSDoc present
+frontend|src/lib/usage.ts|Add a divide-by-zero guard in usageRatio returning 0 when quota is 0|usageRatio(5,0) returns 0
+frontend|src/lib/usage.ts|Add a null-check in seriesToCalls returning [] when series is null or undefined|seriesToCalls(null) returns []
+frontend|src/lib/observability.ts|Add a guard in percentile returning 0 for an empty values array|percentile([],90) returns 0
+frontend|src/lib/observability.ts|Add JSDoc to healthVerdict describing inputs and verdict result|JSDoc present
+frontend|src/lib/capabilities.ts|Add JSDoc to hasCapability documenting null perms handling|JSDoc present
+frontend|src/lib/i18n.ts|Add a guard in activateLocale that falls back to en when locale is not in LOCALES|activateLocale('xx') activates en
+frontend|src/components/Sparkline.tsx|Add a null/empty-data guard rendering nothing when data is empty|Sparkline with data=[] renders no path
+frontend|src/components/UsageMeter.tsx|Add an aria-label to the UsageMeter progress element for accessibility|rendered meter exposes aria-label
+frontend|src/hooks/useOnline.ts|Add JSDoc to useOnline describing the online/offline event subscription|JSDoc present
+frontend|src/lib/apiClient.ts|Add an error-log via logClientEvent in a catch branch of api client fetch|failed request records a client event
+cli|cli/lib/bench.ts|Add a unit test for pure fn median covering odd/even-length and empty arrays|test asserts correct middle value; existing tests pass
+cli|cli/lib/bench.ts|Add JSDoc to pickBest describing tie-breaking and null-on-empty behavior|JSDoc block above pickBest; no logic change
+cli|cli/lib/manifest.ts|Add a unit test for compareSemver asserting -1/0/1 ordering across versions|compareSemver('1.2.0','1.10.0')===-1; suite green
+cli|cli/lib/manifest.ts|Add JSDoc to selectAsset documenting the target-match and undefined return|JSDoc present above selectAsset; behavior unchanged
+cli|cli/lib/audit.ts|Add a unit test for csvField verifying quoting/escaping of commas and quotes|test covers embedded comma, quote, newline; passes
+cli|cli/lib/audit.ts|Add JSDoc to filterByDate documenting bare-date since/until semantics|JSDoc block added; no behavior change
+cli|cli/lib/config.ts|Add a unit test for resolveProfileName precedence flag over env over global|test asserts precedence; suite green
+cli|cli/lib/man.ts|Add a unit test for troffEscape escaping backslash and leading-dot lines|test asserts escaped output; passes
+cli|cli/lib/output.ts|Add a unit test for visibleLen confirming ANSI codes are excluded from length|visibleLen of colored string equals plain length
+cli|cli/lib/output.ts|Add JSDoc to shouldColor describing the noColor/json/isTTY precedence|JSDoc block above shouldColor; behavior unchanged
+cli|cli/lib/completion.ts|Add JSDoc to complete describing word-array input and candidate output|JSDoc present; no behavior change
+cli|cli/lib/dispatch-ledger.ts|Add a unit test for isStale at and just-past the staleness boundary|test asserts boolean at boundary; suite green
+cli|cli/lib/dispatch-ledger.ts|Add JSDoc to foldLedger documenting last-writer-wins fold by key|JSDoc added; behavior unchanged
+cli|cli/lib/backup.ts|Add a unit test for backupOutName verifying the generated filename format|test asserts name contains the time component; passes
+cli|cli/lib/keystore.ts|Add JSDoc to the main exported keystore function describing storage location|JSDoc present above target export
+cli|cli/commands/keys.ts|Add a unit test for redactOlm confirming secrets are masked in output|test asserts redacted string hides token; suite green
+cli|cli/commands/bench.ts|Add a bounded per-target fetch timeout guard via AbortController|timeout aborts a hung request; default path unchanged
+scripts|scripts/ready.mjs|Add JSDoc to have documenting the PATH binary-presence check|JSDoc comment above have; no behavior change
+scripts|scripts/ready.mjs|Add a guard so sh rejects an empty command argument|sh('') throws/returns error early; normal calls unaffected
+scripts|scripts/measure-extract.mjs|Add JSDoc to extractOld documenting html/url/maxText params and return|JSDoc block above extractOld; behavior unchanged
+scripts|scripts/gen-manifest.mjs|Add a top-of-file usage comment describing inputs and generated output|comment header present; script runs identically
+scripts|scripts/testgen.mjs|Add a top-of-file usage header describing what the generator emits|header comment present; no behavior change
+orchestration|orchestration/bin/lib/rank.ts|Add a unit test for severityWeight mapping each Severity to its weight|test asserts weights for all severities; suite green
+orchestration|orchestration/bin/lib/rank.ts|Add JSDoc to dedupe describing DedupeResult grouping|JSDoc added; behavior unchanged
+orchestration|orchestration/bin/lib/note.ts|Add a unit test for refDeficit true/false around the reference threshold|test asserts boolean; passes
+orchestration|orchestration/bin/lib/note.ts|Add JSDoc to noteKey documenting the composite key fields|JSDoc present above noteKey; no behavior change
+orchestration|orchestration/bin/lib/fuse.ts|Add a unit test for critRank ordering CRITICAL before ROADMAP|critRank('CRITICAL')<critRank('ROADMAP'); suite green
+orchestration|orchestration/bin/lib/quality.ts|Add a unit test for parseTscResult on clean vs error output|test asserts ok/errorCount for both cases; passes
+orchestration|orchestration/bin/lib/quality.ts|Add JSDoc to rollup describing the Rollup aggregation|JSDoc added
+orchestration|orchestration/bin/lib/critic.ts|Add a unit test for keywords extracting tokens from a title|test asserts expected keyword array; suite green
+orchestration|orchestration/bin/lib/workspace.ts|Add JSDoc to selectWorkspaceRequest documenting baseUrl/repo request shape|JSDoc block present; behavior unchanged
+orchestration|orchestration/bin/shared.ts|Add a unit test for resolveLane returning matching worktree or null|test asserts resolution and null fallback; passes
+orchestration|orchestration/bin/shared.ts|Add JSDoc to findFile documenting the bounded-depth recursive search|JSDoc above findFile noting default depth=3
+contract|contract/src/state.ts|Add JSDoc documenting the exported state-load function and its return shape|JSDoc present above the function; tsc passes
+contract|contract/src/registry.ts|Add a guard that throws a clear Error when register is called with an empty id|empty id throws with descriptive message
+contract|contract/src/doctor.ts|Add a check that logs a warning when a required binary path is missing|warning emitted on missing path; happy path unchanged
+contract|contract/src/pool.ts|Add a bounds guard so acquiring from an empty pool returns a typed error|empty-pool acquire returns/throws clearly; tsc passes
+contract|contract/src/breaker.ts|Add JSDoc documenting the circuit-breaker states and the trip threshold param|JSDoc present; no logic change
+contract|contract/src/calibrate.ts|Add input validation guarding against negative or zero sample counts|invalid sample count rejected with message
+contract|contract/src/shard.ts|Add a guard rejecting a shard index outside the valid range|out-of-range index throws; in-range identical
+contract|contract/src/keys.ts|Add error handling around key parsing so malformed input throws a descriptive Error|malformed key produces clear error
+contract|contract/src/agent.ts|Add a timeout guard around the long-running agent step with a configurable default|step aborts after timeout with clear error
+contract|contract/src/installer.ts|Add a JSDoc header describing install steps and preconditions|JSDoc present; installer logic unchanged
+tunnel|tunnel/src/daemon.ts|Add error handling on the daemon start path to log and rethrow with context|start failure logs context then rethrows
+tunnel|tunnel/src/proxy.ts|Add a guard validating the target URL before proxying rejecting non-http schemes|invalid scheme rejected with message
+tunnel|tunnel/src/health.ts|Add an assertion that health-check interval is positive defaulting if not|non-positive interval falls back to default
+tunnel|tunnel/src/scoring.ts|Add JSDoc explaining the scoring formula and each weight input|JSDoc present above scoring function; output identical
+tunnel|tunnel/src/switch.ts|Add a guard preventing switching to the same active endpoint as a logged no-op|same-endpoint switch is a logged no-op
+tunnel|tunnel/src/status.ts|Add try/catch around status serialization returning a safe fallback on error|serialization error yields fallback
+tunnel|tunnel/src/ratelimit.ts|Add a guard rejecting a non-positive rate limit and documenting the window units|invalid limit rejected; valid limiter unchanged
+tunnel|tunnel/src/breaker.ts|Add JSDoc documenting failure threshold and reset timeout semantics|JSDoc present; no logic change
+tunnel|tunnel/src/mobileconfig.ts|Add validation that required profile fields are non-empty before generating|missing field throws clear error
+tests|tests/single-flight.test.ts|Add a test assertion confirming concurrent identical calls resolve to one invocation|assertion passes deterministically; suite green
+tests|tests/cli-parser.test.ts|Add an assertion that parsing an unknown flag yields a clear error/usage result|new assertion passes; parser unchanged
+tests|tests/provider-errors.test.ts|Add an assertion mapping a 429 upstream response to the rate-limit error type|new assertion passes; existing mappings unaffected
+host-bridge|bin/host-bridge/hmac.mjs|Add JSDoc for the sign/verify functions and a guard for empty secret|empty secret throws; JSDoc present
+host-bridge|bin/host-bridge/gate.mjs|Add error handling that returns a structured deny result when policy input is malformed|malformed policy yields deny with reason
+host-bridge|bin/host-bridge/tools/web_search.mjs|Add a fetch timeout and catch to return an empty-results object on network error|network error yields empty results object
+host-bridge|bin/host-bridge/lib/metering.mjs|Add a guard clamping negative usage deltas to zero and document units|negative delta clamped; positive accounting unchanged
+host-bridge|bin/host-bridge/terminal-bridge.mjs|Add a JSDoc block documenting the request envelope fields handled by the bridge|JSDoc present; request handling unchanged
+ops|ops/launchd/run-server.sh|Add a guard that exits with a clear message if the server binary path is missing|missing binary exits non-zero with message
+contract|contract/src/pool.ts|Add JSDoc to the pool acquire/release describing lifecycle|JSDoc present; behavior unchanged
+tunnel|tunnel/src/proxy-server.ts|Add a request timeout guard on upstream fetch with a sane default|slow upstream aborts after timeout
+cli|cli/lib/config.ts|Add JSDoc to resolveProfileName documenting the precedence order|JSDoc present; behavior unchanged
+backend|server/rag.ts|Add JSDoc to embedText documenting the embedding provider and dimensions|JSDoc present
+frontend|src/lib/i18n.ts|Add JSDoc to activateLocale documenting the fallback behavior|JSDoc present
+orchestration|orchestration/bin/lib/fuse.ts|Add JSDoc to critRank documenting the criticality ordering|JSDoc present
