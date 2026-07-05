@@ -46,6 +46,22 @@ healthy alternative exists (degrade, don't spin).
 `council --debate` now tallies a **weighted-majority quorum**: a lane clears quorum when >0.6 of responding
 seats emit actionable findings → `decision: EXECUTE`, else `HOLD` (silence/tie → safe Orchestrator override).
 
+## Parity (STEP 6): orchestra = default, claude-dispatch = opt-in
+
+`orchestra.ts` is the **default, always-on $0 conductor** (local model, via `ollamas`/`--watch`).
+`claude-dispatch.ts` is the **opt-in, human-gated escalation** to a paid Claude Code session for the rare
+requirement a local model can't close — off unless `.claude-dispatch-enabled` + `--go`. The conductor runs
+through `ollamas` (living tabs) / `--watch`, deliberately NOT piggy-backed on the SessionStart autopilot
+refresh (a full model-generating tick per session would be a surprising side-effect).
+
+## REPAIR = real gated fix (STEP 4)
+
+REPAIR makes the conductor a fleet worker: it grounds the local model on a stream's focus file
+(`lib/fleet-prompt`), gets a SEARCH/REPLACE proposal, writes it to
+`~/.llm-mission-control/fleet/work/<stream>.orchestra/PROPOSAL.md`, and with `ORCHESTRA_APPLY=1` runs
+`fleet-apply.ts --apply` (tsc + tests gate, reverted on red). Council `HOLD` short-circuits a no-consensus
+tick to MONITORING (a queued task or a blocking signal overrides).
+
 ## Tests
 
 `vitest run --project orchestra` — joker + FSM units + child-process chaos (failover, bounded

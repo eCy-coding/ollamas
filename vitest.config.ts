@@ -60,7 +60,7 @@ export default defineConfig({
         test: {
           name: 'orchestra',
           environment: 'node',
-          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,joker,council-vote,autopilot-stale}.test.ts'],
+          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale}.test.ts'],
         },
       },
     ],

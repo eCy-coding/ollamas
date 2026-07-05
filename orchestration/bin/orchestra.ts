@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/orchestra.ts — the Claude-Code-FREE $0 conductor loop (JUstdoit STEP 1-10 + Emre 4-step).
+ * orchestration/bin/orchestra.ts — the autonomous local-model conductor daemon: the DEFAULT $0 self-healing
+ * FSM loop (JUstdoit STEP 1-10 + Emre 4-step). Runs on Ollama alone; the opt-in escalation that hands a
+ * requirement to a Claude Code session is claude-dispatch.ts (marker-gated) — this file is its $0 replacement.
  *
  * The thin IO shell around the pure FSM core (lib/orchestra-fsm.ts) — same split as conduct.ts (CLI) +
  * lib/conduct (pure). A LOCAL benchmark-picked model conducts; NO Claude Code, NO cloud API required. Each
@@ -31,6 +33,9 @@ import {
 import { resolveConductor, maybeFailover, DEFAULT_JOKER } from "./lib/joker";
 import { chatOnce, listModels } from "./lib/ollama-client";
 import type { Tier } from "./lib/conduct";
+import { FOCUS, focusFile, geminiGroundedPrompt } from "./lib/fleet-prompt";
+import { hasSearchReplace } from "./lib/search-replace";
+import { orderStreams, proposalHeader, applyToken, ORCHESTRA_SLOT } from "./lib/orchestra-repair";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -40,6 +45,7 @@ const STATE = join(STATE_DIR, "orchestra.json");
 const LOG = join(STATE_DIR, "orchestra.log");
 const TSX = join(REPO, "node_modules", ".bin", "tsx");
 const OLLAMA_HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+const FLEET_WORK = join(homedir(), ".llm-mission-control", "fleet", "work"); // where fleet-apply triages proposals
 
 const DRY = process.env.ORCHESTRA_DRY === "1";
 const APPLY = process.env.ORCHESTRA_APPLY === "1";
@@ -114,18 +120,45 @@ function observe(): { actionTier: Tier | null; converged: boolean } {
 }
 
 // ── Phase side-effects (bounded, best-effort; the local model does the work — $0, no Claude Code) ─────
+/**
+ * REPAIR (JUstdoit STEP 4, surgical): the conductor acts as a fleet worker. Ground the local model on a
+ * stream's focus file → get a SEARCH/REPLACE proposal → write it to the fleet work-dir as an ordinary
+ * `<stream>.orchestra/PROPOSAL.md`. With ORCHESTRA_APPLY=1 it is then gated + applied via `fleet-apply.ts
+ * --apply` (tsc + tests; reverted on red — the tree is never left broken). $0, local, no Claude Code.
+ */
 async function repairPropose(state: OrchestraState): Promise<void> {
-  const task = state.current_task || "resolve the top conduct.ts finding (root cause, minimal diff)";
-  if (DRY) { log(`  ↳ REPAIR (dry): would dispatch "${task}" → ${state.conductor_model}`); return; }
+  // Pick a grounded stream whose focus file actually exists (task-named streams first).
+  let stream = "", target = "", content = "";
+  for (const s of orderStreams(state.current_task, Object.keys(FOCUS))) {
+    const tf = focusFile(s), abs = join(REPO, tf);
+    if (tf && existsSync(abs)) { stream = s; target = tf; content = readFileSync(abs, "utf8"); break; }
+  }
+  if (!stream) { log("  ↳ REPAIR: no grounded stream target available — skip"); return; }
+  if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${stream} (${target})`); return; }
+
   try {
-    const sys = "You are the ollamas repair conductor. Output ONLY a concrete minimal fix plan: root cause + the exact file(s)/diff sketch. No prose, no greetings.";
-    const r = await chatOnce(state.conductor_model, sys, task, { host: OLLAMA_HOST, timeoutMs: CHILD_MS, num_ctx: 8192 });
-    const dir = join(STATE_DIR, "orchestra-proposals");
+    const prompt = geminiGroundedPrompt(stream, target, content);
+    const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: CHILD_MS, num_ctx: 8192 });
+    if (!hasSearchReplace(r.text)) { log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`); return; }
+    const dir = join(FLEET_WORK, `${stream}.${ORCHESTRA_SLOT}`);
     mkdirSync(dir, { recursive: true });
-    const f = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}.md`);
-    writeFileSync(f, `# REPAIR proposal (${state.conductor_model})\n\ntask: ${task}\n\n${r.text}\n`);
-    log(`  ↳ REPAIR: ${state.conductor_model} proposed (${r.tokS.toFixed(0)} tok/s) → ${f}`);
+    writeFileSync(join(dir, "PROPOSAL.md"), `${proposalHeader(stream, state.conductor_model)}\n\n${r.text}\n`);
+    log(`  ↳ REPAIR: ${state.conductor_model} → ${stream}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
+    if (APPLY) {
+      try {
+        const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(stream)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
+        log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
+      } catch (e) { log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`); }
+    }
   } catch (e) { log(`  ↳ REPAIR: dispatch failed (${(e as Error).message.slice(0, 80)}) — will retry`); }
+}
+
+/** G2: last council verdict. Only an EXPLICIT HOLD holds; missing/EXECUTE → proceed (never stall the loop). */
+function councilDecision(): "EXECUTE" | "HOLD" {
+  const fake = process.env.ORCHESTRA_FAKE_DECISION;
+  if (fake === "EXECUTE" || fake === "HOLD") return fake;
+  const c = readJson(join(ORCH_DIR, "COUNCIL.json")) as { summary?: { decision?: string } } | null;
+  return c?.summary?.decision === "HOLD" ? "HOLD" : "EXECUTE";
 }
 
 async function runPhaseSideEffect(state: OrchestraState): Promise<void> {
@@ -146,10 +179,14 @@ async function runPhaseSideEffect(state: OrchestraState): Promise<void> {
 }
 
 // ── One FSM tick ──────────────────────────────────────────────────────────────────────────────────────
+/** Conductor model: env override (test/pin seam) else the benchmark pick from MODEL_SELECTION.json. */
+function conductorModel(): string {
+  return process.env.ORCHESTRA_CONDUCTOR || resolveConductor(readJson(join(ORCH_DIR, "MODEL_SELECTION.json")));
+}
+
 async function tick(): Promise<OrchestraState> {
-  const modelSelection = readJson(join(ORCH_DIR, "MODEL_SELECTION.json"));
   const roster = readJson(join(ORCH_DIR, "COUNCIL_ROSTER.json"));
-  const conductor = resolveConductor(modelSelection);
+  const conductor = conductorModel();
   let state = loadState(conductor);
   const ts = new Date().toISOString();
 
@@ -170,7 +207,13 @@ async function tick(): Promise<OrchestraState> {
   let retryExceeded = false;
   if (state.phase === "REPAIR") { const b = bumpRetry(state.retry_count); state.retry_count = b.retry_count; retryExceeded = b.exceeded; }
   const input: PhaseInput = { phase: state.phase, actionTier, hasTask, converged, retryExceeded };
-  const next = nextPhase(input);
+  let next = nextPhase(input);
+  // G2 (STEP 2 wiring): leaving COUNCIL_DEBATE with an explicit council HOLD and nothing forcing work
+  // (no queued task, no blocking signal) → hold at MONITORING instead of burning a repair on no-consensus.
+  if (state.phase === "COUNCIL_DEBATE" && !hasTask && !isBlocking(actionTier) && councilDecision() === "HOLD") {
+    log(`  ↳ council HOLD (uzlaşı yok) → MONITORING (repair yakma)`);
+    next = "MONITORING";
+  }
   if (shouldResetRetry(next)) state.retry_count = 0;
   if (next === "COUNCIL_DEBATE" && state.pending_actions.length) state = dequeueTask(state);
   state.history = pruneHistory(state.history, { ts, phase: next, note: `action=${actionTier ?? "clean"}${isBlocking(actionTier) ? "!" : ""} conv=${converged ? 1 : 0}` });
@@ -184,8 +227,7 @@ async function tick(): Promise<OrchestraState> {
 
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────────
 function enqueueCli(task: string): void {
-  const conductor = resolveConductor(readJson(join(ORCH_DIR, "MODEL_SELECTION.json")));
-  const state = enqueueTask(loadState(conductor), task);
+  const state = enqueueTask(loadState(conductorModel()), task);
   saveState(state);
   log(`＋ enqueued: "${task}" (queue=${state.pending_actions.length})`);
 }
@@ -193,8 +235,7 @@ function enqueueCli(task: string): void {
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   if (argv.includes("--status")) {
-    const conductor = resolveConductor(readJson(join(ORCH_DIR, "MODEL_SELECTION.json")));
-    process.stdout.write(statusLine(loadState(conductor)) + "\n");
+    process.stdout.write(statusLine(loadState(conductorModel())) + "\n");
     return;
   }
   const watchIdx = argv.indexOf("--watch");

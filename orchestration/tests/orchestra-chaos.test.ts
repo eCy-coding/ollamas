@@ -16,7 +16,8 @@ const TSX = join(REPO, "node_modules", ".bin", "tsx");
 const CLI = join(REPO, "orchestration", "bin", "orchestra.ts");
 
 let stateDir: string;
-const baseEnv = () => ({ ...process.env, ORCHESTRA_DRY: "1", ORCHESTRA_STATE_DIR: stateDir });
+// FAKE_DECISION=EXECUTE keeps these FSM/failover tests hermetic from the repo's live COUNCIL.json verdict.
+const baseEnv = () => ({ ...process.env, ORCHESTRA_DRY: "1", ORCHESTRA_STATE_DIR: stateDir, ORCHESTRA_FAKE_DECISION: "EXECUTE" });
 function run(args: string[], extra: Record<string, string> = {}): void {
   execFileSync(TSX, [CLI, ...args], { cwd: REPO, env: { ...baseEnv(), ...extra }, stdio: "ignore", timeout: 30_000 });
 }
@@ -62,6 +63,21 @@ describe("chaos — bounded retry → ESCALATE (no infinite loop)", () => {
     const s = state();
     expect(s.phase).toBe("ESCALATE");        // parked, not spinning
     expect(s.retry_count).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("G2 — council HOLD short-circuit", () => {
+  it("council HOLD at COUNCIL_DEBATE (no task, no blocking) → holds at MONITORING, no repair", () => {
+    run(["--once"]); // BOOTSTRAPPING → COUNCIL_DEBATE
+    expect(state().phase).toBe("COUNCIL_DEBATE");
+    run(["--once"], { ORCHESTRA_FAKE_DECISION: "HOLD" }); // council says HOLD → skip benchmark/repair
+    expect(state().phase).toBe("MONITORING");
+  });
+  it("council HOLD is OVERRIDDEN by a queued task (user intent wins)", () => {
+    run(["fix something"]);       // enqueue
+    run(["--once"], { ORCHESTRA_FAKE_DECISION: "HOLD" }); // BOOTSTRAPPING→COUNCIL (dequeues)
+    run(["--once"], { ORCHESTRA_FAKE_DECISION: "HOLD" }); // COUNCIL→BENCHMARK (hasTask overrides HOLD)
+    expect(state().phase).toBe("BENCHMARK_VALIDATION");
   });
 });
 

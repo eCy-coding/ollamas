@@ -1,6 +1,10 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/claude-dispatch.ts — vO41 otonom Claude Code conductor ZİNCİRİ (IO shell).
+ * orchestration/bin/claude-dispatch.ts — vO41 OPT-IN Claude Code escalation chain (marker-gated, dry-default).
+ *
+ * ROLE (STEP 6 parity): NOT the default conductor. The default $0 conductor is orchestra.ts (local-model
+ * daemon, always-on). This is the deliberate, human-gated escalation to a paid Claude Code session for the
+ * rare critical requirement a local model cannot close — off unless `.claude-dispatch-enabled` + `--go`.
  *
  * conduct/fuse'un tespit ettiği EN KRİTİK gereksinimi alır → YENİ Terminal.app/iTerm2 sekmesinde
  * `claude --permission-mode plan` (conductor prompt'la) açar. vO41 kesintisiz zincir: bir görev
