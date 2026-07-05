@@ -34,6 +34,8 @@ case "${1:-}" in
   status)           exec "$TSX" "$CONDUCTOR" --status ;;
   tasks)            [ "${2:-}" = "--progress" ] && exec "$TSX" "$CONDUCTOR" --progress || exec "$TSX" "$CONDUCTOR" --tasks ;;
   progress)         exec "$TSX" "$CONDUCTOR" --progress ;;  # X/N completion + per-lane breakdown
+  calibrate)        exec "$TSX" "$HERE/calibrate.ts" "${@:2}" ;;    # e2e pipeline calibration
+  deps)             exec "$TSX" "$HERE/deps-doctor.ts" "${@:2}" ;;  # brew/macOS dependency check
   ready)            cd "$REPO" && exec npm run ready ;;    # preflight self-heal (scripts/ready.mjs)
   conductor|watch)  exec "$TSX" "$CONDUCTOR" --watch "${2:-600}" ;;
   *)                cli "$@" ;;
