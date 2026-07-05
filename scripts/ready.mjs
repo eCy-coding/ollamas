@@ -125,7 +125,7 @@ add("agent-endpoint", agentUp ? "ok" : "start", agentUp ? AGENT_URL : `unreachab
 try {
   const bf = join(REPO, "Brewfile");
   if (existsSync(bf)) {
-    const BIN = { librsvg: "rsvg-convert", imagemagick: "magick", "wireguard-tools": "wg" };
+    const BIN = { librsvg: "rsvg-convert", imagemagick: "magick", "wireguard-tools": "wg", "docker-desktop": "docker" };
     let tier = "core"; const deps = [];
     for (const raw of readFileSync(bf, "utf8").split("\n")) {
       const l = raw.trim();

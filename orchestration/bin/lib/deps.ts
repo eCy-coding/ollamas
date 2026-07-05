@@ -19,6 +19,7 @@ const BIN_OVERRIDE: Record<string, string> = {
   librsvg: "rsvg-convert",
   imagemagick: "magick",
   "wireguard-tools": "wg",
+  "docker-desktop": "docker", // the docker-desktop cask provides the `docker` CLI
 };
 
 /** The command to probe for a dep's presence. */

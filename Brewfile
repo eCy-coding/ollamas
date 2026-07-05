@@ -1,5 +1,7 @@
 # Brewfile — ollamas' Homebrew + macOS dependency manifest (iter-10).
-# Install all:   brew bundle          Verify:   brew bundle check          Report:   ollamas deps  (or /deps)
+# Install all:   brew bundle          Verify (presence):   ollamas deps   (or /deps)
+# NB: `brew bundle check` is stricter — it flags tools installed outside brew or merely outdated. The
+# project's real gate is PRESENCE (deps-doctor `command -v`), which is what ready.mjs / boot check.
 #
 # Tiers are parsed from `# === TIER: <name> ===` headers by orchestration/bin/lib/deps.ts. Missing a `core`
 # dep blocks; missing `dev`/lane-optional deps warn. node (mise) + git/curl (Xcode CLT) are external-managed
