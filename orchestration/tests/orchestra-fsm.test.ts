@@ -12,12 +12,13 @@ describe("nextPhase — the FSM walk", () => {
     expect(nextPhase(inp({ phase: "BOOTSTRAPPING" }))).toBe("COUNCIL_DEBATE");
     expect(nextPhase(inp({ phase: "COUNCIL_DEBATE" }))).toBe("BENCHMARK_VALIDATION");
   });
-  it("gate: converged + nothing broken → DEPLOYMENT", () => {
-    expect(nextPhase(inp({ phase: "BENCHMARK_VALIDATION", converged: true, actionTier: null }))).toBe("DEPLOYMENT");
+  it("gate: converged + nothing broken + no task → DEPLOYMENT", () => {
+    expect(nextPhase(inp({ phase: "BENCHMARK_VALIDATION", converged: true, actionTier: null, hasTask: false }))).toBe("DEPLOYMENT");
   });
-  it("gate: not converged OR blocking tier → REPAIR", () => {
+  it("gate: not converged OR blocking tier OR explicit task → REPAIR", () => {
     expect(nextPhase(inp({ phase: "BENCHMARK_VALIDATION", converged: false }))).toBe("REPAIR");
     expect(nextPhase(inp({ phase: "BENCHMARK_VALIDATION", converged: true, actionTier: "RED" }))).toBe("REPAIR");
+    expect(nextPhase(inp({ phase: "BENCHMARK_VALIDATION", converged: true, actionTier: null, hasTask: true }))).toBe("REPAIR");
   });
   it("repair loops to benchmark until retry cap → ESCALATE", () => {
     expect(nextPhase(inp({ phase: "REPAIR", retryExceeded: false }))).toBe("BENCHMARK_VALIDATION");

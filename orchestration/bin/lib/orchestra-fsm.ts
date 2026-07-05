@@ -108,8 +108,9 @@ export function nextPhase(i: PhaseInput): Phase {
     case "COUNCIL_DEBATE":
       return "BENCHMARK_VALIDATION";
     case "BENCHMARK_VALIDATION":
-      // Gate: converged AND nothing broken → ship; else repair the root cause.
-      return i.converged && !isBlocking(i.actionTier) ? "DEPLOYMENT" : "REPAIR";
+      // Gate: converged AND nothing broken AND no explicit task → ship. An explicit pending/current task
+      // (from `ollamas do` or the auto-drain) is real work → route to REPAIR to EXECUTE it before shipping.
+      return i.converged && !isBlocking(i.actionTier) && !i.hasTask ? "DEPLOYMENT" : "REPAIR";
     case "REPAIR":
       return i.retryExceeded ? "ESCALATE" : "BENCHMARK_VALIDATION";
     case "DEPLOYMENT":
