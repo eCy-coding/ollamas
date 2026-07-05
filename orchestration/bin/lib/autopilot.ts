@@ -11,6 +11,7 @@ export interface StepResult {
   ok: boolean;
   ms: number;
   detail: string;   // pick / next-action / hata
+  stale?: boolean;  // budget-exceeded refresh that fell back to the previous on-disk artefact (⏱, not a failure)
 }
 
 /** Sonuçları AUTOPILOT.md markdown özetine indir (saf; ts dışarıdan = deterministik). */
@@ -26,8 +27,11 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
   // heal (vO-AUTO.2 staleness self-heal): tazeleme kararı/sonucu.
   const healR = results.find((r) => r.step === "heal");
 
+  // A timed-out refresh that reused its prior artefact is ⏱ stale — honest: not ✓ (fresh) nor ✗ (failed).
+  const glyph = (r: StepResult) => (r.stale ? "⏱" : r.ok ? "✓" : "✗");
+  const staleN = results.filter((r) => r.stale).length;
   const rows = results.length
-    ? results.map((r) => `| ${r.ok ? "✓" : "✗"} | \`${r.step}\` | ${r.ms}ms | ${r.detail} |`)
+    ? results.map((r) => `| ${glyph(r)} | \`${r.step}\` | ${r.ms}ms | ${r.detail} |`)
     : ["| — | _adım yok (no step)_ | — | — |"];
 
   return [
@@ -37,7 +41,7 @@ export function summarizeAutopilot(results: StepResult[], ts: string): string {
     `> Sekme açılışında (SessionStart hook) + bench değişiminde (launchd WatchPaths) kendiliğinden koşar.`,
     `> Operatör komut çalıştırmaz (0-manuel-işlem).`,
     ``,
-    `**Durum:** ${okN}/${total} adım başarılı · ${ts}`,
+    `**Durum:** ${okN}/${total} adım başarılı${staleN ? ` (${staleN} ⏱ stale-fallback)` : ""} · ${ts}`,
     `**Model seçimi (0-manuel-seçim):** ${pick}`,
     `**Conductor sonraki-aksiyon:** ${next}`,
     `**Readiness (0-manuel aktif mi):** ${readiness}`,

@@ -27,6 +27,18 @@ const HEAL = process.argv.includes("--heal"); // vO-AUTO.2: bayatsa otonom tazel
 // marker .fleet-autoship-enabled + env ORCH_FLEET_AUTOSHIP=1 (claude-dispatch marker deseniyle aynı).
 const FLEET_AUTOSHIP = existsSync(join(ORCH_DIR, ".fleet-autoship-enabled")) && process.env.ORCH_FLEET_AUTOSHIP === "1";
 
+/** Per-step artefact: if a slow refresh times out but this file already exists on disk, the previous
+ *  run's output is still valid → degrade to ⏱ stale-ok instead of a hard ✗ (sustainable refresh loop). */
+const STEP_ARTEFACT: Record<string, string> = {
+  quality: "QUALITY.json", conduct: "CONDUCTOR.md", status: "STATUS.md",
+  critic: "CRITIC.json", dod: "DOD.json", fuse: "REQUIREMENTS.json", council: "COUNCIL_ROSTER.json",
+};
+
+/** execFileSync throws with `killed:true` (+ SIGTERM) when the timeout fires — distinct from a real error. */
+function isTimeoutKill(e: any): boolean {
+  return e?.killed === true || e?.code === "ETIMEDOUT" || e?.signal === "SIGTERM";
+}
+
 /** Bir adımı read-only spawn et; never-throw → StepResult. Süreyi process.hrtime ile ölç (Date.now yok). */
 function runStep(step: string, script: string, args: string[], timeoutMs = 60_000): StepResult {
   const t0 = process.hrtime.bigint();
@@ -38,6 +50,14 @@ function runStep(step: string, script: string, args: string[], timeoutMs = 60_00
     return { step, ok: true, ms, detail: detailFor(step) };
   } catch (e: any) {
     const ms = Number((process.hrtime.bigint() - t0) / 1_000_000n);
+    // ROOT-FIX (RISK-ORCH: quality/conduct/status ETIMEDOUT → phantom ✗ dropping readiness): a refresh
+    // step that exceeds its budget is NOT a failure if its artefact already exists — the loop reuses the
+    // last-known-good output and stays green. Only a timeout with NO prior artefact (or a genuine non-zero
+    // exit) is a real failure.
+    const artefact = STEP_ARTEFACT[step];
+    if (isTimeoutKill(e) && artefact && existsSync(join(ORCH_DIR, artefact))) {
+      return { step, ok: true, stale: true, ms, detail: `⏱ ${Math.round(ms / 1000)}s timeout → önceki ${artefact} korunur (stale)` };
+    }
     // Captured stderr (last non-empty line) is the real reason; fall back to the exec message.
     // Avoids the truncated "Command failed: …/tsx /" noise when a step genuinely errors.
     const err = (e?.stderr?.toString().trim().split("\n").filter(Boolean).pop() || e?.message || "hata");
@@ -205,13 +225,13 @@ function main(): void {
     runStep("quality", "quality.ts", HEAL ? [] : ["--no-tsc"], HEAL ? 300_000 : 60_000),
     runStep("critic", "critic.ts", []),   // vO11 öz-denetim → CRITIC.json (conduct ÖNCESİ üret)
     runStep("dod", "dod.ts", []),         // vO12 yarım-iş gate → DOD.json (conduct ÖNCESİ üret)
-    runStep("conduct", "conduct.ts", ["--json"]), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir
+    runStep("conduct", "conduct.ts", ["--json"], 150_000), // CRITIC/DOD'u COMPLETENESS-finding olarak tüketir (collect() ağır → 150s bütçe + stale-fallback)
     runStep("fuse", "fuse.ts", []),       // vO14 tüm-gate → REQUIREMENTS.md kritik-öncelikli birleşik
     runStep("think", "think.ts", []),     // vO22 THINK loop: finding → PROVEN-solution(registry) | NEEDS_RESEARCH (no-guess)
     runStep("next", "fleet-next.ts", []), // vO24 precompute next-task queue (safe-additive apply → edit → research) → FLEET_NEXT.md
     runStep("tasklist", "tasklist.ts", []), // vO29 persistent master task list → docs/MASTER_TASKLIST.md (auto-refresh)
     runStep("claude", "claude-dispatch.ts", ["--go"]), // vO40 en-kritik gereksinimi Claude conductor oturumuna delege (marker .claude-dispatch-enabled YOKSA dry — tek-manuel aktivasyon)
-    runStep("status", "status.ts", []),
+    runStep("status", "status.ts", [], 150_000),
     runStep("dispatch", "reconcile.ts", []), // vO27 autonomous fleet reconcile → RECONCILE.md (0-manuel self-reconcile)
     runDoctor(),
   ];
