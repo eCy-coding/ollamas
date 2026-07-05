@@ -27,6 +27,7 @@
     "conformance:stdio": "mcp-inspector --cli node dist/mcp-stdio.cjs --method tools/list",
     "dev": "tsx server.ts",
     "council": "node scripts/council.mjs",
+    "siri": "node bin/siri-ask.mjs",
     "gemini:lane": "node scripts/gemini-lane.mjs",
     "ecysearcher": "node scripts/ecysearcher-lane.mjs",
     "gemini:provision": "node scripts/gemini-provision.mjs",

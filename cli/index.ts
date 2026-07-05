@@ -27,7 +27,7 @@ import { isSea } from "node:sea";
 import { loadConfig, saveConfig, configPath, profilePath, setActiveProfile, listProfiles, type CliConfig } from "./lib/config";
 import { describeKeystore, migrateKeySource } from "./lib/keystore";
 
-const VERSION = "16.0.0";
+const VERSION = "16.1.0";
 
 const HELP = `ollamas v${VERSION} — LLM Mission Control CLI
 
@@ -44,6 +44,7 @@ commands:
   bench              benchmark models (tok/s, TTFB) and pick the fastest
   top [--watch]      live metrics dashboard (requests, latency, tool calls)
   shortcuts build    generate an Apple Shortcuts pack (chat|status|bench|mcp-call)
+  siri <question>    on-device Siri search assistant (oracle + deep web; --say to speak)
   remote check       verify gateway is bound to a remote ollama GPU backend
   gemini <prompt>    bridge to Google's Gemini CLI (run|setup-mcp|status)
   doctor             health of gateway + ollama + bridge + ready + agent
@@ -207,6 +208,7 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   bench: "benchmark models (tok/s, TTFB) and pick the fastest",
   top: "live metrics dashboard (requests, latency, tool calls)",
   shortcuts: "generate an Apple Shortcuts pack",
+  siri: "on-device Siri search assistant (oracle verdict + deep web synth)",
   remote: "verify gateway is bound to a remote ollama GPU backend",
   gemini: "bridge to Google's Gemini CLI (run, setup-mcp, status)",
   doctor: "health of gateway, ollama, bridge, ready and agent",
@@ -332,6 +334,13 @@ export async function main(argv: string[]): Promise<number> {
       // Thin launcher (N-012-safe: spawns the zero-dep lane script that drives `docker compose`; no
       // server import). ollamas is the control plane; the main :3000 stack is never touched.
       const r = spawnSync(process.execPath, ["scripts/ecysearcher-lane.mjs", ...rest], { stdio: "inherit" });
+      return r.status ?? 0;
+    }
+    case "siri": {
+      // On-device Siri search assistant ("ollamas sor"): question → local siri-ask brain
+      // (Truth-Oracle verdict / deep web + fleet synth). Thin launcher (N-012-safe: spawns
+      // the standalone zero-server binary; no server/tool-registry import). Server not required.
+      const r = spawnSync(process.execPath, ["bin/siri-ask.mjs", ...rest], { stdio: "inherit" });
       return r.status ?? 0;
     }
     case "doctor":

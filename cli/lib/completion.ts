@@ -26,6 +26,7 @@ export const COMMAND_TREE: CommandTree = {
     "bench",
     "top",
     "shortcuts",
+    "siri",
     "remote",
     "gemini",
     "ecysearcher",
