@@ -37,7 +37,7 @@ import { FOCUS, focusFile, groundedPrompt } from "./lib/fleet-prompt";
 import { hasSearchReplace } from "./lib/search-replace";
 import { orderStreams, proposalHeader, applyToken, ORCHESTRA_SLOT } from "./lib/orchestra-repair";
 import { resolveTask, type Task } from "./lib/task-catalog";
-import { nextPending, mark, summary, laneSummary, type Progress } from "./lib/task-progress";
+import { nextPending, mark, summary, laneSummary, statusOf, type Progress } from "./lib/task-progress";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -241,7 +241,11 @@ async function tick(): Promise<OrchestraState> {
 
   // 2) OBSERVE read-only signals.
   const { actionTier, converged } = observe();
-  const hasTask = state.pending_actions.length > 0 || !!state.current_task;
+  // A current_task whose catalog id is already proposed/done is NOT active work — else the loop re-proposes it
+  // forever (hasTask stuck true) and the autonomous drain can never advance. Treat it as complete → clear it.
+  const curTask = state.current_task ? resolveTask(state.current_task, loadCatalog()) : null;
+  const curDone = !!curTask && statusOf(loadProgress(), curTask.id) !== "pending";
+  const hasTask = state.pending_actions.length > 0 || (!!state.current_task && !curDone);
 
   // 3) SIDE-EFFECT for the current phase (bounded, best-effort).
   await runPhaseSideEffect(state);
@@ -251,6 +255,8 @@ async function tick(): Promise<OrchestraState> {
   if (state.phase === "REPAIR") { const b = bumpRetry(state.retry_count); state.retry_count = b.retry_count; retryExceeded = b.exceeded; }
   const input: PhaseInput = { phase: state.phase, actionTier, hasTask, converged, retryExceeded };
   let next = nextPhase(input);
+  // Clear a completed current_task (proposed/done) so the loop advances (drain picks the next pending below).
+  if (curDone) { log(`  ↳ görev tamam: ${curTask!.id} (${statusOf(loadProgress(), curTask!.id)}) → sıradaki`); state = { ...state, current_task: null }; }
   // G2 (STEP 2 wiring): leaving COUNCIL_DEBATE with an explicit council HOLD and nothing forcing work
   // (no queued task, no blocking signal) → hold at MONITORING instead of burning a repair on no-consensus.
   if (state.phase === "COUNCIL_DEBATE" && !hasTask && !isBlocking(actionTier) && councilDecision() === "HOLD") {
