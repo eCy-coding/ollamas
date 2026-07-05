@@ -11,7 +11,13 @@
 #   --dry       print what would run; mutate nothing (no boot, no tabs)
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE="${BASH_SOURCE[0]}"  # resolve symlinks → real script dir (PATH-symlink safe)
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+HERE="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TSX="$REPO/node_modules/.bin/tsx"
 CONDUCTOR="$HERE/orchestra.ts"

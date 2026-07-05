@@ -9,7 +9,16 @@
 #   ollamas <anything>   → delegate to the existing zero-dep TS CLI (chat/agent/mcp/keys/…)
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks so HERE is the REAL dir of this script even when invoked via a PATH symlink
+# (e.g. ~/.local/bin/ollamas → …/orchestration/bin/ollamas-launch.sh). Without this, BASH_SOURCE is the
+# symlink and REPO mis-resolves to ~ → `tsx not found`.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [ "${SOURCE#/}" = "$SOURCE" ] && SOURCE="$DIR/$SOURCE"
+done
+HERE="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TSX="$REPO/node_modules/.bin/tsx"
 CONDUCTOR="$HERE/orchestra.ts"
