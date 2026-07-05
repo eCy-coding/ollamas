@@ -1,15 +1,15 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/calibrate-100.ts — e2e calibration of the 100-task `ollamas do` pipeline (iter-6).
+ * orchestration/bin/calibrate.ts — e2e calibration of the 100-task `ollamas do` pipeline (iter-6).
  *
  * Runs each catalog task PROPOSE-ONLY (no repo mutation): resolve target → ground the local model → check the
  * proposal is an actionable SEARCH/REPLACE whose SEARCH matches the file VERBATIM (apply-ready). Tallies
- * resolved / actionable / applyClean / crashes → CALIBRATION_100.md (+ --json). The gate + revert-on-red is
+ * resolved / actionable / applyClean / crashes → CALIBRATION.md (+ --json). The gate + revert-on-red is
  * the correctness guarantee at apply time; this harness proves the pipeline PROCESSES all 100 without error.
  *
  * Run:
- *   tsx orchestration/bin/calibrate-100.ts --dry            # structural only (resolve+target-exists), no model — fast CI gate
- *   tsx orchestration/bin/calibrate-100.ts [--limit N] [--model m] [--json]   # live model calibration (slow)
+ *   tsx orchestration/bin/calibrate.ts --dry            # structural only (resolve+target-exists), no model — fast CI gate
+ *   tsx orchestration/bin/calibrate.ts [--limit N] [--model m] [--json]   # live model calibration (slow)
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -36,7 +36,7 @@ const PER_TASK_MS = Number(process.env.CALIBRATE_TASK_MS || 60_000);
 interface Row { id: string; target: string; resolved: boolean; actionable: boolean; applyClean: boolean; reason: string; }
 
 async function main(): Promise<void> {
-  const catalog: Task[] = JSON.parse(readFileSync(join(ORCH_DIR, "TASKS_100.json"), "utf8"));
+  const catalog: Task[] = JSON.parse(readFileSync(join(ORCH_DIR, "TASKS.json"), "utf8"));
   const tasks = LIMIT > 0 ? catalog.slice(0, LIMIT) : catalog;
   const rows: Row[] = [];
   let crashes = 0;
@@ -78,9 +78,9 @@ async function main(): Promise<void> {
     ]),
     ``,
     `> Correctness at apply time = tsc+test gate + revert-on-red. This harness proves the pipeline PROCESSES`,
-    `> ${n} tasks with 0 crashes. Rerun: \`tsx orchestration/bin/calibrate-100.ts\`.`,
+    `> ${n} tasks with 0 crashes. Rerun: \`tsx orchestration/bin/calibrate.ts\`.`,
   ].join("\n");
-  writeFileSync(join(ORCH_DIR, "CALIBRATION_100.md"), md + "\n");
+  writeFileSync(join(ORCH_DIR, "CALIBRATION.md"), md + "\n");
   process.stdout.write(md + "\n");
   process.stderr.write(`[calibrate-100] resolved ${sum.resolved}/${n}${DRY ? "" : ` · actionable ${sum.actionable} · apply-clean ${sum.applyClean} · crashes ${sum.crashes}`}\n`);
   if (DRY && sum.resolved !== n) process.exit(1); // integrity gate: every target must exist

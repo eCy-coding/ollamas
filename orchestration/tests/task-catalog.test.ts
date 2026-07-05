@@ -6,7 +6,7 @@ import { resolveTask, catalogRowErrors, duplicateIds, type Task } from "../bin/l
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
-const CATALOG: Task[] = JSON.parse(readFileSync(join(REPO, "orchestration", "TASKS_100.json"), "utf8"));
+const CATALOG: Task[] = JSON.parse(readFileSync(join(REPO, "orchestration", "TASKS.json"), "utf8"));
 
 describe("resolveTask — precedence", () => {
   const cat: Task[] = [
@@ -27,8 +27,8 @@ describe("resolveTask — precedence", () => {
   });
 });
 
-describe("TASKS_100 catalog integrity (eksiksiz guarantee)", () => {
-  it("has exactly 100 tasks", () => { expect(CATALOG.length).toBe(100); });
+describe("TASKS catalog integrity (eksiksiz guarantee, count-agnostic)", () => {
+  it("covers the project surface (>= 100 tasks)", () => { expect(CATALOG.length).toBeGreaterThanOrEqual(100); });
   it("every row is structurally valid", () => {
     const bad = CATALOG.flatMap((t) => catalogRowErrors(t).map((e) => `${(t as Task).id}: ${e}`));
     expect(bad).toEqual([]);

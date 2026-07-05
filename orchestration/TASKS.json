@@ -1,0 +1,2375 @@
+[
+  {
+    "id": "backend-tokens",
+    "lane": "backend",
+    "target": "server/tokens.ts",
+    "goal": "Add a guard at the top of countTokens that returns 0 when text is empty or not a string",
+    "acceptance": "countTokens('') returns 0 without calling encoder"
+  },
+  {
+    "id": "backend-analyzer",
+    "lane": "backend",
+    "target": "server/analyzer.ts",
+    "goal": "Add a null/empty guard in computeGaps returning [] when tools is null or scripts is empty",
+    "acceptance": "computeGaps(null, []) returns []"
+  },
+  {
+    "id": "backend-ai",
+    "lane": "backend",
+    "target": "server/ai.ts",
+    "goal": "Add JSDoc to exported resolveDefaultModel explaining cache and return value",
+    "acceptance": "JSDoc present, no behavior change"
+  },
+  {
+    "id": "backend-council",
+    "lane": "backend",
+    "target": "server/council.ts",
+    "goal": "Add input validation in checkAnswer returning false when response or answer is empty",
+    "acceptance": "checkAnswer('','x') returns false"
+  },
+  {
+    "id": "backend-notify",
+    "lane": "backend",
+    "target": "server/notify.ts",
+    "goal": "Add a guard in slackPayload that trims text and falls back to a default when blank",
+    "acceptance": "blank text yields non-empty payload"
+  },
+  {
+    "id": "backend-alignment",
+    "lane": "backend",
+    "target": "server/alignment.ts",
+    "goal": "Add JSDoc to alignmentEnabled documenting which env vars are checked",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "backend-capability-cache",
+    "lane": "backend",
+    "target": "server/capability-cache.ts",
+    "goal": "Add a unit test for setToolSupport/getToolSupport round-trip and resetToolSupport clearing",
+    "acceptance": "test passes + tsc clean"
+  },
+  {
+    "id": "backend-provider-errors",
+    "lane": "backend",
+    "target": "server/provider-errors.ts",
+    "goal": "Add a guard in parseRetryAfter returning undefined for null/blank header before parsing",
+    "acceptance": "parseRetryAfter('',0) returns undefined"
+  },
+  {
+    "id": "backend-key-limits",
+    "lane": "backend",
+    "target": "server/key-limits.ts",
+    "goal": "Add JSDoc to approaching describing pct/threshold and boolean meaning",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "backend-key-usage",
+    "lane": "backend",
+    "target": "server/key-usage.ts",
+    "goal": "Add a guard in keyId returning empty string when rawKey is empty",
+    "acceptance": "keyId('') returns ''"
+  },
+  {
+    "id": "backend-quota-persist",
+    "lane": "backend",
+    "target": "server/quota-persist.ts",
+    "goal": "Add JSDoc to dayWindowExpired explaining boundary and expiry logic",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "backend-telemetry",
+    "lane": "backend",
+    "target": "server/telemetry.ts",
+    "goal": "Add a null-check in redactString returning the input unchanged when not a string",
+    "acceptance": "redactString handles non-string via early return"
+  },
+  {
+    "id": "backend-chain-policy",
+    "lane": "backend",
+    "target": "server/chain-policy.ts",
+    "goal": "Add a guard in filterChain returning [] when chain is null or undefined",
+    "acceptance": "filterChain(null, opts) returns []"
+  },
+  {
+    "id": "backend-files",
+    "lane": "backend",
+    "target": "server/files.ts",
+    "goal": "Add a null-check in flattenTreeFiles returning [] when items is null or undefined",
+    "acceptance": "flattenTreeFiles(null) returns []"
+  },
+  {
+    "id": "backend-providers",
+    "lane": "backend",
+    "target": "server/providers.ts",
+    "goal": "Add a guard in repairJson returning null immediately for empty or whitespace input",
+    "acceptance": "repairJson('  ') returns null"
+  },
+  {
+    "id": "backend-cockpit-metrics",
+    "lane": "backend",
+    "target": "server/cockpit-metrics.ts",
+    "goal": "Add a length-mismatch guard in coreUtilization returning [] when prev/now lengths differ",
+    "acceptance": "mismatched arrays return []"
+  },
+  {
+    "id": "backend-stt-catalog",
+    "lane": "backend",
+    "target": "server/stt-catalog.ts",
+    "goal": "Add JSDoc to sttEntryFor documenting env lookup and null return",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "backend-provider-catalog",
+    "lane": "backend",
+    "target": "server/provider-catalog.ts",
+    "goal": "Add a guard in catalogEntry that lowercases and trims the provider key before lookup",
+    "acceptance": "catalogEntry(' OpenAI ') resolves same as openai"
+  },
+  {
+    "id": "backend-single-flight",
+    "lane": "backend",
+    "target": "server/lib/single-flight.ts",
+    "goal": "Add JSDoc to the exported single-flight helper explaining dedupe behavior",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "backend-rag",
+    "lane": "backend",
+    "target": "server/rag.ts",
+    "goal": "Add a guard in embedText that throws a clear Error when text is empty",
+    "acceptance": "embedText('') rejects with descriptive message"
+  },
+  {
+    "id": "frontend-usage",
+    "lane": "frontend",
+    "target": "src/lib/usage.ts",
+    "goal": "Add a divide-by-zero guard in usageRatio returning 0 when quota is 0",
+    "acceptance": "usageRatio(5,0) returns 0"
+  },
+  {
+    "id": "frontend-observability",
+    "lane": "frontend",
+    "target": "src/lib/observability.ts",
+    "goal": "Add a guard in percentile returning 0 for an empty values array",
+    "acceptance": "percentile([],90) returns 0"
+  },
+  {
+    "id": "frontend-capabilities",
+    "lane": "frontend",
+    "target": "src/lib/capabilities.ts",
+    "goal": "Add JSDoc to hasCapability documenting null perms handling",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "frontend-i18n",
+    "lane": "frontend",
+    "target": "src/lib/i18n.ts",
+    "goal": "Add a guard in activateLocale that falls back to en when locale is not in LOCALES",
+    "acceptance": "activateLocale('xx') activates en"
+  },
+  {
+    "id": "frontend-sparkline",
+    "lane": "frontend",
+    "target": "src/components/Sparkline.tsx",
+    "goal": "Add a null/empty-data guard rendering nothing when data is empty",
+    "acceptance": "Sparkline with data=[] renders no path"
+  },
+  {
+    "id": "frontend-usagemeter",
+    "lane": "frontend",
+    "target": "src/components/UsageMeter.tsx",
+    "goal": "Add an aria-label to the UsageMeter progress element for accessibility",
+    "acceptance": "rendered meter exposes aria-label"
+  },
+  {
+    "id": "frontend-useonline",
+    "lane": "frontend",
+    "target": "src/hooks/useOnline.ts",
+    "goal": "Add JSDoc to useOnline describing the online/offline event subscription",
+    "acceptance": "JSDoc present"
+  },
+  {
+    "id": "frontend-apiclient",
+    "lane": "frontend",
+    "target": "src/lib/apiClient.ts",
+    "goal": "Add an error-log via logClientEvent in a catch branch of api client fetch",
+    "acceptance": "failed request records a client event"
+  },
+  {
+    "id": "cli-bench",
+    "lane": "cli",
+    "target": "cli/lib/bench.ts",
+    "goal": "Add a unit test for pure fn median covering odd/even-length and empty arrays",
+    "acceptance": "test asserts correct middle value; existing tests pass"
+  },
+  {
+    "id": "cli-manifest",
+    "lane": "cli",
+    "target": "cli/lib/manifest.ts",
+    "goal": "Add a unit test for compareSemver asserting -1/0/1 ordering across versions",
+    "acceptance": "compareSemver('1.2.0','1.10.0')===-1; suite green"
+  },
+  {
+    "id": "cli-audit",
+    "lane": "cli",
+    "target": "cli/lib/audit.ts",
+    "goal": "Add a unit test for csvField verifying quoting/escaping of commas and quotes",
+    "acceptance": "test covers embedded comma, quote, newline; passes"
+  },
+  {
+    "id": "cli-config",
+    "lane": "cli",
+    "target": "cli/lib/config.ts",
+    "goal": "Add a unit test for resolveProfileName precedence flag over env over global",
+    "acceptance": "test asserts precedence; suite green"
+  },
+  {
+    "id": "cli-man",
+    "lane": "cli",
+    "target": "cli/lib/man.ts",
+    "goal": "Add a unit test for troffEscape escaping backslash and leading-dot lines",
+    "acceptance": "test asserts escaped output; passes"
+  },
+  {
+    "id": "cli-output",
+    "lane": "cli",
+    "target": "cli/lib/output.ts",
+    "goal": "Add a unit test for visibleLen confirming ANSI codes are excluded from length",
+    "acceptance": "visibleLen of colored string equals plain length"
+  },
+  {
+    "id": "cli-completion",
+    "lane": "cli",
+    "target": "cli/lib/completion.ts",
+    "goal": "Add JSDoc to complete describing word-array input and candidate output",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-dispatch-ledger",
+    "lane": "cli",
+    "target": "cli/lib/dispatch-ledger.ts",
+    "goal": "Add a unit test for isStale at and just-past the staleness boundary",
+    "acceptance": "test asserts boolean at boundary; suite green"
+  },
+  {
+    "id": "cli-backup",
+    "lane": "cli",
+    "target": "cli/lib/backup.ts",
+    "goal": "Add a unit test for backupOutName verifying the generated filename format",
+    "acceptance": "test asserts name contains the time component; passes"
+  },
+  {
+    "id": "cli-keystore",
+    "lane": "cli",
+    "target": "cli/lib/keystore.ts",
+    "goal": "Add JSDoc to the main exported keystore function describing storage location",
+    "acceptance": "JSDoc present above target export"
+  },
+  {
+    "id": "cli-keys",
+    "lane": "cli",
+    "target": "cli/commands/keys.ts",
+    "goal": "Add a unit test for redactOlm confirming secrets are masked in output",
+    "acceptance": "test asserts redacted string hides token; suite green"
+  },
+  {
+    "id": "cli-bench-2",
+    "lane": "cli",
+    "target": "cli/commands/bench.ts",
+    "goal": "Add a bounded per-target fetch timeout guard via AbortController",
+    "acceptance": "timeout aborts a hung request; default path unchanged"
+  },
+  {
+    "id": "scripts-ready",
+    "lane": "scripts",
+    "target": "scripts/ready.mjs",
+    "goal": "Add JSDoc to have documenting the PATH binary-presence check",
+    "acceptance": "JSDoc comment above have; no behavior change"
+  },
+  {
+    "id": "scripts-measure-extract",
+    "lane": "scripts",
+    "target": "scripts/measure-extract.mjs",
+    "goal": "Add JSDoc to extractOld documenting html/url/maxText params and return",
+    "acceptance": "JSDoc block above extractOld; behavior unchanged"
+  },
+  {
+    "id": "scripts-gen-manifest",
+    "lane": "scripts",
+    "target": "scripts/gen-manifest.mjs",
+    "goal": "Add a top-of-file usage comment describing inputs and generated output",
+    "acceptance": "comment header present; script runs identically"
+  },
+  {
+    "id": "scripts-testgen",
+    "lane": "scripts",
+    "target": "scripts/testgen.mjs",
+    "goal": "Add a top-of-file usage header describing what the generator emits",
+    "acceptance": "header comment present; no behavior change"
+  },
+  {
+    "id": "orchestration-rank",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/rank.ts",
+    "goal": "Add a unit test for severityWeight mapping each Severity to its weight",
+    "acceptance": "test asserts weights for all severities; suite green"
+  },
+  {
+    "id": "orchestration-note",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/note.ts",
+    "goal": "Add a unit test for refDeficit true/false around the reference threshold",
+    "acceptance": "test asserts boolean; passes"
+  },
+  {
+    "id": "orchestration-fuse",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fuse.ts",
+    "goal": "Add a unit test for critRank ordering CRITICAL before ROADMAP",
+    "acceptance": "critRank('CRITICAL')<critRank('ROADMAP'); suite green"
+  },
+  {
+    "id": "orchestration-quality",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/quality.ts",
+    "goal": "Add a unit test for parseTscResult on clean vs error output",
+    "acceptance": "test asserts ok/errorCount for both cases; passes"
+  },
+  {
+    "id": "orchestration-critic",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/critic.ts",
+    "goal": "Add a unit test for keywords extracting tokens from a title",
+    "acceptance": "test asserts expected keyword array; suite green"
+  },
+  {
+    "id": "orchestration-workspace",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/workspace.ts",
+    "goal": "Add JSDoc to selectWorkspaceRequest documenting baseUrl/repo request shape",
+    "acceptance": "JSDoc block present; behavior unchanged"
+  },
+  {
+    "id": "orchestration-shared",
+    "lane": "orchestration",
+    "target": "orchestration/bin/shared.ts",
+    "goal": "Add a unit test for resolveLane returning matching worktree or null",
+    "acceptance": "test asserts resolution and null fallback; passes"
+  },
+  {
+    "id": "contract-state",
+    "lane": "contract",
+    "target": "contract/src/state.ts",
+    "goal": "Add JSDoc documenting the exported state-load function and its return shape",
+    "acceptance": "JSDoc present above the function; tsc passes"
+  },
+  {
+    "id": "contract-registry",
+    "lane": "contract",
+    "target": "contract/src/registry.ts",
+    "goal": "Add a guard that throws a clear Error when register is called with an empty id",
+    "acceptance": "empty id throws with descriptive message"
+  },
+  {
+    "id": "contract-doctor",
+    "lane": "contract",
+    "target": "contract/src/doctor.ts",
+    "goal": "Add a check that logs a warning when a required binary path is missing",
+    "acceptance": "warning emitted on missing path; happy path unchanged"
+  },
+  {
+    "id": "contract-pool",
+    "lane": "contract",
+    "target": "contract/src/pool.ts",
+    "goal": "Add a bounds guard so acquiring from an empty pool returns a typed error",
+    "acceptance": "empty-pool acquire returns/throws clearly; tsc passes"
+  },
+  {
+    "id": "contract-breaker",
+    "lane": "contract",
+    "target": "contract/src/breaker.ts",
+    "goal": "Add JSDoc documenting the circuit-breaker states and the trip threshold param",
+    "acceptance": "JSDoc present; no logic change"
+  },
+  {
+    "id": "contract-calibrate",
+    "lane": "contract",
+    "target": "contract/src/calibrate.ts",
+    "goal": "Add input validation guarding against negative or zero sample counts",
+    "acceptance": "invalid sample count rejected with message"
+  },
+  {
+    "id": "contract-shard",
+    "lane": "contract",
+    "target": "contract/src/shard.ts",
+    "goal": "Add a guard rejecting a shard index outside the valid range",
+    "acceptance": "out-of-range index throws; in-range identical"
+  },
+  {
+    "id": "contract-keys",
+    "lane": "contract",
+    "target": "contract/src/keys.ts",
+    "goal": "Add error handling around key parsing so malformed input throws a descriptive Error",
+    "acceptance": "malformed key produces clear error"
+  },
+  {
+    "id": "contract-agent",
+    "lane": "contract",
+    "target": "contract/src/agent.ts",
+    "goal": "Add a timeout guard around the long-running agent step with a configurable default",
+    "acceptance": "step aborts after timeout with clear error"
+  },
+  {
+    "id": "contract-installer",
+    "lane": "contract",
+    "target": "contract/src/installer.ts",
+    "goal": "Add a JSDoc header describing install steps and preconditions",
+    "acceptance": "JSDoc present; installer logic unchanged"
+  },
+  {
+    "id": "tunnel-daemon",
+    "lane": "tunnel",
+    "target": "tunnel/src/daemon.ts",
+    "goal": "Add error handling on the daemon start path to log and rethrow with context",
+    "acceptance": "start failure logs context then rethrows"
+  },
+  {
+    "id": "tunnel-proxy",
+    "lane": "tunnel",
+    "target": "tunnel/src/proxy.ts",
+    "goal": "Add a guard validating the target URL before proxying rejecting non-http schemes",
+    "acceptance": "invalid scheme rejected with message"
+  },
+  {
+    "id": "tunnel-health",
+    "lane": "tunnel",
+    "target": "tunnel/src/health.ts",
+    "goal": "Add an assertion that health-check interval is positive defaulting if not",
+    "acceptance": "non-positive interval falls back to default"
+  },
+  {
+    "id": "tunnel-scoring",
+    "lane": "tunnel",
+    "target": "tunnel/src/scoring.ts",
+    "goal": "Add JSDoc explaining the scoring formula and each weight input",
+    "acceptance": "JSDoc present above scoring function; output identical"
+  },
+  {
+    "id": "tunnel-switch",
+    "lane": "tunnel",
+    "target": "tunnel/src/switch.ts",
+    "goal": "Add a guard preventing switching to the same active endpoint as a logged no-op",
+    "acceptance": "same-endpoint switch is a logged no-op"
+  },
+  {
+    "id": "tunnel-status",
+    "lane": "tunnel",
+    "target": "tunnel/src/status.ts",
+    "goal": "Add try/catch around status serialization returning a safe fallback on error",
+    "acceptance": "serialization error yields fallback"
+  },
+  {
+    "id": "tunnel-ratelimit",
+    "lane": "tunnel",
+    "target": "tunnel/src/ratelimit.ts",
+    "goal": "Add a guard rejecting a non-positive rate limit and documenting the window units",
+    "acceptance": "invalid limit rejected; valid limiter unchanged"
+  },
+  {
+    "id": "tunnel-breaker",
+    "lane": "tunnel",
+    "target": "tunnel/src/breaker.ts",
+    "goal": "Add JSDoc documenting failure threshold and reset timeout semantics",
+    "acceptance": "JSDoc present; no logic change"
+  },
+  {
+    "id": "tunnel-mobileconfig",
+    "lane": "tunnel",
+    "target": "tunnel/src/mobileconfig.ts",
+    "goal": "Add validation that required profile fields are non-empty before generating",
+    "acceptance": "missing field throws clear error"
+  },
+  {
+    "id": "tests-single-flight-test",
+    "lane": "tests",
+    "target": "tests/single-flight.test.ts",
+    "goal": "Add a test assertion confirming concurrent identical calls resolve to one invocation",
+    "acceptance": "assertion passes deterministically; suite green"
+  },
+  {
+    "id": "tests-cli-parser-test",
+    "lane": "tests",
+    "target": "tests/cli-parser.test.ts",
+    "goal": "Add an assertion that parsing an unknown flag yields a clear error/usage result",
+    "acceptance": "new assertion passes; parser unchanged"
+  },
+  {
+    "id": "tests-provider-errors-test",
+    "lane": "tests",
+    "target": "tests/provider-errors.test.ts",
+    "goal": "Add an assertion mapping a 429 upstream response to the rate-limit error type",
+    "acceptance": "new assertion passes; existing mappings unaffected"
+  },
+  {
+    "id": "host-bridge-hmac",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/hmac.mjs",
+    "goal": "Add JSDoc for the sign/verify functions and a guard for empty secret",
+    "acceptance": "empty secret throws; JSDoc present"
+  },
+  {
+    "id": "host-bridge-gate",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/gate.mjs",
+    "goal": "Add error handling that returns a structured deny result when policy input is malformed",
+    "acceptance": "malformed policy yields deny with reason"
+  },
+  {
+    "id": "host-bridge-web-search",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/tools/web_search.mjs",
+    "goal": "Add a fetch timeout and catch to return an empty-results object on network error",
+    "acceptance": "network error yields empty results object"
+  },
+  {
+    "id": "host-bridge-metering",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/metering.mjs",
+    "goal": "Add a guard clamping negative usage deltas to zero and document units",
+    "acceptance": "negative delta clamped; positive accounting unchanged"
+  },
+  {
+    "id": "host-bridge-terminal-bridge",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/terminal-bridge.mjs",
+    "goal": "Add a JSDoc block documenting the request envelope fields handled by the bridge",
+    "acceptance": "JSDoc present; request handling unchanged"
+  },
+  {
+    "id": "ops-run-server",
+    "lane": "ops",
+    "target": "ops/launchd/run-server.sh",
+    "goal": "Add a guard that exits with a clear message if the server binary path is missing",
+    "acceptance": "missing binary exits non-zero with message"
+  },
+  {
+    "id": "tunnel-proxy-server",
+    "lane": "tunnel",
+    "target": "tunnel/src/proxy-server.ts",
+    "goal": "Add a request timeout guard on upstream fetch with a sane default",
+    "acceptance": "slow upstream aborts after timeout"
+  },
+  {
+    "id": "backend-agent-events",
+    "lane": "backend",
+    "target": "server/agent-events.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-artifacts",
+    "lane": "backend",
+    "target": "server/artifacts.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-backup",
+    "lane": "backend",
+    "target": "server/backup.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-stripe",
+    "lane": "backend",
+    "target": "server/billing/stripe.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-bridge-hmac",
+    "lane": "backend",
+    "target": "server/bridge-hmac.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-cloudflare",
+    "lane": "backend",
+    "target": "server/cloudflare.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-cockpit-models",
+    "lane": "backend",
+    "target": "server/cockpit-models.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-cockpit",
+    "lane": "backend",
+    "target": "server/cockpit.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-commander",
+    "lane": "backend",
+    "target": "server/commander.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-contract",
+    "lane": "backend",
+    "target": "server/contract.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-db",
+    "lane": "backend",
+    "target": "server/db.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-ecysearch",
+    "lane": "backend",
+    "target": "server/ecysearch.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-ecysearcher-proxy",
+    "lane": "backend",
+    "target": "server/ecysearcher-proxy.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-ecysearcher",
+    "lane": "backend",
+    "target": "server/ecysearcher.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-embed-catalog",
+    "lane": "backend",
+    "target": "server/embed-catalog.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-gemini-cli",
+    "lane": "backend",
+    "target": "server/gemini-cli.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-github-actions",
+    "lane": "backend",
+    "target": "server/github-actions.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-github-app",
+    "lane": "backend",
+    "target": "server/github-app.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-github-search-standard",
+    "lane": "backend",
+    "target": "server/github-search-standard.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-github-search",
+    "lane": "backend",
+    "target": "server/github-search.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-github",
+    "lane": "backend",
+    "target": "server/github.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-host-bridge",
+    "lane": "backend",
+    "target": "server/host-bridge.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-integrations-health",
+    "lane": "backend",
+    "target": "server/integrations-health.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-integrations",
+    "lane": "backend",
+    "target": "server/integrations.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-key-doctor",
+    "lane": "backend",
+    "target": "server/key-doctor.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-key-health",
+    "lane": "backend",
+    "target": "server/key-health.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-keychain-scan",
+    "lane": "backend",
+    "target": "server/lib/keychain-scan.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "backend-logfile",
+    "lane": "backend",
+    "target": "server/logfile.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-catalog",
+    "lane": "backend",
+    "target": "server/mcp/catalog.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-client",
+    "lane": "backend",
+    "target": "server/mcp/client.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-discovery",
+    "lane": "backend",
+    "target": "server/mcp/discovery.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-host-guard",
+    "lane": "backend",
+    "target": "server/mcp/host-guard.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-oauth-metadata",
+    "lane": "backend",
+    "target": "server/mcp/oauth-metadata.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-oauth-provider",
+    "lane": "backend",
+    "target": "server/mcp/oauth-provider.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-prompts",
+    "lane": "backend",
+    "target": "server/mcp/prompts.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-server",
+    "lane": "backend",
+    "target": "server/mcp/server.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-subscriptions",
+    "lane": "backend",
+    "target": "server/mcp/subscriptions.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-supervisor",
+    "lane": "backend",
+    "target": "server/mcp/supervisor.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-upstream-guard",
+    "lane": "backend",
+    "target": "server/mcp/upstream-guard.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-memory-stats",
+    "lane": "backend",
+    "target": "server/memory-stats.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-metrics",
+    "lane": "backend",
+    "target": "server/metrics.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-auth",
+    "lane": "backend",
+    "target": "server/middleware/auth.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-rate-limit",
+    "lane": "backend",
+    "target": "server/middleware/rate-limit.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-oauth-gc",
+    "lane": "backend",
+    "target": "server/oauth-gc.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-openapi",
+    "lane": "backend",
+    "target": "server/openapi.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-orchestrator",
+    "lane": "backend",
+    "target": "server/orchestrator.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-process-guards",
+    "lane": "backend",
+    "target": "server/process-guards.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-revenue",
+    "lane": "backend",
+    "target": "server/revenue.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-selftest-plan",
+    "lane": "backend",
+    "target": "server/selftest-plan.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-db-adapter",
+    "lane": "backend",
+    "target": "server/store/db-adapter.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-migrations",
+    "lane": "backend",
+    "target": "server/store/migrations.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-terminal",
+    "lane": "backend",
+    "target": "server/terminal.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-threatfeed",
+    "lane": "backend",
+    "target": "server/threatfeed.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-tool-interceptors",
+    "lane": "backend",
+    "target": "server/tool-interceptors.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-tool-registry",
+    "lane": "backend",
+    "target": "server/tool-registry.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-outbound",
+    "lane": "backend",
+    "target": "server/webhooks/outbound.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-app",
+    "lane": "frontend",
+    "target": "src/App.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-agentmessage",
+    "lane": "frontend",
+    "target": "src/components/AgentMessage.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-backupcontrol",
+    "lane": "frontend",
+    "target": "src/components/BackupControl.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-capabilitygate",
+    "lane": "frontend",
+    "target": "src/components/CapabilityGate.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-clustermanager",
+    "lane": "frontend",
+    "target": "src/components/ClusterManager.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-commandlineterminal",
+    "lane": "frontend",
+    "target": "src/components/CommandLineTerminal.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-ecysearcherpanel",
+    "lane": "frontend",
+    "target": "src/components/ECySearcherPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-errorfallback",
+    "lane": "frontend",
+    "target": "src/components/ErrorFallback.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-filetransfer",
+    "lane": "frontend",
+    "target": "src/components/FileTransfer.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-githubactionspanel",
+    "lane": "frontend",
+    "target": "src/components/GitHubActionsPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-githubsearchpanel",
+    "lane": "frontend",
+    "target": "src/components/GitHubSearchPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-gmailbrowser",
+    "lane": "frontend",
+    "target": "src/components/GmailBrowser.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-googlecalendarbrowser",
+    "lane": "frontend",
+    "target": "src/components/GoogleCalendarBrowser.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-googledrivebrowser",
+    "lane": "frontend",
+    "target": "src/components/GoogleDriveBrowser.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-googlesheetsbrowser",
+    "lane": "frontend",
+    "target": "src/components/GoogleSheetsBrowser.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-integrationspanel",
+    "lane": "frontend",
+    "target": "src/components/IntegrationsPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-keyvault",
+    "lane": "frontend",
+    "target": "src/components/KeyVault.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-multiagentpipeline",
+    "lane": "frontend",
+    "target": "src/components/MultiAgentPipeline.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-observabilitypanel",
+    "lane": "frontend",
+    "target": "src/components/ObservabilityPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-reactagenttab",
+    "lane": "frontend",
+    "target": "src/components/ReactAgentTab.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-revenueops",
+    "lane": "frontend",
+    "target": "src/components/RevenueOps.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-saasadmin",
+    "lane": "frontend",
+    "target": "src/components/SaaSAdmin.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-securitypolicies",
+    "lane": "frontend",
+    "target": "src/components/SecurityPolicies.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-selftestgates",
+    "lane": "frontend",
+    "target": "src/components/SelfTestGates.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-skeleton",
+    "lane": "frontend",
+    "target": "src/components/Skeleton.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-telemetrycockpit",
+    "lane": "frontend",
+    "target": "src/components/TelemetryCockpit.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-themetoggle",
+    "lane": "frontend",
+    "target": "src/components/ThemeToggle.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-usagepanel",
+    "lane": "frontend",
+    "target": "src/components/UsagePanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-virtualcontroller",
+    "lane": "frontend",
+    "target": "src/components/VirtualController.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-workspacetree",
+    "lane": "frontend",
+    "target": "src/components/WorkspaceTree.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-councilpanel",
+    "lane": "frontend",
+    "target": "src/components/cockpit/CouncilPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-keyhealthpanel",
+    "lane": "frontend",
+    "target": "src/components/cockpit/KeyHealthPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-liveactivitypanel",
+    "lane": "frontend",
+    "target": "src/components/cockpit/LiveActivityPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-modelopsfeed",
+    "lane": "frontend",
+    "target": "src/components/cockpit/ModelOpsFeed.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-modelspanel",
+    "lane": "frontend",
+    "target": "src/components/cockpit/ModelsPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-providerleaderboard",
+    "lane": "frontend",
+    "target": "src/components/cockpit/ProviderLeaderboard.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-rolluptiles",
+    "lane": "frontend",
+    "target": "src/components/cockpit/RollupTiles.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-usetelemetry",
+    "lane": "frontend",
+    "target": "src/components/cockpit/useTelemetry.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-useauth",
+    "lane": "frontend",
+    "target": "src/hooks/useAuth.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-uselogbook",
+    "lane": "frontend",
+    "target": "src/hooks/useLogbook.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-useusage",
+    "lane": "frontend",
+    "target": "src/hooks/useUsage.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-firebase",
+    "lane": "frontend",
+    "target": "src/lib/firebase.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "frontend-theme",
+    "lane": "frontend",
+    "target": "src/lib/theme.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-vitals",
+    "lane": "frontend",
+    "target": "src/lib/vitals.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "frontend-en",
+    "lane": "frontend",
+    "target": "src/locales/en.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-tr",
+    "lane": "frontend",
+    "target": "src/locales/tr.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "frontend-types",
+    "lane": "frontend",
+    "target": "src/types.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-client",
+    "lane": "cli",
+    "target": "cli/lib/client.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-fleet",
+    "lane": "cli",
+    "target": "cli/lib/fleet.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-gemini",
+    "lane": "cli",
+    "target": "cli/lib/gemini.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-io",
+    "lane": "cli",
+    "target": "cli/lib/io.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-keychain",
+    "lane": "cli",
+    "target": "cli/lib/keychain.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-mcp",
+    "lane": "cli",
+    "target": "cli/lib/mcp.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-metrics",
+    "lane": "cli",
+    "target": "cli/lib/metrics.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-minisign-verify",
+    "lane": "cli",
+    "target": "cli/lib/minisign-verify.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-modelcache",
+    "lane": "cli",
+    "target": "cli/lib/modelcache.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-plugins",
+    "lane": "cli",
+    "target": "cli/lib/plugins.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-remote-agent",
+    "lane": "cli",
+    "target": "cli/lib/remote-agent.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-remote",
+    "lane": "cli",
+    "target": "cli/lib/remote.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-role",
+    "lane": "cli",
+    "target": "cli/lib/role.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-sea",
+    "lane": "cli",
+    "target": "cli/lib/sea.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-secrets",
+    "lane": "cli",
+    "target": "cli/lib/secrets.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-shortcuts",
+    "lane": "cli",
+    "target": "cli/lib/shortcuts.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-watch",
+    "lane": "cli",
+    "target": "cli/lib/watch.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "cli-agent",
+    "lane": "cli",
+    "target": "cli/commands/agent.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-backup-2",
+    "lane": "cli",
+    "target": "cli/commands/backup.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-chat",
+    "lane": "cli",
+    "target": "cli/commands/chat.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-doctor",
+    "lane": "cli",
+    "target": "cli/commands/doctor.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-gemini-2",
+    "lane": "cli",
+    "target": "cli/commands/gemini.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-mcp-2",
+    "lane": "cli",
+    "target": "cli/commands/mcp.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-plugin",
+    "lane": "cli",
+    "target": "cli/commands/plugin.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-remote-2",
+    "lane": "cli",
+    "target": "cli/commands/remote.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-saas",
+    "lane": "cli",
+    "target": "cli/commands/saas.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-shortcuts-2",
+    "lane": "cli",
+    "target": "cli/commands/shortcuts.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-top",
+    "lane": "cli",
+    "target": "cli/commands/top.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "cli-update",
+    "lane": "cli",
+    "target": "cli/commands/update.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-council-debate",
+    "lane": "scripts",
+    "target": "scripts/council-debate.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-council-roster",
+    "lane": "scripts",
+    "target": "scripts/council-roster.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-dispatch-bench-run",
+    "lane": "scripts",
+    "target": "scripts/dispatch-bench-run.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-dispatch-merge",
+    "lane": "scripts",
+    "target": "scripts/dispatch-merge.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-ecysearcher-lane",
+    "lane": "scripts",
+    "target": "scripts/ecysearcher-lane.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-ecysearcher-mcp",
+    "lane": "scripts",
+    "target": "scripts/ecysearcher-mcp.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-gemini-pool-check",
+    "lane": "scripts",
+    "target": "scripts/gemini-pool-check.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-gemini-provision",
+    "lane": "scripts",
+    "target": "scripts/gemini-provision.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-provider-bench",
+    "lane": "scripts",
+    "target": "scripts/provider-bench.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "orchestration-align-sweep",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/align-sweep.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-autofix",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/autofix.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-automator-best",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/automator-best.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-automator-loop",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/automator-loop.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-automator-probe",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/automator-probe.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-autopilot",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/autopilot.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-backlog",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/backlog.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-backoff",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/backoff.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-bench",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/bench.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-benchprompt",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/benchprompt.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-build-plan",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/build-plan.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-chrome-probe",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/chrome-probe.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-claims",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/claims.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-claude-constitution",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/claude-constitution.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-claude-dispatch",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/claude-dispatch.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-collect",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/collect.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-completion",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/completion.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-conduct",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/conduct.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-conformance",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/conformance.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-council-roster",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/council-roster.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-council",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/council.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-detectors",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/detectors.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-dispatchbench",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/dispatchbench.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-dispatchdoctor",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/dispatchdoctor.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-dispatchsim",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/dispatchsim.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-doctor",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/doctor.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-dod",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/dod.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-drift",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/drift.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-driftguard",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/driftguard.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-apply",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-apply.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-next",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-next.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-order",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-order.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-plan",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-plan.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-prompt",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-prompt.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-fleet-run",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/fleet-run.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-gate",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/gate.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-gemini-quota",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/gemini-quota.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-gemini",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/gemini.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-gpu-lock",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/gpu-lock.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-graph",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/graph.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-heartbeat",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/heartbeat.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-horizon",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/horizon.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-import-guard",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/import-guard.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-joker",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/joker.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-judge",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/judge.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-licenses",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/licenses.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-loop",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/loop.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-metrics",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/metrics.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-mission",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/mission.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-modelfile",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/modelfile.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-ollama-client",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/ollama-client.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-optimize",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/optimize.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-oracle-lib",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/oracle-lib.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-orchestra-fsm",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/orchestra-fsm.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-orchestra-repair",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/orchestra-repair.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-personas",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/personas.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-proptest",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/proptest.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-reconcile",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/reconcile.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-refresh",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/refresh.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-sbom",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/sbom.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-search-replace",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/search-replace.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-settings-patch",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/settings-patch.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-signal",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/signal.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-suppress",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/suppress.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-synth",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/synth.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-tab-spawn",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/tab-spawn.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-task-catalog",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/task-catalog.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-tasklist",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/tasklist.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-term-exec",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/term-exec.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-think",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/think.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-trend",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/trend.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-vendor-budget",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/vendor-budget.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-vendor-propose",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/vendor-propose.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "contract-audit",
+    "lane": "contract",
+    "target": "contract/src/audit.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-bench",
+    "lane": "contract",
+    "target": "contract/src/bench.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-bootstrap",
+    "lane": "contract",
+    "target": "contract/src/bootstrap.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-cli",
+    "lane": "contract",
+    "target": "contract/src/cli.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-contractdoc",
+    "lane": "contract",
+    "target": "contract/src/contractdoc.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-identity",
+    "lane": "contract",
+    "target": "contract/src/identity.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-invite",
+    "lane": "contract",
+    "target": "contract/src/invite.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-mesh",
+    "lane": "contract",
+    "target": "contract/src/mesh.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-node-config",
+    "lane": "contract",
+    "target": "contract/src/node-config.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-opkey",
+    "lane": "contract",
+    "target": "contract/src/opkey.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "contract-partition",
+    "lane": "contract",
+    "target": "contract/src/partition.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-autopilot",
+    "lane": "tunnel",
+    "target": "tunnel/src/autopilot.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-bench",
+    "lane": "tunnel",
+    "target": "tunnel/src/bench.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-cf-named",
+    "lane": "tunnel",
+    "target": "tunnel/src/cf-named.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-cli",
+    "lane": "tunnel",
+    "target": "tunnel/src/cli.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-connectivity",
+    "lane": "tunnel",
+    "target": "tunnel/src/connectivity.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-crypto",
+    "lane": "tunnel",
+    "target": "tunnel/src/crypto.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-doctor",
+    "lane": "tunnel",
+    "target": "tunnel/src/doctor.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-gateway-state",
+    "lane": "tunnel",
+    "target": "tunnel/src/gateway-state.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-guard",
+    "lane": "tunnel",
+    "target": "tunnel/src/guard.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-keystore",
+    "lane": "tunnel",
+    "target": "tunnel/src/keystore.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-logrotate",
+    "lane": "tunnel",
+    "target": "tunnel/src/logrotate.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-rotate",
+    "lane": "tunnel",
+    "target": "tunnel/src/rotate.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-setup",
+    "lane": "tunnel",
+    "target": "tunnel/src/setup.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-transport",
+    "lane": "tunnel",
+    "target": "tunnel/src/transport.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-caddy-tls",
+    "lane": "tunnel",
+    "target": "tunnel/src/transports/caddy-tls.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-cloudflare",
+    "lane": "tunnel",
+    "target": "tunnel/src/transports/cloudflare.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-cloudflared-named",
+    "lane": "tunnel",
+    "target": "tunnel/src/transports/cloudflared-named.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-headscale",
+    "lane": "tunnel",
+    "target": "tunnel/src/transports/headscale.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "tunnel-wireguard",
+    "lane": "tunnel",
+    "target": "tunnel/src/transports/wireguard.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-bench-metrics",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/bench-metrics.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-drift-check",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/drift-check.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-bridge-guard",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/bridge-guard.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-commit",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/commit.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-doctor",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/doctor.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-events",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/events.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-model-select",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/model-select.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-remediation",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/remediation.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-siri-log",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/siri-log.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-stats",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/stats.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-watch",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/lib/watch.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-register-host-scripts",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/register-host-scripts.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-render-plist",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/render-plist.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-scaffold",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/scaffold.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "host-bridge-schema",
+    "lane": "host-bridge",
+    "target": "bin/host-bridge/schema.mjs",
+    "goal": "add a JSDoc block to the main exported function documenting its params and return",
+    "acceptance": "JSDoc present; no behavior change"
+  }
+]

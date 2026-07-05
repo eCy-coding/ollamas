@@ -130,9 +130,9 @@ function observe(): { actionTier: Tier | null; converged: boolean } {
  * `<stream>.orchestra/PROPOSAL.md`. With ORCHESTRA_APPLY=1 it is then gated + applied via `fleet-apply.ts
  * --apply` (tsc + tests; reverted on red — the tree is never left broken). $0, local, no Claude Code.
  */
-/** Load the 100-task catalog (TASKS_100.json). Empty on any failure — caller falls back to FOCUS streams. */
+/** Load the task catalog (TASKS.json, count-agnostic; legacy TASKS_100.json fallback). Empty on failure. */
 function loadCatalog(): Task[] {
-  const c = readJson(join(ORCH_DIR, "TASKS_100.json"));
+  const c = readJson(join(ORCH_DIR, "TASKS.json")) ?? readJson(join(ORCH_DIR, "TASKS_100.json"));
   return Array.isArray(c) ? (c as Task[]) : [];
 }
 
