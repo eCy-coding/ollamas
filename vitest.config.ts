@@ -53,6 +53,16 @@ export default defineConfig({
           include: ['scripts/tests/**/*.test.ts'],
         },
       },
+      {
+        // orchestra conductor lane — the $0 Claude-Code-free conductor + joker failover FSM.
+        // Scoped to these files (the wider orchestration/tests/** suite is not yet gate-wired).
+        extends: true,
+        test: {
+          name: 'orchestra',
+          environment: 'node',
+          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,joker}.test.ts'],
+        },
+      },
     ],
   },
 });
