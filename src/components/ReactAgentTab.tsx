@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { ChatSession } from "../types";
 import { api, ApiError } from "../lib/apiClient";
+import { firstUsableModel } from "../lib/localModel";
 import { AgentMessage } from "./AgentMessage";
 
 interface TraceStep {
@@ -35,8 +36,11 @@ interface ReactAgentTabProps {
 
 export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const { _ } = useLingui();
-  const [provider, setProvider] = useState<string>("gemini");
-  const [model, setModel] = useState<string>("gemini-3.5-flash");
+  // Default to the $0 local engine (justdoit: local models are the standing conductor) — fetchModels()
+  // fills `model` with the first RUNNING local model on mount, so the panel works out-of-box with no key
+  // and no manual provider switch. A saved session may restore a different (cloud) provider it was created with.
+  const [provider, setProvider] = useState<string>("ollama-local");
+  const [model, setModel] = useState<string>("");
   const [modelsList, setModelsList] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState<boolean>(false);
 
@@ -51,6 +55,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   const [traceSteps, setTraceSteps] = useState<TraceStep[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [autoApply, setAutoApply] = useState<boolean>(true);
+  // Opt-in self-check: an INDEPENDENT verifier model reviews the final answer (implementer≠verifier gate,
+  // justdoit verify step). Off by default (adds one verifier pass); the server no-ops if no verifier model.
+  const [verify, setVerify] = useState<boolean>(false);
   const [currentStepInfo, setCurrentStepInfo] = useState<string>("");
   // Run lifecycle summary (from the server `done` event): clean finish vs depth-limit
   // truncation + the final throughput. null while no run has completed.
@@ -93,8 +100,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     try {
       const data = await api.get<ChatSession>(`/api/agent/sessions/${id}`);
       setActiveSessionId(data.id);
-      setProvider(data.providerId || "gemini");
-      setModel(data.modelId || "gemini-3.5-flash");
+      setProvider(data.providerId || "ollama-local");
+      setModel(data.modelId || "");
       const restored: Message[] = (data.messages || []).map((m) => ({ role: m.role as Message["role"], content: m.content }));
       setMessages(restored.length > 0 ? restored : [
         {
@@ -219,11 +226,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     try {
       const list = await api.get<string[]>(`/api/models/${prov}`);
       setModelsList(list);
-      if (list.length > 0) {
-        // Filter out error placeholder elements for initial selection
-        const validModel = list.find((m: string) => !m.includes("not set") && !m.includes("API key") && !m.includes("not installed"));
-        setModel(validModel || list[0]);
-      }
+      if (list.length > 0) setModel(firstUsableModel(list)); // skip cloud "no key" placeholders
     } catch (e) {
       if (e instanceof ApiError) {
         setModelsList([]);
@@ -284,6 +287,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           model,
           messages: history,
           autoApply,
+          verify,
           maxSteps: 10,
           sessionId
         },
@@ -569,6 +573,27 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             >
               {autoApply ? (
                 <ToggleRight className="w-8 h-8 text-status-accent" />
+              ) : (
+                <ToggleLeft className="w-8 h-8 text-immersive-text-dim" />
+              )}
+            </button>
+          </div>
+          {/* Self-check gate: an independent verifier model reviews the final answer (justdoit verify). */}
+          <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded p-1 px-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-status-warn" />
+              <span className="text-[11px] font-mono text-immersive-text-muted">{_("react-agent.verify.label")}</span>
+            </div>
+            <button
+              onClick={() => {
+                setVerify(!verify);
+                onNotify(verify ? _("react-agent.verify.off") : _("react-agent.verify.on"), "info");
+              }}
+              className="text-immersive-text-muted hover:text-immersive-text-bright transition"
+              title={_("react-agent.verify.title")}
+            >
+              {verify ? (
+                <ToggleRight className="w-8 h-8 text-status-warn" />
               ) : (
                 <ToggleLeft className="w-8 h-8 text-immersive-text-dim" />
               )}

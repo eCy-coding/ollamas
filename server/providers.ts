@@ -18,7 +18,7 @@ function alignSelection(): AlignmentSelection {
 import { estimateCost } from "./tokens";
 import { limitFor, pctOfLimit, approaching } from "./key-limits";
 import { PROVIDER_CATALOG, catalogEntry, catalogBaseUrl } from "./provider-catalog";
-import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_MS } from "./provider-errors";
+import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_MS, classifyKeyError } from "./provider-errors";
 import { filterChain } from "./chain-policy";
 import { setToolSupport, toolSupportSnapshot, hydrateToolSupport } from "./capability-cache";
 import { recordRequestEvent } from "./telemetry";
@@ -401,9 +401,11 @@ export class ProviderRouter {
         } catch (err: any) {
           provErr = err;
           lastAttemptMs = Date.now() - attemptStart;
-          const m = (err?.message || "").toLowerCase();
-          const isQuota = m.includes("429") || m.includes("quota") || m.includes("rate limit") || m.includes("resource_exhausted") || m.includes("exceeded");
-          const isAuth = m.includes("401") || m.includes("403") || m.includes("unauthorized") || m.includes("forbidden") || m.includes("api key");
+          // Prefer the typed HTTP status over message substrings so a typed 5xx isn't mis-cooled as a 6h
+          // quota (classifyKeyError is pure/tested). Untyped errors still fall back to message heuristics.
+          const errKind = classifyKeyError(err);
+          const isQuota = errKind === "quota";
+          const isAuth = errKind === "auth";
           if (cloudKeyed && (isQuota || isAuth)) {
             const spent = this.getDecryptedKey(prov);
             // Cool the spent key: quota honors the server's Retry-After when present (else 6h);

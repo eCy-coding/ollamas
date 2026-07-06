@@ -39,3 +39,22 @@ export class ProviderHttpError extends Error {
     this.retryAfterMs = retryAfterMs;
   }
 }
+
+export type KeyErrorKind = "quota" | "auth" | "generic";
+
+/** Classify a provider error for cooldown TTL. Prefer the TYPED HTTP status (authoritative) over message
+ *  substrings: a 500/503 whose body merely CONTAINS "exceeded"/"rate limit" (e.g. "context length exceeded")
+ *  must NOT be mis-cooled as a 6h quota — that needlessly parks a healthy key and slows self-heal. Only
+ *  untyped errors (network/timeout, no status) fall back to message heuristics. Pure → unit-testable. */
+export function classifyKeyError(err: unknown): KeyErrorKind {
+  const status = err instanceof ProviderHttpError ? err.status : undefined;
+  if (status !== undefined) {
+    if (status === 429) return "quota";
+    if (status === 401 || status === 403) return "auth";
+    return "generic"; // any other typed status (5xx / 400 / etc.) → short bench, not a 6h quota park
+  }
+  const m = (err as { message?: unknown })?.message ? String((err as { message?: unknown }).message).toLowerCase() : "";
+  if (/\b429\b|quota|rate limit|resource_exhausted|exceeded/.test(m)) return "quota";
+  if (/\b401\b|\b403\b|unauthorized|forbidden|api key/.test(m)) return "auth";
+  return "generic";
+}

@@ -2117,6 +2117,7 @@ Followed immediately by a markdown fenced code block containing the complete sou
 
       // Apply write operations internally if permitted
       let writeCount = 0;
+      const writeErrors: string[] = []; // surfaced in the done frame instead of silently swallowing failures
       if (writePermissions) {
         // Parse FILE: annotations
         const lines = coderOutput.split("\n");
@@ -2142,7 +2143,9 @@ Followed immediately by a markdown fenced code block containing the complete sou
                 try {
                   FilesystemManager.writeFile(isLive, db.data.workspacePath, activeFile, blockContent.join("\n"));
                   writeCount++;
-                } catch (e) {}
+                } catch (e: any) {
+                  writeErrors.push(`${activeFile}: ${e?.message || String(e)}`);
+                }
                 activeFile = "";
               }
               continue;
@@ -2248,7 +2251,7 @@ content
         }
       }
 
-      res.write(`data: ${JSON.stringify({ done: true, writeCount })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, writeCount, writeErrors })}\n\n`);
       res.end();
     } catch (e: any) {
       res.write(`data: ${JSON.stringify({ error: e.message || "Pipeline execution failed." })}\n\n`);

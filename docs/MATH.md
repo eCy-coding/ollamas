@@ -94,6 +94,51 @@ TR: core-eksik = boot-blocker; diğer eksik = uyarı. `deps-doctor` presence (co
 
 ---
 
+## 7. Key-autonomy loop — self-heal cooldown (`server/key-health.ts`, `server/provider-errors.ts`)
+
+API-anahtar havuzu ($0 açısından kritik: cloud düşerse yerel Ollama'ya iner) kendini iyileştiren bir
+saf-çekirdek loop ile yönetilir. Her seat için durum: `live | cooled | invalid | absent`.
+
+**Hata sınıflandırma (typed ⊐ message):** `classifyKeyError(e) ∈ {quota, auth, generic}`. Öncelik TYPED
+HTTP status'tur — mesaj-substring'i değil:
+> status=429 → quota · status∈{401,403} → auth · başka-typed-status (5xx/400) → **generic**. Yalnız
+> untyped (network) hata mesaj-sezgisine düşer (`/429|quota|exceeded/`→quota, `/401|403|unauthorized/`→auth).
+> **Teorem (yanlış-6h önlenir):** typed 5xx gövdesinde "exceeded" geçse bile generic → 30s bench, 6h quota DEĞİL.
+
+**Cooldown TTL:** `quotaCooldownTtl(isQuota, retryAfter)`:
+> quota → retryAfter>0 ? retryAfter : 6h · auth → 24h · generic → `FAILURE_COOLDOWN_MS = 30s`.
+> Monoton+sınırlı: 30s ≤ TTL ≤ 24h. Cooldown biten anahtar sweep'te live-pool'a **geri katılır** (monoton geri-dönüş).
+
+**Sweep zamanlaması:** `nextTickDelay(nextExpiry, base, now, floor=1s)` = expiry base'den önce dolacaksa
+sweep'i tam-sonrasına çeker (ε=250ms), floor-guard hot-loop'u önler:
+> nextExpiry=null → base · untilExpiry≥base → base · else → max(floor, untilExpiry). **1s ≤ delay ≤ base.**
+
+**Circuit-breaker backoff:** `nextBackoffMs(fails, base, max) = min(base·2^min(fails,6), max)` — geometrik,
+6-kat cap + max-cap → kalıcı-hatada hot-spin YOK, sonlu backoff.
+
+TR: Anahtar-loop always-on = server içi `setTimeout` + iter-16 fleet-KeepAlive (server çökse launchd/watch
+ayağa kaldırır). Auto-failover (`generate()`): quota/auth → cooldown → havuzda sıradaki live anahtara döner →
+yoksa provider-chain → hepsi cooled ise keyless+yerel. Terminal (`ollamas keys`) == web (`/api/keys/health`)
+aynı `getKeyHealth()` snapshot'ı okur (parite).
+
+## 8. Panel loop'ları — $0-default + pipeline FSM (`ReactAgentTab`, `MultiAgentPipeline`)
+
+**$0-yerel default:** `firstUsableModel(list)` = placeholder-olmayan ilk model (`/not set|API key|not installed/`
+elenir), yoksa list[0], boşsa "". Panel mount → provider=`ollama-local` + firstUsableModel → key-siz out-of-box.
+
+**Pipeline FSM:** sıralı 3-aşama `architect → coder → reviewer`, her biri `ProviderRouter.generate` (joker
+failover chain'i miras alır). Self-improve: `retry ≤ maxIterations` (justdoit N-cap, sonsuz-loop YOK).
+Write: `FILE:`+fenced-blok parse → `writeCount` + `writeErrors[]` (hata **görünür**, sessiz-swallow YOK).
+
+**ReAct verifier gate:** opt-in `verify` → bağımsız verifier model (implementer≠verifier) nihai yanıtı
+inceler → `VERDICT: PASS|FAIL` emit → UI gate. Yanıtı değiştirmez (additive), best-effort (verifier hatası
+yanıtı bozmaz). FAIL → retry (ReAct step-cap ≤ maxSteps, sonlu).
+
+Kanıt: `classifyKeyError`/`quotaCooldownTtl`/`nextTickDelay`/`nextBackoffMs`/`firstUsableModel` property-test'li
+(`tests/provider-errors-classify.test.ts`, `tests/ui/localModel.test.ts`, `tests/key-health*.test.ts`).
+
+---
+
 ## Kompozisyon / Composition
 
 Tick = HEALTH-GATE (§3) ∘ OBSERVE ∘ SIDE-EFFECT ∘ δ (§1) ∘ DRAIN (§5) ∘ PERSIST. Her tick saf-çekirdek

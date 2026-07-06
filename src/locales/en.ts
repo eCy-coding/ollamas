@@ -80,6 +80,11 @@ export const messages: Record<string, string> = {
   'react-agent.autoApply.label': 'Auto-Apply Writes',
   'react-agent.autoApply.title':
     'When enabled, file updates are instantly written to the workspace. When disabled, the agent displays file diffs and awaits manual authorization.',
+  'react-agent.verify.label': 'Independent Verifier',
+  'react-agent.verify.title':
+    'When enabled, an independent verifier model reviews the agent\'s final answer for correctness/completeness (implementer≠verifier gate). It never alters the answer; it reports a PASS/FAIL verdict.',
+  'react-agent.verify.on': 'Independent verifier on',
+  'react-agent.verify.off': 'Independent verifier off',
   'react-agent.sessions.title': 'ReAct Sessions',
   'react-agent.sessions.new': '+ NEW',
   'react-agent.sessions.loading': 'Loading sessions...',

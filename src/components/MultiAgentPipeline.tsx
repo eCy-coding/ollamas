@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Play, ToggleLeft, ToggleRight, Sparkles, AlertCircle, CheckCircle2, RotateCw, Loader2, ArrowRight } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { firstUsableModel } from "../lib/localModel";
 
 interface PipelineProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -91,9 +92,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       const list: any = await api.get(`/api/models/${prov}`);
       setModelsList((prev) => ({ ...prev, [prov]: list }));
       if (list.length > 0) {
-        if (prov === architectProv) setArchitectModel(list[0]);
-        if (prov === coderProv) setCoderModel(list[0]);
-        if (prov === reviewerProv) setReviewerModel(list[0]);
+        const pick = firstUsableModel(list); // skip keyless-cloud placeholders
+        if (prov === architectProv) setArchitectModel(pick);
+        if (prov === coderProv) setCoderModel(pick);
+        if (prov === reviewerProv) setReviewerModel(pick);
       }
     } catch (e) {
       console.error(`Failed to load models list for provider: ${prov}`);
@@ -132,6 +134,7 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       abortControllerRef.current = new AbortController();
 
       let buffer = "";
+      let droppedFrames = 0; // count malformed SSE frames instead of silently discarding them
 
       await api.streamPost(
         "/api/pipeline",
@@ -176,6 +179,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
                   if (data.writeCount !== undefined) {
                     setWriteCount(data.writeCount);
                   }
+                  // Surface any write failures the server collected instead of silently under-counting.
+                  if (Array.isArray(data.writeErrors) && data.writeErrors.length > 0) {
+                    onNotify(`${data.writeErrors.length} file(s) failed to write: ${data.writeErrors[0]}`, "error");
+                  }
                 }
 
                 if (data.error) {
@@ -191,12 +198,15 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
                   onNotify(`Pipeline encountered error: ${data.error}`, "error");
                   break;
                 }
-              } catch (e) {}
+              } catch {
+                droppedFrames += 1; // malformed frame — surfaced after the stream, never silently hidden
+              }
             }
           },
         },
       );
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        if (droppedFrames > 0) onNotify(`Pipeline: ${droppedFrames} malformed frame(s) skipped`, "info");
         onNotify("Pipeline sequence finished successfully!", "success");
       }
     } catch (err: any) {

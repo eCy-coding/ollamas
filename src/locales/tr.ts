@@ -79,6 +79,11 @@ export const messages: Record<string, string> = {
   'react-agent.autoApply.label': 'Yazmaları Otomatik Uygula',
   'react-agent.autoApply.title':
     'Etkinken dosya güncellemeleri anında çalışma alanına yazılır. Devre dışıyken ajan dosya farklarını gösterir ve manuel yetkilendirme bekler.',
+  'react-agent.verify.label': 'Bağımsız Doğrulayıcı',
+  'react-agent.verify.title':
+    'Etkinken bağımsız bir doğrulayıcı model, ajanın nihai yanıtını göreve karşı doğruluk/tamlık için inceler (uygulayıcı≠doğrulayıcı kapısı). Yanıtı değiştirmez; PASS/FAIL verdisi gösterir.',
+  'react-agent.verify.on': 'Bağımsız doğrulayıcı açık',
+  'react-agent.verify.off': 'Bağımsız doğrulayıcı kapalı',
   'react-agent.sessions.title': 'ReAct Oturumları',
   'react-agent.sessions.new': '+ YENİ',
   'react-agent.sessions.loading': 'Oturumlar yükleniyor...',

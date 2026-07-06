@@ -36,6 +36,7 @@ case "${1:-}" in
   progress)         exec "$TSX" "$CONDUCTOR" --progress ;;  # X/N completion + per-lane breakdown
   calibrate)        exec "$TSX" "$HERE/calibrate.ts" "${@:2}" ;;    # e2e pipeline calibration
   deps)             exec "$TSX" "$HERE/deps-doctor.ts" "${@:2}" ;;  # brew/macOS dependency check
+  keys)             exec "$TSX" "$HERE/keys-health.ts" "${@:2}" ;;  # key pool health (== web /api/keys/health)
   ready)            cd "$REPO" && exec npm run ready ;;    # preflight self-heal (scripts/ready.mjs)
   conductor|watch)  exec "$TSX" "$CONDUCTOR" --watch "${2:-600}" ;;
   *)                cli "$@" ;;
