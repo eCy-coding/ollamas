@@ -53,7 +53,12 @@ write_daemon_plist() {
     <string>--watch</string>
     <string>600</string>
   </array>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$daemon_path</string></dict>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$daemon_path</string>
+    <!-- Pin the conductor to the warm champion (qwen3:8b, benchmarked cheapest-100%). A 30b evicts between
+         600s ticks and cold-loads > probe budget → false-down failover thrash; the 8b stays warm → stable. -->
+    <key>ORCHESTRA_CONDUCTOR</key><string>${ORCHESTRA_DAEMON_CONDUCTOR:-qwen3:8b}</string>
+  </dict>
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
