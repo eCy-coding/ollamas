@@ -58,8 +58,9 @@ const APPLY = process.env.ORCHESTRA_APPLY === "1" || existsSync(join(ORCH_DIR, "
 // Autonomous backlog-drain (iter-8): when idle, auto-pull the next PENDING catalog task so the daemon works
 // through the whole project 0-manual. Opt-in marker (mirrors apply) — off by default → reactive to `ollamas do`.
 const AUTODRAIN = process.env.ORCHESTRA_AUTODRAIN === "1" || existsSync(join(ORCH_DIR, ".orchestra-autodrain-enabled"));
-const CHILD_MS = Number(process.env.ORCHESTRA_CHILD_MS || 25_000);
-const PROBE_MS = Number(process.env.ORCHESTRA_PROBE_MS || 12_000);
+const CHILD_MS = Number(process.env.ORCHESTRA_CHILD_MS || 25_000);   // bounded read-only child scripts (conduct/fleet-conduct)
+const PROBE_MS = Number(process.env.ORCHESTRA_PROBE_MS || 45_000);   // health probe / warm (1-token) — a 30b COLD-loads >12s between ticks; too-short = false-down → failover thrash
+const REPAIR_MS = Number(process.env.ORCHESTRA_REPAIR_MS || 120_000); // REPAIR model GENERATION (grounded SEARCH/REPLACE — a 30b needs >25s)
 
 // ── IO primitives (all tolerant — the loop must never die on a child/network failure) ────────────────
 function readJson(p: string): unknown { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } }
@@ -168,7 +169,7 @@ async function repairPropose(state: OrchestraState): Promise<void> {
 
   try {
     const prompt = groundedPrompt(goalText, target, content);
-    const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: CHILD_MS, num_ctx: 8192 });
+    const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: REPAIR_MS, num_ctx: 8192 });
     if (!hasSearchReplace(r.text)) { log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`); return; }
     const dir = join(FLEET_WORK, `${slot}.${ORCHESTRA_SLOT}`);
     mkdirSync(dir, { recursive: true });
