@@ -139,6 +139,61 @@ Kanıt: `classifyKeyError`/`quotaCooldownTtl`/`nextTickDelay`/`nextBackoffMs`/`f
 
 ---
 
+## 9. Fallback-chain ordering — $0-landing garantisi (`providers.ts getFallbackChain/orderRestByLatency`)
+
+Bir istek başarısız olursa router bir provider-zinciri dener. §7 (key-pool) tek provider içini yönetir; bu
+bölüm zincir SIRASINI formalize eder — §7'nin $0-garantisinin eksik yarısı.
+
+Σ = provider'lar. `getFallbackChain(initial) = front(initial) ++ orderRestByLatency(rest)` where
+front(gemini)=[gemini,gemini-cli], front(gemini-cli)=[gemini-cli,gemini], else [initial].
+
+`orderRestByLatency`: TERMINAL-erken `E={fleet, ollama-local}` başta, `demo` sonda, cloud-orta **kararlı**
+latency-sort (`lat(p)=getLatency(p)<0 ? +∞ : getLatency(p)`), gemini-ailesi bitişik.
+> **Değişmezler:** (I9a) `fleet, ollama-local ∈ chain ∧ index düşük` — $0-yerel daima erken. (I9b) `demo` son.
+> (I9c) ölçülmemiş (lat=−1→+∞) → orijinal-sıra korunur (soğuk-cache 0-davranış-değişimi). (I9d) gemini,
+> gemini-cli bitişik. **Teorem ($0-landing):** chain daima bir $0-yerel tier içerir ve ona ulaşılır (cloud
+> tükenirse) → sistem asla "hiç provider yok" durumuna düşmez. Kanıt: order-rest-latency/provider-fleet testleri.
+
+Karmaşıklık: O(n log n) (tek sort), n=|providers|.
+
+## 10. Chain-policy filter — non-empty + monoton (`chain-policy.ts filterChain`)
+
+`filterChain(chain, opts)` zinciri kısıtlara göre süzer. `TERMINAL ⊆ result` DAİMA (terminal p → koşulsuz true).
+> **Teorem (non-empty):** TERMINAL∩chain ≠ ∅ olduğundan `filterChain(chain,·) ⊇ TERMINAL∩chain ≠ ∅` — süzme
+> asla boş bırakmaz ($0-landing korunur). **Monotonluk:** her koşul (privateMode/estTokensIn>maxContext/
+> needTools∧toolCalling=none∨learned=false) yalnız ELER, eklemez → opts daha-kısıtlı ⇒ result ⊆. Learned-verdict
+> catalog-default'u override eder. Kanıt: chain-policy.test.
+
+## 11. SSRF host-guard — totality + no-bypass (`mcp/host-guard.ts classifyIp/blockedVerdict`) [güvenlik-core]
+
+`classifyIp: Host → Verdict ∪ {"reject","null"}` — **total** (her string bir sonuç). Verdict =
+{linklocal,loopback,rfc1918,cgnat,ula,wildcard,public}. Katı dotted-quad olmayan ama numeric-görünen →
+`reject` (encoded-IP bypass savunması); IP-olmayan → null (DNS'e bırak).
+> **Değişmezler:** (I11a) totality — tanımsız girdi yok. (I11b) `looksNumeric(host) ∧ ¬strictQuad ⇒ reject`
+> (0x/8-bit-overflow/decimal-encoded bypass kapalı). (I11c) `blockedVerdict(linklocal,·)=true` DAİMA
+> (metadata/fe80 asla erişilmez). (I11d) saas(multi-tenant) ⇒ yalnız `public` geçer; local-tek-kullanıcı ⇒
+> linklocal-dışı her şey (localhost/private-upstream meşru). Kanıt: upstream-guard + §11 property.
+
+## 12. Telemetry rollup — percentile + zero-leak (`telemetry.ts rollup/pct/redact*`)
+
+`pct(sorted, p)` = nearest-rank (1-tabanlı, boş→0). `rollup(events, now)` 60s-pencere üzerinde p50/p95
+(total,ttft), errorRate, tokPerSec, reqPerMin, costPerHr, provider-leaderboard.
+> **Değişmezler:** (I12a) pXX ∈ [min,max] ∧ monoton (p50≤p95). (I12b) pencere-filtre: yalnız `now−ts ≤ 60s`.
+> (I12c) `costPerHr = Σcost · 3.6e6 / windowMs` (exact extrapolation). (I12d) leaderboard tokPerSec-azalan sıralı.
+> **Zero-leak:** `redactDeep` idempotent + fixpoint (`redactDeep∘redactDeep = redactDeep`), her secret-alan
+> maskeli → prompt/completion/key browser'a ULAŞMAZ. Kanıt: telemetry.test + telemetry-zeroleak.test.
+
+## 13. Rate-limit headroom — proaktif rotasyon (`key-limits.ts pctOfLimit/approaching`)
+
+`pctOfLimit(counts, limit) = max(perMin>0 ? counts.perMin/perMin : 0, perDay>0 ? counts.perDay/perDay : 0)` —
+**en-sıkı limit bağlar** (max). `approaching(pct, θ=0.8) = pct ≥ θ`.
+> **Değişmezler:** (I13a) limitsiz-boyut (limit=0) → 0-katkı (bilinmeyen limit engellemez). (I13b) pct ≥ 0;
+> her iki-limitin max'ı → en-erken-dolan pencere tetikler. (I13c) approaching eşik-gate (θ'da proaktif
+> rotasyon, tükenmeden). Sliding perMin/perDay pencere monoton-decay (`key-usage.ts keyWindows`). Kanıt:
+> **YENİ** key-limits-math.test (bu tur — daha önce testsiz saf-fn).
+
+---
+
 ## Kompozisyon / Composition
 
 Tick = HEALTH-GATE (§3) ∘ OBSERVE ∘ SIDE-EFFECT ∘ δ (§1) ∘ DRAIN (§5) ∘ PERSIST. Her tick saf-çekirdek
