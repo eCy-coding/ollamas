@@ -98,7 +98,13 @@ function runChildJson(script: string, args: string[], timeoutMs = CHILD_MS): unk
 }
 
 // ── Health + observation ─────────────────────────────────────────────────────────────────────────────
-/** Live conductor health: model present in `ollama list` AND answers a 1-token turn within PROBE_MS. */
+/**
+ * Conductor health = the ollama daemon is REACHABLE (models listed) AND the conductor model is INSTALLED.
+ * We deliberately do NOT require a live generation: a slow/cold-loading model is not "down", and a REPAIR
+ * generation that times out is handled by the bounded retry — NOT a conductor death. Requiring a 1-token
+ * generation here caused chronic false-down failover thrash under load (server + ollama + daemon competing).
+ * Failover now fires only on a REAL failure: ollama unreachable (empty list) or the model uninstalled/OOM-evicted.
+ */
 async function probeHealth(model: string): Promise<{ healthy: boolean; healthyModels: string[] }> {
   if (DRY || process.env.ORCHESTRA_FAKE_HEALTHY != null) {
     const healthy = process.env.ORCHESTRA_FAKE_HEALTHY !== "0";
@@ -106,12 +112,8 @@ async function probeHealth(model: string): Promise<{ healthy: boolean; healthyMo
     const hm = (raw != null ? raw : healthy ? model : DEFAULT_JOKER).split(",").map((s) => s.trim()).filter(Boolean);
     return { healthy, healthyModels: hm };
   }
-  const models = await listModels(OLLAMA_HOST);
-  if (!models.includes(model)) return { healthy: false, healthyModels: models };
-  try {
-    const r = await chatOnce(model, "", "ok", { host: OLLAMA_HOST, timeoutMs: PROBE_MS, num_ctx: 512 });
-    return { healthy: r.text.trim().length > 0, healthyModels: models };
-  } catch { return { healthy: false, healthyModels: models }; }
+  const models = await listModels(OLLAMA_HOST); // GET /api/tags, 10s — cheap, no generation
+  return { healthy: models.length > 0 && models.includes(model), healthyModels: models };
 }
 
 function fakeOr<T>(env: string, real: T, map: (v: string) => T): T {
