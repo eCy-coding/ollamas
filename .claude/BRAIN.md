@@ -82,7 +82,9 @@ The **E2E-loop** (`/loop`) wraps the whole chain: it repeats the pass above unti
 
 ## 4. Skill
 
-`.claude/skills/orchestra-conductor/SKILL.md` packages the **$0 Claude-Code-free conductor** — the local-model
+`docs/MATH.md` (TR/EN) = the formal spec of the $0 conductor core (FSM δ + termination, council quorum,
+joker policy, resolver, ledger, deps), proved by `orchestration/tests/math-properties.test.ts` (19 exhaustive
+properties). `.claude/skills/orchestra-conductor/SKILL.md` packages the **$0 Claude-Code-free conductor** — the local-model
 FSM loop (`orchestra.ts`) + live joker failover + the count-agnostic task catalog (`TASKS.json`) + autonomous
 backlog-drain + gated apply + completion progress + turnkey `ollamas` command/daemon. Slash: `/orchestra`
 `/do` `/tasks` `/progress` `/calibrate` `/drain`. This is the DEFAULT conductor; claude-dispatch is opt-in escalation.

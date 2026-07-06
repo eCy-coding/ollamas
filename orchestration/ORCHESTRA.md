@@ -84,7 +84,13 @@ REPAIR makes the conductor a fleet worker: it grounds the local model on a strea
 `fleet-apply.ts --apply` (tsc + tests gate, reverted on red). Council `HOLD` short-circuits a no-consensus
 tick to MONITORING (a queued task or a blocking signal overrides).
 
+## Math (formal spec)
+
+`docs/MATH.md` (TR/EN) formalizes the pure core — FSM transition δ + termination theorem, council quorum
+(>0.6), joker policy, resolver precedence, ledger monotonicity, deps severity — each proved by
+`orchestration/tests/math-properties.test.ts` (exhaustive enumeration, 19 properties).
+
 ## Tests
 
 `vitest run --project orchestra` — joker + FSM units + child-process chaos (failover, bounded
-retry→ESCALATE, task lifecycle) + council quorum.
+retry→ESCALATE, task lifecycle) + council quorum + math-properties (formal invariants).
