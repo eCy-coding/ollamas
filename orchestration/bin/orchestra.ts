@@ -54,10 +54,15 @@ const DRY = process.env.ORCHESTRA_DRY === "1";
 // Autonomous gated apply (0-manual): the env flag OR the opt-in marker `.orchestra-apply-enabled` (mirrors
 // claude-dispatch's `.claude-dispatch-enabled` safety pattern) — so the persistent daemon closes fixes
 // without a per-invocation env. Still gated (tsc+tests, revert-on-red) and never auto-commits.
-const APPLY = process.env.ORCHESTRA_APPLY === "1" || existsSync(join(ORCH_DIR, ".orchestra-apply-enabled"));
+// Marker/flag resolution: an explicit env var (0 or 1) WINS both directions (so tests are hermetic regardless
+// of the on-disk marker); absent env → fall back to the opt-in marker file. (Prev: `env==='1' || marker` let a
+// real marker leak into env=0 test runs.)
+const flagOn = (env: string | undefined, markerFile: string): boolean =>
+  env != null ? env === "1" : existsSync(join(ORCH_DIR, markerFile));
+const APPLY = flagOn(process.env.ORCHESTRA_APPLY, ".orchestra-apply-enabled");
 // Autonomous backlog-drain (iter-8): when idle, auto-pull the next PENDING catalog task so the daemon works
 // through the whole project 0-manual. Opt-in marker (mirrors apply) — off by default → reactive to `ollamas do`.
-const AUTODRAIN = process.env.ORCHESTRA_AUTODRAIN === "1" || existsSync(join(ORCH_DIR, ".orchestra-autodrain-enabled"));
+const AUTODRAIN = flagOn(process.env.ORCHESTRA_AUTODRAIN, ".orchestra-autodrain-enabled");
 const CHILD_MS = Number(process.env.ORCHESTRA_CHILD_MS || 25_000);   // bounded read-only child scripts (conduct/fleet-conduct)
 const PROBE_MS = Number(process.env.ORCHESTRA_PROBE_MS || 45_000);   // health probe / warm (1-token) — a 30b COLD-loads >12s between ticks; too-short = false-down → failover thrash
 const REPAIR_MS = Number(process.env.ORCHESTRA_REPAIR_MS || 120_000); // REPAIR model GENERATION (grounded SEARCH/REPLACE — a 30b needs >25s)

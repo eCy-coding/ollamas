@@ -17,7 +17,8 @@ const CLI = join(REPO, "orchestration", "bin", "orchestra.ts");
 
 let stateDir: string;
 // FAKE_DECISION=EXECUTE keeps these FSM/failover tests hermetic from the repo's live COUNCIL.json verdict.
-const baseEnv = () => ({ ...process.env, ORCHESTRA_DRY: "1", ORCHESTRA_STATE_DIR: stateDir, ORCHESTRA_FAKE_DECISION: "EXECUTE" });
+// ORCHESTRA_AUTODRAIN=0 / APPLY=0 force the opt-in markers OFF so a real on-disk marker can't leak into tests.
+const baseEnv = () => ({ ...process.env, ORCHESTRA_DRY: "1", ORCHESTRA_STATE_DIR: stateDir, ORCHESTRA_FAKE_DECISION: "EXECUTE", ORCHESTRA_AUTODRAIN: "0", ORCHESTRA_APPLY: "0" });
 function run(args: string[], extra: Record<string, string> = {}): void {
   execFileSync(TSX, [CLI, ...args], { cwd: REPO, env: { ...baseEnv(), ...extra }, stdio: "ignore", timeout: 30_000 });
 }
