@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * orchestration/bin/autofix.ts — Self-healing remediation (vO11).
+ * orchestration/bin/autofix.ts — critic-gap governance-doc remediation (roadmap status-flip, vO11).
  *
+ * Rol ayrımı: bu araç critic'in GÜVENLİ governance açıklarını deterministik onarır (model YOK, kod YOK) —
+ * orchestra.ts'in local-model FSM conductor daemon'undan (kod fix'i dispatch eder) TAMAMEN ayrı bir katman.
  * critic'in GÜVENLİ açıklarını (roadmap status-flip planned→DONE, evidence-backed) deterministik
  * onarır. dry-run DEFAULT (plan göster, yazma); --apply ile atomic+backup+line-anchored yaz.
  * GÜVENLİK: yalnız orchestration/ governance dosyaları + allowlist; kod/lane ASLA (§3+güvenlik).
