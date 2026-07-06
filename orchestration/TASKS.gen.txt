@@ -111,8 +111,10 @@ frontend|src/components/cockpit/KeyHealthPanel.tsx|add a null/empty-data guard o
 frontend|src/components/cockpit/LiveActivityPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/cockpit/ModelOpsFeed.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/cockpit/ModelsPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/cockpit/OrchestraPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/cockpit/ProviderLeaderboard.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/cockpit/RollupTiles.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/cockpit/useOrchestra.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 frontend|src/components/cockpit/useTelemetry.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 frontend|src/hooks/useAuth.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 frontend|src/hooks/useLogbook.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change

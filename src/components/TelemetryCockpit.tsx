@@ -8,6 +8,7 @@ import { ModelsPanel } from "./cockpit/ModelsPanel";
 import { CouncilPanel } from "./cockpit/CouncilPanel";
 import { ModelOpsFeed } from "./cockpit/ModelOpsFeed";
 import { RollupTiles } from "./cockpit/RollupTiles";
+import { OrchestraPanel } from "./cockpit/OrchestraPanel";
 import { ProviderLeaderboard } from "./cockpit/ProviderLeaderboard";
 import { KeyHealthPanel } from "./cockpit/KeyHealthPanel";
 
@@ -313,6 +314,8 @@ export const TelemetryCockpit: React.FC<CockpitProps> = ({ telemetry, onRefresh 
       <CouncilPanel />
 
       {/* Master-standard model observability (T5): every model op tracked, metadata-only. */}
+      <OrchestraPanel />
+
       <RollupTiles />
       <KeyHealthPanel />
       <ProviderLeaderboard />

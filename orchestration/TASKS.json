@@ -1197,6 +1197,13 @@
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
   {
+    "id": "frontend-orchestrapanel",
+    "lane": "frontend",
+    "target": "src/components/cockpit/OrchestraPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
     "id": "frontend-providerleaderboard",
     "lane": "frontend",
     "target": "src/components/cockpit/ProviderLeaderboard.tsx",
@@ -1209,6 +1216,13 @@
     "target": "src/components/cockpit/RollupTiles.tsx",
     "goal": "add a null/empty-data guard or an aria-label to the main exported component",
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-useorchestra",
+    "lane": "frontend",
+    "target": "src/components/cockpit/useOrchestra.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
   {
     "id": "frontend-usetelemetry",

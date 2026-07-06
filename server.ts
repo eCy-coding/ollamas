@@ -145,6 +145,37 @@ app.get("/api/ready", async (_req, res) => {
   const ready = CURRENT_MODE !== "demo" && !!db.data.workspacePath && dbOk;
   res.status(ready ? 200 : 503).json({ ready, mode: CURRENT_MODE, db: dbOk ? "up" : "down" });
 });
+// Orchestra conductor live state (iter-13) — the $0 conductor daemon writes host state to ~/.ollamas; this
+// exposes it on :3000 so the web cockpit shows the SAME real data as Terminal.app (`ollamas status/progress`).
+// Graceful: any missing file → that field is null. Host process reads os.homedir() directly (no docker mount).
+app.get("/api/orchestra", (_req, res) => {
+  const readJson = (p: string): any => { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return null; } };
+  const st = readJson(path.join(os.homedir(), ".ollamas", "orchestra.json"));
+  const prog = readJson(path.join(os.homedir(), ".ollamas", "tasks-progress.json")) || {};
+  const catalog: any[] = readJson(path.join(process.cwd(), "orchestration", "TASKS.json")) || [];
+  const sel = readJson(path.join(process.cwd(), "orchestration", "MODEL_SELECTION.json"));
+  // progress summary (same math as lib/task-progress.summary; absent id = pending)
+  let done = 0, proposed = 0;
+  for (const t of catalog) { const s = prog[t.id]; if (s === "done") done++; else if (s === "proposed") proposed++; }
+  const progress = catalog.length ? { total: catalog.length, done, proposed, pending: catalog.length - done - proposed } : null;
+  // deps present/total from DEPS_DOCTOR.md ("**present X/Y**")
+  let deps: { present: number; total: number } | null = null;
+  try { const m = fs.readFileSync(path.join(process.cwd(), "orchestration", "DEPS_DOCTOR.md"), "utf8").match(/present\s+(\d+)\/(\d+)/); if (m) deps = { present: +m[1], total: +m[2] }; } catch { /* absent */ }
+  res.json({
+    ts: new Date().toISOString(),
+    live: !!st,
+    phase: st?.phase ?? null,
+    conductorModel: st?.conductor_model ?? null,
+    preferredModel: sel?.selection?.model ?? null,
+    failoverCount: st?.failover_count ?? 0,
+    currentTask: st?.current_task ?? null,
+    queue: Array.isArray(st?.pending_actions) ? st.pending_actions.length : 0,
+    retry: st ? { count: st.retry_count ?? 0, max: 3 } : null,
+    progress,
+    deps,
+  });
+});
+
 // OpenAPI 3.1 spec + Swagger UI (Faz 10C).
 app.get("/api/openapi.json", (_req, res) => res.json(openApiSpec));
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
