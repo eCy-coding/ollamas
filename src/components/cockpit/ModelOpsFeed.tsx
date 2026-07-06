@@ -8,15 +8,21 @@ const fmtTime = (ts: number) => new Date(ts).toLocaleTimeString([], { hour12: fa
 const fmtMs = (ms?: number) => (typeof ms === "number" ? `${Math.round(ms)}ms` : "—");
 const fmtCost = (usd: number) => (usd > 0 ? `$${usd.toFixed(4)}` : "—");
 
+// A "Live" feed means current activity — old persisted rows (e.g. multi-minute timeout records from a
+// prior incident) must not dominate the view just because recent traffic is light. Window to the last
+// few hours; full history remains in the logbook. Keeps the feed an honest snapshot of current health.
+const FEED_WINDOW_MS = 3 * 60 * 60 * 1000; // 3h
+
 export function ModelOpsFeed(): React.ReactElement {
   const { events } = useTelemetry();
-  const rows: RequestEventVM[] = [...events].reverse().slice(0, 200);
+  const cutoff = Date.now() - FEED_WINDOW_MS;
+  const rows: RequestEventVM[] = [...events].reverse().filter((e) => e.ts >= cutoff).slice(0, 200);
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg mt-6">
       <div className="flex items-center gap-2.5 mb-4">
         <Activity className="w-4 h-4 text-status-accent" />
         <h2 className="text-xs font-bold text-immersive-text-bright font-mono tracking-wider uppercase">Model Ops — Live Request Feed</h2>
-        <span className="text-[10px] text-immersive-text-dim font-mono ml-auto">{rows.length} recent · metadata only</span>
+        <span className="text-[10px] text-immersive-text-dim font-mono ml-auto">{rows.length} · last 3h · metadata only</span>
       </div>
       {rows.length === 0 ? (
         <div className="text-[11px] text-immersive-text-dim font-mono py-6 text-center">No model operations yet — drive a request to see it here live.</div>

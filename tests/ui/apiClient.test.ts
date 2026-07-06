@@ -66,6 +66,25 @@ describe('apiClient — choke-point', () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it('logs api_error on a transient 5xx by default, but NOT when the call is soft', async () => {
+    // Force logClientEvent onto the fetch path (no sendBeacon) so we can observe the logbook POST.
+    const origBeacon = navigator.sendBeacon;
+    navigator.sendBeacon = undefined as unknown as typeof navigator.sendBeacon;
+    try {
+      // default (non-soft) 500 → an api_error is logged (extra POST /api/logbook)
+      const spy1 = stubFetch().mockResolvedValue(res({ error: 'x' }, { status: 500 }));
+      await expect(api.get('/api/ecysearcher/', { retries: 0 })).rejects.toMatchObject({ status: 500 });
+      expect(spy1.mock.calls.some((c) => String(c[0]).includes('/api/logbook'))).toBe(true);
+
+      // soft 500 → no api_error logged (no logbook POST) — expected-offline must not flood RUM
+      const spy2 = stubFetch().mockResolvedValue(res({ error: 'x' }, { status: 500 }));
+      await expect(api.get('/api/ecysearcher/', { retries: 0, soft: true })).rejects.toMatchObject({ status: 500 });
+      expect(spy2.mock.calls.some((c) => String(c[0]).includes('/api/logbook'))).toBe(false);
+    } finally {
+      navigator.sendBeacon = origBeacon;
+    }
+  });
+
   it('streamPost reads chunks until done', async () => {
     const chunks = ['data: {"a":1}\n\n', 'data: {"b":2}\n\n'];
     const enc = new TextEncoder();

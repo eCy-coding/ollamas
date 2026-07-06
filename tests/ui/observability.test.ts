@@ -69,6 +69,20 @@ describe('observability — pure logic (vF10)', () => {
     expect(totalErrors(counts)).toBe(2);
   });
 
+  it('errorCounts windows out old errors when a recency window is given (current-health verdict)', () => {
+    const now = 1_000_000;
+    const entries = [
+      ev('api_error 502 GET /old', new Date(now - 60 * 60_000).toISOString()), // 60min ago → out of window
+      ev('api_error 500 GET /fresh', new Date(now - 60_000).toISOString()),     // 1min ago → counted
+    ];
+    // No window → counts both (back-compat)
+    expect(totalErrors(errorCounts(entries))).toBe(2);
+    // 20-min window → only the fresh one; the resolved-outage burst ages out
+    const windowed = errorCounts(entries, { now, windowMs: 20 * 60_000 });
+    expect(windowed.api).toBe(1);
+    expect(totalErrors(windowed)).toBe(1);
+  });
+
   it('errorBuckets places events into time buckets oldest→newest', () => {
     const now = 100_000;
     const bucketMs = 1_000;

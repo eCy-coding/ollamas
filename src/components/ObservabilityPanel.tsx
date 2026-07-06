@@ -57,8 +57,11 @@ export function ObservabilityPanel() {
     );
   }
 
+  // Window the error tally to the same 20-min span as the sparkline so the verdict tracks CURRENT health
+  // — a since-resolved outage's old errors age out instead of pinning the panel to CRITICAL forever.
+  const RUM_WINDOW_MS = 20 * 60_000;
   const vitals = vitalsSummary(entries);
-  const counts = errorCounts(entries);
+  const counts = errorCounts(entries, { now: Date.now(), windowMs: RUM_WINDOW_MS });
   const errsTotal = totalErrors(counts);
   const health = healthVerdict(vitals, counts);
   const buckets = errorBuckets(entries, Date.now(), 60_000, 20);

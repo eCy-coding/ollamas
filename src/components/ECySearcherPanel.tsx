@@ -41,7 +41,7 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
 
   const loadFeed = async (refresh = false) => {
     setFeedBusy(true); setFeedErr("");
-    try { setFeed(await api.get<FeedResp>(`/api/threatfeed${refresh ? "?refresh=1" : ""}`)); }
+    try { setFeed(await api.get<FeedResp>(`/api/threatfeed${refresh ? "?refresh=1" : ""}`, { soft: true })); }
     catch (e) { setFeedErr(String((e as Error)?.message || e)); }
     finally { setFeedBusy(false); }
   };
@@ -68,14 +68,25 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
     catch { setLogs([]); }
   };
 
-  // Probe reachability + load the analytics summary on mount (on-demand, no constant background poll).
+  // Probe reachability on mount (on-demand, no constant background poll). The proxy short-circuits to a
+  // 200 {offline:true} when the stack is down (no 502 flood), so UP/DOWN is driven off the supervisor
+  // status + that offline flag, and the feature endpoints (root/analytics) are hit ONLY when the stack is
+  // actually running. Every call is `soft` — an expected "down" state must never inflate the RUM error count.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      void refreshStatus();
+      let running = false;
       try {
-        const root = await api.get<{ service?: string; version?: string }>("/api/ecysearcher/");
+        const s = await api.get<SupStatus>("/api/ecysearcher/status", { soft: true });
         if (cancelled) return;
+        setSup(s);
+        running = s?.running === true;
+      } catch { /* supervisor route absent */ }
+      if (!running) { if (!cancelled) setReachable(false); return; }
+      try {
+        const root = await api.get<{ service?: string; version?: string; offline?: boolean }>("/api/ecysearcher/", { soft: true });
+        if (cancelled) return;
+        if (root?.offline) { setReachable(false); return; }
         setReachable(true);
         setVersion(root?.version || "");
       } catch {
@@ -84,7 +95,7 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
       }
       try {
         // The fixed unified analytics endpoint (/api/search + /search/analytics).
-        const a = await api.get<Analytics>("/api/ecysearcher/api/search/search/analytics");
+        const a = await api.get<Analytics>("/api/ecysearcher/api/search/search/analytics", { soft: true });
         const s = a?.data?.summary;
         if (!cancelled && s) setCounts({ threats: s.total_threats ?? 0, domains: s.total_domains ?? 0, ips: s.total_ips ?? 0 });
       } catch { /* analytics optional */ }
@@ -97,7 +108,7 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
     if (!query) return;
     setBusy(true); setErr(""); setResults(null);
     try {
-      const r = await api.get<SearchResp>(`/api/ecysearcher/api/search/search?q=${encodeURIComponent(query)}&type=all&limit=50`);
+      const r = await api.get<SearchResp>(`/api/ecysearcher/api/search/search?q=${encodeURIComponent(query)}&type=all&limit=50`, { soft: true });
       setResults(r);
       onNotify?.(`eCySearcher: ${r?.count ?? 0} sonuç`, "info");
     } catch (e) {

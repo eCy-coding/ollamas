@@ -25,6 +25,24 @@ export function ecyTargetUrl(base: string, subPath: string): string {
 /** Methods whose body we forward. */
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/** Structured "eCySearcher is offline" body — a well-formed empty result the cockpit can render
+ *  without treating it as an error. Shaped to satisfy every consumer (root probe, search, analytics). */
+export function ecyOfflinePayload(): Record<string, unknown> {
+  return { offline: true, ready: false, running: false, service: "ecysearcher", results: [], hits: [], total: 0, analytics: null };
+}
+
+/** Circuit-breaker middleware factory: when the supervisor reports the stack is NOT running, short-circuit
+ *  to a 200 offline payload instead of letting the proxy fetch a dead upstream and 502. A 502-per-poll was
+ *  logged by the browser as `api_error`, flooding RUM to CRITICAL even though "down" is an expected, benign
+ *  state. Only when `isRunning()` is true do we fall through to the real proxy (which still 502s on a genuine
+ *  unexpected fetch failure). `isRunning` is injected so this stays a pure, unit-testable factory. */
+export function ecysearcherOfflineGate(isRunning: () => boolean) {
+  return (_req: Request, res: Response, next: () => void): void => {
+    if (isRunning()) return next();
+    res.status(200).json(ecyOfflinePayload());
+  };
+}
+
 /** Express handler for `app.use("/api/ecysearcher", localOwnerGuard, ecysearcherProxy)`. */
 export async function ecysearcherProxy(req: Request, res: Response): Promise<void> {
   const target = ecyTargetUrl(ecyBaseUrl(), req.url || "/");

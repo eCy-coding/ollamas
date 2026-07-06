@@ -25,6 +25,8 @@ export interface RequestOpts {
   retries?: number; // GET defaults to 2; mutations default to 0
   timeoutMs?: number; // default 30s
   backoffMs?: number; // base backoff; 0 in tests
+  soft?: boolean; // expected-degradable call (offline sub-service / optional integration) — a 5xx here is
+                  // a benign "not available" state, so DON'T log it as an api_error (keeps RUM honest).
 }
 
 // Auth tokens are set by SaaSAdmin into localStorage; injected on every call so
@@ -102,7 +104,7 @@ async function request<T = Json>(endpoint: string, opts: RequestOpts = {}): Prom
         // 401/403 are first-class auth states (callers like useUsage treat them as
         // "unauthorized", not failures) — logging them as client errors falsely
         // inflated the RUM error counter. Only transient (429/5xx) faults are errors.
-        if (isTransient(res.status)) {
+        if (isTransient(res.status) && !opts.soft) {
           logClientEvent(`api_error ${res.status} ${method} ${endpoint}`, { status: res.status });
         }
         if (isTransient(res.status) && attempt < retries) {

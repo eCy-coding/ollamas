@@ -115,11 +115,21 @@ export function categorizeError(note: string | undefined): ErrorCategory | null 
 
 export type ErrorCounts = Record<ErrorCategory, number>;
 
-export function errorCounts(entries: LogEntry[]): ErrorCounts {
+// An optional recency window keeps the RUM verdict a reflection of CURRENT health: without it, a burst
+// of errors from hours ago (e.g. a since-fixed sub-service outage) sits in the logbook slice forever and
+// pins the panel to CRITICAL. With `{ now, windowMs }`, only errors inside the window count — old bursts
+// age out, exactly like the sparkline (errorBuckets) already does. Omitting it counts all (back-compat).
+export function errorCounts(entries: LogEntry[], window?: { now: number; windowMs: number }): ErrorCounts {
   const acc: ErrorCounts = { react: 0, window: 0, unhandled: 0, api: 0 };
+  const start = window ? window.now - window.windowMs : -Infinity;
   for (const e of frontendEvents(entries)) {
     const cat = categorizeError(e.note);
-    if (cat) acc[cat] += 1;
+    if (!cat) continue;
+    if (window) {
+      const t = e.ts ? Date.parse(e.ts) : NaN;
+      if (Number.isNaN(t) || t < start || t > window.now) continue;
+    }
+    acc[cat] += 1;
   }
   return acc;
 }

@@ -22,6 +22,15 @@ export interface RollupVM {
 }
 
 const CAP = 200;
+
+// Append a live SSE event, deduped by requestId+ts and capped. The stream replays its recent buffer on
+// (re)connect, overlapping the initial /recent snapshot (and any poll re-paint) — without dedup the same
+// event is appended repeatedly, piling the feed up to CAP with duplicate rows. Pure → unit-testable.
+export function mergeEvent(list: RequestEventVM[], evt: RequestEventVM, cap = CAP): RequestEventVM[] {
+  if (list.some((x) => x.requestId === evt.requestId && x.ts === evt.ts)) return list;
+  return [...list, evt].slice(-cap);
+}
+
 const EMPTY_ROLLUP: RollupVM = {
   windowMs: 60000, count: 0, p50TotalMs: 0, p95TotalMs: 0, p50TtftMs: 0, p95TtftMs: 0,
   errorRate: 0, tokPerSec: 0, reqPerMin: 0, costPerHr: 0, byProvider: [],
@@ -64,7 +73,9 @@ export function useTelemetry(): { events: RequestEventVM[]; rollup: RollupVM } {
       es.addEventListener("request", (e) => {
         try {
           const evt = JSON.parse((e as MessageEvent).data) as RequestEventVM;
-          evRef.current = [...evRef.current, evt].slice(-CAP);
+          const next = mergeEvent(evRef.current, evt);
+          if (next === evRef.current) return; // duplicate → no re-render
+          evRef.current = next;
           setEvents(evRef.current);
         } catch { /* malformed frame ignored */ }
       });

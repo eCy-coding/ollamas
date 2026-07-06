@@ -10,7 +10,7 @@ import { searchGitHub } from "./server/github-search";
 import { runStandard, type Category } from "./server/github-search-standard";
 import { autoconnectGitHub } from "./server/integrations";
 import { checkIntegrations } from "./server/integrations-health";
-import { ecysearcherProxy } from "./server/ecysearcher-proxy";
+import { ecysearcherProxy, ecysearcherOfflineGate } from "./server/ecysearcher-proxy";
 import { ecysearcherSupervisor } from "./server/ecysearcher";
 import { logger } from "./server/logger";
 import { openApiSpec } from "./server/openapi";
@@ -233,8 +233,11 @@ app.post("/api/integrations/github/autoconnect", async (_req, res) => {
   res.json(await autoconnectGitHub());
 });
 app.get("/api/integrations/health", async (_req, res) => {
+  // Never 500 on a token-read/probe throw — that logged as a RUM api_error and made an optional,
+  // unconfigured integration look like a server fault. Degrade to 200 [] so the panel renders its
+  // honest client-side "needs-setup" rows instead.
   try { res.json(await checkIntegrations({ token: ghToken() })); }
-  catch (e: any) { res.status(500).json({ error: e.message }); }
+  catch { res.json([]); }
 });
 
 // GitHub Actions cockpit (dalga-6). Read paths work unauthenticated for public
@@ -327,7 +330,9 @@ app.get("/api/ecysearcher/logs", async (req, res) => {
 // eCySearcher reverse-proxy — forward its (open) Flask API through ollamas so the cockpit reaches it
 // CORS-free + the local-owner guard is the only exposure. Mounted AFTER the supervisor control
 // routes. See server/ecysearcher-proxy.ts.
-app.use("/api/ecysearcher", ecysearcherProxy);
+// Offline circuit-breaker BEFORE the proxy: supervisor stopped → 200 offline payload (no dead-upstream
+// 502 flood into RUM). Only proxies for real when the stack is running.
+app.use("/api/ecysearcher", ecysearcherOfflineGate(() => ecysearcherSupervisor.status().running === true), ecysearcherProxy);
 
 // GitHub Search (dalga-8) — first-party keyword search over the GitHub REST
 // Search API. Replaces the old ecysearch external-iframe supervisor (which

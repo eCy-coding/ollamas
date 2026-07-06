@@ -24,7 +24,7 @@ export default function IntegrationsPanel({ onNotify }: { onNotify?: (msg: strin
 
   const load = async () => {
     setBusy(true);
-    try { setRows(await api.get<Row[]>("/api/integrations/health")); }
+    try { setRows(await api.get<Row[]>("/api/integrations/health", { soft: true })); }
     catch (e) { onNotify?.(`Sağlık: ${String((e as Error)?.message || e)}`, "error"); }
     finally { setBusy(false); }
   };
