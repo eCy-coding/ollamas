@@ -61,7 +61,7 @@ function loadRecords(): { records: BenchRecord[]; ts: string } {
 async function maybeRefresh(stale: boolean): Promise<boolean> {
   if (!REFRESH || !stale) return false;
   try {
-    const r = await fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(800) });
+    const r = await fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(800) }); // nosemgrep: react-insecure-request -- localhost ollama/host loopback, no transport risk
     if (!r.ok) { console.error("[benchprompt] --refresh: server :3000 yanıt vermedi → mevcut veriyle devam."); return false; }
   } catch { console.error("[benchprompt] --refresh: server :3000 kapalı → mevcut veriyle devam (bench-lane'i koş)."); return false; }
   const mjs = join(WT_ROOT, "bin", "host-bridge", "benchmark.mjs");
@@ -77,7 +77,7 @@ async function maybeRefresh(stale: boolean): Promise<boolean> {
  *  Server kapalı/hata → [] (bölüm render edilmez; benchprompt asla bloklanmaz). */
 async function liveFreeProviders(): Promise<FreeApiProvider[]> {
   try {
-    const r = await fetch("http://127.0.0.1:3000/api/keys/pool", { signal: AbortSignal.timeout(2000) });
+    const r = await fetch("http://127.0.0.1:3000/api/keys/pool", { signal: AbortSignal.timeout(2000) }); // nosemgrep: react-insecure-request -- localhost loopback, no transport risk
     if (!r.ok) return [];
     const j: any = await r.json();
     return Object.entries(j?.pool ?? {})

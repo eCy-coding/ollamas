@@ -435,7 +435,7 @@ export function registerContractRoutes(app: Express, adminGuard: Middleware, rat
         const ctrl = new AbortController();
         req.on("close", () => ctrl.abort());
         const result = await ProviderRouter.generate(
-          { provider: "fleet", model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined } as any,
+          { provider: "fleet", model: model ? String(model) : undefined, messages, temperature: temperature != null ? Number(temperature) : undefined } as any, // nosemgrep: express-wkhtmltoimage-injection -- fleet-provider LLM generate, no wkhtmltoimage/pdf sink
           undefined,
           undefined,
           ctrl.signal,

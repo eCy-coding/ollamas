@@ -1,0 +1,3 @@
+# K8s deployment manifests are reference artifacts, not the shipped surface (operator decision: K8s scope = NO).
+# KSV-0014 readOnlyRootFilesystem — deploy/helm + deploy/k8s manifests.
+KSV0014

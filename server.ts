@@ -1064,7 +1064,7 @@ async function initializeServer() {
 
     try {
       const start = Date.now();
-      const result = await ProviderRouter.generate(testConfig);
+      const result = await ProviderRouter.generate(testConfig); // nosemgrep: express-wkhtmltoimage-injection -- LLM generation (ProviderRouter.generate), no wkhtmltoimage/pdf sink
       const elapsed = Date.now() - start;
       res.json({ success: true, latencyMs: elapsed, output: result.text.substring(0, 50) });
     } catch (e: any) {
@@ -2937,12 +2937,12 @@ content
       const testData = "Mission Control DB Payload 2026";
       const masterKey = db["masterKey"];
       const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv("aes-256-gcm", masterKey, iv);
+      const cipher = crypto.createCipheriv("aes-256-gcm", masterKey, iv, { authTagLength: 16 });
       let enc = cipher.update(testData, "utf8", "hex");
       enc += cipher.final("hex");
       const tag = cipher.getAuthTag().toString("hex");
 
-      const decipher = crypto.createDecipheriv("aes-256-gcm", masterKey, iv);
+      const decipher = crypto.createDecipheriv("aes-256-gcm", masterKey, iv, { authTagLength: 16 });
       decipher.setAuthTag(Buffer.from(tag, "hex"));
       let dec = decipher.update(enc, "hex", "utf8");
       dec += decipher.final("utf8");

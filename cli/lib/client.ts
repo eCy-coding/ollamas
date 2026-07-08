@@ -642,7 +642,7 @@ export async function buildDoctorReport(
     return r.json();
   });
   const bridge = await safeProbe(async () => {
-    const r = await fetch("http://127.0.0.1:7345/health", { signal: AbortSignal.timeout(5000) });
+    const r = await fetch("http://127.0.0.1:7345/health", { signal: AbortSignal.timeout(5000) }); // nosemgrep: react-insecure-request -- 127.0.0.1 loopback bridge probe, no transport risk
     if (!r.ok) throw new Error(`${r.status}`);
     return r.json();
   });
