@@ -33,6 +33,7 @@ export async function runGate(steps, { exec, now = () => Date.now() } = {}) {
     if (s.skip) { results.push({ name: s.name, ok: true, skipped: true, reason: s.reason || "skipped", ms: 0 }); continue; }
     const t0 = now();
     let ok = true, error;
+    // nosemgrep: no-shell-exec -- `exec` is a dependency-injected step runner (opts.exec), not child_process.exec
     try { await exec(s); } catch (e) { ok = false; error = String((e && e.message) || e); }
     results.push({ name: s.name, ok, ms: now() - t0, ...(error ? { error } : {}) });
   }

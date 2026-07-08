@@ -31,9 +31,25 @@ rules:
           - pattern: exec(...)
           - pattern-not: exec($CMD, [...])
           - pattern-not: exec($CMD, [...], ...)
+          # exec() with no args is never child_process.exec (needs a command
+          # string) — it is a local/dependency-injected runner (e.g. mesh.ts
+          # detectMeshHost's ExecFn default = execFileSync("tailscale", [...])).
+          - pattern-not: exec()
       - pattern: execSync(...)
       # argv-taking APIs become shell exec once { shell: true } is passed
       - pattern: "spawn($CMD, $ARGS, {..., shell: true, ...})"
       - pattern: "spawnSync($CMD, $ARGS, {..., shell: true, ...})"
       - pattern: "execFile($CMD, $ARGS, {..., shell: true, ...})"
       - pattern: "execFileSync($CMD, $ARGS, {..., shell: true, ...})"
+    # Scope = shipped product surface (server/cli/orchestration/contract/bin).
+    # Excluded: dev/ops harness + tests — internal tooling run locally by the
+    # operator (hardcoded commands), NOT attacker-reachable via the product's
+    # network surface. (.claude/ hooks+statusline+harness-ops; scripts/ $0 ops;
+    # test files.) Keeps the gate focused on real attack surface, noise-free.
+    paths:
+      exclude:
+        - ".claude/**"
+        - "scripts/**"
+        - "tests/**"
+        - "**/*.test.ts"
+        - "**/*.test.mjs"
