@@ -25,3 +25,13 @@
 ## Not
 - `auto` registry ruleset 6 FP üretti → 1.24.3 gate-blocking-flip öncesi suppress ŞART (yoksa CI hep-kırmızı, gate işe yaramaz). Custom `.semgrep/no-shell-exec` = 0 (temiz).
 - CI run-log kanıtı (Trivy misconfig deploy/, Semgrep 6→0-post-suppress) push'ta doğrulanır.
+
+## EK — custom `no-shell-exec` repo-wide triage (µ1 completeness; EXEC-INVENTORY server/cli/orchestration-only'di, .mjs/.claude/contract kaçmıştı)
+Full-repo `semgrep --config .semgrep/` başta **9 hit** verdi → hepsi FP/scope-dışı, **0 gerçek yeni-vuln**:
+| hit | sınıf | disposition |
+|---|---|---|
+| `.claude/harness-ops.mjs:13,74` · `.claude/hooks/{gate-before-commit,on-stop,preserve-context}.mjs` · `.claude/statusline.mjs:17` · `scripts/system-monitor.mjs:29` (7) | dev/ops harness `sh` helper (hardcoded-cmd, shipped-yüzey değil, attacker-unreachable) | rule `paths: exclude` (.claude/**, scripts/**, tests) |
+| `contract/src/mesh.ts:22` `exec()` | no-arg → child_process değil; injected ExecFn default = `execFileSync("tailscale",[...])` (safe) | rule `pattern-not: exec()` |
+| `bin/host-bridge/gate.mjs:36` `exec(s)` | DI step-runner (`opts.exec`, step-object alır), child_process değil | inline `nosemgrep: no-shell-exec` |
+
+**Sonuç:** rule shipped-surface'e (server/cli/orchestration/contract/bin) scope'landı → repo-wide **0 FP**, scratch-vuln hâlâ **1** (8e60fe2). Gate-flip (1.24.3) artık CI'yı FP ile kırmaz.
