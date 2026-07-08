@@ -27,10 +27,10 @@ jobs:
           scan-ref: .
           severity: CRITICAL,HIGH
           exit-code: "1"
-      - name: Semgrep (SAST)
-        uses: semgrep/semgrep-action@v1
-        with:
-          # auto = registry rulesets; .semgrep/ = repo-local custom guards (no-shell-exec, CWE-78)
-          config: >-
-            auto
-            .semgrep/
+      - name: Semgrep (SAST — CWE-78 no-shell-exec guard, blocking)
+        # Direct pinned CLI (the deprecated semgrep-action@v1 silently ran only 1
+        # config and ignored line-above nosemgrep). Enforces the repo-local
+        # .semgrep/ guard as a blocking gate. `--error` → exit 1 on any finding.
+        run: |
+          python3 -m pip install --quiet semgrep==1.157.0
+          semgrep scan --config .semgrep/ --error --severity ERROR .
