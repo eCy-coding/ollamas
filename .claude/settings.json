@@ -157,9 +157,7 @@
   },
   "effortLevel": "high",
   "alwaysThinkingEnabled": true,
-  "autoCompactEnabled": true,
   "autoMemoryEnabled": true,
-  "fileCheckpointingEnabled": true,
   "enabledMcpjsonServers": [
     "ollamas"
   ],
@@ -170,10 +168,6 @@
     "network": {
       "allowUnixSockets": false
     }
-  },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "node ${CLAUDE_PROJECT_DIR}/.claude/statusline.mjs"
   },
   "env": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
