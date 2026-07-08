@@ -1,0 +1,39 @@
+rules:
+  - id: no-shell-exec
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      CWE-78 (OS Command Injection): this call runs a command through a shell
+      (child_process `exec`/`execSync`, or `spawn`/`spawnSync`/`execFile`/`execFileSync`
+      with `shell: true`). Shell-string execution interpolates untrusted input through
+      /bin/sh, so shell metacharacters (`;`, `|`, `&&`, `$()`, backticks, etc.) in any
+      variable reaching the command string can inject arbitrary commands. Use
+      `execFile`/`execFileSync` (or `spawn`/`spawnSync` without `shell: true`) with the
+      command and an argv array instead, e.g. `execFileSync("git", ["status", "--porcelain"], { cwd })`.
+      This bypasses the shell entirely so arguments can never be reinterpreted.
+    # NOTE: bare identifier-call patterns below (`exec(...)`, `execSync(...)`, ...)
+    # only match free-function calls (Identifier callee). They do NOT match
+    # method calls like `db.exec(...)` or `re.exec(...)` (MemberExpression
+    # callee), so no extra pattern-not is needed to separate those cases.
+    # (A `pattern-not: $OBJ.execSync(...)` was tried here and removed: semgrep's
+    # JS/TS import-equivalence matching unifies destructured named imports
+    # with member-access patterns, so it wrongly matched a bare
+    # `execSync(...)` call whose binding came from `import {execSync} from
+    # "child_process"` and produced false negatives.)
+    pattern-either:
+      # child_process free-function shell exec (callback + sync forms).
+      # exec()'s signature is exec(command: string, options?, callback?) — it
+      # NEVER takes an argv array as its 2nd positional arg. A call whose 2nd
+      # arg is an array literal is provably a local execFile-style wrapper (not
+      # the shell exec) and is excluded. String-command forms like
+      # exec(`git ${x}`) / exec("rm -rf " + x) stay flagged.
+      - patterns:
+          - pattern: exec(...)
+          - pattern-not: exec($CMD, [...])
+          - pattern-not: exec($CMD, [...], ...)
+      - pattern: execSync(...)
+      # argv-taking APIs become shell exec once { shell: true } is passed
+      - pattern: "spawn($CMD, $ARGS, {..., shell: true, ...})"
+      - pattern: "spawnSync($CMD, $ARGS, {..., shell: true, ...})"
+      - pattern: "execFile($CMD, $ARGS, {..., shell: true, ...})"
+      - pattern: "execFileSync($CMD, $ARGS, {..., shell: true, ...})"

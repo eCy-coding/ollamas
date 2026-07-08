@@ -10,7 +10,7 @@
  * Exit: high gap varsa --strict → 1.
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditAll, scoreCompleteness, type Gap } from "./lib/critic";
@@ -78,7 +78,7 @@ function main(): void {
       for (const h of line.toLowerCase().match(/\b[0-9a-f]{7,40}\b/g) || []) candidates.add(h);
     }
     for (const h of [...candidates].slice(0, 50)) { // patolojik roadmap'e karşı üst sınır
-      try { execSync(`git cat-file -e ${h}^{commit}`, { cwd: ORCH_DIR, stdio: "ignore" }); verifiedHashes.push(h); } catch { /* doğrulanamadı → kanıt sayılmaz */ }
+      try { execFileSync("git", ["cat-file", "-e", `${h}^{commit}`], { cwd: ORCH_DIR, stdio: "ignore" }); verifiedHashes.push(h); } catch { /* doğrulanamadı → kanıt sayılmaz */ }
     }
   } catch { verifiedHashes.length = 0; }
 
