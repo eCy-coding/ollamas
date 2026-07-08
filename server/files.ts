@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "node:child_process";
 import { db } from "./db";
 
 export interface FileItem {
@@ -140,8 +141,7 @@ export class FilesystemManager {
     const tree = scanDir(workspaceRoot);
     if (db.data.permissions.git) {
       try {
-        const { execSync } = require("child_process");
-        const statusOutput = execSync("git status --porcelain", { cwd: workspaceRoot, encoding: "utf8" });
+        const statusOutput = execFileSync("git", ["status", "--porcelain"], { cwd: workspaceRoot, encoding: "utf8" });
         const gitMap = parseGitPorcelain(statusOutput);
 
         // Overlay status mapping on the tree
