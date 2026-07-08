@@ -30,5 +30,8 @@ jobs:
       - name: Semgrep (SAST)
         uses: semgrep/semgrep-action@v1
         with:
-          config: auto
+          # auto = registry rulesets; .semgrep/ = repo-local custom guards (no-shell-exec, CWE-78)
+          config: >-
+            auto
+            .semgrep/
         continue-on-error: true
