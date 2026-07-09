@@ -1,3 +1,4 @@
+// @ts-check
 // HMAC-SHA256 host-bridge signing — single source of truth (mjs side).
 // Byte-identical mirror of server/bridge-hmac.ts canonical message. The server
 // (TS) signs; this lib (consumed by terminal-bridge.mjs) verifies. Keeping ONE

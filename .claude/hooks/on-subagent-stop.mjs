@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // SubagentStop hook — log a finished sub-agent for the audit trail. Fail-safe (exit 0, no block).
 // (Quality-gating a sub-agent's output via decision:block is intentionally NOT done here —
 //  the implementer≠verifier discipline is enforced by the cli-verifier agent, not a blind hook.)

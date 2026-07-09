@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // git_ops — read-only git inspection. Subcommand: status|diff|branch|log (default status).
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 

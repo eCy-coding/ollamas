@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Additive merge of the harness keys into .claude/settings.json.
 // Preserves existing hooks (UserPromptSubmit/SessionStart) and any other keys.
 // Only adds permissions / statusLine / PreToolUse if not already present (idempotent).

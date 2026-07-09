@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // mcp-tool-test — exercise each ollamas /mcp tool one-by-one with SAFE args (read-only/scratch).
 // Real-time, deterministic (no LLM unless the tool is an LLM tool). Destructive tools are SKIPPED
 // with a reason. Output: per-tool OK/ERR/SKIP table. Reusable (harness-ops --deep can call it).

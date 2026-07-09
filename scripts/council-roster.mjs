@@ -1,3 +1,4 @@
+// @ts-check
 // scripts/council-roster.mjs — the COUNCIL ROSTER: every seat is JUSTIFIED with a standout
 // capability (specialty), a rationale (why it's on the council) and PROOF (real evidence). Mixes
 // the most MacBook-efficient LOCAL models with CLOUD members (the vault api-keys). A member only

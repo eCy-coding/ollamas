@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PreToolUse fast commit-policy guard (matcher Bash). Enforces CLAUDE.md commit rules cheaply
 // (the heavy typecheck+test gate lives in .git/hooks/pre-commit). Modern signal:
 // permissionDecision="deny" JSON on exit 0. Diagnostics → stderr; stdout = decision JSON only.

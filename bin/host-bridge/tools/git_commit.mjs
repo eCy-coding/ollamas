@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // git_commit — stage all + commit. Optional push with --push (guarded).
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 

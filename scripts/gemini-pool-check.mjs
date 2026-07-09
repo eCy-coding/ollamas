@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/gemini-pool-check.mjs — pool-health monitor for sustainable cloud Gemini.
 //
 // Read-only: GET /api/keys/pool, print the gemini pool health, and (if the live pool is dry)

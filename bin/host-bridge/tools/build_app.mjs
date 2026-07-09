@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // build_app — rebuild + recreate the app container, then health-check.
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 

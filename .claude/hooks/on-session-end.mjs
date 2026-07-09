@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // SessionEnd hook — flush a final state line + prune oversized audit logs. Cannot block
 // (session is ending); fail-safe exit 0. matcher = reason (clear|resume|logout|other).
 

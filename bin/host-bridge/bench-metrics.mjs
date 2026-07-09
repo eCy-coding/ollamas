@@ -1,3 +1,4 @@
+// @ts-check
 // bench-metrics — pure, side-effect-free tok/s extraction for the cross-platform
 // benchmark (scripts domain v4). Kept separate from benchmark.mjs so the math is
 // unit-testable with fixtures (no network, no fs).

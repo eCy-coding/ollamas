@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // kill_process — kill a PID, or all listeners on a port (':<port>').
 // Optional signal: --sig TERM|KILL|INT (default TERM).
 import { bridgeRun, emit, main } from "./lib/bridge-client.mjs";
