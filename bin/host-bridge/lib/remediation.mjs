@@ -1,3 +1,4 @@
+// @ts-check
 // Self-healing core (scripts lane, v7) — PURE, no exec/fs/network. Maps a health
 // snapshot to an ordered, idempotent remediation plan, plus a zero-dep backoff
 // re-check. The executor (tools/self_heal.mjs) runs the plan; keeping the logic

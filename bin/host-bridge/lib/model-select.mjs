@@ -1,3 +1,4 @@
+// @ts-check
 // Efficient local-model selection (scripts lane, v17) — PURE, no fs/network.
 // Extracted from benchmark.mjs's inline ranking so the choice is reusable +
 // unit-testable + constraint-aware (the bench can re-run; selection can read a

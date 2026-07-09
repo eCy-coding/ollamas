@@ -1,3 +1,4 @@
+// @ts-check
 // bin/host-bridge/tools/lib/ask-core.mjs — Siri arama yardımcısı SAF çekirdeği (ağ yok; deterministik; test edilir).
 // siri-ask.mjs bunları kullanır; testler aynı fonksiyonları birim doğrular (web-extract paterni).
 

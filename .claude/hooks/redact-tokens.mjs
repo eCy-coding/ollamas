@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PreToolUse safety hook (registered for Write|Edit only) — block writing a literal secret
 // VALUE into a file. Read-protection for .env lives in permissions.deny (this hook fires
 // before a tool runs, so it never sees file CONTENTS — only what the model is about to write).

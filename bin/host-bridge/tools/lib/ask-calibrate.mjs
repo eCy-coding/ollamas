@@ -1,3 +1,4 @@
+// @ts-check
 // bin/host-bridge/tools/lib/ask-calibrate.mjs — Siri ölçüm SAF yardımcıları (test'li; I/O yok).
 //   ndcg3: graded + çok-gold sıralama kalitesi (Järvelin&Kekäläinen). windowHealth: log SLO + drift.
 //   siri-calibrate.mjs (ndcg3) ve siri-log-report.mjs (windowHealth) tüketir; testler birim doğrular.

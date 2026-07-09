@@ -1,3 +1,4 @@
+// @ts-check
 // tavily.mjs — pure request/response mapping for the Tavily search API (free tier:
 // 1,000 credits/month, recurring, no card). Keyed PRIMARY engine for web_search; the
 // DuckDuckGo scrape stays as the keyless fallback. Zero-dep, IO-free → unit-tested.

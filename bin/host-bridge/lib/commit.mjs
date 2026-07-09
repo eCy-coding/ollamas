@@ -1,3 +1,4 @@
+// @ts-check
 // Auto-commit guard core (scripts lane, v12) — PURE, no git/fs. Decides whether a
 // green-gate auto-commit is SAFE: only scope-owned files get staged, cross-lane
 // tracked changes BLOCK (ERR-SCR-001 contamination), and the message must be a

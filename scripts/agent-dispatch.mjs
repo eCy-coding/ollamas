@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // agent-dispatch — drive the local ollamas ReAct agent as a calibrated sub-agent.
 //
 // Hands a task to /api/agent/chat (real host tools: write_host_file + macos_terminal

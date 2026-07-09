@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PreToolUse safety hook (matcher Bash) — deny irreversible/destructive commands.
 // Modern signal: permissionDecision="deny" JSON on exit 0 (enforced even under bypass mode).
 // Non-Bash tools pass (no stdout). Diagnostics → stderr only.

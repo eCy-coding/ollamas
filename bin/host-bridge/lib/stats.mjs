@@ -1,3 +1,4 @@
+// @ts-check
 // Observability stats core (scripts lane, v8) — PURE, no fs/network. Aggregates
 // a list of seyir events into counts, latency percentiles, and an SLO burn-rate.
 // Keeping it pure makes the dashboard math unit-testable without touching disk.

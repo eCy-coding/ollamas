@@ -1,3 +1,4 @@
+// @ts-check
 // Preflight readiness core (scripts lane, v18) — PURE, no fs/network/spawn here.
 // One-command "is my M4 ollamas e2e ready?" — aggregates install invariants
 // (node, registry drift) + runtime/service checks (ollama, bridge, LaunchAgent,

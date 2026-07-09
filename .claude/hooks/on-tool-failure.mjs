@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PostToolUseFailure hook — capture a failed tool call and feed structured error context
 // back to the model so it can self-recover (root-cause first, not blind retry).
 // Cannot block (failure already happened). Emits hookSpecificOutput.additionalContext on exit 0.

@@ -1,3 +1,4 @@
+// @ts-check
 // Watch dev-loop core (scripts lane, v13) — PURE helpers, no fs/timers bound here.
 // gate.mjs --watch uses these to drive an autonomous "save → gate re-runs" loop
 // with zero external deps (no chokidar). The pure parts are unit-tested; the

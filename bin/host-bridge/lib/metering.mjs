@@ -1,3 +1,4 @@
+// @ts-check
 // Scripts-as-SaaS metering core (scripts lane, v11) — PURE, no fs/network.
 // Turns the host-local seyir event stream into a per-tool COST/usage meter:
 // billable units = Σ tier-weight per call, est. cost = units × rate.
