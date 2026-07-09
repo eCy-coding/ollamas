@@ -1,3 +1,4 @@
+// @ts-check
 // Test fixture for the v1.9 upstream security-scan gate. Stands in for an external
 // scanner (e.g. cisco-ai-defense/mcp-scanner). Reads a manifest JSON object
 // { server, tools:[{name,...}] } from stdin and prints { flagged: string[] } to

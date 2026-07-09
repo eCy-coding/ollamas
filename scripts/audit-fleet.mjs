@@ -1,3 +1,4 @@
+// @ts-check
 // Faz11 — audit fleet. Dispatches the benchmark-winning auditor (qwen3-coder:480b-cloud)
 // across every partition unit, reads each unit's files end-to-end via macos_terminal,
 // extracts non-working-function findings, checkpoints raw/<unit>.json (resumable).
@@ -40,7 +41,7 @@ async function dispatch(unit, attempt) {
     });
     if (!res.ok) return { error: `HTTP ${res.status}` };
     let buf = ""; const dec = new TextDecoder();
-    for await (const chunk of res.body) {
+    for await (const chunk of /** @type {any} */ (res.body)) {
       buf += dec.decode(chunk, { stream: true });
       let idx;
       while ((idx = buf.indexOf("\n\n")) >= 0) {

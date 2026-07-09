@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // log_stream — last N lines of the app container logs.
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 

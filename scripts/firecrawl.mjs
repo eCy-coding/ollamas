@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // firecrawl — key-in-.env REST wrapper for Firecrawl (no MCP install needed).
 //
 // Reads FIRECRAWL_API_KEY from .env (dotenv) and calls the Firecrawl API directly, so

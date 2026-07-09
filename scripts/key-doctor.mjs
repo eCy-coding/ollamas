@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/key-doctor.mjs — operator wrapper for POST /api/keys/doctor (zero-dep).
 //   node scripts/key-doctor.mjs                  -> dry-run scan (env+keychain+gh), masked table
 //   node scripts/key-doctor.mjs --connect        -> validate + SAVE to the vault

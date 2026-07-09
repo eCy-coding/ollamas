@@ -1,3 +1,4 @@
+// @ts-check
 // Faz11 — build docs/audit/AUDIT-FINDINGS.md from all sources:
 // ollamas fleet (raw/<unit>.json) + Tier-1 deep (raw/_tier1-deep.json) + Tier-1 deterministic (raw/_tier1-deterministic.json)
 // + partition (audit-slices.json) + benchmark (AUDIT-BENCH.json). Resilient to partial fleet completion.

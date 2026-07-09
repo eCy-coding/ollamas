@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/ecysearcher-lane.mjs — run the eCySearcher threat-intel platform as a managed SUBSYSTEM
 // under ollamas. ollamas is the control plane: it brings the eCySearcher docker stack up/down and
 // reports its health, CONCURRENT with the main :3000 stack (which it NEVER touches).

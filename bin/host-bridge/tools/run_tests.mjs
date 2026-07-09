@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // run_tests — run the project's vitest unit suite inside the container.
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // add-cli — repeatable e2e CLI→harness integration.
 //   node .claude/add-cli.mjs <cli> --tier allow|ask [--pattern "sub:*"] [--use "what for"]
 // Steps: (1) smoke-test the CLI is installed + runnable, (2) append Bash(<cli> <pattern>) to

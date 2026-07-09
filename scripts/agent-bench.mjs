@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // agent-bench — benchmark local ollama models on system-monitoring/coding task classes,
 // so each agent can be ROUTED to the job it actually passes. Scoring is objective: the
 // ground-truth string MUST appear in a REAL tool-step output (not the model's prose), so

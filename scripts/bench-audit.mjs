@@ -1,3 +1,4 @@
+// @ts-check
 // Faz11 audit-capability benchmark — measures which model best detects REAL bugs
 // (high recall) without fabricating (high precision). Ground-truth = bench-fixture.groundtruth.json.
 // Usage: node scripts/bench-audit.mjs   (boots against OLLAMAS_URL, default :8099)
@@ -38,7 +39,7 @@ async function runOnce(c) {
     });
     if (!res.ok) return { error: `HTTP ${res.status}` };
     let buf = ""; const dec = new TextDecoder();
-    for await (const chunk of res.body) {
+    for await (const chunk of /** @type {any} */ (res.body)) {
       buf += dec.decode(chunk, { stream: true });
       let idx;
       while ((idx = buf.indexOf("\n\n")) >= 0) {

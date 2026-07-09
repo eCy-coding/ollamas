@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // dispatch-merge — fold N per-task dispatch reports into ONE merged epic report.
 //
 // Each per-task report is the JSON emitted by `agent-dispatch.mjs --json` (or the

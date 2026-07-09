@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // process_port — list the process(es) listening on a TCP port.
 import { bridgeRun, emit, main } from "./lib/bridge-client.mjs";
 
