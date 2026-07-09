@@ -31,8 +31,8 @@ export function auditTests(modules: { file: string; fnCount: number }[], testTex
 // önceki adımlar onları her koşuda kirletir, dolayısıyla sayılırlarsa uncommitted-green HİÇ kapanamaz
 // (kalıcı-phantom lapse). El-yazımı governance dokümanları (SEYIR_DEFTERI, ROADMAP) ve bin/tests
 // kaynakları sayılmaya DEVAM eder.
-const GENERATED_ARTIFACT = new RegExp(
-  "^orchestration/(?:\\.autopilot-refresh\\.json$|seyir/|(?:AUTOPILOT|CLAUDE_DISPATCH|CONDUCTOR|COUNCIL|COUNCIL_PROMPT|COUNCIL_ROSTER|CRITIC|DISPATCH_DOCTOR|DOCTOR|DOD|FLEET_[A-Z]+|MISSION|MODEL_PROMPT|MODEL_SELECTION|QUALITY|RECONCILE|REQUIREMENTS|ROLE|STATUS|THINK)\\.(?:md|json)$)"
+export const GENERATED_ARTIFACT = new RegExp(
+  "^orchestration/(?:\\.autopilot-refresh\\.json$|seyir/|(?:AUTOPILOT|CLAUDE_DISPATCH|CONDUCTOR|COUNCIL|COUNCIL_PROMPT|COUNCIL_ROSTER|CRITIC|DISPATCH_DOCTOR|DOCTOR|DOD|DOD_LANES|FLEET_[A-Z]+|MISSION|MODEL_PROMPT|MODEL_SELECTION|QUALITY|RECONCILE|REQUIREMENTS|ROLE|STATUS|THINK)\\.(?:md|json)$)"
 );
 
 /** R3: git porcelain satırları (orchestration) → unshipped. Üretilmiş pipeline artefaktları muaf. */

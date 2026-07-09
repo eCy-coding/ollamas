@@ -91,7 +91,7 @@ export default defineConfig({
         test: {
           name: 'orchestra',
           environment: 'node',
-          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale,task-catalog,task-progress,deps,math-properties,bench,optimize,benchmark-honesty,hierarchy}.test.ts'],
+          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale,task-catalog,task-progress,deps,math-properties,bench,optimize,benchmark-honesty,hierarchy,dod-lanes}.test.ts'],
         },
       },
     ],
