@@ -10,8 +10,9 @@
 // there is ONE source of truth. The thin IO layer keeps a single JSON map (atomic read/write; pickVendor needs
 // a cross-vendor scan, which per-file state would race).
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { withLock } from "./claims";
 
 export interface VendorState { date: string; used: number; limit: number }
 export type BudgetFile = Record<string, VendorState>;
@@ -117,8 +118,18 @@ export function loadBudget(path: string): BudgetFile {
   return {};
 }
 
+// Atomic replace: write a unique tmp sibling then rename(2) over the target. A concurrent reader
+// (guardVendor/loadBudget in another process) therefore sees either the whole OLD file or the whole
+// NEW one — never a truncated mid-write blob that JSON.parse would reject (→ silent `{}` fallback →
+// the entire budget map wiped from the reader's view → catastrophic over-dispatch). Fixes the P3
+// torn-read race; the RMW lost-update is fixed separately by the withLock guard in noteVendorOutcome.
 export function saveBudget(path: string, b: BudgetFile): void {
-  try { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify(b) + "\n"); } catch { /* best-effort */ }
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tmp, JSON.stringify(b) + "\n");
+    renameSync(tmp, path);
+  } catch { /* best-effort */ }
 }
 
 /** Pre-flight gate: may we dispatch to `vendor` now? Loads the map, rolls this vendor over, checks budget. */
@@ -132,14 +143,22 @@ export function guardVendor(path: string, vendor: string, today: string = todayK
   return { allowed, state, msg };
 }
 
-/** Record an outcome for one vendor and persist WITHOUT clobbering the other vendors' slices. */
+/** Record an outcome for one vendor and persist WITHOUT clobbering the other vendors' slices.
+ *  The load→mutate→save is a read-modify-write on a file shared by every fleet dispatch PROCESS
+ *  (fleet-agent, gemini-run run concurrently). Unguarded, two processes both read the old map, both
+ *  write their own slice, and the second rename wins → the first's increment is LOST (P1 lost-update)
+ *  → the free-tier budget under-counts → over-dispatch past the daily cap. `withLock` (mkdir(2) mutex
+ *  + stale-TTL takeover, the same primitive claims.ts uses) serializes the whole RMW across processes,
+ *  so every increment survives. saveBudget's atomic rename keeps concurrent READERS torn-free. */
 export function noteVendorOutcome(path: string, vendor: string, outcome: "success" | "exhausted", today: string = todayKey(), limit: number = defaultLimitFor(vendor)): VendorState {
-  const map = loadBudget(path);
-  const cur = map[vendor] ?? { date: today, used: 0, limit };
-  const next = outcome === "success" ? recordSuccess(cur, today) : recordExhausted(cur, today);
-  map[vendor] = next;
-  saveBudget(path, map);
-  return next;
+  return withLock(`${path}.lock`, () => {
+    const map = loadBudget(path);
+    const cur = map[vendor] ?? { date: today, used: 0, limit };
+    const next = outcome === "success" ? recordSuccess(cur, today) : recordExhausted(cur, today);
+    map[vendor] = next;
+    saveBudget(path, map);
+    return next;
+  });
 }
 
 /** Today's key "YYYY-MM-DD". The only Date use — kept out of the pure core. */

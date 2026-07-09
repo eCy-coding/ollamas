@@ -8,8 +8,9 @@
 // ({date,used,limit}, not the pool map) so existing call sites (gemini-run `--quota`, fleet-agent) are
 // behavior-preserving.
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { withLock } from "./claims";
 import {
   rollover, canDispatch, remaining, recordSuccess, recordExhausted,
   defaultLimitFor, todayKey, type VendorState,
@@ -37,8 +38,15 @@ export function loadQuota(path: string, limit: number = defaultLimit()): QuotaSt
   return { date: todayKey(), used: 0, limit };
 }
 
+// Atomic replace (tmp + rename(2)) so a concurrent reader never sees a truncated mid-write file. See
+// vendor-budget.saveBudget for the full rationale — same shared-file torn-read hazard.
 export function saveQuota(path: string, state: QuotaState): void {
-  try { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify(state) + "\n"); } catch { /* best-effort */ }
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tmp, JSON.stringify(state) + "\n");
+    renameSync(tmp, path);
+  } catch { /* best-effort */ }
 }
 
 /** Pre-flight gate: may we dispatch to Gemini now? Loads + rolls over; returns the (possibly rolled) state. */
@@ -51,10 +59,14 @@ export function guardQuota(path: string, today: string = todayKey(), limit: numb
   return { allowed, state, msg };
 }
 
-/** Record an outcome and persist. `success` → +1; `exhausted` → latch the day. */
+/** Record an outcome and persist. `success` → +1; `exhausted` → latch the day.
+ *  load→mutate→save is a cross-process read-modify-write on the shared quota file; `withLock`
+ *  serializes it so concurrent fleet processes cannot lose each other's +1 (P1 lost-update). */
 export function noteOutcome(path: string, outcome: "success" | "exhausted", today: string = todayKey(), limit: number = defaultLimit()): QuotaState {
-  const cur = loadQuota(path, limit);
-  const next = outcome === "success" ? recordSuccess(cur, today) : recordExhausted(cur, today);
-  saveQuota(path, next);
-  return next;
+  return withLock(`${path}.lock`, () => {
+    const cur = loadQuota(path, limit);
+    const next = outcome === "success" ? recordSuccess(cur, today) : recordExhausted(cur, today);
+    saveQuota(path, next);
+    return next;
+  });
 }
