@@ -1,0 +1,42 @@
+# integration-all-lanes CI (v1.30.2). Continuously guards the `integration/all-lanes`
+# staging branch — the single funnel every lane converges through before touching the
+# trunk (see orchestration/CONVERGENCE.md). Runs the same three gates convergence step 4
+# demands: tsc --noEmit + vitest + the security-gate ($0 Semgrep guard). Kept separate
+# from ci.yml so the staging branch has its OWN standing signal, independent of other
+# lanes' whole-repo RED.
+name: integration-all-lanes
+
+on:
+  push:
+    branches:
+      - "integration/all-lanes"
+      - "integration/**"
+  pull_request:
+    branches:
+      - "integration/all-lanes"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-gate:
+    name: integration-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (tsc --noEmit)
+        run: npx tsc --noEmit
+      - name: Test (vitest)
+        run: npx vitest run
+      - name: Security gate (Semgrep no-shell-exec guard, blocking)
+        run: |
+          python3 -m pip install --quiet semgrep==1.157.0
+          semgrep scan --config .semgrep/ --error --severity ERROR .
