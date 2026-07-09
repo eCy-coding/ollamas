@@ -1,0 +1,6 @@
+{
+  "endpoint": "/api/openapi.json",
+  "requests": 50,
+  "warmup": 5,
+  "p95BudgetMs": 40
+}

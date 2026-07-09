@@ -47,3 +47,28 @@ jobs:
         run: npx vitest run
       - name: Build
         run: npx vite build
+
+  # perf-smoke (v1.29.2): self-contained p95 latency budget gate. Boots the exported app
+  # IN-PROCESS (OLLAMAS_NO_AUTOBOOT=1 — no vite/store boot, no model inference, no GPU) and
+  # hammers one static endpoint (/api/openapi.json). Deterministic + network-free: never
+  # touches a live model or DB, so it is safe on a plain ubuntu runner. Gates on p95 vs
+  # scripts/perf-budget.json (exit 1 over budget) and uploads the measured table as an artifact.
+  perf:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: perf-smoke (p95 budget gate)
+        run: npx tsx scripts/perf-smoke.ts | tee perf-smoke-report.txt
+      - name: Upload perf report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-smoke-report
+          path: perf-smoke-report.txt
+          if-no-files-found: warn
