@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // self_heal (scripts lane, v7) — detect bridge failure and repair it.
 //   node self_heal.mjs            -> DRY: print the remediation plan, change nothing
 //   node self_heal.mjs --apply    -> execute the plan (kill hung 7345 node, restart)

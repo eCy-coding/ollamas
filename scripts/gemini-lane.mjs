@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/gemini-lane.mjs — boot a DEDICATED ollamas gateway for gemini-cli work, on its OWN
 // port + an ISOLATED data dir, CONCURRENT with the main stack on :3000 (it NEVER kills it).
 //

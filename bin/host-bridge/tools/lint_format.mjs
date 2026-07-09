@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // lint_format — typecheck gate (tsc --noEmit). typescript is a devDep absent
 // from the runtime container, so it runs in the builder-target image.
 // Efficiency: only rebuild that image when Dockerfile/package*.json change

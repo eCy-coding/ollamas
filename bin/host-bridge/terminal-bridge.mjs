@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // LLM Mission Control — host-side macOS terminal bridge.
 // Drives iTerm2 + Terminal.app via osascript so the dockerized app can run
 // commands in a REAL, visible terminal window in real time.

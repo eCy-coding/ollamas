@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // doctor — one-command M4 preflight: "is my ollamas host setup e2e ready?" (v18).
 // Aggregates install invariants (node, registry drift) + runtime/service checks
 // (ollama, bridge, LaunchAgent loaded, token, benchmark). Each failure prints an

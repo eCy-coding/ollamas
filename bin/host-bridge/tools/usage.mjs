@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // usage (scripts lane, v11) — Scripts-as-SaaS metering dashboard over the host
 // seyir event stream: per-tool call counts, tier-weighted billable units, est.
 // cost, and a budget gate. HOST-LOCAL cost telemetry only (tenant billing is the

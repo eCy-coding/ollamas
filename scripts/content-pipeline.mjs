@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // content-pipeline — autonomous, headless "post-prep" pipeline for the eCy
 // human-rights publication. Runs WITHOUT Claude Code: research -> draft -> cover ->
 // publish-ready bundle on disk. The ONE step it cannot do headless is the final

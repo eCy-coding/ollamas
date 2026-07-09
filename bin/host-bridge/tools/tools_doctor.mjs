@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // tools_doctor — observability self-test for the toolkit. Runs the fast,
 // read-only tools and verifies they return ok; for slow/destructive tools it
 // only checks the file is present + parses. Emits a JSON health matrix.

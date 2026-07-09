@@ -1,3 +1,4 @@
+// @ts-check
 // Shared client for the macOS terminal bridge. Centralizes token reading,
 // HTTP boilerplate, client-side timeout, a single retry, and consistent
 // error shaping so every tool behaves the same (clig.dev machine-readable +

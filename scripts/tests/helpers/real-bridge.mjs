@@ -1,3 +1,4 @@
+// @ts-check
 // Spawn the REAL host terminal-bridge for e2e tests (scripts lane, v15). Unlike
 // helpers/mock-bridge.mjs (in-memory fake), this runs bin/host-bridge/terminal-bridge.mjs
 // as a child process so the actual production code path (auth, /exec, v14 /write
@@ -20,7 +21,7 @@ export function freePort() {
     const srv = net.createServer();
     srv.once("error", reject);
     srv.listen(0, "127.0.0.1", () => {
-      const { port } = srv.address();
+      const { port } = /** @type {import('node:net').AddressInfo} */ (srv.address());
       srv.close(() => resolve(port));
     });
   });
@@ -43,6 +44,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export async function startRealBridge({ token = "", bind = "127.0.0.1", writeRoots = "", maxBody = "", timeoutMs = 4000 } = {}) {
   const port = await freePort();
+  /** @type {Record<string, string | undefined>} */
   const env = { ...process.env, PORT: String(port), BRIDGE_BIND: bind };
   if (token) env.HOST_BRIDGE_TOKEN = token; else delete env.HOST_BRIDGE_TOKEN;
   if (writeRoots) env.BRIDGE_WRITE_ROOTS = writeRoots;

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Zero-manual quality gate runner (scripts lane, v11). ONE command runs the whole
 // scripts gate in order and reports a machine-readable verdict — no human stitches
 // `npm run lint && npm test && make harden && drift && swift test` by hand. Used by

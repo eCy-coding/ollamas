@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // siri-ask — ollamas Siri arama yardımcısı "BEYNİ" (standalone; gateway/server GEREKMEZ).
 //   node bin/siri-ask.mjs "<soru>" [--say] [--trace]
 // Yol: (a) Truth-Oracle deterministik (Doğru/Yanlış) → (b) değilse deep web_search + fleet sentez.
@@ -150,7 +151,7 @@ function synth(prompt) {
     const t0 = Date.now();
     const r = spawnSync(NODE, [TSX, join(REPO, "bin/siri-synth.ts")],
       { cwd: REPO, input: prompt, encoding: "utf8", timeout: SYNTH_TIMEOUT, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, SIRI_TRACE: TRACE ? "1" : "" } });
-    const timedOut = (r.error && r.error.code === "ETIMEDOUT") || r.signal === "SIGTERM";
+    const timedOut = (r.error && /** @type {NodeJS.ErrnoException} */ (r.error).code === "ETIMEDOUT") || r.signal === "SIGTERM";
     const out = (r.stdout || "").trim();
     const m = (r.stderr || "").match(/⟦SYNTH⟧\s*(\S+)/);
     const backend = m ? m[1] : (timedOut ? "timeout" : (r.error ? "error" : "?"));

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // web_search — web research for the agent (pure HTTP + jsdom readability, no API key, no bridge).
 //   node web_search.mjs <query...>              -> top DuckDuckGo results (snippet, shallow)
 //   node web_search.mjs --deep <q> --top N       -> SAME top-N sources with FULL page text (deep, 1 call)
