@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Standalone drift guard (scripts lane, v10 GA). The host-tool registration has
 // FOUR sources that must name the exact same set of tools:
 //   1. scripts/inventory.json   — the manifest (single source of truth)

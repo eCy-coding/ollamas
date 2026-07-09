@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Generate cross-language HMAC test vectors from the single-source signer
 // (../host-bridge/hmac.mjs). The Swift mirror (OllamasKit) and a node drift
 // test both assert against the committed hmac-vectors.json. If hmac.mjs ever

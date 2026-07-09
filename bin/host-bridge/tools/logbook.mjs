@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // logbook (seyir defteri) — append to / read the shared ship's log.
 //   logbook.mjs add "<text>"   -> append a note
 //   logbook.mjs tail [n]       -> last n entries (default 20)

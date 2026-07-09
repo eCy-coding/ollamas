@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // TDD scaffold generator (scripts lane, v13) — bootstraps the next version's
 // skeleton with zero manual file creation: a RED vitest test + a pure lib stub,
 // matching the lane convention (lib/*.mjs + tests/*.test.ts). Dev-time generator,

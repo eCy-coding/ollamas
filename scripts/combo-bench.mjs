@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // combo-bench — measure which MULTI-MODEL COMBINATION maximizes correct-answer rate.
 //
 // agent-bench's 3 tasks saturate (every strong model 3/3) so they can't differentiate

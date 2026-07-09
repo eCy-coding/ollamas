@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // ready — fresh-session "instant-on" gate. Detects prerequisites, SAFELY auto-fixes
 // the cheap/local ones (deps, .env, local model), then defers to doctor.mjs for the
 // authoritative service audit. Idempotent: a second run is an all-green no-op.

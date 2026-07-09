@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // audit-pipeline — 0-manual operations chain for Audit-as-a-Service (Faz17).
 //
 // Hands-off: for each target repo → clone (if url) → audit-service (local $0 model) →

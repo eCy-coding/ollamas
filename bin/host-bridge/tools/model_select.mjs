@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // model_select (scripts lane, v17) — recommend the most efficient LOCAL model from
 // the cached benchmark (~/.llm-mission-control/benchmark.json), without re-running
 // the slow bench. Correct-first, then metric (tps|latency) + optional min-tok/s.

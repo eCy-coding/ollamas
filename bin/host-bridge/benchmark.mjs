@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // E2E coding benchmark: for each model, ask the app to WRITE a program
 // (/api/generate), then RUN it in a real macOS terminal (/api/macos-terminal),
 // and score correctness + speed. Also benchmarks terminal targets. Writes a

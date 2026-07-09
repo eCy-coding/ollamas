@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // cover-gen — headless, zero-cost editorial cover generator for Substack / social.
 //
 // Authors an ABSTRACT, SYMBOLIC SVG (no faces, no graphic content) and rasterizes

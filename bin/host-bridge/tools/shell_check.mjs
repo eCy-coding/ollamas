@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // shell_check — lint a shell command/script BEFORE running it, to minimize
 // errors. Two passes:
 //   1. shellcheck (via docker koalaman/shellcheck:stable, stdin -> JSON1)

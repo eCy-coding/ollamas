@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // seyir_stats (scripts lane, v8) — read the structured seyir event stream and
 // render an observability dashboard: counts, error-rate, p50/p95/p99 latency,
 // per-tool breakdown, and an SLO burn-rate (error-budget). Exits 1 on SLO alert
