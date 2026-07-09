@@ -27,7 +27,8 @@ export const openApiSpec = swaggerJsdoc({
       { name: "SaaS", description: "Tenant + key administration" },
       { name: "Self", description: "Tenant self-service (scoped)" },
       { name: "Billing", description: "Stripe billing + usage" },
-      { name: "Ops", description: "Health, readiness, metrics" },
+      { name: "Ops", description: "Health, readiness, metrics, API docs" },
+      { name: "AI", description: "Inference + STT facade (google.colab.ai-mirrored, programmatic consumers)" },
     ],
     paths: {
       "/mcp": { post: { tags: ["MCP"], summary: "MCP Streamable HTTP endpoint (JSON-RPC: tools/list, tools/call, resources/list, resources/read)", security: [{ ApiKey: [] }], responses: { "200": { description: "MCP JSON-RPC response" }, "401": { description: "Missing/invalid credential (WWW-Authenticate)" }, "403": { description: "Origin not allowed" } } } },
@@ -57,6 +58,20 @@ export const openApiSpec = swaggerJsdoc({
       "/api/health": { get: { tags: ["Ops"], summary: "Liveness + telemetry", responses: ok("Health") } },
       "/api/ready": { get: { tags: ["Ops"], summary: "Readiness probe", responses: { ...ok("Ready"), "503": { description: "Not ready" } } } },
       "/metrics": { get: { tags: ["Ops"], summary: "Prometheus metrics", responses: ok("Metrics text") } },
+
+      // v1.27.4 µ1 — kept public + doc routes (route-triage.md KEEP-PUBLIC). External/programmatic
+      // consumers or the doc UI fetch these; there is no first-party frontend caller by design.
+      "/.well-known/mcp.json": { get: { tags: ["MCP"], summary: "MCP discovery manifest (3rd-party MCP clients)", responses: ok("Manifest document") } },
+      "/api/openapi.json": { get: { tags: ["Ops"], summary: "This OpenAPI 3.1 spec (JSON) — powers /api/docs + external tooling", responses: ok("OpenAPI 3.1 document") } },
+      "/api/docs": { get: { tags: ["Ops"], summary: "Swagger UI — interactive API docs", responses: ok("HTML docs UI") } },
+      "/api/ai/models": { get: { tags: ["AI"], summary: "List available AI models (mirrors google.colab.ai GET /api/ai/models)", responses: ok("Models") } },
+      "/api/ai/transcribe": { post: { tags: ["AI"], summary: "Speech-to-text over raw audio bytes (mirrors google.colab.ai)", requestBody: { content: { "application/octet-stream": { schema: { type: "string", format: "binary" } } } }, responses: { ...ok("Transcript"), "400": { description: "Missing/invalid audio payload" } } } },
+
+      // v1.27.4 µ1 — privileged self-service routes (route-triage.md PRIVILEGED-KEEP). Auth surface;
+      // 401 without a credential. Documented so the 401 contract + required scope are discoverable.
+      "/api/saas/self/keys/{id}/revoke": { post: { tags: ["Self"], summary: "Revoke one of my keys (scope keys:write)", security: [{ ApiKey: [] }], responses: { ...ok("Revoked"), "401": { description: "Missing/invalid credential (WWW-Authenticate)" }, "403": { description: "insufficient_scope" } } } },
+      "/api/saas/upstreams/status": { get: { tags: ["Self"], summary: "Health/status of my registered upstream MCP servers", security: [{ ApiKey: [] }], responses: { ...ok("Upstream status"), "401": { description: "Missing/invalid credential (WWW-Authenticate)" } } } },
+      "/api/saas/webhooks/deliveries": { get: { tags: ["SaaS"], summary: "Recent webhook delivery attempts (tenant-scoped)", security: [{ ApiKey: [] }], responses: { ...ok("Deliveries"), "401": { description: "Missing/invalid credential (WWW-Authenticate)" } } } },
     },
   },
   apis: ["./server.ts", "./server/**/*.ts"],

@@ -249,7 +249,8 @@ app.get("/api/github/actions/repo-hint", async (_req, res) => {
 });
 app.get("/api/github/actions/runs", async (req, res) => {
   const slug = parseRepoSlug(String(req.query.repo || ""));
-  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  // T4-hardening: machine-readable code alongside the human message.
+  if (!slug) { logger.warn({ route: "/api/github/actions/runs", code: "INVALID_REPO" }, "rejected: bad repo slug"); return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)", code: "INVALID_REPO" }); }
   try {
     res.json(await getRuns({ owner: slug.owner, repo: slug.repo, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
   } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -297,11 +298,12 @@ app.get("/api/github/actions/workflows", async (req, res) => {
 });
 app.post("/api/github/actions/dispatch", async (req, res) => {
   const slug = parseRepoSlug(String(req.query.repo || ""));
-  if (!slug) return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)" });
+  // T4-hardening: every reject branch carries a stable code (INVALID_REPO / NO_GITHUB_TOKEN / MISSING_FIELDS).
+  if (!slug) { logger.warn({ route: "/api/github/actions/dispatch", code: "INVALID_REPO" }, "rejected: bad repo slug"); return res.status(400).json({ error: "invalid or missing 'repo' (owner/name)", code: "INVALID_REPO" }); }
   const token = ghToken();
-  if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla" });
+  if (!token) return res.status(400).json({ error: "GitHub token gerekli — Gelir/Kişisel Ops'ta provider=github anahtarını bağla", code: "NO_GITHUB_TOKEN" });
   const { workflowId, ref, inputs } = req.body || {};
-  if (!workflowId || !ref) return res.status(400).json({ error: "'workflowId' ve 'ref' gerekli" });
+  if (!workflowId || !ref) return res.status(400).json({ error: "'workflowId' ve 'ref' gerekli", code: "MISSING_FIELDS" });
   try {
     const r = await dispatch({ owner: slug.owner, repo: slug.repo, workflowId: String(workflowId), ref: String(ref), inputs, token, signal: AbortSignal.timeout(8000) });
     res.status(r.ok ? 200 : 400).json(r.ok ? { ok: true } : { error: r.error });
@@ -341,7 +343,8 @@ app.use("/api/ecysearcher", ecysearcherOfflineGate(() => ecysearcherSupervisor.s
 app.get("/api/github/search", async (req, res) => {
   const q = String(req.query.q || "");
   const type = String(req.query.type || "repos");
-  if (!q.trim()) return res.status(400).json({ error: "'q' gerekli" });
+  // T4-hardening: structured code so the frontend can branch on the failure kind (not string-match).
+  if (!q.trim()) { logger.warn({ route: "/api/github/search", code: "MISSING_QUERY" }, "rejected: empty query"); return res.status(400).json({ error: "'q' gerekli", code: "MISSING_QUERY" }); }
   try {
     res.json(await searchGitHub({ type, q, token: ghToken(), refresh: req.query.refresh === "1", signal: AbortSignal.timeout(8000) }));
   } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -3161,7 +3164,16 @@ content
   });
 }
 
-// Start full stack Express services
-initializeServer().catch((e) => {
-  console.error("Express initialization crashed on start.", e);
-});
+// Start full stack Express services — unless a caller opts out. In-process route tests
+// import `app` (top-level routes + middleware are already registered at module load) to
+// exercise real handlers WITHOUT binding a port or booting vite/the store. Production
+// (`node dist/server.cjs`), `tsx server.ts` (dev) and the spawned e2e child never set this
+// flag, so they boot the full stack exactly as before.
+if (process.env.OLLAMAS_NO_AUTOBOOT !== "1") {
+  initializeServer().catch((e) => {
+    console.error("Express initialization crashed on start.", e);
+  });
+}
+
+// Exported for in-process HTTP tests (tests/routes-openapi.test.ts, tests/routes-hardening.test.ts).
+export { app };
