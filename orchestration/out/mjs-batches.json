@@ -1,0 +1,153 @@
+{
+  "generatedFrom": "git ls-files '*.mjs'",
+  "total": 107,
+  "batches": [
+    {
+      "id": 1,
+      "files": [
+        ".claude/hooks/block-destructive.mjs",
+        ".claude/hooks/on-tool-failure.mjs",
+        ".claude/hooks/redact-tokens.mjs",
+        "bin/host-bridge/lib/commit.mjs",
+        "bin/host-bridge/lib/doctor.mjs",
+        "bin/host-bridge/lib/metering.mjs",
+        "bin/host-bridge/lib/model-select.mjs",
+        "bin/host-bridge/lib/remediation.mjs",
+        "bin/host-bridge/lib/stats.mjs",
+        "bin/host-bridge/lib/watch.mjs",
+        "bin/host-bridge/tools/lib/ask-calibrate.mjs",
+        "bin/host-bridge/tools/lib/ask-core.mjs",
+        "bin/host-bridge/tools/lib/tavily.mjs",
+        "scripts/agent-dispatch.mjs"
+      ]
+    },
+    {
+      "id": 2,
+      "files": [
+        "scripts/council-roster.mjs",
+        "scripts/gemini-pool-check.mjs",
+        "scripts/provider-bench.mjs",
+        ".claude/hooks/gate-before-commit.mjs",
+        ".claude/hooks/on-session-end.mjs",
+        ".claude/hooks/on-subagent-stop.mjs",
+        ".claude/mcp-tool-test.mjs",
+        ".claude/merge-settings.mjs",
+        "bin/host-bridge/bench-metrics.mjs",
+        "bin/host-bridge/hmac.mjs",
+        "bin/host-bridge/tools/build_app.mjs",
+        "bin/host-bridge/tools/git_commit.mjs",
+        "bin/host-bridge/tools/git_ops.mjs",
+        "bin/host-bridge/tools/kill_process.mjs"
+      ]
+    },
+    {
+      "id": 3,
+      "files": [
+        "bin/host-bridge/tools/log_stream.mjs",
+        "bin/host-bridge/tools/pkg_install.mjs",
+        "bin/host-bridge/tools/process_port.mjs",
+        "bin/host-bridge/tools/run_tests.mjs",
+        "scripts/agent-bench.mjs",
+        "scripts/audit-fleet.mjs",
+        "scripts/audit-ledger.mjs",
+        "scripts/bench-audit.mjs",
+        "scripts/dispatch-merge.mjs",
+        "scripts/ecysearcher-lane.mjs",
+        "scripts/firecrawl.mjs",
+        "scripts/key-doctor.mjs",
+        "tests/fixtures/mini-scanner.mjs",
+        ".claude/add-cli.mjs"
+      ]
+    },
+    {
+      "id": 4,
+      "files": [
+        ".claude/harness-ops.mjs",
+        ".claude/hooks/format-on-edit.mjs",
+        ".claude/hooks/on-notification.mjs",
+        ".claude/hooks/on-stop.mjs",
+        ".claude/hooks/preserve-context.mjs",
+        ".claude/statusline.mjs",
+        ".claude/validate-settings.mjs",
+        "bin/host-bridge/schema.mjs",
+        "bin/host-bridge/tools/apply_patch.mjs",
+        "bin/host-bridge/tools/lib/web-extract.mjs",
+        "scripts/audit-partition.mjs",
+        "scripts/council-debate.mjs",
+        "scripts/gemini-provision.mjs"
+      ]
+    },
+    {
+      "id": 5,
+      "files": [
+        "scripts/measure-extract.mjs",
+        "scripts/ops.mjs",
+        "scripts/substack-digest.mjs",
+        "scripts/substack.mjs",
+        "scripts/tests/helpers/mock-bridge.mjs",
+        "bin/host-bridge/lib/bridge-guard.mjs",
+        "bin/host-bridge/lib/events.mjs",
+        "bin/host-bridge/lib/siri-log.mjs",
+        "bin/host-bridge/render-plist.mjs",
+        "bin/host-bridge/test-bridge.mjs",
+        "bin/host-bridge/tools/health_probe.mjs",
+        "scripts/agent-fleet.mjs",
+        "scripts/audit-service.mjs"
+      ]
+    },
+    {
+      "id": 6,
+      "files": [
+        "scripts/dispatch-bench-run.mjs",
+        "scripts/ecysearcher-mcp.mjs",
+        "scripts/gen-manifest.mjs",
+        "scripts/oracle-client.mjs",
+        "scripts/system-monitor.mjs",
+        "scripts/testgen.mjs",
+        "tests/fixtures/mini-cluster.mjs",
+        "tests/fixtures/mini-mcp.mjs",
+        "tests/fixtures/mini-memory.mjs",
+        "tests/fixtures/roots-mcp.mjs",
+        "tests/fixtures/roots-server-mcp.mjs",
+        "tests/fixtures/sampling-mcp.mjs",
+        "bin/host-bridge/register-host-scripts.mjs"
+      ]
+    },
+    {
+      "id": 7,
+      "files": [
+        "bin/host-bridge/tools/logbook.mjs",
+        "bin/host-bridge/tools/model_select.mjs",
+        "bin/host-bridge/tools/seyir_stats.mjs",
+        "bin/host-bridge/tools/shell_check.mjs",
+        "bin/ios-bridge/gen-vectors.mjs",
+        "scripts/audit-pipeline.mjs",
+        "scripts/combo-bench.mjs",
+        "scripts/council.mjs",
+        "scripts/cover-gen.mjs",
+        "scripts/ready.mjs",
+        "bin/host-bridge/benchmark.mjs",
+        "bin/host-bridge/drift-check.mjs",
+        "bin/host-bridge/scaffold.mjs"
+      ]
+    },
+    {
+      "id": 8,
+      "files": [
+        "bin/host-bridge/tools/lib/bridge-client.mjs",
+        "bin/host-bridge/tools/lint_format.mjs",
+        "bin/host-bridge/tools/web_search.mjs",
+        "scripts/gemini-lane.mjs",
+        "scripts/tests/helpers/real-bridge.mjs",
+        "bin/host-bridge/doctor.mjs",
+        "bin/host-bridge/gate.mjs",
+        "bin/host-bridge/tools/tools_doctor.mjs",
+        "bin/host-bridge/tools/usage.mjs",
+        "scripts/content-pipeline.mjs",
+        "bin/host-bridge/tools/self_heal.mjs",
+        "bin/host-bridge/terminal-bridge.mjs",
+        "bin/siri-ask.mjs"
+      ]
+    }
+  ]
+}
