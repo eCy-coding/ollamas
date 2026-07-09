@@ -23,6 +23,37 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, '.') },
   },
   test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      // PURE-CORE allowlist: IO-free transform modules whose logic is unit-tested in
+      // the wired lanes (orchestra project). The CLI entrypoints (bin/*.ts) do the IO;
+      // these modules are socket/disk-free so every branch is deterministically covered.
+      // IO-heavy / server-boot / CLI-loop modules are deliberately NOT listed — including
+      // them would either inflate the glob with untested code or force a false threshold.
+      include: [
+        'orchestration/bin/lib/autopilot.ts',
+        'orchestration/bin/lib/bench.ts',
+        'orchestration/bin/lib/council.ts',
+        'orchestration/bin/lib/deps.ts',
+        'orchestration/bin/lib/hierarchy.ts',
+        'orchestration/bin/lib/joker.ts',
+        'orchestration/bin/lib/optimize.ts',
+        'orchestration/bin/lib/orchestra-fsm.ts',
+        'orchestration/bin/lib/task-catalog.ts',
+      ],
+      exclude: [
+        '**/*.test.ts',
+        '**/tests/**',
+        '**/*.mjs',
+        '**/dist/**',
+        '**/node_modules/**',
+      ],
+      // Honest floor on the pure-core lane. branches/functions start conservative
+      // (below current) so a later refactor that legitimately drops a branch does
+      // not red the gate; lines is the load-bearing threshold.
+      thresholds: { lines: 70, functions: 70, branches: 60 },
+    },
     projects: [
       {
         // existing backend suite — behavior unchanged
