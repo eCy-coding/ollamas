@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // health_probe + log_stream — aggregate health of the whole stack and snapshot
 // a live terminal buffer. Bridge-integrated critical observability tool.
 //   node health_probe.mjs            -> JSON health report

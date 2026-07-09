@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // measure-extract — gerçek bir makalede ESKİ vs YENİ extractReadable: boilerplate azalması + çekirdek korunumu.
 import { JSDOM, VirtualConsole } from "jsdom";
 import { extractReadable as extractNew } from "../bin/host-bridge/tools/lib/web-extract.mjs";

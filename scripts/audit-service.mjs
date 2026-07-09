@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // audit-service — Audit-as-a-Service runner (Faz16 revenue workflow).
 //
 // Turns ANY local repo into a client-ready, verified bug-audit report using the
@@ -82,7 +83,7 @@ async function dispatch(u) {
     const res = await fetch(`${BASE}/api/agent/chat`, { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify(body), signal: ctrl.signal });
     if (!res.ok) return { error: `HTTP ${res.status}` };
     let buf = ""; const dec = new TextDecoder();
-    for await (const c of res.body) { buf += dec.decode(c, { stream: true }); let i; while ((i = buf.indexOf("\n\n")) >= 0) { const r = buf.slice(0, i); buf = buf.slice(i + 2); let d = ""; for (const ln of r.split("\n")) if (ln.startsWith("data:")) d += ln.slice(5).trim(); if (!d) continue; try { ev.push(JSON.parse(d)); } catch { /* skip */ } } }
+    for await (const c of /** @type {any} */ (res.body)) { /* DOM-lib ReadableStream lacks asyncIterator typing under root; node supports it */ buf += dec.decode(c, { stream: true }); let i; while ((i = buf.indexOf("\n\n")) >= 0) { const r = buf.slice(0, i); buf = buf.slice(i + 2); let d = ""; for (const ln of r.split("\n")) if (ln.startsWith("data:")) d += ln.slice(5).trim(); if (!d) continue; try { ev.push(JSON.parse(d)); } catch { /* skip */ } } }
   } catch (e) { return { error: String(e.message || e), ev }; } finally { clearTimeout(tid); }
   return { ev };
 }

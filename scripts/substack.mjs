@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // substack — toolkit for doing anything on Substack. Two data paths (Substack has no
 // official API + Cloudflare-gates plain fetch):
 //

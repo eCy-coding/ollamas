@@ -1,3 +1,4 @@
+// @ts-check
 // Structured seyir event writer (scripts lane, v8). Appends one OTel-style JSON
 // line per tool run to <DATA_DIR>/seyir-defteri-scripts.jsonl. Zero-dep (node
 // builtins only, mirrors logbook.mjs); best-effort — a write failure must NEVER

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // ops — the single coordinated entry point (Tier-1 conductor) tying the whole
 // 3-tier system together into ONE e2e command: fastest, safest, most correct.
 //

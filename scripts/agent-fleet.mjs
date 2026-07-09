@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // agent-fleet — Tier-2 coordinator in the 3-tier hierarchy:
 //
 //   Tier 1  Claude Code (orchestrates, cross-checks, reports to the human)

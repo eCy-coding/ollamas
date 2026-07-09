@@ -1,3 +1,4 @@
+// @ts-check
 // In-memory mock of the host terminal-bridge for tests. Mirrors the real
 // auth path (bin/host-bridge/hmac.mjs verifyHmacHeaders) and the /health /run
 // /exec /write endpoint shapes, but never drives a real terminal. NOT a *.test.
@@ -55,8 +56,8 @@ export async function startMockBridge({ secret = "" } = {}) {
     return send(404, { ok: false, error: "not found" });
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = server.address().port;
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", /** @type {() => void} */ (resolve)));
+  const port = /** @type {import("node:net").AddressInfo} */ (server.address()).port;
   return {
     port,
     url: `http://127.0.0.1:${port}`,

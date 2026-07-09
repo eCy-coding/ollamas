@@ -1,3 +1,4 @@
+// @ts-check
 // bin/host-bridge/lib/siri-log.mjs — Siri yapısal JSONL log (gözlemlenebilirlik). KENDİ-YETERLİ; events.mjs
 // konvansiyonunu yansıtır ama AYRI dosyaya yazar (seyir-defteri-siri.jsonl). buildSiriRecord SAF (test'li);
 // recordSiri best-effort (asla Siri'yi kırmaz). Algoritma-ölçüm güdümü: her sorgunun kararları kalıcı kaydedilir.

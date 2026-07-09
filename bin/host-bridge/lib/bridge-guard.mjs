@@ -1,3 +1,4 @@
+// @ts-check
 // Host-bridge security guards (scripts lane, v14) — PURE, no http/fs side effects.
 // terminal-bridge.mjs starts an HTTP server at import, so the security logic lives
 // here to stay unit-testable. North Star §0-2: secure the host op before iOS/LAN

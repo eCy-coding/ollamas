@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Render the LaunchAgent plist from the committed template (scripts lane, v16).
 // install-agent.sh pipes this into ~/Library/LaunchAgents so the bridge survives
 // reboot. PURE renderPlist() (template string in → final string out) is unit-

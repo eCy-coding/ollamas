@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // substack-digest — RELIABLE, scrape-free Substack reporting from the user's Gmail.
 //
 // Why Gmail (not web scraping): Substack has no public stats API; substack.com gates

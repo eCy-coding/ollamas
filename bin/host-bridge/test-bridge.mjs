@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Automated proof for the macOS terminal bridge. Drives REAL iTerm2 + Terminal.app.
 // First run triggers a one-time macOS Automation (TCC) prompt — approve it, then
 // reruns are uninterrupted. Exit 0 = all pass.
