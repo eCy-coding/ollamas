@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  parseSysctl, modelVramGb, vramFit, scoreModel, scoreAll, selectBest,
-  optimalConfig, buildWorkingPrompt, DEFAULT_WEIGHTS,
-  type SysInfo, type Selection,
+  parseSysctl, modelVramGb, vramFit, scoreModel, selectBest,
+  optimalConfig, buildWorkingPrompt,
+  type Selection,
 } from "../bin/lib/optimize";
 import type { Agg } from "../bin/lib/bench";
 
@@ -67,6 +67,24 @@ describe("selectBest — en-verimli doğru", () => {
   it("lexicographic tie-break (eşit skor → deterministik)", () => {
     const tie = [agg("b-model", 100, 1), agg("a-model", 100, 1)];
     expect(selectBest(tie, 48)?.model).toBe("a-model");
+  });
+});
+
+describe("selectBest — tokS==0/NaN invalid-sample (v1.25.1 bench honesty)", () => {
+  it("tokS==0 model doğru olsa bile champion seçilmez", () => {
+    const best = selectBest([agg("ghost:8b", 0, 1), agg("real:8b", 70, 1)], 48);
+    expect(best?.model).toBe("real:8b");
+  });
+  it("TÜM adaylar tokS==0 → selectBest null (degenerate veriyle champion yok)", () => {
+    expect(selectBest([agg("ghost:8b", 0, 1), agg("ghost2:8b", 0, 1)], 48)).toBeNull();
+  });
+  it("scoreModel: tokS==0 → skor 0 + invalid reason", () => {
+    const s = scoreModel(agg("ghost:8b", 0, 1), 100, 48);
+    expect(s.score).toBe(0);
+    expect(s.reason).toMatch(/invalid|geçersiz/i);
+  });
+  it("NaN tokS → skor 0 (champion-dışı)", () => {
+    expect(scoreModel(agg("nan:8b", NaN, 1), 100, 48).score).toBe(0);
   });
 });
 

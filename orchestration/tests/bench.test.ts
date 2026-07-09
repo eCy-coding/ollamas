@@ -105,6 +105,25 @@ describe("aggregate / rank / regression", () => {
   });
 });
 
+describe("aggregate — tokS==0/NaN invalid-sample dışlama (v1.25.1 bench honesty)", () => {
+  it("0 ve NaN örnekler medianTokS'tan hariç; geçerli örnek median'ı belirler", () => {
+    const recs = [
+      { device: "mac", model: "flaky:8b", tokS: 0, latencyMs: 0, correct: true, ts: "", source: "" },
+      { device: "mac", model: "flaky:8b", tokS: 90, latencyMs: 0, correct: true, ts: "", source: "" },
+      { device: "mac", model: "flaky:8b", tokS: NaN, latencyMs: 0, correct: true, ts: "", source: "" },
+    ];
+    const q = aggregate(recs).find((x) => x.model === "flaky:8b")!;
+    expect(q.medianTokS).toBe(90); // 0 ve NaN hariç → tek geçerli örnek 90
+  });
+  it("TÜM örnekler geçersiz → medianTokS 0 → rankEfficient champion vermez", () => {
+    const aggs = aggregate([
+      { device: "mac", model: "ghost:8b", tokS: 0, latencyMs: 0, correct: true, ts: "", source: "" },
+    ]);
+    expect(aggs[0].medianTokS).toBe(0);
+    expect(rankEfficient(aggs).get("mac")).toBeUndefined();
+  });
+});
+
 describe("rankEfficient — champion gate (Faz11B: rounded-ratio diskalifiye regresyonu)", () => {
   it("11/12 doğru (0.9166) model champion seçilir — round'lanıp 0.9'a düşüp dışlanmamalı", () => {
     const recs = [];

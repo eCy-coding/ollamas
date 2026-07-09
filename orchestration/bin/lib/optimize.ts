@@ -52,6 +52,11 @@ export function parseSysctl(memBytes: string, physCpu: string, brand: string): S
 export function scoreModel(a: Agg, maxTokS: number, ramGb: number, w: Weights = DEFAULT_WEIGHTS): Scored {
   const vramGb = modelVramGb(a.model);
   const fits = vramGb <= ramGb * 0.8;
+  // v1.25.1: tokS==0 / NaN = invalid-sample (throughput unmeasured) → score 0 so a
+  // degenerate 0-tok/s model can never be crowned 🏆 on correctness weight alone.
+  if (!(a.medianTokS > 0)) {
+    return { model: a.model, score: 0, tokS: a.medianTokS, correctRatio: a.correctRatio, vramGb, fits, reason: `tok/s ${a.medianTokS} geçersiz (invalid-sample) → reddedildi` };
+  }
   if (a.correctRatio < CORRECT_GATE) {
     return { model: a.model, score: 0, tokS: a.medianTokS, correctRatio: a.correctRatio, vramGb, fits, reason: `correctness ${a.correctRatio} < gate ${CORRECT_GATE} → reddedildi` };
   }
@@ -71,7 +76,7 @@ export function scoreModel(a: Agg, maxTokS: number, ramGb: number, w: Weights = 
 /** Tüm adayları skorla (sıralı; lexicographic tie-break determinizm için).
  * maxTokS YALNIZ gate-geçen+sığan adaylardan (reddedilen hızlı-yanlış model tavanı bozmasın). */
 export function scoreAll(aggs: Agg[], ramGb: number, w: Weights = DEFAULT_WEIGHTS): Scored[] {
-  const valid = aggs.filter((a) => a.correctRatio >= CORRECT_GATE && modelVramGb(a.model) <= ramGb * 0.8);
+  const valid = aggs.filter((a) => a.correctRatio >= CORRECT_GATE && a.medianTokS > 0 && modelVramGb(a.model) <= ramGb * 0.8);
   const maxTokS = Math.max(1, ...valid.map((a) => a.medianTokS));
   return aggs
     .map((a) => scoreModel(a, maxTokS, ramGb, w))
@@ -87,7 +92,7 @@ export function selectBest(aggs: Agg[], ramGb: number, w: Weights = DEFAULT_WEIG
 // ── M4 optimal config matrisi (runtime bütünlük) ──────────────────────────────
 
 /** RAM-tier → optimal Ollama/MLX config. num_gpu daima 999 (Apple Silicon tüm-Metal). */
-export function optimalConfig(ramGb: number, cores: number, model: string): OptConfig {
+export function optimalConfig(ramGb: number, cores: number, _model: string): OptConfig {
   const numThread = Math.min(12, Math.max(4, cores - 2)); // OS'a 2 core bırak
   let num_ctx = 4096;
   if (ramGb >= 32) num_ctx = 8192;

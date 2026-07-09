@@ -66,6 +66,20 @@ export function detectDevice() {
   };
 }
 
+// Score a model's code-run result HONESTLY (v1.25.1 bench honesty).
+// A bridge/terminal failure means we COULD NOT MEASURE correctness — that is
+// `null` (unknown), NEVER `false`. "unmeasured ≠ wrong": a down bridge daemon or a
+// macOS-TCC denial must not be recorded as the model answering incorrectly.
+// Only a run that actually produced output is judged correct/incorrect.
+export function scoreRun(runResult, expected) {
+  const r = runResult || {};
+  if (r.bridgeError) {
+    return { ran: null, correct: null, out: "", bridgeError: r.status ?? true };
+  }
+  const out = (r.output || "").trim();
+  return { ran: r.exitCode === 0, correct: out.includes(expected), out };
+}
+
 // Canonical benchmark.json record shape (v4 schema key: platform+device+method).
 export function benchRecord({
   platform,

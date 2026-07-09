@@ -101,7 +101,9 @@ export function aggregate(records: BenchRecord[]): Agg[] {
   const out: Agg[] = [];
   for (const [k, rs] of groups) {
     const [model, device] = k.split("@");
-    const toks = rs.map((r) => r.tokS);
+    // v1.25.1: tokS==0 / NaN = invalid-sample (bridge couldn't measure throughput) →
+    // exclude from medianTokS so a degenerate 0 never drags the champion metric down.
+    const toks = rs.map((r) => r.tokS).filter((t) => Number.isFinite(t) && t > 0);
     const corr = rs.filter((r) => r.correct).length;
     out.push({
       model, device, n: rs.length,
@@ -109,7 +111,7 @@ export function aggregate(records: BenchRecord[]): Agg[] {
       // correctRatio RAW (yuvarlama YOK): rankEfficient `<=0.9` ve optimize `<0.7` gate'leri
       // ham oranda çalışsın — eskiden round(*10)/10 ile %85-94.9 doğru modeller 0.9'a düşüp
       // champion'dan diskalifiye oluyordu. Display zaten Math.round(*100) yapıyor.
-      min: round(Math.min(...toks)), max: round(Math.max(...toks)), correctRatio: corr / rs.length,
+      min: round(toks.length ? Math.min(...toks) : 0), max: round(toks.length ? Math.max(...toks) : 0), correctRatio: corr / rs.length,
     });
   }
   return out.sort((a, b) => b.medianTokS - a.medianTokS);

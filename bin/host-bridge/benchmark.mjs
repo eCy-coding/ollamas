@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parsePlatformArg, detectDevice, benchRecord } from "./bench-metrics.mjs";
+import { parsePlatformArg, detectDevice, benchRecord, scoreRun } from "./bench-metrics.mjs";
 import { rankModels, pickModel } from "./lib/model-select.mjs";
 
 const APP = process.env.APP_URL || "http://127.0.0.1:3000";
@@ -54,15 +54,21 @@ async function generate(provider, model) {
 }
 
 async function runInTerminal(target, command, timeoutMs = 60000) {
-  const res = await fetch(`${APP}/api/macos-terminal`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ target, command, timeoutMs }),
-  });
-  return res.json().catch(() => ({}));
+  // Honesty (v1.25.1): a fetch-throw (bridge daemon down) or a !res.ok (macOS-TCC
+  // denial, 5xx) means we COULD NOT MEASURE — surface it as {bridgeError} so the
+  // caller records correct/ran = null, never a false "wrong answer".
+  try {
+    const res = await fetch(`${APP}/api/macos-terminal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, command, timeoutMs }),
+    });
+    if (!res.ok) return { bridgeError: true, status: `HTTP ${res.status}` };
+    return await res.json().catch(() => ({ bridgeError: true, status: "invalid-json" }));
+  } catch (e) {
+    return { bridgeError: true, status: e.message || "fetch-failed" };
+  }
 }
-
-function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
 
 (async () => {
   console.log(`== E2E coding benchmark (${APP}) ==`);
@@ -99,15 +105,20 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
       const file = `/tmp/bench_${model.replace(/[^a-z0-9]/gi, "_")}.py`;
       fs.writeFileSync(file, code + "\n");
       const r = await runInTerminal(runTarget, `python3 ${file}`, 25000); // watchdog kills hangs ~20s
-      const out = (r.output || "").trim();
-      const correct = out.includes(EXPECTED);
+      // Honest scoring: bridgeError → correct/ran = null (unmeasured ≠ wrong); tok/s stays real.
+      const s = scoreRun(r, EXPECTED);
       const rec = {
         model: tag, gen_ms: g.gen_ms, tok_s: g.tok_s ? +g.tok_s.toFixed(1) : null,
-        exec_ms: r.durationMs, ran: r.exitCode === 0, correct,
-        total_ms: g.gen_ms + (r.durationMs || 0), out: out.slice(0, 40),
+        exec_ms: r.durationMs ?? null, ran: s.ran, correct: s.correct,
+        total_ms: g.gen_ms + (r.durationMs || 0), out: s.out.slice(0, 40),
+        ...(s.bridgeError ? { bridgeError: s.bridgeError } : {}),
       };
       results.push(rec);
-      console.log(`${correct ? "✓ correct" : (rec.ran ? "✗ wrong out" : "✗ failed")} | gen ${g.gen_ms}ms ${rec.tok_s || "?"}tok/s | exec ${r.durationMs}ms`);
+      if (s.bridgeError) {
+        console.log(`? bridge-error (${s.bridgeError}) — unmeasured | gen ${g.gen_ms}ms ${rec.tok_s || "?"}tok/s`);
+      } else {
+        console.log(`${s.correct ? "✓ correct" : (rec.ran ? "✗ wrong out" : "✗ failed")} | gen ${g.gen_ms}ms ${rec.tok_s || "?"}tok/s | exec ${r.durationMs}ms`);
+      }
     } catch (e) {
       console.log("ERROR", e.message);
       results.push({ model: tag, ran: false, correct: false, error: e.message });
@@ -121,7 +132,7 @@ function writeShq(s) { return `'${String(s).replace(/'/g, `'\\''`)}'`; }
   const bestModel = best.model;
 
   console.log("\n== RANKED (correct first, then total latency) ==");
-  ranked.forEach((r, i) => console.log(`  ${i + 1}. ${r.model} ${r.correct ? "✓" : "✗"} total=${r.total_ms || "-"}ms tok/s=${r.tok_s || "-"}`));
+  ranked.forEach((r, i) => console.log(`  ${i + 1}. ${r.model} ${r.correct == null ? "?" : r.correct ? "✓" : "✗"} total=${r.total_ms || "-"}ms tok/s=${r.tok_s || "-"}`));
   console.log(`\n>> bestModel: ${bestModel}  (${best.reason})  bestTerminal: ${bestTerminal}`);
 
   // v4 cross-platform schema: one normalized record per model, keyed by
