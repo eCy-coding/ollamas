@@ -180,6 +180,72 @@ app.get("/api/orchestra", (_req, res) => {
 app.get("/api/openapi.json", (_req, res) => res.json(openApiSpec));
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
+// Health & Telemetry API (L1, L11). Registered at top-level (module load) — not inside
+// initializeServer — so in-process route tests exercise it via the exported `app` without
+// binding a port or booting the full stack. All handler dependencies (refreshMode, reachOllama,
+// CURRENT_MODE, memoryUsage, discoverBinaries, contractPoolStatus, pingStore, db) are module-scoped
+// and resolved lazily at request time. Handlers are order-independent of their later declarations.
+app.get("/api/health", async (req, res) => {
+  await refreshMode(); // self-heal: recover from a stale "degraded-live" once ollama is reachable again
+  const isLive = CURRENT_MODE === "live";
+
+  // Live system metrics querying CPU load and memories
+  const cpuLoads = os.loadavg();
+  // macOS-correct available memory (free+inactive+purgeable+speculative); os.freemem()
+  // alone reads ~99% on macOS. Non-darwin / vm_stat failure → falls back to os.freemem().
+  const systemMemory = memoryUsage();
+
+  let loadedModels: any[] = [];
+  let ollamaVersion = "unavailable";
+  // Reported, not gated: a DB blip shouldn't restart the pod (liveness),
+  // only steer traffic via /api/ready (Faz 13C).
+  const dbUp = await pingStore();
+
+  if (CURRENT_MODE !== "demo") {
+    try {
+      const ver = await reachOllama("/api/version", 3000);
+      if (ver) {
+        const verJson = await ver.res.json();
+        ollamaVersion = verJson?.version || "unknown";
+      }
+      const ps = await reachOllama("/api/ps", 3000);
+      if (ps) {
+        const psJson = await ps.res.json();
+        loadedModels = psJson?.models || [];
+      }
+    } catch (e) {}
+  }
+
+  // SEC-5: surface WHERE the AES master key came from (name only, never a value) + actionable
+  // remediation when the source is weak/ephemeral. Lets the cockpit alert on a degraded secret.
+  const masterKey = db.masterKeyStatus();
+
+  res.json({
+    mode: CURRENT_MODE,
+    isLive,
+    masterKeySource: masterKey.masterKeySource,
+    remediation: masterKey.remediation,
+    os: {
+      platform: os.platform(),
+      release: os.release(),
+      arch: os.arch(),
+      uptime: os.uptime(),
+    },
+    metrics: {
+      cpuLoad1Min: Number(cpuLoads[0].toFixed(2)),
+      memory: systemMemory,
+      ollamaVersion,
+      loadedModels,
+    },
+    workspacePath: db.data.workspacePath,
+    permissions: db.data.permissions,
+    hasBackupEnabled: db.data.backup.enabled,
+    binaries: discoverBinaries(),
+    db: dbUp ? "up" : "down",
+    contractPool: contractPoolStatus(), // vK16 G-A: compute-pool observability (masked counts)
+  });
+});
+
 // Stripe webhook needs the RAW body for signature verification — register the
 // raw parser for that path BEFORE the global JSON parser so it wins (Faz 4).
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
@@ -589,63 +655,9 @@ async function initializeServer() {
   // API ROUTES
   // ----------------------------------------------------
 
-  /**
-   * Health & Telemetry API (L1, L11)
-   */
-  app.get("/api/health", async (req, res) => {
-    await refreshMode(); // self-heal: recover from a stale "degraded-live" once ollama is reachable again
-    const isLive = CURRENT_MODE === "live";
-
-    // Live system metrics querying CPU load and memories
-    const cpuLoads = os.loadavg();
-    // macOS-correct available memory (free+inactive+purgeable+speculative); os.freemem()
-    // alone reads ~99% on macOS. Non-darwin / vm_stat failure → falls back to os.freemem().
-    const systemMemory = memoryUsage();
-
-    let loadedModels: any[] = [];
-    let ollamaVersion = "unavailable";
-    // Reported, not gated: a DB blip shouldn't restart the pod (liveness),
-    // only steer traffic via /api/ready (Faz 13C).
-    const dbUp = await pingStore();
-
-    if (CURRENT_MODE !== "demo") {
-      try {
-        const ver = await reachOllama("/api/version", 3000);
-        if (ver) {
-          const verJson = await ver.res.json();
-          ollamaVersion = verJson?.version || "unknown";
-        }
-        const ps = await reachOllama("/api/ps", 3000);
-        if (ps) {
-          const psJson = await ps.res.json();
-          loadedModels = psJson?.models || [];
-        }
-      } catch (e) {}
-    }
-
-    res.json({
-      mode: CURRENT_MODE,
-      isLive,
-      os: {
-        platform: os.platform(),
-        release: os.release(),
-        arch: os.arch(),
-        uptime: os.uptime(),
-      },
-      metrics: {
-        cpuLoad1Min: Number(cpuLoads[0].toFixed(2)),
-        memory: systemMemory,
-        ollamaVersion,
-        loadedModels,
-      },
-      workspacePath: db.data.workspacePath,
-      permissions: db.data.permissions,
-      hasBackupEnabled: db.data.backup.enabled,
-      binaries: discoverBinaries(),
-      db: dbUp ? "up" : "down",
-      contractPool: contractPoolStatus(), // vK16 G-A: compute-pool observability (masked counts)
-    });
-  });
+  // Health & Telemetry API (L1, L11): /api/health is registered at module top-level
+  // (see registerHealthRoute) so in-process route tests can exercise it via the exported
+  // `app` under OLLAMAS_NO_AUTOBOOT=1 — no port bind, no full-stack boot.
 
   // 2026 cockpit: ONE live SSE stream pushes the full mission-control view (host
   // metrics + active LLM backend + self-healing fleet) every 2s — push, not poll, so

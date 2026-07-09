@@ -148,6 +148,41 @@ export function decideMasterKeySource(o: {
   return { source: "mint" };
 }
 
+// Reported by GET /api/health (name only — NEVER a key value). Distinguishes a strong,
+// persisted secret source from a weak/ephemeral one so the cockpit can surface remediation.
+//   env             → stable secret injected via MASTER_KEY_B64 (Cloud-Run/Docker mount)
+//   secure-enclave  → Secure-Enclave-backed macOS Keychain (opt-in hardware vault)
+//   file            → on-disk .master_key (persisted; single-host)
+//   generated-ephemeral → freshly minted key that WON'T survive restart/replica (cloud, no stable dir)
+//   missing         → no key while an encrypted store exists (fail-closed; never boots)
+export type MasterKeySourceLabel = "env" | "secure-enclave" | "file" | "generated-ephemeral" | "missing";
+
+/** Actionable remediation for a given master-key source. Empty = healthy/strong (no action). */
+export function masterKeyRemediation(source: MasterKeySourceLabel): string {
+  switch (source) {
+    case "generated-ephemeral":
+      return "Ephemeral master key — persisted secrets will NOT survive restart/replica. Set MASTER_KEY_B64 (base64 of a stable 32-byte key), or mount a MISSION_CONTROL_DATA_DIR volume.";
+    case "missing":
+      return "No master key but an encrypted store exists. Set MASTER_KEY_B64 to the original 32-byte key (base64) to decrypt the vault.";
+    case "file":
+      return "Master key on local disk. For multi-replica/Cloud Run set MASTER_KEY_B64, or enable OLLAMAS_MASTER_KEY_KEYCHAIN=1 for the Secure-Enclave hardware vault.";
+    case "env":
+    case "secure-enclave":
+      return "";
+  }
+}
+
+/** Map the internal load decision (+ cloud context) to the reported source label. */
+export function labelMasterKeySource(source: MasterKeyDecision["source"], isCloud: boolean): MasterKeySourceLabel {
+  switch (source) {
+    case "env": return "env";
+    case "keychain": return "secure-enclave";
+    case "file": return "file";
+    case "mint": return isCloud ? "generated-ephemeral" : "file";
+    case "fail": return "missing";
+  }
+}
+
 /** Service name under which the vault master key lives in the macOS Keychain (hardware vault). */
 export function masterKeyService(): string {
   return process.env.OLLAMAS_MASTER_KEY_SERVICE || "OLLAMAS_MASTER_KEY";
@@ -163,6 +198,8 @@ export class SecureDB {
   private filePath: string;
   private masterKey: Buffer;
   public data: DBConfig;
+  /** Reported source of the AES master key (name only, never a value). See MasterKeySourceLabel. */
+  public readonly masterKeySource: MasterKeySourceLabel;
 
   constructor() {
     // 1. Resolve storage path
@@ -233,12 +270,18 @@ export class SecureDB {
     }
     // Observability (source NAME only, never a key value): confirms which store the master key
     // came from — "keychain" proves the Secure-Enclave hardware vault is the live source.
+    this.masterKeySource = labelMasterKeySource(decision.source, !!isCloud);
     if (keychainVaultEnabled()) {
       console.log(`[db] master key source: ${decision.source}${migrated ? " (mirrored → keychain)" : ""}`);
     }
 
     // 3. Load or initiate data
     this.data = this.load();
+  }
+
+  /** Master-key source + remediation for GET /api/health (name only — never a key value). */
+  public masterKeyStatus(): { masterKeySource: MasterKeySourceLabel; remediation: string } {
+    return { masterKeySource: this.masterKeySource, remediation: masterKeyRemediation(this.masterKeySource) };
   }
 
   private load(): DBConfig {
