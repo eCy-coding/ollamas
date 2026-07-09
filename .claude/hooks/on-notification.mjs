@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Notification hook — surfaces long-run / permission-prompt notifications to a log (and a
 // macOS desktop banner when idle). Fail-safe exit 0; never blocks. matcher = notification_type.
 

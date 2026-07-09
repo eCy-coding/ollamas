@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/council-debate.mjs — LIVE multi-model council debate (zero-dep, node 24 fetch).
 // Several local ollama models argue a topic interactively across rounds, streaming their turns
 // to the terminal, then a synthesis pass prints the SINGLE converged answer. Designed to run

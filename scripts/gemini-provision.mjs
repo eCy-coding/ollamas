@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/gemini-provision.mjs — sustainable Gemini key provisioning, zero manual paste.
 //
 // Free-tier Gemini quota is 20 requests/day PER PROJECT. This script uses the operator's

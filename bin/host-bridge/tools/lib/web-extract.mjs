@@ -1,3 +1,4 @@
+// @ts-check
 // bin/host-bridge/tools/lib/web-extract.mjs — saf, deterministik web yardımcıları (jsdom; ağ yok).
 // web_search.mjs bunları kullanır; testler aynı fonksiyonları fixture/birim ile doğrular.
 import { JSDOM, VirtualConsole } from "jsdom";

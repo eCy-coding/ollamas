@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // apply_patch — git apply a unified diff read from stdin (checked first).
 import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { bridgeRun, REPO, emit, main } from "./lib/bridge-client.mjs";

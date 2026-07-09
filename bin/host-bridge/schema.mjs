@@ -1,3 +1,4 @@
+// @ts-check
 // Tool input schemas (scripts lane, v5). Single source for argument validation
 // of the manifest-registered host tools. Zod is the source of truth; the MCP /
 // ReAct registry needs JSON-schema, so `toJsonSchema` derives it on demand

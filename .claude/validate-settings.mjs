@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Settings schema guard — prevents the hallucinated-key class of bug (a wrong key name is
 // silently ignored by Claude Code, so a "set" feature does nothing). Zero-dep: checks the
 // top-level keys of .claude/settings.json against the canonical valid set derived from

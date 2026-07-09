@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // harness-ops — autonomous READ-ONLY harness health runner (heartbeat §3 pattern: observe+report,
 // NEVER mutate). Run by launchd periodically + /harness-ops manual. Writes a single report;
 // auto-fix / auto-commit / auto-apply is intentionally NOT done (human-gated).

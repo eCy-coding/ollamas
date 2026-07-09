@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // statusLine renderer — one line per turn. Reads session JSON from stdin.
 // Shows: model · git branch · autopilot readiness (DOCTOR) · role stage.
 // Fast + defensive: every lookup is best-effort; never throws (a crashing statusline

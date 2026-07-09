@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PreCompact hook — snapshot critical session state to a durable file BEFORE the context
 // window is compacted, so nothing irreplaceable is lost. Best-effort, always exit 0
 // (blocking compaction would be worse than a missed snapshot).

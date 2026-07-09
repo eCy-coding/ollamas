@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Stop hook — runs at turn end (success). Refreshes the durable context snapshot so the
 // latest state survives a later compaction/crash. NEVER blocks the turn (no decision:block):
 // a turn-end side effect must be fail-safe. exit 0 always.

@@ -1,3 +1,4 @@
+// @ts-check
 // Faz11 — deterministic project partition for the bug audit.
 // Lists every source file with LOC, groups by directory affinity, then splits each
 // group into LOC-bounded dispatch units (so each auditor run stays tractable ~benchmark scale).

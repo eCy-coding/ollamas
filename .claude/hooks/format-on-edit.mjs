@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // PostToolUse hook (matcher Edit|Write) — fast, best-effort format of the file just touched.
 // ROOT FIX: single formatter pass, LOCAL binaries only (no `npx -y` network auto-install),
 // short timeout → no multi-second blocking on every edit. NON-BLOCKING: always exit 0.
