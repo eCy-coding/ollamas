@@ -41,10 +41,12 @@ jobs:
       - name: checksum
         run: shasum -a 256 "dist/ollamas-${{ matrix.target }}" | awk '{print $1}' > "dist/ollamas-${{ matrix.target }}.sha256"
       # Detached-sign the binary with minisign (cli/sign-release.sh). The signing key
-      # lives ONLY in the MINISIGN_SECKEY repo secret — no key is committed. The step
-      # NO-OPs gracefully when the secret is absent (forks / PRs without the key) so the
-      # workflow still builds + uploads an unsigned binary. When present, it writes the
-      # secret to a temp keyfile, signs, derives the keyId, and emits it for the manifest.
+      # lives ONLY in the MINISIGN_SECKEY repo secret — no key is committed. Signing is
+      # MANDATORY: a release without a signature is a supply-chain hole, so the step
+      # HARD-FAILS (exit 1) when the secret is absent instead of shipping an unsigned
+      # binary. This workflow only runs on tag pushes / workflow_dispatch (never on fork
+      # PRs), so the secret is always available on a real release. When present, it writes
+      # the secret to a temp keyfile, signs, derives the keyId, and emits it for the manifest.
       - name: sign binary (minisign)
         id: sign
         env:
@@ -52,9 +54,8 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           if [ -z "${SECKEY_CONTENT:-}" ]; then
-            echo "MINISIGN_SECKEY secret absent — skipping signing (unsigned release)." >&2
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "::error::MINISIGN_SECKEY secret absent — refusing to publish an UNSIGNED release. Set the MINISIGN_SECKEY repo secret and re-run." >&2
+            exit 1
           fi
           command -v minisign >/dev/null 2>&1 || {
             if [ "$RUNNER_OS" = "macOS" ]; then brew install minisign;
@@ -72,14 +73,14 @@ jobs:
         # ref_name + target go through env vars (not ${{ }} interpolation in the
         # shell) so a crafted tag name can't inject shell commands here.
         run: |
-          EXTRA=""
+          EXTRA=()
           if [ -f "dist/ollamas-$TARGET.minisig" ]; then
-            EXTRA="dist/ollamas-$TARGET.minisig"
+            EXTRA+=("dist/ollamas-$TARGET.minisig")
             # Sidecar so the cross-job manifest builder can embed keyId in latest.json.
             printf '%s' "$KEY_ID" > "dist/ollamas-$TARGET.keyid"
-            EXTRA="$EXTRA dist/ollamas-$TARGET.keyid"
+            EXTRA+=("dist/ollamas-$TARGET.keyid")
           fi
-          gh release upload "$REF" "dist/ollamas-$TARGET" "dist/ollamas-$TARGET.sha256" $EXTRA --clobber
+          gh release upload "$REF" "dist/ollamas-$TARGET" "dist/ollamas-$TARGET.sha256" "${EXTRA[@]}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REF: ${{ github.ref_name }}
