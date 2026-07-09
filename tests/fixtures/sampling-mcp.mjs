@@ -1,3 +1,4 @@
+// @ts-check
 // Consume-side SAMPLING fixture (Faz 18C). A stdio MCP server whose `ask` tool
 // issues a server→client `sampling/createMessage` request back to the connecting
 // client (ollamas) and returns whatever the client's LLM replied. Exercises the
@@ -14,7 +15,7 @@ s.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 s.setRequestHandler(CallToolRequestSchema, async (req) => {
   const q = req.params?.arguments?.q || "hello";
-  const r = await s.createMessage({ messages: [{ role: "user", content: { type: "text", text: q } }], maxTokens: 100 });
+  const r = await s.createMessage({ messages: [{ role: "user", content: { type: "text", text: /** @type {string} */ (q) } }], maxTokens: 100 });
   const text = r?.content?.type === "text" ? r.content.text : "";
   return { content: [{ type: "text", text }] };
 });

@@ -1,3 +1,4 @@
+// @ts-check
 // Third stdio MCP upstream fixture (v1.11) — stands in for a reference server
 // (e.g. server-memory) to prove 3+ upstreams coexist through the choke-point.
 // Exposes read-biased tools: `read_graph` (allowed) and `wipe_all` (filtered).

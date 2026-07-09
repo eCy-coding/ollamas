@@ -1,3 +1,4 @@
+// @ts-check
 // Manifest-driven host tool registration (scripts lane, v5).
 //
 // THE register-seam. Reads scripts/inventory.json (single source of truth),

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // scripts/ecysearcher-mcp.mjs — a stdio MCP server that exposes eCySearcher's threat-intel REST API
 // as tools, so the ollamas ReAct agent can call them as mcp__ecysearcher__*. Registered as an
 // upstream in tools.json (mcpServers[]); server/mcp/client.ts auto-consumes it (zero server code).

@@ -1,3 +1,4 @@
+// @ts-check
 // Consume-side ROOTS fixture (Faz 20A). A stdio MCP server whose `whereami` tool
 // issues a server→client `roots/list` request back to the connecting client
 // (ollamas) and returns the first root URI it reports. Exercises ollamas

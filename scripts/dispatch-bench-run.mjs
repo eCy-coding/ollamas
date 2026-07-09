@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // dispatch-bench-run — the PRODUCER of ~/.llm-mission-control/dispatch-bench.json.
 //
 // Runs real measured dispatches across working-principle VARIANTS × fleet MACHINES, drives

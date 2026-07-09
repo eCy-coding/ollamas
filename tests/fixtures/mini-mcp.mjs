@@ -1,3 +1,4 @@
+// @ts-check
 // Tiny stdio MCP server used as a CONSUME-side upstream fixture in tests.
 // Exposes a single `ping` tool that returns "pong".
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";

@@ -1,3 +1,4 @@
+// @ts-check
 // scripts/oracle-client.mjs — kalıcı oracle daemon'una küçük NDJSON istemcisi.
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";

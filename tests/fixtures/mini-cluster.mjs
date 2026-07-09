@@ -1,3 +1,4 @@
+// @ts-check
 // Second stdio MCP upstream fixture (v1.10) — proves multi-upstream cluster
 // fan-out + allowedTools filtering alongside mini-mcp.mjs. Exposes two tools:
 // `node_info` (allowed in tests) and `node_secret` (filtered out by allowlist).

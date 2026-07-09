@@ -1,3 +1,4 @@
+// @ts-check
 // Federated-roots fixture (v1.12). A stdio MCP server that SERVES `roots/list`
 // (registers a ListRootsRequest handler) so ollamas' consume-side aggregation
 // (connectUpstream → client.request("roots/list")) can collect it. This is the

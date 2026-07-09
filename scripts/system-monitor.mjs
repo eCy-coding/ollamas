@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // system-monitor — DETERMINISTIC invariant suite for the ollamas system.
 //
 // This is the GROUND TRUTH the monitoring sub-agents report against: pure, read-only,
