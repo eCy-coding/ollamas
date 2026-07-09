@@ -155,3 +155,20 @@ uyarısı). Cockpit'e adoption paneli (snapshot'a `adoptions[]` alanı + cockpit
 | `automator-best` | model otomasyon sentezi | `automator-probe` | model artifact probu |
 | `chrome-probe` | model Chrome-yetenek probu | `gemini-run` | Gemini CLI PROPOSE worker |
 | `align` | Constitutional Alignment harness (vO62) | | |
+
+### v1.28.1 — build/catalog + keys + orchestra araç eşlemesi (roadmap-coherence borç kapanışı)
+
+> Requirements-traceability disiplini (Gotel & Finkelstein 1994, *An Analysis of the Requirements
+> Traceability Problem*; ISO/IEC/IEEE 29148:2018 bidirectional traceability): her araç GERİYE bir
+> gereksinime, İLERİYE bir artefakta (test/commit) izlenebilir. Aşağıdaki 7 araç yukarıdaki tabloda
+> anılmıyordu → orphan-artifact borcu kapatıldı, tool-map ↔ roadmap eşlemesi denetlenebilir.
+
+| Araç | Ait olduğu iş |
+|------|---------------|
+| `build-tasks` | `TASKS.json` üretici — iki kaynağı target-bazlı dedup (curated-öncelik) |
+| `calibrate` | 100-görev `ollamas do` pipeline e2e kalibrasyonu (PROPOSE-only, repo-mutasyonsuz) |
+| `deps-doctor` | Homebrew/macOS dep denetimi Brewfile'a karşı + opt-in eksik-kurulum |
+| `gen-catalog` | proje yüzeyinden "yeteri kadar" görev seti türetimi (substantial exported-symbol) |
+| `keys-health` | API-key havuzu (Donanım Kasası) sağlık görünümü — `GET /api/keys/health`, read-only |
+| `orchestra` | otonom local-model conductor daemon — DEFAULT $0 self-healing FSM (STEP 1-10) |
+| `refresh-catalog` | `gen-catalog → build-tasks` tek-adım catalog tazeleme (autopilot refresh loop) |

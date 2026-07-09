@@ -88,6 +88,14 @@
       "sources": ["AGENTS.md §3 quality gate (this project)", "trunk-based development: small, gated, frequent commits"],
       "evidence": "each vO phase closed with a gated conventional commit (d1cce40 etc.)",
       "appliedIn": "vO-all"
+    },
+    {
+      "category": "roadmap-coherence",
+      "pattern": "roadmap.?coheren|roadmap.?incoheren|requirements?.?traceab|traceab|untraced|orphan requirement|no requirement|not (in|on) (the )?roadmap|coverage.*(requirement|roadmap)|roadmap.*(drift|stale|gap|miss)",
+      "provenSolution": "Establish bidirectional requirements traceability: every roadmap item traces FORWARD to an artifact (tool/test/commit) and every artifact traces BACKWARD to a requirement. Maintain a traceability matrix (roadmap ↔ bin/*.ts tool-map), and flag both orphan requirements (a roadmap line with no implementation) and orphan artifacts (a tool with no roadmap line). Keep roadmap and tool-map in sync so coverage stays auditable rather than drifting.",
+      "sources": ["Gotel & Finkelstein 1994 — 'An Analysis of the Requirements Traceability Problem', Proc. 1st IEEE Int'l Conf. on Requirements Engineering (ICRE), pp. 94-101", "ISO/IEC/IEEE 29148:2018 — Systems and software engineering — Life cycle processes — Requirements engineering (bidirectional traceability requirement)"],
+      "evidence": "orchestration/ROADMAP_ORCHESTRATION.md 'Araç–Versiyon İzlenebilirlik' tool-map (7-tool v1.28.1 subsection) + dod.ts roadmap-incoherence rule → DOD.json",
+      "appliedIn": "v1.28.1"
     }
   ]
 }
