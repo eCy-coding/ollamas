@@ -1,0 +1,11 @@
+/* ollamas dark cockpit — remap hedefi (kaynak: src/styles/tokens.css · HANDOFF-PIPELINE §1.2) */
+--ollamas-color-bg-base:#050608;    --ollamas-color-bg-sidebar:#08090d;
+--ollamas-color-bg-panel:#0a0b10;   --ollamas-color-bg-inset:#04050a;
+--ollamas-color-border-subtle:rgba(255,255,255,.05);
+--ollamas-color-text-bright:#f8fafc; --ollamas-color-text-muted:#94a3b8;
+--ollamas-color-status-accent:#818cf8; --ollamas-color-status-ok:#34d399;
+--ollamas-color-status-warn:#fbbf24;   --ollamas-color-status-err:#fb7185; --ollamas-color-status-info:#22d3ee;
+/* font: sans=Inter · mono=JetBrains Mono · radius sm3/md8/lg12 · space 4/8/12/16 */
+/* Remap: #0a0b10→bg-immersive-panel · #08090d→bg-immersive-sidebar · #050608→bg-immersive-bg ·
+   #6366f1/#818cf8→text-status-accent · #34d399→text-status-ok · #fbbf24→text-status-warn ·
+   #fb7185→text-status-err · rgba(255,255,255,.05)→border-immersive-border · dark: prefix YAZMA */
