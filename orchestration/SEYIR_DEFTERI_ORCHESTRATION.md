@@ -743,3 +743,44 @@ safe-auto tier-only (review/blocked conductor'a düşer), keep-green/revert-red,
 **Not (governance):** Bu girdi DOD "done-without-governance" lapse kapanışı — vO45 ROADMAP'te
 DONE işaretliydi ama SEYIR kanıt-girdisi eksikti; içerik ROADMAP satırı + commit 1520285'ten
 geriye-dönük derlendi (yeni iş değil, kayıt borcu).
+
+---
+
+## vO46 — DOD R6 concurrent-triad kapanışı: 7 araç için test+SEYIR eş-zamanlı (2026-07-10)
+
+**Tetik:** `dod --lane orchestration` = 60/100, 7 R6-lapse. Her R6 "concurrent-triad" ihlali =
+bir araç roadmap'te var ama {test, SEYIR-entry} üçlüsünden en az biri eksik (present 1<3). Eksik
+7 araç: **build-tasks**, **calibrate**, **deps-doctor**, **gen-catalog**, **keys-health**,
+**orchestra**, **refresh-catalog** — hepsi ROADMAP satırı var, test+SEYIR yoktu.
+
+**Yapıldı (GERÇEK test, checker-gaming YOK):** Her araç için `orchestration/tests/<araç>.test.ts`
+davranış-testi — araçların SAF çekirdeğini gerçekten import+assert eder (stem-mention değil):
+- **build-tasks** → yeni `lib/build-tasks-core.ts` (`slug`/`parseTaskLine`/`mergeTasks`): target-dedupe
+  first-seen wins, nonexistent-drop, stable-id numeric-suffix collision. Araç bu core'a rewire edildi
+  (FS kabuğu kaldı, davranış birebir: `wrote 351 tasks · dropped 0`).
+- **gen-catalog** → yeni `lib/gen-catalog-core.ts` (`isTaskable`/`goalFor`/`MIN_LOC`): ext/test/decl/
+  barrel red, <MIN_LOC red, no-export red, dosya-tipi→goal map. Araç rewire (thin-IO `taskable` wrapper).
+- **keys-health** → yeni `lib/keys-health-core.ts` (`glyph`/`formatBanner`/`formatRow`): status→glyph,
+  live/total+keyless sayım, snap.live precedence, cooled/converged flag, absent+signupUrl satır. Araç
+  fetch-kabuğu kaldı, render pure'a taşındı.
+- **refresh-catalog** → yeni `lib/refresh-catalog-core.ts` (`formatRefresh`): human+JSON stdout kontratı
+  (ok/count · error). Araç spawn-kabuğu bu formatter'a rewire.
+- **deps-doctor** → `lib/deps.ts` pipeline testi (parse→classify→summarize→missingBlock gate): core dep
+  eksik=BLOCK, non-core=WARN — aracın komposizyonunu birebir doğrular (araç değişmedi).
+- **calibrate** → `lib/search-replace.ts` edit-motoru testi (parse/apply/dedupe/all-or-nothing) —
+  calibrate'in her fix'i gate'lediği çekirdek (araç değişmedi).
+- **orchestra** → `lib/orchestra-repair.ts` (stream-order/proposal-header/apply-token) + `lib/task-progress.ts`
+  (nextPending/mark/summary/laneSummary) — tick-loop IO'su değil, saf karar mantığı (araç değişmedi).
+
+7 test-adı ROOT `vitest.config.ts` orchestra-project include listesine eklendi (deterministik node lane).
+
+**Kanıt:** `npx tsc --noEmit` = 0 · yeni 7 test dosyası **42 assertion passed** (`vitest run --config
+vitest.config.ts …`) · `dod --lane orchestration` 60→95 (7 R6 kapandı, kalan tek lapse = R3 TASKS.json
+generated-churn, commit-dışı) · `dod --all --strict` exit 0 (regresyon-yok) · gen-catalog/build-tasks
+rewire canlı-koştu 351 görev/dropped 0.
+
+**GOTCHA:** keys-health.ts + calibrate.ts + refresh-catalog.ts + deps-doctor.ts top-level `main()`/IO
+import-anında koşar (orchestra dışında import.meta guard yok) → aracı doğrudan test-import etmek fetch/
+spawn/process.exit tetikler. Bu yüzden saf-çekirdek AYRI `-core` lib'e çıkarıldı ve oradan test edildi
+(task'ın "pure-parçasını test-et, IO-main'i değil" kuralı). Duplike-mantık bırakılmadı — araçlar tek-kaynağa
+rewire edildi.
