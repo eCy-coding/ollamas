@@ -49,7 +49,7 @@ if [ ! -f .env ]; then
     printf '\033[35m[DRY]\033[0m would create .env (from .env.example when present)\n'
   else
     echo "[+] Creating .env (from .env.example when present)..."
-    if [ -f .env.example ]; then cp .env.example .env; else : > .env; fi
+    if [ -f .env.example ]; then cp .env.example .env; else : >.env; fi
     chmod 600 .env
   fi
 fi
