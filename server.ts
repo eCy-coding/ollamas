@@ -287,7 +287,7 @@ app.use(
     "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
     "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
     "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
-    "/api/ecysearcher", "/api/threatfeed",
+    "/api/ecysearcher", "/api/threatfeed", "/api/model-overrides",
     // NARROW prefixes only: bare "/api/github" would also gate /api/github/webhook
     // (inbound FROM GitHub) and 403 it under SAAS_ENFORCE=1.
     "/api/github/actions", "/api/github/search", "/api/integrations",

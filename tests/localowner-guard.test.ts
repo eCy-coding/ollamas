@@ -21,7 +21,7 @@ const GUARDED = [
   "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
   "/api/backup", "/api/cluster", "/api/security", "/api/generate", "/api/ai",
   "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
-  "/api/ecysearcher", "/api/threatfeed",
+  "/api/ecysearcher", "/api/threatfeed", "/api/model-overrides",
   "/api/github/actions", "/api/github/search", "/api/integrations",
 ];
 
@@ -30,6 +30,8 @@ const DANGEROUS = [
   "/api/terminal", "/api/macos-terminal", "/api/pipeline", "/api/workspace",
   "/api/agent", "/api/keys", "/api/cluster", "/api/backup", "/api/security",
   "/api/generate", "/api/ai",
+  // Writes per-model overrides incl. an injected system prompt → prompt-injection surface.
+  "/api/model-overrides",
 ];
 
 beforeAll(async () => {
