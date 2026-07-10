@@ -132,21 +132,21 @@
 
 ## P4 — Ürün / Revenue / UX
 
-### M-017 · P4 · M · GAP-016 · billing e2e zincir testi
+### M-017 · V6 · ✅ · GAP-016 · billing e2e zincir testi
 - **anchor:** `server/billing/stripe.ts` (createAuditCheckout, sendMeterEventAsync, constructEvent), `server/store/index.ts` (usage_events→rollup)
 - **action:** test-mode zincir: checkout oluştur → webhook event simüle → meter kaydı → tenant rollup (BillingRun/BillingLine) doğrula. Mevcut parça testleri (`server/__tests__/stripe-meter.test.ts` vb.) birleştir.
 - **test:** `tests/billing-e2e-chain.test.ts` (yeni)
 - **kabul:** `vitest run tests/billing-e2e-chain` → checkout→webhook→meter→rollup yeşil; test-mode kanıt.
 - **dep:** yok · **durum:** ☐
 
-### M-018 · P4 · S · GAP-017 · Lighthouse RUN + eşik doğrula
+### M-018 · V6 · ✅ · GAP-017 · Lighthouse RUN + eşik doğrula
 - **anchor:** `lighthouserc.json` (perf≥0.85 warn, LCP≤2500 error, CLS≤0.1, TBT≤300), `budget.json` (script 150KB, total 200KB)
 - **action:** `npm run build` (dist) → Lighthouse koş → eşik-geçer doğrula. Eşik aşılırsa 03-GAP'e perf-gap satırı.
 - **test:** yok (koşum)
 - **kabul:** `npx lighthouse http://localhost:3000 --output=json` → assertions pass (LCP/CLS error-eşikleri geçer).
 - **dep:** M-013 · **durum:** ☐
 
-### M-019 · P4 · XS · GAP-018 · i18n key-count parite assert
+### M-019 · V6 · ✅ · GAP-018 · i18n key-count parite assert
 - **anchor:** `src/locales/{en,tr}.ts` (159 key flat), `tests/ui/i18n.test.tsx` (çeviri var, count-assert yok)
 - **action:** `tests/ui/i18n.test.tsx`'e `Object.keys(en)` === `Object.keys(tr)` (set-eşitlik) assert ekle; fark listesi boş.
 - **test:** `tests/ui/i18n.test.tsx` (mevcut dosyaya `it` ekle)
@@ -372,14 +372,14 @@
 - **kabul:** Linux'ta `install.sh` (veya Docker-yol) exit 0 + `ollamas status`.
 - **dep:** M-036 (deploy-guide) · **durum:** ☐
 
-### M-047 · V6 · M · GAP-043 · GDPR veri-silme + export
+### M-047 · V6 · ✅ · GAP-043 · GDPR veri-silme + export
 - **anchor:** `server/store/index.ts` (tenant data), `oauth-gc.ts` (retention var), erasure endpoint yok
 - **action:** `POST /api/account/delete` (self-service tenant erasure — tüm veri+key sil) + `GET /api/account/export` (JSON export). Audit log'a kaydet. SaaS auth-korumalı.
 - **test:** `tests/account-erasure.test.ts` — delete→veri gitti, export→tam JSON.
 - **kabul:** erasure sonrası tenant verisi 0; export tam.
 - **dep:** yok · **durum:** ☐
 
-### M-048 · V6 · S · GAP-044 · i18n RTL + Intl format
+### M-048 · V6 · ✅ · GAP-044 · i18n RTL + Intl format
 - **anchor:** `src/locales/{en,tr}.ts` (LTR), `src/` (Intl grep=0)
 - **action:** locale'e `dir` (ltr/rtl) alanı + `<html dir>` bind; tarih/sayı `Intl.DateTimeFormat`/`NumberFormat` locale-aware. (RTL locale eklenince hazır.)
 - **test:** `tests/ui/i18n-format.test.tsx` — Intl format locale'e göre; dir doğru.

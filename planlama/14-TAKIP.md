@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1·V2·V3·V4·V5 ✅ TAMAM → V6 sırada** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V6 ✅ TAMAM (6/10) → V7 sırada** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,9 +15,9 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1–V5 ✅ TAMAM** (branch feat/v-final-train, 14 commit) |
-| Kodlama durumu | ✅ V1–V5 (M-015 audit/* 67→arşiv-tag+sil, branch 137→73) → **V6 sırada** |
-| Genel ilerleme (kod) | **32 / 50 mikro-görev** · **5 / 10 versiyon (YARI)** |
+| Aktif aşama | **V1–V6 ✅ TAMAM** (branch feat/v-final-train, 17 commit) |
+| Kodlama durumu | ✅ V1–V6 (billing e2e, Lighthouse perf0.96, GDPR erasure, i18n RTL) → **V7 sırada** |
+| Genel ilerleme (kod) | **37 / 50 mikro-görev** · **6 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
 | Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
@@ -31,8 +31,8 @@ V2  Kendi Modelini Getir ██████████ ✅ v1.25.0  3/3 KULLANI
 V3  Kendi Geliştirmeni.. ██████████ ✅ v1.26.0  6/6 (adding-a-tool/extension-guide/HOWTO/CLI/api/troubleshoot)
 V4  Güvenlik Kanıtı      ██████████ ✅ v1.27.0  11/11 (M-004/006 V5'te açıldı)
 V5  Test Bütünlüğü       ██████████ ✅ v1.28.0  9/9 (M-015 audit/* arşivlendi · FRESH 1518)
-V6  Ürün & Gelir         ░░░░░░░░░░ ☐  v1.29.0  ◀ SIRADA (M-017 billing,018 Lighthouse,019 i18n + M-047/048)
-V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  (M-038,039)
+V6  Ürün & Gelir         ██████████ ✅ v1.29.0  5/5 (M-017 billing,018 LH0.96,019/048 i18n,047 GDPR)
+V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  ◀ SIRADA (M-038 per-model UI, M-039 GGUF import)
 V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  (M-020,022,023,024,036)
 V9  Gözlemlenebilir+Cila ░░░░░░░░░░ ☐  v1.32.0  (M-041,042,043)
 V10 v-FINAL / GA         ░░░░░░░░░░ ☐  v1.33.0  ✅GA-ÜRETİME-HAZIR (M-044 Opus-gate)
@@ -103,12 +103,12 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **32/50** (V1–V5) · ⊘ test-only 4 · ⛔ Emre-gate 0 (M-015 çözüldü) · outward tag V10 · aktif-yol 18.
+**Sayaç:** kapandı **37/50** (V1–V6) · kalan V7-V10 (13) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 13.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
 - **Şu an:** V1–V5 kapandı (32/50, YARI YOL). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
-- **Sonraki versiyon: V6 Ürün & Gelir (v1.29.0)** — M-017 (billing e2e, stripe.ts), M-018 (Lighthouse RUN), M-019 (i18n key-parite) + M-047 (GDPR erasure), M-048 (i18n RTL).
+- **Sonraki versiyon: V7 Gelişmiş Model Kontrolü (v1.30.0)** — M-038 (per-model num_ctx/temp/keep_alive UI), M-039 (GGUF/Modelfile import, CLI-yolu).
 - **Barrier:** M-018←M-013(✅). Kalan Emre-gate: yalnız V10 git-tag (outward).
 
 ## ⛔ Bloke / Emre-gate bekleyenler

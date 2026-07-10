@@ -250,4 +250,20 @@
 
 ---
 
+## S-013 · 2026-07-10 · V6 Ürün & Gelir 5/5 (subagent-driven + TDD) · conductor: fable-5
+
+- **V6 5/5 ✅** (commit dea0168): M-019 i18n key-parite (159/159 set-assert); M-017 billing e2e zincir
+  (createAuditCheckout→gerçek generateTestHeaderString/constructEvent webhook→sendMeterEventAsync→runBilling rollup +
+  tampered-imza-ret); M-048 i18n RTL (`dir` alanı + `<html dir>` bind + Intl formatNumber/formatDate); M-047 GDPR
+  (server/account.ts registerAccountRoutes: GET /api/account/export + POST /api/account/delete, 11-tablo FK-güvenli
+  erasure + audit, boot-harness gerekmedi — registerContractRoutes deseni); M-018 Lighthouse GERÇEK KOŞTU (vite build
+  → lhci autorun → perf 0.96, LCP 2405ms, CLS 0, embed/web 1.0).
+- **KANIT (conductor self-verify):** tsc exit 0 · 4 yeni test 11/11 · **FRESH-suite node 1523/0 fail** (V6 regresyon yok) ·
+  IDE-stale-diagnostic yine otoriter-tsc ile çözüldü.
+- **37/50 görev, 6/10 versiyon, 17 commit.** Kalan Emre-gate: yalnız V10 git-tag (outward).
+- **BAĞLAM-RESET NOKTASI:** conversation çok derin → Emre'ye `/clear` + §RESUME-KIT önerildi (V7-V10 taze bağlamda).
+- **Sonraki:** V7 Gelişmiş Model Kontrolü → M-038 (per-model UI), M-039 (GGUF import). Resume=14-TAKIP ilk ☐.
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->
