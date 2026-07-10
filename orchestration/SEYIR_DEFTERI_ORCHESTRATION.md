@@ -674,6 +674,7 @@ izlenebilirlik satırlarıydı. Bu girdi sicili kapatır: her satır amaç + git
 | `claude-dispatch` | vO41 otonom Claude Code conductor zinciri (IO shell) | `6b5bec4` |
 | `completion-scan` | ollamas uçtan-uca tamamlanmışlık taraması | `4736002` |
 | `council` | hibrit model-council — yetenek-eşlemeli fleet analizi | `921988a` |
+| `converge` | tek lane'i `integration/all-lanes` üzerinden trunk'a indiren convergence planner (gate→no-ff→[T0] ff) | backfill |
 | `dispatchbench` | vO18 distributed-dispatch research→test→update harness | `82489e4` |
 | `dispatchdoctor` | vO21 uzak worker havuzu GO/NO-GO ağ probu | `4f20f63` |
 | `dispatchsim` | vO20 dispatch flow simulator (deterministik, canlı makinesiz) | `e5f512a` |
@@ -685,7 +686,9 @@ izlenebilirlik satırlarıydı. Bu girdi sicili kapatır: her satır amaç + git
 | `fleet-next` | fleet turu sonrası öncelikli NEXT-TASK kuyruğu | `665945c` |
 | `fleet-run` | fleet'i uçtan-uca koşturan TEK komut | `ec419eb` |
 | `fleet-watch` | fleet canlı takip konsolu (operatör izler) | `d298177` |
+| `finish` | v2.0.1 SHIP-GATE aggregator — 11 checker cheap→expensive, `--dry` rapor / `--ship` first-fail enforce | backfill |
 | `gemini-run` | Gemini CLI'ı read-only PROPOSE worker olarak koşturur | `857e0c4` |
+| `lane-triage` | READ-ONLY lane-branch triage — trunk'a karşı ahead/behind/unlanded/landed/age (git plumbing) | backfill |
 | `oracle` | Doğruluk Oracle'ı CLI (deterministik verify) | `921988a` |
 | `oracle-serve` | kalıcı Doğruluk Oracle daemon'u | `921988a` |
 | `provider-smoke` | CANLI provider e2e kanıtı (vP5) | `3effd11` |

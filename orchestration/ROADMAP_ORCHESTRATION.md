@@ -172,3 +172,16 @@ uyarısı). Cockpit'e adoption paneli (snapshot'a `adoptions[]` alanı + cockpit
 | `keys-health` | API-key havuzu (Donanım Kasası) sağlık görünümü — `GET /api/keys/health`, read-only |
 | `orchestra` | otonom local-model conductor daemon — DEFAULT $0 self-healing FSM (STEP 1-10) |
 | `refresh-catalog` | `gen-catalog → build-tasks` tek-adım catalog tazeleme (autopilot refresh loop) |
+
+### v1.25.4 — lane-landing araç eşlemesi (roadmap-coherence borç kapanışı, 2. tur)
+
+> Aynı traceability disiplini (ISO/IEC/IEEE 29148:2018): lane-convergence + ship-gate + triage
+> araçları test'e sahipti ama roadmap tool-map'inde anılmıyordu → orphan-artifact borcu. Aşağıdaki
+> 3 araç eklendi; her biri geriye bir gereksinime (lane→trunk landing), ileriye bir test+SEYIR
+> girdisine izlenebilir.
+
+| Araç | Ait olduğu iş |
+|------|---------------|
+| `converge` | tek lane'i paylaşılan `integration/all-lanes` staging üzerinden trunk'a indiren deterministik convergence planner (merge→gate→no-ff→gate→[T0] ff) |
+| `finish` | v2.0.1 SHIP-GATE aggregator — 11 checker cheap→expensive, `--dry` read-only rapor / `--ship` first-fail enforcing (publish [T0] insan kararı) |
+| `lane-triage` | READ-ONLY lane-branch triage — trunk'a karşı ahead/behind/unlanded/landed/age ölçümü (yalnız git plumbing, merge/checkout YOK) |
