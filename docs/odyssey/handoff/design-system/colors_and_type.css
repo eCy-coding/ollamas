@@ -1,0 +1,199 @@
+/* ─────────────────────────────────────────────
+   eCy Design System — Color & Type Tokens
+   Version 1.0.0 | April 2026
+   KAYNAK: claude.ai/design "eCy Design System" (019dd99c-8b53-76bd-ae1b-f3912dcc9b4b)
+   İNDİRİLDİ: DesignSync get_file · 2026-07-11 · REFERANS kopya (repo'da kaynak-of-truth DEĞİL —
+   entegrasyon ODYSSEY-TOKEN-MAP.md üzerinden tokens/*.json'a yapılır)
+───────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+
+  /* ── RAW COLOR PALETTE ─────────────────── */
+
+  /* Backgrounds */
+  --color-bg-base:       #050A14;
+  --color-bg-surface:    #0D1B2E;
+  --color-bg-raised:     #132338;
+  --color-bg-overlay:    #1A2E47;
+
+  /* Cyan / Primary Accent */
+  --color-cyan-900:      #002A33;
+  --color-cyan-700:      #005F73;
+  --color-cyan-500:      #00A8C8;
+  --color-cyan-400:      #00C4EE;
+  --color-cyan-300:      #00D4FF;
+  --color-cyan-200:      #66E5FF;
+  --color-cyan-100:      #B3F2FF;
+
+  /* Violet / Secondary Accent */
+  --color-violet-900:    #1A1030;
+  --color-violet-700:    #3D2A6E;
+  --color-violet-500:    #6B48B5;
+  --color-violet-400:    #7B5EA7;
+  --color-violet-300:    #9B80CC;
+  --color-violet-200:    #C4AAEE;
+
+  /* Neutral (cool-toned grey) */
+  --color-neutral-950:   #050A14;
+  --color-neutral-900:   #0D1B2E;
+  --color-neutral-800:   #1A2A40;
+  --color-neutral-700:   #263548;
+  --color-neutral-600:   #3A4F66;
+  --color-neutral-500:   #536882;
+  --color-neutral-400:   #6E859E;
+  --color-neutral-300:   #8A9BB0;
+  --color-neutral-200:   #B0BFCF;
+  --color-neutral-100:   #D4DCE8;
+  --color-neutral-50:    #F0F4FF;
+
+  /* Semantic */
+  --color-success:       #00C896;
+  --color-success-bg:    rgba(0, 200, 150, 0.12);
+  --color-warning:       #F5A623;
+  --color-warning-bg:    rgba(245, 166, 35, 0.12);
+  --color-danger:        #FF4757;
+  --color-danger-bg:     rgba(255, 71, 87, 0.12);
+  --color-info:          #00D4FF;
+  --color-info-bg:       rgba(0, 212, 255, 0.10);
+
+  /* ── SEMANTIC DESIGN TOKENS ────────────── */
+
+  /* Text */
+  --fg-primary:          var(--color-neutral-50);
+  --fg-secondary:        var(--color-neutral-300);
+  --fg-tertiary:         var(--color-neutral-400);
+  --fg-disabled:         var(--color-neutral-600);
+  --fg-inverse:          var(--color-bg-base);
+  --fg-accent:           var(--color-cyan-300);
+  --fg-link:             var(--color-cyan-300);
+  --fg-link-hover:       var(--color-cyan-200);
+
+  /* Backgrounds */
+  --bg-base:             var(--color-bg-base);
+  --bg-surface:          var(--color-bg-surface);
+  --bg-raised:           var(--color-bg-raised);
+  --bg-overlay:          var(--color-bg-overlay);
+  --bg-accent:           var(--color-cyan-300);
+  --bg-accent-hover:     var(--color-cyan-200);
+  --bg-accent-muted:     rgba(0, 212, 255, 0.10);
+  --bg-accent-muted-hover: rgba(0, 212, 255, 0.18);
+
+  /* Borders */
+  --border-subtle:       rgba(255,255,255,0.06);
+  --border-default:      rgba(255,255,255,0.10);
+  --border-accent:       rgba(0, 212, 255, 0.20);
+  --border-accent-strong: rgba(0, 212, 255, 0.50);
+  --border-focus:        var(--color-cyan-300);
+
+  /* ── TYPOGRAPHY ───────────────────────── */
+
+  --font-display:        'Space Grotesk', sans-serif;
+  --font-body:           'DM Sans', sans-serif;
+  --font-mono:           'JetBrains Mono', monospace;
+
+  --fw-light:    300;
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --text-xs:   0.75rem;    /* 12px */
+  --text-sm:   0.875rem;   /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-md:   1.125rem;   /* 18px */
+  --text-lg:   1.25rem;    /* 20px */
+  --text-xl:   1.5rem;     /* 24px */
+  --text-2xl:  2rem;       /* 32px */
+  --text-3xl:  2.5rem;     /* 40px */
+  --text-4xl:  3rem;       /* 48px */
+  --text-5xl:  4rem;       /* 64px */
+  --text-6xl:  5.5rem;     /* 88px */
+
+  --lh-tight:   1.1;
+  --lh-snug:    1.25;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.65;
+
+  --ls-tighter: -0.03em;
+  --ls-tight:   -0.02em;
+  --ls-normal:   0em;
+  --ls-wide:     0.05em;
+  --ls-wider:    0.12em;
+  --ls-widest:   0.2em;
+
+  /* ── SPACING SCALE ────────────────────── */
+
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32: 128px;
+
+  /* ── BORDER RADIUS ────────────────────── */
+
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+  --radius-full: 9999px;
+
+  /* ── SHADOW / ELEVATION ───────────────── */
+
+  --shadow-low:  0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-mid:  0 4px 16px rgba(0,0,0,0.40), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-high: 0 12px 40px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.30);
+  --shadow-glow: 0 0 20px rgba(0,212,255,0.25), 0 0 60px rgba(0,212,255,0.08);
+  --shadow-glow-strong: 0 0 30px rgba(0,212,255,0.40), 0 0 80px rgba(0,212,255,0.15);
+  --shadow-violet: 0 0 20px rgba(123,94,167,0.30);
+
+  /* ── ANIMATION ─────────────────────────── */
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-expo:  cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out:   cubic-bezier(0.45, 0, 0.55, 1);
+  --dur-fast:      150ms;
+  --dur-base:      200ms;
+  --dur-slow:      400ms;
+  --dur-slower:    600ms;
+
+  /* ── Z-INDEX ───────────────────────────── */
+
+  --z-base:    0;
+  --z-raised:  10;
+  --z-dropdown: 100;
+  --z-sticky:  200;
+  --z-modal:   500;
+  --z-toast:   1000;
+}
+
+/* ── SEMANTIC TYPE STYLES ─────────────────── */
+
+h1, .h1 { font-family: var(--font-display); font-size: var(--text-5xl); font-weight: var(--fw-bold); line-height: var(--lh-tight); letter-spacing: var(--ls-tighter); color: var(--fg-primary); }
+h2, .h2 { font-family: var(--font-display); font-size: var(--text-4xl); font-weight: var(--fw-semibold); line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--fg-primary); }
+h3, .h3 { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--fw-semibold); line-height: var(--lh-snug); letter-spacing: var(--ls-tight); color: var(--fg-primary); }
+h4, .h4 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--fw-medium); line-height: var(--lh-snug); color: var(--fg-primary); }
+h5, .h5 { font-family: var(--font-body); font-size: var(--text-md); font-weight: var(--fw-semibold); line-height: var(--lh-normal); color: var(--fg-primary); }
+p, .body { font-family: var(--font-body); font-size: var(--text-base); font-weight: var(--fw-regular); line-height: var(--lh-relaxed); color: var(--fg-secondary); }
+.body-sm { font-family: var(--font-body); font-size: var(--text-sm); line-height: var(--lh-normal); color: var(--fg-secondary); }
+.label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: var(--fw-medium); letter-spacing: var(--ls-wide); color: var(--fg-secondary); }
+.eyebrow { font-family: var(--font-display); font-size: var(--text-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-widest); text-transform: uppercase; color: var(--fg-accent); }
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-accent-muted); color: var(--fg-accent); padding: 2px 6px; border-radius: var(--radius-xs); border: 1px solid var(--border-accent); }
+pre { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--bg-raised); color: var(--fg-primary); padding: var(--space-6); border-radius: var(--radius-md); border: 1px solid var(--border-default); overflow-x: auto; line-height: var(--lh-relaxed); }
+a { color: var(--fg-link); text-decoration: none; transition: color var(--dur-fast) var(--ease-out-expo); }
+a:hover { color: var(--fg-link-hover); text-decoration: underline; }
+
+/* ── GLOBAL BASE ─────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+body { background-color: var(--bg-base); color: var(--fg-primary); font-family: var(--font-body); font-size: var(--text-base); line-height: var(--lh-normal); -webkit-font-smoothing: antialiased; margin: 0; }
