@@ -324,21 +324,21 @@
 - **📚 ref:** 17-KAYNAK-KOD-ORNEKLERI §B [M-041] Keep-a-Changelog + git-cliff
 - **test:** yok (format doğrulama)
 - **kabul:** `CHANGELOG.md` var; v1.21→mevcut geçmiş + Unreleased bölümü.
-- **dep:** yok · **durum:** ☐
+- **dep:** yok · **durum:** ✅ KANIT: Keep-a-Changelog, v1.21→v1.23 git-log'dan + Unreleased 2-katman (lane-work + V1-V8 train) · 7ab149c · S-016
 
 ### M-042 · V9 · M · GAP-040 · full-E2E acceptance koşumu
 - **anchor:** `vitest.config.ts`, `playwright.config.ts`, `package.json` (conformance, test:e2e), `install.sh`
 - **action:** tek oturumda: `vitest run` + `npm run test:e2e` + `npm run conformance` + temiz-dizin install — hepsi yeşil, tek-geçiş kanıt.
 - **test:** yok (acceptance koşumu)
 - **kabul:** 4 komut 0-fail, çıktı 09-SEYIR'de damgalı.
-- **dep:** M-013 (FRESH suite), M-023 (install) · **durum:** ☐
+- **dep:** M-013 (FRESH suite), M-023 (install) · **durum:** ✅ KANIT: vitest 2228/0 + PERF=1 conformance 3/3 + playwright 28/28 + DRY_RUN install exit-0 (tek-oturum, S-016); 2 e2e kök-neden fix f93705a (model-clobber + WCAG kontrast)
 
 ### M-043 · V9 · S · GAP-040 · docs cross-link sweep
 - **anchor:** `README.md`, `QUICKSTART.md`, `docs/*`, `docs/extension-guide.md`
 - **action:** tüm docs birbirine linkli + ölü-link taraması (`grep -oE 'https?://[^) ]+'` + relative-path kontrolü); extension-guide 9-nokta tam.
 - **test:** yok
 - **kabul:** ölü-link 0; README↔QUICKSTART↔docs/* çapraz-link; extension-guide tam.
-- **dep:** M-026, M-030 · **durum:** ☐
+- **dep:** M-026, M-030 · **durum:** ✅ KANIT: 74/74 relative + 7/7 external canlı, extension-guide 9/9, README Dokümantasyon bölümü · 7ab149c · S-016
 
 ### M-044 · V10 · M · — · GA-gate (P-FINAL operasyon)
 - **anchor:** `planlama/02-DOD.md` (D1-D23), `planlama/06-KOR-NOKTA.md` (14 boyut)
@@ -391,7 +391,7 @@
 - **action:** merkezi exception hook (`process.on('unhandledRejection'/'uncaughtException')` + Express error-middleware) → structured-log + sayaç + eşik-alert (opsiyonel webhook). Sentry-opsiyonel (env-gated), zorunlu dep değil.
 - **test:** `tests/error-tracking.test.ts` — exception → aggregation kaydı + sayaç.
 - **kabul:** yakalanan exception aggregation'a düşer + eşik-alert tetiklenebilir.
-- **dep:** yok · **durum:** ☐
+- **dep:** yok · **durum:** ✅ KANIT: server/error-tracking.ts ring+sayaç+webhook-alert+process-hooks, 11/11 test, yeni route yok (guard yüzeyi değişmedi) · db14cdb · S-016
 
 ---
 

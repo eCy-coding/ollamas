@@ -74,8 +74,8 @@ Kimlik-borcu kümesi: GAP-024+025 (+P5 GAP-020+023) = repo gerçek kimliğini ya
 
 | ID | Boyut | Sev | DURUM | DoD | Gap özeti | Mikro | Kabul-komutu |
 |---|---|---|---|---|---|---|---|
-| GAP-039 | docs | 🔵 | **gerçek** — CHANGELOG YOK (tag v1.21→v1.23 var, sürüm-notu yok) | D16 | Keep-a-Changelog | M-041 | `CHANGELOG.md` var + geçmiş |
-| GAP-040 | test | 🟡 | **gerçek** — full-E2E tek-geçiş acceptance kanıtı yok | D6/D7 | vitest+e2e+conformance+install tek-oturum | M-042 | 4 komut 0-fail 09-SEYIR'de |
+| GAP-039 | docs | 🔵 | ✅**DONE** — CHANGELOG.md Keep-a-Changelog v1.21→Unreleased (S-016) | D16 | Keep-a-Changelog | M-041 | `CHANGELOG.md` var + geçmiş |
+| GAP-040 | test | 🟡 | ✅**DONE** — tek-oturum: vitest 2228/0 + conformance + playwright 28/28 + install-DRY 0; link-sweep 74+7 canlı (S-016) | D6/D7 | vitest+e2e+conformance+install tek-oturum | M-042 | 4 komut 0-fail 09-SEYIR'de |
 
 **GA-yolu:** V9 (M-041,042,043) + V10 (M-044 GA-gate) = "uçtan uca hazır" son adımlar. Yürütme: 16-VERSIYON.
 
@@ -89,7 +89,7 @@ Kimlik-borcu kümesi: GAP-024+025 (+P5 GAP-020+023) = repo gerçek kimliğini ya
 | GAP-042 | release/platform | 🟡 | ✅**DONE** — Docker-yol Linux + compose-config exit-0 + launchctl-gate toleransı + guide Linux bölümü; ⚠ tam smoke CI-ubuntu (S-015) | V8 | çoklu-platform install (Linux) | M-046 | Linux'ta install exit 0 (veya CI matrix) |
 | GAP-043 | güvenlik/gizlilik | 🔵 | **gerçek** — GDPR erasure/export endpoint YOK (grep=0); retention prune var | V6 | self-service veri-silme + export | M-047 | `/api/account/{delete,export}` + test |
 | GAP-044 | i18n | ⚪ | **gerçek** — RTL + `Intl` format YOK (grep=0); GAP-018 sadece key-parite | V6 | RTL yön + Intl tarih/sayı | M-048 | RTL dir + Intl format testi |
-| GAP-045 | observability | ⚪ | **gerçek** — exception-aggregation/alert YOK (sentry grep=0); /metrics var | V9 | harici error-tracking/alerting | M-049 | error-aggregation hook + alert eşiği |
+| GAP-045 | observability | ⚪ | ✅**DONE** — error-tracking.ts ring+sayaç+eşik-webhook+process-hooks, 11/11 test (S-016) | V9 | harici error-tracking/alerting | M-049 | error-aggregation hook + alert eşiği |
 
 ## FP / yeniden-açma YASAK (00-ANAYASA §3.7 — canlı doğrulandı S-001)
 

@@ -340,3 +340,31 @@
   exit-1 + make-gate shfmt = env/scripts-lane durumu, doc-dışı kök neden.
 - **45/50 görev, 8/10 versiyon.** Sonraki: V9 (M-041 CHANGELOG, M-049 error-tracking, M-043 link-sweep,
   M-042 full-E2E conductor-koşumu).
+
+## S-016 · 2026-07-10 · V9 Gözlemlenebilirlik & Cila 4/4 · conductor: fable-5
+
+- **V9 4/4 ✅:** M-041 CHANGELOG.md (Keep-a-Changelog; v1.21→v1.23 git-log'dan, Unreleased 2-katman:
+  entegre lane-work + V1-V8 train "GA'da tek tag" notuyla) + M-043 link-sweep (74/74 relative + 7/7
+  external canlı, extension-guide 9/9, README Dokümantasyon bölümü) → 7ab149c. M-049 error-tracking
+  (server/error-tracking.ts: 100'lük ring + per-kind sayaç + pino structured-log + ollamas_errors_total
+  metrik + env-gated eşik-webhook; uncaught→log+exit(1), unhandledRejection→kaydet-yaşa; process-hook
+  double-register guard'ı; YENİ ROUTE YOK → guard yüzeyi değişmedi) 11/11 test → db14cdb.
+- **M-042 full-E2E tek-oturum KANIT (22:50):**
+  ```text
+  $ npx vitest run → Tests 2228 passed | 22 skipped · 0 fail
+  $ PERF=1 npm run conformance → exit 0 (3/3; PERF=1 şart — e2e-glob default-dışı, bilinen gotcha)
+  $ npm run test:e2e → 28 passed · exit 0
+  $ cd $(mktemp -d) && DRY_RUN=1 bash install.sh → exit 0
+  ```
+- **M-042 sırasında 2 e2e kök-neden fix (f93705a):**
+  1. Pipeline/ReAct model-clobber: fetchModels her yüklemede list[0]'ı dayatıyordu; host'a başka
+     lane'in eklediği aligned `-ca` tag'leri listeyi yeniden sıralayınca qwen3:8b default'u eziliyordu
+     → `preferredOrFirstUsable` (geçerli seçim listede ise korunur) + 4 birim test (TDD RED 4-fail kanıtlı).
+  2. WCAG AA kontrast (a11y veri-bağımlı gotcha — canlı session/tool-roster'a göre node değişiyor):
+     AgentMessage code-chip purple-300 light'ta 1.78:1 → `[data-theme="light"] .text-purple-300`
+     override (6.4:1); STOP butonu rose-600+text-bright her iki temada <4.5 → rose-700+white (≥5.9:1).
+- **Ayrıca:** localowner-guard yük-bağımlı flake kökten çözüldü (paralel fetch + 30s headroom,
+  assert değişmedi) → db14cdb içinde. Yabancı-ama-geçerli commit kabul: 080f40f (diğer oturum,
+  CI install-smoke workflow, push-gated) — çift-kondüktör hâlâ aktifti, S-014b kuralı hatırlatıldı.
+- **flake yeniden-koşum kanıtı:** FRESH 2 ardışık tam koşum 0-fail (22:35, 22:50).
+- **49/50 görev, 9/10 versiyon.** Kalan: V10 M-044 GA-gate (Opus verifier) → git-tag = Emre onayı.

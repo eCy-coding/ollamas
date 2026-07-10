@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V8 ✅ TAMAM (8/10) → V9 sırada** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V9 ✅ TAMAM (9/10) → V10 GA-gate sırada** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,11 +15,11 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1–V8 ✅ TAMAM** (branch feat/v-final-train, 23 commit) |
-| Kodlama durumu | ✅ V1–V8 (cloud-key fail-closed, deploy-guide, install/rollback drilli) → **V9 sırada** |
-| Genel ilerleme (kod) | **45 / 50 mikro-görev** · **8 / 10 versiyon** |
+| Aktif aşama | **V1–V9 ✅ TAMAM** (branch feat/v-final-train, 27 commit) |
+| Kodlama durumu | ✅ V1–V9 (CHANGELOG, error-tracking, link-sweep, full-E2E 28/28) → **V10 GA-gate** |
+| Genel ilerleme (kod) | **49 / 50 mikro-görev** · **9 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) + per-model ayar (V7) |
-| Sıradaki adım | **V9 Gözlemlenebilirlik & Cila** → M-041 (CHANGELOG) |
+| Sıradaki adım | **V10 GA-gate** → M-044 (Opus 02-DOD tam re-verify) → git-tag Emre onayı |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
 | Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
@@ -34,7 +34,7 @@ V5  Test Bütünlüğü       ██████████ ✅ v1.28.0  9/9 (M
 V6  Ürün & Gelir         ██████████ ✅ v1.29.0  5/5 (M-017 billing,018 LH0.96,019/048 i18n,047 GDPR)
 V7  Gelişmiş Model Kont. ██████████ ✅ v1.30.0  2/2 (M-038 per-model UI, M-039 GGUF guide)
 V8  Dağıtım Sağlamlığı   ██████████ ✅ v1.31.0  6/6 (M-020 fail-closed,022,023,024,036,046)
-V9  Gözlemlenebilir+Cila ░░░░░░░░░░ ☐  v1.32.0  (M-041,042,043)
+V9  Gözlemlenebilir+Cila ██████████ ✅ v1.32.0  4/4 (M-041,042,043,049 · e2e 28/28)
 V10 v-FINAL / GA         ░░░░░░░░░░ ☐  v1.33.0  ✅GA-ÜRETİME-HAZIR (M-044 Opus-gate)
 ```
 
@@ -98,17 +98,17 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-038 | V7 | per-model ayar UI | ✅ | model-overrides+UI+API · 48/48 · 62ab63c | — |
 | M-039 | V7 | GGUF/Modelfile import | ✅ | docs/custom-model.md CLI-yolu · 62ab63c | — |
 | M-040 | V3 | API quickstart | ✅ | be79cb9 | — |
-| M-041 | V9 | CHANGELOG.md | ☐ | — | — |
-| M-042 | V9 | full-E2E acceptance | ☐ | — | M-013/023 |
-| M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
+| M-041 | V9 | CHANGELOG.md | ✅ | Keep-a-Changelog · 7ab149c | — |
+| M-042 | V9 | full-E2E acceptance | ✅ | 4-komut-0-fail + f93705a fix'ler · S-016 | — |
+| M-043 | V9 | docs cross-link sweep | ✅ | 74+7 link canlı, guide 9/9 · 7ab149c | — |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **45/50** (V1–V8) · kalan V9-V10 (5) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 5.
+**Sayaç:** kapandı **49/50** (V1–V9) · kalan V10 (1: M-044) · ⛔ Emre-gate: yalnız git-tag · aktif-yol 1.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
 - **Şu an:** V1–V7 kapandı (39/50). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
-- **Sonraki versiyon: V9 Gözlemlenebilirlik & Cila (v1.32.0)** — M-041 (CHANGELOG), M-049 (error-tracking), M-043 (docs cross-link sweep), M-042 (full-E2E acceptance, conductor koşar).
+- **Sonraki versiyon: V10 v-FINAL/GA (v1.33.0)** — M-044 GA-gate (Opus-tier bağımsız verifier, 02-DOD satır-satır) → tag Emre onayı.
 - **Kalan Emre-gate:** yalnız V10 git-tag (outward).
 
 ## ⛔ Bloke / Emre-gate bekleyenler
@@ -121,6 +121,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
+- **S-016** (2026-07-10) · V9 4/4: CHANGELOG + link-sweep (7ab149c), error-tracking 11/11 (db14cdb), full-E2E tek-oturum 4-komut-0-fail + 2 e2e kök-neden fix: model-clobber (preferredOrFirstUsable) + WCAG kontrast (f93705a). Yabancı-geçerli 080f40f (CI install-smoke) kabul.
 - **S-015** (2026-07-10) · V8 3-paralel-subagent: M-020 fail-closed (RED/GREEN 16/16) + install.sh MASTER_KEY_B64 bootstrap, deploy-guide 4-yol, DRY_RUN install drilli (gerçek koşum dürüst-sapma→M-042), rollback 5-bölüm sandbox, spot-check 11-exit-0 + verify-docfix. FRESH 2213/0.
 - **S-014b** (2026-07-10) · GÜVENLİK: /api/model-overrides localOwnerGuard'a eklendi (5e3e606, SaaS prompt-injection yüzeyiydi) + çift-kondüktör olayı çözüldü (tek oturum kuralı).
 - **S-014** (2026-07-10) · V7 subagent-driven+TDD: per-model override (server/model-overrides.ts saf-çekirdek + /api/model-overrides + ModelSettings.tsx UI + locales EN/TR) [M-038], docs/custom-model.md GGUF CLI-yolu [M-039]. tsc-0 · 48/48 · commit 62ab63c.
