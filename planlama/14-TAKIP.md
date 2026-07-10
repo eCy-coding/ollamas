@@ -5,9 +5,9 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · commit `c5ac42d` · faz: **PLANLAMA v6 TAMAM (10-versiyon + research cookbook) → kodlama-bekliyor**
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 YÜRÜTMEDE (4/5 ✅, M-025 Emre-gate)**
 >
-> 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md` (15 doğrulanmış dış-kaynak pattern + kod örneği).
+> 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
 ---
 
@@ -15,18 +15,18 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **Planlama v5 tamamlandı** (17 dosya + 10-versiyon release-train) |
-| Kodlama durumu | ☐ başlamadı — V1 onayı sonrası |
-| Genel ilerleme (kod) | **0 / 44 mikro-görev** · **0 / 10 versiyon** (planlama %100, kodlama %0) |
-| Başlangıç sürümü | ürün **v1.23.0** (git tag) → yol haritası **v1.24.0 … v1.33.0 GA** |
-| Sıradaki adım | **V1 Dürüst Kimlik** → ilk todo M-026 (README gerçek-ürün) — 16-VERSIYON V1-a |
-| Bloke / Emre-gate | M-025 (canonical, V1), M-015 (branch, V5) — karar bekliyor |
+| Aktif aşama | **V1 Dürüst Kimlik YÜRÜTMEDE** (branch feat/v-final-train) |
+| Kodlama durumu | ◐ V1 4/5 ✅ (M-026,027,021,028) · M-025 Emre-gate bekliyor |
+| Genel ilerleme (kod) | **4 / 49 mikro-görev** · **0.8 / 10 versiyon** (planlama %100) |
+| Başlangıç sürümü | v1.23.0 → **package.json artık ollamas@1.24.0 ✅** (M-021) |
+| Sıradaki adım | M-025 (canonical PLAN notu) = Emre-gate → onay sonrası V1 kapat → **V2** |
+| Bloke / Emre-gate | **M-025 (canonical, ŞİMDİ)**, M-015 (branch, V5) |
 | Kullanıcı ne zaman kullanır | **V2** (v1.25.0) — kendi modelini bağlayıp çalıştırır |
 
 ## 🚂 Versiyon ilerleme (release-train — yürütme sırası)
 
 ```
-V1  Dürüst Kimlik        ░░░░░░░░░░ ☐  v1.24.0  (README/setup/VERSION/CONTRIBUTING · M-026,027,021,028,025)
+V1  Dürüst Kimlik        ████████░░ ◐  v1.24.0  4/5 ✅ (M-026,027,021,028) · M-025 Emre-gate
 V2  Kendi Modelini Getir ░░░░░░░░░░ ☐  v1.25.0  ✅İLK-KULLANILABİLİR (M-031 bug,037 wizard,033 guide)
 V3  Kendi Geliştirmeni.. ░░░░░░░░░░ ☐  v1.26.0  ✅dev-extensible (M-029,030,034,035,040,032)
 V4  Güvenlik Kanıtı      ░░░░░░░░░░ ☐  v1.27.0  (M-001..011)
@@ -78,14 +78,14 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-018 | P4 | Lighthouse RUN + doğrula | ☐ | — | M-013 |
 | M-019 | P4 | i18n key-count parite assert | ☐ | — | — |
 | M-020 | P5 | cloud master-key fail-closed | ☐ | — | — |
-| M-021 | P5 | VERSION + package semver | ☐ | — | — |
+| M-021 | V1 | VERSION + package semver | ✅ | ollamas@1.24.0 · vitest 2/2 · 4a9cc28 | — |
 | M-022 | P5 | README/QUICKSTART spot-check | ☐ | — | M-021 |
 | M-023 | P5 | install.sh temiz-dizin | ☐ | — | M-021 |
 | M-024 | P5 | RELEASE_ROLLBACK tatbikat | ☐ | — | — |
-| M-025 | P5 | canonical plan notu | ⛔ | — | **Emre** |
-| M-026 | P6a | README gerçek-ürün | ☐ | — | — |
-| M-027 | P6a | setup.sh düzelt/yönlendir | ☐ | — | M-026 |
-| M-028 | P6a | CONTRIBUTING + CoC | ☐ | — | — |
+| M-025 | V1 | canonical plan notu | ⛔ | — | **Emre — ŞİMDİ** |
+| M-026 | V1 | README gerçek-ürün | ✅ | kurgu-grep=0 · gerçek başlık · QUICKSTART link · 4a9cc28 | — |
+| M-027 | V1 | setup.sh düzelt/yönlendir | ✅ | go-build=0 · ready-wrapper · bash-n OK · 4a9cc28 | — |
+| M-028 | V1 | CONTRIBUTING + CoC | ✅ | iki dosya + CoC-2.1 · 4a9cc28 | — |
 | M-029 | P6b | docs/adding-a-tool.md | ☐ | — | — |
 | M-030 | P6b | Extension Guide (indeks) | ☐ | — | M-029/034/035 |
 | M-031 | P6b | custom-openai dropdown (BUG) | ☐ | — | — |

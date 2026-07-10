@@ -164,7 +164,7 @@
 - **kabul:** key'siz `isCloud` boot → fail-closed; darwin boot etkilenmez.
 - **dep:** yok · **durum:** ☐ · **not:** darwin'de tetiklenmez; deploy-kritik.
 
-### M-021 · P5 · S · GAP-020 · VERSION + package semver
+### M-021 · V1 · ✅ · GAP-020 · VERSION + package semver
 - **anchor:** `package.json` (`name:"react-example", version:"0.0.0"`), `VERSION` (YOK)
 - **action:** `package.json` gerçek ad (`ollamas`) + semver; `VERSION` dosyası tek-kaynak; build script'leri VERSION'dan okusun (varsa).
 - **test:** `tests/version-consistency.test.ts` (yeni) — package.version === VERSION içeriği.
@@ -206,21 +206,21 @@
 > 15 gerçek gap: 2 kod-bug/UX + 13 dokümantasyon. Alt-akış P6a (kimlik/onboarding, hızlı-blocker) +
 > P6b (DX docs + BYO-model UX). Doküman görevleri kanıtı = dosya-var + içerik-grep (test yerine).
 
-### M-026 · P6a · S · GAP-024 · README gerçek-ürün onboarding
+### M-026 · V1 · ✅ · GAP-024 · README gerçek-ürün onboarding
 - **anchor:** `README.md:1` ("LLM Mission Control: Distributed Mesh" — kurgusal)
 - **action:** README'yi gerçek ollamas'a yaz: MCP gateway + CLI + $0 conductor + yerel model. QUICKSTART ile hizalı. Kurgusal mesh/WASM/70B/consent-cluster içeriği kaldır. QUICKSTART'a çapraz-link.
 - **test:** yok (içerik grep)
 - **kabul:** `grep -ci "mission control.*mesh\|WASM sandbox\|informed consent" README.md` = 0; README başlığı gerçek ürün + `npm run ready` yolu.
 - **dep:** yok · **durum:** ☐ · **not:** kimlik-borcu kümesi (GAP-020/023/025 ile)
 
-### M-027 · P6a · XS · GAP-025 · setup.sh düzelt/yönlendir
+### M-027 · V1 · ✅ · GAP-025 · setup.sh düzelt/yönlendir
 - **anchor:** `setup.sh` (olmayan `bin/main.go`/`go build` arıyor)
 - **action:** ya `setup.sh`'i sil + README'yi `npm run ready`e yönlendir, ya `setup.sh`'i `exec npm run ready` wrapper yap.
 - **test:** yok
 - **kabul:** `bash -n setup.sh` temiz + `grep -c "go build\|bin/main.go" setup.sh` = 0; çalıştırınca `ready` akışına gider.
 - **dep:** M-026 (README yolu ile senkron) · **durum:** ☐
 
-### M-028 · P6a · S · GAP-026 · CONTRIBUTING + CODE_OF_CONDUCT
+### M-028 · V1 · ✅ · GAP-026 · CONTRIBUTING + CODE_OF_CONDUCT
 - **anchor:** kök (dosyalar YOK); kaynak: QUICKSTART.md + package.json scripts + 00-ANAYASA kalite kapısı
 - **action:** `CONTRIBUTING.md` (dev-env `npm run ready`, branch/commit conventional, kalite kapısı tsc→vitest→lint, PR akışı) + `CODE_OF_CONDUCT.md` (standart Contributor Covenant).
 - **test:** yok
