@@ -23,6 +23,14 @@
 | Bloke / Emre-gate | YOK — tüm gate'ler kapandı (tag✅ S-019b) |
 | Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
+## 🌌 ODYSSEY programı (GA sonrası — self-hosted AI-workspace)
+
+v1.33.0 GA sonrası yeni program. 9 modül (research/documents/email/notes/calendar/cookbook + 2FA + shell + chat).
+3-aşamalı handoff: Claude Design (Emre 11 panel tasarladı) → Claude Code TDD → deploy. Model: kod=Sonnet, gate=fable.
+- **O0 foundation ✅** (98e0049): module registry + /api/modules guard + per-collection vector; FRESH 2271/0.
+- **8/9 panel design.html indi** (861b931, DesignSync 0-manuel). Tek-kaynak: docs/odyssey/handoff/PANEL-INVENTORY.md + PROGRESS.md.
+- **Panel dalgaları** (yeni-modül önce, chat/shell son): cookbook(pilot)→research→notes→documents→calendar→email→settings→chat→shell.
+
 ## 🚂 Versiyon ilerleme (release-train — yürütme sırası)
 
 ```

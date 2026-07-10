@@ -4,12 +4,19 @@
 // minimal placeholder is deliberate — App.tsx gets ONE mount point, not a
 // per-module `activeTab === "..."` block (avoids the scattered-registration
 // anti-pattern O0 exists to kill).
+import CookbookPanel from "./CookbookPanel";
+
 interface ModulePanelProps {
   id: string;
   labelKey?: string;
 }
 
 export default function ModulePanel({ id, labelKey }: ModulePanelProps) {
+  // O7: modules with a real surface render it here, keyed by id (still ONE mount
+  // point in App.tsx — no scattered `activeTab === "..."` blocks). Cookbook is the
+  // pilot; later modules add a case or their own lazy-loaded panel.
+  if (id === "cookbook") return <CookbookPanel />;
+
   return (
     <section
       aria-label={`module-panel-${id}`}

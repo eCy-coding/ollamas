@@ -249,9 +249,9 @@ export default function App() {
                   } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
                 >
                   {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
-                  {/* Module tabs carry their own label (from the manifest); static
-                      tabs resolve via the i18n catalog. */}
-                  <span>{tab.label ?? _(`app.tab.${tab.id}`)}</span>
+                  {/* Module tabs carry their own labelKey (from the manifest);
+                      both static and module tabs resolve via the i18n catalog. */}
+                  <span>{_(tab.label ?? `app.tab.${tab.id}`)}</span>
                 </button>
                 );
               })}

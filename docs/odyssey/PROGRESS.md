@@ -176,3 +176,5 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T01:43Z O0.toggle DONE modules-api 3/3 + module-tabs 4/4 + demo 5/5 + o0-parity 4/4; MODULE_DEMO=0→404∧tool-yok∧tab-gizli
 2026-07-11T01:43Z O0.GATE DONE tsc-0 · FRESH vitest 285 files / 2271 passed / 0 fail (baseline 2236 → +35 O0)
 2026-07-11T02:05Z PANEL.download DONE 7/9 design.html diskte (chat/research/documents/email/settings-2fa/cookbook/notes-tasks); calendar+shell impl-anı; DesignSync ana-thread, subagent'ta tool-yok
+
+2026-07-11T02:40Z O7.cookbook DONE (PILOT) server/modules/cookbook/{index,router,service,schema,store}.ts + CookbookPanel.tsx + i18n 196/196; hardware-detect(arm64→metal) + rule-base(FIT_RATIO 0.7 docs-pin) + bench(ToolRegistry choke-point) + pull-SSE(name-sanitize SSRF-red) + config→model-overrides bridge; 26 test; guard-inherit(/api/modules 403∧toggle-404); tsc-0 FRESH 2297/0

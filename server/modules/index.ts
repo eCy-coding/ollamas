@@ -3,6 +3,7 @@
 // (defineModule calls in each module's index.ts) before the boot-time mount.
 // Adding a module = one import line here + its server/modules/<id>/ directory.
 import "./demo"; // side-effect: defineModule({ id: "demo", ... })
+import "./cookbook"; // side-effect: defineModule({ id: "cookbook", ... }) — O7 pilot
 
 export {
   defineModule,
