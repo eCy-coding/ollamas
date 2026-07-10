@@ -63,8 +63,8 @@ release-hijyen + lane-konsolidasyon ağırlıklı.
 | GAP-030 | docs/DX | 🔵 | **gerçek** — CLI alt-komut ekleme rehberi zayıf | D22 | `cli/commands/*` deseni belge | M-035 | rehber var |
 | GAP-033 | docs | 🔵 | **gerçek** — deploy parçalı + stack-update yok | D22 | birleşik deploy-guide | M-036 | `docs/deploy-guide.md` var |
 | GAP-034 | UX/kod | 🔵 | **gerçek** — model yoksa `ai.ts:77` throw; wizard yok | D21 | first-run model-pull wizard/net-mesaj | M-037 | model-yok → yönlendirici mesaj + test |
-| GAP-037 | UX/kod | 🔵 | **gerçek** — model-başına ayar global (`providers.ts:933`) | D21 | per-model num_ctx/temp/keep_alive UI | M-038 | UI override + persist test |
-| GAP-036 | kod | ⚪ | **gerçek** — GGUF/Modelfile import yok (yalnız bench_gguf) | D21 | `ollama create` akışı veya doküman | M-039 | import akışı veya belge |
+| GAP-037 | UX/kod | 🔵 | ✅**DONE** — `modelOverrides` persist (db) + `/api/model-overrides` (localOwnerGuard'lı) + providers iki-blok wiring + ModelSettings.tsx paneli | D21 | per-model num_ctx/temp/keep_alive/system UI | M-038 | 12+5 test + FRESH 2206 yeşil (V7) |
+| GAP-036 | kod | ⚪ | ✅**DONE** — `docs/custom-model.md` GGUF→Modelfile→`ollama create` CLI yolu (blob-upload nüansı) + model-guide cross-link | D21 | `ollama create` akışı veya doküman | M-039 | doküman var, 4× `ollama create` örneği (V7) |
 | GAP-038 | docs | ⚪ | **gerçek** — OpenAPI var, "key al→ilk /mcp" quickstart yok | D22 | API quickstart | M-040 | örnekli quickstart var |
 
 **P6 özeti:** 15 gerçek gap. **2 kod-bug/UX** (GAP-035 gerçek bug, GAP-034/037/036 UX), **13 dokümantasyon**.

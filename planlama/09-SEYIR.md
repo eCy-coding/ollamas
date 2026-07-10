@@ -290,3 +290,25 @@
 ---
 
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->
+
+## S-014b · 2026-07-10 · V7 güvenlik-hardening + ÇİFT-KONDÜKTÖR olayı · conductor: fable-5 (ikinci oturum)
+
+- **Olay:** Aynı repo/branch'te İKİ eşzamanlı conductor oturumu V7'yi paralel yürüttü (RESUME-KIT iki
+  terminalde çalıştırılmış). Oturum-A 21:49'da commit'ledi (62ab63c+4520f7f); oturum-B (bu kayıt)
+  yarışmak yerine doğruladı (subagent 120s write-quiesce + bağımsız gate). S-014'teki "yabancı lane
+  test çakışması" = oturum-B subagent'ının spekülatif `tests/model-settings.test.ts`'i (kendisi sildi).
+- **Güvenlik bulgusu (oturum-B doğrulaması):** 62ab63c'de `/api/model-overrides` localOwnerGuard prefix
+  listesinde YOKTU → SAAS_ENFORCE=1 altında korumasız yazma-endpoint'i; per-model **system prompt**
+  persist ettiği için prompt-injection yüzeyi (00-ANAYASA §4). Fix: guard listesi + M-001/M-002
+  GUARDED+DANGEROUS invariant'larına eklendi.
+- **KANIT:**
+  ```text
+  $ git show 62ab63c:server.ts | sed -n '285,296p'   → prefix listesinde model-overrides YOK
+  $ npm run lint → tsc exit 0
+  $ npx vitest run tests/localowner-guard.test.ts tests/model-overrides.test.ts tests/routes-hardening.test.ts
+  Tests 19 passed (19)
+  $ npx vitest run (FRESH, fix öncesi tam koşum) → 274 dosya / 2206 pass, 0 fail
+  ```
+  → yorum: guard artık SAAS modda 403 döndürür; invariant testi gelecek regresyonu yakalar. Commit 5e3e606.
+- **DERS (yeni gotcha):** RESUME-KIT'i aynı anda tek terminalde çalıştır — çift-kondüktör commit-yarışı
+  ve gözden-kaçan-review üretir. V8 öncesi Emre karar: hangi oturum devam edecek?
