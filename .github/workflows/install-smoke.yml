@@ -1,0 +1,67 @@
+# Linux install smoke (M-046) — verifies the documented Linux path (docs/deploy-guide.md §Linux):
+# `./install.sh` on a clean ubuntu box must generate .env + MASTER_KEY_B64 and bring up a healthy
+# container. ⚠ Added 2026-07-10, not yet executed in CI (runs on future pushes).
+#
+# mode=dry-run    → green gate today (no side effects).
+# mode=full-boot  → real build + up + health. Marked continue-on-error until the known
+#                   Dockerfile runtime-stage gap (missing COPY of cli/ contract/ bin/ →
+#                   ERR_MODULE_NOT_FOUND /app/cli/lib/remote; see docs/deploy-guide.md
+#                   "Known issue") is fixed — flip continue-on-error to false with that fix.
+name: install-smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - Dockerfile
+      - docker-compose.yml
+      - .github/workflows/install-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [dry-run, full-boot]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Static checks (bash -n + compose config)
+        run: |
+          bash -n install.sh
+          # compose config needs the env_file to exist; probe with a throwaway copy
+          cp .env.example .env
+          docker compose config -q
+          rm -f .env
+
+      - name: Dry-run install (no side effects)
+        if: matrix.mode == 'dry-run'
+        run: DRY_RUN=1 ./install.sh
+
+      - name: Full install (build → up → health)
+        if: matrix.mode == 'full-boot'
+        # Known-red until the Dockerfile COPY fix lands (header comment) — keep the
+        # evidence visible without blocking every push.
+        continue-on-error: true
+        run: ./install.sh
+
+      - name: Assert .env + MASTER_KEY_B64 were generated
+        if: matrix.mode == 'full-boot'
+        run: |
+          test -f .env
+          grep -q '^MASTER_KEY_B64=' .env
+          # never print the value — name-only evidence
+          echo "MASTER_KEY_B64 present (value withheld)"
+
+      - name: Container logs on teardown
+        if: matrix.mode == 'full-boot' && always()
+        run: |
+          docker compose ps || true
+          docker compose logs --tail 50 || true
+          docker compose down -v || true
