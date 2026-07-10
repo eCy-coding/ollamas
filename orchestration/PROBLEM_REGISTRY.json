@@ -96,6 +96,14 @@
       "sources": ["Gotel & Finkelstein 1994 — 'An Analysis of the Requirements Traceability Problem', Proc. 1st IEEE Int'l Conf. on Requirements Engineering (ICRE), pp. 94-101", "ISO/IEC/IEEE 29148:2018 — Systems and software engineering — Life cycle processes — Requirements engineering (bidirectional traceability requirement)"],
       "evidence": "orchestration/ROADMAP_ORCHESTRATION.md 'Araç–Versiyon İzlenebilirlik' tool-map (7-tool v1.28.1 subsection) + dod.ts roadmap-incoherence rule → DOD.json",
       "appliedIn": "v1.28.1"
+    },
+    {
+      "category": "concurrent-task",
+      "pattern": "concurrent.?task|kısmen tamam|eksik eş.?zamanl|eş-zamanlı gereken|SEYIR-entry",
+      "provenSolution": "A tool is not 'Done' until its Definition-of-Done triple — {unit test, roadmap row, SEYIR (logbook) entry} — is satisfied concurrently at the phase boundary. On a concurrent-task lapse, complete the MISSING members together (write the pure-core test, add the roadmap row, record the SEYIR entry) instead of shipping partial work; batch newer tools through a one-shot governance-reconcile sweep. This is the union of the coverage-gap + roadmap-coherence + governance rules — the same 'no partial Done' discipline applied across all three artifacts at once.",
+      "sources": ["Schwaber & Sutherland — The Scrum Guide 2020, 'Definition of Done' (an Increment is unusable until it meets the shared DoD, which includes tests + documentation → no partial 'Done')", "this project: sibling DOD rules already proven+registered (coverage-gap vO20, uncommitted-green vO-all, roadmap-coherence v1.28.1) — concurrent-task (R6) is their conjunction"],
+      "evidence": "orchestration/bin/lib/dod.ts auditConcurrent (R6 rule) + vO43 governance reconcile (commit 1201852: 27 tools' roadmap-row + SEYIR-entry + (missing) test completed eş-zamanlı; tests/fleet-launch.test.ts + tests/oracle.test.ts added)",
+      "appliedIn": "vO43"
     }
   ]
 }
