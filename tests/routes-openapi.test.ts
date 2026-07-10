@@ -42,6 +42,20 @@ const PRIVILEGED_ROUTES: Array<[string, string]> = [
   ["/api/saas/webhooks/deliveries", "get"],
 ];
 
+// v1.29.4 — newly documented local-owner facade routes (no ApiKey: loopback owner surface,
+// 403 only under SAAS_ENFORCE=1). Grown one batch at a time.
+const LOCAL_OWNER_ROUTES: Array<[string, string]> = [
+  // batch1 — inference facade
+  ["/api/generate", "post"],
+  ["/api/ai/generate", "post"],
+  ["/api/models/{provider}", "get"],
+  ["/api/orchestra", "get"],
+  ["/api/pipeline", "post"],
+];
+// v1.29.4 — newly documented tenant-authenticated routes (ApiKey + 401 contract).
+const TENANT_AUTH_ROUTES: Array<[string, string]> = [
+];
+
 describe("OpenAPI — kept routes are documented in the served spec", () => {
   test("/api/openapi.json is a well-formed OpenAPI 3.1 document", () => {
     expect(spec.openapi).toMatch(/^3\.1/);
@@ -59,6 +73,26 @@ describe("OpenAPI — kept routes are documented in the served spec", () => {
 
   test("PRIVILEGED routes appear AND declare the ApiKey auth (401 contract)", () => {
     for (const [p, m] of PRIVILEGED_ROUTES) {
+      const op = spec.paths?.[p]?.[m];
+      expect(op, `${m.toUpperCase()} ${p} missing from openapi.json`).toBeTruthy();
+      expect(op.security, `${m.toUpperCase()} ${p} must declare security`).toBeTruthy();
+      const usesApiKey = op.security.some((s: Record<string, unknown>) => "ApiKey" in s);
+      expect(usesApiKey, `${m.toUpperCase()} ${p} must require ApiKey`).toBe(true);
+      expect(op.responses?.["401"], `${m.toUpperCase()} ${p} must document 401`).toBeTruthy();
+    }
+  });
+
+  test("v1.29.4 local-owner facade routes appear with the right method + a summary", () => {
+    for (const [p, m] of LOCAL_OWNER_ROUTES) {
+      const op = spec.paths?.[p]?.[m];
+      expect(op, `${m.toUpperCase()} ${p} missing from openapi.json`).toBeTruthy();
+      expect(typeof op.summary).toBe("string");
+      expect(op.summary.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("v1.29.4 tenant-authenticated routes appear AND declare ApiKey + 401", () => {
+    for (const [p, m] of TENANT_AUTH_ROUTES) {
       const op = spec.paths?.[p]?.[m];
       expect(op, `${m.toUpperCase()} ${p} missing from openapi.json`).toBeTruthy();
       expect(op.security, `${m.toUpperCase()} ${p} must declare security`).toBeTruthy();
