@@ -87,6 +87,7 @@ import { buildFleetView } from "./server/cockpit";
 import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
 import { rankMacModels } from "./server/cockpit-models";
 import { checkAnswer, scoreCouncil } from "./server/council";
+import { registerCookbookRoutes } from "./server/cookbook";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -779,6 +780,9 @@ app.post("/api/model-overrides", (req, res) => {
 app.post("/api/revenue/storefront", (req, res) => {
   try { res.json(generateStorefront(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
 });
+
+// Cookbook — hardware-aware recipe runner (P1). New /api/cookbook/* routes, localOwnerGuard'd.
+registerCookbookRoutes(app, db, localOwnerGuard);
 
 /**
  * Every way ollama might be reachable — try each until one answers. `host.docker.internal` only resolves
