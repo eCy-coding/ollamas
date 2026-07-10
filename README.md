@@ -1,43 +1,43 @@
-# LLM Mission Control: Distributed Mesh
+# ollamas — LLM Mission Control
 
-LLM Mission Control, kişisel bilgisayarların GPU/RAM kaynaklarını birleştirerek devasa modelleri (70B+) yerel ağınızda çalıştırmanıza olanak tanıyan, şeffaf ve gönüllülük esasına dayalı bir dağıtık çıkarım (inference) ağıdır.
+Yerel modelleri (ollama) + bulut sağlayıcıları tek bir kontrol panelinden yöneten, **MCP gateway**
+olarak tool'larını dışa açan ve **$0 yerel-model conductor**'ıyla kendini yöneten bir LLM işletim
+merkezi. Kendi modelini getir, kendi tool'unu ekle, Claude Code veya herhangi bir MCP client'ı bağla —
+hepsi kendi makinende, gerekli olmadıkça API key olmadan.
 
-## Teknik Şartname & Güvenlik (Hard Laws)
-- **Güvenlik (§0-§6):** Tüm yabancı kodlar WASM sandbox içerisinde çalışır.
-- **Gizlilik:** Kişisel veriler asla makineden çıkmaz. Sadece model katman aktivasyonları mesh üzerinden iletilir.
-- **Gönüllülük:** Hiçbir makine izinsiz katılamaz, "opt-out" bir tıkla gerçekleşir.
+- **Yerel-önce:** ollama yerel motor (varsayılan `qwen3:8b`); key yoksa nazik fallback (ollama → … → demo).
+- **MCP gateway:** workspace tool'larını `/mcp` (Streamable HTTP) üzerinden expose + dış MCP server'ları consume.
+- **tools-as-SaaS:** tek choke-point (`server/tool-registry.ts`) üstünde multi-tenant auth + rate-limit + usage metering + Stripe billing.
+- **$0 conductor:** Claude-Code-free FSM loop, joker failover, katalog (`ollamas do`), gated apply.
+- **Birleşik CLI:** zero-dep `ollamas` (chat/agent/mcp/saas/bench/top).
 
-## Kurulum ve Çalıştırma (macOS M4 Pro Max / ARM64)
+## Hızlı başlangıç
 
-Bu proje macOS (ARM64) üzerinde en yüksek performans için optimize edilmiştir.
-M4 Pro Max için "Master" seviyesi ince ayarlar:
+```bash
+npm run ready        # ön-koşulları tespit+düzelt (Node, deps, .env, ollama, model pull, doctor)
+npm run dev          # tsx server.ts → http://localhost:3000  (veya: make up)
+```
 
-### 1. E2E Master Workflow (iTerm2 / Terminal)
+`npm run ready` idempotent: Node kontrol, `npm ci`, `.env`'i `.env.example`'dan kopyala, ollama
+daemon doğrula, varsayılan modeli çek, derin audit. **Yerel kullanım için API key gerekmez.**
+Tam 60-saniye yol + slash komutlar (`/ready /agent /ops /verify /ship`): **[QUICKSTART.md](QUICKSTART.md)**.
 
-1. **Ön Hazırlık:**
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
+## Platform
 
-2. **Server Başlatma:**
-   ```bash
-   npm run dev
-   # Port 3000 üzerinde orchestrator aktif olur.
-   ```
+macOS (Apple Silicon / ARM64) için optimize; Docker ile Linux/çok-platform desteği (bkz.
+[`docs/`](docs/) deploy kılavuzları). Tek-GPU gerçeği: yerel LLM çağrılarını **sıralı** işle
+(paralel ~3× yavaş serialize eder).
 
-3. **Cluster Mesh'e Dahil Olma:**
-   - Web arayüzünden informed consent onayını verin.
-   - Orchestrator M4 Pro Max çip mimarisini otomatik olarak kalibre edecektir (`./bin/hardware_orchestrator` üzerinden).
+## Katkı
 
-4. **Doğrulama Görevleri:**
-   - `G-Cluster` ve `G-Sandbox` testlerini `G-Gates` panelinden tetikleyin.
-   - Şüpheli bir durumda `project_cortex.md` dosyasını `tail -f project_cortex.md` komutuyla izleyin, tüm hatalar buraya düşer.
+Geliştirme kurulumu, kalite-kapısı ve PR akışı: **[CONTRIBUTING.md](CONTRIBUTING.md)**. Kendi tool/skill/
+CLI-komutu eklemek: [`docs/extension-guide.md`](docs/extension-guide.md).
 
-### 2. İnce Performans Ayarları (M4 Pro Max için):
-   - Cluster ayarlarından `Performance Flags` kısmına şunu girmenizi öneririz:
-     `--metal --threads 12 --batch-size 512`
-   - Bu, Apple Metal hızlandırmasını tetikler ve M4'ün yüksek-performans çekirdeklerini optimize eder.
+## Lisans
+
+MIT — bkz. [LICENSE](LICENSE).
+
+---
 
 ## MCP Gateway + tools-as-SaaS
 
@@ -130,9 +130,11 @@ npx @modelcontextprotocol/publisher publish server.json   # dışa-dönük; onay
 Uzak tenant'a açmadan önce `MCP_EXPOSE_TIERS`'i daralt veya plan allowlist'ine güven.
 Tüm env var'lar `.env.example`'da. Tüm SaaS yolları hermetik test altında (`npx vitest run`).
 
-## Doğrulama Kapıları (G-Gates)
-Sistemin dürüstlüğünü kanıtlayan kapılar:
-- **G-Cluster:** İletişim testi.
-- **G-Sandbox:** WASM/WASI izolasyon testi.
-- **G-Governor:** CPU/VRAM kaynak kısıtlama testi.
-- **G-Durability:** Düğüm arızasında Pause-Replicate-Retry testi.
+## Doğrulama (kalite kapısı)
+Commit öncesi kanıt-temelli kapı (evidence over assertion — komutu koş, çıktıyı gör):
+```bash
+npm run lint && npm run test    # tsc --noEmit + full vitest suite (PBVC gate)
+npm run test:e2e                # playwright (React lane)
+npm run doctor                  # node/ollama/bridge/app health derin audit
+```
+Sınırlar: token İSİMLERİ loglanabilir, DEĞERLERİ asla · kök-neden önce · `npm run verify` yeşil olmadan commit yok.
