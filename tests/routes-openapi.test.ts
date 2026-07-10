@@ -51,6 +51,13 @@ const LOCAL_OWNER_ROUTES: Array<[string, string]> = [
   ["/api/models/{provider}", "get"],
   ["/api/orchestra", "get"],
   ["/api/pipeline", "post"],
+  // batch2 — ReAct agent chat + session lifecycle
+  ["/api/agent/chat", "post"],
+  ["/api/agent/sessions", "get"],
+  ["/api/agent/sessions", "post"],
+  ["/api/agent/sessions/{id}", "get"],
+  ["/api/agent/sessions/{id}", "delete"],
+  ["/api/agent/sessions/{id}/events", "get"],
 ];
 // v1.29.4 — newly documented tenant-authenticated routes (ApiKey + 401 contract).
 const TENANT_AUTH_ROUTES: Array<[string, string]> = [
