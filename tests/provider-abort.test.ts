@@ -19,7 +19,7 @@
 // could spy on getFallbackChain — but that is a private method. The approach
 // here stays hermetic and tests what IS observable: what the fetch call receives.
 
-import { describe, test, expect, vi, afterEach } from "vitest";
+import { describe, test, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { ProviderRouter, type GenerateConfig } from "../server/providers";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -29,6 +29,27 @@ const BASE_CONFIG: GenerateConfig = {
   model: "test-model",
   messages: [{ role: "user", content: "hi" }],
 };
+
+// Determinism/isolation (flake fix): the fallback chain includes the `fleet` provider,
+// which reads ~/.ollamas/backends.json and probes each backend's /api/tags. On a machine
+// with a REAL fleet configured (e.g. a remote http://desktop-ert7724:11434), that probe:
+//   (1) interleaves extra fetch() calls that overwrite `capturedSignal` in a non-composed
+//       order → the abort-signal assertions became ordering-dependent (flaky under load), and
+//   (2) risks a genuine DNS/TCP attempt to the remote box when a mock ever races setup/teardown.
+// Point FLEET_BACKENDS_PATH at a path that does not exist → loadFleetPool() returns an empty
+// pool → `fleet` immediately delegates to ollama-local with NO /api/tags probe. The ONLY fetch
+// calls are ollama-local's /api/chat, so `capturedSignal` is deterministically the COMPOSED
+// caller/timeout signal we intend to assert on. No behaviour is weakened — the test still
+// verifies real abort-signal threading, now hermetically.
+let prevFleetPath: string | undefined;
+beforeAll(() => {
+  prevFleetPath = process.env.FLEET_BACKENDS_PATH;
+  process.env.FLEET_BACKENDS_PATH = "/nonexistent/ollamas-test-no-fleet.json";
+});
+afterAll(() => {
+  if (prevFleetPath === undefined) delete process.env.FLEET_BACKENDS_PATH;
+  else process.env.FLEET_BACKENDS_PATH = prevFleetPath;
+});
 
 /** Minimal valid non-streaming ollama /api/chat JSON body. */
 function ollamaOkBody(text = "hello") {
@@ -157,7 +178,7 @@ describe("ProviderRouter.generate — abort signal threading (v1.11)", () => {
 
   test("resolves within 1s when pre-aborted (AbortError on ollama-local → demo fallback)", async () => {
     // fetch aborts immediately; demo provider takes over and responds synchronously.
-    vi.spyOn(global, "fetch").mockImplementation((_url, init) => {
+    vi.spyOn(global, "fetch").mockImplementation((_url, _init) => {
       return Promise.reject(new DOMException("The operation was aborted", "AbortError"));
     });
 

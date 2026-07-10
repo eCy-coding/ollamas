@@ -3,6 +3,22 @@
  * (no real `gemini` binary required). Pure: stripBadMcpType (the v0.22.2 settings auto-fix).
  */
 import { describe, it, expect, vi } from "vitest";
+
+// Determinism (flake fix): `ollamas gemini status` calls detectGemini(), which does
+// `execFile("gemini", ["--version"], { timeout: 8000 })`. On a machine where the real gemini
+// binary is on PATH that spawns a genuine subprocess; under parallel CI/GPU load the spawn +
+// version query can exceed vitest's 5s per-test timeout → intermittent FAIL. Mock detectGemini
+// to a deterministic "present" result (and keep every OTHER export real via importOriginal, so
+// the command-layer logic under test — output composition + exit-code branching — is unchanged).
+// No live-binary dependency, same assertions. detectAuthMode stays real (pure, reads env only).
+vi.mock("../cli/lib/gemini", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../cli/lib/gemini")>();
+  return {
+    ...actual,
+    detectGemini: vi.fn(async () => ({ present: true, version: "0.0.0-test" })),
+  };
+});
+
 import { main } from "../cli/index";
 import { stripBadMcpType } from "../cli/commands/gemini";
 
