@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V9 ✅ TAMAM (9/10) → V10 GA-gate sırada** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V9 ✅ + V10 gate KOŞTU → KOŞULLU-GO (4 Emre-gate)** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -16,11 +16,11 @@
 | Alan | Değer |
 |---|---|
 | Aktif aşama | **V1–V9 ✅ TAMAM** (branch feat/v-final-train, 27 commit) |
-| Kodlama durumu | ✅ V1–V9 (CHANGELOG, error-tracking, link-sweep, full-E2E 28/28) → **V10 GA-gate** |
+| Kodlama durumu | ✅ V1–V9 + M-044 verifier 18/23→fix'ler → **KOŞULLU-GO** |
 | Genel ilerleme (kod) | **49 / 50 mikro-görev** · **9 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) + per-model ayar (V7) |
-| Sıradaki adım | **V10 GA-gate** → M-044 (Opus 02-DOD tam re-verify) → git-tag Emre onayı |
-| Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
+| Sıradaki adım | **EMRE KARARI ×4:** ① iç-worktree sil-onayı ② push→CI (D14) ③ 05-TEHDIT §5 Onay ④ `git tag v1.33.0` |
+| Bloke / Emre-gate | D9 iç-worktree-sil · D14 push→CI · §5 risk-Onay · git-tag v1.33.0 (S-017) |
 | Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
 ## 🚂 Versiyon ilerleme (release-train — yürütme sırası)
@@ -35,7 +35,7 @@ V6  Ürün & Gelir         ██████████ ✅ v1.29.0  5/5 (M-01
 V7  Gelişmiş Model Kont. ██████████ ✅ v1.30.0  2/2 (M-038 per-model UI, M-039 GGUF guide)
 V8  Dağıtım Sağlamlığı   ██████████ ✅ v1.31.0  6/6 (M-020 fail-closed,022,023,024,036,046)
 V9  Gözlemlenebilir+Cila ██████████ ✅ v1.32.0  4/4 (M-041,042,043,049 · e2e 28/28)
-V10 v-FINAL / GA         ░░░░░░░░░░ ☐  v1.33.0  ✅GA-ÜRETİME-HAZIR (M-044 Opus-gate)
+V10 v-FINAL / GA         █████████░ ◐  v1.33.0  KOŞULLU-GO (18/23+fix'ler · kalan Emre-gate ×4)
 ```
 
 Detay: `16-VERSIYON-YOLHARITASI.md` (her versiyon phase/todo/alt-todo/DoD/precompute).
@@ -101,7 +101,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-041 | V9 | CHANGELOG.md | ✅ | Keep-a-Changelog · 7ab149c | — |
 | M-042 | V9 | full-E2E acceptance | ✅ | 4-komut-0-fail + f93705a fix'ler · S-016 | — |
 | M-043 | V9 | docs cross-link sweep | ✅ | 74+7 link canlı, guide 9/9 · 7ab149c | — |
-| M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
+| M-044 | V10 | GA-gate (Opus) | ◐ | 18/23→fix'ler→KOŞULLU-GO · S-017 | Emre×4 |
 
 **Sayaç:** kapandı **49/50** (V1–V9) · kalan V10 (1: M-044) · ⛔ Emre-gate: yalnız git-tag · aktif-yol 1.
 
@@ -121,6 +121,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
+- **S-017** (2026-07-10) · M-044 Opus-verifier 23-satır canlı: 18 PASS/5 FAIL → D19 (14-boyut taze-damga) + D20 kapatıldı, D18-Durum 12/12; KOŞULLU-GO. Kalan 4 karar Emre'de.
 - **S-016** (2026-07-10) · V9 4/4: CHANGELOG + link-sweep (7ab149c), error-tracking 11/11 (db14cdb), full-E2E tek-oturum 4-komut-0-fail + 2 e2e kök-neden fix: model-clobber (preferredOrFirstUsable) + WCAG kontrast (f93705a). Yabancı-geçerli 080f40f (CI install-smoke) kabul.
 - **S-015** (2026-07-10) · V8 3-paralel-subagent: M-020 fail-closed (RED/GREEN 16/16) + install.sh MASTER_KEY_B64 bootstrap, deploy-guide 4-yol, DRY_RUN install drilli (gerçek koşum dürüst-sapma→M-042), rollback 5-bölüm sandbox, spot-check 11-exit-0 + verify-docfix. FRESH 2213/0.
 - **S-014b** (2026-07-10) · GÜVENLİK: /api/model-overrides localOwnerGuard'a eklendi (5e3e606, SaaS prompt-injection yüzeyiydi) + çift-kondüktör olayı çözüldü (tek oturum kuralı).
