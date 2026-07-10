@@ -297,7 +297,7 @@
 - **action:** ReactAgentTab/cockpit'e model-başına num_ctx/temperature/keep_alive/system override UI; `config.numCtx` zaten destekli, UI'dan geçir + persist.
 - **test:** `tests/ui/model-settings.test.tsx` (yeni)
 - **kabul:** UI override → request'e geçer + persist; test yeşil.
-- **dep:** yok · **durum:** ☐
+- **dep:** yok · **durum:** ✅ KANIT: model-overrides.ts saf-çekirdek + /api/model-overrides + ModelSettings.tsx; tsc 0 · 48/48 (5 dosya) · 62ab63c
 
 ### M-039 · P6b · S · GAP-036 · GGUF/Modelfile import
 - **anchor:** `server/tool-registry.ts:635` (bench_gguf — yalnız benchmark)
@@ -305,7 +305,7 @@
 - **📚 ref:** 17-KAYNAK-KOD-ORNEKLERI §A [M-039] Modelfile + CLI-nüansı
 - **test:** import varsa test; doküman ise yok
 - **kabul:** import akışı çalışır VEYA doküman GGUF→kullanılabilir-model yolunu belgeler.
-- **dep:** M-033 (model-guide) · **durum:** ☐
+- **dep:** M-033 (model-guide) · **durum:** ✅ KANIT: docs/custom-model.md (CLI `ollama create -f` yolu + blob-upload nüansı) + model-guide cross-link · 62ab63c
 
 ### M-040 · V3 · ✅ · GAP-038 · API quickstart
 - **anchor:** `server/openapi.ts` (OpenAPI 3.1), `/api/openapi.json`, Bearer `olm_`

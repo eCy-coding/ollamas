@@ -266,4 +266,27 @@
 
 ---
 
+## S-014 · 2026-07-10 · V7 Gelişmiş Model Kontrolü 2/2 (subagent-driven + TDD) · conductor: fable-5
+
+- **V7 2/2 ✅** (commit 62ab63c): M-038 per-model override — yeni `server/model-overrides.ts` saf çekirdek
+  (sanitizeModelOverride/resolveModelTuning/resolveKeepAlive/withSystemOverride, öncelik: request > override > global),
+  `db.data.modelOverrides` persist, `GET/POST /api/model-overrides` route, `src/components/ModelSettings.tsx`
+  katlanır editör (ReactAgentTab model-seçici altına mount), locales 12 anahtar EN+TR; providers.ts ollama-local+cloud
+  branch'lerinde `options.num_ctx/temperature` + top-level `keep_alive` + system-prepend uygulanır.
+  M-039 `docs/custom-model.md` — GGUF→Modelfile→`ollama create -f` CLI yolu (+ `/api/create` blob-upload nüansı,
+  cookbook 17-§A), model-guide.md cross-link.
+- **KANIT (conductor self-verify):**
+  ```text
+  $ npm run lint → tsc exit 0
+  $ npx vitest run tests/model-overrides.test.ts tests/ui/model-settings.test.tsx tests/ui/ReactAgentTab.test.tsx tests/ui/i18n.test.tsx tests/ai.test.ts
+  Test Files 5 passed (5) · Tests 48 passed (48)
+  ```
+  → yorum: kabul karşılandı — override request-gövdesine geçer + persist test yeşil; GGUF doküman mevcut.
+- **Bulgu (subagent):** numCtx/temperature per-request zaten GenerateConfig'teydi; keep_alive yalnız env, system yalnız
+  konuşmadan — ikisi override'a bağlandı. Eşzamanlı yabancı lane `tests/model-settings.test.ts` çakışması geldi-gitti
+  (dokunulmadı, final gate temiz). Tag YOK (V1–V6 emsali; v1.30.0 mantıksal etiket, tag V10'da Emre).
+- **39/50 görev, 7/10 versiyon.** Sonraki: V8 Dağıtım Sağlamlığı → M-023/024/022/036/020/046.
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->

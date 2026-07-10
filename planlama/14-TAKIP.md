@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V6 ✅ TAMAM (6/10) → V7 sırada** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V7 ✅ TAMAM (7/10) → V8 sırada** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,11 +15,11 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1–V6 ✅ TAMAM** (branch feat/v-final-train, 17 commit) |
-| Kodlama durumu | ✅ V1–V6 (billing e2e, Lighthouse perf0.96, GDPR erasure, i18n RTL) → **V7 sırada** |
-| Genel ilerleme (kod) | **37 / 50 mikro-görev** · **6 / 10 versiyon** |
-| Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
-| Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
+| Aktif aşama | **V1–V7 ✅ TAMAM** (branch feat/v-final-train, 19 commit) |
+| Kodlama durumu | ✅ V1–V7 (per-model override UI+API, GGUF import guide) → **V8 sırada** |
+| Genel ilerleme (kod) | **39 / 50 mikro-görev** · **7 / 10 versiyon** |
+| Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) + per-model ayar (V7) |
+| Sıradaki adım | **V8 Dağıtım Sağlamlığı** → M-023 (install.sh temiz-dizin) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
 | Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
@@ -32,8 +32,8 @@ V3  Kendi Geliştirmeni.. ██████████ ✅ v1.26.0  6/6 (addin
 V4  Güvenlik Kanıtı      ██████████ ✅ v1.27.0  11/11 (M-004/006 V5'te açıldı)
 V5  Test Bütünlüğü       ██████████ ✅ v1.28.0  9/9 (M-015 audit/* arşivlendi · FRESH 1518)
 V6  Ürün & Gelir         ██████████ ✅ v1.29.0  5/5 (M-017 billing,018 LH0.96,019/048 i18n,047 GDPR)
-V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  ◀ SIRADA (M-038 per-model UI, M-039 GGUF import)
-V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  (M-020,022,023,024,036)
+V7  Gelişmiş Model Kont. ██████████ ✅ v1.30.0  2/2 (M-038 per-model UI, M-039 GGUF guide)
+V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  ◀ SIRADA (M-020,022,023,024,036,046)
 V9  Gözlemlenebilir+Cila ░░░░░░░░░░ ☐  v1.32.0  (M-041,042,043)
 V10 v-FINAL / GA         ░░░░░░░░░░ ☐  v1.33.0  ✅GA-ÜRETİME-HAZIR (M-044 Opus-gate)
 ```
@@ -95,21 +95,21 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-035 | V3 | CLI alt-komut rehberi | ✅ | be79cb9 | — |
 | M-036 | P6b | deploy-guide + stack-update | ☐ | — | — |
 | M-037 | V2 | first-run model onboarding | ✅ | ai.ts aksiyon-mesajı + 2/2 test · e0edba4 | — |
-| M-038 | P6b | per-model ayar UI | ☐ | — | — |
-| M-039 | P6b | GGUF/Modelfile import | ☐ | — | M-033 |
+| M-038 | V7 | per-model ayar UI | ✅ | model-overrides+UI+API · 48/48 · 62ab63c | — |
+| M-039 | V7 | GGUF/Modelfile import | ✅ | docs/custom-model.md CLI-yolu · 62ab63c | — |
 | M-040 | V3 | API quickstart | ✅ | be79cb9 | — |
 | M-041 | V9 | CHANGELOG.md | ☐ | — | — |
 | M-042 | V9 | full-E2E acceptance | ☐ | — | M-013/023 |
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **37/50** (V1–V6) · kalan V7-V10 (13) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 13.
+**Sayaç:** kapandı **39/50** (V1–V7) · kalan V8-V10 (11) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 11.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
-- **Şu an:** V1–V5 kapandı (32/50, YARI YOL). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
-- **Sonraki versiyon: V7 Gelişmiş Model Kontrolü (v1.30.0)** — M-038 (per-model num_ctx/temp/keep_alive UI), M-039 (GGUF/Modelfile import, CLI-yolu).
-- **Barrier:** M-018←M-013(✅). Kalan Emre-gate: yalnız V10 git-tag (outward).
+- **Şu an:** V1–V7 kapandı (39/50). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
+- **Sonraki versiyon: V8 Dağıtım Sağlamlığı (v1.31.0)** — M-023 (install.sh temiz-dizin), M-024 (rollback tatbikat), M-022 (README spot-check), M-036 (deploy-guide), M-020 (cloud master-key fail-closed), M-046 (Linux-install).
+- **Kalan Emre-gate:** yalnız V10 git-tag (outward).
 
 ## ⛔ Bloke / Emre-gate bekleyenler
 
@@ -121,6 +121,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
+- **S-014** (2026-07-10) · V7 subagent-driven+TDD: per-model override (server/model-overrides.ts saf-çekirdek + /api/model-overrides + ModelSettings.tsx UI + locales EN/TR) [M-038], docs/custom-model.md GGUF CLI-yolu [M-039]. tsc-0 · 48/48 · commit 62ab63c.
 - **S-009** (2026-07-10) · V3 subagent-driven: 6 dev-doküman (adding-a-tool/extension-guide/HOWTO-ADD-SKILL/CLI-guide/api-quickstart/troubleshooting), tsc-0, commit be79cb9. Yöntem 18-§9.
 - **S-008** (2026-07-10) · V1 kapandı + V2 TAMAM (kullanılabilir): custom-openai+catalog dropdown+server, first-run onboarding, model-guide. 23/23 test.
 - **S-007** (2026-07-10) · V1 4/5 (README/setup/VERSION/CONTRIBUTING) — kod başladı, branch feat/v-final-train.
