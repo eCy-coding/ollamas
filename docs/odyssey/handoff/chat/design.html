@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/colors_and_type.css">
+<script src="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:#0a0b10}
+:root{
+  --ui:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','SF Mono',monospace;
+  --desk:#070810; --griddot:rgba(255,255,255,.035);
+  --bg:#0a0b10; --panel:#12141c; --surface:#0c0d13; --raised:#171923; --raised-2:#1d202b; --inset:#0b0c11;
+  --border:rgba(255,255,255,.07); --border-2:rgba(255,255,255,.11); --border-accent:rgba(99,102,241,.4);
+  --fg:#e7e8ef; --fg-2:#a1a4b5; --fg-3:#71748a; --fg-faint:#3f4256;
+  --accent:#6366f1; --accent-2:#818cf8; --accent-3:#a5b4fc; --accent-weak:rgba(99,102,241,.14); --accent-weak-2:rgba(99,102,241,.24);
+  --user:#181b28; --user-border:rgba(99,102,241,.26);
+  --ok:#2bd4a4; --ok-weak:rgba(43,212,164,.13);
+  --bad:#ff5a68; --bad-weak:rgba(255,90,104,.13);
+  --warn:#f6ad2e; --warn-weak:rgba(246,173,46,.14);
+  --add-fg:#2bd4a4; --add-bg:rgba(43,212,164,.10); --add-line:rgba(43,212,164,.15);
+  --del-fg:#ff5a68; --del-bg:rgba(255,90,104,.09); --del-line:rgba(255,90,104,.15);
+  --shadow-mid:0 4px 20px rgba(0,0,0,.5); --shadow-high:0 18px 50px rgba(0,0,0,.6);
+  --glow:0 0 0 1px rgba(99,102,241,.45),0 0 28px rgba(99,102,241,.26);
+  --kbd-bg:#1c1f29;
+}
+[data-theme="light"]{
+  --desk:#e4e6ee; --griddot:rgba(20,24,40,.05);
+  --bg:#eef0f5; --panel:#ffffff; --surface:#f6f7fb; --raised:#ffffff; --raised-2:#f1f2f7; --inset:#f4f5f9;
+  --border:rgba(15,18,30,.10); --border-2:rgba(15,18,30,.15); --border-accent:rgba(99,102,241,.42);
+  --fg:#14161f; --fg-2:#565a6b; --fg-3:#868a9b; --fg-faint:#b9bcca;
+  --accent:#5457e6; --accent-2:#6366f1; --accent-3:#4338ca; --accent-weak:rgba(99,102,241,.11); --accent-weak-2:rgba(99,102,241,.18);
+  --user:#eef0fe; --user-border:rgba(99,102,241,.28);
+  --ok:#0e9f78; --ok-weak:rgba(14,159,120,.12);
+  --bad:#e23050; --bad-weak:rgba(226,48,80,.10);
+  --warn:#c77d10; --warn-weak:rgba(199,125,16,.13);
+  --add-fg:#0e9f78; --add-bg:rgba(14,159,120,.10); --add-line:rgba(14,159,120,.16);
+  --del-fg:#e23050; --del-bg:rgba(226,48,80,.08); --del-line:rgba(226,48,80,.14);
+  --shadow-mid:0 4px 18px rgba(20,24,40,.10); --shadow-high:0 18px 46px rgba(20,24,40,.16);
+  --glow:0 0 0 1px rgba(99,102,241,.35),0 0 22px rgba(99,102,241,.16);
+  --kbd-bg:#eceef4;
+}
+textarea,input,button,select{font-family:inherit;color:inherit}
+textarea::placeholder{color:var(--fg-3)}
+textarea{resize:none}
+kbd{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--fg-2);background:var(--kbd-bg);border:1px solid var(--border-2);border-radius:5px;padding:1px 5px;line-height:1.5;white-space:nowrap;display:inline-block}
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[data-focusring]:focus-within{border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-weak)!important}
+summary{list-style:none;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+[data-chev]{transition:transform .18s cubic-bezier(0.16,1,0.3,1)}
+details[open]>summary [data-chev]{transform:rotate(90deg)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--fg-faint)}
+::-webkit-scrollbar-track{background:transparent}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulsed{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes sheen{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" data-theme="{{ theme }}" style="min-height:100vh;background:var(--desk);background-image:radial-gradient(circle at 1px 1px,var(--griddot) 1px,transparent 0);background-size:30px 30px;font-family:var(--ui);color:var(--fg);position:relative;-webkit-font-smoothing:antialiased">
+
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+<defs>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6"/></symbol>
+<symbol id="i-filecode" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9.5 12.5 8 14l1.5 1.5M14.5 12.5 16 14l-1.5 1.5"/></symbol>
+<symbol id="i-filetext" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
+<symbol id="i-git" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M18 10.5c0 3.5-2.5 4-6 4.5M6 8.5v7"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v5.5L5.2 17a2 2 0 0 0 1.8 3h10a2 2 0 0 0 1.8-3L14 8.5V3M7.5 14.5h9"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-checkcircle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.4 2.4L15.5 9"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+<symbol id="i-chevdown" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chevright" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-arrowup" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+<symbol id="i-enter" viewBox="0 0 24 24"><path d="M9 10 4 15l5 5M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.3M21 3v5h-5"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+<symbol id="i-diff" viewBox="0 0 24 24"><path d="M12 3v14M5 10h14M5 21h14"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="m19 14 .8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-panelright" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-cmd" viewBox="0 0 24 24"><path d="M15 6a3 3 0 1 1 3 3h-3zm0 0v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><path d="M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM18 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0v2a4 4 0 0 1-4 4H9"/></symbol>
+<symbol id="i-return" viewBox="0 0 24 24"><path d="M20 6v4a2 2 0 0 1-2 2H5M8 9l-3 3 3 3"/></symbol>
+</defs>
+</svg>
+
+<!--DOC HEADER-->
+<div style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:20px;padding:16px 32px;background:color-mix(in srgb,var(--desk) 82%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;box-shadow:var(--glow);flex-shrink:0">
+      <svg viewBox="0 0 24 24" style="width:19px;height:19px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg>
+    </div>
+    <div>
+      <div style="font:700 16px var(--ui);letter-spacing:-.02em;color:var(--fg)">eCy Agent Console</div>
+      <div style="font:500 11.5px var(--mono);color:var(--fg-3);margin-top:1px">AI agent panel · dark + light · 4 states + tablet</div>
+    </div>
+  </div>
+  <div style="flex:1"></div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="display:flex;align-items:center;gap:12px;padding:5px 12px;border:1px solid var(--border);border-radius:9px;background:var(--panel)">
+      <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px var(--mono);color:var(--fg-3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--warn)"></span>running</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px var(--mono);color:var(--fg-3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>done</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px var(--mono);color:var(--fg-3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--bad)"></span>failed</span>
+    </div>
+    <div style="display:inline-flex;padding:3px;gap:2px;background:var(--panel);border:1px solid var(--border-2);border-radius:10px">
+      <sc-if value="{{ isDark }}"><button type="button" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:7px;background:var(--accent-weak);color:var(--fg);font:600 12px var(--ui);cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-moon"/></svg>Dark</button></sc-if>
+      <sc-if value="{{ isLight }}"><button type="button" onClick="{{ setDark }}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:7px;background:transparent;color:var(--fg-2);font:600 12px var(--ui);cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-moon"/></svg>Dark</button></sc-if>
+      <sc-if value="{{ isLight }}"><button type="button" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:7px;background:var(--accent-weak);color:var(--fg);font:600 12px var(--ui);cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sun"/></svg>Light</button></sc-if>
+      <sc-if value="{{ isDark }}"><button type="button" onClick="{{ setLight }}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:none;border-radius:7px;background:transparent;color:var(--fg-2);font:600 12px var(--ui);cursor:pointer"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sun"/></svg>Light</button></sc-if>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;flex-direction:column;align-items:center;gap:0;padding:40px 40px 160px;position:relative;z-index:1">
+
+<!--=================== FRAME 01 · EMPTY ===================-->
+<section id="empty" data-screen-label="EMPTY" style="width:1440px;margin-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px;padding-left:2px">
+    <span style="font:700 13px var(--mono);color:var(--accent-2);letter-spacing:.04em">01</span>
+    <span style="font:700 17px var(--ui);letter-spacing:-.01em;color:var(--fg)">Empty · new conversation</span>
+    <span style="font:500 13px var(--ui);color:var(--fg-3)">Prompt suggestions, idle trace, composer at rest</span>
+  </div>
+
+  <div style="width:1440px;height:900px;border-radius:16px;overflow:hidden;border:1px solid var(--border-2);box-shadow:var(--shadow-high);background:var(--panel);display:flex;flex-direction:column">
+
+    <!--TOP BAR-->
+    <div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)">
+      <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:500 12.5px var(--mono);color:var(--fg-2)">acme/checkout-web</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border-2);border-radius:6px;background:var(--raised);font:500 11.5px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-branch"/></svg>fix/cart-total</span>
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" style="display:inline-flex;align-items:center;gap:9px;padding:6px 10px 6px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent)">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg>
+        <span style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:8b</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;background:var(--ok-weak);font:700 9.5px var(--mono);letter-spacing:.04em;color:var(--ok)">LOCAL · FREE</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg>
+      </button>
+      <div style="width:1px;height:22px;background:var(--border)"></div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-zap"/></svg>— tok/s</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-layers"/></svg>0 / 128K</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--raised);font:600 11.5px var(--ui);color:var(--fg-2)"><span style="width:7px;height:7px;border-radius:50%;background:var(--fg-3)"></span>Ready</div>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <!--LEFT SIDEBAR-->
+      <div style="width:264px;flex:none;border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="padding:12px 12px 8px">
+          <button type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:600 13px var(--ui);cursor:pointer;box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.98)">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-plus"/></svg>
+            New chat
+            <span style="flex:1"></span>
+            <kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘N</kbd>
+          </button>
+          <div data-focusring style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--inset)">
+            <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg>
+            <input placeholder="Search chats" style="flex:1;min-width:0;background:none;border:none;outline:none;font:500 12.5px var(--ui);color:var(--fg)"/>
+            <kbd>⌘K</kbd>
+          </div>
+        </div>
+        <div style="padding:6px 18px 4px;font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Recent</div>
+        <div style="flex:1;overflow-y:auto;padding:2px 8px 8px;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+            <sc-if value="{{ s.active }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px 9px 12px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);cursor:pointer">
+                <span style="position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)"></span>
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg>
+                <span style="flex:1;min-width:0"><span style="display:block;font:600 12.5px var(--ui);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-3)">{{ s.time }}</span></span>
+                <span style="width:7px;height:7px;border-radius:50%;background:var(--warn);flex-shrink:0;animation:pulsed 1.4s ease-in-out infinite"></span>
+              </button>
+            </sc-if>
+            <sc-if value="{{ s.inactive }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="--rowdel:1;background:var(--raised-2)">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg>
+                <span style="flex:1;min-width:0"><span style="display:block;font:500 12.5px var(--ui);color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-faint)">{{ s.time }}</span></span>
+                <span style="display:inline-flex;opacity:var(--rowdel,0);transition:opacity .15s" style-hover="color:var(--bad)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-trash"/></svg></span>
+              </button>
+            </sc-if>
+          </sc-for>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:10px 12px;display:flex;align-items:center;gap:9px">
+          <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent-3),var(--accent));display:flex;align-items:center;justify-content:center;font:700 12px var(--ui);color:#fff">D</div>
+          <div style="flex:1;min-width:0"><div style="font:600 12px var(--ui);color:var(--fg)">Dana Okafor</div><div style="font:500 10.5px var(--mono);color:var(--fg-3)">Pro workspace</div></div>
+          <button type="button" style="display:inline-flex;padding:6px;border:none;background:none;cursor:pointer;color:var(--fg-3);border-radius:7px" style-hover="background:var(--raised-2);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sliders"/></svg></button>
+        </div>
+      </div>
+
+      <!--CENTER-->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface)">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 48px;min-height:0">
+          <div style="width:56px;height:56px;border-radius:15px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;box-shadow:var(--glow);margin-bottom:22px"><svg viewBox="0 0 24 24" style="width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+          <div style="font:700 10.5px var(--mono);letter-spacing:.18em;color:var(--accent-2);text-transform:uppercase;margin-bottom:10px">Local · qwen3:8b · $0</div>
+          <div style="font:700 25px var(--ui);letter-spacing:-.02em;color:var(--fg);margin-bottom:8px">What should we build?</div>
+          <div style="font:450 14.5px var(--ui);line-height:1.55;color:var(--fg-2);max-width:440px;text-align:center;margin-bottom:30px">eCy reads your repo, runs tools, and edits files — pausing for your approval before anything is written to disk.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:660px">
+            <button type="button" style="display:flex;gap:12px;text-align:left;padding:15px;border:1px solid var(--border-2);border-radius:12px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent);background:var(--raised-2)" style-active="transform:scale(.99)">
+              <div style="width:34px;height:34px;flex:none;border-radius:9px;background:var(--accent-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></div>
+              <div><div style="font:600 13.5px var(--ui);color:var(--fg);margin-bottom:3px">Fix a failing test</div><div style="font:450 12px var(--ui);line-height:1.5;color:var(--fg-3)">Point eCy at a red test; it finds the cause and patches it.</div></div>
+            </button>
+            <button type="button" style="display:flex;gap:12px;text-align:left;padding:15px;border:1px solid var(--border-2);border-radius:12px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent);background:var(--raised-2)" style-active="transform:scale(.99)">
+              <div style="width:34px;height:34px;flex:none;border-radius:9px;background:var(--accent-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></div>
+              <div><div style="font:600 13.5px var(--ui);color:var(--fg);margin-bottom:3px">Explain a file</div><div style="font:450 12px var(--ui);line-height:1.5;color:var(--fg-3)">Summarize what a module does and where it is used.</div></div>
+            </button>
+            <button type="button" style="display:flex;gap:12px;text-align:left;padding:15px;border:1px solid var(--border-2);border-radius:12px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent);background:var(--raised-2)" style-active="transform:scale(.99)">
+              <div style="width:34px;height:34px;flex:none;border-radius:9px;background:var(--accent-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg></div>
+              <div><div style="font:600 13.5px var(--ui);color:var(--fg);margin-bottom:3px">Run a command</div><div style="font:450 12px var(--ui);line-height:1.5;color:var(--fg-3)">Execute a shell task and stream the output back.</div></div>
+            </button>
+            <button type="button" style="display:flex;gap:12px;text-align:left;padding:15px;border:1px solid var(--border-2);border-radius:12px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent);background:var(--raised-2)" style-active="transform:scale(.99)">
+              <div style="width:34px;height:34px;flex:none;border-radius:9px;background:var(--accent-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--accent-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></div>
+              <div><div style="font:600 13.5px var(--ui);color:var(--fg);margin-bottom:3px">Refactor safely</div><div style="font:450 12px var(--ui);line-height:1.5;color:var(--fg-3)">Propose edits behind a human approval gate.</div></div>
+            </button>
+          </div>
+        </div>
+        <!--COMPOSER-->
+        <div style="flex:none;padding:14px 20px 16px;border-top:1px solid var(--border);background:var(--panel)">
+          <div data-focusring style="border:1px solid var(--border-2);border-radius:14px;background:var(--raised);box-shadow:var(--shadow-mid);overflow:hidden">
+            <textarea rows="2" placeholder="Describe a task, paste an error, or ask a question…  Use @ to attach files." style="width:100%;padding:14px 16px 6px;background:none;border:none;outline:none;font:450 14px var(--ui);line-height:1.5;color:var(--fg)"></textarea>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px 10px">
+              <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--border-2);border-radius:8px;background:var(--inset);cursor:pointer" style-hover="border-color:var(--border-accent)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg><span style="font:600 11.5px var(--mono);color:var(--fg-2)">qwen3:8b</span><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg></button>
+              <div style="flex:1"></div>
+              <button type="button" onClick="{{ toggleAuto }}" style="display:inline-flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;padding:4px 4px;border-radius:7px">
+                <sc-if value="{{ autoApply }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);transition:background .15s;flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .15s"></span></span></sc-if>
+                <sc-if value="{{ autoApplyOff }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);transition:background .15s;flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2);transition:left .15s"></span></span></sc-if>
+                <span style="font:600 11.5px var(--ui);color:var(--fg-2)">Auto-apply</span>
+              </button>
+              <button type="button" onClick="{{ toggleVerify }}" style="display:inline-flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;padding:4px 4px;border-radius:7px">
+                <sc-if value="{{ verify }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);transition:background .15s;flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .15s"></span></span></sc-if>
+                <sc-if value="{{ verifyOff }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);transition:background .15s;flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2);transition:left .15s"></span></span></sc-if>
+                <span style="font:600 11.5px var(--ui);color:var(--fg-2)">Verify</span>
+              </button>
+              <div style="width:1px;height:20px;background:var(--border)"></div>
+              <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:8px 10px 8px 14px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 12.5px var(--ui)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)">Send<kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘↵</kbd></button>
+            </div>
+          </div>
+          <sc-if value="{{ showHints }}">
+            <div style="display:flex;align-items:center;gap:14px;margin-top:9px;padding:0 4px;font:500 11px var(--mono);color:var(--fg-3)">
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘↵</kbd> send</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⇧⌘↵</kbd> send &amp; run</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘K</kbd> commands</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>esc</kbd> stop</span>
+              <span style="flex:1"></span>
+              <span>Enter inserts newline</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!--RIGHT RAIL-->
+      <div style="width:328px;flex:none;border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="flex:none;display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border)">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg>
+          <span style="font:600 12.5px var(--ui);color:var(--fg)">Execution trace</span>
+          <span style="flex:1"></span>
+          <span style="padding:2px 8px;border-radius:5px;background:var(--raised-2);font:700 9.5px var(--mono);letter-spacing:.08em;color:var(--fg-3)">IDLE</span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:16px;min-height:0">
+          <div style="border:1px dashed var(--border-2);border-radius:12px;padding:26px 20px;text-align:center;background:var(--surface)">
+            <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--fg-faint);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-bottom:10px"><use href="#i-terminal"/></svg>
+            <div style="font:600 12.5px var(--ui);color:var(--fg-2);margin-bottom:4px">No active run</div>
+            <div style="font:450 11.5px var(--ui);line-height:1.5;color:var(--fg-3)">Every tool eCy calls streams here as a numbered step with status and latency.</div>
+          </div>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);display:flex;flex-direction:column;max-height:380px">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px">
+            <span style="font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Available tools</span>
+            <span style="flex:1"></span>
+            <span style="font:600 11px var(--mono);color:var(--fg-3)">7</span>
+          </div>
+          <div style="overflow-y:auto;padding:0 10px 12px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">read_file</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Read file contents</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--raised-2);font:600 9.5px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-folder"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">list_files</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">List a directory</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--raised-2);font:600 9.5px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">grep</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Search across files</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--raised-2);font:600 9.5px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">run_command</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Run a shell command</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--warn-weak);font:600 9.5px var(--mono);color:var(--warn)">exec</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">run_tests</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Run the test suite</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--warn-weak);font:600 9.5px var(--mono);color:var(--warn)">exec</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;border:1px solid var(--border-accent);background:var(--accent-weak)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">edit_file</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Apply a unified diff</div></div><span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;background:var(--accent-weak-2);font:600 9.5px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg>approval</span></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-diff"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12px var(--mono);color:var(--fg)">git_diff</div><div style="font:450 10.5px var(--ui);color:var(--fg-3)">Show working changes</div></div><span style="padding:2px 7px;border-radius:5px;background:var(--raised-2);font:600 9.5px var(--mono);color:var(--fg-3)">read</span></div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding:11px 16px;display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)"></span><span style="font:600 11.5px var(--mono);color:var(--fg-2)">qwen3:8b</span><span style="font:500 11px var(--ui);color:var(--fg-3)">Local runtime · ready</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!--=================== FRAME 02 · STREAMING ===================-->
+<section id="streaming" data-screen-label="STREAMING" style="width:1440px;margin-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px;padding-left:2px">
+    <span style="font:700 13px var(--mono);color:var(--accent-2);letter-spacing:.04em">02</span>
+    <span style="font:700 17px var(--ui);letter-spacing:-.01em;color:var(--fg)">Streaming · assistant mid-response</span>
+    <span style="font:500 13px var(--ui);color:var(--fg-3)">Live cursor, collapsed reasoning, one tool-call running</span>
+  </div>
+
+  <div style="width:1440px;height:900px;border-radius:16px;overflow:hidden;border:1px solid var(--border-2);box-shadow:var(--shadow-high);background:var(--panel);display:flex;flex-direction:column">
+
+    <!--TOP BAR-->
+    <div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)">
+      <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:500 12.5px var(--mono);color:var(--fg-2)">acme/checkout-web</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border-2);border-radius:6px;background:var(--raised);font:500 11.5px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-branch"/></svg>fix/cart-total</span>
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" style="display:inline-flex;align-items:center;gap:9px;padding:6px 10px 6px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent)">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg>
+        <span style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:8b</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;background:var(--ok-weak);font:700 9.5px var(--mono);letter-spacing:.04em;color:var(--ok)">LOCAL · FREE</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg>
+      </button>
+      <div style="width:1px;height:22px;background:var(--border)"></div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-zap"/></svg>148 tok/s</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-layers"/></svg>12.4K / 128K</div>
+      <div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:7px;border:1px solid var(--warn-weak);background:var(--warn-weak);font:600 11.5px var(--ui);color:var(--warn)"><span style="width:7px;height:7px;border-radius:50%;background:var(--warn);animation:pulsed 1.2s ease-in-out infinite"></span>Streaming</div>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <!--LEFT SIDEBAR-->
+      <div style="width:264px;flex:none;border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="padding:12px 12px 8px">
+          <button type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:600 13px var(--ui);cursor:pointer;box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.98)">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-plus"/></svg>New chat<span style="flex:1"></span><kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘N</kbd>
+          </button>
+          <div data-focusring style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--inset)">
+            <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg>
+            <input placeholder="Search chats" style="flex:1;min-width:0;background:none;border:none;outline:none;font:500 12.5px var(--ui);color:var(--fg)"/><kbd>⌘K</kbd>
+          </div>
+        </div>
+        <div style="padding:6px 18px 4px;font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Recent</div>
+        <div style="flex:1;overflow-y:auto;padding:2px 8px 8px;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+            <sc-if value="{{ s.active }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px 9px 12px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);cursor:pointer">
+                <span style="position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)"></span>
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg>
+                <span style="flex:1;min-width:0"><span style="display:block;font:600 12.5px var(--ui);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-3)">{{ s.time }}</span></span>
+                <span style="width:7px;height:7px;border-radius:50%;background:var(--warn);flex-shrink:0;animation:pulsed 1.4s ease-in-out infinite"></span>
+              </button>
+            </sc-if>
+            <sc-if value="{{ s.inactive }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="--rowdel:1;background:var(--raised-2)">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg>
+                <span style="flex:1;min-width:0"><span style="display:block;font:500 12.5px var(--ui);color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-faint)">{{ s.time }}</span></span>
+                <span style="display:inline-flex;opacity:var(--rowdel,0);transition:opacity .15s" style-hover="color:var(--bad)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-trash"/></svg></span>
+              </button>
+            </sc-if>
+          </sc-for>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:10px 12px;display:flex;align-items:center;gap:9px">
+          <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent-3),var(--accent));display:flex;align-items:center;justify-content:center;font:700 12px var(--ui);color:#fff">D</div>
+          <div style="flex:1;min-width:0"><div style="font:600 12px var(--ui);color:var(--fg)">Dana Okafor</div><div style="font:500 10.5px var(--mono);color:var(--fg-3)">Pro workspace</div></div>
+          <button type="button" style="display:inline-flex;padding:6px;border:none;background:none;cursor:pointer;color:var(--fg-3);border-radius:7px" style-hover="background:var(--raised-2);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sliders"/></svg></button>
+        </div>
+      </div>
+
+      <!--CENTER-->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface)">
+        <div ref="{{ refStream }}" style="flex:1;overflow-y:auto;padding:26px 34px;min-height:0">
+          <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:22px">
+            <!--user msg-->
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+              <div style="max-width:78%;padding:11px 15px;border-radius:14px 14px 4px 14px;background:var(--user);border:1px solid var(--user-border);font:450 14px var(--ui);line-height:1.55;color:var(--fg)">The CartSummary test started failing after I added coupon support. Can you find the cause and fix it?</div>
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--raised-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font:700 11px var(--ui);color:var(--fg-2)">D</div>
+            </div>
+            <!--assistant-->
+            <div style="display:flex;gap:12px">
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+              <div style="flex:1;min-width:0">
+                <details style="border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:14px">
+                  <summary style="display:flex;align-items:center;gap:9px;padding:9px 12px">
+                    <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg>
+                    <span style="font:600 12px var(--ui);color:var(--fg-2)">Reasoning</span>
+                    <span style="font:500 11px var(--mono);color:var(--fg-3)">· thought for 3.2s</span>
+                    <span style="flex:1"></span>
+                    <svg data-chev viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg>
+                  </summary>
+                  <div style="padding:2px 14px 13px 35px;border-top:1px solid var(--border);font:450 12.5px var(--ui);line-height:1.65;color:var(--fg-3)">The test asserts the total after a coupon is applied. I should reproduce the failure first to see the exact assertion, then read the code path that computes the total before proposing any change.</div>
+                </details>
+                <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-bottom:14px">I&#39;ll reproduce the failure first, then read the code path the test exercises. Running the CartSummary suite now.</div>
+
+                <!--RUNNING tool card-->
+                <div style="position:relative;border:1px solid var(--border-accent);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 1px var(--accent-weak),0 4px 18px rgba(0,0,0,.25)">
+                  <div style="position:absolute;top:0;left:0;right:0;height:2px;overflow:hidden"><span style="position:absolute;top:0;left:0;height:2px;width:40%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:sheen 1.3s linear infinite"></span></div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:11px 13px">
+                    <span style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--warn-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span>
+                    <div style="flex:1;min-width:0">
+                      <div style="display:flex;align-items:center;gap:8px"><span style="font:700 13px var(--mono);color:var(--fg)">run_tests</span><span style="font:500 11px var(--mono);color:var(--fg-3)">step 01</span></div>
+                      <div style="font:500 11.5px var(--mono);color:var(--fg-3);margin-top:2px">npm test -- CartSummary</div>
+                    </div>
+                    <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:var(--warn-weak);color:var(--warn);font:700 9.5px var(--mono);letter-spacing:.06em"><span style="width:11px;height:11px;border:1.6px solid var(--warn);border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span>RUNNING</span>
+                    <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px var(--mono);color:var(--warn)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-clock"/></svg>1.4s</span>
+                  </div>
+                  <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.7;color:var(--fg-2)">
+                    <div style="color:var(--ok)">PASS  src/utils/format.test.ts</div>
+                    <div style="color:var(--fg-3)">RUNS  src/components/CartSummary.test.tsx</div>
+                    <div style="display:flex;align-items:center;gap:8px;color:var(--fg-faint)"><span style="width:60%;height:9px;border-radius:3px;background:var(--raised-2);position:relative;overflow:hidden"><span style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--border-2),transparent);animation:sheen 1.3s linear infinite"></span></span></div>
+                  </div>
+                </div>
+
+                <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-top:14px">Waiting for the runner to report the failing assertion<span style="display:inline-block;width:8px;height:16px;background:var(--accent);vertical-align:-3px;margin-left:2px;border-radius:1px;animation:blink 1s steps(1) infinite"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--COMPOSER (streaming/stop)-->
+        <div style="flex:none;padding:14px 20px 16px;border-top:1px solid var(--border);background:var(--panel)">
+          <div style="position:relative;border:1px solid var(--border-accent);border-radius:14px;background:var(--raised);box-shadow:var(--shadow-mid);overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:2px;overflow:hidden"><span style="position:absolute;top:0;height:2px;width:35%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:sheen 1.4s linear infinite"></span></div>
+            <div style="padding:14px 16px 6px;font:450 14px var(--ui);line-height:1.5;color:var(--fg-3)">eCy is working — responding and calling tools. Press <kbd>esc</kbd> to interrupt.</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px 10px">
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--border-2);border-radius:8px;background:var(--inset)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg><span style="font:600 11.5px var(--mono);color:var(--fg-2)">qwen3:8b</span></div>
+              <div style="flex:1"></div>
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:4px 4px"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2)"></span></span><span style="font:600 11.5px var(--ui);color:var(--fg-3)">Auto-apply</span></div>
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:4px 4px"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span><span style="font:600 11.5px var(--ui);color:var(--fg-2)">Verify</span></div>
+              <div style="width:1px;height:20px;background:var(--border)"></div>
+              <button type="button" style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px 8px 13px;border:1px solid var(--bad);border-radius:9px;background:var(--bad-weak);color:var(--bad);cursor:pointer;font:600 12.5px var(--ui)" style-hover="background:var(--bad);color:#fff"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:currentColor;stroke:none"><use href="#i-stop"/></svg>Stop<kbd style="background:transparent;border-color:currentColor;color:currentColor">esc</kbd></button>
+            </div>
+          </div>
+          <sc-if value="{{ showHints }}">
+            <div style="display:flex;align-items:center;gap:14px;margin-top:9px;padding:0 4px;font:500 11px var(--mono);color:var(--fg-3)">
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>esc</kbd> interrupt run</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘.</kbd> pause after step</span>
+              <span style="flex:1"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulsed 1.2s infinite"></span>generating · 148 tok/s</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!--RIGHT RAIL (active run)-->
+      <div style="width:328px;flex:none;border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="flex:none;display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border)">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg>
+          <span style="font:600 12.5px var(--ui);color:var(--fg)">Execution trace</span>
+          <span style="flex:1"></span>
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;background:var(--warn-weak);font:700 9.5px var(--mono);letter-spacing:.06em;color:var(--warn)"><span style="width:6px;height:6px;border-radius:50%;background:var(--warn);animation:pulsed 1.2s infinite"></span>RUN 01</span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:14px 16px;min-height:0">
+          <div style="border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:11px 13px;margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font:600 11.5px var(--ui);color:var(--fg-2)">Generating response</span><span style="font:700 11px var(--mono);color:var(--accent-2)">148 tok/s</span></div>
+            <div style="height:5px;border-radius:3px;background:var(--raised-2);overflow:hidden;position:relative"><span style="position:absolute;top:0;left:0;bottom:0;width:45%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:sheen 1.3s linear infinite"></span></div>
+          </div>
+          <!--running step-->
+          <div style="position:relative;display:flex;gap:11px">
+            <div style="display:flex;flex-direction:column;align-items:center;flex:none"><span style="width:26px;height:26px;border-radius:50%;border:1.5px solid var(--warn);background:var(--warn-weak);display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);color:var(--warn)">01</span></div>
+            <div style="flex:1;min-width:0;border:1px solid var(--border-accent);border-radius:11px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 1px var(--accent-weak)">
+              <div style="position:absolute;left:37px;right:0;top:0;height:2px;overflow:hidden"><span style="position:absolute;top:0;left:0;height:2px;width:40%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:sheen 1.3s linear infinite"></span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none"><use href="#i-flask"/></svg>
+                <span style="font:700 12.5px var(--mono);color:var(--fg);flex:1">run_tests</span>
+                <span style="width:12px;height:12px;border:1.6px solid var(--warn);border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span>
+              </div>
+              <div style="border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+                <span style="font:500 10.5px var(--mono);color:var(--fg-3)">executing…</span>
+                <span style="font:600 10.5px var(--mono);color:var(--warn)">1.4s</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:11px;margin-top:8px;opacity:.5">
+            <div style="width:26px;display:flex;justify-content:center;flex:none"><span style="width:26px;height:26px;border-radius:50%;border:1px dashed var(--border-2);display:flex;align-items:center;justify-content:center;font:700 11px var(--mono);color:var(--fg-3)">02</span></div>
+            <div style="flex:1;display:flex;align-items:center;padding:7px 0;font:500 11.5px var(--ui);color:var(--fg-3)">queued · read the failing source</div>
+          </div>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px"><span style="font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Available tools</span><span style="flex:1"></span><span style="font:600 11px var(--mono);color:var(--fg-3)">7</span></div>
+          <div style="padding:0 10px 10px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">read_file</span><span style="padding:1px 6px;border-radius:4px;background:var(--raised-2);font:600 9px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">grep</span><span style="padding:1px 6px;border-radius:4px;background:var(--raised-2);font:600 9px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;background:var(--warn-weak);border:1px solid var(--warn-weak)"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg)">run_tests</span><span style="display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:4px;background:var(--warn);font:600 9px var(--mono);color:#1a1200">active</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;border:1px solid var(--border-accent);background:var(--accent-weak)"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg)">edit_file</span><span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;background:var(--accent-weak-2);font:600 9px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg>approval</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!--=================== FRAME 03 · ERROR ===================-->
+<section id="error" data-screen-label="ERROR" style="width:1440px;margin-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px;padding-left:2px">
+    <span style="font:700 13px var(--mono);color:var(--accent-2);letter-spacing:.04em">03</span>
+    <span style="font:700 17px var(--ui);letter-spacing:-.01em;color:var(--fg)">Error · run interrupted</span>
+    <span style="font:500 13px var(--ui);color:var(--fg-3)">Failed tool step, recovery banner, retry</span>
+  </div>
+
+  <div style="width:1440px;height:900px;border-radius:16px;overflow:hidden;border:1px solid var(--border-2);box-shadow:var(--shadow-high);background:var(--panel);display:flex;flex-direction:column">
+
+    <!--TOP BAR-->
+    <div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)">
+      <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:500 12.5px var(--mono);color:var(--fg-2)">acme/checkout-web</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border-2);border-radius:6px;background:var(--raised);font:500 11.5px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-branch"/></svg>fix/cart-total</span>
+      </div>
+      <div style="flex:1"></div>
+      <button type="button" style="display:inline-flex;align-items:center;gap:9px;padding:6px 10px 6px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent)">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg>
+        <span style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:8b</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;background:var(--ok-weak);font:700 9.5px var(--mono);letter-spacing:.04em;color:var(--ok)">LOCAL · FREE</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg>
+      </button>
+      <div style="width:1px;height:22px;background:var(--border)"></div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-faint)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-zap"/></svg>0 tok/s</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-layers"/></svg>9.1K / 128K</div>
+      <div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:7px;border:1px solid var(--bad);background:var(--bad-weak);font:600 11.5px var(--ui);color:var(--bad)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-alert"/></svg>Stopped</div>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <!--LEFT SIDEBAR-->
+      <div style="width:264px;flex:none;border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="padding:12px 12px 8px">
+          <button type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:600 13px var(--ui);cursor:pointer;box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.98)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-plus"/></svg>New chat<span style="flex:1"></span><kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘N</kbd></button>
+          <div data-focusring style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--inset)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg><input placeholder="Search chats" style="flex:1;min-width:0;background:none;border:none;outline:none;font:500 12.5px var(--ui);color:var(--fg)"/><kbd>⌘K</kbd></div>
+        </div>
+        <div style="padding:6px 18px 4px;font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Recent</div>
+        <div style="flex:1;overflow-y:auto;padding:2px 8px 8px;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+            <sc-if value="{{ s.active }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px 9px 12px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);cursor:pointer"><span style="position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)"></span><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg><span style="flex:1;min-width:0"><span style="display:block;font:600 12.5px var(--ui);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-3)">{{ s.time }}</span></span><span style="width:7px;height:7px;border-radius:50%;background:var(--bad);flex-shrink:0"></span></button>
+            </sc-if>
+            <sc-if value="{{ s.inactive }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="--rowdel:1;background:var(--raised-2)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg><span style="flex:1;min-width:0"><span style="display:block;font:500 12.5px var(--ui);color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-faint)">{{ s.time }}</span></span><span style="display:inline-flex;opacity:var(--rowdel,0);transition:opacity .15s" style-hover="color:var(--bad)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-trash"/></svg></span></button>
+            </sc-if>
+          </sc-for>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:10px 12px;display:flex;align-items:center;gap:9px"><div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent-3),var(--accent));display:flex;align-items:center;justify-content:center;font:700 12px var(--ui);color:#fff">D</div><div style="flex:1;min-width:0"><div style="font:600 12px var(--ui);color:var(--fg)">Dana Okafor</div><div style="font:500 10.5px var(--mono);color:var(--fg-3)">Pro workspace</div></div><button type="button" style="display:inline-flex;padding:6px;border:none;background:none;cursor:pointer;color:var(--fg-3);border-radius:7px" style-hover="background:var(--raised-2);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sliders"/></svg></button></div>
+      </div>
+
+      <!--CENTER-->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface)">
+        <div style="flex:1;overflow-y:auto;padding:26px 34px;min-height:0">
+          <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:22px">
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+              <div style="max-width:78%;padding:11px 15px;border-radius:14px 14px 4px 14px;background:var(--user);border:1px solid var(--user-border);font:450 14px var(--ui);line-height:1.55;color:var(--fg)">The CartSummary test started failing after I added coupon support. Can you find the cause and fix it?</div>
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--raised-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font:700 11px var(--ui);color:var(--fg-2)">D</div>
+            </div>
+            <div style="display:flex;gap:12px">
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+              <div style="flex:1;min-width:0">
+                <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-bottom:14px">Let me reproduce the failure by running the CartSummary suite.</div>
+                <!--FAILED tool card-->
+                <div style="border:1px solid var(--bad);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 1px var(--bad-weak)">
+                  <div style="display:flex;align-items:center;gap:10px;padding:11px 13px">
+                    <span style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--bad-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--bad);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span>
+                    <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font:700 13px var(--mono);color:var(--fg)">run_tests</span><span style="font:500 11px var(--mono);color:var(--fg-3)">step 01</span></div><div style="font:500 11.5px var(--mono);color:var(--fg-3);margin-top:2px">npm test -- CartSummary</div></div>
+                    <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;background:var(--bad-weak);color:var(--bad);font:700 9.5px var(--mono);letter-spacing:.06em"><svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg>FAILED</span>
+                    <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-clock"/></svg>2.1s</span>
+                  </div>
+                  <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.75;color:var(--fg-2)">
+                    <div style="color:var(--fg-3)">RUNS  src/components/CartSummary.test.tsx</div>
+                    <div style="color:var(--bad)">● Test worker terminated unexpectedly</div>
+                    <div style="color:var(--bad)">Error: Cannot allocate memory — CUDA OOM (tried to allocate 2.10 GiB)</div>
+                    <div style="color:var(--fg-faint)">process exited with code 137</div>
+                  </div>
+                </div>
+                <!--ERROR banner-->
+                <div style="position:relative;margin-top:16px;border:1px solid var(--bad);border-radius:13px;background:linear-gradient(180deg,var(--bad-weak),transparent);padding:16px 18px 16px 20px;overflow:hidden">
+                  <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--bad)"></span>
+                  <div style="display:flex;gap:13px">
+                    <div style="width:34px;height:34px;flex:none;border-radius:9px;background:var(--bad-weak);border:1px solid var(--bad);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:19px;height:19px;fill:none;stroke:var(--bad);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-alert"/></svg></div>
+                    <div style="flex:1">
+                      <div style="font:700 14.5px var(--ui);color:var(--fg);margin-bottom:4px">Run stopped — tool execution failed</div>
+                      <div style="font:450 13px var(--ui);line-height:1.6;color:var(--fg-2);margin-bottom:12px">The local runtime ran out of memory while running the test suite. No files were changed — your workspace is clean and safe to retry.</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
+                        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;background:var(--bad-weak);border:1px solid var(--bad);font:700 10px var(--mono);letter-spacing:.03em;color:var(--bad)">EXIT 137 · OUT OF MEMORY</span>
+                        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;background:var(--raised-2);font:600 10px var(--mono);color:var(--fg-3)">qwen3:8b · local runtime</span>
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center">
+                        <button type="button" style="display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 13px var(--ui);box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-refresh"/></svg>Retry run<kbd style="background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28);color:#fff">⌘R</kbd></button>
+                        <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);color:var(--fg);cursor:pointer;font:600 12.5px var(--ui)" style-hover="border-color:var(--border-accent);background:var(--raised-2)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-return"/></svg>Resume from step 01</button>
+                        <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:none;border-radius:9px;background:transparent;color:var(--accent-2);cursor:pointer;font:600 12.5px var(--ui)" style-hover="background:var(--accent-weak)">Switch to a cloud model<svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--COMPOSER-->
+        <div style="flex:none;padding:14px 20px 16px;border-top:1px solid var(--border);background:var(--panel)">
+          <div data-focusring style="border:1px solid var(--border-2);border-radius:14px;background:var(--raised);box-shadow:var(--shadow-mid);overflow:hidden">
+            <textarea rows="1" placeholder="Reply, or retry the run above…" style="width:100%;padding:14px 16px 6px;background:none;border:none;outline:none;font:450 14px var(--ui);line-height:1.5;color:var(--fg)"></textarea>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px 10px">
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--border-2);border-radius:8px;background:var(--inset)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg><span style="font:600 11.5px var(--mono);color:var(--fg-2)">qwen3:8b</span><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg></div>
+              <div style="flex:1"></div>
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:4px 4px"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2)"></span></span><span style="font:600 11.5px var(--ui);color:var(--fg-3)">Auto-apply</span></div>
+              <div style="display:inline-flex;align-items:center;gap:7px;padding:4px 4px"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span><span style="font:600 11.5px var(--ui);color:var(--fg-2)">Verify</span></div>
+              <div style="width:1px;height:20px;background:var(--border)"></div>
+              <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:8px 10px 8px 14px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 12.5px var(--ui)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)">Send<kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘↵</kbd></button>
+            </div>
+          </div>
+          <sc-if value="{{ showHints }}">
+            <div style="display:flex;align-items:center;gap:14px;margin-top:9px;padding:0 4px;font:500 11px var(--mono);color:var(--fg-3)">
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘R</kbd> retry run</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘↵</kbd> send</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘K</kbd> commands</span>
+              <span style="flex:1"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--bad)"></span>last run failed at step 01</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!--RIGHT RAIL (failed run)-->
+      <div style="width:328px;flex:none;border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="flex:none;display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg><span style="font:600 12.5px var(--ui);color:var(--fg)">Execution trace</span><span style="flex:1"></span><span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;background:var(--bad-weak);font:700 9.5px var(--mono);letter-spacing:.06em;color:var(--bad)">RUN FAILED</span></div>
+        <div style="flex:1;overflow-y:auto;padding:14px 16px;min-height:0">
+          <div style="position:relative;display:flex;gap:11px">
+            <span style="width:26px;height:26px;flex:none;border-radius:50%;border:1.5px solid var(--bad);background:var(--bad-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--bad);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg></span>
+            <div style="flex:1;min-width:0;border:1px solid var(--bad);border-radius:11px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 1px var(--bad-weak)">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--bad);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none"><use href="#i-flask"/></svg><span style="font:700 12.5px var(--mono);color:var(--fg);flex:1">run_tests</span><span style="font:600 10.5px var(--mono);color:var(--bad)">2.1s</span></div>
+              <div style="border-top:1px solid var(--border);background:var(--inset);padding:9px 12px;font:500 10.5px var(--mono);line-height:1.6;color:var(--bad)">EXIT 137 · out of memory<div style="color:var(--fg-faint);margin-top:2px">worker terminated</div></div>
+            </div>
+          </div>
+          <button type="button" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:10px;border:1px solid var(--border-accent);border-radius:10px;background:var(--accent-weak);color:var(--accent-2);cursor:pointer;font:600 12.5px var(--ui)" style-hover="background:var(--accent-weak-2)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-refresh"/></svg>Retry run</button>
+          <div style="margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font:500 11px var(--mono);color:var(--fg-3);display:flex;justify-content:space-between"><span>Run ended</span><span>1 step · <span style="color:var(--bad)">failed</span></span></div>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px"><span style="font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Available tools</span><span style="flex:1"></span><span style="font:600 11px var(--mono);color:var(--fg-3)">7</span></div>
+          <div style="padding:0 10px 12px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">read_file</span><span style="padding:1px 6px;border-radius:4px;background:var(--raised-2);font:600 9px var(--mono);color:var(--fg-3)">read</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">run_tests</span><span style="padding:1px 6px;border-radius:4px;background:var(--warn-weak);font:600 9px var(--mono);color:var(--warn)">exec</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;border:1px solid var(--border-accent);background:var(--accent-weak)"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg)">edit_file</span><span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;background:var(--accent-weak-2);font:600 9px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg>approval</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!--=================== FRAME 04 · FULL ===================-->
+<section id="full" data-screen-label="FULL" style="width:1440px;margin-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px;padding-left:2px">
+    <span style="font:700 13px var(--mono);color:var(--accent-2);letter-spacing:.04em">04</span>
+    <span style="font:700 17px var(--ui);letter-spacing:-.01em;color:var(--fg)">Full · rich conversation + approval gate</span>
+    <span style="font:500 13px var(--ui);color:var(--fg-3)">Interactive — approve/reject the diff, expand reasoning, open the model menu</span>
+  </div>
+
+  <div style="position:relative;width:1440px;height:900px;border-radius:16px;overflow:hidden;border:1px solid var(--border-2);box-shadow:var(--shadow-high);background:var(--panel);display:flex;flex-direction:column">
+
+    <!--TOP BAR-->
+    <div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel);position:relative;z-index:30">
+      <div style="width:26px;height:26px;border-radius:7px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font:500 12.5px var(--mono);color:var(--fg-2)">acme/checkout-web</span>
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border-2);border-radius:6px;background:var(--raised);font:500 11.5px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-branch"/></svg>fix/cart-total</span>
+      </div>
+      <div style="flex:1"></div>
+      <!--MODEL SELECTOR (open)-->
+      <div style="position:relative">
+        <button type="button" style="display:inline-flex;align-items:center;gap:9px;padding:6px 10px 6px 11px;border:1px solid var(--border-accent);border-radius:9px;background:var(--raised);cursor:pointer;box-shadow:0 0 0 3px var(--accent-weak)">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg>
+          <span style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:8b</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;background:var(--ok-weak);font:700 9.5px var(--mono);letter-spacing:.04em;color:var(--ok)">LOCAL · FREE</span>
+          <svg data-chev viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transform:rotate(90deg)"><use href="#i-chevright"/></svg>
+        </button>
+        <div style="position:absolute;top:calc(100% + 8px);left:0;width:328px;background:var(--panel);border:1px solid var(--border-2);border-radius:13px;box-shadow:var(--shadow-high);padding:8px;z-index:40">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 8px"><span style="font:600 10px var(--mono);letter-spacing:.14em;color:var(--ok);text-transform:uppercase">Local · $0</span><span style="flex:1;height:1px;background:var(--border)"></span></div>
+          <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);cursor:pointer;margin-bottom:2px"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:8b</div><div style="font:500 10.5px var(--ui);color:var(--fg-3)">On-device · Ollama · 142 tok/s</div></div><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></button>
+          <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12.5px var(--mono);color:var(--fg)">qwen3:14b</div><div style="font:500 10.5px var(--ui);color:var(--fg-3)">On-device · Ollama</div></div><span style="font:700 9.5px var(--mono);color:var(--ok)">FREE</span></button>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 8px 8px"><span style="font:600 10px var(--mono);letter-spacing:.14em;color:var(--fg-3);text-transform:uppercase">Cloud · metered</span><span style="flex:1;height:1px;background:var(--border)"></span></div>
+          <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12.5px var(--mono);color:var(--fg)">claude-sonnet-4.5</div><div style="font:500 10.5px var(--ui);color:var(--fg-3)">Anthropic</div></div><span style="font:600 10px var(--mono);color:var(--fg-3)">$3 / Mtok</span></button>
+          <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12.5px var(--mono);color:var(--fg)">gpt-5</div><div style="font:500 10.5px var(--ui);color:var(--fg-3)">OpenAI</div></div><span style="font:600 10px var(--mono);color:var(--fg-3)">$5 / Mtok</span></button>
+          <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="background:var(--raised-2)"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></span><div style="flex:1;min-width:0"><div style="font:600 12.5px var(--mono);color:var(--fg)">gemini-2.5-pro</div><div style="font:500 10.5px var(--ui);color:var(--fg-3)">Google</div></div><span style="font:600 10px var(--mono);color:var(--fg-3)">$4 / Mtok</span></button>
+          <div style="padding:9px 9px 5px;font:450 10.5px var(--ui);line-height:1.5;color:var(--fg-3);border-top:1px solid var(--border);margin-top:6px">Local models run fully offline at no cost. Cloud usage is billed per token.</div>
+        </div>
+      </div>
+      <div style="width:1px;height:22px;background:var(--border)"></div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-zap"/></svg>156 tok/s</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;font:600 11.5px var(--mono);color:var(--fg-3)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-faint);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-layers"/></svg>24.8K / 128K</div>
+      <div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:7px;border:1px solid var(--ok);background:var(--ok-weak);font:600 11.5px var(--ui);color:var(--ok)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg>Clean finish</div>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <!--LEFT SIDEBAR-->
+      <div style="width:264px;flex:none;border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="padding:12px 12px 8px">
+          <button type="button" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:600 13px var(--ui);cursor:pointer;box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.98)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-plus"/></svg>New chat<span style="flex:1"></span><kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘N</kbd></button>
+          <div data-focusring style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 11px;border:1px solid var(--border-2);border-radius:9px;background:var(--inset)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg><input placeholder="Search chats" style="flex:1;min-width:0;background:none;border:none;outline:none;font:500 12.5px var(--ui);color:var(--fg)"/><kbd>⌘K</kbd></div>
+        </div>
+        <div style="padding:6px 18px 4px;font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Recent</div>
+        <div style="flex:1;overflow-y:auto;padding:2px 8px 8px;display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="6">
+            <sc-if value="{{ s.active }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px 9px 12px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);cursor:pointer"><span style="position:absolute;left:0;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)"></span><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg><span style="flex:1;min-width:0"><span style="display:block;font:600 12.5px var(--ui);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-3)">{{ s.time }}</span></span><span style="width:14px;height:14px;flex-shrink:0;color:var(--ok);display:inline-flex"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span></button>
+            </sc-if>
+            <sc-if value="{{ s.inactive }}">
+              <button type="button" onClick="{{ s.onClick }}" style="position:relative;display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:9px 10px;border:1px solid transparent;border-radius:9px;background:transparent;cursor:pointer" style-hover="--rowdel:1;background:var(--raised-2)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#i-chat"/></svg><span style="flex:1;min-width:0"><span style="display:block;font:500 12.5px var(--ui);color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.title }}</span><span style="font:500 10.5px var(--mono);color:var(--fg-faint)">{{ s.time }}</span></span><span style="display:inline-flex;opacity:var(--rowdel,0);transition:opacity .15s" style-hover="color:var(--bad)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-trash"/></svg></span></button>
+            </sc-if>
+          </sc-for>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:10px 12px;display:flex;align-items:center;gap:9px"><div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent-3),var(--accent));display:flex;align-items:center;justify-content:center;font:700 12px var(--ui);color:#fff">D</div><div style="flex:1;min-width:0"><div style="font:600 12px var(--ui);color:var(--fg)">Dana Okafor</div><div style="font:500 10.5px var(--mono);color:var(--fg-3)">Pro workspace</div></div><button type="button" style="display:inline-flex;padding:6px;border:none;background:none;cursor:pointer;color:var(--fg-3);border-radius:7px" style-hover="background:var(--raised-2);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sliders"/></svg></button></div>
+      </div>
+
+      <!--CENTER-->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface)">
+        <div ref="{{ refFull }}" style="flex:1;overflow-y:auto;padding:26px 34px;min-height:0">
+          <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+              <div style="max-width:78%;padding:11px 15px;border-radius:14px 14px 4px 14px;background:var(--user);border:1px solid var(--user-border);font:450 14px var(--ui);line-height:1.55;color:var(--fg)">The CartSummary test started failing after I added coupon support. Can you find the cause and fix it?</div>
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--raised-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font:700 11px var(--ui);color:var(--fg-2)">D</div>
+            </div>
+            <div style="display:flex;gap:12px">
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+              <div style="flex:1;min-width:0">
+                <details style="border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:14px">
+                  <summary style="display:flex;align-items:center;gap:9px;padding:9px 12px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg><span style="font:600 12px var(--ui);color:var(--fg-2)">Reasoning</span><span style="font:500 11px var(--mono);color:var(--fg-3)">· thought for 4.1s</span><span style="flex:1"></span><svg data-chev viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></summary>
+                  <div style="padding:2px 14px 13px 35px;border-top:1px solid var(--border);font:450 12.5px var(--ui);line-height:1.7;color:var(--fg-3)">Plan: 1) reproduce with the CartSummary suite to capture the exact assertion; 2) locate <span style="font-family:var(--mono);color:var(--fg-2)">computeTotal</span> and read it; 3) the assertion expects a discounted total, so the discount branch is likely not running. Most probable cause is a field-name mismatch between the coupon guard and the <span style="font-family:var(--mono);color:var(--fg-2)">Coupon</span> type. Fix is one line — gate behind approval since it writes to disk.</div>
+                </details>
+                <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-bottom:14px">I reproduced the failure, traced it to the coupon guard, and prepared a one-line fix. Here is the trail:</div>
+
+                <!--tool card: run_tests fail (open)-->
+                <details open style="border:1px solid var(--border);border-radius:11px;background:var(--panel);overflow:hidden;margin-bottom:10px">
+                  <summary style="display:flex;align-items:center;gap:10px;padding:10px 13px"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--bad-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--bad);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--mono);color:var(--fg)">run_tests <span style="font-weight:500;color:var(--fg-3)">npm test -- CartSummary</span></div></div><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:var(--bad-weak);color:var(--bad);font:700 9px var(--mono);letter-spacing:.05em">1 FAILED</span><span style="font:600 10.5px var(--mono);color:var(--fg-3)">2.4s</span><svg data-chev viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></summary>
+                  <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.7;color:var(--fg-2)"><div style="color:var(--bad)">✕ applies an active coupon to the subtotal (18ms)</div><div style="color:var(--fg-3);padding-left:14px">expected: <span style="color:var(--add-fg)">45.00</span>   received: <span style="color:var(--del-fg)">50.00</span></div><div style="color:var(--fg-faint);margin-top:4px">Tests: 1 failed, 3 passed, 4 total</div></div>
+                </details>
+                <!--tool card: grep (collapsed)-->
+                <details style="border:1px solid var(--border);border-radius:11px;background:var(--panel);overflow:hidden;margin-bottom:10px">
+                  <summary style="display:flex;align-items:center;gap:10px;padding:10px 13px"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--mono);color:var(--fg)">grep <span style="font-weight:500;color:var(--fg-3)">computeTotal src/</span></div></div><span style="font:500 11px var(--mono);color:var(--fg-3)">3 matches</span><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:var(--ok-weak);color:var(--ok);font:700 9px var(--mono);letter-spacing:.05em"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg>DONE</span><span style="font:600 10.5px var(--mono);color:var(--fg-3)">41ms</span><svg data-chev viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></summary>
+                  <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.7;color:var(--fg-2)"><div><span style="color:var(--accent-2)">src/utils/cart.ts</span>:12  export function computeTotal(</div><div><span style="color:var(--accent-2)">src/components/CartSummary.tsx</span>:8  const total = computeTotal(</div><div><span style="color:var(--accent-2)">src/utils/cart.test.ts</span>:5  describe('computeTotal'</div></div>
+                </details>
+                <!--tool card: read_file (collapsed)-->
+                <details style="border:1px solid var(--border);border-radius:11px;background:var(--panel);overflow:hidden;margin-bottom:14px">
+                  <summary style="display:flex;align-items:center;gap:10px;padding:10px 13px"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--mono);color:var(--fg)">read_file <span style="font-weight:500;color:var(--fg-3)">src/utils/cart.ts:12-19</span></div></div><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:var(--ok-weak);color:var(--ok);font:700 9px var(--mono);letter-spacing:.05em"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg>DONE</span><span style="font:600 10.5px var(--mono);color:var(--fg-3)">12ms</span><svg data-chev viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></summary>
+                  <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.7;color:var(--fg-3)"><div>13   const subtotal = items.reduce(…);</div><div style="color:var(--del-fg)">15   if (coupon &amp;&amp; coupon.active) {</div><div>16     return round2(subtotal * (1 - coupon.rate));</div></div>
+                </details>
+
+                <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-bottom:14px">The <span style="font-family:var(--mono);font-size:13px;background:var(--accent-weak);color:var(--accent-2);padding:1px 5px;border-radius:4px">Coupon</span> type defines <span style="font-family:var(--mono);font-size:13px;background:var(--accent-weak);color:var(--accent-2);padding:1px 5px;border-radius:4px">isActive</span>, but <span style="font-family:var(--mono);font-size:13px;background:var(--accent-weak);color:var(--accent-2);padding:1px 5px;border-radius:4px">computeTotal</span> checks <span style="font-family:var(--mono);font-size:13px;background:var(--del-bg);color:var(--del-fg);padding:1px 5px;border-radius:4px">coupon.active</span> — always <span style="font-family:var(--mono);font-size:13px;color:var(--fg-2)">undefined</span>, so the discount never applies. Here is the one-line fix.</div>
+
+                <!--=== DIFF APPROVAL — HERO ===-->
+                <sc-if value="{{ diffPending }}">
+                <div style="border:1px solid var(--border-accent);border-radius:14px;background:var(--panel);overflow:hidden;box-shadow:var(--glow)">
+                  <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;background:var(--accent-weak);border-bottom:1px solid var(--border-accent)">
+                    <span style="width:30px;height:30px;flex:none;border-radius:8px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span>
+                    <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font:700 13px var(--mono);color:var(--fg)">edit_file</span><span style="font:500 11px var(--mono);color:var(--fg-3)">step 04</span></div><div style="font:600 11.5px var(--mono);color:var(--accent-2);margin-top:1px">src/utils/cart.ts</div></div>
+                    <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:var(--accent);color:#fff;font:700 9.5px var(--mono);letter-spacing:.05em"><svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-shield"/></svg>WRITE · APPROVAL REQUIRED</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:8px 15px;border-bottom:1px solid var(--border);background:var(--surface)">
+                    <span style="font:600 11.5px var(--mono);color:var(--fg-2)">src/utils/cart.ts</span>
+                    <span style="font:700 11px var(--mono);color:var(--add-fg)">+1</span>
+                    <span style="font:700 11px var(--mono);color:var(--del-fg)">−1</span>
+                    <span style="font:500 11px var(--mono);color:var(--fg-3)">1 file changed</span>
+                    <span style="flex:1"></span>
+                    <button type="button" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border-2);border-radius:6px;background:var(--panel);color:var(--fg-3);cursor:pointer;font:600 10px var(--mono)" style-hover="color:var(--fg);border-color:var(--border-accent)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-copy"/></svg>copy</button>
+                  </div>
+                  <div style="background:var(--inset);padding:10px 0;font:500 12px var(--mono);line-height:1.85">
+                    <div style="display:flex;padding:0 14px"><span style="width:42px;color:var(--fg-faint);flex:none;text-align:right;padding-right:14px">12</span><span style="width:14px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">export function computeTotal(items, coupon) {</span></div>
+                    <div style="display:flex;padding:0 14px"><span style="width:42px;color:var(--fg-faint);flex:none;text-align:right;padding-right:14px">13</span><span style="width:14px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">  const subtotal = items.reduce(sum, 0);</span></div>
+                    <div style="display:flex;padding:0 14px;background:var(--del-bg);box-shadow:inset 2px 0 0 var(--del-fg)"><span style="width:42px;color:var(--del-fg);flex:none;text-align:right;padding-right:14px">15</span><span style="width:14px;flex:none;color:var(--del-fg);font-weight:700">−</span><span style="color:var(--fg)">  if (coupon &amp;&amp; coupon.<span style="background:rgba(255,90,104,.28);border-radius:3px;padding:0 2px">active</span>) {</span></div>
+                    <div style="display:flex;padding:0 14px;background:var(--add-bg);box-shadow:inset 2px 0 0 var(--add-fg)"><span style="width:42px;color:var(--add-fg);flex:none;text-align:right;padding-right:14px">15</span><span style="width:14px;flex:none;color:var(--add-fg);font-weight:700">+</span><span style="color:var(--fg)">  if (coupon &amp;&amp; coupon.<span style="background:rgba(43,212,164,.28);border-radius:3px;padding:0 2px">isActive</span>) {</span></div>
+                    <div style="display:flex;padding:0 14px"><span style="width:42px;color:var(--fg-faint);flex:none;text-align:right;padding-right:14px">16</span><span style="width:14px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">    return round2(subtotal * (1 - coupon.rate));</span></div>
+                    <div style="display:flex;padding:0 14px"><span style="width:42px;color:var(--fg-faint);flex:none;text-align:right;padding-right:14px">17</span><span style="width:14px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">  }</span></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px 15px;border-top:1px solid var(--border-accent);background:var(--panel)">
+                    <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none"><use href="#i-lock"/></svg>
+                    <span style="font:500 11.5px var(--ui);color:var(--fg-2);flex:1;line-height:1.4">Auto-apply is off — eCy paused before writing to disk.</span>
+                    <button type="button" onClick="{{ reject }}" style="display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:1px solid var(--bad);border-radius:9px;background:var(--bad-weak);color:var(--bad);cursor:pointer;font:600 12.5px var(--ui)" style-hover="background:var(--bad);color:#fff">Reject<kbd style="background:transparent;border-color:currentColor;color:currentColor">⌘⌫</kbd></button>
+                    <button type="button" onClick="{{ approve }}" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 12.5px var(--ui);box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg>Approve &amp; apply<kbd style="background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28);color:#fff">⌘↵</kbd></button>
+                  </div>
+                </div>
+                </sc-if>
+
+                <sc-if value="{{ diffApproved }}">
+                <div style="border:1px solid var(--ok);border-radius:13px;background:linear-gradient(180deg,var(--ok-weak),transparent);overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:11px;padding:13px 15px">
+                    <span style="width:30px;height:30px;flex:none;border-radius:8px;background:var(--ok-weak);border:1px solid var(--ok);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--ok);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span>
+                    <div style="flex:1;min-width:0"><div style="font:700 13px var(--ui);color:var(--fg)">Applied to <span style="font-family:var(--mono);font-size:12px">src/utils/cart.ts</span></div><div style="font:500 11.5px var(--mono);color:var(--fg-3);margin-top:1px"><span style="color:var(--add-fg)">+1</span> <span style="color:var(--del-fg)">−1</span> · written to disk</div></div>
+                    <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:var(--ok-weak);color:var(--ok);font:700 9.5px var(--mono);letter-spacing:.05em">APPROVED</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:20px">
+                  <div style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg);margin-bottom:14px">Applied the fix. Re-running the suite to verify.</div>
+                    <details open style="border:1px solid var(--ok);border-radius:11px;background:var(--panel);overflow:hidden;box-shadow:0 0 0 1px var(--ok-weak);margin-bottom:14px">
+                      <summary style="display:flex;align-items:center;gap:10px;padding:10px 13px"><span style="width:26px;height:26px;flex:none;border-radius:7px;background:var(--ok-weak);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--ok);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--mono);color:var(--fg)">run_tests <span style="font-weight:500;color:var(--fg-3)">npm test -- CartSummary</span></div></div><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:var(--ok-weak);color:var(--ok);font:700 9px var(--mono);letter-spacing:.05em">4 PASSED</span><span style="font:600 10.5px var(--mono);color:var(--fg-3)">2.1s</span></summary>
+                      <div style="border-top:1px solid var(--border);background:var(--inset);padding:11px 14px;font:500 11.5px var(--mono);line-height:1.7;color:var(--ok)"><div>✓ applies an active coupon to the subtotal (16ms)</div><div style="color:var(--fg-3)">Tests: <span style="color:var(--ok)">4 passed</span>, 4 total</div></div>
+                    </details>
+                    <div style="font:450 14.5px var(--ui);line-height:1.65;color:var(--fg)">All four tests pass — the coupon discount now applies correctly. <span style="color:var(--ok);font-weight:600">Clean finish.</span></div>
+                    <button type="button" onClick="{{ resetDiff }}" style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:6px 11px;border:1px solid var(--border-2);border-radius:8px;background:var(--raised);color:var(--fg-2);cursor:pointer;font:600 11.5px var(--ui)" style-hover="border-color:var(--border-accent);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-refresh"/></svg>Reset approval demo</button>
+                  </div>
+                </div>
+                </sc-if>
+
+                <sc-if value="{{ diffRejected }}">
+                <div style="border:1px dashed var(--border-2);border-radius:13px;background:var(--surface);overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:11px;padding:13px 15px">
+                    <span style="width:30px;height:30px;flex:none;border-radius:8px;background:var(--raised-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg></span>
+                    <div style="flex:1;min-width:0"><div style="font:700 13px var(--ui);color:var(--fg-2)">Change rejected — nothing was written</div><div style="font:500 11.5px var(--mono);color:var(--fg-3);margin-top:1px">src/utils/cart.ts is unchanged</div></div>
+                    <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;background:var(--raised-2);color:var(--fg-3);font:700 9.5px var(--mono);letter-spacing:.05em">REJECTED</span>
+                  </div>
+                  <div style="padding:0 15px 14px 56px;font:450 12.5px var(--ui);line-height:1.6;color:var(--fg-3)">The proposed edit was discarded. Ask eCy to revise the approach, or <button type="button" onClick="{{ resetDiff }}" style="border:none;background:none;color:var(--accent-2);cursor:pointer;font:600 12.5px var(--ui);padding:0" style-hover="text-decoration:underline">restore the diff</button>.</div>
+                </div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--COMPOSER-->
+        <div style="flex:none;padding:14px 20px 16px;border-top:1px solid var(--border);background:var(--panel)">
+          <div data-focusring style="border:1px solid var(--border-2);border-radius:14px;background:var(--raised);box-shadow:var(--shadow-mid);overflow:hidden">
+            <textarea rows="1" placeholder="Reply to eCy, or start a new task…" style="width:100%;padding:14px 16px 6px;background:none;border:none;outline:none;font:450 14px var(--ui);line-height:1.5;color:var(--fg)"></textarea>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 12px 10px">
+              <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--border-2);border-radius:8px;background:var(--inset);cursor:pointer" style-hover="border-color:var(--border-accent)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg><span style="font:600 11.5px var(--mono);color:var(--fg-2)">qwen3:8b</span><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevdown"/></svg></button>
+              <div style="flex:1"></div>
+              <button type="button" onClick="{{ toggleAuto }}" style="display:inline-flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:7px">
+                <sc-if value="{{ autoApply }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .15s"></span></span></sc-if>
+                <sc-if value="{{ autoApplyOff }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2);transition:left .15s"></span></span></sc-if>
+                <span style="font:600 11.5px var(--ui);color:var(--fg-2)">Auto-apply</span>
+              </button>
+              <button type="button" onClick="{{ toggleVerify }}" style="display:inline-flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:7px">
+                <sc-if value="{{ verify }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--accent);flex:none"><span style="position:absolute;top:2px;left:15px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .15s"></span></span></sc-if>
+                <sc-if value="{{ verifyOff }}"><span style="position:relative;width:30px;height:17px;border-radius:9px;background:var(--border-2);flex:none"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--fg-2);transition:left .15s"></span></span></sc-if>
+                <span style="font:600 11.5px var(--ui);color:var(--fg-2)">Verify</span>
+              </button>
+              <div style="width:1px;height:20px;background:var(--border)"></div>
+              <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:8px 10px 8px 14px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 12.5px var(--ui)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)">Send<kbd style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.25);color:#fff">⌘↵</kbd></button>
+            </div>
+          </div>
+          <sc-if value="{{ showHints }}">
+            <div style="display:flex;align-items:center;gap:14px;margin-top:9px;padding:0 4px;font:500 11px var(--mono);color:var(--fg-3)">
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘↵</kbd> approve diff</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘⌫</kbd> reject</span>
+              <span style="display:inline-flex;align-items:center;gap:5px"><kbd>⌘K</kbd> commands</span>
+              <span style="flex:1"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>run 02 · clean finish · 2.5s</span>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <!--RIGHT RAIL (completed run + pending write)-->
+      <div style="width:328px;flex:none;border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+        <div style="flex:none;display:flex;align-items:center;gap:8px;padding:14px 16px 12px;border-bottom:1px solid var(--border)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg><span style="font:600 12.5px var(--ui);color:var(--fg)">Execution trace</span><span style="flex:1"></span><span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;background:var(--accent-weak);font:700 9.5px var(--mono);letter-spacing:.06em;color:var(--accent-2)">RUN 02</span></div>
+        <div style="flex:1;overflow-y:auto;padding:14px 16px;min-height:0">
+          <div style="position:relative">
+            <span style="position:absolute;left:12.5px;top:22px;bottom:22px;width:1.5px;background:var(--border-2)"></span>
+            <!--step 01 done-->
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">run_tests</span><span style="font:600 10px var(--mono);color:var(--fg-3)">2.4s</span></div><div style="font:500 10px var(--mono);color:var(--bad);margin-top:3px">1 failed · captured assertion</div></div></div>
+            <!--step 02 done-->
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">grep</span><span style="font:600 10px var(--mono);color:var(--fg-3)">41ms</span></div><div style="font:500 10px var(--mono);color:var(--fg-3);margin-top:3px">3 matches</div></div></div>
+            <!--step 03 done-->
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">read_file</span><span style="font:600 10px var(--mono);color:var(--fg-3)">12ms</span></div><div style="font:500 10px var(--mono);color:var(--fg-3);margin-top:3px">cart.ts:12-19</div></div></div>
+            <!--step 04 pending/approved/rejected-->
+            <sc-if value="{{ diffPending }}">
+            <div style="position:relative;display:flex;gap:11px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--accent-weak);border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border-accent);border-radius:10px;background:var(--accent-weak);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">edit_file</span></div><div style="font:600 10px var(--mono);color:var(--accent-2);margin-top:3px">awaiting your review →</div></div></div>
+            </sc-if>
+            <sc-if value="{{ diffApproved }}">
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">edit_file</span><span style="font:600 10px var(--mono);color:var(--ok)">applied</span></div><div style="font:500 10px var(--mono);color:var(--add-fg);margin-top:3px">+1 −1 · approved</div></div></div>
+            <div style="position:relative;display:flex;gap:11px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">run_tests</span><span style="font:600 10px var(--mono);color:var(--fg-3)">2.1s</span></div><div style="font:500 10px var(--mono);color:var(--ok);margin-top:3px">4 passed</div></div></div>
+            </sc-if>
+            <sc-if value="{{ diffRejected }}">
+            <div style="position:relative;display:flex;gap:11px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--raised-2);border:1.5px solid var(--border-2);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg-2);flex:1">edit_file</span><span style="font:600 10px var(--mono);color:var(--fg-3)">rejected</span></div><div style="font:500 10px var(--mono);color:var(--fg-3);margin-top:3px">no changes written</div></div></div>
+            </sc-if>
+          </div>
+          <div style="margin-top:14px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;justify-content:space-between;font:600 11px var(--mono);color:var(--fg-3)"><span>4 steps</span><span>2.5s · <span style="color:var(--ok)">clean finish</span></span></div>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 8px"><span style="font:600 10px var(--mono);letter-spacing:.16em;color:var(--fg-3);text-transform:uppercase">Available tools</span><span style="flex:1"></span><span style="font:600 11px var(--mono);color:var(--fg-3)">7</span></div>
+          <div style="padding:0 10px 12px;display:flex;flex-direction:column;gap:1px">
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">read_file</span><span style="font:600 10px var(--mono);color:var(--fg-3)">×1</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">grep</span><span style="font:600 10px var(--mono);color:var(--fg-3)">×1</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--inset);border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg-2)">run_tests</span><span style="font:600 10px var(--mono);color:var(--fg-3)">×2</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;border:1px solid var(--border-accent);background:var(--accent-weak)"><span style="width:24px;height:24px;flex:none;border-radius:6px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span><span style="flex:1;font:600 11.5px var(--mono);color:var(--fg)">edit_file</span><span style="display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:4px;background:var(--accent-weak-2);font:600 9px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg>approval</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!--=================== FRAME 05 · TABLET ===================-->
+<section id="tablet" data-screen-label="TABLET" style="width:834px;margin-bottom:60px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px;padding-left:2px">
+    <span style="font:700 13px var(--mono);color:var(--accent-2);letter-spacing:.04em">05</span>
+    <span style="font:700 17px var(--ui);letter-spacing:-.01em;color:var(--fg)">Tablet · right rail as a drawer</span>
+    <span style="font:500 13px var(--ui);color:var(--fg-3)">Icon rail, condensed chat, slide-over trace — tap the scrim to close</span>
+  </div>
+
+  <div style="position:relative;width:834px;height:1180px;border-radius:16px;overflow:hidden;border:1px solid var(--border-2);box-shadow:var(--shadow-high);background:var(--panel);display:flex;flex-direction:column">
+
+    <!--TOP BAR-->
+    <div style="height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--border);background:var(--panel)">
+      <button type="button" style="display:inline-flex;padding:8px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);cursor:pointer;color:var(--fg-2)" style-hover="border-color:var(--border-accent);color:var(--fg)"><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-list"/></svg></button>
+      <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+      <span style="font:600 13px var(--ui);color:var(--fg)">Fix CartSummary test</span>
+      <div style="flex:1"></div>
+      <button type="button" style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid var(--border-2);border-radius:9px;background:var(--raised);cursor:pointer" style-hover="border-color:var(--border-accent)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-cpu"/></svg><span style="font:600 11.5px var(--mono);color:var(--fg)">qwen3:8b</span></button>
+      <button type="button" onClick="{{ toggleDrawer }}" style="display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid var(--border-accent);border-radius:9px;background:var(--accent-weak);color:var(--accent-2);cursor:pointer;font:600 11.5px var(--ui)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-panelright"/></svg>Trace</button>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <!--LEFT ICON RAIL-->
+      <div style="width:64px;flex:none;border-right:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px">
+        <button type="button" style="width:40px;height:40px;border-radius:11px;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--glow)" style-hover="filter:brightness(1.08)"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-plus"/></svg></button>
+        <div style="width:26px;height:1px;background:var(--border);margin:6px 0"></div>
+        <button type="button" style="position:relative;width:40px;height:40px;border-radius:11px;border:1px solid var(--border-accent);background:var(--accent-weak);color:var(--accent-2);display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="position:absolute;left:-1px;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)"></span><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chat"/></svg></button>
+        <button type="button" style="width:40px;height:40px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--fg-3);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--raised-2);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chat"/></svg></button>
+        <button type="button" style="width:40px;height:40px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--fg-3);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--raised-2);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chat"/></svg></button>
+        <div style="flex:1"></div>
+        <button type="button" style="width:40px;height:40px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--fg-3);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--raised-2);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sliders"/></svg></button>
+        <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent-3),var(--accent));display:flex;align-items:center;justify-content:center;font:700 12px var(--ui);color:#fff">D</div>
+      </div>
+
+      <!--CENTER-->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface)">
+        <div style="flex:1;overflow-y:auto;padding:22px 26px;min-height:0">
+          <div style="max-width:600px;margin:0 auto;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;justify-content:flex-end;gap:9px">
+              <div style="max-width:82%;padding:11px 14px;border-radius:14px 14px 4px 14px;background:var(--user);border:1px solid var(--user-border);font:450 14px var(--ui);line-height:1.55;color:var(--fg)">The CartSummary test is failing after I added coupon support. Find and fix it.</div>
+            </div>
+            <div style="display:flex;gap:11px">
+              <div style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-3));display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg></div>
+              <div style="flex:1;min-width:0">
+                <details style="border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:12px">
+                  <summary style="display:flex;align-items:center;gap:9px;padding:8px 11px"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-sparkles"/></svg><span style="font:600 11.5px var(--ui);color:var(--fg-2)">Reasoning</span><span style="font:500 10.5px var(--mono);color:var(--fg-3)">· 4.1s</span><span style="flex:1"></span><svg data-chev viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-chevright"/></svg></summary>
+                  <div style="padding:2px 12px 11px 32px;border-top:1px solid var(--border);font:450 12px var(--ui);line-height:1.65;color:var(--fg-3)">The coupon guard checks <span style="font-family:var(--mono);color:var(--fg-2)">coupon.active</span>, but the type defines <span style="font-family:var(--mono);color:var(--fg-2)">isActive</span> — the discount branch never runs. One-line fix, gated behind approval.</div>
+                </details>
+                <div style="font:450 14px var(--ui);line-height:1.6;color:var(--fg);margin-bottom:13px">Found it — a field-name mismatch in <span style="font-family:var(--mono);font-size:12.5px;background:var(--accent-weak);color:var(--accent-2);padding:1px 5px;border-radius:4px">computeTotal</span>. Full trace is in the drawer. Review the fix:</div>
+
+                <sc-if value="{{ diffPending }}">
+                <div style="border:1px solid var(--border-accent);border-radius:13px;background:var(--panel);overflow:hidden;box-shadow:var(--glow)">
+                  <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--accent-weak);border-bottom:1px solid var(--border-accent)">
+                    <span style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--panel);border:1px solid var(--border-accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg></span>
+                    <div style="flex:1;min-width:0"><div style="font:700 12.5px var(--mono);color:var(--fg)">edit_file</div><div style="font:600 11px var(--mono);color:var(--accent-2)">src/utils/cart.ts</div></div>
+                    <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;background:var(--accent);color:#fff;font:700 9px var(--mono);letter-spacing:.04em"><svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-shield"/></svg>APPROVAL</span>
+                  </div>
+                  <div style="background:var(--inset);padding:9px 0;font:500 11.5px var(--mono);line-height:1.8">
+                    <div style="display:flex;padding:0 13px"><span style="width:30px;color:var(--fg-faint);flex:none;text-align:right;padding-right:11px">13</span><span style="width:13px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">const subtotal = items.reduce(…);</span></div>
+                    <div style="display:flex;padding:0 13px;background:var(--del-bg);box-shadow:inset 2px 0 0 var(--del-fg)"><span style="width:30px;color:var(--del-fg);flex:none;text-align:right;padding-right:11px">15</span><span style="width:13px;flex:none;color:var(--del-fg);font-weight:700">−</span><span style="color:var(--fg)">if (coupon.<span style="background:rgba(255,90,104,.28);border-radius:3px;padding:0 2px">active</span>) {</span></div>
+                    <div style="display:flex;padding:0 13px;background:var(--add-bg);box-shadow:inset 2px 0 0 var(--add-fg)"><span style="width:30px;color:var(--add-fg);flex:none;text-align:right;padding-right:11px">15</span><span style="width:13px;flex:none;color:var(--add-fg);font-weight:700">+</span><span style="color:var(--fg)">if (coupon.<span style="background:rgba(43,212,164,.28);border-radius:3px;padding:0 2px">isActive</span>) {</span></div>
+                    <div style="display:flex;padding:0 13px"><span style="width:30px;color:var(--fg-faint);flex:none;text-align:right;padding-right:11px">16</span><span style="width:13px;flex:none;color:var(--fg-faint)"> </span><span style="color:var(--fg-3)">  return round2(subtotal * …);</span></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px;padding:11px 13px;border-top:1px solid var(--border-accent)">
+                    <span style="font:700 11px var(--mono);color:var(--add-fg)">+1</span><span style="font:700 11px var(--mono);color:var(--del-fg)">−1</span>
+                    <span style="flex:1"></span>
+                    <button type="button" onClick="{{ reject }}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 13px;border:1px solid var(--bad);border-radius:9px;background:var(--bad-weak);color:var(--bad);cursor:pointer;font:600 12px var(--ui)" style-hover="background:var(--bad);color:#fff">Reject<kbd style="background:transparent;border-color:currentColor;color:currentColor">⌘⌫</kbd></button>
+                    <button type="button" onClick="{{ approve }}" style="display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font:600 12px var(--ui);box-shadow:var(--glow)" style-hover="filter:brightness(1.08)" style-active="transform:scale(.97)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg>Approve<kbd style="background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28);color:#fff">⌘↵</kbd></button>
+                  </div>
+                </div>
+                </sc-if>
+                <sc-if value="{{ diffApproved }}">
+                <div style="border:1px solid var(--ok);border-radius:12px;background:linear-gradient(180deg,var(--ok-weak),transparent);padding:13px 15px;display:flex;align-items:center;gap:11px"><span style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--ok-weak);border:1px solid var(--ok);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:var(--ok);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--ui);color:var(--fg)">Applied · <span style="font-family:var(--mono);font-size:11px;color:var(--add-fg)">+1 −1</span></div><div style="font:500 11px var(--mono);color:var(--fg-3)">cart.ts written · 4 tests pass</div></div><button type="button" onClick="{{ resetDiff }}" style="display:inline-flex;padding:7px;border:1px solid var(--border-2);border-radius:8px;background:var(--raised);color:var(--fg-3);cursor:pointer" style-hover="color:var(--fg)"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-refresh"/></svg></button></div>
+                </sc-if>
+                <sc-if value="{{ diffRejected }}">
+                <div style="border:1px dashed var(--border-2);border-radius:12px;background:var(--surface);padding:13px 15px;display:flex;align-items:center;gap:11px"><span style="width:28px;height:28px;flex:none;border-radius:8px;background:var(--raised-2);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg></span><div style="flex:1;min-width:0"><div style="font:700 12.5px var(--ui);color:var(--fg-2)">Rejected — nothing written</div><div style="font:500 11px var(--mono);color:var(--fg-3)">cart.ts unchanged</div></div><button type="button" onClick="{{ resetDiff }}" style="border:none;background:none;color:var(--accent-2);cursor:pointer;font:600 11.5px var(--ui)" style-hover="text-decoration:underline">restore</button></div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!--COMPOSER-->
+        <div style="flex:none;padding:12px 16px 14px;border-top:1px solid var(--border);background:var(--panel)">
+          <div data-focusring style="border:1px solid var(--border-2);border-radius:13px;background:var(--raised);box-shadow:var(--shadow-mid);overflow:hidden">
+            <textarea rows="1" placeholder="Reply to eCy…" style="width:100%;padding:12px 14px 4px;background:none;border:none;outline:none;font:450 13.5px var(--ui);line-height:1.5;color:var(--fg)"></textarea>
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 10px 9px">
+              <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 4px"><span style="position:relative;width:28px;height:16px;border-radius:8px;background:var(--border-2);flex:none"><span style="position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--fg-2)"></span></span><span style="font:600 11px var(--ui);color:var(--fg-3)">Auto-apply</span></div>
+              <div style="display:inline-flex;align-items:center;gap:6px;padding:5px 4px"><span style="position:relative;width:28px;height:16px;border-radius:8px;background:var(--accent);flex:none"><span style="position:absolute;top:2px;left:14px;width:12px;height:12px;border-radius:50%;background:#fff"></span></span><span style="font:600 11px var(--ui);color:var(--fg-2)">Verify</span></div>
+              <div style="flex:1"></div>
+              <button type="button" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer" style-hover="filter:brightness(1.08)" style-active="transform:scale(.95)"><svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-arrowup"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!--RIGHT DRAWER (slide-over)-->
+    <sc-if value="{{ drawerOpen }}">
+      <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;background:rgba(4,5,10,.55);backdrop-filter:blur(1px);z-index:20"></div>
+      <div style="position:absolute;top:0;right:0;bottom:0;width:364px;z-index:21;background:var(--panel);border-left:1px solid var(--border-2);box-shadow:var(--shadow-high);display:flex;flex-direction:column;animation:rise .2s cubic-bezier(0.16,1,0.3,1)">
+        <div style="flex:none;display:flex;align-items:center;gap:9px;padding:16px 16px 13px;border-bottom:1px solid var(--border)">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg>
+          <span style="font:600 13px var(--ui);color:var(--fg)">Execution trace</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;background:var(--ok-weak);font:700 9px var(--mono);letter-spacing:.05em;color:var(--ok)">DONE</span>
+          <span style="flex:1"></span>
+          <button type="button" onClick="{{ closeDrawer }}" style="display:inline-flex;padding:7px;border:1px solid var(--border-2);border-radius:8px;background:var(--raised);color:var(--fg-2);cursor:pointer" style-hover="color:var(--fg);border-color:var(--border-accent)"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-x"/></svg></button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:14px 16px;min-height:0">
+          <div style="position:relative">
+            <span style="position:absolute;left:12.5px;top:20px;bottom:20px;width:1.5px;background:var(--border-2)"></span>
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">run_tests</span><span style="font:600 10px var(--mono);color:var(--fg-3)">2.4s</span></div><div style="font:500 10px var(--mono);color:var(--bad);margin-top:3px">1 failed · captured assertion</div></div></div>
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">grep</span><span style="font:600 10px var(--mono);color:var(--fg-3)">41ms</span></div><div style="font:500 10px var(--mono);color:var(--fg-3);margin-top:3px">3 matches</div></div></div>
+            <div style="position:relative;display:flex;gap:11px;margin-bottom:8px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--ok-weak);border:1.5px solid var(--ok);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--ok);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><use href="#i-check"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--fg-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">read_file</span><span style="font:600 10px var(--mono);color:var(--fg-3)">12ms</span></div><div style="font:500 10px var(--mono);color:var(--fg-3);margin-top:3px">cart.ts:12-19</div></div></div>
+            <div style="position:relative;display:flex;gap:11px"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--accent-weak);border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;z-index:1"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--accent-2);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg></span><div style="flex:1;min-width:0;border:1px solid var(--border-accent);border-radius:10px;background:var(--accent-weak);padding:8px 11px"><div style="display:flex;align-items:center;gap:7px"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:var(--accent-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-pencil"/></svg><span style="font:700 11.5px var(--mono);color:var(--fg);flex:1">edit_file</span></div><div style="font:600 10px var(--mono);color:var(--accent-2);margin-top:3px">awaiting your review →</div></div></div>
+          </div>
+        </div>
+        <div style="flex:none;border-top:1px solid var(--border);padding:12px 16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font:600 10px var(--mono);letter-spacing:.14em;color:var(--fg-3);text-transform:uppercase">Available tools</span><span style="flex:1"></span><span style="font:600 11px var(--mono);color:var(--fg-3)">7</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:600 11px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-filetext"/></svg>read_file</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:600 11px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--fg-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-search"/></svg>grep</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:600 11px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-flask"/></svg>run_tests</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border-accent);border-radius:7px;background:var(--accent-weak);font:600 11px var(--mono);color:var(--accent-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><use href="#i-lock"/></svg>edit_file</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font:600 11px var(--mono);color:var(--fg-2)"><svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:var(--warn);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round"><use href="#i-terminal"/></svg>run_command</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</section>
+<!--FRAMES_END--></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#6366f1&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Brand&quot;,&quot;options&quot;:[&quot;#6366f1&quot;,&quot;#7c3aed&quot;,&quot;#06b6d4&quot;,&quot;#10b981&quot;,&quot;#f43f5e&quot;]},&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;section&quot;:&quot;Brand&quot;},&quot;keyboardHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { theme:(props && props.defaultTheme) || 'dark', diff:'pending', autoApply:false, verify:true, activeSession:'cart', drawerOpen:true };
+  }
+  componentDidMount(){ this.applyAccent(); this.scrollStreams(); }
+  componentDidUpdate(){ this.applyAccent(); this.scrollStreams(); }
+  scrollStreams(){ ['sFull','sStream'].forEach(k=>{ const el=this[k]; if(el){ el.scrollTop = el.scrollHeight; } }); }
+  applyAccent(){
+    const el=this.root, c=this.props && this.props.accentColor;
+    if(!el || !c) return;
+    el.style.setProperty('--accent', c);
+    el.style.setProperty('--accent-2', this.mix(c,'#ffffff',0.32));
+    el.style.setProperty('--accent-3', this.mix(c,'#ffffff',0.58));
+    el.style.setProperty('--accent-weak', this.rgba(c,0.14));
+    el.style.setProperty('--accent-weak-2', this.rgba(c,0.24));
+    el.style.setProperty('--border-accent', this.rgba(c,0.4));
+    el.style.setProperty('--glow', '0 0 0 1px '+this.rgba(c,0.45)+',0 0 28px '+this.rgba(c,0.26));
+  }
+  hexToRgb(h){ h=String(h).replace('#',''); if(h.length===3) h=h.split('').map(x=>x+x).join(''); const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  rgba(h,a){ const [r,g,b]=this.hexToRgb(h); return `rgba(${r},${g},${b},${a})`; }
+  mix(h,h2,t){ const a=this.hexToRgb(h), b=this.hexToRgb(h2); const m=a.map((v,i)=>Math.round(v+(b[i]-v)*t)); return `rgb(${m[0]},${m[1]},${m[2]})`; }
+  renderVals(){
+    const t=this.state, self=this;
+    const SESS=[
+      {id:'cart', title:'Fix failing CartSummary test', time:'now'},
+      {id:'auth', title:'Add OAuth refresh-token flow', time:'2h ago'},
+      {id:'perf', title:'Profile slow /dashboard route', time:'Yesterday'},
+      {id:'types', title:'Migrate cart utils to strict TS', time:'Mon'},
+      {id:'ci', title:'Fix flaky e2e run in CI', time:'Apr 2'},
+      {id:'docs', title:'Draft README for cart module', time:'Mar 28'}
+    ];
+    const sessions=SESS.map(s=>({ ...s, active:s.id===t.activeSession, inactive:s.id!==t.activeSession, onClick:()=>self.setState({activeSession:s.id}) }));
+    return {
+      theme:t.theme, isDark:t.theme==='dark', isLight:t.theme==='light',
+      setDark:()=>this.setState({theme:'dark'}), setLight:()=>this.setState({theme:'light'}),
+      diffPending:t.diff==='pending', diffApproved:t.diff==='approved', diffRejected:t.diff==='rejected',
+      approve:()=>this.setState({diff:'approved'}), reject:()=>this.setState({diff:'rejected'}), resetDiff:()=>this.setState({diff:'pending'}),
+      autoApply:t.autoApply, autoApplyOff:!t.autoApply, toggleAuto:()=>this.setState(s=>({autoApply:!s.autoApply})),
+      verify:t.verify, verifyOff:!t.verify, toggleVerify:()=>this.setState(s=>({verify:!s.verify})),
+      showHints: !(this.props && this.props.keyboardHints===false),
+      drawerOpen:t.drawerOpen, drawerClosed:!t.drawerOpen,
+      toggleDrawer:()=>this.setState(s=>({drawerOpen:!s.drawerOpen})),
+      closeDrawer:()=>this.setState({drawerOpen:false}), openDrawer:()=>this.setState({drawerOpen:true}),
+      sessions,
+      rootRef:(el)=>{ this.root=el; if(el) this.applyAccent(); },
+      refFull:(el)=>{ this.sFull=el; }, refStream:(el)=>{ this.sStream=el; }
+    };
+  }
+}
+</script>
+</body>
+</html>

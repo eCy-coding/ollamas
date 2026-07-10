@@ -169,3 +169,10 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 ---
 
 *Üretici: ODYSSEY planlama üreteci (PROGRESS sentez). Kaynak: `docs/odyssey/00-MASTER.md` + 8 plan .md (01,03,07 + 05-features/{documents,email-mcp,mcp-extensions,calendar-caldav,notes-tasks}) + ollamas kodu (server.ts:3191, App.tsx:23-tab, migrations:v6, .env.example:21-toggle, package.json dep-probe, server/mcp/*:12-dosya, sqlite-vec@^0.1.9). Doğrulama tarihi: 2026-07-10.*
+
+2026-07-11T01:43Z O0.registry DONE registry.test.ts 5/5 + module-guard 14/14; server.ts 3-satır mount+guard (INV-O0-1)
+2026-07-11T01:43Z O0.vector DONE vector.test.ts 5/5 koleksiyon-izole upsert/query/delete + dim/provider-kilit
+2026-07-11T01:43Z O0.migrations DONE v7 idempotent+rollback; module-migrations 4/4; import-guard canlı
+2026-07-11T01:43Z O0.toggle DONE modules-api 3/3 + module-tabs 4/4 + demo 5/5 + o0-parity 4/4; MODULE_DEMO=0→404∧tool-yok∧tab-gizli
+2026-07-11T01:43Z O0.GATE DONE tsc-0 · FRESH vitest 285 files / 2271 passed / 0 fail (baseline 2236 → +35 O0)
+2026-07-11T02:05Z PANEL.download DONE 7/9 design.html diskte (chat/research/documents/email/settings-2fa/cookbook/notes-tasks); calendar+shell impl-anı; DesignSync ana-thread, subagent'ta tool-yok

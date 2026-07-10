@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/colors_and_type.css">
+<script src="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/_ds_bundle.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#050A14;overflow:hidden;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#26374a;border-radius:5px;border:2px solid #050A14;}
+  ::-webkit-scrollbar-thumb:hover{background:#3A4F66;}
+  input:focus{outline:none;}
+  a{color:#00D4FF;} a:hover{color:#66E5FF;}
+  @keyframes ecyFade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  @keyframes ecyPulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;width:100%;background:#050A14;color:#F0F4FF;font-family:'DM Sans',sans-serif;overflow:hidden;">
+
+  <div style="width:60px;flex:0 0 60px;background:#080F1B;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;z-index:10;">
+    <img src="assets/logo-icon.svg" alt="eCy" style="width:32px;height:32px;display:block;border-radius:9px;" />
+    <div style="width:26px;height:1px;background:rgba(255,255,255,0.08);margin:8px 0;"></div>
+    <sc-for list="{{ railItems }}" as="r" hint-placeholder-count="5">
+      <button onClick="{{ r.onClick }}" title="{{ r.label }}" style="width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;border:1px solid {{ r.border }};background:{{ r.bg }};cursor:pointer;position:relative;transition:background 150ms;" style-hover="background:#132338;">
+        <sc-if value="{{ r.active }}"><span style="position:absolute;left:-15px;top:11px;width:3px;height:20px;border-radius:2px;background:#00D4FF;box-shadow:0 0 8px rgba(0,212,255,0.6);"></span></sc-if>
+        {{ r.node }}
+      </button>
+    </sc-for>
+    <div style="flex:1;"></div>
+    <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#00D4FF,#7B5EA7);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:#050A14;">YU</div>
+  </div>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+    <div style="height:58px;flex:0 0 58px;display:flex;align-items:center;justify-content:space-between;padding:0 24px 0 22px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(8,15,27,0.7);backdrop-filter:blur(12px);">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;border:1px solid rgba(255,255,255,0.10);background:#0D1B2E;cursor:pointer;" style-hover="border-color:rgba(0,212,255,0.3);">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:#F0F4FF;">ollamas</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#647d97" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#00C896;box-shadow:0 0 8px rgba(0,200,150,0.6);animation:ecyPulse 2.4s ease-in-out infinite;"></span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8A9BB0;">local workspace · 127.0.0.1</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;width:210px;border-radius:9px;border:1px solid rgba(255,255,255,0.08);background:#0B1524;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#647d97" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/></svg>
+          <span style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#536882;">Search settings</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:9px;background:rgba(0,200,150,0.10);border:1px solid rgba(0,200,150,0.22);">
+          <span style="width:6px;height:6px;border-radius:50%;background:#00C896;"></span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:#00C896;">daemon v1.6.2</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;display:flex;">
+
+      <div style="width:252px;flex:0 0 252px;border-right:1px solid rgba(255,255,255,0.06);background:#0A121F;padding:20px 14px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#4a5f78;padding:4px 10px 10px;">Settings</div>
+        <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+          <button onClick="{{ n.onClick }}" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid {{ n.border }};background:{{ n.bg }};cursor:pointer;transition:background 150ms;" style-hover="background:#132338;">
+            <span style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:{{ n.iconBg }};flex:0 0 auto;">{{ n.node }}</span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1;">
+              <span style="font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:{{ n.weight }};color:{{ n.labelColor }};display:flex;align-items:center;gap:7px;">{{ n.label }}{{ n.dotNode }}</span>
+              <span style="font-family:'DM Sans',sans-serif;font-size:11px;color:#4d6480;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ n.sub }}</span>
+            </span>
+          </button>
+        </sc-for>
+        <div style="flex:1;"></div>
+        <div style="margin:8px 6px 2px;padding:12px;border-radius:10px;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.12);">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#00D4FF;margin-bottom:5px;">Local-first</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:11.5px;line-height:1.45;color:#8A9BB0;">All inference and data stay on this machine. Nothing is sent to eCy.</div>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+
+        <div style="flex:0 0 auto;display:flex;align-items:center;gap:9px 22px;padding:9px 32px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(10,18,31,0.5);flex-wrap:wrap;">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#4a5f78;white-space:nowrap;">Trust model</span>
+          <div style="display:flex;align-items:center;gap:8px;">{{ chipEnforced }}<span style="font-family:'DM Sans',sans-serif;font-size:11.5px;color:#8A9BB0;">Guaranteed by the daemon — the UI cannot override it.</span></div>
+          <div style="display:flex;align-items:center;gap:8px;">{{ chipAdvisory }}<span style="font-family:'DM Sans',sans-serif;font-size:11.5px;color:#8A9BB0;">A convenience hint a determined process can bypass.</span></div>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:26px 32px 64px;">
+          <div style="max-width:1060px;">
+
+            <sc-if value="{{ isGeneral }}">
+              <div style="animation:ecyFade 0.28s cubic-bezier(0.16,1,0.3,1);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;">
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#00D4FF;margin-bottom:8px;">General</div>
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#F0F4FF;margin:0;">Preferences</h3>
+                    <p style="font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#8A9BB0;margin:7px 0 0;max-width:560px;">These settings are stored locally and shape only this device. They never affect access control or leave your machine.</p>
+                  </div>
+                  {{ chipLocal }}
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;margin-bottom:18px;">
+                  <div style="padding:15px 22px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.04em;color:#B0BFCF;text-transform:uppercase;">Appearance</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 22px;">
+                    <div><div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;">Theme</div><div style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#8A9BB0;margin-top:2px;">Optimized for dark environments.</div></div>
+                    <div style="display:flex;gap:4px;padding:4px;background:#0A1524;border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+                      <sc-for list="{{ themeOpts }}" as="o" hint-placeholder-count="3">
+                        <button onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all 150ms;background:{{ o.bg }};color:{{ o.color }};" style-hover="background:rgba(255,255,255,0.04);">{{ o.node }}{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 22px;border-top:1px solid rgba(255,255,255,0.06);">
+                    <div><div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;">Interface density</div><div style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#8A9BB0;margin-top:2px;">Compact packs more onto each screen.</div></div>
+                    <div style="display:flex;gap:4px;padding:4px;background:#0A1524;border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+                      <sc-for list="{{ densityOpts }}" as="o" hint-placeholder-count="2">
+                        <button onClick="{{ o.onClick }}" style="padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all 150ms;background:{{ o.bg }};color:{{ o.color }};" style-hover="background:rgba(255,255,255,0.04);">{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 22px;border-top:1px solid rgba(255,255,255,0.06);">
+                    <div><div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;">Reduce motion</div><div style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#8A9BB0;margin-top:2px;">Minimize transitions and animated effects.</div></div>
+                    {{ reduceMotionSwitch }}
+                  </div>
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;margin-bottom:18px;">
+                  <div style="padding:15px 22px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.04em;color:#B0BFCF;text-transform:uppercase;">Language &amp; region</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:18px 22px;">
+                    <div style="display:flex;flex-direction:column;gap:7px;">
+                      <label style="font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;color:#B0BFCF;">Display language</label>
+                      <select value="{{ language }}" onChange="{{ onLang }}" style="font-family:'DM Sans',sans-serif;font-size:14px;background:#0A1524;color:#F0F4FF;border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:10px 12px;cursor:pointer;">
+                        <option value="en-US">English (United States)</option>
+                        <option value="en-GB">English (United Kingdom)</option>
+                        <option value="de-DE">Deutsch</option>
+                        <option value="fr-FR">Français</option>
+                        <option value="ja-JP">日本語</option>
+                        <option value="es-ES">Español</option>
+                      </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:7px;">
+                      <label style="font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;color:#B0BFCF;">Time zone</label>
+                      <div style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:13px;background:#0A1524;color:#8A9BB0;border:1px solid rgba(255,255,255,0.10);border-radius:8px;padding:10px 12px;">{{ iconGlobe }}Auto · America/New_York (UTC−5)</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;">
+                  <div style="padding:15px 22px;border-bottom:1px solid rgba(255,255,255,0.06);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.04em;color:#B0BFCF;text-transform:uppercase;">Privacy</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 22px;">
+                    <div style="flex:1;">
+                      <div style="display:flex;align-items:center;gap:10px;"><div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;">Anonymous usage analytics</div>{{ chipEnforced }}</div>
+                      <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#8A9BB0;margin-top:4px;max-width:640px;">Locked off. The daemon blocks all telemetry egress at the network boundary — this toggle exists for parity and cannot be enabled on a local-first install.</div>
+                    </div>
+                    {{ telemetrySwitch }}
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isSecurity }}" hint-placeholder-val="{{ true }}">
+              <div style="animation:ecyFade 0.28s cubic-bezier(0.16,1,0.3,1);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;">
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#00D4FF;margin-bottom:8px;">Security</div>
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#F0F4FF;margin:0;">Authentication &amp; sessions</h3>
+                    <p style="font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#8A9BB0;margin:7px 0 0;max-width:580px;">Access to this workspace is verified by the ollamas daemon on every sign-in. Controls here are hard boundaries, not UI conveniences.</p>
+                  </div>
+                  {{ chipSec }}
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.12);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;margin-bottom:18px;">
+                  <div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div style="width:40px;height:40px;border-radius:10px;background:rgba(0,212,255,0.10);border:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.6 8-9.5V5.2L12 2.3 4 5.2v7.3C4 18.4 12 22 12 22Z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/></svg>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:#F0F4FF;">Two-factor authentication</div>
+                      <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#8A9BB0;margin-top:2px;">Time-based one-time passwords (TOTP) from an authenticator app.</div>
+                    </div>
+                    <sc-if value="{{ twoFAActive }}"><span style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:9999px;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.28);color:#00C896;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;"><span style="width:6px;height:6px;border-radius:50%;background:#00C896;"></span>Active</span></sc-if>
+                  </div>
+
+                  <sc-if value="{{ twoFAActive }}">
+                    <div style="padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+                      <div style="display:flex;flex-direction:column;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:10px;font-family:'DM Sans',sans-serif;font-size:13.5px;color:#B0BFCF;">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00C896" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg>
+                          Authenticator app · enrolled
+                        </div>
+                        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A9BB0;">{{ backupRemaining }} of 10 backup codes remaining</div>
+                      </div>
+                      <div style="display:flex;gap:10px;">
+                        <button onClick="{{ regenBackup }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#B0BFCF;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4);color:#00D4FF;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3.5V9h-5.5"/></svg>Regenerate codes</button>
+                        <button onClick="{{ disable2FA }}" style="padding:9px 15px;border-radius:8px;border:1px solid rgba(255,71,87,0.3);background:rgba(255,71,87,0.08);color:#FF4757;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="background:rgba(255,71,87,0.16);">Disable</button>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ enrolling }}">
+                    <div style="padding:20px 22px;">
+                      <div style="display:flex;align-items:center;gap:0;margin-bottom:22px;max-width:440px;">
+                        <div style="display:flex;align-items:center;gap:9px;flex:0 0 auto;"><span style="width:26px;height:26px;border-radius:50%;background:#00D4FF;color:#050A14;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;">1</span><span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#F0F4FF;">Scan</span></div>
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);margin:0 12px;"></div>
+                        <div style="display:flex;align-items:center;gap:9px;flex:0 0 auto;"><span style="width:26px;height:26px;border-radius:50%;background:{{ step2Bg }};border:1px solid {{ step2Bd }};color:{{ step2Fg }};display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;">2</span><span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:{{ step2Label }};">Verify</span></div>
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);margin:0 12px;"></div>
+                        <div style="display:flex;align-items:center;gap:9px;flex:0 0 auto;"><span style="width:26px;height:26px;border-radius:50%;background:{{ step3Bg }};border:1px solid {{ step3Bd }};color:{{ step3Fg }};display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;">3</span><span style="font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:{{ step3Label }};">Backup</span></div>
+                      </div>
+
+                      <sc-if value="{{ step1 }}">
+                        <div style="display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;">
+                          <div style="width:172px;height:172px;border-radius:12px;background:#F0F4FF;padding:10px;flex:0 0 auto;box-shadow:0 0 24px rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.2);">{{ qrNode }}</div>
+                          <div style="flex:1;min-width:260px;">
+                            <div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;margin-bottom:6px;">Scan with your authenticator app</div>
+                            <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;line-height:1.5;color:#8A9BB0;margin-bottom:16px;">The secret is generated on-device and never transmitted. Can't scan? Enter the key manually.</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#4a5f78;margin-bottom:6px;">Setup key</div>
+                            <div style="display:flex;align-items:center;gap:10px;background:#0A1524;border:1px solid rgba(255,255,255,0.10);border-radius:8px;padding:11px 14px;max-width:340px;">
+                              <span style="flex:1;font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:0.08em;color:#00D4FF;">{{ secretGroups }}</span>
+                              <button onClick="{{ onCopyKey }}" title="Copy key" style="background:transparent;border:none;cursor:pointer;padding:2px;display:flex;">{{ secretCopyNode }}</button>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:20px;">
+                              <button onClick="{{ toVerify }}" style="padding:10px 20px;border-radius:8px;border:none;background:#00D4FF;color:#050A14;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 0 20px rgba(0,212,255,0.3);transition:all 150ms;" style-hover="filter:brightness(1.1);">Continue</button>
+                              <button onClick="{{ cancelEnroll }}" style="padding:10px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#8A9BB0;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;" style-hover="color:#F0F4FF;">Cancel</button>
+                            </div>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ step2 }}">
+                        <div style="max-width:420px;">
+                          <div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;margin-bottom:6px;">Enter the 6-digit code</div>
+                          <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;line-height:1.5;color:#8A9BB0;margin-bottom:18px;">Type the current code from your authenticator app. <span style="font-family:'JetBrains Mono',monospace;color:#647d97;">(demo: 123456)</span></div>
+                          <div style="display:flex;gap:10px;margin-bottom:12px;">
+                            <sc-for list="{{ otpSlots }}" as="slot" hint-placeholder-count="6">
+                              <input value="{{ slot.value }}" onChange="{{ slot.onChange }}" onKeyDown="{{ slot.onKeyDown }}" ref="{{ slot.setRef }}" inputmode="numeric" maxlength="6" style="width:48px;height:56px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:500;color:#F0F4FF;background:#0A1524;border:1.5px solid {{ otpBorder }};border-radius:10px;transition:all 150ms;" style-focus="border-color:#00D4FF;box-shadow:0 0 0 3px rgba(0,212,255,0.15);" />
+                            </sc-for>
+                          </div>
+                          <sc-if value="{{ otpErr }}"><div style="display:flex;align-items:center;gap:7px;font-family:'DM Sans',sans-serif;font-size:12.5px;color:#FF4757;margin-bottom:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF4757" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>That code didn't match. Check your app and try again.</div></sc-if>
+                          <div style="display:flex;gap:14px;margin-top:8px;align-items:center;">
+                            <button onClick="{{ backToScan }}" style="padding:9px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#8A9BB0;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;" style-hover="color:#F0F4FF;">Back</button>
+                            <span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#536882;">Verified server-side — the code is checked by the daemon.</span>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ step3 }}">
+                        <div style="max-width:520px;">
+                          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><div style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#F0F4FF;">Save your backup codes</div><span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:9999px;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:#F5A623;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;">One-time use</span></div>
+                          <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;line-height:1.5;color:#8A9BB0;margin-bottom:16px;">Each code signs you in once if you lose your device. Store them offline — they are shown only now.</div>
+                          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:16px;background:#0A1524;border:1px solid rgba(255,255,255,0.10);border-radius:10px;margin-bottom:14px;">
+                            <sc-for list="{{ backupCodes }}" as="b" hint-placeholder-count="10">
+                              <div style="display:flex;align-items:center;gap:10px;"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4a5f78;">{{ b.idx }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:0.06em;color:#B0F0FF;">{{ b.code }}</span></div>
+                            </sc-for>
+                          </div>
+                          <div style="display:flex;gap:10px;margin-bottom:16px;">
+                            <button onClick="{{ onCopyBackup }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#B0BFCF;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4);">{{ backupCopyNode }}Copy</button>
+                            <button onClick="{{ onDownloadBackup }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#B0BFCF;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>Download .txt</button>
+                          </div>
+                          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:18px;">
+                            <span onClick="{{ toggleAck }}" style="width:20px;height:20px;border-radius:5px;border:1.5px solid {{ ackBorder }};background:{{ ackBg }};display:flex;align-items:center;justify-content:center;flex:0 0 auto;transition:all 150ms;">{{ ackCheck }}</span>
+                            <span onClick="{{ toggleAck }}" style="font-family:'DM Sans',sans-serif;font-size:13px;color:#B0BFCF;">I've stored these codes somewhere safe.</span>
+                          </label>
+                          <button onClick="{{ finishEnroll }}" disabled="{{ finishDisabled }}" style="padding:11px 24px;border-radius:8px;border:none;background:#00D4FF;color:#050A14;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;cursor:{{ finishCursor }};opacity:{{ finishOpacity }};box-shadow:0 0 20px rgba(0,212,255,0.25);transition:all 150ms;">Finish setup</button>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ twoFADisabled }}">
+                    <div style="padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
+                      <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#8A9BB0;max-width:520px;">Two-factor is currently off. Add a TOTP method to require a second step at sign-in for every session.</div>
+                      <button onClick="{{ begin2FA }}" style="display:flex;align-items:center;gap:8px;padding:11px 20px;border-radius:8px;border:none;background:#00D4FF;color:#050A14;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;box-shadow:0 0 20px rgba(0,212,255,0.3);white-space:nowrap;transition:all 150ms;" style-hover="filter:brightness(1.1);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#050A14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Enable two-factor</button>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div style="display:flex;align-items:center;gap:10px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:#F0F4FF;">Active sessions</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#647d97;">{{ sessionCount }} active</span>{{ chipEnforced }}</div>
+                    <button onClick="{{ onSignOutOthers }}" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,71,87,0.28);background:transparent;color:#FF6B78;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="background:rgba(255,71,87,0.1);">Sign out others</button>
+                  </div>
+                  <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:14px;padding:14px 22px;border-top:1px solid rgba(255,255,255,0.05);">
+                      <span style="width:36px;height:36px;border-radius:9px;background:#132338;display:flex;align-items:center;justify-content:center;flex:0 0 auto;">{{ s.node }}</span>
+                      <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:9px;"><span style="font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;color:#F0F4FF;">{{ s.client }}</span><sc-if value="{{ s.current }}"><span style="padding:1px 8px;border-radius:9999px;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);color:#00D4FF;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;">This device</span></sc-if></div>
+                        <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:#647d97;margin-top:1px;">{{ s.meta }}</div>
+                      </div>
+                      <div style="text-align:right;flex:0 0 auto;margin-right:6px;"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A9BB0;">{{ s.ip }}</div><div style="font-family:'DM Sans',sans-serif;font-size:11px;color:#4d6480;">{{ s.loc }} · {{ s.when }}</div></div>
+                      <sc-if value="{{ s.current }}"><span style="width:80px;text-align:right;font-family:'DM Sans',sans-serif;font-size:12px;color:#00C896;flex:0 0 auto;">Current</span></sc-if>
+                      <sc-if value="{{ s.notCurrent }}"><button onClick="{{ s.onRevoke }}" style="width:80px;padding:7px 0;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#8A9BB0;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:500;cursor:pointer;flex:0 0 auto;transition:all 150ms;" style-hover="border-color:rgba(255,71,87,0.4);color:#FF6B78;">Revoke</button></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isRoles }}">
+              <div style="animation:ecyFade 0.28s cubic-bezier(0.16,1,0.3,1);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;">
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#00D4FF;margin-bottom:8px;">Access control</div>
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#F0F4FF;margin:0;">Roles &amp; permissions</h3>
+                    <p style="font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#8A9BB0;margin:7px 0 0;max-width:600px;">RBAC is enforced by the daemon. A capability the daemon denies cannot be granted from this table — the matrix reflects policy, it does not bypass it.</p>
+                  </div>
+                  {{ chipRoles }}
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;width:260px;border-radius:9px;border:1px solid rgba(255,255,255,0.10);background:#0B1524;">{{ iconSearch }}<span style="font-family:'DM Sans',sans-serif;font-size:12.5px;color:#536882;">Search members &amp; roles</span></div>
+                  <div style="display:flex;gap:10px;">
+                    <button style="padding:9px 15px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:#B0BFCF;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4);color:#00D4FF;">New role</button>
+                    <button style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:8px;border:none;background:#00D4FF;color:#050A14;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 0 16px rgba(0,212,255,0.25);transition:all 150ms;" style-hover="filter:brightness(1.1);">{{ iconPlus }}Invite member</button>
+                  </div>
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.12);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;">
+                  <div style="display:grid;grid-template-columns:minmax(190px,1.3fr) 132px repeat(5,minmax(62px,1fr));align-items:center;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.08);background:#0A1524;">
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#647d97;">Role</div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#647d97;">Members</div>
+                    <sc-for list="{{ caps }}" as="c" hint-placeholder-count="5">
+                      <div title="{{ c.f }}" style="font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#647d97;text-align:center;">{{ c.l }}</div>
+                    </sc-for>
+                  </div>
+                  <sc-for list="{{ roles }}" as="role" hint-placeholder-count="5">
+                    <div onClick="{{ role.onSelect }}" style="display:grid;grid-template-columns:minmax(190px,1.3fr) 132px repeat(5,minmax(62px,1fr));align-items:center;padding:13px 20px;border-top:1px solid rgba(255,255,255,0.05);cursor:pointer;background:{{ role.rowBg }};position:relative;transition:background 150ms;" style-hover="background:rgba(255,255,255,0.02);">
+                      <sc-if value="{{ role.selected }}"><span style="position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:#00D4FF;"></span></sc-if>
+                      <div style="display:flex;align-items:center;gap:11px;min-width:0;">
+                        <span style="width:32px;height:32px;border-radius:9px;background:#132338;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">{{ role.node }}</span>
+                        <div style="min-width:0;">
+                          <div style="display:flex;align-items:center;gap:7px;"><span style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#F0F4FF;">{{ role.name }}</span><sc-if value="{{ role.locked }}">{{ iconLock }}</sc-if></div>
+                          <div style="font-family:'DM Sans',sans-serif;font-size:11.5px;color:#647d97;">{{ role.kind }}</div>
+                        </div>
+                      </div>
+                      <div style="display:flex;align-items:center;">
+                        <sc-if value="{{ role.hasMembers }}">
+                          <div style="display:flex;align-items:center;">
+                            <sc-for list="{{ role.avatars }}" as="a" hint-placeholder-count="2">
+                              <span style="width:26px;height:26px;border-radius:50%;background:{{ a.c }};border:2px solid #0D1B2E;margin-right:-8px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;color:#050A14;">{{ a.i }}</span>
+                            </sc-for>
+                            <sc-if value="{{ role.hasExtra }}"><span style="width:26px;height:26px;border-radius:50%;background:#26374a;border:2px solid #0D1B2E;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:600;color:#B0BFCF;margin-left:0;">+{{ role.extra }}</span></sc-if>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ role.isService }}"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9B80CC;padding:3px 9px;border-radius:6px;background:rgba(123,94,167,0.12);border:1px solid rgba(123,94,167,0.25);">service</span></sc-if>
+                      </div>
+                      <sc-for list="{{ role.cells }}" as="cell" hint-placeholder-count="5">
+                        <div style="display:flex;justify-content:center;">
+                          <button onClick="{{ cell.onClick }}" disabled="{{ cell.locked }}" style="width:34px;height:34px;border-radius:8px;border:1px solid transparent;background:transparent;display:flex;align-items:center;justify-content:center;cursor:{{ cell.cursor }};transition:all 150ms;" style-hover="{{ cell.hover }}">{{ cell.mark }}</button>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:22px;margin-top:14px;flex-wrap:wrap;">
+                  <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;">Allowed</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><span style="width:9px;height:9px;background:#F5A623;transform:rotate(45deg);border-radius:1.5px;"></span></span><span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;">Scoped — limited to a resource subset</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;"><span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#334862" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h12"/></svg></span><span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;">Denied</span></div>
+                  <div style="flex:1;"></div>
+                  <div style="display:flex;align-items:center;gap:8px;">{{ chipImmutable }}<span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;">The Owner role always retains full control.</span></div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isTools }}">
+              <div style="animation:ecyFade 0.28s cubic-bezier(0.16,1,0.3,1);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:22px;">
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#00D4FF;margin-bottom:8px;">Agent permissions</div>
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#F0F4FF;margin:0;">Tool policies</h3>
+                    <p style="font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#8A9BB0;margin:7px 0 0;max-width:600px;">Decide what tools agents may invoke. Whether a policy is a hard boundary or a request depends on the execution sandbox below.</p>
+                  </div>
+                  {{ chipTools }}
+                </div>
+
+                <div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border-radius:12px;margin-bottom:16px;border:1px solid {{ sandboxBannerBd }};background:{{ sandboxBannerBg }};transition:all 200ms;">
+                  <span style="width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:{{ sandboxIconBg }};">{{ sandboxIcon }}</span>
+                  <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:10px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#F0F4FF;">Execution sandbox</span>{{ sandboxChip }}</div>
+                    <div style="font-family:'DM Sans',sans-serif;font-size:12.5px;line-height:1.45;color:#8A9BB0;margin-top:3px;max-width:640px;">{{ sandboxDesc }}</div>
+                  </div>
+                  {{ sandboxSwitch }}
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;">
+                  <sc-for list="{{ tools }}" as="t" hint-placeholder-count="8">
+                    <div style="display:flex;align-items:center;gap:16px;padding:15px 20px;border-top:1px solid rgba(255,255,255,0.05);">
+                      <span style="width:38px;height:38px;border-radius:9px;background:#132338;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">{{ t.node }}</span>
+                      <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:10px;"><span style="font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#F0F4FF;">{{ t.name }}</span>{{ t.chip }}</div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;"><span style="font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;">{{ t.desc }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#4d6480;">· {{ t.scope }}</span></div>
+                      </div>
+                      <div style="display:flex;gap:3px;padding:3px;background:#0A1524;border:1px solid rgba(255,255,255,0.08);border-radius:9px;flex:0 0 auto;">
+                        <sc-for list="{{ t.policyOpts }}" as="p" hint-placeholder-count="3">
+                          <button onClick="{{ p.onClick }}" style="padding:6px 15px;border-radius:6px;border:1px solid {{ p.bd }};background:{{ p.bg }};color:{{ p.fg }};font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;transition:all 150ms;">{{ p.label }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isVault }}">
+              <div style="animation:ecyFade 0.28s cubic-bezier(0.16,1,0.3,1);">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;">
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#00D4FF;margin-bottom:8px;">Secrets &amp; models</div>
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.02em;color:#F0F4FF;margin:0;">Vault &amp; local models</h3>
+                    <p style="font-family:'DM Sans',sans-serif;font-size:13.5px;line-height:1.5;color:#8A9BB0;margin:7px 0 0;max-width:600px;">Credentials are encrypted at rest by the daemon and injected into tool runtimes at execution — never written to logs or model context.</p>
+                  </div>
+                  {{ chipVault }}
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.12);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;margin-bottom:18px;">
+                  <div style="display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <span style="width:44px;height:44px;border-radius:11px;background:{{ vaultIconBg }};border:1px solid {{ vaultIconBd }};display:flex;align-items:center;justify-content:center;flex:0 0 auto;">{{ vaultIcon }}</span>
+                    <div style="flex:1;">
+                      <div style="display:flex;align-items:center;gap:10px;"><span style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#F0F4FF;">Secrets vault</span>{{ chipVault }}</div>
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8A9BB0;margin-top:3px;">AES-256-GCM · key derived via Argon2id from your master passphrase</div>
+                    </div>
+                    <button onClick="{{ toggleVault }}" style="display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:8px;border:1px solid {{ vaultBtnBd }};background:{{ vaultBtnBg }};color:{{ vaultBtnFg }};font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 150ms;">{{ vaultBtnLabel }}</button>
+                  </div>
+
+                  <sc-if value="{{ vaultLocked }}">
+                    <div style="padding:38px 22px;text-align:center;">
+                      <div style="font-family:'DM Sans',sans-serif;font-size:13.5px;color:#8A9BB0;">Vault is locked. Unlock with your master passphrase to view stored credentials.</div>
+                      <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:#4d6480;margin-top:6px;">Revealing a secret requires re-authentication and writes an audit event.</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ vaultUnlocked }}">
+                    <div>
+                      <sc-for list="{{ secrets }}" as="k" hint-placeholder-count="5">
+                        <div style="display:flex;align-items:center;gap:14px;padding:13px 22px;border-top:1px solid rgba(255,255,255,0.05);">
+                          <div style="flex:0 0 210px;min-width:0;"><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#F0F4FF;">{{ k.name }}</div><div style="font-family:'DM Sans',sans-serif;font-size:11.5px;color:#647d97;">{{ k.type }} · {{ k.used }}</div></div>
+                          <div style="flex:1;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:0.04em;color:{{ k.valColor }};">{{ k.display }}</div>
+                          <button onClick="{{ k.onReveal }}" title="Reveal" style="background:transparent;border:none;cursor:pointer;padding:5px;display:flex;" style-hover="opacity:0.7;">{{ k.eyeNode }}</button>
+                          <button onClick="{{ k.onCopy }}" title="Copy" style="background:transparent;border:none;cursor:pointer;padding:5px;display:flex;" style-hover="opacity:0.7;">{{ k.copyNode }}</button>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;">
+                  <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.14);border-radius:12px;padding:16px 18px;box-shadow:0 0 20px rgba(0,212,255,0.08);">
+                    <div style="display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;margin-bottom:8px;">{{ iconBoxStat }}Models installed</div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;color:#F0F4FF;line-height:1;">{{ modelCount }}<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:#00C896;font-weight:500;margin-left:8px;">{{ loadedCount }} loaded</span></div>
+                  </div>
+                  <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;padding:16px 18px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;margin-bottom:8px;">{{ iconHardDrive }}Disk used</div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;color:#F0F4FF;line-height:1;">{{ diskUsed }}</div>
+                  </div>
+                  <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;padding:16px 18px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;font-size:12px;color:#8A9BB0;margin-bottom:8px;">{{ iconCpuStat }}VRAM available</div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;color:#F0F4FF;line-height:1;">{{ vram }}</div>
+                  </div>
+                </div>
+
+                <div style="background:#0D1B2E;border:1px solid rgba(0,212,255,0.10);border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid rgba(255,255,255,0.06);"><span style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:#F0F4FF;">Local models</span><span style="display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-size:11.5px;color:#00C896;"><span style="width:6px;height:6px;border-radius:50%;background:#00C896;"></span>Runs on-device — no data leaves your machine</span></div>
+                  <sc-for list="{{ models }}" as="m" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:center;gap:16px;padding:13px 22px;border-top:1px solid rgba(255,255,255,0.05);">
+                      <span style="flex:0 0 auto;">{{ m.statusDot }}</span>
+                      <div style="flex:1;min-width:0;"><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#F0F4FF;">{{ m.name }}</div><div style="font-family:'DM Sans',sans-serif;font-size:11.5px;color:#647d97;">{{ m.kind }} · {{ m.quant }} · {{ m.ctx }} ctx</div></div>
+                      <div style="flex:0 0 160px;"><div style="height:5px;border-radius:3px;background:#0A1524;overflow:hidden;"><div style="height:100%;width:{{ m.barPct }}%;background:{{ m.barColor }};border-radius:3px;"></div></div></div>
+                      <div style="flex:0 0 70px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#B0BFCF;">{{ m.size }}</div>
+                      <div style="flex:0 0 84px;text-align:right;"><span style="font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:600;color:{{ m.statusColor }};text-transform:uppercase;letter-spacing:0.06em;">{{ m.status }}</span></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;openSection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;security&quot;,&quot;options&quot;:[&quot;general&quot;,&quot;security&quot;,&quot;roles&quot;,&quot;tools&quot;,&quot;vault&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview state&quot;},&quot;twoFactor&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;disabled&quot;,&quot;options&quot;:[&quot;disabled&quot;,&quot;active&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview state&quot;},&quot;sandboxEnforced&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview state&quot;}}">
+const BACKUP = ['4F9A-2K7Q','8B3E-9X1M','C6D0-7P4R','1E5F-3T8Y','A2N7-6Q9L','9G4H-0Z2K','D8J3-5W1B','7K6M-4V0C','3P9Q-8R2E','6T1X-2A5N'];
+const SECRET_KEY = 'JBSWY3DPEHPK3PXP';
+
+const ICONS = {
+  chat:'<path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H8l-4 4V6a1 1 0 0 1 1-1Z"/>',
+  box:'<path d="M12 2 3 7v10l9 5 9-5V7Z"/><path d="M3 7l9 5 9-5M12 12v10"/>',
+  wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+  lock:'<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+  lockOpen:'<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 7.7-1.6"/>',
+  settings:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.4M12 19.6V22M22 12h-2.4M4.4 12H2M19.07 4.93l-1.7 1.7M6.63 17.37l-1.7 1.7M19.07 19.07l-1.7-1.7M6.63 6.63l-1.7-1.7"/>',
+  sliders:'<path d="M4 6h9M4 12h2M4 18h7M18 6h2M11 12h9M14 18h6"/><circle cx="15.5" cy="6" r="2"/><circle cx="8.5" cy="12" r="2"/><circle cx="12.5" cy="18" r="2"/>',
+  shield:'<path d="M12 22s8-3.6 8-9.5V5.2L12 2.3 4 5.2v7.3C4 18.4 12 22 12 22Z"/>',
+  shieldCheck:'<path d="M12 22s8-3.6 8-9.5V5.2L12 2.3 4 5.2v7.3C4 18.4 12 22 12 22Z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/>',
+  key:'<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8-8M15.8 4.2 20 8.4M16.8 7.2 19.5 4.5"/>',
+  users:'<path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.6"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.87M15.5 3.6a4 4 0 0 1 0 7.75"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 20v-1a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v1"/>',
+  cpu:'<rect x="6" y="6" width="12" height="12" rx="1.6"/><rect x="9.5" y="9.5" width="5" height="5" rx="0.8"/><path d="M9 2v2.5M15 2v2.5M9 19.5V22M15 19.5V22M2 9h2.5M2 15h2.5M19.5 9H22M19.5 15H22"/>',
+  database:'<ellipse cx="12" cy="5" rx="7.5" ry="3"/><path d="M4.5 5v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V5M4.5 11v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3v-6"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.6 6 3.6 9s-1.1 6.4-3.6 9c-2.5-2.6-3.6-6-3.6-9s1.1-6.4 3.6-9Z"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h3.5l2 2.4H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  terminal:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
+  code:'<path d="m8 6-5 6 5 6M16 6l5 6-5 6"/>',
+  plug:'<path d="M12 22v-4.5M9.5 8.5V2.5M14.5 8.5V2.5M6.5 8.5h11v2.5a5.5 5.5 0 0 1-11 0Z"/>',
+  clip:'<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1M9 5h6"/>',
+  smartphone:'<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/>',
+  qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21v.01M21 21v-3M17.5 17.5h.01"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/>',
+  download:'<path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3.5V9h-5.5"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  minus:'<path d="M6 12h12"/>',
+  alert:'<path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  chevR:'<path d="m9 6 6 6-6 6"/>',
+  chevD:'<path d="m6 9 6 6 6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
+  laptop:'<rect x="4" y="5" width="16" height="11" rx="1.8"/><path d="M2 20h20l-2-4H4l-2 4Z"/>',
+  languages:'<path d="M2 5h8M6 3v2c0 3.5-1.7 6.3-4 8M4 9c0 2 2.8 4 6 4M11.5 20l4-9 4 9M13 16.5h5"/>',
+  hardDrive:'<path d="M22 12H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/><path d="M6 16h.01M10 16h.01"/>',
+  activity:'<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+  eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M9.9 5.1A9.5 9.5 0 0 1 12 5c6.4 0 10 7 10 7a13 13 0 0 1-2.2 2.9M6.6 6.6A13 13 0 0 0 2 12s3.6 7 10 7a9.5 9.5 0 0 0 4.2-1M3 3l18 18M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>'
+};
+
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      section: props.openSection || 'security',
+      theme:'dark', density:'compact', language:'en-US', reduceMotion:false, telemetry:false,
+      twoFA: props.twoFactor || 'disabled',
+      step:0, otp:['','','','','',''], otpErr:false, backupCodes:BACKUP, backupAck:false, backupRemaining:10,
+      sandbox: props.sandboxEnforced !== false,
+      copiedKey:null,
+      selectedRole:'admin',
+      vaultLocked:true, revealed:{},
+      tools:[
+        {id:'net',name:'Network / web fetch',icon:'globe',desc:'Outbound HTTP(S) requests to the public internet.',scope:'egress firewall',policy:'ask',hard:true},
+        {id:'fsr',name:'Filesystem read',icon:'folder',desc:'Read files inside the workspace root.',scope:'~/ollamas/workspace',policy:'allow',hard:true},
+        {id:'fsw',name:'Filesystem write',icon:'folder',desc:'Create or modify files in the workspace.',scope:'~/ollamas/workspace',policy:'ask',hard:true},
+        {id:'sh',name:'Shell execution',icon:'terminal',desc:'Run shell commands on the host machine.',scope:'sandboxed PTY',policy:'deny',hard:true},
+        {id:'py',name:'Code interpreter',icon:'code',desc:'Execute Python in an isolated runtime.',scope:'gVisor sandbox',policy:'allow',hard:true},
+        {id:'mcp',name:'MCP connectors',icon:'plug',desc:'Call external Model Context Protocol servers.',scope:'3 connected',policy:'ask',hard:true},
+        {id:'clip',name:'Clipboard access',icon:'clip',desc:'Read from and write to the system clipboard.',scope:'on request',policy:'ask',hard:false},
+        {id:'mem',name:'Persistent memory',icon:'database',desc:'Write durable facts to long-term agent memory.',scope:'local store',policy:'allow',hard:false}
+      ],
+      roles:[
+        {id:'owner',name:'Owner',kind:'You',icon:'user',locked:true,members:1,avatars:[{i:'YU',c:'#00D4FF'}],extra:0,perm:{models:'allow',tools:'allow',vault:'allow',users:'allow',daemon:'allow'}},
+        {id:'admin',name:'Admin',kind:'Human role',icon:'users',locked:false,members:2,avatars:[{i:'AK',c:'#7B5EA7'},{i:'MR',c:'#00C896'}],extra:0,perm:{models:'allow',tools:'allow',vault:'allow',users:'allow',daemon:'deny'}},
+        {id:'operator',name:'Operator',kind:'Human role',icon:'users',locked:false,members:3,avatars:[{i:'JS',c:'#F5A623'},{i:'TL',c:'#00A8C8'},{i:'DP',c:'#9B80CC'}],extra:0,perm:{models:'allow',tools:'allow',vault:'scoped',users:'deny',daemon:'deny'}},
+        {id:'viewer',name:'Viewer',kind:'Human role',icon:'users',locked:false,members:5,avatars:[{i:'RB',c:'#536882'},{i:'NK',c:'#3A4F66'},{i:'PW',c:'#6E859E'}],extra:2,perm:{models:'deny',tools:'deny',vault:'deny',users:'deny',daemon:'deny'}},
+        {id:'agent',name:'Agent Runner',kind:'Service role',icon:'cpu',locked:false,members:0,avatars:[],extra:0,perm:{models:'deny',tools:'scoped',vault:'scoped',users:'deny',daemon:'deny'}}
+      ],
+      sessions:[
+        {id:'s1',client:'ollamas Desktop',meta:'macOS 15.3 · Apple Silicon',ip:'127.0.0.1',loc:'This device',when:'Active now',current:true},
+        {id:'s2',client:'Web UI · Firefox',meta:'Linux workstation',ip:'192.168.1.24',loc:'LAN',when:'12 min ago',current:false},
+        {id:'s3',client:'ollamas-cli 1.4.0',meta:'headless session',ip:'127.0.0.1',loc:'This device',when:'2 hours ago',current:false}
+      ],
+      secrets:[
+        {id:'k1',name:'ANTHROPIC_API_KEY',type:'Provider key',mask:'sk-ant-••••••••••••4f2a',full:'sk-ant-api03-Rf9K2anthropic4f2a',used:'Used 3h ago'},
+        {id:'k2',name:'OPENAI_API_KEY',type:'Provider key',mask:'sk-••••••••••••••9c1d',full:'sk-proj-8Xz1openaikey9c1d',used:'Used yesterday'},
+        {id:'k3',name:'HF_TOKEN',type:'Model registry',mask:'hf_••••••••••••7b30',full:'hf_QmZ4huggingface7b30',used:'Used 2d ago'},
+        {id:'k4',name:'GITHUB_PAT',type:'Tool credential',mask:'ghp_••••••••••••a5e8',full:'ghp_Lk92githubtokena5e8',used:'Used 5d ago'},
+        {id:'k5',name:'SMTP_PASSWORD',type:'Notifier',mask:'••••••••••••',full:'m41l-p4ss-w0rd-2026',used:'Never used'}
+      ],
+      models:[
+        {id:'m1',name:'llama-3.3-70b-instruct',quant:'Q4_K_M',size:'42.5 GB',num:42.5,ctx:'128k',kind:'Chat',status:'loaded'},
+        {id:'m2',name:'qwen2.5-coder-32b',quant:'Q4_K_M',size:'19.8 GB',num:19.8,ctx:'32k',kind:'Code',status:'loaded'},
+        {id:'m3',name:'mistral-small-3.1-24b',quant:'Q5_K_M',size:'15.1 GB',num:15.1,ctx:'32k',kind:'Chat',status:'available'},
+        {id:'m4',name:'llava-1.6-vicuna-13b',quant:'Q4_0',size:'8.2 GB',num:8.2,ctx:'4k',kind:'Vision',status:'available'},
+        {id:'m5',name:'whisper-large-v3',quant:'fp16',size:'3.1 GB',num:3.1,ctx:'—',kind:'Audio',status:'available'},
+        {id:'m6',name:'nomic-embed-text-v1.5',quant:'fp16',size:'0.5 GB',num:0.5,ctx:'8k',kind:'Embed',status:'loaded'}
+      ]
+    };
+    this.otpRefs = [];
+  }
+
+  componentDidUpdate(prevProps, prevState){
+    if(prevProps.openSection !== this.props.openSection && this.props.openSection) this.setState({section:this.props.openSection});
+    if(prevProps.twoFactor !== this.props.twoFactor && this.props.twoFactor) this.setState({twoFA:this.props.twoFactor, step:0});
+    if(prevProps.sandboxEnforced !== this.props.sandboxEnforced) this.setState({sandbox:this.props.sandboxEnforced !== false});
+    if(prevState.step !== this.state.step && this.state.step === 2) setTimeout(()=>this.focusOtp(0), 60);
+  }
+
+  icon(name,size,sw,color){
+    return React.createElement('svg',{width:size||16,height:size||16,viewBox:'0 0 24 24',fill:'none',stroke:color||'currentColor','strokeWidth':sw||1.5,'strokeLinecap':'round','strokeLinejoin':'round',style:{flex:'0 0 auto',display:'block'},dangerouslySetInnerHTML:{__html:ICONS[name]||''}});
+  }
+
+  dot(color,size){
+    return React.createElement('span',{style:{width:size||6,height:size||6,borderRadius:'50%',background:color,boxShadow:'0 0 6px '+color,flex:'0 0 auto',display:'block'}});
+  }
+
+  chip(kind,label,small){
+    const M = {
+      enforced:{c:'#00D4FF',bg:'rgba(0,212,255,0.10)',bd:'rgba(0,212,255,0.30)',ic:'shieldCheck',t:'Enforced by daemon'},
+      advisory:{c:'#F5A623',bg:'rgba(245,166,35,0.10)',bd:'rgba(245,166,35,0.32)',ic:'alert',t:'Advisory · bypassable'},
+      local:{c:'#8A9BB0',bg:'rgba(255,255,255,0.05)',bd:'rgba(255,255,255,0.12)',ic:'laptop',t:'This device only'},
+      immutable:{c:'#9B80CC',bg:'rgba(123,94,167,0.12)',bd:'rgba(123,94,167,0.34)',ic:'lock',t:'Immutable'}
+    }[kind];
+    return React.createElement('span',{title:M.t,style:{display:'inline-flex',alignItems:'center',gap:5,padding:small?'2px 8px':'3px 10px',borderRadius:9999,background:M.bg,border:'1px solid '+M.bd,color:M.c,fontFamily:"'Space Grotesk',sans-serif",fontSize:small?10:10.5,fontWeight:600,letterSpacing:'0.03em',whiteSpace:'nowrap',lineHeight:1.4}},
+      this.icon(M.ic, small?12:13, 2, M.c),
+      React.createElement('span',null, label || M.t));
+  }
+
+  switchEl(on,onClick,opts){
+    opts = opts||{};
+    const tint = opts.tint || '#00D4FF';
+    return React.createElement('button',{onClick:opts.disabled?undefined:onClick,disabled:opts.disabled,'aria-pressed':on,style:{
+      width:40,height:23,borderRadius:9999,padding:0,flex:'0 0 auto',position:'relative',cursor:opts.disabled?'not-allowed':'pointer',
+      border:'1px solid '+(on?(opts.disabled?'rgba(138,155,176,0.4)':'rgba(0,212,255,0.55)'):'rgba(255,255,255,0.12)'),
+      background:on?(opts.disabled?'#3A4F66':tint):'#16273c',opacity:opts.disabled?0.7:1,
+      transition:'all 200ms cubic-bezier(0.16,1,0.3,1)',boxShadow:(on&&!opts.disabled)?'0 0 12px rgba(0,212,255,0.35)':'none'}},
+      React.createElement('span',{style:{position:'absolute',top:2,left:on?19:2,width:17,height:17,borderRadius:'50%',background:on?'#050A14':'#8A9BB0',transition:'left 200ms cubic-bezier(0.16,1,0.3,1)'}}));
+  }
+
+  cellMark(state){
+    if(state==='allow') return this.icon('check',18,2.4,'#00D4FF');
+    if(state==='scoped') return React.createElement('span',{title:'Scoped',style:{width:9,height:9,background:'#F5A623',transform:'rotate(45deg)',borderRadius:1.5,boxShadow:'0 0 8px rgba(245,166,35,0.4)'}});
+    return this.icon('minus',18,2,'#334862');
+  }
+
+  buildQR(){
+    const n=25, cell=7, quiet=4, size=n*cell+quiet*2;
+    const rects=[]; let s=987654321;
+    const rnd=()=>{ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; };
+    const push=(r,c)=>rects.push(React.createElement('rect',{key:r+'_'+c,x:quiet+c*cell,y:quiet+r*cell,width:cell,height:cell,fill:'#050A14'}));
+    const inFinder=(r,c)=>{ const sep=(R,C)=> r>=R-1&&r<=R+7&&c>=C-1&&c<=C+7; return sep(0,0)||sep(0,n-7)||sep(n-7,0); };
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(inFinder(r,c)) continue; if(rnd()>0.5) push(r,c); }
+    const finder=(R,C)=>{ for(let r=0;r<7;r++) for(let c=0;c<7;c++){ const edge=r===0||r===6||c===0||c===6; const core=r>=2&&r<=4&&c>=2&&c<=4; if(edge||core) push(R+r,C+c); } };
+    finder(0,0); finder(0,n-7); finder(n-7,0);
+    return React.createElement('svg',{width:'100%',height:'100%',viewBox:'0 0 '+size+' '+size,'shapeRendering':'crispEdges',style:{display:'block'}},
+      React.createElement('rect',{x:0,y:0,width:size,height:size,fill:'#F0F4FF'}), rects);
+  }
+
+  focusOtp(i){ const el=this.otpRefs[i]; if(el) el.focus(); }
+  onOtpChange(i,e){
+    const raw=(e.target.value||'').replace(/\D/g,'');
+    const otp=this.state.otp.slice();
+    if(raw.length>1){ for(let k=0;k<6;k++) otp[k]=raw[k]||''; this.setState({otp,otpErr:false},()=>{ this.focusOtp(Math.min(raw.length,6)-1); if(otp.every(x=>x)) this.verifyOtp(otp); }); return; }
+    otp[i]=raw.slice(-1);
+    this.setState({otp,otpErr:false},()=>{ if(otp[i]&&i<5) this.focusOtp(i+1); if(otp.every(x=>x)) this.verifyOtp(otp); });
+  }
+  onOtpKey(i,e){ if(e.key==='Backspace' && !this.state.otp[i] && i>0) this.focusOtp(i-1); }
+  verifyOtp(otp){
+    if(otp.join('')==='123456') this.setState({step:3, backupCodes:BACKUP, backupAck:false});
+    else this.setState({otpErr:true, otp:['','','','','','']}, ()=>this.focusOtp(0));
+  }
+
+  copy(key,text){ try{ navigator.clipboard.writeText(text); }catch(e){} this.setState({copiedKey:key}); clearTimeout(this._ct); this._ct=setTimeout(()=>this.setState({copiedKey:null}),1500); }
+  downloadBackup(){ try{ const blob=new Blob([this.state.backupCodes.join('\n')+'\n'],{type:'text/plain'}); const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download='ollamas-backup-codes.txt'; a.click(); URL.revokeObjectURL(u); }catch(e){} }
+
+  setPolicy(id,p){ this.setState(s=>({tools:s.tools.map(t=>t.id===id?Object.assign({},t,{policy:p}):t)})); }
+  cycleCell(rid,cid){ this.setState(s=>({roles:s.roles.map(r=>{ if(r.id!==rid||r.locked) return r; const order=['allow','deny','scoped']; const nx=order[(order.indexOf(r.perm[cid])+1)%3]; return Object.assign({},r,{perm:Object.assign({},r.perm,{[cid]:nx})}); })})); }
+
+  renderVals(){
+    const S=this.state, self=this;
+    const twoFAActive = S.twoFA==='active';
+    const rail=[
+      {id:'chat',label:'Workspace',icon:'chat'},{id:'models',label:'Models',icon:'box'},
+      {id:'agents',label:'Agents',icon:'wrench'},{id:'vault',label:'Vault',icon:'lock'},
+      {id:'settings',label:'Settings',icon:'settings',active:true}
+    ].map(r=>({key:r.id,label:r.label,active:!!r.active,node:self.icon(r.icon,20,1.6,r.active?'#00D4FF':'#647d97'),bg:r.active?'rgba(0,212,255,0.10)':'transparent',border:r.active?'rgba(0,212,255,0.22)':'transparent',onClick:()=>{}}));
+
+    const navDefs=[
+      {id:'general',label:'General',icon:'sliders',sub:'Appearance · language'},
+      {id:'security',label:'Security & 2FA',icon:'shield',sub:'Sign-in · sessions'},
+      {id:'roles',label:'Roles & access',icon:'users',sub:'RBAC · members'},
+      {id:'tools',label:'Tool policies',icon:'wrench',sub:'Agent permissions'},
+      {id:'vault',label:'Vault & models',icon:'database',sub:'Secrets · local LLMs'}
+    ];
+    const nav=navDefs.map(n=>{
+      const active=S.section===n.id;
+      let dotNode=null;
+      if(n.id==='security') dotNode=self.dot(twoFAActive?'#00C896':'#F5A623');
+      if(n.id==='tools') dotNode=self.dot(S.sandbox?'#00D4FF':'#F5A623');
+      return {key:n.id,label:n.label,sub:n.sub,active,onClick:()=>self.setState({section:n.id}),
+        node:self.icon(n.icon,17,1.7,active?'#00D4FF':'#8A9BB0'),
+        iconBg:active?'rgba(0,212,255,0.12)':'#132338',
+        bg:active?'rgba(0,212,255,0.07)':'transparent',
+        border:active?'rgba(0,212,255,0.20)':'transparent',
+        labelColor:active?'#F0F4FF':'#B0BFCF',weight:active?600:500,dotNode};
+    });
+
+    const themeOpts=[{k:'system',l:'System',i:'laptop'},{k:'dark',l:'Dark',i:'moon'},{k:'light',l:'Light',i:'sun'}].map(o=>{
+      const active=S.theme===o.k;
+      return {key:o.k,label:o.l,active,onClick:()=>self.setState({theme:o.k}),node:self.icon(o.i,15,1.7,active?'#00D4FF':'#8A9BB0'),bg:active?'rgba(0,212,255,0.12)':'transparent',color:active?'#00D4FF':'#8A9BB0'};
+    });
+    const densityOpts=[{k:'comfortable',l:'Comfortable'},{k:'compact',l:'Compact'}].map(o=>{ const active=S.density===o.k; return {key:o.k,label:o.l,active,onClick:()=>self.setState({density:o.k}),bg:active?'rgba(0,212,255,0.12)':'transparent',color:active?'#00D4FF':'#8A9BB0'}; });
+
+    const caps=[{id:'models',l:'Models',f:'Manage models'},{id:'tools',l:'Tools',f:'Run tools'},{id:'vault',l:'Vault',f:'Read vault'},{id:'users',l:'Users',f:'Manage users'},{id:'daemon',l:'Daemon',f:'Configure daemon'}];
+    const roles=S.roles.map(r=>{
+      const selected=S.selectedRole===r.id;
+      return Object.assign({},r,{key:r.id,selected,onSelect:()=>self.setState({selectedRole:r.id}),
+        node:self.icon(r.icon,16,1.7,selected?'#00D4FF':'#8A9BB0'),
+        rowBg:selected?'rgba(0,212,255,0.05)':'transparent',
+        hasMembers:r.avatars.length>0, hasExtra:r.extra>0, isService:r.id==='agent',
+        avatars:r.avatars.map((a,i)=>Object.assign({key:i},a)),
+        cells:caps.map(c=>({key:c.id,mark:self.cellMark(r.perm[c.id]),locked:r.locked,onClick:r.locked?undefined:()=>self.cycleCell(r.id,c.id),cursor:r.locked?'not-allowed':'pointer',hover:r.locked?'':'background:#132338;'}))});
+    });
+
+    const tools=S.tools.map(t=>{
+      const enforced=S.sandbox&&t.hard;
+      return Object.assign({},t,{key:t.id,node:self.icon(t.icon,18,1.7,'#B0BFCF'),
+        chip:enforced?self.chip('enforced','Enforced',true):self.chip('advisory','Advisory',true),
+        policyOpts:[{k:'allow',l:'Allow',c:'#00D4FF'},{k:'ask',l:'Ask',c:'#F5A623'},{k:'deny',l:'Deny',c:'#FF4757'}].map(o=>{
+          const active=t.policy===o.k;
+          return {key:o.k,label:o.l,active,onClick:()=>self.setPolicy(t.id,o.k),
+            bg:active?(o.k==='allow'?'rgba(0,212,255,0.15)':o.k==='ask'?'rgba(245,166,35,0.15)':'rgba(255,71,87,0.15)'):'transparent',
+            fg:active?o.c:'#647d97',bd:active?o.c:'transparent'};
+        })});
+    });
+
+    const secrets=S.secrets.map(k=>{
+      const rev=!!S.revealed[k.id];
+      return Object.assign({},k,{key:k.id,revealed:rev,display:rev?k.full:k.mask,valColor:rev?'#B0F0FF':'#8A9BB0',
+        eyeNode:self.icon(rev?'eyeOff':'eye',16,1.6,'#8A9BB0'),onReveal:()=>self.setState(s=>({revealed:Object.assign({},s.revealed,{[k.id]:!s.revealed[k.id]})})),
+        copyNode:self.icon(S.copiedKey===('sec'+k.id)?'check':'copy',15,1.7,S.copiedKey===('sec'+k.id)?'#00C896':'#8A9BB0'),onCopy:()=>self.copy('sec'+k.id,k.full)});
+    });
+    const models=S.models.map(m=>Object.assign({},m,{key:m.id,loaded:m.status==='loaded',statusColor:m.status==='loaded'?'#00D4FF':'#647d97',
+      statusDot:self.dot(m.status==='loaded'?'#00D4FF':'#536882',7),
+      barPct:Math.max(6,Math.round(m.num/42.5*100)),
+      barColor:m.status==='loaded'?'#00D4FF':'#3A4F66'}));
+
+    const sessions=S.sessions.map(x=>Object.assign({},x,{key:x.id,notCurrent:!x.current,
+      node:self.icon(x.current?'laptop':(x.client.indexOf('cli')>-1?'terminal':'globe'),17,1.6,x.current?'#00D4FF':'#8A9BB0'),
+      onRevoke:()=>self.setState(s=>({sessions:s.sessions.filter(y=>y.id!==x.id)}))}));
+
+    const otpSlots=[0,1,2,3,4,5].map(i=>({key:i,value:S.otp[i],onChange:(e)=>self.onOtpChange(i,e),onKeyDown:(e)=>self.onOtpKey(i,e),setRef:(el)=>{self.otpRefs[i]=el;}}));
+    const backup=S.backupCodes.map((c,i)=>({key:i,idx:(i+1<10?'0':'')+(i+1),code:c}));
+
+    const st=(n)=> S.step>=n ? {bg:'#00D4FF',bd:'transparent',fg:'#050A14',label:'#F0F4FF'} : {bg:'transparent',bd:'rgba(255,255,255,0.2)',fg:'#647d97',label:'#647d97'};
+    const s2=st(2), s3=st(3), sb=S.sandbox;
+    return {
+      // shell
+      railItems:rail, navItems:nav,
+      chipEnforced:self.chip('enforced'), chipAdvisory:self.chip('advisory'),
+      logo:'assets/logo-icon.svg',
+      // section flags
+      isGeneral:S.section==='general', isSecurity:S.section==='security', isRoles:S.section==='roles', isTools:S.section==='tools', isVault:S.section==='vault',
+      // general
+      themeOpts, densityOpts, language:S.language, onLang:(e)=>self.setState({language:e.target.value}),
+      reduceMotionSwitch:self.switchEl(S.reduceMotion,()=>self.setState(s=>({reduceMotion:!s.reduceMotion}))),
+      telemetrySwitch:self.switchEl(false,undefined,{disabled:true}),
+      chipLocal:self.chip('local'),
+      iconGlobe:self.icon('globe',16,1.6,'#8A9BB0'),
+      // security
+      chipSec:self.chip('enforced','Enforced at every login'),
+      twoFAActive, enrolling:S.step>0, step1:S.step===1, step2:S.step===2, step3:S.step===3,
+      qrNode:self.buildQR(), secretGroups:'JBSW Y3DP EHPK 3PXP',
+      secretCopyNode:self.icon(S.copiedKey==='key'?'check':'copy',15,1.7,S.copiedKey==='key'?'#00C896':'#8A9BB0'),
+      onCopyKey:()=>self.copy('key',SECRET_KEY),
+      begin2FA:()=>self.setState({step:1}), toVerify:()=>self.setState({step:2,otp:['','','','','',''],otpErr:false}),
+      backToScan:()=>self.setState({step:1}), cancelEnroll:()=>self.setState({step:0,otp:['','','','','',''],otpErr:false}),
+      finishEnroll:()=>self.setState({twoFA:'active',step:0,backupRemaining:10}),
+      disable2FA:()=>self.setState({twoFA:'disabled',step:0,otp:['','','','','',''],backupAck:false}),
+      regenBackup:()=>self.setState({backupRemaining:10}),
+      otpSlots, otpErr:S.otpErr, otpBorder:S.otpErr?'#FF4757':'rgba(255,255,255,0.14)',
+      backupCodes:backup, backupAck:S.backupAck, toggleAck:()=>self.setState(s=>({backupAck:!s.backupAck})),
+      finishDisabled:!S.backupAck, finishOpacity:S.backupAck?1:0.5, finishCursor:S.backupAck?'pointer':'not-allowed',
+      backupRemaining:S.backupRemaining,
+      backupCopyNode:self.icon(S.copiedKey==='bak'?'check':'copy',15,1.7,S.copiedKey==='bak'?'#00C896':'#8A9BB0'),
+      onCopyBackup:()=>self.copy('bak',S.backupCodes.join('\n')), onDownloadBackup:()=>self.downloadBackup(),
+      ackCheck:S.backupAck?self.icon('check',13,3,'#050A14'):null,
+      sessions, onSignOutOthers:()=>self.setState(s=>({sessions:s.sessions.filter(y=>y.current)})),
+      sessionCount:S.sessions.length,
+      // roles
+      chipRoles:self.chip('enforced'), chipImmutable:self.chip('immutable'),
+      caps, roles, selectedRoleName:(S.roles.find(r=>r.id===S.selectedRole)||{}).name||'',
+      iconPlus:self.icon('plus',15,2,'#050A14'), iconSearch:self.icon('search',15,1.7,'#647d97'), iconLock:self.icon('lock',13,1.7,'#9B80CC'),
+      // tools
+      chipTools:self.chip('enforced'), tools, sandbox:S.sandbox,
+      sandboxSwitch:self.switchEl(S.sandbox,()=>self.setState(s=>({sandbox:!s.sandbox}))),
+      sandboxChip:S.sandbox?self.chip('enforced','Enforced'):self.chip('advisory','Advisory only'),
+      sandboxIcon:self.icon('shieldCheck',20,1.7,S.sandbox?'#00D4FF':'#F5A623'),
+      // vault
+      chipVault:self.chip('enforced'), vaultLocked:S.vaultLocked,
+      toggleVault:()=>self.setState(s=>({vaultLocked:!s.vaultLocked,revealed:{}})),
+      vaultIcon:self.icon(S.vaultLocked?'lock':'lockOpen',22,1.7,S.vaultLocked?'#F5A623':'#00C896'),
+      secrets, models, iconHardDrive:self.icon('hardDrive',17,1.6,'#00D4FF'), iconCpuStat:self.icon('cpu',17,1.6,'#7B5EA7'), iconBoxStat:self.icon('box',17,1.6,'#00C896'),
+      twoFADisabled:S.twoFA==='disabled'&&S.step===0,
+      step2Bg:s2.bg,step2Bd:s2.bd,step2Fg:s2.fg,step2Label:s2.label,
+      step3Bg:s3.bg,step3Bd:s3.bd,step3Fg:s3.fg,step3Label:s3.label,
+      ackBorder:S.backupAck?'#00D4FF':'rgba(255,255,255,0.2)', ackBg:S.backupAck?'#00D4FF':'transparent',
+      sandboxBannerBd:sb?'rgba(0,212,255,0.25)':'rgba(245,166,35,0.28)', sandboxBannerBg:sb?'rgba(0,212,255,0.06)':'rgba(245,166,35,0.06)', sandboxIconBg:sb?'rgba(0,212,255,0.12)':'rgba(245,166,35,0.12)',
+      sandboxDesc:sb?'Denied tools are blocked at the syscall boundary — a compromised agent cannot exceed these limits; the kernel refuses the call.':'Policies are requests only. Agents are asked to comply, but a jailbroken or buggy agent can bypass every rule below.',
+      vaultUnlocked:!S.vaultLocked,
+      vaultIconBg:S.vaultLocked?'rgba(245,166,35,0.12)':'rgba(0,200,150,0.12)', vaultIconBd:S.vaultLocked?'rgba(245,166,35,0.30)':'rgba(0,200,150,0.30)',
+      vaultBtnBd:S.vaultLocked?'rgba(0,212,255,0.35)':'rgba(255,255,255,0.12)', vaultBtnBg:S.vaultLocked?'rgba(0,212,255,0.10)':'transparent', vaultBtnFg:S.vaultLocked?'#00D4FF':'#B0BFCF', vaultBtnLabel:S.vaultLocked?'Unlock vault':'Lock now',
+      diskUsed:'89.2 GB', modelCount:6, loadedCount:3, vram:'24 GB'
+    };
+  }
+}
+</script>
+</body>
+</html>

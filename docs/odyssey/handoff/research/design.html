@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/colors_and_type.css">
+<script src="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<style>
+  @keyframes drp-spin { to { transform: rotate(360deg); } }
+  @keyframes drp-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes drp-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+  @keyframes drp-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
+  @keyframes drp-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  body { margin: 0; background: #070810; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { color: var(--accent); text-decoration: underline; }
+  ::selection { background: rgba(99,102,241,0.32); }
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="--bg:#0a0b10; --canvas:#070810; --surface:#101119; --raised:#15161f; --overlay:#1a1c27; --line:rgba(255,255,255,0.08); --line-2:rgba(255,255,255,0.05); --line-strong:rgba(255,255,255,0.14); --fg:#e8eaf3; --fg-2:#9498ac; --fg-3:#666b7e; --accent:#6366f1; --accent-2:#818cf8; --accent-dim:rgba(99,102,241,0.14); --accent-line:rgba(99,102,241,0.38); --ok:#34d399; --ok-dim:rgba(52,211,153,0.13); --warn:#f5a623; --warn-dim:rgba(245,166,35,0.13); --bad:#f43f5e; --bad-dim:rgba(244,63,94,0.13); --shadow:0 18px 50px rgba(0,0,0,0.55); min-height:100vh; background:radial-gradient(1200px 480px at 50% -180px, rgba(99,102,241,0.10), transparent 70%), var(--canvas); color:var(--fg); padding:52px 40px 96px; display:flex; flex-direction:column; align-items:center; gap:46px;">
+
+  <!-- ============ DOC HEADER ============ -->
+  <header style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:16px;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.22em; text-transform:uppercase; color:var(--accent-2);">ollamas · yerel-öncelikli çalışma alanı</div>
+    <h1 style="margin:0; font-family:'Inter',sans-serif; font-size:34px; font-weight:700; letter-spacing:-0.025em; line-height:1.05; color:var(--fg);">Derin Araştırma paneli</h1>
+    <div style="max-width:720px; font-size:15.5px; line-height:1.6; color:var(--fg-2);">Tek soru, çok adımlı ardışık düzen: <span style="color:var(--fg);">planla → kaynak getir → özetle → doğrula → sentezle</span>. Görünür ilerleme, ardından satır içi <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--accent-2);">[n]</span> atıflı, numaralı kaynak listesiyle eşlenmiş rapor. Altı durum.</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:2px;">
+      <a href="#f1" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--fg-2);">01 · Boş</a>
+      <a href="#f2" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--fg-2);">02 · Araştırıyor</a>
+      <a href="#f3" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--fg-2);">03 · Hata</a>
+      <a href="#f4" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--accent-line); background:var(--accent-dim); color:var(--accent-2);">04 · Dolu</a>
+      <a href="#f5" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--fg-2);">05 · Tablet</a>
+      <a href="#f6" style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--fg-2);">06 · Açık tema</a>
+    </div>
+  </header>
+
+  <!-- ============ FRAME 1 · EMPTY ============ -->
+  <div id="f1" style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--fg); background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:3px 8px;">01</span>
+      <span style="font-size:15px; font-weight:600; color:var(--fg);">Boş</span>
+      <span style="font-size:13px; color:var(--fg-3);">Soru kutusu · 3 öneri · cihaz üstü model göstergesi</span>
+    </div>
+    <section data-screen-label="Derin Araştırma — Boş durum" style="background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div style="width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--accent-dim); border:1px solid var(--accent-line); color:var(--accent-2); flex:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 22 12 12 22 2 12Z"/><path d="M12 7 17 12 12 17 7 12Z"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:14px; font-weight:600; color:var(--fg); letter-spacing:-0.01em;">Derin Araştırma</div><div style="font-size:12px; color:var(--fg-3);">Çok adımlı · kaynak doğrulamalı</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; background:var(--raised); border:1px solid var(--line);"><span style="width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok);"></span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">Cihazda · llama3.1:8b</span></div>
+          <div style="display:flex; align-items:center; gap:6px; padding:6px 11px; border-radius:999px; background:var(--raised); border:1px solid var(--line); font-size:11.5px; color:var(--fg-3);">Çevrimdışı çalışır</div>
+        </div>
+      </div>
+      <div style="padding:52px 56px 44px; display:flex; flex-direction:column; align-items:center; gap:26px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;">
+          <div style="width:52px; height:52px; border-radius:14px; display:grid; place-items:center; background:var(--accent-dim); border:1px solid var(--accent-line); color:var(--accent-2);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+          <div style="font-family:'Inter',sans-serif; font-size:24px; font-weight:700; letter-spacing:-0.02em; color:var(--fg);">Ne araştıralım?</div>
+          <div style="max-width:520px; font-size:14.5px; line-height:1.6; color:var(--fg-2);">Bir soru sorun. Panel alt sorular üretir, kaynakları getirir, iddiaları çapraz doğrular ve atıflı bir rapor yazar.</div>
+        </div>
+        <div style="width:100%; max-width:760px; display:flex; flex-direction:column; gap:16px;">
+          <div style="border:1px solid var(--line-strong); border-radius:14px; background:var(--surface); padding:4px; box-shadow:0 0 0 1px rgba(0,0,0,0.2);">
+            <textarea tabindex="0" rows="2" placeholder="Yerel LLM'ler gizlilik açısından bulut modellerden neden daha güvenli?" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="width:100%; resize:none; border:none; background:transparent; color:var(--fg); font-family:'Inter',sans-serif; font-size:16px; line-height:1.5; padding:14px 16px 6px;"></textarea>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px 8px 14px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; padding:3px; gap:2px; background:var(--raised); border:1px solid var(--line); border-radius:9px;">
+                  <span style="font-size:12px; color:var(--fg-3); padding:5px 10px; border-radius:6px;">Hızlı</span>
+                  <span style="font-size:12px; color:var(--fg-3); padding:5px 10px; border-radius:6px;">Dengeli</span>
+                  <span style="font-size:12px; font-weight:600; color:#fff; background:var(--accent); padding:5px 10px; border-radius:6px;">Derin</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:7px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--raised); font-size:12px; color:var(--fg-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/></svg>Web + Yerel</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-3);"><span style="border:1px solid var(--line-strong); border-radius:4px; padding:1px 5px; color:var(--fg-2);">⏎</span> Araştır</span>
+                <button tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style-hover="{&quot;filter&quot;:&quot;brightness(1.1)&quot;,&quot;boxShadow&quot;:&quot;0 0 20px rgba(99,102,241,0.45)&quot;}" style="display:flex; align-items:center; gap:8px; border:none; cursor:pointer; background:var(--accent); color:#fff; font-family:'Inter',sans-serif; font-size:14px; font-weight:600; padding:10px 18px; border-radius:10px;">Araştır<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:9px;">
+            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3);">Deneyin</div>
+            <div style="display:flex; flex-wrap:wrap; gap:9px;">
+              <button tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; text-align:left; font-family:'Inter',sans-serif; font-size:13px; color:var(--fg-2); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:8px 14px;">Yerel LLM'ler gizlilik açısından neden daha güvenli?</button>
+              <button tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; text-align:left; font-family:'Inter',sans-serif; font-size:13px; color:var(--fg-2); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:8px 14px;">RAG için en iyi yerel embedding modelleri</button>
+              <button tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; text-align:left; font-family:'Inter',sans-serif; font-size:13px; color:var(--fg-2); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:8px 14px;">Ollama ve llama.cpp performans farkları</button>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; padding-top:2px; font-size:12px; color:var(--fg-3);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Yerel kitaplık: 12 belge indekslendi · web erişimi açık</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ FRAME 2 · RESEARCHING ============ -->
+  <div id="f2" style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--fg); background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:3px 8px;">02</span>
+      <span style="font-size:15px; font-weight:600; color:var(--fg);">Araştırıyor</span>
+      <span style="font-size:13px; color:var(--fg-3);">①②③ bitti · ④ doğrula çalışıyor · ⑤ sırada · sonuç iskeleti · buton → Durdur</span>
+    </div>
+    <section data-screen-label="Derin Araştırma — Araştırıyor" style="background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div style="width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--accent-dim); border:1px solid var(--accent-line); color:var(--accent-2); flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="animation:drp-spin .9s linear infinite;"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:14px; font-weight:600; color:var(--fg);">Araştırılıyor…</div><div style="font-size:12px; color:var(--fg-3);">3/5 adım · doğrulama sürüyor</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; background:var(--raised); border:1px solid var(--line);"><span style="width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok);"></span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">Cihazda · llama3.1:8b · 38 tok/sn</span></div>
+      </div>
+      <!-- query recap + stop -->
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line);">
+        <div style="min-width:0;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin-bottom:3px;">Soru</div>
+          <div style="font-size:14.5px; color:var(--fg); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Yerel LLM'ler gizlilik açısından bulut modellerden neden daha güvenli?</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; flex:none;">
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--fg-2);">00:11</span>
+          <button tabindex="0" style-hover="{&quot;background&quot;:&quot;var(--bad-dim)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--bad)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:8px; cursor:pointer; background:transparent; color:var(--bad); border:1px solid var(--bad); border-radius:9px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:8px 14px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Durdur<span style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:400; border:1px solid var(--bad); opacity:.7; border-radius:4px; padding:0 4px;">Esc</span></button>
+        </div>
+      </div>
+      <div style="height:3px; background:var(--line-2);"><div style="width:62%; height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-2)); box-shadow:0 0 12px var(--accent);"></div></div>
+      <!-- main split: pipeline + console -->
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 372px;">
+        <div style="padding:22px 24px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-3); margin-bottom:12px;">Ardışık düzen</div>
+
+          <!-- step 1 done -->
+          <div style="display:grid; grid-template-columns:26px 1fr; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><div style="width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div><div style="width:1.5px; flex:1; background:var(--line); margin:4px 0;"></div></div>
+            <div style="padding-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:14px; font-weight:600; color:var(--fg);">① Planla</span><span style="font-size:11px; color:var(--ok); background:var(--ok-dim); border-radius:5px; padding:2px 7px;">Tamamlandı</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-3); margin-left:auto;">1.2s</span></div>
+              <div data-substep style="margin-top:8px; display:flex; flex-direction:column; gap:5px;">
+                <div style="font-size:12.5px; color:var(--fg-2);">3 alt sorgu üretildi</div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--fg-3); line-height:1.7;">→ cihaz üstü çıkarımın gizliliğe etkisi<br>→ bulut sağlayıcılarında veri saklama<br>→ GDPR ve kendi kendine barındırma</div>
+              </div>
+            </div>
+          </div>
+          <!-- step 2 done -->
+          <div style="display:grid; grid-template-columns:26px 1fr; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><div style="width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div><div style="width:1.5px; flex:1; background:var(--line); margin:4px 0;"></div></div>
+            <div style="padding-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:14px; font-weight:600; color:var(--fg);">② Kaynakları getir</span><span style="font-size:11px; color:var(--ok); background:var(--ok-dim); border-radius:5px; padding:2px 7px;">Tamamlandı</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-3); margin-left:auto;">4.6s</span></div>
+              <div data-substep style="margin-top:8px; display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+                <div style="display:flex; align-items:center; gap:8px; color:var(--fg-2);"><span style="color:var(--ok);">✓</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">arxiv.org/abs/2403.05121</span><span style="color:var(--fg-3);">200 · yerel</span></div>
+                <div style="display:flex; align-items:center; gap:8px; color:var(--fg-2);"><span style="color:var(--ok);">✓</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">eff.org/deeplinks/2025/ai-retention</span><span style="color:var(--fg-3);">200 · web</span></div>
+                <div style="display:flex; align-items:center; gap:8px; color:var(--fg-2);"><span style="color:var(--ok);">✓</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">ollama.com/blog/self-hosting</span><span style="color:var(--fg-3);">200 · web</span></div>
+                <div style="display:flex; align-items:center; gap:8px; color:var(--fg-2);"><span style="color:var(--ok);">✓</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">docs.searxng.org/admin/privacy</span><span style="color:var(--fg-3);">200 · web</span></div>
+                <div style="display:flex; align-items:center; gap:8px; color:var(--fg-2);"><span style="color:var(--ok);">✓</span><span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">edpb.europa.eu/guidelines/ai</span><span style="color:var(--fg-3);">200 · önbellek</span></div>
+              </div>
+            </div>
+          </div>
+          <!-- step 3 done -->
+          <div style="display:grid; grid-template-columns:26px 1fr; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><div style="width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div><div style="width:1.5px; flex:1; background:var(--line); margin:4px 0;"></div></div>
+            <div style="padding-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:14px; font-weight:600; color:var(--fg);">③ Özetle</span><span style="font-size:11px; color:var(--ok); background:var(--ok-dim); border-radius:5px; padding:2px 7px;">Tamamlandı</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-3); margin-left:auto;">6.1s</span></div>
+              <div data-substep style="margin-top:8px; font-size:12.5px; color:var(--fg-2);">5 belge özetlendi · <span style="font-family:'JetBrains Mono',monospace; color:var(--fg-3);">12.4k → 2.1k token</span></div>
+            </div>
+          </div>
+          <!-- step 4 RUNNING -->
+          <div style="display:grid; grid-template-columns:26px 1fr; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><div style="width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--accent-dim); border:1px solid var(--accent); color:var(--accent-2);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="animation:drp-spin .9s linear infinite;"><path d="M12 3a9 9 0 1 0 9 9"/></svg></div><div style="width:1.5px; flex:1; background:var(--line); margin:4px 0;"></div></div>
+            <div style="padding-bottom:16px;">
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:14px; font-weight:600; color:var(--fg);">④ Doğrula</span><span style="font-size:11px; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:2px 7px;">Çalışıyor</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent-2); margin-left:auto; display:flex; align-items:center; gap:5px;"><span style="width:5px; height:5px; border-radius:50%; background:var(--accent); animation:drp-pulse 1s ease-in-out infinite;"></span>canlı</span></div>
+              <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+                <div style="font-size:12.5px; color:var(--fg);">İddialar kaynaklar arası eşleştiriliyor…</div>
+                <div style="display:flex; align-items:center; gap:10px;"><div style="flex:1; height:6px; border-radius:3px; background:var(--raised); overflow:hidden;"><div style="width:80%; height:100%; background:var(--accent);"></div></div><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">iddia 4/5</span></div>
+                <div data-substep style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--warn); display:flex; align-items:center; gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg>olası çelişki: iddia #4 (GDPR uyumu)</div>
+              </div>
+            </div>
+          </div>
+          <!-- step 5 QUEUED -->
+          <div style="display:grid; grid-template-columns:26px 1fr; gap:14px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><div style="width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--surface); border:1px dashed var(--line-strong); color:var(--fg-3); font-family:'JetBrains Mono',monospace; font-size:11px;">5</div></div>
+            <div>
+              <div style="display:flex; align-items:center; gap:10px;"><span style="font-size:14px; font-weight:600; color:var(--fg-3);">⑤ Sentezle</span><span style="font-size:11px; color:var(--fg-3); background:var(--surface); border:1px solid var(--line); border-radius:5px; padding:2px 7px;">Sırada</span></div>
+              <div style="margin-top:6px; font-size:12.5px; color:var(--fg-3);">Doğrulama tamamlanınca atıflı rapor yazılacak</div>
+            </div>
+          </div>
+        </div>
+        <!-- console -->
+        <div data-chatter style="border-left:1px solid var(--line); background:#08090f; padding:18px 18px; display:flex; flex-direction:column; gap:2px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-3);">Model günlüğü</span><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--accent-2);">llama3.1:8b-q4</span></div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.85;">
+            <div style="color:var(--fg-3);">$ plan --subqueries=3</div>
+            <div style="color:var(--fg-3);">✓ 3 alt sorgu · sıcaklık 0.2</div>
+            <div style="color:var(--fg-3);">$ fetch --web --local</div>
+            <div style="color:var(--fg-3);">✓ 5 kaynak (3 web · 2 yerel)</div>
+            <div style="color:var(--fg-3);">$ summarize --map-reduce</div>
+            <div style="color:var(--fg-2);">✓ 12.4k→2.1k token · 6.1s</div>
+            <div style="color:var(--fg-2);">$ verify --cross-source</div>
+            <div style="color:var(--fg);">→ iddia 1 ✓ 2 kaynak</div>
+            <div style="color:var(--fg);">→ iddia 2 ✓ 2 kaynak</div>
+            <div style="color:var(--fg);">→ iddia 3 ✓ 2 kaynak</div>
+            <div style="color:var(--warn);">→ iddia 4 ⚠ çelişki [3]≠[5]</div>
+            <div style="color:var(--fg-2); display:flex; align-items:center; gap:2px;">→ iddia 5 eşleştiriliyor<span style="display:inline-block; width:8px; height:15px; background:var(--accent-2); margin-left:3px; animation:drp-blink 1s step-end infinite;"></span></div>
+          </div>
+        </div>
+      </div>
+      <!-- result skeleton -->
+      <div style="border-top:1px solid var(--line); padding:20px 24px; background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span style="font-size:12.5px; color:var(--fg-3);">Rapor sentezleniyor…</span></div>
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:24px;">
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="height:16px; width:70%; border-radius:6px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:11px; width:100%; border-radius:5px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:11px; width:96%; border-radius:5px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:11px; width:88%; border-radius:5px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:11px; width:60%; border-radius:5px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="height:44px; border-radius:10px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:44px; border-radius:10px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+            <div style="height:44px; border-radius:10px; background:linear-gradient(90deg,var(--raised),var(--overlay),var(--raised)); background-size:200% 100%; animation:drp-shimmer 1.5s ease-in-out infinite;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ FRAME 3 · ERROR ============ -->
+  <div id="f3" style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--fg); background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:3px 8px;">03</span>
+      <span style="font-size:15px; font-weight:600; color:var(--fg);">Hata</span>
+      <span style="font-size:13px; color:var(--fg-3);">SearXNG kapalı · dürüst boş durum · asla sahte rapor yok</span>
+    </div>
+    <section data-screen-label="Derin Araştırma — Hata" style="background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div style="width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--warn-dim); border:1px solid var(--warn); color:var(--warn); flex:none;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/><path d="M12 17.5v.5"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:14px; font-weight:600; color:var(--fg);">Araştırma durduruldu</div><div style="font-size:12px; color:var(--fg-3);">② Kaynakları getir adımında başarısız</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; background:var(--raised); border:1px solid var(--line);"><span style="width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok);"></span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">Cihazda · llama3.1:8b</span></div>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line);">
+        <div style="min-width:0;"><div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin-bottom:3px;">Soru</div><div style="font-size:14.5px; color:var(--fg); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Yerel LLM'ler gizlilik açısından bulut modellerden neden daha güvenli?</div></div>
+        <button tabindex="0" style-hover="{&quot;filter&quot;:&quot;brightness(1.1)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:8px; flex:none; cursor:pointer; background:var(--accent); color:#fff; border:none; border-radius:9px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:9px 15px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Yeniden dene</button>
+      </div>
+      <div style="padding:24px; display:flex; flex-direction:column; gap:20px;">
+        <!-- amber banner -->
+        <div style="display:flex; gap:14px; padding:16px 18px; border-radius:12px; background:var(--warn-dim); border:1px solid var(--warn); border-left:3px solid var(--warn);">
+          <div style="color:var(--warn); flex:none; padding-top:1px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/><path d="M12 17.5v.5"/></svg></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:14.5px; font-weight:600; color:var(--fg); margin-bottom:4px;">SearXNG meta-arama yanıt vermiyor</div>
+            <div style="font-size:13px; color:var(--fg-2); line-height:1.6; margin-bottom:8px;">Web kaynakları getirilemedi. Meta-arama uç noktasına ulaşılamıyor; yerel indeks kullanılabilir durumda.</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--warn); background:rgba(0,0,0,0.25); border:1px solid var(--line); border-radius:7px; padding:8px 10px;">ECONNREFUSED · http://127.0.0.1:8888/search · 3 deneme başarısız</div>
+          </div>
+        </div>
+        <!-- mini pipeline -->
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; background:var(--surface); border:1px solid var(--line);"><span style="color:var(--ok);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span><span style="font-size:12.5px; color:var(--fg-2);">① Planla</span></div>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; background:var(--bad-dim); border:1px solid var(--bad);"><span style="color:var(--bad);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span><span style="font-size:12.5px; color:var(--fg); font-weight:600;">② Kaynakları getir</span></div>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; background:var(--surface); border:1px dashed var(--line-strong); opacity:.6;"><span style="font-size:12.5px; color:var(--fg-3);">③ Özetle · başlamadı</span></div>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; background:var(--surface); border:1px dashed var(--line-strong); opacity:.6;"><span style="font-size:12.5px; color:var(--fg-3);">④ Doğrula · başlamadı</span></div>
+          <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:9px; background:var(--surface); border:1px dashed var(--line-strong); opacity:.6;"><span style="font-size:12.5px; color:var(--fg-3);">⑤ Sentezle · başlamadı</span></div>
+        </div>
+        <!-- honest empty state -->
+        <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; padding:38px 24px; border:1px dashed var(--line-strong); border-radius:14px; background:var(--surface);">
+          <div style="width:46px; height:46px; border-radius:12px; display:grid; place-items:center; background:var(--raised); border:1px solid var(--line); color:var(--fg-3);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h5"/><path d="M15.5 14.5 20 19M20 14.5 15.5 19"/></svg></div>
+          <div style="font-size:17px; font-weight:600; color:var(--fg);">Rapor oluşturulmadı</div>
+          <div style="max-width:520px; font-size:13.5px; line-height:1.65; color:var(--fg-2);">Yeterli kaynak getirilemediği için sentezleme çalıştırılmadı. <span style="color:var(--fg);">Doğrulanmamış bir yanıt uydurmuyoruz</span> — kaynak yoksa rapor yok.</div>
+          <div style="display:flex; gap:10px; margin-top:4px;">
+            <button tabindex="0" style-hover="{&quot;filter&quot;:&quot;brightness(1.1)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:8px; cursor:pointer; background:var(--accent); color:#fff; border:none; border-radius:9px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:10px 16px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Yeniden dene</button>
+            <button tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:8px; cursor:pointer; background:transparent; color:var(--fg-2); border:1px solid var(--line-strong); border-radius:9px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:10px 16px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Yalnızca yerel kitaplıkla sürdür</button>
+          </div>
+          <div style="font-size:12px; color:var(--fg-3); margin-top:2px;">Yerel kitaplıkta 2 ilgili belge mevcut · web olmadan kısmi kapsam</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ FRAME 4 · FILLED ============ -->
+  <div id="f4" style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:#fff; background:var(--accent); border:1px solid var(--accent); border-radius:6px; padding:3px 8px;">04</span>
+      <span style="font-size:15px; font-weight:600; color:var(--fg);">Dolu</span>
+      <span style="font-size:13px; color:var(--fg-3);">Adımlar özet çubuğunda · atıflı rapor + [1]–[5] · numaralı kaynaklar · güven rozetleri</span>
+    </div>
+    <section data-frame data-screen-label="Derin Araştırma — Rapor" style="background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div style="width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok); flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:14px; font-weight:600; color:var(--fg);">Araştırma tamamlandı</div><div style="font-size:12px; color:var(--fg-3);">5 adım · 00:19 · 5 kaynak</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button data-snippet-toggle-x tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:7px; cursor:pointer; background:var(--surface); color:var(--fg-2); border:1px solid var(--line-strong); border-radius:8px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500; padding:7px 12px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Kopyala</button>
+          <button tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;,&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:7px; cursor:pointer; background:var(--surface); color:var(--fg-2); border:1px solid var(--line-strong); border-radius:8px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500; padding:7px 12px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>Markdown ▾</button>
+          <button tabindex="0" style-hover="{&quot;filter&quot;:&quot;brightness(1.1)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:7px; cursor:pointer; background:var(--accent); color:#fff; border:none; border-radius:8px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:7px 12px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Yeniden çalıştır</button>
+        </div>
+      </div>
+      <!-- collapsed steps summary bar -->
+      <div style="display:flex; align-items:center; gap:10px; padding:11px 18px; border-bottom:1px solid var(--line); background:#0c0d15; flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3); margin-right:2px;">Ardışık düzen</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>① Planla</span>
+        <span style="color:var(--line-strong);">·</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>② Getir</span>
+        <span style="color:var(--line-strong);">·</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>③ Özetle</span>
+        <span style="color:var(--line-strong);">·</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>④ Doğrula</span>
+        <span style="color:var(--line-strong);">·</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>⑤ Sentezle</span>
+        <button data-steps-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="margin-left:auto; cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:12px; color:var(--accent-2); display:flex; align-items:center; gap:5px;">Adımları göster<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div data-steps-detail style="display:none; padding:14px 18px; border-bottom:1px solid var(--line); background:#0a0b12; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2); line-height:1.85;">
+        <div>① Planla · 3 alt sorgu · 1.2s</div>
+        <div>② Kaynakları getir · 5 kaynak (3 web · 2 yerel) · 4.6s</div>
+        <div>③ Özetle · 12.4k→2.1k token · 6.1s</div>
+        <div>④ Doğrula · 5 iddia çapraz kontrol · 1 çelişki · 5.3s</div>
+        <div>⑤ Sentezle · rapor + atıflar · 1.9s</div>
+      </div>
+      <!-- verification summary strip -->
+      <div style="display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid var(--line); background:var(--surface); flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--fg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z"/><path d="M9 12l2 2 4-4"/></svg>Doğrulama</span>
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:6px; padding:3px 9px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>4 doğrulandı</span>
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:6px; padding:3px 9px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg>1 çelişkili</span>
+        <span style="font-size:12.5px; color:var(--fg-3);">· 5 iddia · 5 kaynak çapraz kontrol edildi</span>
+        <span data-verify-mode style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2); background:var(--raised); border:1px solid var(--line); border-radius:6px; padding:4px 9px;">Denge modu</span>
+      </div>
+      <!-- main split: report + sources -->
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 348px;">
+        <!-- REPORT -->
+        <div style="padding:26px 28px; display:flex; flex-direction:column; gap:18px; min-width:0;">
+          <div>
+            <div style="font-family:'Inter',sans-serif; font-size:22px; font-weight:700; letter-spacing:-0.02em; line-height:1.25; color:var(--fg);">Yerel LLM'lerde gizlilik: neden bulut modellerinden daha güvenli?</div>
+            <div style="margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-3);">Sentez raporu · 5 kaynak · 4/5 iddia doğrulandı · llama3.1:8b · 19 sn</div>
+          </div>
+          <div data-refs="1,2,3,5" style="border-radius:8px; padding:2px 8px; margin:0 -8px; font-size:14.5px; line-height:1.75; color:var(--fg-2);">Yerel (cihaz üstü) çalışan dil modelleri, istem ve yanıt verilerini üçüncü taraf sunuculara göndermediği için bulut tabanlı modellere kıyasla daha güçlü gizlilik garantileri sunar<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="1" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;1px&quot;}" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">1</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow); text-align:left; white-space:normal;"><span style="display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[1] arxiv.org · yerel</span><span style="display:block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--fg); line-height:1.4;">On-Device LM Inference: Privacy &amp; Latency Trade-offs</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…inference performed entirely on-device eliminates transmission of user prompts to remote servers…”</span></span></sup><sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="3" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;1px&quot;}" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">3</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow); text-align:left; white-space:normal;"><span style="display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[3] ollama.com · web</span><span style="display:block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--fg); line-height:1.4;">Self-hosting language models with Ollama</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…models run locally; no data leaves your machine by default…”</span></span></sup>. Bulut sağlayıcıları istemleri kötüye kullanım denetimi ve model iyileştirme için saklayabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="2" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;1px&quot;}" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">2</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow); text-align:left; white-space:normal;"><span style="display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[2] eff.org · web</span><span style="display:block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--fg); line-height:1.4;">What cloud AI providers retain about you</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…providers may retain prompts and metadata for abuse-monitoring and model-improvement…”</span></span></sup>. Ancak gizlilik avantajı otomatik yasal uyum anlamına gelmez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;1px&quot;}" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow); text-align:left; white-space:normal;"><span style="display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:5px; font-size:12.5px; font-weight:600; color:var(--fg); line-height:1.4;">Guidelines on data processing &amp; AI</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…compliance depends on the nature of processing, not the location of computation…”</span></span></sup>.</div>
+
+          <!-- claim 1 -->
+          <div data-refs="1,3" style="border-radius:10px; padding:12px 14px; margin:0 -6px; border:1px solid var(--line); background:var(--surface);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><span style="font-size:13.5px; font-weight:600; color:var(--fg);">Veri cihazdan ayrılmıyor</span><span style="display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 8px; white-space:nowrap;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>Doğrulandı · 2 kaynak</span></div>
+            <div style="font-size:13.5px; line-height:1.7; color:var(--fg-2);">Yerel çıkarımda istemler ve belgeler cihazda işlenir; ağ üzerinden bir sağlayıcıya iletilmez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="1" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">1</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[1] arxiv.org · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…eliminates transmission of user prompts to remote servers…”</span></span></sup>. Ollama gibi araçlar modelleri yerelde çalıştırır ve varsayılan olarak dışarıya veri göndermez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="3" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">3</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[3] ollama.com · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…no data leaves your machine by default…”</span></span></sup>.</div>
+          </div>
+          <!-- claim 2 -->
+          <div data-refs="2,5" style="border-radius:10px; padding:12px 14px; margin:0 -6px; border:1px solid var(--line); background:var(--surface);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><span style="font-size:13.5px; font-weight:600; color:var(--fg);">Bulut sağlayıcılarında veri saklama</span><span style="display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 8px; white-space:nowrap;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>Doğrulandı · 2 kaynak</span></div>
+            <div style="font-size:13.5px; line-height:1.7; color:var(--fg-2);">Bulut sağlayıcıları istemleri ve meta verileri belirli süreler boyunca saklayabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="2" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">2</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[2] eff.org · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…retain prompts and metadata for abuse-monitoring…”</span></span></sup>. Bu, erişim yüzeyini genişletir; EDPB kılavuzları bu tür işlemelerin belgelenmesini bekler<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…compliance depends on the nature of processing…”</span></span></sup>.</div>
+          </div>
+          <!-- claim 3 -->
+          <div data-refs="3,4" style="border-radius:10px; padding:12px 14px; margin:0 -6px; border:1px solid var(--line); background:var(--surface);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><span style="font-size:13.5px; font-weight:600; color:var(--fg);">Kendi kendine barındırma ve denetlenebilirlik</span><span style="display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 8px; white-space:nowrap;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>Doğrulandı · 2 kaynak</span></div>
+            <div style="font-size:13.5px; line-height:1.7; color:var(--fg-2);">Kendi kendine barındırılan yığınlar denetlenebilir; SearXNG gibi meta-arama araçları sorguları profillemeden çalışacak şekilde yapılandırılabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="4" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">4</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[4] docs.searxng.org · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…aggregates results without logging or profiling queries…”</span></span></sup>. Model ve veri hattının tamamı yerelde tutulabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="3" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">3</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[3] ollama.com · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…the full model and data pipeline stays local…”</span></span></sup>.</div>
+          </div>
+          <!-- conflict / verify gap -->
+          <div data-refs="5" style="border-radius:10px; padding:13px 15px; margin:0 -6px; background:var(--bad-dim); border:1px solid var(--bad); border-left:3px solid var(--bad);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bad)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg><span style="font-size:12.5px; font-weight:600; color:var(--fg);">Çelişkili iddia — rapordan çıkarıldı</span><span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--bad); background:rgba(0,0,0,0.2); border-radius:5px; padding:2px 7px;">1/2 kaynak katılmıyor</span></div>
+            <div style="font-size:13px; line-height:1.7; color:var(--fg-2);">«Yerel modeller <span style="color:var(--fg); font-weight:600;">her zaman</span> GDPR uyumludur» iddiası doğrulanamadı. EDPB'ye göre uyum, hesaplamanın <em>yerine</em> değil işlemenin <em>niteliğine</em> bağlıdır<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…compliance depends on the nature of processing, not the location of computation…”</span></span></sup>; kaynak [3] bu genellemeyi desteklemez.</div>
+          </div>
+          <!-- follow-up -->
+          <div style="border-radius:10px; padding:13px 15px; margin:0 -6px; background:var(--accent-dim); border:1px dashed var(--accent-line);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8Z"/></svg><span style="font-size:12px; font-weight:600; letter-spacing:0.02em; color:var(--accent-2);">Önerilen takip sorusu</span></div>
+            <button tabindex="0" style-hover="{&quot;background&quot;:&quot;var(--surface)&quot;,&quot;borderColor&quot;:&quot;var(--accent)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; background:transparent; border:1px solid var(--accent-line); border-radius:9px; padding:10px 13px; font-family:'Inter',sans-serif; font-size:13px; color:var(--fg);">Yerel dağıtımda model ağırlıklarının ve istem günlüklerinin sızma riski nasıl azaltılır?<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <!-- SOURCES -->
+        <div style="border-left:1px solid var(--line); padding:20px 18px; background:#0b0c13; display:flex; flex-direction:column; gap:12px; min-width:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-3);">Kaynaklar · 5</span><span style="font-size:11px; color:var(--fg-3);">bir kaynağa tıkla → iddiaları vurgula</span></div>
+          <!-- source 1 -->
+          <div data-src="1" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:8px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">1</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">arxiv.org</span><span style="margin-left:auto; display:flex; align-items:center; gap:4px; font-size:10px; color:var(--warn); background:var(--warn-dim); border-radius:5px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Yerel</span></div>
+            <div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">On-Device LM Inference: Privacy &amp; Latency Trade-offs</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-size:10.5px; color:var(--fg-3);">2 iddiada kullanıldı</span><button data-snippet-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:11.5px; color:var(--accent-2); display:flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6M7 12h10M7 16h8"/></svg>Alıntı göster</button></div>
+            <div data-snippet style="display:none; font-size:11.5px; font-style:italic; line-height:1.55; color:var(--fg-2); border-top:1px solid var(--line); padding-top:8px;">“…inference performed entirely on-device eliminates transmission of user prompts to remote servers…” <span style="font-style:normal; color:var(--fg-3);">— arxiv.org/abs/2403.05121</span></div>
+          </div>
+          <!-- source 2 -->
+          <div data-src="2" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:8px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">2</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">eff.org</span><span style="margin-left:auto; display:flex; align-items:center; gap:4px; font-size:10px; color:var(--accent-2); background:var(--accent-dim); border-radius:5px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/></svg>Web</span></div>
+            <div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">What cloud AI providers retain about you</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-size:10.5px; color:var(--fg-3);">2 iddiada kullanıldı</span><button data-snippet-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:11.5px; color:var(--accent-2); display:flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6M7 12h10M7 16h8"/></svg>Alıntı göster</button></div>
+            <div data-snippet style="display:none; font-size:11.5px; font-style:italic; line-height:1.55; color:var(--fg-2); border-top:1px solid var(--line); padding-top:8px;">“…providers may retain prompts and metadata for abuse-monitoring and model-improvement purposes…” <span style="font-style:normal; color:var(--fg-3);">— eff.org</span></div>
+          </div>
+          <!-- source 3 -->
+          <div data-src="3" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:8px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">3</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">ollama.com</span><span style="margin-left:auto; display:flex; align-items:center; gap:4px; font-size:10px; color:var(--accent-2); background:var(--accent-dim); border-radius:5px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/></svg>Web</span></div>
+            <div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Self-hosting language models with Ollama</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-size:10.5px; color:var(--fg-3);">3 iddiada kullanıldı</span><button data-snippet-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:11.5px; color:var(--accent-2); display:flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6M7 12h10M7 16h8"/></svg>Alıntı göster</button></div>
+            <div data-snippet style="display:none; font-size:11.5px; font-style:italic; line-height:1.55; color:var(--fg-2); border-top:1px solid var(--line); padding-top:8px;">“…models run locally; no data is sent to external services by default…” <span style="font-style:normal; color:var(--fg-3);">— ollama.com/blog</span></div>
+          </div>
+          <!-- source 4 -->
+          <div data-src="4" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:8px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">4</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">docs.searxng.org</span><span style="margin-left:auto; display:flex; align-items:center; gap:4px; font-size:10px; color:var(--accent-2); background:var(--accent-dim); border-radius:5px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/></svg>Web</span></div>
+            <div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Private meta-search configuration</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-size:10.5px; color:var(--fg-3);">1 iddiada kullanıldı</span><button data-snippet-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:11.5px; color:var(--accent-2); display:flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6M7 12h10M7 16h8"/></svg>Alıntı göster</button></div>
+            <div data-snippet style="display:none; font-size:11.5px; font-style:italic; line-height:1.55; color:var(--fg-2); border-top:1px solid var(--line); padding-top:8px;">“…aggregates results without profiling or logging user queries…” <span style="font-style:normal; color:var(--fg-3);">— docs.searxng.org</span></div>
+          </div>
+          <!-- source 5 -->
+          <div data-src="5" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:8px; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">5</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">edpb.europa.eu</span><span style="margin-left:auto; display:flex; align-items:center; gap:4px; font-size:10px; color:var(--warn); background:var(--warn-dim); border-radius:5px; padding:2px 6px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Yerel</span></div>
+            <div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Guidelines on data processing &amp; AI</div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="display:flex; align-items:center; gap:4px; font-size:10.5px; color:var(--bad);"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg>1 çelişki kaynağı</span><button data-snippet-toggle tabindex="0" style-hover="{&quot;color&quot;:&quot;var(--fg)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="cursor:pointer; background:transparent; border:none; font-family:'Inter',sans-serif; font-size:11.5px; color:var(--accent-2); display:flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6M7 12h10M7 16h8"/></svg>Alıntı göster</button></div>
+            <div data-snippet style="display:none; font-size:11.5px; font-style:italic; line-height:1.55; color:var(--fg-2); border-top:1px solid var(--line); padding-top:8px;">“…compliance depends on the nature of processing, not solely the location of computation…” <span style="font-style:normal; color:var(--fg-3);">— edpb.europa.eu</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- footer: follow-up refine -->
+      <div style="display:flex; align-items:center; gap:12px; padding:14px 18px; border-top:1px solid var(--line); background:var(--surface);">
+        <div style="flex:1; display:flex; align-items:center; gap:10px; padding:9px 13px; border:1px solid var(--line-strong); border-radius:10px; background:var(--bg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-3)" stroke-width="1.6" stroke-linecap="round"><path d="M4 12h16M4 6h16M4 18h10"/></svg><input tabindex="0" placeholder="Bu araştırmayı daraltın veya bir bölümü derinleştirin…" style-focus="{&quot;outline&quot;:&quot;none&quot;}" style="flex:1; border:none; background:transparent; color:var(--fg); font-family:'Inter',sans-serif; font-size:13.5px;"></div>
+        <button tabindex="0" style-hover="{&quot;filter&quot;:&quot;brightness(1.1)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:7px; cursor:pointer; background:var(--accent); color:#fff; border:none; border-radius:10px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:10px 16px;">Daralt<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ FRAME 5 · TABLET ============ -->
+  <div id="f5" style="width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:var(--fg); background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:3px 8px;">05</span>
+      <span style="font-size:15px; font-weight:600; color:var(--fg);">Tablet · tek sütun</span>
+      <span style="font-size:13px; color:var(--fg-3);">Dolu durumun daraltılmış düzeni — rapor üstte, kaynaklar altta</span>
+    </div>
+    <div style="display:flex; justify-content:center;">
+    <section data-frame data-screen-label="Derin Araştırma — Tablet" style="width:768px; max-width:100%; background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="display:flex; align-items:center; gap:11px; min-width:0;">
+          <div style="width:32px; height:32px; border-radius:9px; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok); flex:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:13.5px; font-weight:600; color:var(--fg);">Araştırma tamamlandı</div><div style="font-size:11.5px; color:var(--fg-3);">5 adım · 5 kaynak · 4/5 doğrulandı</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:7px; padding:5px 10px; border-radius:999px; background:var(--raised); border:1px solid var(--line);"><span style="width:6px; height:6px; border-radius:50%; background:var(--ok);"></span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">llama3.1:8b</span></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line); background:var(--surface); flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:6px; padding:3px 8px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>4 doğrulandı</span>
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:6px; padding:3px 8px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg>1 çelişkili</span>
+        <span data-verify-mode style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-2); background:var(--raised); border:1px solid var(--line); border-radius:6px; padding:3px 8px;">Denge modu</span>
+      </div>
+      <!-- report single column -->
+      <div style="padding:22px 22px 8px; display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <div style="font-family:'Inter',sans-serif; font-size:19px; font-weight:700; letter-spacing:-0.02em; line-height:1.3; color:var(--fg);">Yerel LLM'lerde gizlilik: neden bulut modellerinden daha güvenli?</div>
+          <div style="margin-top:7px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-3);">Sentez · 5 kaynak · 4/5 doğrulandı · 19 sn</div>
+        </div>
+        <div data-refs="1,2,3,5" style="border-radius:8px; padding:2px 6px; margin:0 -6px; font-size:14px; line-height:1.75; color:var(--fg-2);">Yerel çalışan modeller istem ve yanıt verilerini üçüncü taraflara göndermez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="1" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">1</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[1] arxiv.org · yerel</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…eliminates transmission of user prompts to remote servers…”</span></span></sup>. Bulut sağlayıcıları istemleri saklayabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="2" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">2</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[2] eff.org · web</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…retain prompts and metadata…”</span></span></sup>; gizlilik avantajı yasal uyum garantisi değildir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…compliance depends on the nature of processing…”</span></span></sup>.</div>
+        <div data-refs="1,3" style="border-radius:10px; padding:11px 13px; margin:0 -4px; border:1px solid var(--line); background:var(--surface);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;"><span style="font-size:13px; font-weight:600; color:var(--fg);">Veri cihazdan ayrılmıyor</span><span style="display:flex; align-items:center; gap:4px; font-size:10px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 7px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>2 kaynak</span></div>
+          <div style="font-size:13px; line-height:1.65; color:var(--fg-2);">Yerel çıkarımda istemler cihazda işlenir; Ollama gibi araçlar varsayılan olarak dışarıya veri göndermez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="3" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">3</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[3] ollama.com · web</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…no data leaves your machine by default…”</span></span></sup>.</div>
+        </div>
+        <div data-refs="3,4" style="border-radius:10px; padding:11px 13px; margin:0 -4px; border:1px solid var(--line); background:var(--surface);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;"><span style="font-size:13px; font-weight:600; color:var(--fg);">Kendi kendine barındırma</span><span style="display:flex; align-items:center; gap:4px; font-size:10px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 7px;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>2 kaynak</span></div>
+          <div style="font-size:13px; line-height:1.65; color:var(--fg-2);">SearXNG gibi meta-arama araçları sorguları profillemeden çalışacak şekilde yapılandırılabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="4" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">4</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[4] docs.searxng.org · web</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…without logging or profiling queries…”</span></span></sup>.</div>
+        </div>
+        <div data-refs="5" style="border-radius:10px; padding:12px 14px; margin:0 -4px; background:var(--bad-dim); border:1px solid var(--bad); border-left:3px solid var(--bad);">
+          <div style="display:flex; align-items:center; gap:7px; margin-bottom:5px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--bad)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg><span style="font-size:12px; font-weight:600; color:var(--fg);">Çelişkili iddia — çıkarıldı</span><span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--bad);">1/2 katılmıyor</span></div>
+          <div style="font-size:12.5px; line-height:1.65; color:var(--fg-2);">«Yerel modeller her zaman GDPR uyumludur» doğrulanamadı; uyum işlemenin niteliğine bağlıdır<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; z-index:30; width:240px; padding:10px 12px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:4px; font-size:11px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…not the location of computation…”</span></span></sup>.</div>
+        </div>
+      </div>
+      <!-- sources row -->
+      <div style="padding:8px 22px 22px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-3);">Kaynaklar · 5 · dokun → iddiaları vurgula</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:9px;">
+          <div data-src="1" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:7px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 6px;">1</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">arxiv.org</span><span style="margin-left:auto; font-size:9.5px; color:var(--warn); background:var(--warn-dim); border-radius:4px; padding:1px 5px;">Yerel</span></div><div style="font-size:11.5px; color:var(--fg); line-height:1.35;">On-Device LM Inference</div></div>
+          <div data-src="2" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:7px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 6px;">2</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">eff.org</span><span style="margin-left:auto; font-size:9.5px; color:var(--accent-2); background:var(--accent-dim); border-radius:4px; padding:1px 5px;">Web</span></div><div style="font-size:11.5px; color:var(--fg); line-height:1.35;">Cloud AI retention</div></div>
+          <div data-src="3" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:7px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 6px;">3</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">ollama.com</span><span style="margin-left:auto; font-size:9.5px; color:var(--accent-2); background:var(--accent-dim); border-radius:4px; padding:1px 5px;">Web</span></div><div style="font-size:11.5px; color:var(--fg); line-height:1.35;">Self-hosting with Ollama</div></div>
+          <div data-src="4" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:7px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 6px;">4</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">searxng</span><span style="margin-left:auto; font-size:9.5px; color:var(--accent-2); background:var(--accent-dim); border-radius:4px; padding:1px 5px;">Web</span></div><div style="font-size:11.5px; color:var(--fg); line-height:1.35;">Private meta-search</div></div>
+          <div data-src="5" tabindex="0" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:5px; padding:10px 12px; border:1px solid var(--line); border-radius:11px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:7px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; color:var(--accent-2); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 6px;">5</span><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2);">edpb.europa.eu</span><span style="margin-left:auto; font-size:9.5px; color:var(--warn); background:var(--warn-dim); border-radius:4px; padding:1px 5px;">Yerel</span></div><div style="font-size:11.5px; color:var(--fg); line-height:1.35;">GDPR guidelines</div></div>
+        </div>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 6 · LIGHT ============ -->
+  <div id="f6" style="--bg:#ffffff; --canvas:#eef0f5; --surface:#ffffff; --raised:#f4f5f9; --overlay:#ffffff; --line:rgba(17,19,28,0.10); --line-2:rgba(17,19,28,0.06); --line-strong:rgba(17,19,28,0.18); --fg:#16171f; --fg-2:#565b6d; --fg-3:#888da0; --accent:#5457e6; --accent-2:#6366f1; --accent-dim:rgba(99,102,241,0.10); --accent-line:rgba(99,102,241,0.32); --ok:#059669; --ok-dim:rgba(5,150,105,0.10); --warn:#c77a12; --warn-dim:rgba(199,122,18,0.12); --bad:#e11d48; --bad-dim:rgba(225,29,72,0.09); --shadow:0 18px 44px rgba(30,35,60,0.16); width:1200px; max-width:100%; display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; color:#e8eaf3; background:#15161f; border:1px solid var(--line-strong); border-radius:6px; padding:3px 8px;">06</span>
+      <span style="font-size:15px; font-weight:600; color:#e8eaf3;">Açık tema</span>
+      <span style="font-size:13px; color:#888da0;">Dolu durumun açık tema varyantı — indigo aksan korunur</span>
+    </div>
+    <section data-frame data-screen-label="Derin Araştırma — Açık tema" style="background:var(--bg); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-bottom:1px solid var(--line); background:var(--raised);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div style="width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:var(--ok-dim); border:1px solid var(--ok); color:var(--ok); flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></div>
+          <div style="min-width:0;"><div style="font-size:14px; font-weight:600; color:var(--fg);">Araştırma tamamlandı</div><div style="font-size:12px; color:var(--fg-3);">5 adım · 00:19 · 5 kaynak</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; background:var(--surface); border:1px solid var(--line-strong);"><span style="width:7px; height:7px; border-radius:50%; background:var(--ok);"></span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">Cihazda · llama3.1:8b</span></div>
+          <button tabindex="0" style-hover="{&quot;filter&quot;:&quot;brightness(1.05)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent-2)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; align-items:center; gap:7px; cursor:pointer; background:var(--accent); color:#fff; border:none; border-radius:8px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:7px 12px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Yeniden çalıştır</button>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding:11px 18px; border-bottom:1px solid var(--line); background:var(--raised); flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--fg-3);">Ardışık düzen</span>
+        <span style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--fg-2);"><span style="color:var(--ok);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg></span>① Planla · ② Getir · ③ Özetle · ④ Doğrula · ⑤ Sentezle</span>
+        <span data-verify-mode style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-2); background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:4px 9px;">Denge modu</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid var(--line); background:var(--surface); flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--fg);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z"/><path d="M9 12l2 2 4-4"/></svg>Doğrulama</span>
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:6px; padding:3px 9px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>4 doğrulandı</span>
+        <span style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:6px; padding:3px 9px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg>1 çelişkili</span>
+        <span style="font-size:12.5px; color:var(--fg-3);">· 5 iddia · 5 kaynak çapraz kontrol edildi</span>
+      </div>
+      <div style="display:grid; grid-template-columns:minmax(0,1fr) 348px;">
+        <div style="padding:26px 28px; display:flex; flex-direction:column; gap:16px; min-width:0;">
+          <div>
+            <div style="font-family:'Inter',sans-serif; font-size:22px; font-weight:700; letter-spacing:-0.02em; line-height:1.25; color:var(--fg);">Yerel LLM'lerde gizlilik: neden bulut modellerinden daha güvenli?</div>
+            <div style="margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-3);">Sentez raporu · 5 kaynak · 4/5 iddia doğrulandı · 19 sn</div>
+          </div>
+          <div data-refs="1,2,3,5" style="border-radius:8px; padding:2px 8px; margin:0 -8px; font-size:14.5px; line-height:1.75; color:var(--fg-2);">Yerel çalışan dil modelleri istem ve yanıt verilerini üçüncü taraf sunuculara göndermez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="1" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">1</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[1] arxiv.org · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…eliminates transmission of user prompts to remote servers…”</span></span></sup>. Bulut sağlayıcıları istemleri kötüye kullanım denetimi için saklayabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="2" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">2</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[2] eff.org · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…retain prompts and metadata for abuse-monitoring…”</span></span></sup>. Gizlilik avantajı otomatik yasal uyum anlamına gelmez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…compliance depends on the nature of processing…”</span></span></sup>.</div>
+          <div data-refs="1,3" style="border-radius:10px; padding:12px 14px; margin:0 -6px; border:1px solid var(--line); background:var(--raised);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><span style="font-size:13.5px; font-weight:600; color:var(--fg);">Veri cihazdan ayrılmıyor</span><span style="display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 8px; white-space:nowrap;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>Doğrulandı · 2 kaynak</span></div>
+            <div style="font-size:13.5px; line-height:1.7; color:var(--fg-2);">Yerel çıkarımda istemler cihazda işlenir; Ollama modelleri yerelde çalıştırır ve varsayılan olarak dışarıya veri göndermez<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="3" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">3</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[3] ollama.com · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…no data leaves your machine by default…”</span></span></sup>.</div>
+          </div>
+          <div data-refs="3,4" style="border-radius:10px; padding:12px 14px; margin:0 -6px; border:1px solid var(--line); background:var(--raised);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;"><span style="font-size:13.5px; font-weight:600; color:var(--fg);">Kendi kendine barındırma ve denetlenebilirlik</span><span style="display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ok); background:var(--ok-dim); border:1px solid var(--ok); border-radius:999px; padding:2px 8px; white-space:nowrap;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 10 18 20 6"/></svg>Doğrulandı · 2 kaynak</span></div>
+            <div style="font-size:13.5px; line-height:1.7; color:var(--fg-2);">SearXNG gibi meta-arama araçları sorguları profillemeden çalışacak şekilde yapılandırılabilir<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="4" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">4</span><span data-cite-pop style="display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[4] docs.searxng.org · web</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…without profiling or logging user queries…”</span></span></sup>.</div>
+          </div>
+          <div data-refs="5" style="border-radius:10px; padding:13px 15px; margin:0 -6px; background:var(--bad-dim); border:1px solid var(--bad); border-left:3px solid var(--bad);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--bad)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20H2Z"/><path d="M12 10v4"/></svg><span style="font-size:12.5px; font-weight:600; color:var(--fg);">Çelişkili iddia — rapordan çıkarıldı</span><span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--bad);">1/2 katılmıyor</span></div>
+            <div style="font-size:13px; line-height:1.7; color:var(--fg-2);">«Yerel modeller her zaman GDPR uyumludur» iddiası doğrulanamadı; EDPB'ye göre uyum hesaplamanın yerine değil işlemenin niteliğine bağlıdır<sup data-cite-wrap style="position:relative; display:inline-block;"><span data-cite="5" tabindex="0" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--bad); background:var(--bad-dim); border:1px solid var(--bad); border-radius:5px; padding:1px 5px; margin-left:2px; cursor:pointer;">5</span><span data-cite-pop style="display:none; position:absolute; bottom:calc(100% + 8px); left:0; z-index:30; width:262px; padding:11px 13px; background:var(--overlay); border:1px solid var(--line-strong); border-radius:11px; box-shadow:var(--shadow);"><span style="display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-3);">[5] edpb.europa.eu · yerel</span><span style="display:block; margin-top:5px; font-size:11.5px; font-style:italic; color:var(--fg-2); line-height:1.5;">“…not the location of computation…”</span></span></sup>; kaynak [3] bu genellemeyi desteklemez.</div>
+          </div>
+        </div>
+        <div style="border-left:1px solid var(--line); padding:20px 18px; background:var(--raised); display:flex; flex-direction:column; gap:12px; min-width:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--fg-3);">Kaynaklar · 5</span><span style="font-size:11px; color:var(--fg-3);">tıkla → vurgula</span></div>
+          <div data-src="1" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:7px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:12px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">1</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">arxiv.org</span><span style="margin-left:auto; font-size:10px; color:var(--warn); background:var(--warn-dim); border-radius:5px; padding:2px 6px;">Yerel</span></div><div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">On-Device LM Inference: Privacy &amp; Latency</div></div>
+          <div data-src="2" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:7px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:12px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">2</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">eff.org</span><span style="margin-left:auto; font-size:10px; color:var(--accent); background:var(--accent-dim); border-radius:5px; padding:2px 6px;">Web</span></div><div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">What cloud AI providers retain about you</div></div>
+          <div data-src="3" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:7px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:12px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">3</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">ollama.com</span><span style="margin-left:auto; font-size:10px; color:var(--accent); background:var(--accent-dim); border-radius:5px; padding:2px 6px;">Web</span></div><div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Self-hosting language models with Ollama</div></div>
+          <div data-src="4" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:7px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:12px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">4</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">docs.searxng.org</span><span style="margin-left:auto; font-size:10px; color:var(--accent); background:var(--accent-dim); border-radius:5px; padding:2px 6px;">Web</span></div><div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Private meta-search configuration</div></div>
+          <div data-src="5" tabindex="0" style-hover="{&quot;borderColor&quot;:&quot;var(--accent-line)&quot;}" style-focus="{&quot;outline&quot;:&quot;2px solid var(--accent)&quot;,&quot;outlineOffset&quot;:&quot;2px&quot;}" style="display:flex; flex-direction:column; gap:7px; padding:12px 13px; border:1px solid var(--line-strong); border-radius:12px; background:var(--surface); cursor:pointer;"><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-dim); border:1px solid var(--accent-line); border-radius:6px; padding:1px 7px;">5</span><span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--fg-2);">edpb.europa.eu</span><span style="margin-left:auto; font-size:10px; color:var(--warn); background:var(--warn-dim); border-radius:5px; padding:2px 6px;">Yerel</span></div><div style="font-size:12.5px; font-weight:500; color:var(--fg); line-height:1.4;">Guidelines on data processing &amp; AI</div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#6366f1&quot;,&quot;options&quot;:[&quot;#6366f1&quot;,&quot;#00D4FF&quot;,&quot;#22c55e&quot;,&quot;#f43f5e&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Tema&quot;},&quot;showModelChatter&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ardışık düzen&quot;},&quot;pipelineDetail&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;detailed&quot;,&quot;options&quot;:[&quot;detailed&quot;,&quot;compact&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ardışık düzen&quot;},&quot;verifyStrictness&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;balanced&quot;,&quot;options&quot;:[&quot;lenient&quot;,&quot;balanced&quot;,&quot;strict&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Doğrulama&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { rootRef: (el) => { this._root = el; } };
+  }
+
+  componentDidMount() {
+    const root = this._root;
+    if (!root) return;
+
+    // ── Tweak: accent override ──
+    const accent = this.props.accent;
+    if (accent) {
+      root.style.setProperty('--accent', accent);
+      root.style.setProperty('--accent-2', accent);
+      root.style.setProperty('--accent-dim', this.rgba(accent, 0.15));
+      root.style.setProperty('--accent-line', this.rgba(accent, 0.4));
+    }
+
+    // ── Tweak: model chatter ──
+    if (this.props.showModelChatter === false) {
+      root.querySelectorAll('[data-chatter]').forEach((e) => { e.style.display = 'none'; });
+    }
+
+    // ── Tweak: pipeline detail ──
+    if (this.props.pipelineDetail === 'compact') {
+      root.querySelectorAll('[data-substep]').forEach((e) => { e.style.display = 'none'; });
+    }
+
+    // ── Tweak: verify strictness label ──
+    const vm = this.props.verifyStrictness || 'balanced';
+    const label = { lenient: 'Esnek mod', balanced: 'Denge modu', strict: 'Katı mod' }[vm] || 'Denge modu';
+    root.querySelectorAll('[data-verify-mode]').forEach((e) => { e.textContent = label; });
+
+    // ── Interactions, scoped per frame ──
+    root.querySelectorAll('[data-frame]').forEach((frame) => this.wireFrame(frame));
+  }
+
+  rgba(hex, a) {
+    let h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    const n = parseInt(h, 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  wireFrame(frame) {
+    // Citation hover / focus previews
+    frame.querySelectorAll('[data-cite-wrap]').forEach((wrap) => {
+      const chip = wrap.querySelector('[data-cite]');
+      const pop = wrap.querySelector('[data-cite-pop]');
+      if (!chip || !pop) return;
+      const show = () => { pop.style.display = 'block'; };
+      const hide = () => { pop.style.display = 'none'; };
+      chip.addEventListener('mouseenter', show);
+      chip.addEventListener('mouseleave', hide);
+      chip.addEventListener('focus', show);
+      chip.addEventListener('blur', hide);
+    });
+
+    // Snippet toggles
+    frame.querySelectorAll('[data-snippet-toggle]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = btn.closest('[data-src]');
+        const snip = card && card.querySelector('[data-snippet]');
+        if (!snip) return;
+        const open = snip.style.display === 'block';
+        snip.style.display = open ? 'none' : 'block';
+        btn.lastChild && (btn.lastChild.textContent = open ? 'Alıntı göster' : 'Alıntıyı gizle');
+      });
+    });
+
+    // Source click → highlight the claims it supports
+    const cards = Array.from(frame.querySelectorAll('[data-src]'));
+    const claims = Array.from(frame.querySelectorAll('[data-refs]'));
+    let active = null;
+
+    const clear = () => {
+      active = null;
+      cards.forEach((c) => {
+        c.style.boxShadow = 'none';
+        c.style.background = 'var(--surface)';
+      });
+      claims.forEach((cl) => {
+        cl.style.background = cl.hasAttribute('data-tint') ? cl.getAttribute('data-tint') : 'transparent';
+        cl.style.boxShadow = 'none';
+        cl.style.opacity = '1';
+      });
+    };
+
+    const activate = (n, card) => {
+      active = n;
+      cards.forEach((c) => {
+        const on = c === card;
+        c.style.boxShadow = on ? '0 0 0 2px var(--accent)' : 'none';
+        c.style.background = on ? 'var(--accent-dim)' : 'var(--surface)';
+      });
+      claims.forEach((cl) => {
+        const refs = (cl.getAttribute('data-refs') || '').split(',').map((s) => s.trim());
+        const on = refs.indexOf(String(n)) !== -1;
+        cl.style.transition = 'opacity .2s ease, box-shadow .2s ease, background .2s ease';
+        cl.style.opacity = on ? '1' : '0.4';
+        cl.style.boxShadow = on ? 'inset 3px 0 0 var(--accent)' : 'none';
+        if (on) cl.style.background = 'var(--accent-dim)';
+      });
+    };
+
+    cards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const n = card.getAttribute('data-src');
+        if (active === n) clear(); else activate(n, card);
+      });
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+      });
+    });
+
+    // Steps expand / collapse
+    frame.querySelectorAll('[data-steps-toggle]').forEach((btn) => {
+      const first = btn.firstChild;
+      btn.addEventListener('click', () => {
+        const panel = frame.querySelector('[data-steps-detail]');
+        if (!panel) return;
+        const open = panel.style.display === 'block';
+        panel.style.display = open ? 'none' : 'block';
+        if (first) first.textContent = open ? 'Adımları göster' : 'Adımları gizle';
+      });
+    });
+  }
+}
+</script>
+</body>
+</html>

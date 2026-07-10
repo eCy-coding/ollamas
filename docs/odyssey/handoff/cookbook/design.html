@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/colors_and_type.css">
+<script src="_ds/ecy-design-system-019dd99c-8b53-76bd-ae1b-f3912dcc9b4b/_ds_bundle.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { background: var(--bg-base); overflow: hidden; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.16); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+  *::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.30); background-clip: content-box; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  @keyframes ecyScan { 0% { transform: translateX(-120%); } 100% { transform: translateX(420%); } }
+  @keyframes ecySpin { to { transform: rotate(360deg); } }
+  @keyframes ecyPulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+</style>
+</helmet>
+
+<div style="display:flex; height:100vh; width:100%; background:var(--bg-base); font-family:var(--font-body); color:var(--fg-primary);">
+
+  <!-- ═══ GLOBAL NAV RAIL ═══ -->
+  <nav style="width:60px; flex:0 0 60px; background:#050A14; border-right:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; align-items:center; padding:14px 0 12px; gap:5px; z-index:10;">
+    <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#00D4FF,#7B5EA7); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:19px; color:#050A14; box-shadow:0 0 18px rgba(0,212,255,0.4); margin-bottom:12px; letter-spacing:-0.05em;">e</div>
+
+    <button title="Chat" style="width:42px; height:42px; border-radius:11px; border:none; background:transparent; color:#536882; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(255,255,255,0.05); color:#8A9BB0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+
+    <button title="Cookbook" style="position:relative; width:42px; height:42px; border-radius:11px; border:none; background:rgba(0,212,255,0.12); color:#00D4FF; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 0 16px rgba(0,212,255,0.16);">
+      <span style="position:absolute; left:-9px; top:11px; width:3px; height:20px; border-radius:3px; background:#00D4FF; box-shadow:0 0 8px #00D4FF;"></span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+    </button>
+
+    <button title="Knowledge" style="width:42px; height:42px; border-radius:11px; border:none; background:transparent; color:#536882; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(255,255,255,0.05); color:#8A9BB0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+    </button>
+
+    <button title="Tools" style="width:42px; height:42px; border-radius:11px; border:none; background:transparent; color:#536882; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(255,255,255,0.05); color:#8A9BB0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
+    </button>
+
+    <button title="Activity" style="width:42px; height:42px; border-radius:11px; border:none; background:transparent; color:#536882; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(255,255,255,0.05); color:#8A9BB0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+    </button>
+
+    <div style="flex:1;"></div>
+
+    <button title="Settings" style="width:42px; height:42px; border-radius:11px; border:none; background:transparent; color:#536882; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(255,255,255,0.05); color:#8A9BB0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>
+    </button>
+    <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#7B5EA7,#00D4FF); border:1px solid rgba(255,255,255,0.15); margin-top:4px;"></div>
+  </nav>
+
+  <!-- ═══ FEATURE PANEL ═══ -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <!-- top bar -->
+    <header style="height:52px; flex:0 0 52px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(5,10,20,0.72); backdrop-filter:blur(14px); z-index:5;">
+      <div style="display:flex; align-items:center; gap:9px; min-width:0;">
+        <span style="font-family:var(--font-mono); font-size:11px; color:#536882; letter-spacing:0.03em;">workspace</span>
+        <span style="color:#3A4F66;">/</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+        <span style="font-family:var(--font-display); font-size:15px; font-weight:600; color:var(--fg-primary); letter-spacing:-0.01em;">Cookbook</span>
+        <span style="font-family:var(--font-mono); font-size:10px; color:#00D4FF; background:rgba(0,212,255,0.10); border:1px solid rgba(0,212,255,0.20); border-radius:5px; padding:2px 7px; margin-left:2px;">local-first</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-family:var(--font-mono); font-size:10.5px; color:#536882;">ollama runtime · <span style="color:#00C896;">connected</span></span>
+        <button onClick="{{ redetect }}" style="display:flex; align-items:center; gap:6px; background:transparent; color:#8A9BB0; border:1px solid rgba(255,255,255,0.10); border-radius:7px; padding:6px 12px; font-family:var(--font-display); font-size:12px; font-weight:500; cursor:pointer; transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4); color:#00D4FF">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+          Re-detect
+        </button>
+      </div>
+    </header>
+
+    <!-- scroll area -->
+    <div style="flex:1; overflow-y:auto; overflow-x:hidden;">
+      <div style="max-width:1200px; margin:0 auto; padding:22px 24px 44px; display:flex; flex-direction:column; gap:20px;">
+
+        <!-- ── HARDWARE DETECTION ── -->
+        <section style="background:linear-gradient(180deg, rgba(19,35,56,0.9), rgba(13,27,46,0.65)); border:1px solid rgba(0,212,255,0.15); border-radius:14px; padding:18px 20px; position:relative; overflow:hidden;">
+          <sc-if value="{{ detecting }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute; top:0; left:0; height:2px; width:26%; background:linear-gradient(90deg, transparent, #00D4FF, transparent); animation:ecyScan 0.85s linear infinite; box-shadow:0 0 10px #00D4FF;"></div>
+          </sc-if>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap;">
+            <div style="min-width:0;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="width:7px; height:7px; border-radius:50%; background:#00C896; box-shadow:0 0 8px #00C896;"></span>
+                <span class="eyebrow" style="color:#00D4FF;">Hardware · detected</span>
+                <sc-if value="{{ detecting }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-family:var(--font-mono); font-size:10px; color:#00D4FF; animation:ecyPulse 0.85s ease-in-out infinite;">re-scanning…</span>
+                </sc-if>
+              </div>
+              <div style="display:flex; align-items:baseline; gap:11px; margin-top:7px;">
+                <h3 style="font-size:23px; margin:0; letter-spacing:-0.02em;">{{ hwName }}</h3>
+                <span style="font-family:var(--font-mono); font-size:11px; color:#8A9BB0; background:#0D1B2E; border:1px solid rgba(255,255,255,0.08); border-radius:5px; padding:3px 8px;">{{ hwSub }}</span>
+              </div>
+              <div style="font-family:var(--font-mono); font-size:11px; color:#536882; margin-top:7px;">7 models scored · recommendations recomputed for this profile</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+              <span style="font-family:var(--font-mono); font-size:10px; color:#536882; letter-spacing:0.03em;">not your machine? simulate ↓</span>
+              <div style="display:inline-flex; gap:3px; background:#0D1B2E; border:1px solid rgba(255,255,255,0.08); border-radius:9px; padding:3px;">
+                <sc-for list="{{ machineList }}" as="mc" hint-placeholder-count="4">
+                  <button onClick="{{ mc.select }}" style="font-family:var(--font-display); font-size:12px; font-weight:600; padding:5px 11px; border-radius:6px; border:1px solid {{ mc.border }}; background:{{ mc.bg }}; color:{{ mc.color }}; cursor:pointer; transition:all 150ms; white-space:nowrap;">{{ mc.short }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px;">
+            <x-import component-from-global-scope="StatCard" value="{{ memLabel }}" unit="GB" label="{{ memType }}" hint-size="100%,88px"></x-import>
+            <x-import component-from-global-scope="StatCard" value="{{ usableLabel }}" unit="GB" label="Free for inference" glow="{{ true }}" hint-size="100%,88px"></x-import>
+            <x-import component-from-global-scope="StatCard" value="{{ bwLabel }}" unit="GB/s" label="{{ accelLabel }}" hint-size="100%,88px"></x-import>
+            <x-import component-from-global-scope="StatCard" value="{{ cpuCoreLabel }}" unit="core" label="{{ cpuLabel }}" hint-size="100%,88px"></x-import>
+          </div>
+        </section>
+
+        <!-- ── SECTION: RECOMMENDED ── -->
+        <div style="display:flex; align-items:center; gap:10px; margin-top:2px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 14.06A2 2 0 0 0 8.5 12.62l-5.9-1.52a.5.5 0 0 1 0-.96l5.9-1.52A2 2 0 0 0 9.94 7.2l1.52-5.9a.5.5 0 0 1 .96 0l1.52 5.9a2 2 0 0 0 1.44 1.44l5.9 1.52a.5.5 0 0 1 0 .96l-5.9 1.52a2 2 0 0 0-1.44 1.44l-1.52 5.9a.5.5 0 0 1-.96 0z"/></svg>
+          <h4 style="font-size:15px; margin:0; font-weight:600;">Recommended for this machine</h4>
+          <span style="flex:1; height:1px; background:rgba(255,255,255,0.06);"></span>
+          <span style="font-family:var(--font-mono); font-size:10.5px; color:#536882;">primary pick</span>
+        </div>
+
+        <!-- ── PRIMARY HERO: qwen3:8b ── -->
+        <section style="background:rgba(13,27,46,0.85); border:1px solid rgba(0,212,255,0.30); border-radius:16px; box-shadow:0 0 30px rgba(0,212,255,0.1), 0 8px 30px rgba(0,0,0,0.4); overflow:hidden;">
+          <div style="display:grid; grid-template-columns:1fr 292px;">
+            <!-- left -->
+            <div style="padding:22px 24px; min-width:0; border-right:1px solid rgba(255,255,255,0.06);">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; gap:5px; font-family:var(--font-display); font-size:10.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#050A14; background:#00D4FF; border-radius:9999px; padding:3px 11px; box-shadow:0 0 14px rgba(0,212,255,0.4);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 14.06A2 2 0 0 0 8.5 12.62l-5.9-1.52a.5.5 0 0 1 0-.96l5.9-1.52A2 2 0 0 0 9.94 7.2l1.52-5.9a.5.5 0 0 1 .96 0l1.52 5.9a2 2 0 0 0 1.44 1.44l5.9 1.52a.5.5 0 0 1 0 .96l-5.9 1.52a2 2 0 0 0-1.44 1.44l-1.52 5.9a.5.5 0 0 1-.96 0z"/></svg>
+                  Primary
+                </span>
+                <span style="display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10.5px; font-weight:600; color:#00C896; background:rgba(0,200,150,0.10); border:1px solid rgba(0,200,150,0.25); border-radius:9999px; padding:3px 10px;">$0 local</span>
+                <sc-if value="{{ primary.isInstalled }}" hint-placeholder-val="{{ false }}">
+                  <x-import component-from-global-scope="Badge" type="live" hint-size="auto,22px">Installed</x-import>
+                </sc-if>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:13px; margin-top:15px;">
+                <div style="width:46px; height:46px; flex:0 0 46px; border-radius:12px; background:rgba(0,212,255,0.10); border:1px solid rgba(0,212,255,0.4); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:22px; color:#00D4FF; box-shadow:0 0 16px rgba(0,212,255,0.15);">Q</div>
+                <div style="min-width:0;">
+                  <div style="font-family:var(--font-mono); font-size:21px; font-weight:700; color:var(--fg-primary); letter-spacing:-0.01em;">qwen3:8b</div>
+                  <div style="font-size:12.5px; color:#8A9BB0; margin-top:2px;">Qwen3 · {{ primary.roleLabel }}</div>
+                </div>
+              </div>
+
+              <div style="margin-top:16px; background:rgba(123,94,167,0.08); border:1px solid rgba(123,94,167,0.22); border-radius:10px; padding:12px 14px;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9B80CC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 14.06A2 2 0 0 0 8.5 12.62l-5.9-1.52a.5.5 0 0 1 0-.96l5.9-1.52A2 2 0 0 0 9.94 7.2l1.52-5.9a.5.5 0 0 1 .96 0l1.52 5.9a2 2 0 0 0 1.44 1.44l5.9 1.52a.5.5 0 0 1 0 .96l-5.9 1.52a2 2 0 0 0-1.44 1.44l-1.52 5.9a.5.5 0 0 1-.96 0z"/></svg>
+                  <span style="font-family:var(--font-display); font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#9B80CC;">Why this model</span>
+                </div>
+                <p style="margin:0; font-size:13px; line-height:1.55; color:#B0BFCF;">{{ primary.why }}</p>
+              </div>
+
+              <div style="margin-top:15px;">
+                <div style="font-family:var(--font-mono); font-size:10px; color:#536882; letter-spacing:0.06em; margin-bottom:8px;">SERVING CONFIG</div>
+                <div style="display:flex; flex-wrap:wrap; gap:7px;">
+                  <span style="font-family:var(--font-mono); font-size:11px; color:#B0BFCF; background:#132338; border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:4px 9px; white-space:nowrap;">quant <span style="color:#00D4FF;">{{ primary.quantLabel }}</span></span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:#B0BFCF; background:#132338; border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:4px 9px; white-space:nowrap;">{{ primary.paramsLabel }} params</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:#B0BFCF; background:#132338; border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:4px 9px; white-space:nowrap;">ctx {{ primary.ctxLabel }} → {{ primary.ctxMaxLabel }}</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:#B0BFCF; background:#132338; border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:4px 9px; white-space:nowrap;">{{ primary.offloadLabel }}</span>
+                  <span style="font-family:var(--font-mono); font-size:11px; color:#050A14; background:#00D4FF; border-radius:6px; padding:4px 9px; font-weight:600; white-space:nowrap;">{{ primary.tokLabel }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- right: gauge + action -->
+            <div style="padding:22px 20px; display:flex; flex-direction:column; align-items:center; gap:14px; background:rgba(5,10,20,0.35);">
+              <div style="position:relative; width:96px; height:96px;">
+                <svg width="96" height="96" viewBox="0 0 96 96" style="transform:rotate(-90deg);">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="7"/>
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="{{ primary.tierColor }}" stroke-width="7" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="{{ primary.ringOffset }}" style="transition:stroke-dashoffset 500ms cubic-bezier(0.16,1,0.3,1), stroke 300ms;"/>
+                </svg>
+                <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                  <span style="font-family:var(--font-display); font-size:30px; font-weight:700; color:var(--fg-primary); line-height:1;">{{ primary.fitStr }}</span>
+                  <span style="font-family:var(--font-mono); font-size:9px; color:#536882;">/ 100 fit</span>
+                </div>
+              </div>
+              <div style="font-family:var(--font-display); font-size:13px; font-weight:600; color:{{ primary.tierColor }};">{{ primary.tierLabel }}</div>
+
+              <div style="width:100%; border-top:1px solid rgba(255,255,255,0.06); padding-top:14px;">
+                <sc-if value="{{ primary.showProgress }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:100%;">
+                    <div style="display:flex; align-items:center; gap:7px; margin-bottom:9px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="animation:ecySpin 0.9s linear infinite;"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                      <span style="font-family:var(--font-mono); font-size:11px; color:#00D4FF;">{{ primary.pullStatus }}</span>
+                    </div>
+                    <div style="height:8px; border-radius:9999px; background:rgba(255,255,255,0.08); overflow:hidden;">
+                      <div style="height:100%; width:{{ primary.pullBarPct }}; background:linear-gradient(90deg,#00A8C8,#00D4FF); box-shadow:0 0 12px rgba(0,212,255,0.5); border-radius:9999px; transition:width 130ms linear;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; font-family:var(--font-mono); font-size:10.5px; color:#536882;">
+                      <span>{{ primary.pctLabel }}</span><span>{{ primary.pullMeta }}</span>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ primary.showReady }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:100%; display:flex; flex-direction:column; gap:9px;">
+                    <sc-if value="{{ primary.isLoaded }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; align-items:center; justify-content:center; gap:7px; background:rgba(0,200,150,0.10); border:1px solid rgba(0,200,150,0.3); border-radius:10px; padding:11px; color:#00C896; font-family:var(--font-display); font-size:13px; font-weight:600;">
+                        <span style="width:7px; height:7px; border-radius:50%; background:#00C896; box-shadow:0 0 8px #00C896;"></span> Active in workspace
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ primary.notLoaded }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ primary.load }}" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:#00D4FF; color:#050A14; border:none; border-radius:10px; padding:11px 16px; font-family:var(--font-display); font-size:13.5px; font-weight:600; cursor:pointer; box-shadow:0 0 18px rgba(0,212,255,0.28); transition:all 150ms;" style-hover="filter:brightness(1.08)" style-active="transform:scale(0.98)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                        Load into workspace
+                      </button>
+                    </sc-if>
+                    <div style="display:flex; gap:8px;">
+                      <button style="flex:1; background:transparent; color:#8A9BB0; border:1px solid rgba(255,255,255,0.10); border-radius:9px; padding:8px; font-family:var(--font-display); font-size:12px; font-weight:500; cursor:pointer; transition:all 150ms;" style-hover="border-color:rgba(0,212,255,0.4); color:#00D4FF">Open in chat</button>
+                      <button onClick="{{ primary.remove }}" title="Remove model" style="background:transparent; color:#536882; border:1px solid rgba(255,255,255,0.10); border-radius:9px; padding:8px 10px; cursor:pointer; transition:all 150ms; display:flex; align-items:center;" style-hover="border-color:rgba(255,71,87,0.4); color:#FF4757">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                      </button>
+                    </div>
+                    <sc-if value="{{ primary.readyWarn }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10px; color:#F5A623;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        exceeds this machine — will page to disk
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ primary.showWont }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:100%; text-align:center;">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:7px; color:#FF4757; margin-bottom:11px;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                      <span style="font-family:var(--font-display); font-size:12px; font-weight:600;">Exceeds usable memory</span>
+                    </div>
+                    <sc-if value="{{ hasFallback }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:11.5px; color:#8A9BB0; margin-bottom:10px;">Tuned pick for {{ hwName }}:</div>
+                      <button onClick="{{ fallbackPull }}" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:#00D4FF; color:#050A14; border:none; border-radius:10px; padding:10px 14px; font-family:var(--font-display); font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:0 0 16px rgba(0,212,255,0.25);" style-hover="filter:brightness(1.08)">
+                        Pull {{ fallbackName }} instead
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                      </button>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ primary.showIdle }}" hint-placeholder-val="{{ true }}">
+                  <div style="width:100%; display:flex; flex-direction:column; gap:8px;">
+                    <button onClick="{{ primary.startPull }}" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:#00D4FF; color:#050A14; border:none; border-radius:10px; padding:12px 16px; font-family:var(--font-display); font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 0 20px rgba(0,212,255,0.3); transition:all 150ms;" style-hover="filter:brightness(1.08)" style-active="transform:scale(0.98)">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                      Pull qwen3:8b
+                    </button>
+                    <div style="font-family:var(--font-mono); font-size:10.5px; color:#536882; text-align:center;">{{ primary.sizeLabel }} · one-time · then $0 forever</div>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── SECTION: ALTERNATIVES ── -->
+        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A9BB0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+          <h4 style="font-size:15px; margin:0; font-weight:600;">Alternatives, scored for this machine</h4>
+          <span style="flex:1; height:1px; background:rgba(255,255,255,0.06);"></span>
+          <span style="font-family:var(--font-mono); font-size:10.5px; color:#536882;">sorted by fit ↓</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+          <sc-for list="{{ alts }}" as="m" hint-placeholder-count="6">
+            <div style="background:rgba(13,27,46,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:11px; opacity:{{ m.cardOpacity }}; transition:border-color 150ms, transform 150ms;" style-hover="border-color:rgba(0,212,255,0.28); transform:translateY(-2px)">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:34px; height:34px; flex:0 0 34px; border-radius:9px; background:rgba(255,255,255,0.04); border:1px solid {{ m.familyColor }}; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:15px; color:{{ m.familyColor }};">{{ m.familyLetter }}</div>
+                <div style="min-width:0; flex:1;">
+                  <div style="font-family:var(--font-mono); font-size:14px; font-weight:600; color:var(--fg-primary);">{{ m.id }}</div>
+                  <div style="font-size:11px; color:#536882; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.roleLabel }}</div>
+                </div>
+                <div style="text-align:right; flex:0 0 auto;">
+                  <div style="font-family:var(--font-display); font-size:21px; font-weight:700; color:{{ m.tierColor }}; line-height:1;">{{ m.fitStr }}</div>
+                  <div style="font-family:var(--font-mono); font-size:9px; color:#536882;">/ 100</div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <x-import component-from-global-scope="Badge" type="{{ m.badgeType }}" hint-size="auto,20px">{{ m.tierLabel }}</x-import>
+                  <span style="font-family:var(--font-mono); font-size:10.5px; color:#8A9BB0;">{{ m.headroomLabel }}</span>
+                </div>
+                <div style="height:5px; border-radius:9999px; background:rgba(255,255,255,0.06); overflow:hidden;">
+                  <div style="height:100%; width:{{ m.barPct }}; background:{{ m.tierColor }}; border-radius:9999px; transition:width 500ms cubic-bezier(0.16,1,0.3,1);"></div>
+                </div>
+              </div>
+
+              <p style="margin:0; font-size:11.5px; line-height:1.5; color:#8A9BB0; min-height:35px;">{{ m.reason }}</p>
+
+              <div style="display:flex; gap:6px; flex-wrap:wrap; font-family:var(--font-mono); font-size:10px; color:#6E859E;">
+                <span style="background:#0D1B2E; border:1px solid rgba(255,255,255,0.06); border-radius:5px; padding:2px 7px;">{{ m.quantLabel }}</span>
+                <span style="background:#0D1B2E; border:1px solid rgba(255,255,255,0.06); border-radius:5px; padding:2px 7px;">{{ m.sizeLabel }}</span>
+                <span style="background:#0D1B2E; border:1px solid rgba(255,255,255,0.06); border-radius:5px; padding:2px 7px;">{{ m.tokLabel }}</span>
+              </div>
+
+              <div style="margin-top:auto;">
+                <sc-if value="{{ m.showProgress }}" hint-placeholder-val="{{ false }}">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:#00D4FF; margin-bottom:5px;"><span>{{ m.pullStageWord }}</span><span>{{ m.pctLabel }}</span></div>
+                    <div style="height:6px; border-radius:9999px; background:rgba(255,255,255,0.08); overflow:hidden;"><div style="height:100%; width:{{ m.pullBarPct }}; background:linear-gradient(90deg,#00A8C8,#00D4FF); box-shadow:0 0 8px rgba(0,212,255,0.5); border-radius:9999px; transition:width 130ms linear;"></div></div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.showInstalled }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 11px; border-radius:8px; background:rgba(0,200,150,0.10); border:1px solid rgba(0,200,150,0.25);">
+                    <span style="display:flex; align-items:center; gap:6px; color:#00C896; font-family:var(--font-display); font-size:12px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Installed</span>
+                    <button onClick="{{ m.remove }}" title="Remove" style="background:transparent; border:none; color:#536882; cursor:pointer; display:flex; padding:2px;" style-hover="color:#FF4757"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.showPull }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ m.startPull }}" style="width:100%; display:flex; align-items:center; justify-content:center; gap:7px; background:rgba(0,212,255,0.10); color:#00D4FF; border:1px solid rgba(0,212,255,0.25); border-radius:8px; padding:8px; font-family:var(--font-display); font-size:12.5px; font-weight:600; cursor:pointer; transition:all 150ms;" style-hover="background:rgba(0,212,255,0.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Pull · {{ m.sizeLabel }}</button>
+                </sc-if>
+                <sc-if value="{{ m.showWont }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:100%; display:flex; align-items:center; justify-content:center; gap:7px; background:rgba(255,71,87,0.06); color:#FF4757; border:1px solid rgba(255,71,87,0.2); border-radius:8px; padding:8px; font-family:var(--font-display); font-size:11.5px; font-weight:600;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> {{ m.headroomLabel }}</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- ── REVENUE HOOK ── -->
+        <sc-if value="{{ showHook }}" hint-placeholder-val="{{ true }}">
+          <section style="margin-top:6px; border-radius:16px; overflow:hidden; border:1px solid rgba(0,212,255,0.2); background:radial-gradient(120% 150% at 0% 0%, rgba(0,212,255,0.13), transparent 55%), radial-gradient(120% 150% at 100% 100%, rgba(123,94,167,0.18), transparent 55%), #0D1B2E;">
+            <div style="display:grid; grid-template-columns:1.15fr 1fr;">
+              <div style="padding:24px 26px; border-right:1px solid rgba(255,255,255,0.06);">
+                <span class="eyebrow" style="color:#00C896;">Cost · this workspace</span>
+                <div style="display:flex; align-items:flex-end; gap:16px; margin-top:14px;">
+                  <div>
+                    <div style="font-family:var(--font-display); font-size:46px; font-weight:700; color:#00C896; line-height:0.9;">$0<span style="font-size:22px;">.00</span></div>
+                    <div style="font-family:var(--font-mono); font-size:11px; color:#536882; margin-top:6px;">local · per month</div>
+                  </div>
+                  <div style="font-family:var(--font-mono); font-size:20px; color:#3A4F66; padding-bottom:8px;">vs</div>
+                  <div style="padding-bottom:2px;">
+                    <div style="font-family:var(--font-display); font-size:30px; font-weight:600; color:#8A9BB0; line-height:0.9; text-decoration:line-through; text-decoration-color:rgba(255,71,87,0.65);">{{ revCloud }}</div>
+                    <div style="font-family:var(--font-mono); font-size:11px; color:#536882; margin-top:8px;">same {{ revTokens }} tokens on a hosted 8B API</div>
+                  </div>
+                </div>
+                <p style="margin:16px 0 0; font-size:12.5px; line-height:1.55; color:#B0BFCF; max-width:46ch;">Every token runs on your {{ hwName }}. Nothing metered, nothing leaves the device — your baseline stays <strong style="color:#00C896;">$0 forever</strong>. That's <strong style="color:var(--fg-primary);">{{ revYear }}/yr</strong> that never hits a bill.</p>
+              </div>
+              <div style="padding:24px 26px; display:flex; flex-direction:column; justify-content:center; gap:12px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D4FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
+                  <h4 style="margin:0; font-size:16px;">Outgrow your hardware?</h4>
+                </div>
+                <p style="margin:0; font-size:12.5px; line-height:1.55; color:#8A9BB0;">eCy Cloud bursts to 70B+ and 200K-context models when a job is too big for local — billed only for the overflow. Your $0 local baseline stays the default.</p>
+                <div style="display:flex; gap:10px; margin-top:4px;">
+                  <x-import component-from-global-scope="Btn" variant="primary" size="md" hint-size="auto,40px">Explore eCy Cloud →</x-import>
+                  <x-import component-from-global-scope="Btn" variant="ghost" size="md" hint-size="auto,40px">Stay local, $0</x-import>
+                </div>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1440, &quot;height&quot;: 940 },
+  &quot;defaultMachine&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;m3pro&quot;, &quot;rtx4090&quot;, &quot;m1air&quot;, &quot;ryzen&quot;], &quot;default&quot;: &quot;m3pro&quot;, &quot;tsType&quot;: &quot;'m3pro' | 'rtx4090' | 'm1air' | 'ryzen'&quot;, &quot;section&quot;: &quot;Hardware&quot; },
+  &quot;primaryInstalled&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;State&quot; },
+  &quot;showRevenueHook&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Sections&quot; }
+}">
+class Component extends DCLogic {
+  state = { machine: null, installed: null, pull: {}, detecting: false, loaded: null };
+
+  machines = {
+    m3pro:   { short: 'M3 Pro',   label: 'Apple M3 Pro',   sub: '14-inch MacBook Pro', mem: 36, usable: 26,  bw: 150,  accel: 'Metal', accelLabel: 'Metal · 18-core GPU',   memType: 'Unified LPDDR5',  cpu: 'M3 Pro · 12-core',   cpuCore: 12 },
+    rtx4090: { short: 'RTX 4090', label: 'GeForce RTX 4090', sub: 'Desktop workstation', mem: 64, usable: 24,  bw: 1008, accel: 'CUDA',  accelLabel: 'CUDA · 24GB VRAM',      memType: 'GDDR6X VRAM',     cpu: 'i9-14900K · 24-core', cpuCore: 24 },
+    m1air:   { short: 'M1 Air',   label: 'MacBook Air M1',  sub: '8GB · fanless',      mem: 8,  usable: 5.5, bw: 68,   accel: 'Metal', accelLabel: 'Metal · 7-core GPU',    memType: 'Unified LPDDR4X', cpu: 'M1 · 8-core',        cpuCore: 8 },
+    ryzen:   { short: 'Ryzen 7',  label: 'Ryzen 7 7840U',   sub: 'CPU inference',      mem: 32, usable: 20,  bw: 64,   accel: 'CPU',   accelLabel: 'CPU only · iGPU idle',  memType: 'DDR5-5600',       cpu: 'Ryzen 7 · 8-core',   cpuCore: 8 },
+  };
+
+  models = [
+    { id: 'qwen3:8b',         family: 'Qwen3',        letter: 'Q', color: '#00D4FF', role: 'General reasoning + tool use',   params: 8.2,  size: 5.2,  footprint: 6.6,  quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 4.5,  layers: '33/33' },
+    { id: 'qwen3:4b',         family: 'Qwen3',        letter: 'Q', color: '#00D4FF', role: 'Fast drafts, routing, autocomplete', params: 4.0, size: 2.6, footprint: 3.6, quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 3.8, layers: '37/37' },
+    { id: 'qwen3:14b',        family: 'Qwen3',        letter: 'Q', color: '#00D4FF', role: 'Deeper reasoning, long context', params: 14.8, size: 9.3,  footprint: 11.0, quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 4.7,  layers: '41/41' },
+    { id: 'qwen3:32b',        family: 'Qwen3',        letter: 'Q', color: '#00D4FF', role: 'Frontier-class, near-cloud quality', params: 32.8, size: 20.0, footprint: 22.5, quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 5.0, layers: '65/65' },
+    { id: 'llama3.1:8b',      family: 'Llama 3.1',    letter: 'L', color: '#9B80CC', role: 'Broad ecosystem + fine-tunes',   params: 8.0,  size: 4.9,  footprint: 6.3,  quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 4.1,  layers: '33/33' },
+    { id: 'deepseek-r1:8b',   family: 'DeepSeek R1',  letter: 'D', color: '#00C896', role: 'Explicit chain-of-thought',      params: 8.0,  size: 5.2,  footprint: 6.8,  quant: 'Q4_K_M', ctx: 32, ctxMax: 64,  quality: 4.35, layers: '33/33' },
+    { id: 'qwen2.5-coder:7b', family: 'Qwen2.5',      letter: 'Q', color: '#00D4FF', role: 'Code completion + repo edits',   params: 7.6,  size: 4.7,  footprint: 6.1,  quant: 'Q4_K_M', ctx: 32, ctxMax: 128, quality: 4.2,  layers: '29/29' },
+  ];
+
+  componentDidMount() {
+    this._timers = {};
+    const P = this.props || {};
+    const seed = P.primaryInstalled ? ['qwen3:8b'] : [];
+    let installed = seed;
+    try { const raw = localStorage.getItem('ecy_cookbook_installed_v2'); if (raw) installed = JSON.parse(raw); } catch (e) {}
+    this.setState({ installed, detecting: true });
+    this._t0 = setTimeout(() => this.setState({ detecting: false }), 750);
+  }
+  componentWillUnmount() {
+    clearTimeout(this._t0); clearTimeout(this._t1); clearTimeout(this._tf);
+    Object.values(this._timers || {}).forEach(clearInterval);
+  }
+
+  score(m, hw) {
+    const usable = hw.usable;
+    const headroom = usable - m.footprint;
+    const fits = headroom >= 0;
+    const eff = hw.accel === 'CPU' ? 0.45 : 0.85;
+    let tok = (hw.bw / m.footprint) * eff;
+    if (!fits) tok *= 0.35;
+    tok = Math.max(0.4, tok);
+    let mem;
+    if (fits) mem = Math.min(100, 70 + (headroom / usable) * 45);
+    else mem = Math.max(3, Math.min(55, 45 + headroom * 7));
+    const speed = Math.max(0, Math.min(100, (tok / 25) * 100));
+    const qual = (m.quality / 5) * 100;
+    let fit = mem * 0.40 + speed * 0.15 + qual * 0.45;
+    if (!fits) fit = Math.min(fit, mem);
+    fit = Math.round(Math.max(3, Math.min(99, fit)));
+    const tier = !fits ? 'wont' : fit >= 85 ? 'excellent' : fit >= 72 ? 'good' : 'tight';
+    return { fit, tier, tok, headroom, fits };
+  }
+
+  reason(m, hw, sc) {
+    const t = sc.tok >= 10 ? Math.round(sc.tok) : sc.tok.toFixed(1);
+    if (!sc.fits) {
+      const short = (m.footprint - hw.usable);
+      return `Needs ~${m.footprint} GB, but only ${hw.usable} GB is free — ${short.toFixed(1)} GB short. Would page to disk and crawl.`;
+    }
+    const w = sc.tok >= 45 ? 'very fast' : sc.tok >= 22 ? 'snappy' : sc.tok >= 11 ? 'comfortable' : sc.tok >= 5 ? 'usable' : 'slow but works';
+    return `Fits with ${sc.headroom.toFixed(1)} GB to spare · ~${t} tok/s on ${hw.short} — ${w} for interactive work.`;
+  }
+
+  whyPrimary(m, hw, sc) {
+    if (!sc.fits) {
+      return `qwen3:8b needs about ${m.footprint} GB and ${hw.short} only frees ${hw.usable} GB — it would swap to disk. On this machine the tuned pick is qwen3:4b: same family, built to fit and stay responsive.`;
+    }
+    const t = sc.tok >= 10 ? Math.round(sc.tok) : sc.tok.toFixed(1);
+    return `The efficient-yet-correct pick for ${hw.short}. Large enough to run tools, code, and multi-step reasoning correctly — small enough to stay responsive at ~${t} tok/s and leave ${sc.headroom.toFixed(0)} GB of headroom for long context. 100% on-device: no data leaves the machine, $0 per token.`;
+  }
+
+  pullStatus(p, m) {
+    if (p.stage === 'manifest') return 'pulling manifest';
+    if (p.stage === 'pulling') return 'pulling ' + m.id;
+    if (p.stage === 'verify') return 'verifying sha256 digest';
+    if (p.stage === 'writing') return 'writing manifest';
+    return 'success';
+  }
+  pullMeta(p) {
+    if (p.stage === 'pulling') return (p.mb / 1024).toFixed(1) + ' / ' + (p.totalMB / 1024).toFixed(1) + ' GB · ' + p.speed + ' MB/s';
+    if (p.stage === 'manifest') return 'resolving';
+    if (p.stage === 'done') return 'ready';
+    return Math.round(p.pct) + '%';
+  }
+
+  setMachine(id) {
+    this.setState({ machine: id, detecting: true });
+    clearTimeout(this._t1);
+    this._t1 = setTimeout(() => this.setState({ detecting: false }), 550);
+  }
+  redetect() {
+    this.setState({ detecting: true });
+    clearTimeout(this._t1);
+    this._t1 = setTimeout(() => this.setState({ detecting: false }), 750);
+  }
+
+  startPull(id) {
+    if (!this._timers) this._timers = {};
+    if (this.state.pull[id]) return;
+    const m = this.models.find(x => x.id === id);
+    if (!m) return;
+    const totalMB = Math.round(m.size * 1024);
+    this.setState(s => ({ pull: { ...s.pull, [id]: { pct: 0, stage: 'manifest', mb: 0, totalMB, speed: 0 } } }));
+    let pct = 0;
+    this._timers[id] = setInterval(() => {
+      const inc = pct < 8 ? 4.5 : pct < 86 ? (2.4 + Math.random() * 3.4) : pct < 94 ? 2.6 : 1.8;
+      pct = Math.min(100, pct + inc);
+      const stage = pct < 8 ? 'manifest' : pct < 86 ? 'pulling' : pct < 94 ? 'verify' : pct < 100 ? 'writing' : 'done';
+      const mb = Math.round((pct / 100) * totalMB);
+      const speed = stage === 'pulling' ? (30 + Math.round(Math.random() * 52)) : 0;
+      this.setState(s => (s.pull[id] ? { pull: { ...s.pull, [id]: { pct, stage, mb, totalMB, speed } } } : null));
+      if (pct >= 100) {
+        clearInterval(this._timers[id]);
+        delete this._timers[id];
+        this._tf = setTimeout(() => this.finishPull(id), 480);
+      }
+    }, 130);
+  }
+  finishPull(id) {
+    this.setState(s => {
+      const pull = { ...s.pull }; delete pull[id];
+      const cur = s.installed || [];
+      const installed = cur.includes(id) ? cur : [...cur, id];
+      try { localStorage.setItem('ecy_cookbook_installed_v2', JSON.stringify(installed)); } catch (e) {}
+      return { pull, installed };
+    });
+  }
+  removeModel(id) {
+    this.setState(s => {
+      const installed = (s.installed || []).filter(x => x !== id);
+      try { localStorage.setItem('ecy_cookbook_installed_v2', JSON.stringify(installed)); } catch (e) {}
+      const loaded = s.loaded === id ? null : s.loaded;
+      return { installed, loaded };
+    });
+  }
+
+  renderVals() {
+    const P = this.props || {};
+    const machine = this.state.machine || P.defaultMachine || 'm3pro';
+    const hw = this.machines[machine] || this.machines.m3pro;
+    const installed = this.state.installed || (P.primaryInstalled ? ['qwen3:8b'] : []);
+    const pulls = this.state.pull || {};
+    const loaded = this.state.loaded;
+    const showHook = P.showRevenueHook !== false;
+    const detecting = !!this.state.detecting;
+
+    const tierMap = {
+      excellent: { label: 'Excellent fit', color: '#00D4FF', badge: 'info' },
+      good:      { label: 'Good fit',      color: '#00C896', badge: 'live' },
+      tight:     { label: 'Tight fit',     color: '#F5A623', badge: 'building' },
+      wont:      { label: "Won't fit",     color: '#FF4757', badge: 'failed' },
+    };
+
+    const dec = (m) => {
+      const sc = this.score(m, hw);
+      const tm = tierMap[sc.tier];
+      const isInstalled = installed.includes(m.id);
+      const p = pulls[m.id] || null;
+      const isPulling = !!p;
+      const tokDisp = sc.tok >= 100 ? '100+' : sc.tok >= 10 ? String(Math.round(sc.tok)) : sc.tok.toFixed(1);
+      const isLoaded = loaded === m.id;
+      return {
+        ...m,
+        fit: sc.fit, fitStr: String(sc.fit), barPct: sc.fit + '%', fits: sc.fits,
+        tierLabel: tm.label, tierColor: tm.color, badgeType: tm.badge,
+        tokLabel: '~' + tokDisp + ' tok/s',
+        sizeLabel: (m.size % 1 ? m.size.toFixed(1) : String(m.size)) + ' GB',
+        ctxLabel: m.ctx + 'K', ctxMaxLabel: m.ctxMax + 'K',
+        quantLabel: m.quant, paramsLabel: m.params + 'B',
+        offloadLabel: hw.accel === 'CPU' ? (hw.cpuCore + '-thread CPU') : ('GPU ' + m.layers + ' layers'),
+        roleLabel: m.role, familyLetter: m.letter, familyColor: m.color,
+        headroomLabel: sc.fits ? ('+' + sc.headroom.toFixed(1) + ' GB free') : ((m.footprint - hw.usable).toFixed(1) + ' GB short'),
+        reason: this.reason(m, hw, sc),
+        why: this.whyPrimary(m, hw, sc),
+        ringOffset: (251.3 * (1 - sc.fit / 100)).toFixed(1),
+        isInstalled, isPulling, isLoaded,
+        // primary hero states
+        showProgress: isPulling,
+        showReady: !isPulling && isInstalled,
+        showWont: !isPulling && !isInstalled && sc.tier === 'wont',
+        showIdle: !isPulling && !isInstalled && sc.tier !== 'wont',
+        readyWarn: isInstalled && !sc.fits,
+        notLoaded: !isLoaded,
+        // alt card states
+        showInstalled: isInstalled && !isPulling,
+        showPull: !isInstalled && !isPulling && sc.fits,
+        showWontAlt: !isInstalled && !isPulling && !sc.fits,
+        cardOpacity: (!sc.fits && !isInstalled) ? '0.6' : '1',
+        // pull display
+        pctLabel: p ? Math.round(p.pct) + '%' : '',
+        pullBarPct: p ? p.pct + '%' : '0%',
+        pullStatus: p ? this.pullStatus(p, m) : '',
+        pullMeta: p ? this.pullMeta(p) : '',
+        pullStageWord: p ? ({ manifest: 'manifest', pulling: 'pulling', verify: 'verifying', writing: 'writing', done: 'done' }[p.stage]) : '',
+        startPull: () => this.startPull(m.id),
+        remove: () => this.removeModel(m.id),
+        load: () => this.setState({ loaded: m.id }),
+      };
+    };
+
+    const scored = this.models.map(dec);
+    const primary = scored.find(x => x.id === 'qwen3:8b');
+    const alts = scored.filter(x => x.id !== 'qwen3:8b').sort((a, b) => b.fit - a.fit).map(x => ({ ...x, showWont: x.showWontAlt }));
+    const fallback = alts.filter(x => x.fits).sort((a, b) => b.fit - a.fit)[0] || null;
+
+    const machineList = Object.keys(this.machines).map(k => {
+      const active = k === machine;
+      return {
+        id: k, short: this.machines[k].short, active,
+        bg: active ? '#00D4FF' : 'transparent',
+        color: active ? '#050A14' : '#8A9BB0',
+        border: active ? '#00D4FF' : 'rgba(255,255,255,0.10)',
+        select: () => this.setMachine(k),
+      };
+    });
+
+    return {
+      detecting, showHook,
+      hwName: hw.label, hwSub: hw.sub,
+      memLabel: String(hw.mem), usableLabel: (hw.usable % 1 ? hw.usable.toFixed(1) : String(hw.usable)),
+      memType: hw.memType, bwLabel: String(hw.bw), accelLabel: hw.accelLabel,
+      cpuCoreLabel: String(hw.cpuCore), cpuLabel: hw.cpu,
+      machineList, primary, alts,
+      hasFallback: !!fallback, fallbackName: fallback ? fallback.id : '',
+      fallbackPull: fallback ? () => this.startPull(fallback.id) : (() => {}),
+      redetect: () => this.redetect(),
+      revTokens: '128.4M', revCloud: '$70.62', revYear: '$847',
+    };
+  }
+}
+</script>
+</body>
+</html>
