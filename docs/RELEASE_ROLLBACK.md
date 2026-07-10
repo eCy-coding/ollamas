@@ -8,13 +8,16 @@ shipped version breaks users and a forward fix cannot land fast enough.
 so already-installed clients keep working while new installs stop landing on the bad build.
 Every step ends with a **verify** so you have evidence the rollback took effect.
 
-Fill in the placeholders before running:
+Fill in the placeholders before running (values verified in the 2026-07-10 dry drill):
 
-- `BAD` — the broken version being rolled back (e.g. `1.31.0`).
-- `GOOD` — the last known-good version to fall back to (e.g. `1.30.4`).
-- `PKG` — the npm package name (e.g. `ollamas`).
-- `TAP` — the Homebrew tap/formula (e.g. `ollamas/tap/ollamas`).
-- `REPO` — the GitHub `owner/name` that hosts the releases.
+- `BAD` — the broken version being rolled back (e.g. `1.24.0`).
+- `GOOD` — the last known-good version to fall back to (e.g. `1.23.0` — the current
+  `Latest` GitHub release at drill time).
+- `PKG` — the npm package name: `ollamas`. **Note:** not yet published to npm (registry
+  returns 404), so section 2 stays drill-only until the first `npm publish`.
+- `TAP` — the Homebrew tap/formula (e.g. `ollamas/tap/ollamas`; no tap published yet —
+  drill-only until it exists).
+- `REPO` — the GitHub `owner/name` that hosts the releases: `eCy-coding/ollamas`.
 
 ---
 
@@ -30,8 +33,10 @@ Before touching any channel, stop the bleeding and record the decision.
 4. Capture the current state for the post-mortem:
    ```sh
    npm view "$PKG" dist-tags --json
-   gh release view "v$BAD" -R "$REPO" --json tagName,assets,isLatest
+   gh release view "v$BAD" -R "$REPO" --json tagName,assets,isPrerelease
    ```
+   (`isLatest` is not a `gh release view` field — use `gh release list` to see which
+   release carries the `Latest` marker.)
 
 **Verify:** the pipeline is quiet (no running release workflow) and `GOOD` is identified.
 
@@ -46,6 +51,10 @@ gh run list -R "$REPO" --workflow=release-binary.yml --limit 5
 Prefer **deprecate** (non-destructive, keeps the version resolvable) over `unpublish`.
 Unpublish is only allowed within 72h and breaks anyone pinned to `BAD` — avoid unless legally
 required.
+
+> **Tatbikat-only (2026-07-10):** `PKG` is not on the registry yet (`npm view ollamas
+> dist-tags --json` → E404), so steps 1–3 and the verify block cannot run until first publish.
+> Dry part verified: `npm pack --dry-run` → exit 0 (5.5 MB tarball, 4794 files).
 
 1. Deprecate the bad version with a message pointing at `GOOD`:
    ```sh
@@ -73,6 +82,10 @@ npm view "$PKG@$BAD" deprecated    # prints the deprecation message
 
 The tap formula points at a specific version + URL + sha256. Roll it back to `GOOD`.
 
+> **Tatbikat-only (2026-07-10):** no tap is published yet, so the `brew` verify block cannot
+> run. The revert flow itself was drilled in a sandbox tap repo: `git revert --no-edit
+> <bump-sha>` → exit 0, formula `version`/`url`/`sha256` restored to `GOOD` (1.31.0 → 1.30.4).
+
 1. In the tap repo, revert the formula bump commit that introduced `BAD`:
    ```sh
    git -C "<tap-checkout>" revert --no-edit <formula-bump-sha>
@@ -99,6 +112,10 @@ The `release-binary.yml` workflow publishes per-arch binaries, `.sha256`, `.mini
 signatures, and a `latest.json` manifest that `ollamas update` consumes. Rolling back the
 **manifest that `latest.json` advertises** is what actually moves clients off `BAD`.
 
+> **Tatbikat-only (2026-07-10):** `gh release edit/download` against the real `REPO` is an
+> outward step (no rollback was actually needed). Manifest re-point was drilled in a sandbox
+> repo with `v1.30.4`/`v1.31.0` tags: after revert, `jq .version latest.json` → `"1.30.4"`.
+
 1. Mark the bad release so it stops being served as newest:
    ```sh
    gh release edit "v$BAD" -R "$REPO" --prerelease --latest=false
@@ -119,7 +136,7 @@ signatures, and a `latest.json` manifest that `ollamas update` consumes. Rolling
 **Verify:**
 
 ```sh
-gh release view -R "$REPO" --json tagName,isLatest      # latest → v$GOOD
+gh release list -R "$REPO" --limit 5                    # `Latest` marker → v$GOOD
 gh release download "v$GOOD" -R "$REPO" -p latest.json -O - | jq .version   # == $GOOD
 # End-to-end: a client update lands on GOOD and verifies its signature
 ollamas update --manifest "https://github.com/$REPO/releases/download/v$GOOD/latest.json"
@@ -138,6 +155,8 @@ A rollback is not done until a clean-room install of each channel lands on `GOOD
       verifies (bad signature must abort the update).
 - [ ] The always-running server survives the downgrade — run `ops/launchd/verify.sh` to confirm
       the launchd agent respawns and `/api/health` returns 200 after the rollback.
+      *(Drilled 2026-07-10: `RESPAWN OK (label=com.ollamas.server old_pid=10865 new_pid=41137
+      health=200)`, exit 0.)*
 - [ ] Status page / issue updated: rollback complete, `GOOD` is the safe version.
 
 Only after all boxes are checked, unfreeze the pipeline and open the forward-fix tracking issue

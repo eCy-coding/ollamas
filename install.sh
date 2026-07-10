@@ -40,15 +40,39 @@ if ! command -v docker &>/dev/null; then
   exit 0
 fi
 
-# 2. Compile Docker compose stack
+# 2. Ensure .env exists (compose `env_file: .env` requires it) and carries a stable
+#    vault master key: keyless cloud/container boots FAIL CLOSED (server/db.ts, M-020),
+#    so the installer mints one stable MASTER_KEY_B64 up front instead of letting the
+#    container refuse to boot.
+if [ ! -f .env ]; then
+  if [ "$DRY_RUN" = "1" ]; then
+    printf '\033[35m[DRY]\033[0m would create .env (from .env.example when present)\n'
+  else
+    echo "[+] Creating .env (from .env.example when present)..."
+    if [ -f .env.example ]; then cp .env.example .env; else : > .env; fi
+    chmod 600 .env
+  fi
+fi
+if [ "$DRY_RUN" = "1" ]; then
+  printf '\033[35m[DRY]\033[0m would append a generated MASTER_KEY_B64 to .env when missing\n'
+elif ! grep -q '^MASTER_KEY_B64=' .env; then
+  echo "[+] Generating stable vault master key (MASTER_KEY_B64) into .env..."
+  {
+    printf '\n# Stable 32-byte vault master key (base64). Container boots fail closed without it\n'
+    printf '# (server/db.ts M-020): an ephemeral minted key would orphan secrets on recreate.\n'
+    printf 'MASTER_KEY_B64=%s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+  } >>.env
+fi
+
+# 3. Compile Docker compose stack
 echo "[+] Docker verified on system. Starting building processes..."
 run docker compose build
 
-# 3. Mount and spin daemon container
+# 4. Mount and spin daemon container
 echo "[+] Spin up container service..."
 run docker compose up -d
 
-# 4. Verify container is active and responding
+# 5. Verify container is active and responding
 if [ "$DRY_RUN" = "1" ]; then
   echo "[DRY] would verify health on http://localhost:3000/api/health; skipping (no container started)."
   exit 0
@@ -83,7 +107,7 @@ if [ "$SERVER_READY" = false ]; then
   exit 1
 fi
 
-# 5. Host terminal-bridge as a reboot-durable LaunchAgent (macOS, v16). Host-side
+# 6. Host terminal-bridge as a reboot-durable LaunchAgent (macOS, v16). Host-side
 #    concern, independent of the docker app; idempotent + DRY-aware.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if command -v launchctl >/dev/null 2>&1; then

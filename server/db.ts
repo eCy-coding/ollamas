@@ -119,7 +119,8 @@ const DEFAULT_CONFIG: DBConfig = {
 // Master-key source decision (pure → unit-tested). Priority: an injected env key (the stable
 // Cloud-Run/Docker secret-mount path) wins; else an existing on-disk key file; else — if an
 // encrypted store ALREADY exists — FAIL CLOSED rather than mint a key that can't decrypt it;
-// else (truly fresh) mint a new one. This is what prevents a silent secret-wipe on restart.
+// else (truly fresh): mint a new one LOCALLY, but on cloud/container boots FAIL CLOSED too
+// (M-020 — an ephemeral minted key dies with the replica and orphans every secret).
 export type MasterKeyDecision =
   | { source: "env"; key: Buffer }
   | { source: "keychain"; key: Buffer }
@@ -137,6 +138,9 @@ export function decideMasterKeySource(o: {
   keychainKey?: Buffer;
   keyFileExists: boolean;
   configExists: boolean;
+  /** Cloud/container context (M-020): minting is forbidden — a fresh random key dies with the
+   *  replica and orphans every secret encrypted under it, so a keyless cloud boot FAILS CLOSED. */
+  isCloud?: boolean;
 }): MasterKeyDecision {
   if (o.envB64) {
     const key = Buffer.from(o.envB64, "base64");
@@ -147,6 +151,9 @@ export function decideMasterKeySource(o: {
   if (o.keyFileExists) return { source: "file" };
   if (o.configExists) {
     return { source: "fail", reason: "encrypted store exists but no master key — set MASTER_KEY_B64 (the original 32-byte key, base64) to decrypt it" };
+  }
+  if (o.isCloud) {
+    return { source: "fail", reason: "cloud/container boot without a master key — refusing to mint an ephemeral key that would orphan all secrets on restart/replica; set MASTER_KEY_B64 (base64 of a stable 32-byte key)" };
   }
   return { source: "mint" };
 }
@@ -243,6 +250,7 @@ export class SecureDB {
       keychainKey,
       keyFileExists: fs.existsSync(keyPath),
       configExists: fs.existsSync(this.filePath),
+      isCloud: !!isCloud,
     });
     switch (decision.source) {
       case "env":
@@ -255,10 +263,10 @@ export class SecureDB {
         this.masterKey = fs.readFileSync(keyPath);
         break;
       case "mint": {
+        // Local-only path: cloud boots never reach here (keyless cloud → "fail", M-020).
         const newKey = crypto.randomBytes(32);
         atomicWriteFileSync(keyPath, newKey, { mode: 0o600 });
         this.masterKey = newKey;
-        if (isCloud) console.warn("[db] minted ephemeral master key — set MASTER_KEY_B64 to persist secrets across restarts/replicas");
         break;
       }
       case "fail":

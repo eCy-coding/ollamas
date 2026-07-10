@@ -43,4 +43,4 @@ Local LLM calls are single-GPU: **sequence them, don't parallelize** (parallel s
 - This tab's live identity (CLI lane): `CLAUDE.md` (auto-loaded; `npx tsx cli/lib/role.ts` for live status)
 
 ## Boundaries (carried)
-Token NAMES ok to log, VALUES never · root cause before symptom · evidence over assertion (run it, show stdout) · no `--no-verify` · `npm run verify` green before commit.
+Token NAMES ok to log, VALUES never · root cause before symptom · evidence over assertion (run it, show stdout) · no `--no-verify` · `npm run lint && npm run test` green before commit.

@@ -24,9 +24,9 @@ Tam 60-saniye yol + slash komutlar (`/ready /agent /ops /verify /ship`): **[QUIC
 
 ## Platform
 
-macOS (Apple Silicon / ARM64) için optimize; Docker ile Linux/çok-platform desteği (bkz.
-[`docs/`](docs/) deploy kılavuzları). Tek-GPU gerçeği: yerel LLM çağrılarını **sıralı** işle
-(paralel ~3× yavaş serialize eder).
+macOS (Apple Silicon / ARM64) için optimize; Docker ile Linux/çok-platform desteği — yol seçimi
+(local / Docker / compose / Helm / k8s) + güncelleme akışı: **[docs/deploy-guide.md](docs/deploy-guide.md)**.
+Tek-GPU gerçeği: yerel LLM çağrılarını **sıralı** işle (paralel ~3× yavaş serialize eder).
 
 ## Katkı
 
@@ -137,4 +137,4 @@ npm run lint && npm run test    # tsc --noEmit + full vitest suite (PBVC gate)
 npm run test:e2e                # playwright (React lane)
 npm run doctor                  # node/ollama/bridge/app health derin audit
 ```
-Sınırlar: token İSİMLERİ loglanabilir, DEĞERLERİ asla · kök-neden önce · `npm run verify` yeşil olmadan commit yok.
+Sınırlar: token İSİMLERİ loglanabilir, DEĞERLERİ asla · kök-neden önce · `npm run lint && npm run test` yeşil olmadan commit yok.
