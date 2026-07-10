@@ -68,6 +68,11 @@ const LOCAL_OWNER_ROUTES: Array<[string, string]> = [
   ["/api/revenue/checkout", "post"],
   ["/api/revenue/config", "get"],
   ["/api/revenue/config", "post"],
+  // batch5 — owner workspace filesystem
+  ["/api/workspace/tree", "get"],
+  ["/api/workspace/file", "get"],
+  ["/api/workspace/file", "post"],
+  ["/api/workspace/file", "delete"],
 ];
 // v1.29.4 — newly documented tenant-authenticated routes (ApiKey + 401 contract).
 const TENANT_AUTH_ROUTES: Array<[string, string]> = [

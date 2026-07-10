@@ -114,6 +114,14 @@ export const openApiSpec = swaggerJsdoc({
       },
       "/api/saas/catalog": { get: { tags: ["SaaS"], summary: "MCP upstream catalog decorated with this tenant's installed servers", security: [{ ApiKey: [] }], responses: { "200": { description: "Catalog entries", content: { "application/json": { schema: { type: "array", items: { type: "object" } } } } }, "401": { description: "Missing/invalid credential (WWW-Authenticate)" } } } },
       "/api/saas/usage": { get: { tags: ["SaaS"], summary: "This tenant's current-month usage summary (plan/quota/used)", security: [{ ApiKey: [] }], responses: { "200": { description: "Usage summary", content: { "application/json": { schema: { type: "object", properties: { tenantId: { type: "string" }, plan: { type: "string" }, monthlyQuota: { type: "number" }, used: { type: "number" } } } } } }, "401": { description: "Missing/invalid credential (WWW-Authenticate)" } } } },
+
+      // v1.29.4 batch5 — owner workspace filesystem (local-owner; path-confined by resolveSafePath).
+      "/api/workspace/tree": { get: { tags: ["Workspace"], summary: "Workspace file tree for the selected workspace path (+ current mode)", responses: { "200": { description: "Tree + mode", ...jsonObj }, "500": { description: "tree read failure" } } } },
+      "/api/workspace/file": {
+        get: { tags: ["Workspace"], summary: "Read a workspace file's text content", parameters: [{ name: "relativePath", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "{ content }", content: { "application/json": { schema: { type: "object", properties: { content: { type: "string" } } } } } }, "400": { description: "relativePath query parameter required" }, "500": { description: "read failure" } } },
+        post: { tags: ["Workspace"], summary: "Write text content to a workspace file", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["relativePath", "content"], properties: { relativePath: { type: "string" }, content: { type: "string" } } } } } }, responses: { "200": { description: "{ success: true }", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" } } } } } }, "400": { description: "relativePath + content (strings) required" }, "500": { description: "write failure" } } },
+        delete: { tags: ["Workspace"], summary: "Delete a workspace file", parameters: [{ name: "relativePath", in: "query", required: true, schema: { type: "string" } }], responses: { "200": { description: "{ success: true }", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" } } } } } }, "400": { description: "relativePath query parameter required" }, "500": { description: "delete failure" } } },
+      },
     },
   },
   apis: ["./server.ts", "./server/**/*.ts"],
