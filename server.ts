@@ -4,7 +4,7 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import path from "path";
 import { register as metricsRegister, httpDuration, recordToolMetric, registerStoreMetrics, shutdownTotal, unhandledRejectionTotal, ukpStageEventsTotal } from "./server/metrics";
-import { installProcessGuards } from "./server/process-guards";
+import { errorTrackingMiddleware, installProcessErrorHooks } from "./server/error-tracking";
 import { selftestProbePlan } from "./server/selftest-plan";
 import { searchGitHub } from "./server/github-search";
 import { runStandard, type Category } from "./server/github-search-standard";
@@ -881,6 +881,14 @@ export function createAdminGuard(): express.RequestHandler {
     next();
   };
 }
+
+// Central error tracking (M-049): 4-arg error middleware AFTER the top-level routes so any
+// thrown/`next(err)` route error becomes a structured 500 + ring-buffer/aggregation entry +
+// ollamas_errors_total{kind="route"} metric. Routes registered later (inside initializeServer)
+// sit AFTER this layer in the Express stack, so the same middleware is registered a second
+// time at the end of initializeServer to cover them. No new public route is added — the
+// aggregation surfaces through the existing GET /metrics output and getErrorStats().
+app.use(errorTrackingMiddleware);
 
 // Dynamic start wrapper
 async function initializeServer() {
@@ -3179,6 +3187,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     });
   }
 
+  // Second registration of the central error middleware (M-049): routes registered inside
+  // initializeServer come after the module-top-level registration in the Express stack, so
+  // their errors only reach a handler registered here. Same function → same behavior.
+  app.use(errorTrackingMiddleware);
+
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Cockpit] Console backend is listening on http://0.0.0.0:${PORT}`);
     // Hydrate the vault-stored Cloudflare account id (T7) so the Workers AI base URL resolves
@@ -3227,12 +3240,14 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
-  // Last-resort guards: a stray `.catch`-less background promise must NOT kill the gateway
-  // (Node ≥15 terminates on an unhandled rejection by default). Survive + log + count rejections;
-  // graceful-exit on an uncaughtException (undefined state). See server/process-guards.ts.
-  installProcessGuards({
-    shutdown: (signal) => void shutdown(signal),
-    logError: (msg, err) => console.error(msg, err),
+  // Last-resort guards, now centralized in server/error-tracking.ts (M-049): a stray
+  // `.catch`-less background promise must NOT kill the gateway (Node ≥15 terminates on an
+  // unhandled rejection by default) → record + survive; uncaughtException → record then the
+  // graceful `shutdown` closure drains + exits (state undefined — never resume), unless
+  // OLLAMAS_KEEP_ALIVE_ON_UNCAUGHT=1. Every event also lands in the error ring buffer +
+  // ollamas_errors_total. Legacy ollamas_unhandled_rejection_total kept via onRejectionSurvived.
+  installProcessErrorHooks({
+    onFatal: (_err) => void shutdown("uncaughtException"),
     onRejectionSurvived: () => unhandledRejectionTotal.inc(),
   });
 }

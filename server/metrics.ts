@@ -51,6 +51,15 @@ export const unhandledRejectionTotal = new client.Counter({
   registers: [register],
 });
 
+/** Central error-tracking counter (M-049) — every recorded error, by kind
+ * (route | unhandledRejection | uncaughtException). Fed by server/error-tracking.ts. */
+export const errorsTotal = new client.Counter({
+  name: "ollamas_errors_total",
+  help: "Errors recorded by the central error tracker, by kind",
+  labelNames: ["kind"],
+  registers: [register],
+});
+
 /** ecysearch supervised sub-service — supervision telemetry (set by server/ecysearch.ts). */
 export const ecysearchRestartsTotal = new client.Counter({
   name: "ecysearch_restarts_total",

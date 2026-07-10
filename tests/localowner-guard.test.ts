@@ -63,13 +63,18 @@ describe("localOwnerGuard (M-001)", () => {
     }
   });
 
+  // Unlike the 403 tests (guard short-circuits instantly), these requests fall through to the
+  // REAL handlers (db reads, provider probes). Sequential awaits under full-suite CPU contention
+  // overran the default 5s timeout (load-dependent flake) — so fetch in parallel and give the
+  // slow path headroom. The assertion itself is unchanged: 403 is the only forbidden outcome.
   test("SAAS_ENFORCE unset → guard calls next() (never 403)", async () => {
     delete process.env.SAAS_ENFORCE;
-    for (const p of GUARDED) {
+    const results = await Promise.all(GUARDED.map(async (p) => [p, await status(p)] as const));
+    for (const [p, code] of results) {
       // Handler may 400/404/200/502 — the ONLY forbidden outcome is 403 (the guard blocking).
-      expect(await status(p), `${p} must not be 403 in local mode`).not.toBe(403);
+      expect(code, `${p} must not be 403 in local mode`).not.toBe(403);
     }
-  });
+  }, 30_000);
 });
 
 describe("allowlist completeness invariant (M-002)", () => {
