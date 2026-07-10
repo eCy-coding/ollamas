@@ -441,3 +441,9 @@
   ```
 - release-binary.yml tag-tetiklemesi Monitor'da; sonucu bu kayda eklenecek (D14 release-ayağı).
 - **🎉 v-FINAL RELEASE TRAIN TAMAM: 50/50 mikro-görev · 10/10 versiyon · GA v1.33.0 remote'ta.**
+
+- **S-019b ek — release-binary sonucu:** tag v1.33.0 koşusu TETİKLENDİ (run 29124260058; D14 koşu-kanıtı
+  tamam). darwin-arm64 + linux-x64 binary'leri DERLENDİ; fail = imza adımında TASARIM-GEREĞİ:
+  `MINISIGN_SECKEY secret absent — refusing to publish an UNSIGNED release` (fail-closed, doğru davranış).
+  "Publish image" workflow ✅ success. Emre-opsiyonel: MINISIGN_SECKEY repo-secret'ı set + re-run →
+  imzalı binary release. GA'yı bloklamaz (tag + image + CI yeşil).
