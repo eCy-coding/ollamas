@@ -24,6 +24,7 @@
 import { createHash } from "node:crypto";
 import type { Requirement } from "./fuse";
 import type { SpawnApp } from "./tab-spawn";
+import { parsePolicy, resolveTierForClass, type Tier } from "./hierarchy";
 
 export type SessionStatus = "active" | "done" | "stale" | "blocked";
 
@@ -141,12 +142,35 @@ export interface DispatchPlanInput {
   staleCountForReq?: number;    // staleCounts().get(fingerprint) for THIS requirement
   maxStale?: number;            // escalation threshold (default 2)
   candidateStable?: boolean;    // vO44 churn-guard: isStableCandidate() result (default true)
+  tierHint?: Tier;              // v1.25.3µ3 hierarchy tier-hint; UNDEFINED = default-OFF (byte-identical)
 }
 export interface DispatchPlan {
   go: boolean;
   mode: "spawn" | "dry" | "skip" | "blocked";
   reason: string;
   fingerprint?: string;
+  tierHint?: Tier;             // v1.25.3µ3: echoed only when hierarchy is ON; omitted otherwise (golden-invariant)
+}
+
+/**
+ * v1.25.3µ3 — env-gated hierarchy tier-hint. PURE (env string + policy JSON + now all injected → no IO).
+ * Contract:
+ *   - `env !== "1"` (unset / any other value) → `undefined`: DEFAULT-OFF, planDispatch stays byte-identical.
+ *   - ON (`env === "1"`) with a VALID policy → the resolved tier for `taskClass` (resolveTierForClass).
+ *   - ON but policy missing (`null`/`undefined`) OR degenerate/unparseable → `undefined`: GRACEFUL fall to
+ *     current behavior. This is the calibration-T0 safety valve — before a real HIERARCHY_POLICY.json exists
+ *     the hint must never throw and never alter routing.
+ */
+export function resolveTierHint(
+  env: string | undefined, policyJson: unknown, taskClass: string, now?: Date,
+): Tier | undefined {
+  if (env !== "1") return undefined;
+  if (policyJson === null || policyJson === undefined) return undefined;
+  try {
+    return resolveTierForClass(parsePolicy(policyJson), taskClass, { now }).tier;
+  } catch {
+    return undefined; // degenerate / pre-calibration policy → graceful no-op (never throw, never reroute)
+  }
 }
 
 /**
@@ -155,6 +179,13 @@ export interface DispatchPlan {
  * churn-guard(candidateStable) → cooldown(ONLY after stale = failure backoff; done chains instantly) → activation.
  */
 export function planDispatch(i: DispatchPlanInput): DispatchPlan {
+  const plan = decideDispatch(i);
+  // GOLDEN-INVARIANT: tierHint is a RIDE-ALONG hint only — it never changes go/mode/reason. When it is
+  // undefined (default-OFF) we return `plan` untouched, so the object is byte-identical to the pre-wire output.
+  return i.tierHint === undefined ? plan : { ...plan, tierHint: i.tierHint };
+}
+
+function decideDispatch(i: DispatchPlanInput): DispatchPlan {
   const maxActive = i.maxActive ?? 1;
   const cooldownH = i.cooldownH ?? 4;
   const maxPerDay = i.maxPerDay ?? 6;

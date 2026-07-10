@@ -34,6 +34,7 @@ import { notify } from "./lib/signal";
 import {
   foldSessions, reconcileSessions, autoCompleteSessions, staleCounts, spawnsInWindow, shouldAudit,
   planDispatch, buildDispatchPrompt, renderDispatchMd, taskFingerprint, nextPending, isStableCandidate,
+  resolveTierHint,
   type DispatchSession,
 } from "./lib/claude-dispatch";
 
@@ -47,6 +48,9 @@ const AUDIT_F = join(ORCH_DIR, "seyir", "dispatch-log.jsonl");
 const CANDIDATE_F = join(ORCH_DIR, "seyir", "candidate-log.jsonl"); // vO44 churn-guard sightings
 const KILL_F = join(ORCH_DIR, ".claude-dispatch-off");
 const MARKER_F = join(ORCH_DIR, ".claude-dispatch-enabled");
+// v1.25.3µ3 — hierarchy tier-hint policy (calibration-T0 artifact). Loaded ONLY when OLLAMAS_HIERARCHY=1;
+// absent file → resolveTierHint graceful no-op (pre-calibration must not break dispatch). Default-OFF.
+const HIERARCHY_POLICY_F = join(ORCH_DIR, "HIERARCHY_POLICY.json");
 // vO41 KÖK-FIX: launchd WatchPaths ~/.llm-mission-control'ü izler; vO40 spawn dosyalarını ORAYA
 // yazıyordu → her spawn/dry kendi autopilot zincirini re-trigger ediyordu (1 satır/dk churn).
 const HOME_DIR = join(homedir(), ".ollamas", "claude-dispatch");
@@ -137,11 +141,17 @@ function main(): void {
   const goEnabled = GO && (existsSync(MARKER_F) || process.env.ORCH_CLAUDE_GO === "1");
   const lastSession = [...sessions].sort((a, b) => Date.parse(b.startedTs) - Date.parse(a.startedTs))[0];
   const spawns24h = spawnsInWindow(rawLines, nowMs);
+  // v1.25.3µ3 tier-hint: OLLAMAS_HIERARCHY unset/≠1 → undefined (byte-identical). ON → resolveTierHint reads
+  // policy (task-class = requirement criticality) or gracefully no-ops if the calibration-T0 file is absent.
+  const hierEnv = process.env.OLLAMAS_HIERARCHY;
+  const hierPolicyJson = hierEnv === "1" && existsSync(HIERARCHY_POLICY_F) ? readJson(HIERARCHY_POLICY_F) : null;
+  const tierHint = req ? resolveTierHint(hierEnv, hierPolicyJson, req.criticality) : undefined;
   const plan = planDispatch({
     sessions, req, nowMs, killSwitch, goEnabled, maxPerDay: MAX_PER_DAY,
     lastStatus: lastSession?.status, spawns24h,
     staleCountForReq: req ? (staleCounts(rawLines).get(taskFingerprint(req)) ?? 0) : 0,
     candidateStable: req ? stability.stable : true,
+    tierHint,
   });
   if (reqStale && plan.mode === "skip" && !req) plan.reason = "REQUIREMENTS.json bayat (>60 dk) — önce autopilot/fuse taze koş";
 

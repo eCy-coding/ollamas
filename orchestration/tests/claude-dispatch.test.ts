@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   taskFingerprint, sessionTarget, foldSessions, reconcileSessions, autoCompleteSessions,
   staleCounts, spawnsInWindow, shouldAudit, planDispatch, buildDispatchPrompt, renderDispatchMd,
-  nextPending, isStableCandidate,
+  nextPending, isStableCandidate, resolveTierHint,
   type DispatchSession,
 } from "../bin/lib/claude-dispatch";
 import { buildSpawnScript, openTab, type SpawnRunner } from "../bin/lib/tab-spawn";
@@ -356,5 +356,55 @@ describe("kenar durumları — şekil koruması + override'lar", () => {
   it("nextPending: eski-format (target'sız) aktif oturum da busy sayılır — task'tan türetilir", () => {
     const oldFormat = sess({ target: undefined, task: "CRITICAL:red:backend" });
     expect(nextPending([REQ], [oldFormat])).toBeNull();
+  });
+});
+
+// v1.25.3µ3 — OLLAMAS_HIERARCHY env-gated tier-wire. Default-OFF byte-identical + ON resolves via test-fixture
+// POLICY (inline; NOT the real calibration-T0 HIERARCHY_POLICY.json) + graceful no-op when policy absent.
+describe("resolveTierHint + planDispatch tier-wire (v1.25.3µ3)", () => {
+  const NOW_D = new Date(NOW); // 2026-07-03T12:00:00Z — inside fixture staleDays window
+  // Inline test-fixture policy (NOT real calibration). CRITICAL → sonnet, gate passes (0.9 ≥ 0.8).
+  const FIXTURE_POLICY = {
+    routes: [
+      { taskClass: "CRITICAL", chosenTier: "sonnet", wilsonLow: 0.9, gateSource: "scorecard", model: "test-sonnet", estCostUnits: 3, reason: "fixture" },
+      { taskClass: "COMPLETENESS", chosenTier: "local", wilsonLow: 0.85, gateSource: "scorecard", model: "test-local", estCostUnits: 1, reason: "fixture" },
+    ],
+    gate: { wilsonFloor: 0.8, staleDays: 30 },
+    escalationLadder: ["local", "sonnet", "opus"],
+    evidence: { scorecard: "fixture-scorecard.md", benchmarkJson: "" },
+    ts: "2026-07-01T00:00:00Z",
+  };
+  const base = { sessions: [] as DispatchSession[], req: REQ, nowMs: NOW, killSwitch: false, goEnabled: true };
+
+  it("(a) OFF (env unset) → tierHint undefined; planDispatch GOLDEN byte-identical (before == after)", () => {
+    // resolveTierHint returns nothing when OFF — even with a valid policy present.
+    expect(resolveTierHint(undefined, FIXTURE_POLICY, REQ.criticality, NOW_D)).toBeUndefined();
+    expect(resolveTierHint("0", FIXTURE_POLICY, REQ.criticality, NOW_D)).toBeUndefined();
+    // GOLDEN: planDispatch with no tierHint == pre-wire output (no extra key, identical serialization).
+    const off = planDispatch(base);
+    expect(off).not.toHaveProperty("tierHint");
+    expect(Object.keys(off)).toEqual(["go", "mode", "reason", "fingerprint"]);
+    expect(JSON.stringify(off)).toBe(JSON.stringify({ go: true, mode: "spawn", reason: `spawn: ${REQ.criticality}:${REQ.target}`, fingerprint: taskFingerprint(REQ) }));
+    // Passing undefined tierHint explicitly must ALSO be byte-identical (the default-OFF call-site path).
+    expect(JSON.stringify(planDispatch({ ...base, tierHint: undefined }))).toBe(JSON.stringify(off));
+  });
+
+  it("(b) ON (env=1) + fixture POLICY → resolved tier (CRITICAL gate-pass → sonnet), echoed in plan", () => {
+    expect(resolveTierHint("1", FIXTURE_POLICY, "CRITICAL", NOW_D)).toBe("sonnet");
+    expect(resolveTierHint("1", FIXTURE_POLICY, "COMPLETENESS", NOW_D)).toBe("local");
+    expect(resolveTierHint("1", FIXTURE_POLICY, "unknown-class", NOW_D)).toBe("local"); // ladder[0] default
+    // Ride-along only: go/mode/reason unchanged, tierHint appended.
+    const on = planDispatch({ ...base, tierHint: resolveTierHint("1", FIXTURE_POLICY, REQ.criticality, NOW_D) });
+    expect(on).toMatchObject({ go: true, mode: "spawn", tierHint: "sonnet" });
+  });
+
+  it("(c) ON (env=1) but POLICY absent (null) OR degenerate → graceful undefined (pre-calibration safe)", () => {
+    expect(resolveTierHint("1", null, "CRITICAL", NOW_D)).toBeUndefined();
+    expect(resolveTierHint("1", undefined, "CRITICAL", NOW_D)).toBeUndefined();
+    expect(resolveTierHint("1", {}, "CRITICAL", NOW_D)).toBeUndefined();          // parsePolicy throws → caught
+    expect(resolveTierHint("1", { routes: [] }, "CRITICAL", NOW_D)).toBeUndefined(); // degenerate → caught
+    // Graceful path leaves planDispatch byte-identical (no hint applied).
+    const graceful = planDispatch({ ...base, tierHint: resolveTierHint("1", null, REQ.criticality, NOW_D) });
+    expect(graceful).not.toHaveProperty("tierHint");
   });
 });
