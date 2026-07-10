@@ -14,6 +14,20 @@ export interface Migration {
   version: number;
   name: string;
   up: (db: DbClient) => Promise<void>;
+  // Optional reverse of `up` (M-045). Drops exactly the schema objects `up` created so
+  // rollbackTo() can return to an earlier version after a bad upgrade. Must be idempotent
+  // (DROP ... IF EXISTS / guarded) — a retry or an already-reverted object is a no-op.
+  down?: (db: DbClient) => Promise<void>;
+}
+
+// Guarded DROP COLUMN reverse of addColumnIfMissing: sqlite ≥3.35 and pg both support
+// `DROP COLUMN`, but a column that is already gone (double rollback) must be a no-op.
+async function dropColumnIfPresent(db: DbClient, table: string, column: string): Promise<void> {
+  try {
+    await db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  } catch (e: any) {
+    if (!/no such column|does not exist|no column/i.test(String(e?.message))) throw e;
+  }
 }
 
 // Advisory-lock key (arbitrary constant, unique to this app's migration runner).
@@ -42,6 +56,9 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await db.exec("CREATE INDEX IF NOT EXISTS idx_usage_events_ts ON usage_events(ts)");
     },
+    down: async (db) => {
+      await db.exec("DROP INDEX IF EXISTS idx_usage_events_ts");
+    },
   },
   {
     version: 2,
@@ -60,6 +77,9 @@ export const MIGRATIONS: Migration[] = [
         registration_access_token_hash TEXT,
         created_at TEXT NOT NULL
       )`);
+    },
+    down: async (db) => {
+      await db.exec("DROP TABLE IF EXISTS oauth_clients");
     },
   },
   {
@@ -98,6 +118,13 @@ export const MIGRATIONS: Migration[] = [
       // sqlite, so a retry that finds the column already present is a no-op.
       try { await db.exec("ALTER TABLE oauth_clients ADD COLUMN tenant_id TEXT"); }
       catch (e: any) { if (!/duplicate column|already exists/i.test(String(e?.message))) throw e; }
+    },
+    down: async (db) => {
+      await db.exec("DROP TABLE IF EXISTS oauth_tokens");
+      await db.exec("DROP TABLE IF EXISTS oauth_codes");
+      // Reverse the tenant_id column v3 added to oauth_clients (guarded — v2's down may
+      // already have dropped the whole table when rolling back below version 2).
+      await dropColumnIfPresent(db, "oauth_clients", "tenant_id");
     },
   },
   {
@@ -139,6 +166,10 @@ export const MIGRATIONS: Migration[] = [
       }
       await db.exec("CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens(family_id)");
     },
+    down: async (db) => {
+      await db.exec("DROP INDEX IF EXISTS idx_oauth_refresh_family");
+      await db.exec("DROP TABLE IF EXISTS oauth_refresh_tokens");
+    },
   },
   {
     version: 5,
@@ -155,6 +186,9 @@ export const MIGRATIONS: Migration[] = [
         received_at TEXT
       )`);
     },
+    down: async (db) => {
+      await db.exec("DROP TABLE IF EXISTS ukp_stage_events");
+    },
   },
   {
     version: 6,
@@ -164,19 +198,25 @@ export const MIGRATIONS: Migration[] = [
     up: async (db) => {
       await db.exec("CREATE INDEX IF NOT EXISTS idx_ukp_stage_events_ts ON ukp_stage_events(ts)");
     },
+    down: async (db) => {
+      await db.exec("DROP INDEX IF EXISTS idx_ukp_stage_events_ts");
+    },
   },
 ];
 
-// Fail fast at module load on a duplicate migration version. A typo'd duplicate
-// silently SKIPS on an existing DB (version already in schema_migrations) yet runs
-// twice on a fresh DB → divergent schema. Cheap invariant, caught at boot not prod.
-{
+/** Fail fast on a duplicate migration version. A typo'd duplicate silently SKIPS on an
+ *  existing DB (version already in schema_migrations) yet runs twice on a fresh DB →
+ *  divergent schema. Cheap invariant, asserted at module load (below) — not in prod.
+ *  Exported so the regression test (M-012) can drive it without a fresh module load. */
+export function assertUniqueVersions(migrations: ReadonlyArray<{ version: number; name: string }>): void {
   const seenVersions = new Set<number>();
-  for (const m of MIGRATIONS) {
+  for (const m of migrations) {
     if (seenVersions.has(m.version)) throw new Error(`Duplicate migration version ${m.version} (${m.name})`);
     seenVersions.add(m.version);
   }
 }
+
+assertUniqueVersions(MIGRATIONS);
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:
  *  a second run (or a second replica) is a no-op once versions are recorded. */
@@ -201,4 +241,32 @@ export async function runMigrations(db: DbClient): Promise<number[]> {
     }
   });
   return applied;
+}
+
+/** Roll back every applied migration with version > targetVersion, NEWEST-FIRST, under the
+ *  same cross-replica lock. Each migration's `down` reverses its `up` and its schema_migrations
+ *  row is deleted so a later runMigrations() re-applies it cleanly. Returns the versions rolled
+ *  back (descending). A migration that is applied but has no `down` is unrollable → throw (the
+ *  caller must not lose track of an irreversible step). Idempotent: nothing above targetVersion
+ *  is applied → no-op. */
+export async function rollbackTo(db: DbClient, targetVersion: number): Promise<number[]> {
+  const rolledBack: number[] = [];
+  await db.withLock(MIGRATION_LOCK_KEY, async () => {
+    await db.exec(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
+    );
+    const done = new Set(
+      (await db.query("SELECT version FROM schema_migrations")).rows.map((r) => Number(r.version))
+    );
+    // Newest-first: reverse dependency order (e.g. drop the child index before its table).
+    for (const m of [...MIGRATIONS].sort((a, b) => b.version - a.version)) {
+      if (m.version <= targetVersion) continue;
+      if (!done.has(m.version)) continue;
+      if (!m.down) throw new Error(`Migration version ${m.version} (${m.name}) has no down() — cannot roll back`);
+      await m.down(db);
+      await db.run("DELETE FROM schema_migrations WHERE version = ?", [m.version]);
+      rolledBack.push(m.version);
+    }
+  });
+  return rolledBack;
 }

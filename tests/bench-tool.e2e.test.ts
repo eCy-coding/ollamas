@@ -60,6 +60,7 @@ describe("bench_model — llama-bench tok/s via choke-point", () => {
     try { execSync("command -v llama-bench", { stdio: "ignore" }); return true; } catch { return false; }
   })();
   const MODEL = process.env.LLAMA_BENCH_MODEL;
+  // gated: RUN_LIVE_E2E=1 + llama-bench binary + LLAMA_BENCH_MODEL — runs the real llama-bench.
   test.skipIf(process.env.RUN_LIVE_E2E !== "1" || !haveBinary || !MODEL)(
     "real llama-bench produces a positive tps",
     async () => {

@@ -13,6 +13,7 @@ const live = process.platform === "darwin" && process.env.OLLAMAS_LIVE_KEYCHAIN 
 const SVC = "ollamas-test-probe";
 const ACCT = "v11-live";
 
+// gated: OLLAMAS_LIVE_KEYCHAIN=1 (macOS) — round-trips a REAL Keychain TEST item; opt-in so CI never triggers a keychain prompt.
 describe.skipIf(!live)("live keychain round-trip (macOS, opt-in, TEST item only)", () => {
   afterAll(() => {
     deleteMasterKey(SVC, ACCT); // belt-and-suspenders cleanup, even on failure

@@ -62,9 +62,11 @@ describe("ai façade — listModels / default model", () => {
     expect(await ai.resolveDefaultModel()).toBe("qwen3-coder:30b");
   });
 
-  test("resolveDefaultModel throws a clear error when no local model is installed", async () => {
+  test("resolveDefaultModel throws an actionable error when no local model is installed", async () => {
     vi.spyOn(global, "fetch").mockResolvedValue(tagsResponse([]));
-    await expect(ai.resolveDefaultModel()).rejects.toThrow(/no local ollama model available/);
+    // M-037 first-run onboarding: the error now tells the user how to fix it (ollama pull),
+    // not a dead-end "not available".
+    await expect(ai.resolveDefaultModel()).rejects.toThrow(/ollama pull/);
   });
 
   test("listModels: ilk base erişilemez → sonraki base'den döner (Faz11C T1-001)", async () => {

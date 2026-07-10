@@ -91,7 +91,7 @@ describe("distributed dispatch e2e (real mac server + live desktop-ert7724)", ()
     if (!macUp || !remoteUp) {
       // Loud skip (runtime) — see the beforeAll console.warn. Does NOT fail hard: ctx.skip()
       // marks this test skipped at runtime. The pure test carries the deterministic contract.
-      ctx.skip();
+      ctx.skip(); // gated: runtime — mac server + live remote must be reachable; pure test carries the contract
       return;
     }
 

@@ -60,6 +60,7 @@ describe("RAG — sqlite-vec store + choke-point", () => {
   });
 
   // Live: real ollama embeddings (needs `ollama pull nomic-embed-text`). Opt-in.
+  // gated: RUN_LIVE_E2E=1 — needs a running ollama for real embeddings (fake embedder path is always tested).
   test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
     "real ollama embeddings index + search round-trip",
     async () => {

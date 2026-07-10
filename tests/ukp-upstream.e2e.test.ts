@@ -16,6 +16,7 @@ const UKP = path.resolve(ROOT, "..", "uk-pipeline", "ukp.py");
 const HAVE_UKP = fs.existsSync(UKP);
 
 describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
+  // gated: uk-pipeline checkout present (fs.existsSync(UKP)) — needs the local uk-pipeline repo to spawn the upstream.
   test.skipIf(!HAVE_UKP)(
     "connectUpstream spawns uk-pipeline stdio server; hesapla reachable via choke-point",
     async () => {
@@ -48,6 +49,7 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
     30000,
   );
 
+  // gated: uk-pipeline checkout present — see the HAVE_UKP note above.
   test.skipIf(!HAVE_UKP)("uk-pipeline tools register at host_upstream tier", async () => {
     const { connectUpstream } = await import("../server/mcp/client");
     const { ToolRegistry } = await import("../server/tool-registry");
@@ -63,6 +65,7 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
   // through the REAL ollamas consume chain (spawn + choke-point), not just hesapla.
   const ctx = { isLive: true, workspaceRoot: ".", autoApply: true, deps: {} as any };
 
+  // gated: uk-pipeline checkout present — see the HAVE_UKP note above.
   test.skipIf(!HAVE_UKP)("LIVE: all 7 local-safe ukp tools reachable (smart/planla wired)", async () => {
     const { connectUpstream } = await import("../server/mcp/client");
     const { ToolRegistry } = await import("../server/tool-registry");
@@ -75,6 +78,7 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
     expect(ToolRegistry.has("mcp__ukp__planla")).toBe(true);
   }, 30000);
 
+  // gated: uk-pipeline checkout present — see the HAVE_UKP note above.
   test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__smart returns a portable prompt through choke-point", async () => {
     const { connectUpstream } = await import("../server/mcp/client");
     const { ToolRegistry } = await import("../server/tool-registry");
@@ -87,6 +91,7 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
     expect(String(out.output)).toContain("<task>"); // craft_smart portable prompt reached ollamas live
   }, 30000);
 
+  // gated: uk-pipeline checkout present — see the HAVE_UKP note above.
   test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__planla returns honest gap-analysis JSON", async () => {
     const { connectUpstream } = await import("../server/mcp/client");
     const { ToolRegistry } = await import("../server/tool-registry");
@@ -102,6 +107,7 @@ describe("MCP gateway CONSUME — uk-pipeline upstream (mcp__ukp__*)", () => {
     expect(d).toHaveProperty("prompt");
   }, 30000);
 
+  // gated: uk-pipeline checkout present — see the HAVE_UKP note above.
   test.skipIf(!HAVE_UKP)("LIVE: mcp__ukp__seyir returns structured logbook (stats/errors/tokens)", async () => {
     const { connectUpstream } = await import("../server/mcp/client");
     const { ToolRegistry } = await import("../server/tool-registry");

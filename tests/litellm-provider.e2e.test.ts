@@ -31,11 +31,12 @@ async function proxyReachable(): Promise<boolean> {
 }
 
 describe("provider CONSUME — LiteLLM HTTP backend (custom-openai)", () => {
+  // gated: RUN_LIVE_E2E=1 — needs a running LiteLLM proxy on LITELLM_BASE_URL.
   test.skipIf(!RUN_LIVE)(
     "ProviderRouter routes a generate through the LiteLLM proxy",
     async (ctx) => {
       if (!(await proxyReachable())) {
-        ctx.skip(); // opted-in but proxy down → skip, don't fail CI
+        ctx.skip(); // gated: runtime — opted-in (RUN_LIVE_E2E=1) but proxy down → skip, don't fail CI
         return;
       }
       process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-litellm-${process.pid}.db`);

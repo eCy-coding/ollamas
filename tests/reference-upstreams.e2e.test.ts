@@ -44,6 +44,7 @@ describe("MCP gateway CONSUME — reference-server fan-out (3+ upstreams)", () =
 
   // Live (dalga-2): a curated CATALOG entry drives connectUpstream end-to-end —
   // proves the catalog's command/args are exactly what the transport needs.
+  // gated: RUN_LIVE_E2E=1 — connects the real @modelcontextprotocol/server-everything via npx (network).
   test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
     "catalog 'memory' entry connects the real server via npx stdio",
     async () => {
@@ -62,6 +63,7 @@ describe("MCP gateway CONSUME — reference-server fan-out (3+ upstreams)", () =
   );
 
   // Live: real @modelcontextprotocol/server-everything (canonical test server, no FS writes).
+  // gated: RUN_LIVE_E2E=1 — connects the real @modelcontextprotocol/server-everything via npx (network).
   test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
     "real server-everything registers mcp__everything__echo at host_upstream",
     async () => {

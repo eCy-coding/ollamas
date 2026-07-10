@@ -55,6 +55,7 @@ describe("mac_power — powermetrics telemetry via choke-point", () => {
   });
 
   // Live: real powermetrics (needs sudo + darwin). Opt-in + skip otherwise.
+  // gated: RUN_LIVE_E2E=1 + darwin — runs the real (sudo) powermetrics sampler; no-op elsewhere.
   test.skipIf(process.env.RUN_LIVE_E2E !== "1" || os.platform() !== "darwin")(
     "real powermetrics produces a power reading",
     async () => {

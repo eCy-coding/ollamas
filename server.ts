@@ -293,6 +293,251 @@ app.use(
   localOwnerGuard,
 );
 
+// --- Multi-agent pipeline (M3) — registered at module top-level (M-050) so in-process route
+// tests exercise it via the exported `app` under OLLAMAS_NO_AUTOBOOT=1 without booting the full
+// stack. Gated by the localOwnerGuard prefix above; all deps (ProviderRouter, Filesystem/Terminal
+// Manager, db, CURRENT_MODE) are module-scoped and resolved lazily at request time.
+  /**
+   * Complex Hierarchical Multi-Agent Pipeline Execution Engine (M3)
+   */
+  // Load the measured correctness-maximizing role assignment (combo-bench →
+  // MODEL_SELECTION.json.champions.combination.roles). Graceful absent → {} so the
+  // pipeline keeps prior behavior (caller-specified, else provider defaults).
+  const loadCombinationRoles = (): Record<string, { provider?: string; model?: string }> => {
+    try {
+      const p = path.join(process.cwd(), "orchestration", "MODEL_SELECTION.json");
+      const j = JSON.parse(fs.readFileSync(p, "utf8"));
+      return j?.champions?.combination?.roles || {};
+    } catch { return {}; }
+  };
+
+  app.post("/api/pipeline", async (req, res) => {
+    const {
+      prompt,
+      architectProvider: _aP, architectModel: _aM,
+      coderProvider: _cP, coderModel: _cM,
+      reviewerProvider: _rP, reviewerModel: _rM,
+      enableSelfImprove,
+      maxIterations,
+      writePermissions,
+    } = req.body;
+
+    // Caller params win; otherwise default each role to the measured best combination.
+    const _roles = loadCombinationRoles();
+    const architectProvider = _aP ?? _roles.architect?.provider;
+    const architectModel = _aM ?? _roles.architect?.model;
+    const coderProvider = _cP ?? _roles.coder?.provider;
+    const coderModel = _cM ?? _roles.coder?.model;
+    const reviewerProvider = _rP ?? _roles.reviewer?.provider;
+    const reviewerModel = _rM ?? _roles.reviewer?.model;
+
+    // Validate BEFORE switching to SSE — once event-stream headers are sent we can
+    // no longer return a clean status; a missing prompt would stream `undefined`.
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ error: "prompt (non-empty string) is required" });
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const sendProgress = (stage: string, status: "pending" | "running" | "done" | "fail", resultText: string = "", tokensPerSec: number = 0, elapsed: number = 0, fallback?: string) => {
+      res.write(`data: ${JSON.stringify({ stage, status, text: resultText, tokensPerSec, elapsed, fallback })}\n\n`);
+    };
+
+    const isLive = CURRENT_MODE !== "demo";
+    let architectOutput = "";
+    let coderOutput = "";
+    let reviewerOutput = "";
+
+    try {
+      // 1. ARCHITECT STAGE
+      sendProgress("architect", "running");
+      const archPrompt = `[STAGE 1: ARCHITECT]
+You are the Systems Architect. Design the project directory layout, file structures, and architecture mapping based on the user's requirements:
+"${prompt}"
+
+OUTPUT: Set out clear module hierarchies, files to be created, and complete specification rules.`;
+
+      const startArch = Date.now();
+      const archResult = await ProviderRouter.generate({
+        provider: architectProvider,
+        model: architectModel,
+        messages: [{ role: "user", content: archPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("architect", "running", "", 0, 0, `fallback: ${from} → ${to}`);
+      });
+      architectOutput = archResult.text;
+      const elapsedArch = Date.now() - startArch;
+      // Synthesize estimated tokens per sec metrics matching real values (L11)
+      const archTokensPerSec = archResult.tokensPerSec !== undefined ? archResult.tokensPerSec : Math.round((architectOutput.length / 4) / (elapsedArch / 1000 || 1));
+      sendProgress("architect", "done", architectOutput, archTokensPerSec, elapsedArch);
+
+      // 2. CODER STAGE
+      sendProgress("coder", "running");
+      const coderPrompt = `[STAGE 2: CODER]
+You are the software developer. Based on the Architect's layout design:\n${architectOutput}\n\nWrite the FULL completed executable content for each file requested.
+STRICT RULE: For each file you propose to create, emit a marker line of the format:
+FILE: relative/path/to/file.ext
+Followed immediately by a markdown fenced code block containing the complete source content. Write complete code with NO shortcuts.`;
+
+      const startCoder = Date.now();
+      const coderResult = await ProviderRouter.generate({
+        provider: coderProvider,
+        model: coderModel,
+        messages: [{ role: "user", content: coderPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("coder", "running", "", 0, 0, `fallback: ${from} → ${to}`);
+      });
+      coderOutput = coderResult.text;
+      const elapsedCoder = Date.now() - startCoder;
+      const coderTokensPerSec = coderResult.tokensPerSec !== undefined ? coderResult.tokensPerSec : Math.round((coderOutput.length / 4) / (elapsedCoder / 1000 || 1));
+      sendProgress("coder", "done", coderOutput, coderTokensPerSec, elapsedCoder);
+
+      // Apply write operations internally if permitted
+      let writeCount = 0;
+      const writeErrors: string[] = []; // surfaced in the done frame instead of silently swallowing failures
+      if (writePermissions) {
+        // Parse FILE: annotations
+        const lines = coderOutput.split("\n");
+        let activeFile = "";
+        let collectingContent = false;
+        let blockContent: string[] = [];
+
+        for (const line of lines) {
+          if (line.trim().startsWith("FILE:")) {
+            activeFile = line.replace("FILE:", "").trim();
+            collectingContent = false;
+            blockContent = [];
+            continue;
+          }
+
+          if (activeFile) {
+            if (line.trim().startsWith("```")) {
+              if (!collectingContent) {
+                collectingContent = true;
+              } else {
+                // End block, write now
+                collectingContent = false;
+                try {
+                  FilesystemManager.writeFile(isLive, db.data.workspacePath, activeFile, blockContent.join("\n"));
+                  writeCount++;
+                } catch (e: any) {
+                  writeErrors.push(`${activeFile}: ${e?.message || String(e)}`);
+                }
+                activeFile = "";
+              }
+              continue;
+            }
+
+            if (collectingContent) {
+              blockContent.push(line);
+            }
+          }
+        }
+      }
+
+      // 3. REVIEWER STAGE
+      sendProgress("reviewer", "running");
+      const reviewerPrompt = `[STAGE 3: REVIEWER]
+You are the primary Code Reviewer. Audit the designed structure and complete files emitted by the Coder:
+${coderOutput}
+
+Validate code correctness, structural logic, and perform a solid Big-O performance check and error safety inspection.`;
+
+      const startReview = Date.now();
+      const reviewerResult = await ProviderRouter.generate({
+        provider: reviewerProvider,
+        model: reviewerModel,
+        messages: [{ role: "user", content: reviewerPrompt }],
+      }, undefined, (from, to) => {
+        sendProgress("reviewer", "running", "", 0, 0, `fallback: ${from} → ${to}`);
+      });
+      reviewerOutput = reviewerResult.text;
+      const elapsedReview = Date.now() - startReview;
+      const reviewTokensPerSec = reviewerResult.tokensPerSec !== undefined ? reviewerResult.tokensPerSec : Math.round((reviewerOutput.length / 4) / (elapsedReview / 1000 || 1));
+      sendProgress("reviewer", "done", reviewerOutput, reviewTokensPerSec, elapsedReview);
+
+      // Optional Bounded Self-Improve loop using workspace tests results (L12, M3 AC-12)
+      if (enableSelfImprove && isLive) {
+        let currentIt = 1;
+        const maxIt = Math.min(Number(maxIterations) || 2, 3);
+        let passed = false;
+
+        while (currentIt <= maxIt && !passed) {
+          res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "running", text: `Running self-improve round ${currentIt}/${maxIt}...` })}\n\n`);
+          
+          // Execute test terminal script
+          const testResult = await TerminalManager.execute(isLive, db.data.workspacePath, "pytest");
+          if (testResult.exitCode === 0) {
+            passed = true;
+            res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "done", text: `Success: All tests passed on round ${currentIt}!` })}\n\n`);
+          } else {
+            res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "pending", text: `Tests failed on round ${currentIt}. Feeding back debugger report...` })}\n\n`);
+            
+            // Loop back failures to Coder
+            const debugPrompt = `[SELF-IMPROVE DEBUGRound ${currentIt}]
+The test suite yielded the following failures:
+\`\`\`
+${testResult.stderr || testResult.stdout}
+\`\`\`
+Please fix the code and output the corrected version of the files, matching the annotation rule:
+FILE: path/to/file.ext
+\`\`\`
+content
+\`\`\``;
+            const refixResult = await ProviderRouter.generate({
+              provider: coderProvider,
+              model: coderModel,
+              messages: [
+                { role: "user", content: coderOutput },
+                { role: "assistant", content: "I will review and fix" },
+                { role: "user", content: debugPrompt }
+              ],
+            });
+            coderOutput = refixResult.text;
+
+            // Re-write fresh corrections
+            const lines = coderOutput.split("\n");
+            let activeFile = "";
+            let collectingContent = false;
+            let blockContent: string[] = [];
+
+            for (const line of lines) {
+              if (line.trim().startsWith("FILE:")) {
+                activeFile = line.replace("FILE:", "").trim();
+                collectingContent = false;
+                blockContent = [];
+                continue;
+              }
+              if (activeFile) {
+                if (line.trim().startsWith("```")) {
+                  if (!collectingContent) collectingContent = true;
+                  else {
+                    collectingContent = false;
+                    try {
+                      FilesystemManager.writeFile(isLive, db.data.workspacePath, activeFile, blockContent.join("\n"));
+                    } catch (e) {}
+                    activeFile = "";
+                  }
+                  continue;
+                }
+                if (collectingContent) blockContent.push(line);
+              }
+            }
+          }
+          currentIt++;
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true, writeCount, writeErrors })}\n\n`);
+      res.end();
+    } catch (e: any) {
+      res.write(`data: ${JSON.stringify({ error: e.message || "Pipeline execution failed." })}\n\n`);
+      res.end();
+    }
+  });
+
 // Integrations completion (dalga-11) — 0-manual GitHub connect (pulls the gh
 // CLI token into the vault) + on-demand health matrix. Local-owner only.
 app.post("/api/integrations/github/autoconnect", async (_req, res) => {
@@ -579,6 +824,47 @@ async function refreshMode(ttlMs = 10_000): Promise<void> {
     ProviderRouter.demoFallbackAllowed = CURRENT_MODE === "demo";
     console.log(`[Cockpit] environment mode re-detected: ${CURRENT_MODE.toUpperCase()}`);
   }
+}
+
+// Per-IP brute-force throttle + timing-safe compare for the SaaS admin token. timingSafeEqual
+// alone does not stop an attacker hammering guesses; lock an IP out for the window after N misses.
+// In-memory (per-process) — adequate for the single admin surface; a multi-replica deploy would
+// back this with the shared store/Redis. Extracted to a module-level factory (M-050) so the
+// regression test (M-006) can drive the REAL middleware on a throwaway app without booting the
+// full stack. Each call returns an ISOLATED per-IP failure map — production builds one instance
+// inside initializeServer; a test builds a fresh one per case so brute-force state never leaks.
+export function createAdminGuard(): express.RequestHandler {
+  const adminFailures = new Map<string, { count: number; until: number }>();
+  const ADMIN_MAX_FAILS = 5;
+  const ADMIN_LOCK_MS = 15 * 60_000;
+  return (req, res, next) => {
+    const required = process.env.SAAS_ADMIN_TOKEN;
+    if (required) {
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      const now = Date.now();
+      const rec = adminFailures.get(ip);
+      if (rec && rec.count >= ADMIN_MAX_FAILS && now < rec.until) {
+        res.setHeader("Retry-After", Math.ceil((rec.until - now) / 1000));
+        return res.status(429).json({ error: "Too many bad admin attempts; try later" });
+      }
+      // Timing-safe compare to avoid leaking the token via response timing.
+      const got = String(req.headers["x-admin-token"] || "");
+      const a = Buffer.from(got);
+      const b = Buffer.from(required);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        const r = adminFailures.get(ip) ?? { count: 0, until: 0 };
+        r.count += 1;
+        r.until = now + ADMIN_LOCK_MS;
+        adminFailures.set(ip, r);
+        return res.status(401).json({ error: "Bad admin token" });
+      }
+      adminFailures.delete(ip); // success → reset the counter
+    } else if (process.env.SAAS_ENFORCE === "1") {
+      // Enforcement on but no token configured → refuse rather than expose.
+      return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
+    }
+    next();
+  };
 }
 
 // Dynamic start wrapper
@@ -2064,247 +2350,6 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   });
 
   /**
-   * Complex Hierarchical Multi-Agent Pipeline Execution Engine (M3)
-   */
-  // Load the measured correctness-maximizing role assignment (combo-bench →
-  // MODEL_SELECTION.json.champions.combination.roles). Graceful absent → {} so the
-  // pipeline keeps prior behavior (caller-specified, else provider defaults).
-  const loadCombinationRoles = (): Record<string, { provider?: string; model?: string }> => {
-    try {
-      const p = path.join(process.cwd(), "orchestration", "MODEL_SELECTION.json");
-      const j = JSON.parse(fs.readFileSync(p, "utf8"));
-      return j?.champions?.combination?.roles || {};
-    } catch { return {}; }
-  };
-
-  app.post("/api/pipeline", async (req, res) => {
-    const {
-      prompt,
-      architectProvider: _aP, architectModel: _aM,
-      coderProvider: _cP, coderModel: _cM,
-      reviewerProvider: _rP, reviewerModel: _rM,
-      enableSelfImprove,
-      maxIterations,
-      writePermissions,
-    } = req.body;
-
-    // Caller params win; otherwise default each role to the measured best combination.
-    const _roles = loadCombinationRoles();
-    const architectProvider = _aP ?? _roles.architect?.provider;
-    const architectModel = _aM ?? _roles.architect?.model;
-    const coderProvider = _cP ?? _roles.coder?.provider;
-    const coderModel = _cM ?? _roles.coder?.model;
-    const reviewerProvider = _rP ?? _roles.reviewer?.provider;
-    const reviewerModel = _rM ?? _roles.reviewer?.model;
-
-    // Validate BEFORE switching to SSE — once event-stream headers are sent we can
-    // no longer return a clean status; a missing prompt would stream `undefined`.
-    if (typeof prompt !== "string" || !prompt.trim()) {
-      return res.status(400).json({ error: "prompt (non-empty string) is required" });
-    }
-
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
-    const sendProgress = (stage: string, status: "pending" | "running" | "done" | "fail", resultText: string = "", tokensPerSec: number = 0, elapsed: number = 0, fallback?: string) => {
-      res.write(`data: ${JSON.stringify({ stage, status, text: resultText, tokensPerSec, elapsed, fallback })}\n\n`);
-    };
-
-    const isLive = CURRENT_MODE !== "demo";
-    let architectOutput = "";
-    let coderOutput = "";
-    let reviewerOutput = "";
-
-    try {
-      // 1. ARCHITECT STAGE
-      sendProgress("architect", "running");
-      const archPrompt = `[STAGE 1: ARCHITECT]
-You are the Systems Architect. Design the project directory layout, file structures, and architecture mapping based on the user's requirements:
-"${prompt}"
-
-OUTPUT: Set out clear module hierarchies, files to be created, and complete specification rules.`;
-
-      const startArch = Date.now();
-      const archResult = await ProviderRouter.generate({
-        provider: architectProvider,
-        model: architectModel,
-        messages: [{ role: "user", content: archPrompt }],
-      }, undefined, (from, to) => {
-        sendProgress("architect", "running", "", 0, 0, `fallback: ${from} → ${to}`);
-      });
-      architectOutput = archResult.text;
-      const elapsedArch = Date.now() - startArch;
-      // Synthesize estimated tokens per sec metrics matching real values (L11)
-      const archTokensPerSec = archResult.tokensPerSec !== undefined ? archResult.tokensPerSec : Math.round((architectOutput.length / 4) / (elapsedArch / 1000 || 1));
-      sendProgress("architect", "done", architectOutput, archTokensPerSec, elapsedArch);
-
-      // 2. CODER STAGE
-      sendProgress("coder", "running");
-      const coderPrompt = `[STAGE 2: CODER]
-You are the software developer. Based on the Architect's layout design:\n${architectOutput}\n\nWrite the FULL completed executable content for each file requested.
-STRICT RULE: For each file you propose to create, emit a marker line of the format:
-FILE: relative/path/to/file.ext
-Followed immediately by a markdown fenced code block containing the complete source content. Write complete code with NO shortcuts.`;
-
-      const startCoder = Date.now();
-      const coderResult = await ProviderRouter.generate({
-        provider: coderProvider,
-        model: coderModel,
-        messages: [{ role: "user", content: coderPrompt }],
-      }, undefined, (from, to) => {
-        sendProgress("coder", "running", "", 0, 0, `fallback: ${from} → ${to}`);
-      });
-      coderOutput = coderResult.text;
-      const elapsedCoder = Date.now() - startCoder;
-      const coderTokensPerSec = coderResult.tokensPerSec !== undefined ? coderResult.tokensPerSec : Math.round((coderOutput.length / 4) / (elapsedCoder / 1000 || 1));
-      sendProgress("coder", "done", coderOutput, coderTokensPerSec, elapsedCoder);
-
-      // Apply write operations internally if permitted
-      let writeCount = 0;
-      const writeErrors: string[] = []; // surfaced in the done frame instead of silently swallowing failures
-      if (writePermissions) {
-        // Parse FILE: annotations
-        const lines = coderOutput.split("\n");
-        let activeFile = "";
-        let collectingContent = false;
-        let blockContent: string[] = [];
-
-        for (const line of lines) {
-          if (line.trim().startsWith("FILE:")) {
-            activeFile = line.replace("FILE:", "").trim();
-            collectingContent = false;
-            blockContent = [];
-            continue;
-          }
-
-          if (activeFile) {
-            if (line.trim().startsWith("```")) {
-              if (!collectingContent) {
-                collectingContent = true;
-              } else {
-                // End block, write now
-                collectingContent = false;
-                try {
-                  FilesystemManager.writeFile(isLive, db.data.workspacePath, activeFile, blockContent.join("\n"));
-                  writeCount++;
-                } catch (e: any) {
-                  writeErrors.push(`${activeFile}: ${e?.message || String(e)}`);
-                }
-                activeFile = "";
-              }
-              continue;
-            }
-
-            if (collectingContent) {
-              blockContent.push(line);
-            }
-          }
-        }
-      }
-
-      // 3. REVIEWER STAGE
-      sendProgress("reviewer", "running");
-      const reviewerPrompt = `[STAGE 3: REVIEWER]
-You are the primary Code Reviewer. Audit the designed structure and complete files emitted by the Coder:
-${coderOutput}
-
-Validate code correctness, structural logic, and perform a solid Big-O performance check and error safety inspection.`;
-
-      const startReview = Date.now();
-      const reviewerResult = await ProviderRouter.generate({
-        provider: reviewerProvider,
-        model: reviewerModel,
-        messages: [{ role: "user", content: reviewerPrompt }],
-      }, undefined, (from, to) => {
-        sendProgress("reviewer", "running", "", 0, 0, `fallback: ${from} → ${to}`);
-      });
-      reviewerOutput = reviewerResult.text;
-      const elapsedReview = Date.now() - startReview;
-      const reviewTokensPerSec = reviewerResult.tokensPerSec !== undefined ? reviewerResult.tokensPerSec : Math.round((reviewerOutput.length / 4) / (elapsedReview / 1000 || 1));
-      sendProgress("reviewer", "done", reviewerOutput, reviewTokensPerSec, elapsedReview);
-
-      // Optional Bounded Self-Improve loop using workspace tests results (L12, M3 AC-12)
-      if (enableSelfImprove && isLive) {
-        let currentIt = 1;
-        const maxIt = Math.min(Number(maxIterations) || 2, 3);
-        let passed = false;
-
-        while (currentIt <= maxIt && !passed) {
-          res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "running", text: `Running self-improve round ${currentIt}/${maxIt}...` })}\n\n`);
-          
-          // Execute test terminal script
-          const testResult = await TerminalManager.execute(isLive, db.data.workspacePath, "pytest");
-          if (testResult.exitCode === 0) {
-            passed = true;
-            res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "done", text: `Success: All tests passed on round ${currentIt}!` })}\n\n`);
-          } else {
-            res.write(`data: ${JSON.stringify({ stage: "self_improve", status: "pending", text: `Tests failed on round ${currentIt}. Feeding back debugger report...` })}\n\n`);
-            
-            // Loop back failures to Coder
-            const debugPrompt = `[SELF-IMPROVE DEBUGRound ${currentIt}]
-The test suite yielded the following failures:
-\`\`\`
-${testResult.stderr || testResult.stdout}
-\`\`\`
-Please fix the code and output the corrected version of the files, matching the annotation rule:
-FILE: path/to/file.ext
-\`\`\`
-content
-\`\`\``;
-            const refixResult = await ProviderRouter.generate({
-              provider: coderProvider,
-              model: coderModel,
-              messages: [
-                { role: "user", content: coderOutput },
-                { role: "assistant", content: "I will review and fix" },
-                { role: "user", content: debugPrompt }
-              ],
-            });
-            coderOutput = refixResult.text;
-
-            // Re-write fresh corrections
-            const lines = coderOutput.split("\n");
-            let activeFile = "";
-            let collectingContent = false;
-            let blockContent: string[] = [];
-
-            for (const line of lines) {
-              if (line.trim().startsWith("FILE:")) {
-                activeFile = line.replace("FILE:", "").trim();
-                collectingContent = false;
-                blockContent = [];
-                continue;
-              }
-              if (activeFile) {
-                if (line.trim().startsWith("```")) {
-                  if (!collectingContent) collectingContent = true;
-                  else {
-                    collectingContent = false;
-                    try {
-                      FilesystemManager.writeFile(isLive, db.data.workspacePath, activeFile, blockContent.join("\n"));
-                    } catch (e) {}
-                    activeFile = "";
-                  }
-                  continue;
-                }
-                if (collectingContent) blockContent.push(line);
-              }
-            }
-          }
-          currentIt++;
-        }
-      }
-
-      res.write(`data: ${JSON.stringify({ done: true, writeCount, writeErrors })}\n\n`);
-      res.end();
-    } catch (e: any) {
-      res.write(`data: ${JSON.stringify({ error: e.message || "Pipeline execution failed." })}\n\n`);
-      res.end();
-    }
-  });
-
-  /**
    * Client-Side Secure Backups API (M8, M9)
    */
   app.get("/api/backup/config", (req, res) => {
@@ -2586,41 +2631,9 @@ content
   if (process.env.SAAS_ENFORCE === "1" && !process.env.SAAS_ADMIN_TOKEN) {
     console.warn("[SaaS] SAAS_ENFORCE=1 but SAAS_ADMIN_TOKEN unset — /api/saas + /api/billing admin routes are LOCKED (set SAAS_ADMIN_TOKEN).");
   }
-  // Per-IP brute-force throttle for the admin token. timingSafeEqual alone does not
-  // stop an attacker hammering guesses; lock an IP out for the window after N misses.
-  // In-memory (per-process) — adequate for the single admin surface; a multi-replica
-  // deploy would back this with the shared store/Redis.
-  const adminFailures = new Map<string, { count: number; until: number }>();
-  const ADMIN_MAX_FAILS = 5;
-  const ADMIN_LOCK_MS = 15 * 60_000;
-  const adminGuard = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const required = process.env.SAAS_ADMIN_TOKEN;
-    if (required) {
-      const ip = req.ip || req.socket?.remoteAddress || "unknown";
-      const now = Date.now();
-      const rec = adminFailures.get(ip);
-      if (rec && rec.count >= ADMIN_MAX_FAILS && now < rec.until) {
-        res.setHeader("Retry-After", Math.ceil((rec.until - now) / 1000));
-        return res.status(429).json({ error: "Too many bad admin attempts; try later" });
-      }
-      // Timing-safe compare to avoid leaking the token via response timing.
-      const got = String(req.headers["x-admin-token"] || "");
-      const a = Buffer.from(got);
-      const b = Buffer.from(required);
-      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-        const r = adminFailures.get(ip) ?? { count: 0, until: 0 };
-        r.count += 1;
-        r.until = now + ADMIN_LOCK_MS;
-        adminFailures.set(ip, r);
-        return res.status(401).json({ error: "Bad admin token" });
-      }
-      adminFailures.delete(ip); // success → reset the counter
-    } else if (process.env.SAAS_ENFORCE === "1") {
-      // Enforcement on but no token configured → refuse rather than expose.
-      return res.status(403).json({ error: "Admin disabled: set SAAS_ADMIN_TOKEN" });
-    }
-    next();
-  };
+  // Per-IP brute-force throttle + timing-safe admin-token compare (see createAdminGuard above,
+  // module scope — extracted for the M-006 regression test). Prod builds one instance here.
+  const adminGuard = createAdminGuard();
   app.get("/api/saas/plans", adminGuard, async (_req, res) => res.json(await listPlans()));
   app.get("/api/saas/tenants", adminGuard, async (_req, res) => res.json(await listTenants()));
   app.get("/api/saas/keys", adminGuard, async (req, res) => {

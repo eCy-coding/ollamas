@@ -41,6 +41,7 @@ describe("MCP gateway CONSUME — multi-upstream cluster fan-out", () => {
   }, 30000);
 
   // Live: the real filesystem MCP server (Apache) via npx. Opt-in; skip if npx/net absent.
+  // gated: RUN_LIVE_E2E=1 — connects the real @modelcontextprotocol/server-filesystem via npx (network).
   test.skipIf(process.env.RUN_LIVE_E2E !== "1")(
     "real @modelcontextprotocol/server-filesystem registers mcp__fs__* at host_upstream",
     async () => {

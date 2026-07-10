@@ -12,10 +12,12 @@ import { PROVIDER_CATALOG } from "../server/provider-catalog";
 
 const LIVE = process.env.LIVE_PROVIDERS === "1";
 
+// gated: LIVE_PROVIDERS=1 — hits real free-tier provider HTTP APIs.
 describe.skipIf(!LIVE)("live free-tier providers (LIVE_PROVIDERS=1)", () => {
   for (const entry of Object.values(PROVIDER_CATALOG)) {
     const haveKey = !!(process.env[entry.envKey] || "").trim();
     const haveCf = entry.id !== "cloudflare" || !!(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+    // gated: <entry.envKey> present (+CLOUDFLARE_ACCOUNT_ID for cloudflare) — needs the provider's real API key.
     it.skipIf(!haveKey || !haveCf)(`${entry.id}: one real completion via ${entry.envKey}`, async () => {
       const res = await ProviderRouter.generate({
         provider: entry.id,

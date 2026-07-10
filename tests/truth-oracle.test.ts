@@ -201,6 +201,7 @@ describe("mantık motoru — DPLL (truth-table'a karşı diferansiyel + tanık +
 
   // PERF/stress: ~0.8s alone but 2^18 brute-fallback thrashes under a saturated box (was 140s in
   // the commit gate). It's a stress proof, not a fast-gate test → PERF-only (CI). Run: PERF=1 vitest.
+  // gated: PERF=1 — heavy adversarial-UNSAT budget-overflow perf case (slow; excluded from the default fast suite).
   test.skipIf(!process.env.PERF)("ROBUSTLUK: adversaryel UNSAT → bütçe aşımı → brute fallback (kesin, asılma yok)", () => {
     // ⋁(Xᵢ∧¬Xᵢ) plain-DPLL için patolojik; 18 değişken → DPLL bütçe aşar → ≤22 brute fallback → kesin sonuç.
     const hard = letters(18).map((c) => `(${c} and not ${c})`).join(" or ");
@@ -255,6 +256,7 @@ describe("CDCL SAT motoru — diferansiyel + tanık determinizmi + 135s→ms + s
 
   // PERF: wall-clock assertion (flaky under a saturated box) → PERF-only. The correctness of this
   // case is already covered by the non-timed CDCL==brute differential test above.
+  // gated: PERF=1 — heavy CDCL headline perf case (slow; excluded from the default fast suite).
   test.skipIf(!process.env.PERF)("HEADLINE: ⋁(Xᵢ∧¬Xᵢ)@25 CDCL ile ANINDA (plain-DPLL'de 135s idi)", () => {
     const orContra25 = letters(25).map((c) => `(${c} and not ${c})`).join(" or ");
     const t0 = Date.now();
