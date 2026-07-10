@@ -58,6 +58,12 @@ const LOCAL_OWNER_ROUTES: Array<[string, string]> = [
   ["/api/agent/sessions/{id}", "get"],
   ["/api/agent/sessions/{id}", "delete"],
   ["/api/agent/sessions/{id}/events", "get"],
+  // batch3 — provider key vault + pool
+  ["/api/keys", "post"],
+  ["/api/keys/add", "post"],
+  ["/api/keys/test", "post"],
+  ["/api/keys/health", "get"],
+  ["/api/keys/pool", "get"],
 ];
 // v1.29.4 — newly documented tenant-authenticated routes (ApiKey + 401 contract).
 const TENANT_AUTH_ROUTES: Array<[string, string]> = [
