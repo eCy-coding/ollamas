@@ -5,6 +5,7 @@ export const dir: 'ltr' | 'rtl' = 'ltr';
 export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Cockpit Dashboard',
   'app.tab.revenue': 'Revenue / Personal Ops',
+  'app.tab.documents': 'Documents',
   'app.tab.swarm': 'P2P Computing Swarm',
   'app.tab.saas': 'SaaS Gateway',
   'app.tab.pipeline': 'Pipeline Agent',

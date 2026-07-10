@@ -13,6 +13,7 @@ import ECySearcherPanel from "./components/ECySearcherPanel";
 import { GoogleSheetsBrowser } from "./components/GoogleSheetsBrowser";
 import { GoogleCalendarBrowser } from "./components/GoogleCalendarBrowser";
 import { GmailBrowser } from "./components/GmailBrowser";
+import { DocumentsPanel } from "./components/DocumentsPanel";
 import GitHubActionsPanel from "./components/GitHubActionsPanel";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
@@ -36,7 +37,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch, Plug,
+  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch, Plug, FileText,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -128,6 +129,7 @@ export default function App() {
     { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
     { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
     { id: "revenue", icon: <DollarSign className="w-4 h-4 text-green-400" /> },
+    { id: "documents", icon: <FileText className="w-4 h-4 text-blue-400" /> },
   ];
 
   // Map header status badge
@@ -336,6 +338,12 @@ export default function App() {
           {activeTab === "gmail" && (
             <div className="animate-fade-in">
               <GmailBrowser />
+            </div>
+          )}
+
+          {activeTab === "documents" && (
+            <div className="animate-fade-in">
+              <DocumentsPanel onNotify={notify} />
             </div>
           )}
 

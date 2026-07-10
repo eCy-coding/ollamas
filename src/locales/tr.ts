@@ -23,6 +23,7 @@ export const messages: Record<string, string> = {
   'app.tab.automation': 'Sanal Denetleyici',
   'app.tab.selftest': 'Doğrulama Kapıları',
   'app.tab.revenue': 'Gelir / Kişisel Ops',
+  'app.tab.documents': 'Belgeler',
   'app.sidebar.explorer': 'Proje Gezgini',
   'app.status.activeHost': 'Aktif Ana Makine:',
   'app.status.workspace': 'Çalışma Alanı:',
