@@ -4,6 +4,22 @@ import userEvent from '@testing-library/user-event';
 import { renderUI } from './helpers';
 import { LanguageToggle } from '../../src/components/LanguageToggle';
 import { i18n, activateLocale } from '../../src/lib/i18n';
+import { messages as enMessages } from '../../src/locales/en';
+import { messages as trMessages } from '../../src/locales/tr';
+
+// M-019 — key-parity guard: EN and TR catalogs must expose the exact same key
+// set, or a locale switch silently falls back to the id for the missing keys.
+describe('i18n key parity (M-019)', () => {
+  it('EN and TR catalogs have an identical key set (diff = 0)', () => {
+    const enKeys = new Set(Object.keys(enMessages));
+    const trKeys = new Set(Object.keys(trMessages));
+    const missingInTr = [...enKeys].filter((k) => !trKeys.has(k));
+    const missingInEn = [...trKeys].filter((k) => !enKeys.has(k));
+    expect(missingInTr).toEqual([]);
+    expect(missingInEn).toEqual([]);
+    expect(trKeys.size).toBe(enKeys.size);
+  });
+});
 
 // vF9 — runtime catalog swap (TR/EN) + persisted LanguageToggle.
 describe('i18n (vF9)', () => {

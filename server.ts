@@ -61,6 +61,7 @@ import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { registerContractRoutes, poolStatusReport as contractPoolStatus } from "./server/contract";
+import { registerAccountRoutes } from "./server/account";
 import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCustomer, createPortalSession, createCheckoutSession, sendMeterEventAsync, isLive as stripeIsLive, createAuditCheckout, dollarsToCents } from "./server/billing/stripe";
 
 const app = express();
@@ -2670,6 +2671,9 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   // --- Contract lane (vK2): machine onboarding — apply → T0 approve → API key.
   // Pure logic in contract/src; admin actions share the same adminGuard as /api/saas. ---
   registerContractRoutes(app, adminGuard, rateLimitMiddleware(), authMiddleware(true));
+
+  // --- GDPR self-service account routes (M-047): tenant-authenticated export + erasure. ---
+  registerAccountRoutes(app, authMiddleware(true));
 
   // --- Per-tenant upstream MCP servers (Faz 9E). Tenant-authenticated. ---
   app.get("/api/saas/upstreams", authMiddleware(true), async (req, res) => res.json(await listUpstreamServers(req.tenant!.tenantId)));

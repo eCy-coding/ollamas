@@ -278,6 +278,46 @@ export async function listAudit(tenantId?: string, limit = 100): Promise<any[]> 
     : (await d().query("SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", [lim])).rows;
 }
 
+// M-047 — GDPR data portability: export every tenant-scoped row as a plain JSON
+// object (right of access / portability). Read-only; safe to call anytime.
+export async function exportTenantData(tenantId: string): Promise<Record<string, any>> {
+  const q = async (sql: string) => (await d().query(sql, [tenantId])).rows;
+  return {
+    exportedAt: nowIso(),
+    tenant: await getTenant(tenantId),
+    apiKeys: await q("SELECT id, label, revoked, scopes, expires_at, last_used_at, created_at FROM api_keys WHERE tenant_id = ?"),
+    usageEvents: await q("SELECT * FROM usage_events WHERE tenant_id = ?"),
+    invoices: await q("SELECT * FROM invoices WHERE tenant_id = ?"),
+    auditEvents: await q("SELECT * FROM audit_events WHERE tenant_id = ?"),
+    upstreamServers: await q("SELECT * FROM upstream_servers WHERE tenant_id = ?"),
+  };
+}
+
+// M-047 — GDPR right to erasure: delete all tenant-scoped rows + the tenant. Children
+// are deleted before the tenant row so foreign_keys=ON never blocks the wipe. Each
+// DELETE is guarded so a migration-gated table that doesn't exist can't abort the rest.
+// Returns per-table deleted-row counts. The erasure ACT itself is audited by the caller.
+export async function eraseTenantData(tenantId: string): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const del = async (label: string, sql: string) => {
+    try { const r = await d().run(sql, [tenantId]); counts[label] = r.changes ?? 0; }
+    catch (err) { console.warn(`[store] erase ${label} failed:`, (err as Error)?.message); counts[label] = 0; }
+  };
+  await del("api_keys", "DELETE FROM api_keys WHERE tenant_id = ?");
+  await del("usage_events", "DELETE FROM usage_events WHERE tenant_id = ?");
+  await del("invoices", "DELETE FROM invoices WHERE tenant_id = ?");
+  await del("audit_events", "DELETE FROM audit_events WHERE tenant_id = ?");
+  await del("upstream_servers", "DELETE FROM upstream_servers WHERE tenant_id = ?");
+  await del("webhooks", "DELETE FROM webhooks WHERE tenant_id = ?");
+  await del("webhook_deliveries", "DELETE FROM webhook_deliveries WHERE tenant_id = ?");
+  await del("oauth_clients", "DELETE FROM oauth_clients WHERE tenant_id = ?");
+  await del("oauth_codes", "DELETE FROM oauth_codes WHERE tenant_id = ?");
+  await del("oauth_tokens", "DELETE FROM oauth_tokens WHERE tenant_id = ?");
+  await del("oauth_refresh_tokens", "DELETE FROM oauth_refresh_tokens WHERE tenant_id = ?");
+  await del("tenants", "DELETE FROM tenants WHERE id = ?");
+  return counts;
+}
+
 export async function hasInvoice(tenantId: string, period: string): Promise<boolean> {
   return !!(await d().query("SELECT 1 AS x FROM invoices WHERE tenant_id = ? AND period = ? LIMIT 1", [tenantId, period])).rows[0];
 }

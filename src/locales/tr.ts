@@ -1,4 +1,6 @@
 // vF9 — Türkçe mesaj kataloğu (runtime id'ler, macro yok). en.ts ile aynı anahtarlar.
+// M-048 — text direction for this locale (ltr today; ready for an rtl catalog).
+export const dir: 'ltr' | 'rtl' = 'ltr';
 export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Kokpit Paneli',
   'app.tab.swarm': 'P2P Hesaplama Sürüsü',

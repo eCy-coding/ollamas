@@ -1,5 +1,7 @@
 // vF9 — English message catalog (runtime ids, no macro). Keys are explicit so
 // `i18n._('app.tab.telemetry')` returns the string; missing → returns the id.
+// M-048 — text direction for this locale (ltr today; ready for an rtl catalog).
+export const dir: 'ltr' | 'rtl' = 'ltr';
 export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Cockpit Dashboard',
   'app.tab.revenue': 'Revenue / Personal Ops',
