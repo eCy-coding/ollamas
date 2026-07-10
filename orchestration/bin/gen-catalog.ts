@@ -11,14 +11,14 @@
  * Run:  tsx orchestration/bin/gen-catalog.ts
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, type Stats } from "node:fs";
-import { join, dirname, extname, basename } from "node:path";
+import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isTaskable, goalFor } from "./lib/gen-catalog-core";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
 const REPO = join(ORCH_DIR, "..");
 const OUT = join(ORCH_DIR, "TASKS.gen.txt");
-const MIN_LOC = 25;
 
 // lane label → { dir, maxDepth }
 const LANES: { lane: string; dir: string; depth: number }[] = [
@@ -45,24 +45,12 @@ function walk(dir: string, depth: number, acc: string[] = []): string[] {
   return acc;
 }
 
-/** Is this a substantial, taskable source file? */
+/** Thin IO wrapper: skip wrong-ext early (no read), else read body and defer to pure isTaskable. */
 function taskable(rel: string): boolean {
-  const ext = extname(rel), base = basename(rel);
-  if (![".ts", ".tsx", ".mjs"].includes(ext)) return false;
-  if (/\.(test|spec|d)\.ts$/.test(base) || base === "index.ts" || base === "index.tsx") return false;
+  if (![".ts", ".tsx", ".mjs"].includes(extname(rel))) return false;
   let content: string;
   try { content = readFileSync(join(REPO, rel), "utf8"); } catch { return false; }
-  if (content.split("\n").length < MIN_LOC) return false;
-  return /(^|\n)\s*export\b/.test(content);
-}
-
-/** Deterministic additive goal by file type/path (calibratable — the model reads the inlined file). */
-function goalFor(rel: string): { goal: string; acceptance: string } {
-  const ext = extname(rel);
-  if (ext === ".tsx") return { goal: "add a null/empty-data guard or an aria-label to the main exported component", acceptance: "tsc clean; component renders safely on empty/undefined input" };
-  if (ext === ".mjs") return { goal: "add a JSDoc block to the main exported function documenting its params and return", acceptance: "JSDoc present; no behavior change" };
-  if (/\/lib\//.test(rel)) return { goal: "add a unit test for a pure exported function in this file", acceptance: "new assertion passes; tsc clean" };
-  return { goal: "add JSDoc or an input-validation guard to the primary exported function", acceptance: "tsc clean; guard/JSDoc present; no behavior change" };
+  return isTaskable(rel, content);
 }
 
 const lines: string[] = [];

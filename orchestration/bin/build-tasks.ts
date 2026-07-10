@@ -8,11 +8,14 @@
  * Drops any row whose target file does not exist (every catalog target is real). Assigns stable unique ids.
  * NO cap — N = the project's real taskable surface ("yeteri kadar sayı"). Deterministic.
  *
+ * Pure parse/dedupe/id logic → ./lib/build-tasks-core (IO-free, unit-tested); this file is the FS shell only.
+ *
  * Run:  tsx orchestration/bin/gen-catalog.ts && tsx orchestration/bin/build-tasks.ts
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseTaskLine, mergeTasks, type RawTask } from "./lib/build-tasks-core";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -20,34 +23,19 @@ const REPO = join(ORCH_DIR, "..");
 const SOURCES = [join(ORCH_DIR, "TASKS_100.src.txt"), join(ORCH_DIR, "TASKS.gen.txt")]; // curated first
 const OUT = join(ORCH_DIR, "TASKS.json");
 
-function slug(s: string): string {
-  return s.toLowerCase().replace(/\.[a-z]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
-interface Task { id: string; lane: string; target: string; goal: string; acceptance: string; }
-
-const usedId = new Set<string>();
-const seenTarget = new Set<string>(); // dedupe by target — curated (read first) wins
-const out: Task[] = [];
-let dropped = 0;
-
+const rows: RawTask[] = [];
+let parseDropped = 0;
 for (const src of SOURCES) {
   if (!existsSync(src)) continue;
   for (const raw of readFileSync(src, "utf8").split("\n")) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const [lane, target, goal, acceptance = ""] = line.split("|").map((x) => x.trim());
-    if (!lane || !target || !goal) { dropped++; continue; }
-    if (seenTarget.has(target)) continue;             // curated priority
-    if (!existsSync(join(REPO, target))) { dropped++; continue; }
-    seenTarget.add(target);
-    let id = `${lane}-${slug(basename(target))}`, n = 1;
-    while (usedId.has(id)) { n++; id = `${lane}-${slug(basename(target))}-${n}`; }
-    usedId.add(id);
-    out.push({ id, lane, target, goal, acceptance });
+    const r = parseTaskLine(raw);
+    if (!r) { if (raw.trim() && !raw.trim().startsWith("#")) parseDropped++; continue; } // incomplete row
+    rows.push(r);
   }
 }
 
-writeFileSync(OUT, JSON.stringify(out, null, 2) + "\n");
-const byLane = out.reduce<Record<string, number>>((m, t) => ((m[t.lane] = (m[t.lane] || 0) + 1), m), {});
-console.log(`[build-tasks] wrote ${out.length} tasks → ${OUT} (dropped ${dropped})`);
+const { tasks, dropped } = mergeTasks(rows, (t) => existsSync(join(REPO, t)));
+writeFileSync(OUT, JSON.stringify(tasks, null, 2) + "\n");
+const byLane = tasks.reduce<Record<string, number>>((m, t) => ((m[t.lane] = (m[t.lane] || 0) + 1), m), {});
+console.log(`[build-tasks] wrote ${tasks.length} tasks → ${OUT} (dropped ${dropped + parseDropped})`);
 console.log(`[build-tasks] by lane: ${JSON.stringify(byLane)}`);
