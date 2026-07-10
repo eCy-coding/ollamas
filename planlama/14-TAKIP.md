@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 YÜRÜTMEDE (4/5 ✅, M-025 Emre-gate)**
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 ✅ + V2 ✅ TAMAM → V3 sırada**
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,20 +15,20 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1 Dürüst Kimlik YÜRÜTMEDE** (branch feat/v-final-train) |
-| Kodlama durumu | ◐ V1 4/5 ✅ (M-026,027,021,028) · M-025 Emre-gate bekliyor |
-| Genel ilerleme (kod) | **4 / 49 mikro-görev** · **0.8 / 10 versiyon** (planlama %100) |
-| Başlangıç sürümü | v1.23.0 → **package.json artık ollamas@1.24.0 ✅** (M-021) |
-| Sıradaki adım | M-025 (canonical PLAN notu) = Emre-gate → onay sonrası V1 kapat → **V2** |
-| Bloke / Emre-gate | **M-025 (canonical, ŞİMDİ)**, M-015 (branch, V5) |
-| Kullanıcı ne zaman kullanır | **V2** (v1.25.0) — kendi modelini bağlayıp çalıştırır |
+| Aktif aşama | **V1+V2 TAMAM** (branch feat/v-final-train, 6 commit) |
+| Kodlama durumu | ✅ V1 5/5 · ✅ V2 3/3 → **V3 sırada** (M-029 adding-a-tool) |
+| Genel ilerleme (kod) | **8 / 49 mikro-görev** · **2 / 10 versiyon** |
+| Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
+| Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
+| Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
+| Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
 ## 🚂 Versiyon ilerleme (release-train — yürütme sırası)
 
 ```
-V1  Dürüst Kimlik        ████████░░ ◐  v1.24.0  4/5 ✅ (M-026,027,021,028) · M-025 Emre-gate
-V2  Kendi Modelini Getir ░░░░░░░░░░ ☐  v1.25.0  ✅İLK-KULLANILABİLİR (M-031 bug,037 wizard,033 guide)
-V3  Kendi Geliştirmeni.. ░░░░░░░░░░ ☐  v1.26.0  ✅dev-extensible (M-029,030,034,035,040,032)
+V1  Dürüst Kimlik        ██████████ ✅ v1.24.0  5/5 (M-026,027,021,028,025)
+V2  Kendi Modelini Getir ██████████ ✅ v1.25.0  3/3 KULLANILABİLİR (M-031,037,033)
+V3  Kendi Geliştirmeni.. ░░░░░░░░░░ ☐  v1.26.0  ◀ SIRADA (M-029,030,034,035,040,032)
 V4  Güvenlik Kanıtı      ░░░░░░░░░░ ☐  v1.27.0  (M-001..011)
 V5  Test Bütünlüğü       ░░░░░░░░░░ ☐  v1.28.0  (M-012..016 · FRESH-suite barrier)
 V6  Ürün & Gelir         ░░░░░░░░░░ ☐  v1.29.0  (M-017,018,019)
@@ -82,19 +82,19 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-022 | P5 | README/QUICKSTART spot-check | ☐ | — | M-021 |
 | M-023 | P5 | install.sh temiz-dizin | ☐ | — | M-021 |
 | M-024 | P5 | RELEASE_ROLLBACK tatbikat | ☐ | — | — |
-| M-025 | V1 | canonical plan notu | ⛔ | — | **Emre — ŞİMDİ** |
+| M-025 | V1 | canonical plan notu | ✅ | PLAN.md+ROADMAP canonical-not · 1ccdbed | — |
 | M-026 | V1 | README gerçek-ürün | ✅ | kurgu-grep=0 · gerçek başlık · QUICKSTART link · 4a9cc28 | — |
 | M-027 | V1 | setup.sh düzelt/yönlendir | ✅ | go-build=0 · ready-wrapper · bash-n OK · 4a9cc28 | — |
 | M-028 | V1 | CONTRIBUTING + CoC | ✅ | iki dosya + CoC-2.1 · 4a9cc28 | — |
 | M-029 | P6b | docs/adding-a-tool.md | ☐ | — | — |
 | M-030 | P6b | Extension Guide (indeks) | ☐ | — | M-029/034/035 |
-| M-031 | P6b | custom-openai dropdown (BUG) | ☐ | — | — |
+| M-031 | V2 | custom-openai+catalog dropdown+server | ✅ | server-branch + 11 dropdown + 21/21 test · e0edba4 | — |
 | M-032 | P6b | docs/troubleshooting.md | ☐ | — | — |
-| M-033 | P6b | docs/model-guide.md | ☐ | — | — |
+| M-033 | V2 | docs/model-guide.md | ✅ | VRAM tablosu+BYO+GGUF · e0edba4 | — |
 | M-034 | P6b | HOWTO-ADD-SKILL.md | ☐ | — | — |
 | M-035 | P6b | CLI alt-komut rehberi | ☐ | — | — |
 | M-036 | P6b | deploy-guide + stack-update | ☐ | — | — |
-| M-037 | P6b | first-run model wizard | ☐ | — | — |
+| M-037 | V2 | first-run model onboarding | ✅ | ai.ts aksiyon-mesajı + 2/2 test · e0edba4 | — |
 | M-038 | P6b | per-model ayar UI | ☐ | — | — |
 | M-039 | P6b | GGUF/Modelfile import | ☐ | — | M-033 |
 | M-040 | P6b | API quickstart | ☐ | — | — |
@@ -103,7 +103,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı 0/44 · ⊘ test-only 6 · ⛔ Emre-gate 2 · doküman 15 + UX/kod 21 · aktif-yol 36.
+**Sayaç:** kapandı **8/49** (V1+V2) · ⊘ test-only 6 · ⛔ Emre-gate 1 (M-015) + outward tag · aktif-yol 41.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 

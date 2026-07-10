@@ -186,4 +186,21 @@
 
 ---
 
+## S-008 · 2026-07-10 · V1 kapandı + V2 TAMAM (kullanılabilir) · Sonnet-exec
+
+- **V1 5/5 ✅** (M-025 canonical-not uygulandı, commit 1ccdbed). V1 = Dürüst Kimlik kapandı.
+- **V2 3/3 ✅ — İLK KULLANILABİLİR VERSİYON:**
+  - **M-031** (gerçek bug, commit e0edba4): keşif — `/api/models/:provider` catalog+custom-openai için `[]`
+    döndürüyordu (yalnız dropdown değil, server de eksikti). Fix: server.ts generic branch (catalog
+    `catalogBaseUrl`+`/models`, custom-openai endpoint, key-yok→defaultModel/mesaj) + ReactAgentTab
+    dropdown'a 11 seçenek (custom-openai + 10 catalog) + 2 test (21/21).
+  - **M-037** (e0edba4): `ai.ts` iki throw → `NO_LOCAL_MODEL_HELP` (ollama pull champion + npm run ready);
+    2/2 test (mesaj-aksiyon + resolveDefaultModel throw).
+  - **M-033** (e0edba4): `docs/model-guide.md` (VRAM tablosu, champion gerekçe, BYO endpoint, GGUF/Modelfile).
+- **KANIT:** `npm run lint` exit 0 · `vitest ReactAgentTab+model-onboarding` 23/23 · commit'ler 1ccdbed, e0edba4.
+- **Kullanıcı artık kendi modelini bağlayıp kullanabilir** (V2 hedefi ✅).
+- **Sonraki:** V3 Kendi Geliştirmeni Yap → M-029 (docs/adding-a-tool.md, cookbook §C). Kesintisiz devam.
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->

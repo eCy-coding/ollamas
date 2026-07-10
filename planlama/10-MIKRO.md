@@ -241,7 +241,7 @@
 - **kabul:** dosya var; 9 uzatma noktası linkli tablo.
 - **dep:** M-029, M-034, M-035 (linklediği docs) · **durum:** ☐
 
-### M-031 · P6b · S · GAP-035 · custom-openai + catalog dropdown (GERÇEK BUG)
+### M-031 · V2 · ✅ · GAP-035 · custom-openai + catalog dropdown (GERÇEK BUG — server+ui)
 - **anchor:** `src/components/ReactAgentTab.tsx:211-221` (`providers` dizisi — custom-openai + catalog YOK), `KeyVault.tsx:39` (CUSTOM_OPENAI_PRESETS), `server/provider-catalog.ts` (groq/cerebras/zai/sambanova/nvidia-nim)
 - **action:** `providers` dizisine `custom-openai` + catalog provider'ları ekle (key-var olanları dinamik göster). Key girilen endpoint agent'tan seçilebilsin.
 - **test:** `tests/ui/react-agent-providers.test.tsx` (yeni) — key-var provider dropdown'da görünür.
@@ -256,7 +256,7 @@
 - **kabul:** dosya var; ≥5 senaryo belirti/çözüm.
 - **dep:** yok · **durum:** ☐
 
-### M-033 · P6b · S · GAP-032 · docs/model-guide.md
+### M-033 · V2 · ✅ · GAP-032 · docs/model-guide.md
 - **anchor:** `server/cockpit-models.ts:11` (rankMacModels RAM-fit), `ai.ts:35` (champion qwen3:8b)
 - **action:** `docs/model-guide.md`: model seçimi + VRAM/RAM tablosu (8B/14B/30B/70B gereksinimi), champion neden qwen3:8b, custom-openai endpoint kullanımı, MAX_LOADED_MODELS=1 tek-GPU gerçeği.
 - **test:** yok
@@ -284,7 +284,7 @@
 - **kabul:** dosya var; 4 deploy yolu + update akışı.
 - **dep:** yok · **durum:** ☐
 
-### M-037 · P6b · M · GAP-034 · first-run model onboarding
+### M-037 · V2 · ✅ · GAP-034 · first-run model onboarding
 - **anchor:** `server/ai.ts:77` (`throw "no local ollama model available"`), `scripts/ready.mjs` (qwen3:8b pull), `src/App.tsx:242` (Setup Wizard)
 - **action:** model yoksa: net yönlendirici mesaj + `ollama pull <champion>` öneri/tetik (UI veya API `/api/models/pull` opsiyonel). En az throw yerine actionable mesaj.
 - **test:** `tests/model-onboarding.test.ts` (yeni) — model-yok → yönlendirici hata (throw-string değil).
