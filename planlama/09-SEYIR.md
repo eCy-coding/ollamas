@@ -233,4 +233,21 @@
 
 ---
 
+## S-011 · 2026-07-10 · V5 Test Bütünlüğü 8/9 (subagent-driven + TDD skill) · conductor: fable-5
+
+- **Slash orkestrasyon (§10):** V5 subagent `superpowers:test-driven-development` çağırdı (kırmızı→yeşil).
+- **V5 8/9 ✅** (commit 06e27f4): M-050 boot-harness (server.ts createAdminGuard factory + /api/pipeline
+  module top-level, prod-boot BOZULMADI) → M-004/M-006 açıldı+test; M-012 assertUniqueVersions export+test;
+  M-045 migration down()+rollbackTo() (up-path değişmedi)+test; M-014 21-skip gated + docs/TESTING.md; M-016 worktree 6→5 (audit-cont temiz-sil).
+- **M-013 FRESH-suite (conductor):** ilk koşu **1 fail** — `tests/ai.test.ts:67` eski mesaj assert'i (V2/M-037'de
+  mesajı aksiyon-alınabilir yapmıştım → o zaman full-suite koşmadığım için kaçtı). Kök-neden düzeltildi
+  (test `/ollama pull/` assert eder) → **1518 passed / 0 failed**. FRESH-suite tam amacına hizmet etti.
+- **KANIT (conductor self-verify):** tsc exit 0 · vitest node-project 1518/0 · IDE-stale-diagnostic çelişkisi
+  otoriter tsc ile çözüldü (export'lar var). e2e (playwright) HENÜZ koşulmadı (server-boot gerekir) — V6/verify'da.
+- **⛔ STOP — M-015 Emre-gate:** 67 `audit/*` branch + 2 divergent-lane (gateway-v2/v1.8-bench) + 5 iç worktree.
+  Branch-silme geri-alınamaz → Emre kararı bekliyor (18-§2). Sonrası V6.
+- **31/50 görev, ~4.9/10 versiyon, 13 commit.**
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->

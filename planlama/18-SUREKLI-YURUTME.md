@@ -102,6 +102,21 @@ ollamas otonom yürütme — kaldığın yerden devam. Branch: feat/v-final-trai
 
 İki yöntem (subagent-driven §9 · yeni-terminal §RESUME-KIT) aynı tek-kaynaktan (14-TAKIP) resume eder → tutarlı.
 
+## §10 Slash-skill orkestrasyon haritası (kondüktör kararı)
+
+Her aşamada uygun `/` skill'i çağrılır. Ağır skill'ler SUBAGENT context'inde (ana-thread yalın); hafif
+kapanış-skill'i conductor'da.
+
+| İş | Skill | Kim |
+|---|---|---|
+| Test yazımı (V4-V5-V6 test) | `superpowers:test-driven-development` | subagent |
+| Fail → kök-neden | `superpowers:systematic-debugging` | subagent |
+| Branch/lane hijyeni (M-015/016) | `superpowers:finishing-a-development-branch` | conductor (M-015 Emre-gate) |
+| Versiyon kapanış doğrulama | `superpowers:verification-before-completion` | conductor |
+| Commit | `caveman:caveman-commit` (`/commit`) | conductor |
+| Yerel lint/test/git | `ecydev` (eCyMCP) | ikisi |
+| Domain (V6 billing/perf, V7 model) | ilgili `jeff-*`/`analytics-*` gerekirse | subagent |
+
 ## §8 Kesintisiz çalışma sözü
 
 Her tur: net durum + kaldığın-yer + sıradaki-adım (P-E). STOP koşulu yoksa bir sonraki versiyona geç —

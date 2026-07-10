@@ -32,7 +32,7 @@
 - **kabul:** `vitest run tests/commander-exec` → 3 case yeşil; injection stdout'a sızmaz.
 - **dep:** yok · **durum:** ⊘ (test-only, kod FP)
 
-### M-004 · V5◐ · ERTELENDİ(boot-harness) · GAP-003 · pipeline validate-order regresyon testi
+### M-004 · V5 · ✅ · GAP-003 · pipeline validate-order regresyon testi
 - **anchor:** `server.ts:2050,2072-2078` (`/api/pipeline`, validate→setHeader)
 - **action:** empty/eksik prompt → 400 JSON (SSE header'dan önce). Kod DEĞİŞMEZ.
 - **test:** `tests/pipeline-validate.test.ts` (yeni)
@@ -46,7 +46,7 @@
 - **kabul:** mock DB reject → çağrı resolve/void, unhandled-rejection yok.
 - **dep:** yok · **durum:** ⊘
 
-### M-006 · V5◐ · ERTELENDİ(boot-harness) · GAP-005 · adminGuard brute-force regresyon testi
+### M-006 · V5 · ✅ · GAP-005 · adminGuard brute-force regresyon testi
 - **anchor:** `server.ts:2563-2593` (adminFailures, MAX_FAILS=5, LOCK_MS, timing-safe)
 - **action:** 5 yanlış token → 429 + Retry-After. Kod DEĞİŞMEZ.
 - **test:** `tests/admin-guard.test.ts` (yeni)
@@ -93,21 +93,21 @@
 
 ## P3 — Test / Contract / Lane
 
-### M-012 · P3 · XS · GAP-011 · migration uniqueness regresyon testi
+### M-012 · V5 · ✅ · GAP-011 · migration uniqueness regresyon testi
 - **anchor:** `server/store/migrations.ts:14,38-181` (v1-v6 + seenVersions throw 170-181)
 - **action:** dup-version array → module-load throw doğrula (assert MEVCUT). Divergent-lane merge kararı = M-015 kapsamı.
 - **test:** `tests/migration-uniqueness.test.ts` (yeni) veya mevcut `tests/migration-drift.test.ts`'e ekle
 - **kabul:** dup-version → "Duplicate migration version" throw; `grep -cE 'version:' migrations.ts` = 6.
 - **dep:** yok · **durum:** ⊘
 
-### M-013 · P3 · M · GAP-012 · full-suite + e2e FRESH koşumu
+### M-013 · V5 · ✅ · GAP-012 · full-suite + e2e FRESH koşumu
 - **anchor:** `vitest.config.ts` (4 project), `playwright.config.ts` (8 spec)
 - **action:** temiz `vitest run` + `npm run test:e2e`; fail varsa 03-GAP'e yeni satır (systematic-debugging).
 - **test:** yok (koşum + kanıt)
 - **kabul:** `vitest run` 0 failed; `npm run test:e2e` 0 failed; çıktı 09-SEYIR'e.
 - **dep:** M-001..M-012 (yeni testler yazıldıktan sonra) · **durum:** ☐
 
-### M-014 · P3 · S · GAP-013 · skipped test gerekçe-belge
+### M-014 · V5 · ✅ · GAP-013 · skipped test gerekçe-belge
 - **anchor:** 22 skip call-site (12-TEST-PLANI §skip-map): `tests/cli-keychain-live.test.ts:16`, `tests/mac-power.e2e.test.ts:58`, `tests/rag.e2e.test.ts:63`, `tests/bench-tool.e2e.test.ts:63`, `tests/litellm-provider.e2e.test.ts:34,38`, `tests/providers-live.test.ts:15,19`, `tests/truth-oracle.test.ts:204,258`, `tests/ukp-upstream.e2e.test.ts`(6×), `tests/ClusterE2ELive.test.ts:14`, +
 - **action:** her skip call-site'a `// gated: <ENV> — <gerçek-infra sebebi>` yorumu + `docs/TESTING.md` skip-tablosu (dosya · env · sebep · nasıl-koşulur).
 - **test:** yok (belge + grep doğrulama)
@@ -121,7 +121,7 @@
 - **kabul:** `git branch --list 'audit/*' | wc -l` ≤ hedef; reconcile kararı 09-SEYIR'de.
 - **dep:** M-012 (migration uniqueness netliği) · **durum:** ☐ · **eskalasyon:** Emre
 
-### M-016 · P3 · S · GAP-015 · iç worktree prune
+### M-016 · V5 · ✅ · GAP-015 · iç worktree prune
 - **anchor:** `git worktree list` — 6 iç `.claude/worktrees/*` + completion-integration + audit-cont
 - **action:** her iç worktree: canlı-süreç/kaza-dirty kontrolü (SEYIR Faz 33 dersi) → temizse `git worktree remove`.
 - **test:** yok
@@ -351,14 +351,14 @@
 
 ## Completeness gap'leri (S-006 — GAP-041..045; S-010 — GAP-046)
 
-### M-050 · V5 · M · GAP-046 · boot-gated route test harness (S-010 keşif)
+### M-050 · V5 · ✅ · GAP-046 · boot-gated route test harness (S-010 keşif)
 - **anchor:** `server.ts` `initializeServer()` (~585+, route'lar burada kayıtlı; export değil), `vitest.config.ts` (PERF-gated)
 - **action:** `initializeServer`'ı test-edilebilir kıl (export + test-mode flag: network/DB/timer atla, VEYA handler'ları ayrı modül). M-004 (pipeline validate) + M-006 (adminGuard 429) regresyon-testlerini AÇAR.
 - **test:** harness sonrası `tests/pipeline-validate.test.ts` + `tests/admin-guard.test.ts`.
 - **kabul:** boot-gated route testi mümkün + M-004/M-006 yeşil.
 - **dep:** yok · **durum:** ☐ · **not:** kod-doğru (anchor 2100-2104, 2596-2616) ama V4'te regresyon-test kilidi
 
-### M-045 · V5 · M · GAP-041 · migration rollback/down yolu
+### M-045 · V5 · ✅ · GAP-041 · migration rollback/down yolu
 - **anchor:** `server/store/migrations.ts` (v1-v6 forward-only, `down` fn yok — grep=0), `runMigrations`
 - **action:** her migration'a opsiyonel `down(db)` + `rollbackTo(version)` fonksiyonu; başarısız upgrade'de son sağlam versiyona dön. Uniqueness assert (170-181) korunur.
 - **test:** `tests/migration-rollback.test.ts` — upgrade→down→şema eski-haline.
