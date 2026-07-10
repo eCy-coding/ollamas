@@ -114,7 +114,7 @@
 - **kabul:** `grep -rn "skip" tests --include=*.ts | wc -l` = 22; her satırda "gated:" var; docs/TESTING.md tablosu 22 satır.
 - **dep:** yok · **durum:** ☐
 
-### M-015 · P3 · M · GAP-014 · audit/* branch + divergent-lane konsolidasyon
+### M-015 · V5 · ✅ · GAP-014 · audit/* branch + divergent-lane konsolidasyon
 - **anchor:** `git branch --list 'audit/*'` (67), `feat/gateway-v2` + `feat/v1.8-bench` (divergent v3)
 - **action:** 67 audit/* için karar (entegre/arşiv-tag/sil) — Emre onayı (eskalasyon 08 §5); divergent-lane OAuth (opaque vs JWT) + migration renumber kararı.
 - **test:** yok (git işlemi + karar kaydı)

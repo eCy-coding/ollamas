@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1·V2·V3·V4 ✅ · V5 8/9 (M-015 Emre-gate)** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1·V2·V3·V4·V5 ✅ TAMAM → V6 sırada** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,9 +15,9 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1·V2·V3·V4 ✅ · V5 8/9** (branch feat/v-final-train, 13 commit) |
-| Kodlama durumu | ✅ V1·V2·V3·V4 · V5 8/9 (M-004/006 açıldı, FRESH-suite 1518✅) → **M-015 Emre-gate** |
-| Genel ilerleme (kod) | **31 / 50 mikro-görev** · **4.9 / 10 versiyon** |
+| Aktif aşama | **V1–V5 ✅ TAMAM** (branch feat/v-final-train, 14 commit) |
+| Kodlama durumu | ✅ V1–V5 (M-015 audit/* 67→arşiv-tag+sil, branch 137→73) → **V6 sırada** |
+| Genel ilerleme (kod) | **32 / 50 mikro-görev** · **5 / 10 versiyon (YARI)** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
 | Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
@@ -30,7 +30,7 @@ V1  Dürüst Kimlik        ██████████ ✅ v1.24.0  5/5 (M-02
 V2  Kendi Modelini Getir ██████████ ✅ v1.25.0  3/3 KULLANILABİLİR (M-031,037,033)
 V3  Kendi Geliştirmeni.. ██████████ ✅ v1.26.0  6/6 (adding-a-tool/extension-guide/HOWTO/CLI/api/troubleshoot)
 V4  Güvenlik Kanıtı      ██████████ ✅ v1.27.0  11/11 (M-004/006 V5'te açıldı)
-V5  Test Bütünlüğü       █████████░ ◐  v1.28.0  8/9 (M-012,013✅1518,014,016,045,050,004,006) · M-015⛔Emre
+V5  Test Bütünlüğü       ██████████ ✅ v1.28.0  9/9 (M-015 audit/* arşivlendi · FRESH 1518)
 V6  Ürün & Gelir         ░░░░░░░░░░ ☐  v1.29.0  ◀ SIRADA (M-017 billing,018 Lighthouse,019 i18n + M-047/048)
 V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  (M-038,039)
 V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  (M-020,022,023,024,036)
@@ -58,22 +58,22 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 | M | Faz | Görev (kısa) | Durum | Kanıt | Blocker |
 |---|---|---|---|---|---|
-| M-001 | P2 | localOwnerGuard SAAS testi | ☐ | — | — |
-| M-002 | P2 | allowlist tamlık invariant | ☐ | — | M-001 |
-| M-003 | P2 | commander execFile regresyon | ☐⊘ | — | — |
-| M-004 | P2 | pipeline validate-order testi | ☐⊘ | — | — |
-| M-005 | P2 | record swallow testi | ☐⊘ | — | — |
-| M-006 | P2 | adminGuard brute-force testi | ☐⊘ | — | — |
-| M-007 | P2 | providers safeParse testi | ☐⊘ | — | — |
-| M-008 | P2 | workflow lint (ref_name) | ☐ | — | — |
-| M-009 | P2 | ReDoS audit (threatfeed) | ☐ | — | — |
-| M-010 | P2 | colab urllib scheme guard | ☐ | — | — |
-| M-011 | P2 | docker-compose read-only | ☐ | — | — |
-| M-012 | P3 | migration uniqueness testi | ☐⊘ | — | — |
-| M-013 | P3 | FRESH suite + e2e (BARRIER) | ☐ | — | M-001..012 |
-| M-014 | P3 | skipped test gerekçe-belge | ☐ | — | — |
-| M-015 | P3 | audit/* + divergent konsolidasyon | ⛔ | — | **Emre** |
-| M-016 | P3 | iç worktree prune | ☐ | — | — |
+| M-001 | V4 | localOwnerGuard SAAS testi | ✅ | 5da6452 | — |
+| M-002 | V4 | allowlist tamlık invariant | ✅ | 5da6452 | — |
+| M-003 | V4 | commander execFile regresyon | ✅⊘ | 5da6452 | — |
+| M-004 | V5 | pipeline validate-order testi | ✅ | boot-harness · 06e27f4 | — |
+| M-005 | V4 | record swallow testi | ✅⊘ | 5da6452 | — |
+| M-006 | V5 | adminGuard brute-force testi | ✅ | boot-harness · 06e27f4 | — |
+| M-007 | V4 | providers safeParse testi | ✅⊘ | 5da6452 | — |
+| M-008 | V4 | workflow lint (ref_name) | ✅ | env-only grep · 5da6452 | — |
+| M-009 | V4 | ReDoS audit (threatfeed) | ✅ | name-literal→nosemgrep · 5da6452 | — |
+| M-010 | V4 | colab urllib scheme guard | ✅ | python 8/8 · 5da6452 | — |
+| M-011 | V4 | docker-compose read-only | ✅ | read_only+tmpfs · 5da6452 | — |
+| M-012 | V5 | migration uniqueness testi | ✅ | 06e27f4 | — |
+| M-013 | V5 | FRESH suite (BARRIER) | ✅ | 1518 pass · M-037 regr-fix · 06e27f4 | — |
+| M-014 | V5 | skipped test gerekçe-belge | ✅ | 21 gated + TESTING.md · 06e27f4 | — |
+| M-015 | V5 | audit/* konsolidasyon | ✅ | 67→archive-tag+sil · branch 137→73 | — |
+| M-016 | V5 | iç worktree prune | ✅ | 6→5 audit-cont · 06e27f4 | — |
 | M-017 | P4 | billing e2e zincir testi | ☐ | — | — |
 | M-018 | P4 | Lighthouse RUN + doğrula | ☐ | — | M-013 |
 | M-019 | P4 | i18n key-count parite assert | ☐ | — | — |
@@ -103,21 +103,21 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **14/49** (V1+V2+V3) · ⊘ test-only 6 · ⛔ Emre-gate 1 (M-015) + outward tag · aktif-yol 35.
+**Sayaç:** kapandı **32/50** (V1–V5) · ⊘ test-only 4 · ⛔ Emre-gate 0 (M-015 çözüldü) · outward tag V10 · aktif-yol 18.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
-- **Şu an:** V1+V2+V3 kapandı (14/49). Yöntem: subagent-driven (§9) — her versiyon taze subagent, conductor doğrular+commit'ler.
-- **Sonraki versiyon: V4 Güvenlik Kanıtı (v1.27.0)** — ilk todo **M-001** (localOwnerGuard SAAS testi, `server.ts:276-294`).
-  M-001,002 auth-test + M-003..007 ⊘ regresyon + M-008 workflow-lint + M-009 ReDoS(RE2) + M-010 colab + M-011 compose.
-- **Barrier hatırlatma:** M-013 (V5 FRESH suite) tüm V4/V5 test-yazımı sonrası; M-015 (V5) Emre-gate; M-044 (V10 GA) + git-tag outward.
+- **Şu an:** V1–V5 kapandı (32/50, YARI YOL). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
+- **Sonraki versiyon: V6 Ürün & Gelir (v1.29.0)** — M-017 (billing e2e, stripe.ts), M-018 (Lighthouse RUN), M-019 (i18n key-parite) + M-047 (GDPR erasure), M-048 (i18n RTL).
+- **Barrier:** M-018←M-013(✅). Kalan Emre-gate: yalnız V10 git-tag (outward).
 
 ## ⛔ Bloke / Emre-gate bekleyenler
 
 | M | Ne için karar | Neden Emre |
 |---|---|---|
-| M-015 | 67 `audit/*` branch (entegre/arşiv/sil) + divergent-lane OAuth seçimi | geri-alınamaz git; mimari karar (08 §5) |
-| M-025 | kök PLAN.md + ROADMAP-vNext başına "canonical" notu | mevcut doküman değişikliği onayı |
+| ~~M-015~~ ✅ | çözüldü: 67 audit/* arşiv-tag+sil (Emre onayı) | — |
+| divergent-lane | V10-sonrası ertelendi (Emre) | GA bloklamaz |
+| V10 git-tag | GA `git tag v1.33.0` (outward) | ileride |
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
