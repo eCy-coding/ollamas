@@ -22,6 +22,7 @@ import { ProviderHttpError, parseRetryAfter, quotaCooldownTtl, FAILURE_COOLDOWN_
 import { filterChain } from "./chain-policy";
 import { setToolSupport, toolSupportSnapshot, hydrateToolSupport } from "./capability-cache";
 import { recordRequestEvent } from "./telemetry";
+import { resolveModelTuning, resolveKeepAlive, withSystemOverride } from "./model-overrides";
 import { randomUUID } from "node:crypto";
 
 // Types
@@ -930,20 +931,22 @@ export class ProviderRouter {
       }
 
       case "ollama-local": {
-        const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
         // The model actually used. After a provider fallback config.model is nulled
         // so each provider self-defaults; reporting config.model in the returns would
         // surface modelUsed:undefined — resolve it once here and reuse everywhere.
         const requestedModel = config.model || "qwen3:8b";
+        // M-038: persisted per-model override — explicit request values still win.
+        const override = db.data.modelOverrides?.[requestedModel];
+        const { numCtx, temperature } = resolveModelTuning(config, override, db.data.ollamaNumCtx);
         // vO65 alignment wiring: swap to the regression-clean "-ca" variant when OLLAMAS_ALIGN is on (else no-op).
         const usedModel = resolveAlignedModel(requestedModel, alignSelection(), { enabled: alignmentEnabled(process.env) });
         if (usedModel !== requestedModel) console.log(`[align] ${requestedModel} → ${usedModel}`);
         const reqBody = JSON.stringify({
           model: usedModel,
-          messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args, not stringified
+          messages: toOpenAiMessages(withSystemOverride(config.messages, override?.system), false), // ollama wants OBJECT args, not stringified
           options: {
             num_ctx: numCtx,
-            temperature: config.temperature ?? 0.7,
+            temperature,
             // Calibrated for Apple Silicon: pin threads to performance cores,
             // keep all layers on the GPU. Env-driven (omitted if unset).
             ...(process.env.OLLAMA_NUM_THREAD ? { num_thread: Number(process.env.OLLAMA_NUM_THREAD) } : {}),
@@ -951,7 +954,7 @@ export class ProviderRouter {
           },
           // Keep the model warm in Metal VRAM so repeat calls skip the reload
           // cost (stable low latency). Default 30m; "0" disables.
-          keep_alive: process.env.OLLAMA_KEEP_ALIVE || "30m",
+          keep_alive: resolveKeepAlive(override, process.env.OLLAMA_KEEP_ALIVE),
           think: false, // Prevent reasoning bloat output according to L6 Spec
           stream: !!onStreamChunk,
           tools: config.tools,
@@ -1083,11 +1086,13 @@ export class ProviderRouter {
         const apiKey = this.getDecryptedKey("ollama-cloud");
         if (!apiKey) throw new Error("Ollama Cloud Key is not set");
         const ollamaHost = "https://ollama.com/api";
-        const numCtx = config.numCtx || db.data.ollamaNumCtx || 8192;
         // Direct ollama.com API serves cloud models by their BASE name (no "-cloud"
         // suffix → that suffix is only for the local daemon's pulled cloud tags). A
         // non-cloud default like qwen3:8b 404s here, so default to a real cloud model.
         const cloudModel = (config.model || "gpt-oss:120b").replace(/-cloud$/, "");
+        // M-038: per-model override keyed by the tag the user selected (as shown in the UI).
+        const cloudOverride = db.data.modelOverrides?.[config.model || cloudModel];
+        const { numCtx, temperature } = resolveModelTuning(config, cloudOverride, db.data.ollamaNumCtx);
 
         const response = await fetch(`${ollamaHost}/chat`, {
           method: "POST",
@@ -1097,10 +1102,10 @@ export class ProviderRouter {
           },
           body: JSON.stringify({
             model: cloudModel,
-            messages: toOpenAiMessages(config.messages, false), // ollama wants OBJECT args
+            messages: toOpenAiMessages(withSystemOverride(config.messages, cloudOverride?.system), false), // ollama wants OBJECT args
             options: {
               num_ctx: numCtx,
-              temperature: config.temperature ?? 0.7,
+              temperature,
             },
             think: false,
             stream: !!onStreamChunk,

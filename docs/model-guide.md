@@ -68,6 +68,8 @@ SYSTEM """You are a helpful assistant."""
 ```bash
 ollama create my-model -f Modelfile   # then it appears in ollamas' model list
 ```
+Full walkthrough (why the CLI beats HTTP `/api/create` for local files, per-model tuning after
+import): [custom-model.md](custom-model.md).
 
 ## No key needed for local use
 

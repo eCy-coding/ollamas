@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 import { readGenericPassword, writeGenericPassword } from "./lib/keychain-scan";
+import type { ModelOverride } from "./model-overrides";
 
 // Atomic file write: write a temp sibling then rename over the target. rename(2) is atomic on
 // POSIX within the same directory, so a crash / power loss mid-write can never leave the target
@@ -82,6 +83,8 @@ export interface DBConfig {
   revenue?: { model?: string; brand?: string; email?: string; paymentLink?: string };
   /** Outbound alert sinks (Slack/Discord incoming webhooks) — local-owner only. */
   notify?: { slackWebhookUrl?: string; discordWebhookUrl?: string };
+  /** Per-model tuning overrides (M-038): model tag → num_ctx/temperature/keep_alive/system. */
+  modelOverrides?: Record<string, ModelOverride>;
 }
 
 const DEFAULT_CONFIG: DBConfig = {

@@ -73,6 +73,19 @@ export const messages: Record<string, string> = {
   'app.usage.loadError': 'Kullanım yüklenemedi.',
   'app.offline.badge': 'Çevrimdışı',
   'app.offline.hint': 'Ağ yok — son bilinen veri gösteriliyor.',
+  // Model bazlı ayar editörü (V7 M-038)
+  'model-settings.toggle': 'Model Ayarları',
+  'model-settings.toggle.title':
+    'Bu model için her istekte uygulanan model bazlı geçersiz kılmalar (num_ctx, temperature, keep-alive, sistem istemi). Boş alanlar geçersiz kılmayı temizler.',
+  'model-settings.numCtx': 'Bağlam penceresi (num_ctx)',
+  'model-settings.temperature': 'Sıcaklık (temperature)',
+  'model-settings.keepAlive': 'Bellekte tutma (keep-alive)',
+  'model-settings.system': 'Sistem istemi',
+  'model-settings.system.placeholder': 'örn. Yardımsever bir asistansın.',
+  'model-settings.save': 'Kaydet',
+  'model-settings.saving': 'Kaydediliyor...',
+  'model-settings.notify.saved': 'Model ayarları kaydedildi:',
+  'model-settings.notify.saveFailed': 'Model ayarları kaydedilemedi.',
   // ReAct Uzmanı sekmesi (vF9 Faz 2)
   'react-agent.provider.label': 'Ajan Sağlayıcı Seç',
   'react-agent.model.label': 'Aktif LLM Modeli',

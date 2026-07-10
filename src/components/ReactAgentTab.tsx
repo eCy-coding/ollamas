@@ -9,6 +9,7 @@ import { ChatSession } from "../types";
 import { api, ApiError } from "../lib/apiClient";
 import { firstUsableModel } from "../lib/localModel";
 import { AgentMessage } from "./AgentMessage";
+import { ModelSettings } from "./ModelSettings";
 
 interface TraceStep {
   stepNum: number;
@@ -568,6 +569,8 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               )}
             </select>
           </div>
+          {/* Per-model overrides (M-038) live where the model is picked. */}
+          <ModelSettings model={model} onNotify={onNotify} />
         </div>
 
         {/* Toggles & Actions */}

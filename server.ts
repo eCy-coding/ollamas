@@ -37,6 +37,7 @@ import { parseRepoSlug, rerunFailedJobs, cancelRun } from "./server/github";
 import { getRuns, getJobs, getWorkflows, getLog, dispatch, detectRepoSlug } from "./server/github-actions";
 import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
+import { sanitizeModelOverride } from "./server/model-overrides";
 import { FilesystemManager } from "./server/files";
 import { TerminalManager } from "./server/terminal";
 import { BackupService } from "./server/backup";
@@ -761,6 +762,19 @@ app.post("/api/notify/config", (req, res) => {
 app.post("/api/notify/test", async (req, res) => {
   const sent = await notify(String(req.body?.text || "ollamas test alert ✅"), db.data.notify);
   res.json({ ok: sent.length > 0, sent });
+});
+// Per-model tuning overrides (M-038): the router applies these for the matching model tag
+// (options.num_ctx / options.temperature, top-level keep_alive, leading system message).
+app.get("/api/model-overrides", (_req, res) => res.json(db.data.modelOverrides ?? {}));
+app.post("/api/model-overrides", (req, res) => {
+  const model = typeof req.body?.model === "string" ? req.body.model.trim() : "";
+  if (!model) return res.status(400).json({ error: "model (non-empty string) required" });
+  const override = sanitizeModelOverride(req.body?.override);
+  if (!db.data.modelOverrides) db.data.modelOverrides = {};
+  if (override) db.data.modelOverrides[model] = override;
+  else delete db.data.modelOverrides[model]; // empty/invalid override = clear for this model
+  db.save?.(db.data);
+  res.json({ ok: true, overrides: db.data.modelOverrides });
 });
 app.post("/api/revenue/storefront", (req, res) => {
   try { res.json(generateStorefront(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }

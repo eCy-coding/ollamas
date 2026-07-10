@@ -74,6 +74,19 @@ export const messages: Record<string, string> = {
   'app.usage.loadError': "Couldn't load usage.",
   'app.offline.badge': 'Offline',
   'app.offline.hint': 'Network unavailable — showing last-known data.',
+  // Per-model settings editor (V7 M-038)
+  'model-settings.toggle': 'Model Settings',
+  'model-settings.toggle.title':
+    'Per-model overrides (num_ctx, temperature, keep-alive, system prompt) applied on every request for this model. Blank fields clear the override.',
+  'model-settings.numCtx': 'Context window (num_ctx)',
+  'model-settings.temperature': 'Temperature',
+  'model-settings.keepAlive': 'Keep-alive',
+  'model-settings.system': 'System prompt',
+  'model-settings.system.placeholder': 'e.g. You are a helpful assistant.',
+  'model-settings.save': 'Save',
+  'model-settings.saving': 'Saving...',
+  'model-settings.notify.saved': 'Model settings saved for',
+  'model-settings.notify.saveFailed': 'Could not save model settings.',
   // ReAct Specialist tab (vF9 Phase 2)
   'react-agent.provider.label': 'Select Agent Provider',
   'react-agent.model.label': 'Active LLM Model',
