@@ -64,9 +64,16 @@ const LOCAL_OWNER_ROUTES: Array<[string, string]> = [
   ["/api/keys/test", "post"],
   ["/api/keys/health", "get"],
   ["/api/keys/pool", "get"],
+  // batch4 — local-owner revenue tooling
+  ["/api/revenue/checkout", "post"],
+  ["/api/revenue/config", "get"],
+  ["/api/revenue/config", "post"],
 ];
 // v1.29.4 — newly documented tenant-authenticated routes (ApiKey + 401 contract).
 const TENANT_AUTH_ROUTES: Array<[string, string]> = [
+  // batch4 — tenant-authenticated SaaS reads
+  ["/api/saas/catalog", "get"],
+  ["/api/saas/usage", "get"],
 ];
 
 describe("OpenAPI — kept routes are documented in the served spec", () => {
