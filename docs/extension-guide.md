@@ -19,7 +19,7 @@ Everything a tool does crosses one choke-point (`ToolRegistry.execute`,
 | 6 | **Add an external `ollamas <name>` subcommand** without touching the source — checksum-gated plugin | `ollamas plugin install` (`cli/commands/plugin.ts`, trust-on-first-use sha256 gate) | Run `ollamas plugin --help`; source: [../cli/commands/plugin.ts](../cli/commands/plugin.ts) |
 | 7 | **Call the gateway from your own program** over HTTP / JSON-RPC | REST `/api/*` + MCP `/mcp` with Bearer `olm_<key>` | [api-quickstart.md](./api-quickstart.md) |
 | 8 | **Integrate a Claude Code slash command / hook** into this harness | `.claude/commands/*.md` (frontmatter + `allowed-tools`); CLI permissioning via `.claude/HOWTO-ADD-CLI.md` | [../.claude/HOWTO-ADD-CLI.md](../.claude/HOWTO-ADD-CLI.md) |
-| 9 | **Bring/pick a model or a custom OpenAI-compatible endpoint** | Provider catalog + `custom-openai` seam; model selection | [model-guide.md](./model-guide.md) |
+| 9 | **Bring/pick a model or a custom OpenAI-compatible endpoint** | Provider catalog + `custom-openai` seam; model selection | [model-guide.md](./model-guide.md), [custom-model.md](./custom-model.md) (GGUF → Modelfile import) |
 
 ## How the points relate
 
@@ -59,3 +59,11 @@ Everything a tool does crosses one choke-point (`ToolRegistry.execute`,
 - **Zero-dep CLI.** CLI subcommands use only Node built-ins.
 - **Verify before ship.** `npm run lint` (`tsc --noEmit`) then `npm run test`
   (`vitest run`) green before committing.
+
+## See also
+
+- Getting started: [../QUICKSTART.md](../QUICKSTART.md) · full docs index: [../README.md](../README.md)
+- Deploying your extended build (local / Docker / compose / Helm / k8s): [deploy-guide.md](./deploy-guide.md)
+- Test suite, gates & skip map (what your extension must keep green): [TESTING.md](./TESTING.md)
+- Release rollback runbook: [RELEASE_ROLLBACK.md](./RELEASE_ROLLBACK.md)
+- Something broke while extending: [troubleshooting.md](./troubleshooting.md)

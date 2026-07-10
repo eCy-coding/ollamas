@@ -33,6 +33,32 @@ Tek-GPU gerçeği: yerel LLM çağrılarını **sıralı** işle (paralel ~3× y
 Geliştirme kurulumu, kalite-kapısı ve PR akışı: **[CONTRIBUTING.md](CONTRIBUTING.md)**. Kendi tool/skill/
 CLI-komutu eklemek: [`docs/extension-guide.md`](docs/extension-guide.md).
 
+## Dokümantasyon
+
+| Konu | Doküman |
+|------|---------|
+| 60 saniyede kurulum + slash komutlar | [QUICKSTART.md](QUICKSTART.md) |
+| Sürüm geçmişi | [CHANGELOG.md](CHANGELOG.md) |
+| HTTP API + MCP client bağlama | [docs/api-quickstart.md](docs/api-quickstart.md) |
+| Kendi tool'unu ekleme (ToolDef + tier matrisi) | [docs/adding-a-tool.md](docs/adding-a-tool.md) |
+| Tüm genişletme noktaları (9'lu index) | [docs/extension-guide.md](docs/extension-guide.md) |
+| Model seçimi + provider kataloğu | [docs/model-guide.md](docs/model-guide.md) |
+| Custom model import (GGUF → Modelfile) | [docs/custom-model.md](docs/custom-model.md) |
+| Deploy yolları (local / Docker / compose / Helm / k8s) | [docs/deploy-guide.md](docs/deploy-guide.md) |
+| Test suite, kalite kapıları, skip haritası | [docs/TESTING.md](docs/TESTING.md) |
+| Release rollback runbook | [docs/RELEASE_ROLLBACK.md](docs/RELEASE_ROLLBACK.md) |
+| Sorun giderme | [docs/troubleshooting.md](docs/troubleshooting.md) |
+
+Tasarım / iç dokümanlar: [MATH](docs/MATH.md) ($0 conductor formal spec) ·
+[TASKS](docs/TASKS.md) (`ollamas do` kataloğu) · [COUNCIL](docs/COUNCIL.md) ·
+[AGENT_TOPOLOGY](docs/AGENT_TOPOLOGY.md) · [ROADMAP-vNext](docs/ROADMAP-vNext.md) ·
+[E2E_LOOP](docs/E2E_LOOP.md) · [E2E_ANALYSIS](docs/E2E_ANALYSIS.md) ·
+[FREE_PROVIDERS](docs/FREE_PROVIDERS.md) · [KEY_POOL](docs/KEY_POOL.md) ·
+[GEMINI_CLI_PLAN](docs/GEMINI_CLI_PLAN.md) · [GEMINI_CLI_RESEARCH](docs/GEMINI_CLI_RESEARCH.md) ·
+[CODE_PLAN](docs/CODE_PLAN.md) · [CODINGS_STATUS](docs/CODINGS_STATUS.md) ·
+[COMPLETENESS](docs/COMPLETENESS.md) · [REQUEST_EN](docs/REQUEST_EN.md) ·
+[MASTER_TASKLIST](docs/MASTER_TASKLIST.md)
+
 ## Lisans
 
 MIT — bkz. [LICENSE](LICENSE).

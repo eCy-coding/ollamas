@@ -41,6 +41,8 @@ Local LLM calls are single-GPU: **sequence them, don't parallelize** (parallel s
 - State / vault / logs / content-queue: `~/.llm-mission-control/`
 - Full contract + 28-phase roadmap + lane laws: **`AGENTS.md`** (canonical)
 - This tab's live identity (CLI lane): `CLAUDE.md` (auto-loaded; `npx tsx cli/lib/role.ts` for live status)
+- Full docs index: **[README.md](README.md)** (Dokümantasyon table) · extension points: [docs/extension-guide.md](docs/extension-guide.md)
+- Something broken? [docs/troubleshooting.md](docs/troubleshooting.md) · test/gate map: [docs/TESTING.md](docs/TESTING.md)
 
 ## Boundaries (carried)
 Token NAMES ok to log, VALUES never · root cause before symptom · evidence over assertion (run it, show stdout) · no `--no-verify` · `npm run lint && npm run test` green before commit.
