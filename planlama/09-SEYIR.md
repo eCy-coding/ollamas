@@ -389,3 +389,21 @@
   - D13 sapması kabul: gerçek temiz-install → CI install-smoke (080f40f) push sonrası.
 - **SONUÇ: KOŞULLU-GO.** Kod/test/doc eksenleri %100 kanıtlı; kalan 4 madde tümüyle Emre-gate
   (worktree-sil onayı · push/CI · §5 risk-onayı · git tag v1.33.0). STOP §2 (outward) gereği duruldu.
+
+## S-018 · 2026-07-10 · GA-FINALIZE (tamamlayıcı görev, claude.app-çakışmasız) · conductor: fable-5
+
+- **claude.app takibi:** diğer oturum = orchestration convergence döngüsü (tasklist.ts/loop); 23:12 damgası:
+  acceptance 14/14, THINK 27→0, next-queue 0, gate yeşil → CONVERGED'e yakın. Yüzeyine dokunulmadı.
+- **D9 ✅** 6 iç worktree: arşiv (~/Desktop/ollamas-internal-worktrees-archive-20260710.tar.gz, 6507 giriş)
+  → Emre İSMEN onayı (AskUserQuestion) → remove ×5 + kalıntı-dizin rm + prune → iç worktree = 0.
+- **D18 ✅** 05-TEHDIT §5 3/3 kabul-edilen-risk `✅ Emre onayı 2026-07-10` + §6 nihai imza; §3 T-12 ◐→✅.
+- **T-12 ✅** tests/agent-injection.test.ts 8/8 (693b330): rol-yükseltme-yok (openai/anthropic/gemini
+  mapper'ları), opaque pass-through, wire-body doğrulama, tool-sonucu-markup→toolCall-yok,
+  executor-spy-çağrısız, boundary-pin. Mutation-check: assertion flip → 1 fail (ısırıyor). Artık-risk
+  (model-eko) belgeli — tier-gate + T0-onay katmanı.
+- **D11 ✅** 02-DOD ölçüm-metni lhci-autorun'a düzeltildi (a382133).
+- **KANIT:** `npm run lint` 0 · FRESH `vitest run` → **2236 pass / 22 skip / 0 fail** · injection 8/8.
+- **D14 ⛔→Emre-komutu:** `git push` classifier-red (outward, otomatik yapılamaz). Emre `!` ile koşacak:
+  (1) `git push -u origin feat/v-final-train` → CI izlenir; (2) CI yeşil → `git tag -a v1.33.0 -m "..."`
+  + `git push origin v1.33.0` (release-binary.yml tetiklenir → D14 tam kanıt).
+- **GA DURUMU: GO** (kod/test/doc/onay eksenleri %100; tek kalan fiziksel push+tag = Emre klavyesi).
