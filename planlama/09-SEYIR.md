@@ -203,4 +203,18 @@
 
 ---
 
+## S-009 · 2026-07-10 · V3 TAMAM (subagent-driven) · conductor: fable-5, worker: general-purpose
+
+- **Yöntem geçişi:** bağlam-verimliliği için subagent-driven mod (18-§9). Ana-thread kondüktör; V3 taze
+  subagent'a dağıtıldı → kanıt+dosya-listesi döndü → conductor doğruladı+surgical-commit'ledi.
+- **V3 Kendi Geliştirmeni Yap 6/6 ✅** (commit be79cb9): docs/adding-a-tool.md (4 tier matrisi + ToolDef),
+  docs/extension-guide.md (9-nokta indeks), .claude/HOWTO-ADD-SKILL.md, cli/ADDING-A-COMMAND.md,
+  docs/api-quickstart.md (key→/mcp curl), docs/troubleshooting.md (6 senaryo).
+- **KANIT (conductor doğrulaması):** 6 dosya var (untracked=subagent commit'lemedi) · adding-a-tool 4-tier ·
+  extension-guide 9-nokta tablo · troubleshooting 7 ## · `npm run lint` exit 0 · surgical-stage (docs/odyssey autopilot-dirty dokunulmadı).
+- **Geliştirici artık kendi tool/skill/CLI/entegrasyonunu belgeli-yolla ekleyebilir** (V3 hedefi ✅).
+- **Sonraki:** V4 Güvenlik Kanıtı → M-001 (localOwnerGuard test) + M-003..007 regresyon + M-009 ReDoS(RE2). Kesintisiz.
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->

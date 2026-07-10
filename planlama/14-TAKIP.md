@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 ✅ + V2 ✅ TAMAM → V3 sırada**
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 ✅ V2 ✅ V3 ✅ → V4 sırada** · yöntem: subagent-driven (§9)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,9 +15,9 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1+V2 TAMAM** (branch feat/v-final-train, 6 commit) |
-| Kodlama durumu | ✅ V1 5/5 · ✅ V2 3/3 → **V3 sırada** (M-029 adding-a-tool) |
-| Genel ilerleme (kod) | **8 / 49 mikro-görev** · **2 / 10 versiyon** |
+| Aktif aşama | **V1+V2+V3 TAMAM** (branch feat/v-final-train, 9 commit) |
+| Kodlama durumu | ✅ V1 5/5 · ✅ V2 3/3 · ✅ V3 6/6 → **V4 sırada** (M-001 auth-test) |
+| Genel ilerleme (kod) | **14 / 49 mikro-görev** · **3 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
 | Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
@@ -28,8 +28,8 @@
 ```
 V1  Dürüst Kimlik        ██████████ ✅ v1.24.0  5/5 (M-026,027,021,028,025)
 V2  Kendi Modelini Getir ██████████ ✅ v1.25.0  3/3 KULLANILABİLİR (M-031,037,033)
-V3  Kendi Geliştirmeni.. ░░░░░░░░░░ ☐  v1.26.0  ◀ SIRADA (M-029,030,034,035,040,032)
-V4  Güvenlik Kanıtı      ░░░░░░░░░░ ☐  v1.27.0  (M-001..011)
+V3  Kendi Geliştirmeni.. ██████████ ✅ v1.26.0  6/6 (adding-a-tool/extension-guide/HOWTO/CLI/api/troubleshoot)
+V4  Güvenlik Kanıtı      ░░░░░░░░░░ ☐  v1.27.0  ◀ SIRADA (M-001..011)
 V5  Test Bütünlüğü       ░░░░░░░░░░ ☐  v1.28.0  (M-012..016 · FRESH-suite barrier)
 V6  Ürün & Gelir         ░░░░░░░░░░ ☐  v1.29.0  (M-017,018,019)
 V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  (M-038,039)
@@ -86,33 +86,31 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-026 | V1 | README gerçek-ürün | ✅ | kurgu-grep=0 · gerçek başlık · QUICKSTART link · 4a9cc28 | — |
 | M-027 | V1 | setup.sh düzelt/yönlendir | ✅ | go-build=0 · ready-wrapper · bash-n OK · 4a9cc28 | — |
 | M-028 | V1 | CONTRIBUTING + CoC | ✅ | iki dosya + CoC-2.1 · 4a9cc28 | — |
-| M-029 | P6b | docs/adding-a-tool.md | ☐ | — | — |
-| M-030 | P6b | Extension Guide (indeks) | ☐ | — | M-029/034/035 |
+| M-029 | V3 | docs/adding-a-tool.md | ✅ | be79cb9 | — |
+| M-030 | V3 | Extension Guide (indeks) | ✅ | be79cb9 | — |
 | M-031 | V2 | custom-openai+catalog dropdown+server | ✅ | server-branch + 11 dropdown + 21/21 test · e0edba4 | — |
-| M-032 | P6b | docs/troubleshooting.md | ☐ | — | — |
+| M-032 | V3 | docs/troubleshooting.md | ✅ | be79cb9 | — |
 | M-033 | V2 | docs/model-guide.md | ✅ | VRAM tablosu+BYO+GGUF · e0edba4 | — |
-| M-034 | P6b | HOWTO-ADD-SKILL.md | ☐ | — | — |
-| M-035 | P6b | CLI alt-komut rehberi | ☐ | — | — |
+| M-034 | V3 | HOWTO-ADD-SKILL.md | ✅ | be79cb9 | — |
+| M-035 | V3 | CLI alt-komut rehberi | ✅ | be79cb9 | — |
 | M-036 | P6b | deploy-guide + stack-update | ☐ | — | — |
 | M-037 | V2 | first-run model onboarding | ✅ | ai.ts aksiyon-mesajı + 2/2 test · e0edba4 | — |
 | M-038 | P6b | per-model ayar UI | ☐ | — | — |
 | M-039 | P6b | GGUF/Modelfile import | ☐ | — | M-033 |
-| M-040 | P6b | API quickstart | ☐ | — | — |
+| M-040 | V3 | API quickstart | ✅ | be79cb9 | — |
 | M-041 | V9 | CHANGELOG.md | ☐ | — | — |
 | M-042 | V9 | full-E2E acceptance | ☐ | — | M-013/023 |
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **8/49** (V1+V2) · ⊘ test-only 6 · ⛔ Emre-gate 1 (M-015) + outward tag · aktif-yol 41.
+**Sayaç:** kapandı **14/49** (V1+V2+V3) · ⊘ test-only 6 · ⛔ Emre-gate 1 (M-015) + outward tag · aktif-yol 35.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
-- **Şu an:** planlama v5 tamam; kodlama başlamadı.
-- **Sonraki versiyon: V1 Dürüst Kimlik (v1.24.0)** — ilk todo **M-026** (README gerçek-ürün, `README.md:1`).
-  Phase V1-a (kimlik docs) → V1-b (sürüm hijyeni). Sekme prompt'u: 07-PROMPTLAR §MIKRO M-026.
-- **Neden V1 önce:** kimlik-borcu (README kurgusal + package react-example) adoption-blocker; hızlı kapanır.
-- **Kullanıcı V2'de (v1.25.0) kendi modelini kullanmaya başlar.**
-- **Barrier hatırlatma:** M-013 (V5 FRESH suite) tüm V4/V5 test-yazımı sonrası; M-044 (V10 GA) tüm önceki sonrası.
+- **Şu an:** V1+V2+V3 kapandı (14/49). Yöntem: subagent-driven (§9) — her versiyon taze subagent, conductor doğrular+commit'ler.
+- **Sonraki versiyon: V4 Güvenlik Kanıtı (v1.27.0)** — ilk todo **M-001** (localOwnerGuard SAAS testi, `server.ts:276-294`).
+  M-001,002 auth-test + M-003..007 ⊘ regresyon + M-008 workflow-lint + M-009 ReDoS(RE2) + M-010 colab + M-011 compose.
+- **Barrier hatırlatma:** M-013 (V5 FRESH suite) tüm V4/V5 test-yazımı sonrası; M-015 (V5) Emre-gate; M-044 (V10 GA) + git-tag outward.
 
 ## ⛔ Bloke / Emre-gate bekleyenler
 
@@ -123,10 +121,10 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
-- **S-005** (2026-07-10) · araştırma + implementation cookbook (17): 15 doğrulanmış dış-kaynak pattern+kod örneği (Ollama/Stripe/Lighthouse/MCP-SDK/semgrep…). İyileştirme: RE2, git-cliff, CLI-GGUF.
-- **S-004** (2026-07-10) · 10-versiyon release-train: V1→V10 (v1.24→v1.33 GA), 44 mikro-görev, usability-first.
-- **S-003** (2026-07-10) · dogfooding kullanıcı-ihtiyaç: P6 Benimseme/DX + GAP-024..038 (15) + M-026..040.
-- **S-002** (2026-07-10) · çalışma prensipleri §8 + canlı takip 14-TAKIP + Artifact ayna kuruldu.
+- **S-009** (2026-07-10) · V3 subagent-driven: 6 dev-doküman (adding-a-tool/extension-guide/HOWTO-ADD-SKILL/CLI-guide/api-quickstart/troubleshooting), tsc-0, commit be79cb9. Yöntem 18-§9.
+- **S-008** (2026-07-10) · V1 kapandı + V2 TAMAM (kullanılabilir): custom-openai+catalog dropdown+server, first-run onboarding, model-guide. 23/23 test.
+- **S-007** (2026-07-10) · V1 4/5 (README/setup/VERSION/CONTRIBUTING) — kod başladı, branch feat/v-final-train.
+- **S-006** (2026-07-10) · sürekli-yürütme protokolü (18) + completeness 5 gap (GAP-041..045).
 
 ## 👁 Emre nasıl canlı takip eder
 

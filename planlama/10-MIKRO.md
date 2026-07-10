@@ -227,14 +227,14 @@
 - **kabul:** iki dosya var; CONTRIBUTING test-gate + commit-kuralı içerir; README linkler.
 - **dep:** yok · **durum:** ☐
 
-### M-029 · P6b · S · GAP-027 · docs/adding-a-tool.md
+### M-029 · V3 · ✅ · GAP-027 · docs/adding-a-tool.md
 - **anchor:** `server/tool-registry.ts:195` (TOOLS), `:852` (register), `:43` (ToolTier)
 - **action:** `docs/adding-a-tool.md`: 4 tier matrisi (safe/host/privileged/host_upstream + ne zaman), `ToolDef` şablonu (schema+invoke), inline TOOLS vs dinamik register, tier-güvenlik gerekçesi (05-TEHDIT §6).
 - **test:** yok
 - **kabul:** dosya var; 4 tier açıklı + çalışan ToolDef örneği + tier seçim matrisi.
 - **dep:** yok · **durum:** ☐
 
-### M-030 · P6b · S · GAP-028 · Extension Guide (indeks)
+### M-030 · V3 · ✅ · GAP-028 · Extension Guide (indeks)
 - **anchor:** 11-MIMARI + AGENTS.md + INTEGRATIONS.md + MCP_LANE.md + HOWTO-ADD-CLI.md
 - **action:** `docs/extension-guide.md`: 9 uzatma noktası tek indeks (tool→adding-a-tool, MCP-consume→INTEGRATIONS, MCP-expose→openapi, skill→HOWTO-ADD-SKILL, CLI→cli-rehber, plugin→plugin.ts, API→openapi). Her noktaya "nereden başla" linki.
 - **test:** yok
@@ -249,7 +249,7 @@
 - **dep:** yok · **durum:** ☐ · **not:** gerçek kullanıcı-bug (key girilse kullanılamıyordu)
 - **📚 ref:** 17-KAYNAK-KOD-ORNEKLERI §A [M-031] OpenAI baseURL seam + PRESETS (Ollama/LMStudio/vLLM/Groq)
 
-### M-032 · P6b · S · GAP-031 · docs/troubleshooting.md
+### M-032 · V3 · ✅ · GAP-031 · docs/troubleshooting.md
 - **anchor:** kaynak: `.env.example` (OLLAMA_NUM_CTX), `server.ts:143` health/ready, SEYIR gotcha'lar (port-3000, HMR-24678)
 - **action:** `docs/troubleshooting.md`: 5+ senaryo — ollama-down, port-3000-çakışma, OOM (num_ctx düşür), health-503, HMR-port. Her biri: belirti → tanı → çözüm.
 - **test:** yok
@@ -263,14 +263,14 @@
 - **kabul:** dosya var; VRAM tablosu + model-seçim rehberi.
 - **dep:** yok · **durum:** ☐
 
-### M-034 · P6b · XS · GAP-029 · HOWTO-ADD-SKILL.md
+### M-034 · V3 · ✅ · GAP-029 · HOWTO-ADD-SKILL.md
 - **anchor:** `.claude/HOWTO-ADD-CLI.md` (muadil desen), `.claude/skills/*/SKILL.md`, `tests/skills-wiring.test.ts`
 - **action:** `.claude/HOWTO-ADD-SKILL.md`: SKILL.md formatı (name+description+script), wiring-testi geçme, slash-komut kaydı.
 - **test:** yok
 - **kabul:** dosya var; SKILL.md şablonu + wiring adımı.
 - **dep:** yok · **durum:** ☐
 
-### M-035 · P6b · XS · GAP-030 · CLI alt-komut ekleme rehberi
+### M-035 · V3 · ✅ · GAP-030 · CLI alt-komut ekleme rehberi
 - **anchor:** `cli/commands/*.ts` (agent/mcp/plugin desenleri), `cli/CLI_AGENTS.md`
 - **action:** `cli/ADDING-A-COMMAND.md`: parseArgs deseni, output ctx (TTY/--json), help kaydı, zero-dep kuralı, saf-fn+thin-IO.
 - **test:** yok
@@ -307,7 +307,7 @@
 - **kabul:** import akışı çalışır VEYA doküman GGUF→kullanılabilir-model yolunu belgeler.
 - **dep:** M-033 (model-guide) · **durum:** ☐
 
-### M-040 · P6b · XS · GAP-038 · API quickstart
+### M-040 · V3 · ✅ · GAP-038 · API quickstart
 - **anchor:** `server/openapi.ts` (OpenAPI 3.1), `/api/openapi.json`, Bearer `olm_`
 - **action:** `docs/api-quickstart.md`: key al → ilk `/mcp` JSON-RPC çağrısı (curl örneği) → tool listesi → tool çağırma.
 - **test:** yok

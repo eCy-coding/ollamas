@@ -77,6 +77,31 @@ yeniden-doğrular** (implementer≠verifier).
 
 (047=GDPR, 048=RTL → V6; 045=migration-rollback → V5; 046=Linux-install → V8; 049=error-tracking → V9)
 
+## §9 Subagent-driven mod (bağlam-verimli yürütme)
+
+Uzun oturumlarda bağlam-verimliliği için: **ana-thread = KONDÜKTÖR**, her versiyon **taze-bağlamlı
+subagent'a** dağıtılır. Subagent 16-VERSIYON Vn kartı + 10-MIKRO anchor + 17-cookbook'tan üretilmiş
+tight prompt ile kodlar + kalite-kapısı koşar + **kanıt + değişen-dosya-listesi + diff-özeti** döner
+(commit ETMEZ). Conductor: doğrula → **surgical-stage** (`git add <dosya>`, `-A` yasak) → commit →
+14-TAKIP/Artifact → checkpoint → sonraki. Kod-okuma yükü subagent'ta kalır → ana-context yalın.
+
+## §RESUME-KIT — yeni oturum / yeni terminal.app başlatıcı
+
+Taze bir Claude Code oturumu (yeni terminal.app) ollamas'ta bu prompt'la kaldığı yerden devam eder:
+
+```text
+ollamas otonom yürütme — kaldığın yerden devam. Branch: feat/v-final-train.
+1. OKU: planlama/14-TAKIP.md (tek-kaynak durum) — ilk ☐/◐ satır = sıradaki M-görev.
+2. OKU: planlama/18-SUREKLI-YURUTME.md (protokol §1 döngü + §2 STOP) + planlama/00-ANAYASA.md (yasalar+§8 prensipler).
+3. Sıradaki versiyonu YÜKLE: planlama/16-VERSIYON-YOLHARITASI.md#<Vn> + 10-MIKRO M-görevleri + 17-KAYNAK-KOD-ORNEKLERI ref.
+4. KODLA (scope-law anchor) → GATE (npm run lint → vitest run ilgili → versiyon kabul-komutu) →
+   GÜNCELLE (10-MIKRO durum ✅ + 14-TAKIP + 09-SEYIR kanıt) → surgical COMMIT (git add <dosya>, -A YASAK, PUSH YOK).
+5. STOP yoksa sonraki versiyon (kesintisiz). DUR yalnız: M-015 (V5 branch-sil) / outward git-tag (V10) / 3-strike blocker.
+6. Kanıt zorunlu (00-ANAYASA §5): her iddia komut+çıktı. Yabancı-WIP (autopilot dirty dosyaları) commit'leme.
+```
+
+İki yöntem (subagent-driven §9 · yeni-terminal §RESUME-KIT) aynı tek-kaynaktan (14-TAKIP) resume eder → tutarlı.
+
 ## §8 Kesintisiz çalışma sözü
 
 Her tur: net durum + kaldığın-yer + sıradaki-adım (P-E). STOP koşulu yoksa bir sonraki versiyona geç —
