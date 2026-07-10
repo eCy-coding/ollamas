@@ -9,20 +9,20 @@
 
 | # | Boyut | Tarama komutu | Son tarama damgası |
 |---|---|---|---|
-| 1 | Güvenlik (kod) | `semgrep scan --config auto --severity ERROR server/ .github/ --json \| jq '.results \| length'` | 2026-06-21 · semgrep 31 → ~10 gerçek + ~6 FP (NEXT_TODO cycle-2) — P2'de yeniden |
-| 2 | Test coverage | `vitest run` (FRESH) + skipped listesi | 2026-06-21 · 832 pass / 13 skip / 0 fail |
-| 3 | Docs güncelliği | README/QUICKSTART spot-check ≥10 komut koş + ölü link tarama | ☐ hiç taranmadı (P5) |
-| 4 | Release/rollback | `gh run list --workflow release-binary.yml -L 1` + RELEASE_ROLLBACK.md tatbikat | ☐ tatbikat yapılmadı (P5) |
-| 5 | Lisans + bağımlılık | `npm audit --json` + LICENSE dosyası + adoption-attribution notları | 2026-07-10 · c5ac42d · 3 moderate / 0 high / 0 critical |
-| 6 | CI sağlığı | `gh run list -L 10` (workflow yeşilliği) + workflow injection taraması (T-06) | ☐ P2/P5'te damgalanacak |
-| 7 | Performans | `npm run test:perf` + Lighthouse (D11) + tok/s parite (`ollamas status`) | kısmi: 84 tok/s chat kanıtı (SEYIR Faz 33) — Lighthouse ☐ |
-| 8 | Billing/para | Stripe test-mode zinciri (D10) + `budget.json`/usage metering denetimi | ☐ P4 |
-| 9 | UX / a11y | playwright suite + a11y spec'leri (`npm run test:e2e:web`) | 2026-07-05 · playwright 19/19 (SEYIR Faz 33) |
-| 10 | i18n TR-EN | locale anahtar-parite testi (D12) | ☐ parite testi yok — P4'te yazılır |
-| 11 | Observability | `/api/health` + RUM sayacı + telemetri panel canlılığı (`curl :3000/api/health`) | 2026-07-05 · health 200, RUM sağlıklı, DOD-100 |
-| 12 | Veri gizliliği / key hijyeni | `git log --all -S "sk-" --oneline \| head` + `ollamas keys` == `/api/keys/health` parite | kısmi: keys parite ✅ (COMPLETENESS) — git-secret taraması ☐ |
-| 13 | Worktree/branch hijyeni | `git worktree list \| wc -l` + `git branch --list 'audit/*' \| wc -l` + `claude/*` iç worktree sayısı | 2026-07-10 · c5ac42d · 19 worktree, 67 audit/*, 4 claude/* — konsolidasyon P3 |
-| 14 | Kullanıcı benimseme / DX | `grep -ci "mission control.*mesh" README.md` + CONTRIBUTING/adding-a-tool/extension-guide/troubleshooting/model-guide dosya-var + custom-openai dropdown testi (D21/D22/D23) | 2026-07-10 · S-003 dogfooding: README kurgusal-ürün, CONTRIBUTING yok, custom-openai dropdown-dışı, docs eksik — P6 |
+| 1 | Güvenlik (kod) | `semgrep scan --config auto --severity ERROR server/ .github/ --json \| jq '.results \| length'` | 2026-07-10 · 5dd49d0 · semgrep ERROR server/+.github/ = 0 (M-044 canlı) |
+| 2 | Test coverage | `vitest run` (FRESH) + skipped listesi | 2026-07-10 · 5dd49d0 · vitest FRESH 2228 pass / 22 skip / 0 fail (M-042, 2 ardışık koşum) |
+| 3 | Docs güncelliği | README/QUICKSTART spot-check ≥10 komut koş + ölü link tarama | 2026-07-10 · 5dd49d0 · M-022: 14 komut/11-exit-0 + ölü-link 0 (74 rel + 7 ext) + verify-docfix |
+| 4 | Release/rollback | `gh run list --workflow release-binary.yml -L 1` + RELEASE_ROLLBACK.md tatbikat | 2026-07-10 · 5dd49d0 · M-024 5-bölüm sandbox-drill ✅; release-binary.yml default-branch'te hiç koşmadı (D14 → Emre push-gate) |
+| 5 | Lisans + bağımlılık | `npm audit --json` + LICENSE dosyası + adoption-attribution notları | 2026-07-10 · 5dd49d0 · npm audit: 3 moderate / 0 high / 0 critical (M-044 canlı) |
+| 6 | CI sağlığı | `gh run list -L 10` (workflow yeşilliği) + workflow injection taraması (T-06) | 2026-07-10 · 5dd49d0 · son 5 koşu 07-08: security-gate blocking KANITLI (planted-vuln fail=by-design), scripts-ci kırmızı=key-autonomy lane; bu branch push'suz → train CI'da koşmadı (D14) |
+| 7 | Performans | `npm run test:perf` + Lighthouse (D11) + tok/s parite (`ollamas status`) | 2026-07-10 · 5dd49d0 · lhci autorun (dist) exit 0, 3 URL/9 koşu assertions pass (M-044); perf 0.96 damgası M-018 |
+| 8 | Billing/para | Stripe test-mode zinciri (D10) + `budget.json`/usage metering denetimi | 2026-07-10 · 5dd49d0 · billing-e2e-chain testi yeşil (M-044 canlı re-run) |
+| 9 | UX / a11y | playwright suite + a11y spec'leri (`npm run test:e2e:web`) | 2026-07-10 · 5dd49d0 · playwright 28/28 (2 WCAG kontrast kök-neden fix f93705a dahil) |
+| 10 | i18n TR-EN | locale anahtar-parite testi (D12) | 2026-07-10 · 5dd49d0 · i18n parite+RTL+Intl testleri yeşil (M-019/048; M-044 canlı re-run) |
+| 11 | Observability | `/api/health` + RUM sayacı + telemetri panel canlılığı (`curl :3000/api/health`) | 2026-07-10 · 5dd49d0 · /api/health 200 mode=live + /api/ready 200 + /metrics 200 (ollamas_errors_total eklendi, M-049) |
+| 12 | Veri gizliliği / key hijyeni | `git log --all -S "sk-" --oneline \| head` + `ollamas keys` == `/api/keys/health` parite | 2026-07-10 · 5dd49d0 · git log -S sk- isabetleri planlama/orchestration METİN dosyaları (key değil, spot-check); keys parite ✅ |
+| 13 | Worktree/branch hijyeni | `git worktree list \| wc -l` + `git branch --list 'audit/*' \| wc -l` + `claude/*` iç worktree sayısı | 2026-07-10 · 5dd49d0 · audit/*=0 ✅ · iç claude/* worktree 6 (arşiv-tar hazır, silme classifier-red → Emre-gate) · 19 lane-worktree = Emre V10-sonrası erteleme |
+| 14 | Kullanıcı benimseme / DX | `grep -ci "mission control.*mesh" README.md` + CONTRIBUTING/adding-a-tool/extension-guide/troubleshooting/model-guide dosya-var + custom-openai dropdown testi (D21/D22/D23) | 2026-07-10 · 5dd49d0 · README kurgu-grep 0 · CONTRIBUTING/adding-a-tool/extension-guide(9/9)/troubleshooting/model-guide/custom-model/deploy-guide VAR · dropdown+onboarding testli |
 
 ## Faz kapanış şablonu (her faz oturumu doldurur, 09-SEYIR'e de kopyalanır)
 

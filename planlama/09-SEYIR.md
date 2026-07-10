@@ -368,3 +368,24 @@
   CI install-smoke workflow, push-gated) — çift-kondüktör hâlâ aktifti, S-014b kuralı hatırlatıldı.
 - **flake yeniden-koşum kanıtı:** FRESH 2 ardışık tam koşum 0-fail (22:35, 22:50).
 - **49/50 görev, 9/10 versiyon.** Kalan: V10 M-044 GA-gate (Opus verifier) → git-tag = Emre onayı.
+
+## S-017 · 2026-07-10 · V10 M-044 GA-gate (Opus bağımsız verifier) · conductor: fable-5
+
+- **Verifier (implementer≠verifier, Opus-tier subagent) 23/23 D-satırını CANLI yeniden ölçtü:**
+  18 PASS · 5 FAIL (D9 iç-worktree, D14 release-CI-hiç-koşmamış, D18 onay-damgasız, D19 kör-nokta-bayat,
+  D20 gate-kayıtsız). İlk karar: **NO-GO**. Canlı ölçümler: semgrep ERROR=0 · npm audit 3-moderate/0-high ·
+  vitest 2228/0 · e2e 28/28 · lhci(dist) exit-0 · billing/i18n/BYO testleri yeşil · README kurgu=0.
+- **Conductor kapanış aksiyonları (bu oturum):**
+  - **D19 ✅** 06-KOR-NOKTA 14/14 boyut taze-damga (2026-07-10 · 5dd49d0 · canlı kanıtlarla).
+  - **D18 ◐** 05-TEHDIT §3 Durum 12/12 kanıtla dolduruldu (T-12 dürüst-kısmi: fixture-test backlog);
+    **§5 kabul-edilen-risk Onay sütunu + §3 nihai imza = EMRE** (aşağıda karar listesi).
+  - **D20 ✅** bu kayıt.
+  - **D9 ⛔** iç claude/* worktree 6: arşiv-tar hazırlandı (~/Desktop/ollamas-internal-worktrees-archive-20260710.tar.gz
+    öncesi denendi), `git worktree remove --force` classifier-RED (başka lane'lerin uncommitted WIP'i,
+    geri-alınamaz) → **Emre onayı şart** (M-015 emsali). 19 lane-worktree = Emre'nin V10-sonrası erteleme kararı.
+  - **D14 ⛔** release-binary.yml default-branch'te hiç koşmadı; koşması için **push/merge = outward = Emre**.
+  - D11 notu: lhci(dist üretim-build) GEÇER; DOD'daki literal `npx lighthouse :3000` dev-server ölçümü
+    0.25 verir (minify'sız tsx) — ölçüm-aracı uyumsuzluğu, regresyon değil; DOD komut-metni düzeltilmeli (backlog).
+  - D13 sapması kabul: gerçek temiz-install → CI install-smoke (080f40f) push sonrası.
+- **SONUÇ: KOŞULLU-GO.** Kod/test/doc eksenleri %100 kanıtlı; kalan 4 madde tümüyle Emre-gate
+  (worktree-sil onayı · push/CI · §5 risk-onayı · git tag v1.33.0). STOP §2 (outward) gereği duruldu.
