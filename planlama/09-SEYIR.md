@@ -217,4 +217,20 @@
 
 ---
 
+## S-010 · 2026-07-10 · V4 Güvenlik Kanıtı 9/11 (subagent-driven) · conductor: fable-5
+
+- **V4 9/11 ✅** (commit 5da6452): 5 test dosyası (localOwnerGuard/commander/store-swallow/providers-safeParse/
+  threatfeed-redos) 19/19 + colab urllib guard python-test 8/8 + threatfeed nosemgrep(+7 yorum) + docker-compose
+  read_only/tmpfs/no-new-privileges(+10). Kanıt: tsc-0, vitest 19/19, `docker compose config` exit 0.
+- **M-009 bulgu:** threatfeed `name` user-controlled DEĞİL (tüm çağıranlar sabit literal) + regex linear → RE2
+  gereksiz, nosemgrep+gerekçe (doğrulandı). **M-008:** `github.ref_name` yalnız env: bloğunda (grep).
+- **⚠️ DÜRÜST ATLAMA (P-B):** M-004 (pipeline validate) + M-006 (adminGuard 429) — route'lar `initializeServer()`
+  içinde inline-closure, export değil, boot network/DB/timer tetikliyor (PERF-gated). Uydurma/kırılgan test
+  YAZILMADI. Kod anchor'la doğru (2100-2104, 2596-2616) ama regresyon-test altyapı-kilidi.
+- **YENİ KEŞİF → GAP-046/M-050** (V5): boot-gated route test harness → M-004/M-006'yı açar. (50 görev oldu.)
+- **Sonraki:** V5 Test Bütünlüğü → M-012(migration)+M-013(FRESH-suite BARRIER)+M-014+M-016+M-045(rollback)+
+  M-050(harness). **M-015 = Emre-gate** (67 audit/* branch-sil) → V5'te sorulacak.
+
+---
+
 <!-- Otonom-yürütme kayıtları buraya eklenir (her versiyon kapanışı). -->

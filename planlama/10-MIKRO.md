@@ -11,63 +11,63 @@
 
 ## P2 — Güvenlik (reconcile sonrası: çoğu regresyon-testi)
 
-### M-001 · P2 · S · GAP-001 · localOwnerGuard SAAS davranış testi
+### M-001 · V4 · ✅ · GAP-001 · localOwnerGuard SAAS davranış testi
 - **anchor:** `server.ts:276-294` (localOwnerGuard + prefix `app.use`)
 - **action:** `SAAS_ENFORCE=1` iken korunan her prefix'in 403 döndüğünü, `unset` iken next()'e geçtiğini doğrulayan test. Kod DEĞİŞMEZ.
 - **test:** `tests/localowner-guard.test.ts` (yeni) — supertest/fetch ile her prefix.
 - **kabul:** `vitest run tests/localowner-guard` → korunan 14 prefix × 2 mod yeşil.
 - **dep:** yok · **durum:** ☐
 
-### M-002 · P2 · S · GAP-001 · allowlist tamlık denetimi (invariant testi)
+### M-002 · V4 · ✅ · GAP-001 · allowlist tamlık denetimi (invariant testi)
 - **anchor:** `server.ts:285-292` (prefix listesi) vs tehlikeli route tanımları (1399-2050)
 - **action:** tehlikeli route prefix'lerinin (terminal/macos-terminal/pipeline/workspace/agent/keys/cluster/backup/security/generate/ai) HEPSİNİN localOwnerGuard listesinde olduğunu assert eden invariant testi. Yeni tehlikeli prefix eklenince test kırılır (regresyon kalkanı).
 - **test:** `tests/localowner-guard.test.ts` (aynı dosya, invariant `describe`)
 - **kabul:** DANGEROUS_PREFIXES ⊆ guard listesi assert yeşil.
 - **dep:** M-001 · **durum:** ☐
 
-### M-003 · P2 · XS · GAP-002 · commander execFile regresyon testi
+### M-003 · V4 · ✅ · GAP-002 · commander execFile regresyon testi
 - **anchor:** `server/commander.ts:19-50` (`execute`, execFileP, allowlist, python3 traversal guard)
 - **action:** (a) allowlist-dışı komut → throw, (b) `args` içinde `; rm -rf` metachar → shell'e ULAŞMAZ (execFile argv), (c) python3 `../` traversal → "Path traversal blocked". Kod DEĞİŞMEZ.
 - **test:** `tests/commander-exec.test.ts` (yeni)
 - **kabul:** `vitest run tests/commander-exec` → 3 case yeşil; injection stdout'a sızmaz.
 - **dep:** yok · **durum:** ⊘ (test-only, kod FP)
 
-### M-004 · P2 · XS · GAP-003 · pipeline validate-order regresyon testi
+### M-004 · V5◐ · ERTELENDİ(boot-harness) · GAP-003 · pipeline validate-order regresyon testi
 - **anchor:** `server.ts:2050,2072-2078` (`/api/pipeline`, validate→setHeader)
 - **action:** empty/eksik prompt → 400 JSON (SSE header'dan önce). Kod DEĞİŞMEZ.
 - **test:** `tests/pipeline-validate.test.ts` (yeni)
 - **kabul:** empty-prompt → status 400, `content-type` text/event-stream DEĞİL.
 - **dep:** yok · **durum:** ⊘
 
-### M-005 · P2 · XS · GAP-004 · recordUsage/recordAudit swallow testi
+### M-005 · V4 · ✅ · GAP-004 · recordUsage/recordAudit swallow testi
 - **anchor:** `server/store/index.ts:229-237, 266-271`
 - **action:** DB-fail enjekte → `recordUsage/recordAudit` throw ETMEZ (best-effort swallow). Kod DEĞİŞMEZ.
 - **test:** `tests/store-record-swallow.test.ts` (yeni)
 - **kabul:** mock DB reject → çağrı resolve/void, unhandled-rejection yok.
 - **dep:** yok · **durum:** ⊘
 
-### M-006 · P2 · XS · GAP-005 · adminGuard brute-force regresyon testi
+### M-006 · V5◐ · ERTELENDİ(boot-harness) · GAP-005 · adminGuard brute-force regresyon testi
 - **anchor:** `server.ts:2563-2593` (adminFailures, MAX_FAILS=5, LOCK_MS, timing-safe)
 - **action:** 5 yanlış token → 429 + Retry-After. Kod DEĞİŞMEZ.
 - **test:** `tests/admin-guard.test.ts` (yeni)
 - **kabul:** 6. deneme 429; timing-safe compare kullanılıyor.
 - **dep:** yok · **durum:** ⊘
 
-### M-007 · P2 · XS · GAP-006 · providers safeParse fallback testi
+### M-007 · V4 · ✅ · GAP-006 · providers safeParse fallback testi
 - **anchor:** `server/providers.ts:204,209-219`
 - **action:** bozuk tool-call JSON → `safeParse` undefined → fallback (throw yok). Kod DEĞİŞMEZ.
 - **test:** `tests/providers-safeparse.test.ts` (veya mevcut `tests/providers-guard.test.ts`'e ekle)
 - **kabul:** bozuk-JSON fixture → provider düşmez.
 - **dep:** yok · **durum:** ⊘
 
-### M-008 · P2 · XS · GAP-007 · workflow lint (ref_name env doğrula)
+### M-008 · V4 · ✅ · GAP-007 · workflow lint (ref_name env doğrula)
 - **anchor:** `.github/workflows/release-binary.yml:73,86,92`
 - **action:** `actionlint` (veya manuel grep) ile `${{ github.ref_name }}` yalnız `env:` içinde; `run:` gövdesinde interpolation YOK.
 - **test:** yok (lint doğrulama)
 - **kabul:** `grep -n 'ref_name' .github/workflows/*.yml` → yalnız `env:` satırı; `actionlint` temiz.
 - **dep:** yok · **durum:** ☐
 
-### M-009 · P2 · S · GAP-008 · ReDoS audit (threatfeed dynamic RegExp)
+### M-009 · V4 · ✅ · GAP-008 · ReDoS audit (threatfeed dynamic RegExp)
 - **anchor:** `server/threatfeed.ts:72-73` (`new RegExp` dynamic `name`), `server/memory-stats.ts:21` (static)
 - **action:** threatfeed `name` kaynağını izle (user-controlled mi?); user-controlled ise **RE2 (linear-time) + escape + anchor** (17-§C M-009; escape-tek yeterli değil) veya string-match. memory-stats static → nosemgrep+gerekçe. Repo-geneli semgrep detect-non-literal-regexp triage.
 - **📚 ref:** 17-KAYNAK-KOD-ORNEKLERI §C [M-009] RE2 pattern
@@ -75,14 +75,14 @@
 - **kabul:** `semgrep scan --config auto --severity ERROR server/` → ReDoS ERROR=0; threatfeed testi <100ms.
 - **dep:** yok · **durum:** ☐
 
-### M-010 · P2 · S · GAP-009 · colab_exec urllib scheme guard
+### M-010 · V4 · ✅ · GAP-009 · colab_exec urllib scheme guard
 - **anchor:** `colab_exec.py` (colab lane — `grep -rn "urllib\|urlopen" *.py`)
 - **action:** urlopen öncesi scheme allowlist (`http/https`), `file://`/`ftp://` reddi.
 - **test:** `colab_exec` python testi (pytest) veya JS-tarafı guard testi.
 - **kabul:** `file://` scheme → reddedilir.
 - **dep:** yok · **durum:** ☐ · **lane:** colab
 
-### M-011 · P2 · XS · GAP-010 · docker-compose read-only
+### M-011 · V4 · ✅ · GAP-010 · docker-compose read-only
 - **anchor:** `docker-compose*.yml` (`grep -rn "read_only\|tmpfs"`)
 - **action:** servis(ler)e `read_only: true` + gerekli `tmpfs:` mount.
 - **test:** compose config lint.
@@ -349,7 +349,14 @@
 
 ---
 
-## Completeness gap'leri (S-006 — GAP-041..045)
+## Completeness gap'leri (S-006 — GAP-041..045; S-010 — GAP-046)
+
+### M-050 · V5 · M · GAP-046 · boot-gated route test harness (S-010 keşif)
+- **anchor:** `server.ts` `initializeServer()` (~585+, route'lar burada kayıtlı; export değil), `vitest.config.ts` (PERF-gated)
+- **action:** `initializeServer`'ı test-edilebilir kıl (export + test-mode flag: network/DB/timer atla, VEYA handler'ları ayrı modül). M-004 (pipeline validate) + M-006 (adminGuard 429) regresyon-testlerini AÇAR.
+- **test:** harness sonrası `tests/pipeline-validate.test.ts` + `tests/admin-guard.test.ts`.
+- **kabul:** boot-gated route testi mümkün + M-004/M-006 yeşil.
+- **dep:** yok · **durum:** ☐ · **not:** kod-doğru (anchor 2100-2104, 2596-2616) ama V4'te regresyon-test kilidi
 
 ### M-045 · V5 · M · GAP-041 · migration rollback/down yolu
 - **anchor:** `server/store/migrations.ts` (v1-v6 forward-only, `down` fn yok — grep=0), `runMigrations`

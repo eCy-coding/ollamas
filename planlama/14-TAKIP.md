@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 ✅ V2 ✅ V3 ✅ → V4 sırada** · yöntem: subagent-driven (§9)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1 ✅ V2 ✅ V3 ✅ V4 9/11 → V5 sırada** · yöntem: subagent-driven (§9)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,9 +15,9 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1+V2+V3 TAMAM** (branch feat/v-final-train, 9 commit) |
-| Kodlama durumu | ✅ V1 5/5 · ✅ V2 3/3 · ✅ V3 6/6 → **V4 sırada** (M-001 auth-test) |
-| Genel ilerleme (kod) | **14 / 49 mikro-görev** · **3 / 10 versiyon** |
+| Aktif aşama | **V1+V2+V3 ✅ · V4 9/11** (branch feat/v-final-train, 11 commit) |
+| Kodlama durumu | ✅ V1·V2·V3 · V4 9/11 (M-004/006 → V5 boot-harness M-050) → **V5 sırada** |
+| Genel ilerleme (kod) | **23 / 50 mikro-görev** · **3.8 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) |
 | Sıradaki adım | **V3 Kendi Geliştirmeni Yap** → M-029 (docs/adding-a-tool.md) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
@@ -29,8 +29,8 @@
 V1  Dürüst Kimlik        ██████████ ✅ v1.24.0  5/5 (M-026,027,021,028,025)
 V2  Kendi Modelini Getir ██████████ ✅ v1.25.0  3/3 KULLANILABİLİR (M-031,037,033)
 V3  Kendi Geliştirmeni.. ██████████ ✅ v1.26.0  6/6 (adding-a-tool/extension-guide/HOWTO/CLI/api/troubleshoot)
-V4  Güvenlik Kanıtı      ░░░░░░░░░░ ☐  v1.27.0  ◀ SIRADA (M-001..011)
-V5  Test Bütünlüğü       ░░░░░░░░░░ ☐  v1.28.0  (M-012..016 · FRESH-suite barrier)
+V4  Güvenlik Kanıtı      █████████░ ◐  v1.27.0  9/11 (M-001,002,003,005,007,008,009,010,011) · M-004/006→V5
+V5  Test Bütünlüğü       ░░░░░░░░░░ ☐  v1.28.0  ◀ SIRADA (M-012,013,014,015⛔,016,045,050 + M-004/006)
 V6  Ürün & Gelir         ░░░░░░░░░░ ☐  v1.29.0  (M-017,018,019)
 V7  Gelişmiş Model Kont. ░░░░░░░░░░ ☐  v1.30.0  (M-038,039)
 V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  (M-020,022,023,024,036)
