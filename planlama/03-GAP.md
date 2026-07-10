@@ -34,10 +34,10 @@
 | GAP-016 | billing | 🟡 | **gerçek** — stripe.ts + parça testler VAR; uçtan-uca zincir tek-testte kanıt YOK | D10 | checkout→webhook→meter→rollup e2e | M-017 | zincir testi yeşil + test-mode kanıt |
 | GAP-017 | performans | 🟡→🔵 | ⬇ **config VAR** — `lighthouserc.json` (perf≥0.85, LCP≤2500) + `budget.json` mevcut; RUN edilmemiş | D11 | Lighthouse RUN + eşik-doğrula | M-018 | `npx lighthouse` json eşik-geçer |
 | GAP-018 | i18n | 🟡 | **gerçek (küçük)** — en/tr 159 key parite VAR; `tests/ui/i18n.test.tsx` var ama key-count assert YOK | D12 | key-count parite assert ekle | M-019 | `vitest run tests/ui/i18n*` fark=0 assert |
-| GAP-019 | persistence | 🔵 | **gerçek (darwin-dışı)** — Cloud master-key boot regenerate (ROADMAP T3.1) | D2/T-07 | Secret Manager + fail-closed | M-020 | key'siz cloud-boot fail-closed testi |
+| GAP-019 | persistence | 🔵 | ✅**DONE** — decideMasterKeySource isCloud→fail-closed + install.sh MASTER_KEY_B64 bootstrap (env>keychain>file>fail) | D2/T-07 | Secret Manager + fail-closed | M-020 | key'siz cloud-boot fail-closed testi |
 | GAP-020 | hijyen | 🟡 | **gerçek** — `package.json` react-example@0.0.0; VERSION dosyası YOK | D17 | gerçek ad+semver + VERSION tek-kaynak | M-021 | `node -p version` gerçek semver |
-| GAP-021 | docs | 🟡 | **gerçek** — README/QUICKSTART komut-güncelliği doğrulanmadı | D16 | ≥10 komut spot-check + ölü link | M-022 | ≥10 komut exit 0 + link=0 |
-| GAP-022 | release | 🟡 | ⬇ **install.sh VAR** (DRY_RUN'lı) + RELEASE_ROLLBACK.md VAR (144 satır); temiz-makine + tatbikat koşulmadı | D13/D15 | install temiz-dizin + rollback tatbikat | M-023, M-024 | temiz-dizin `install.sh` exit 0 + rollback kanıt |
+| GAP-021 | docs | 🟡 | ✅**DONE** — 14 koşu 11-exit-0 + ölü-link 0 + kırık `npm run verify`→lint&&test fix (S-015) | D16 | ≥10 komut spot-check + ölü link | M-022 | ≥10 komut exit 0 + link=0 |
+| GAP-022 | release | 🟡 | ✅**DONE** — mktemp-d DRY_RUN drilli exit-0 (gerçek koşum V9/M-042 CI'ya dürüst-sapma) + rollback 5-bölüm sandbox-tatbikat (S-015) | D13/D15 | install temiz-dizin + rollback tatbikat | M-023, M-024 | temiz-dizin `install.sh` exit 0 + rollback kanıt |
 | GAP-023 | canonical plan | ⚪ | **gerçek** — kök PLAN.md eski "Genesis" | — | canonical notu (Emre onayı) | M-025 | PLAN.md başına canonical notu |
 
 **Reconcile özeti (P0-P5):** 5 FP/DONE (GAP-002,003,005,006,007), 4 downgrade (001,004,011,017,022), 
@@ -61,7 +61,7 @@ release-hijyen + lane-konsolidasyon ağırlıklı.
 | GAP-032 | docs | 🟡 | **gerçek** — model kılavuzu yok (VRAM/model seçimi) | D21 | `docs/model-guide.md` | M-033 | dosya var + VRAM tablosu |
 | GAP-029 | docs/DX | 🔵 | **gerçek** — HOWTO-ADD-SKILL yok (HOWTO-ADD-CLI muadili) | D22 | skill ekleme rehberi | M-034 | dosya var |
 | GAP-030 | docs/DX | 🔵 | **gerçek** — CLI alt-komut ekleme rehberi zayıf | D22 | `cli/commands/*` deseni belge | M-035 | rehber var |
-| GAP-033 | docs | 🔵 | **gerçek** — deploy parçalı + stack-update yok | D22 | birleşik deploy-guide | M-036 | `docs/deploy-guide.md` var |
+| GAP-033 | docs | 🔵 | ✅**DONE** — docs/deploy-guide.md karar-ağacı + 4 yol + stack-update (S-015) | D22 | birleşik deploy-guide | M-036 | `docs/deploy-guide.md` var |
 | GAP-034 | UX/kod | 🔵 | **gerçek** — model yoksa `ai.ts:77` throw; wizard yok | D21 | first-run model-pull wizard/net-mesaj | M-037 | model-yok → yönlendirici mesaj + test |
 | GAP-037 | UX/kod | 🔵 | ✅**DONE** — `modelOverrides` persist (db) + `/api/model-overrides` (localOwnerGuard'lı) + providers iki-blok wiring + ModelSettings.tsx paneli | D21 | per-model num_ctx/temp/keep_alive/system UI | M-038 | 12+5 test + FRESH 2206 yeşil (V7) |
 | GAP-036 | kod | ⚪ | ✅**DONE** — `docs/custom-model.md` GGUF→Modelfile→`ollama create` CLI yolu (blob-upload nüansı) + model-guide cross-link | D21 | `ollama create` akışı veya doküman | M-039 | doküman var, 4× `ollama create` örneği (V7) |
@@ -86,7 +86,7 @@ Kimlik-borcu kümesi: GAP-024+025 (+P5 GAP-020+023) = repo gerçek kimliğini ya
 | ID | Boyut | Sev | DURUM (canlı) | Ver | Gap özeti | Mikro | Kabul |
 |---|---|---|---|---|---|---|---|
 | GAP-041 | test/migration | 🟡 | **gerçek** — `migrations.ts` down/rollback fn YOK (grep=0), forward-only | V5 | migration rollback/down yolu | M-045 | down-migration + rollback testi |
-| GAP-042 | release/platform | 🟡 | **gerçek** — `install.sh` Docker/macOS-first, Linux-native yok (apt/yum grep=0) | V8 | çoklu-platform install (Linux) | M-046 | Linux'ta install exit 0 (veya CI matrix) |
+| GAP-042 | release/platform | 🟡 | ✅**DONE** — Docker-yol Linux + compose-config exit-0 + launchctl-gate toleransı + guide Linux bölümü; ⚠ tam smoke CI-ubuntu (S-015) | V8 | çoklu-platform install (Linux) | M-046 | Linux'ta install exit 0 (veya CI matrix) |
 | GAP-043 | güvenlik/gizlilik | 🔵 | **gerçek** — GDPR erasure/export endpoint YOK (grep=0); retention prune var | V6 | self-service veri-silme + export | M-047 | `/api/account/{delete,export}` + test |
 | GAP-044 | i18n | ⚪ | **gerçek** — RTL + `Intl` format YOK (grep=0); GAP-018 sadece key-parite | V6 | RTL yön + Intl tarih/sayı | M-048 | RTL dir + Intl format testi |
 | GAP-045 | observability | ⚪ | **gerçek** — exception-aggregation/alert YOK (sentry grep=0); /metrics var | V9 | harici error-tracking/alerting | M-049 | error-aggregation hook + alert eşiği |

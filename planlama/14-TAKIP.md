@@ -5,7 +5,7 @@
 > Durum kaynağı = 10-MIKRO (M-durum) + 04-FAZLAR (faz) + 09-SEYIR (kayıt). El-ile güncellenir
 > (kodlama fazında `bin/takip.ts` canlı-türetme scripti eklenecek — CLAUDE.md role.ts benzeri).
 >
-> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V7 ✅ TAMAM (7/10) → V8 sırada** · yöntem: subagent-driven + slash (§9/§10)
+> **Son güncelleme:** 2026-07-10 · branch `feat/v-final-train` · faz: **V1–V8 ✅ TAMAM (8/10) → V9 sırada** · yöntem: subagent-driven + slash (§9/§10)
 >
 > 📚 Kodlama referansı: `17-KAYNAK-KOD-ORNEKLERI.md`. Otonom protokol: `18-SUREKLI-YURUTME.md`.
 
@@ -15,11 +15,11 @@
 
 | Alan | Değer |
 |---|---|
-| Aktif aşama | **V1–V7 ✅ TAMAM** (branch feat/v-final-train, 19 commit) |
-| Kodlama durumu | ✅ V1–V7 (per-model override UI+API, GGUF import guide) → **V8 sırada** |
-| Genel ilerleme (kod) | **39 / 50 mikro-görev** · **7 / 10 versiyon** |
+| Aktif aşama | **V1–V8 ✅ TAMAM** (branch feat/v-final-train, 23 commit) |
+| Kodlama durumu | ✅ V1–V8 (cloud-key fail-closed, deploy-guide, install/rollback drilli) → **V9 sırada** |
+| Genel ilerleme (kod) | **45 / 50 mikro-görev** · **8 / 10 versiyon** |
 | Sürüm | ollamas@**1.24.0** · **KULLANICI ARTIK KENDİ MODELİNİ KULLANABİLİR** (V2) + per-model ayar (V7) |
-| Sıradaki adım | **V8 Dağıtım Sağlamlığı** → M-023 (install.sh temiz-dizin) |
+| Sıradaki adım | **V9 Gözlemlenebilirlik & Cila** → M-041 (CHANGELOG) |
 | Bloke / Emre-gate | M-015 (branch-sil, V5), V10 git-tag (outward) — ikisi de ileride |
 | Kullanıcı kullanabilir mi | ✅ **EVET** (V2: custom-openai+catalog dropdown, first-run onboarding, model-guide) |
 
@@ -33,7 +33,7 @@ V4  Güvenlik Kanıtı      ██████████ ✅ v1.27.0  11/11 (M
 V5  Test Bütünlüğü       ██████████ ✅ v1.28.0  9/9 (M-015 audit/* arşivlendi · FRESH 1518)
 V6  Ürün & Gelir         ██████████ ✅ v1.29.0  5/5 (M-017 billing,018 LH0.96,019/048 i18n,047 GDPR)
 V7  Gelişmiş Model Kont. ██████████ ✅ v1.30.0  2/2 (M-038 per-model UI, M-039 GGUF guide)
-V8  Dağıtım Sağlamlığı   ░░░░░░░░░░ ☐  v1.31.0  ◀ SIRADA (M-020,022,023,024,036,046)
+V8  Dağıtım Sağlamlığı   ██████████ ✅ v1.31.0  6/6 (M-020 fail-closed,022,023,024,036,046)
 V9  Gözlemlenebilir+Cila ░░░░░░░░░░ ☐  v1.32.0  (M-041,042,043)
 V10 v-FINAL / GA         ░░░░░░░░░░ ☐  v1.33.0  ✅GA-ÜRETİME-HAZIR (M-044 Opus-gate)
 ```
@@ -77,11 +77,11 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-017 | P4 | billing e2e zincir testi | ☐ | — | — |
 | M-018 | P4 | Lighthouse RUN + doğrula | ☐ | — | M-013 |
 | M-019 | P4 | i18n key-count parite assert | ☐ | — | — |
-| M-020 | P5 | cloud master-key fail-closed | ☐ | — | — |
+| M-020 | V8 | cloud master-key fail-closed | ✅ | RED/GREEN 16/16 + install-bootstrap · S-015 | — |
 | M-021 | V1 | VERSION + package semver | ✅ | ollamas@1.24.0 · vitest 2/2 · 4a9cc28 | — |
-| M-022 | P5 | README/QUICKSTART spot-check | ☐ | — | M-021 |
-| M-023 | P5 | install.sh temiz-dizin | ☐ | — | M-021 |
-| M-024 | P5 | RELEASE_ROLLBACK tatbikat | ☐ | — | — |
+| M-022 | V8 | README/QUICKSTART spot-check | ✅ | 11-exit-0 + link-0 + verify-fix · S-015 | — |
+| M-023 | V8 | install.sh temiz-dizin | ✅ | DRY_RUN exit-0 + doctor (gerçek→M-042) · S-015 | — |
+| M-024 | V8 | RELEASE_ROLLBACK tatbikat | ✅ | 5-bölüm sandbox-drill · S-015 | — |
 | M-025 | V1 | canonical plan notu | ✅ | PLAN.md+ROADMAP canonical-not · 1ccdbed | — |
 | M-026 | V1 | README gerçek-ürün | ✅ | kurgu-grep=0 · gerçek başlık · QUICKSTART link · 4a9cc28 | — |
 | M-027 | V1 | setup.sh düzelt/yönlendir | ✅ | go-build=0 · ready-wrapper · bash-n OK · 4a9cc28 | — |
@@ -93,7 +93,7 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-033 | V2 | docs/model-guide.md | ✅ | VRAM tablosu+BYO+GGUF · e0edba4 | — |
 | M-034 | V3 | HOWTO-ADD-SKILL.md | ✅ | be79cb9 | — |
 | M-035 | V3 | CLI alt-komut rehberi | ✅ | be79cb9 | — |
-| M-036 | P6b | deploy-guide + stack-update | ☐ | — | — |
+| M-036 | V8 | deploy-guide + stack-update | ✅ | 4-yol + Linux + update-flow · S-015 | — |
 | M-037 | V2 | first-run model onboarding | ✅ | ai.ts aksiyon-mesajı + 2/2 test · e0edba4 | — |
 | M-038 | V7 | per-model ayar UI | ✅ | model-overrides+UI+API · 48/48 · 62ab63c | — |
 | M-039 | V7 | GGUF/Modelfile import | ✅ | docs/custom-model.md CLI-yolu · 62ab63c | — |
@@ -103,12 +103,12 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 | M-043 | V9 | docs cross-link sweep | ☐ | — | M-026/030 |
 | M-044 | V10 | GA-gate (Opus) | ☐ | — | tüm önceki |
 
-**Sayaç:** kapandı **39/50** (V1–V7) · kalan V8-V10 (11) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 11.
+**Sayaç:** kapandı **45/50** (V1–V8) · kalan V9-V10 (5) · ⛔ Emre-gate 0 · outward tag V10 · aktif-yol 5.
 
 ## ▶ Aktif versiyon + sonraki adım (16-VERSIYON)
 
 - **Şu an:** V1–V7 kapandı (39/50). Yöntem: subagent-driven (§9) + slash (§10, TDD-skill).
-- **Sonraki versiyon: V8 Dağıtım Sağlamlığı (v1.31.0)** — M-023 (install.sh temiz-dizin), M-024 (rollback tatbikat), M-022 (README spot-check), M-036 (deploy-guide), M-020 (cloud master-key fail-closed), M-046 (Linux-install).
+- **Sonraki versiyon: V9 Gözlemlenebilirlik & Cila (v1.32.0)** — M-041 (CHANGELOG), M-049 (error-tracking), M-043 (docs cross-link sweep), M-042 (full-E2E acceptance, conductor koşar).
 - **Kalan Emre-gate:** yalnız V10 git-tag (outward).
 
 ## ⛔ Bloke / Emre-gate bekleyenler
@@ -121,6 +121,8 @@ P-FINAL Gate     ░░░░░░░░░░ ☐  0%     (Opus kapanış dene
 
 ## 🕘 Son seyir (09-SEYIR özeti)
 
+- **S-015** (2026-07-10) · V8 3-paralel-subagent: M-020 fail-closed (RED/GREEN 16/16) + install.sh MASTER_KEY_B64 bootstrap, deploy-guide 4-yol, DRY_RUN install drilli (gerçek koşum dürüst-sapma→M-042), rollback 5-bölüm sandbox, spot-check 11-exit-0 + verify-docfix. FRESH 2213/0.
+- **S-014b** (2026-07-10) · GÜVENLİK: /api/model-overrides localOwnerGuard'a eklendi (5e3e606, SaaS prompt-injection yüzeyiydi) + çift-kondüktör olayı çözüldü (tek oturum kuralı).
 - **S-014** (2026-07-10) · V7 subagent-driven+TDD: per-model override (server/model-overrides.ts saf-çekirdek + /api/model-overrides + ModelSettings.tsx UI + locales EN/TR) [M-038], docs/custom-model.md GGUF CLI-yolu [M-039]. tsc-0 · 48/48 · commit 62ab63c.
 - **S-009** (2026-07-10) · V3 subagent-driven: 6 dev-doküman (adding-a-tool/extension-guide/HOWTO-ADD-SKILL/CLI-guide/api-quickstart/troubleshooting), tsc-0, commit be79cb9. Yöntem 18-§9.
 - **S-008** (2026-07-10) · V1 kapandı + V2 TAMAM (kullanılabilir): custom-openai+catalog dropdown+server, first-run onboarding, model-guide. 23/23 test.

@@ -312,3 +312,31 @@
   → yorum: guard artık SAAS modda 403 döndürür; invariant testi gelecek regresyonu yakalar. Commit 5e3e606.
 - **DERS (yeni gotcha):** RESUME-KIT'i aynı anda tek terminalde çalıştır — çift-kondüktör commit-yarışı
   ve gözden-kaçan-review üretir. V8 öncesi Emre karar: hangi oturum devam edecek?
+
+## S-015 · 2026-07-10 · V8 Dağıtım Sağlamlığı 6/6 (3-paralel-subagent) · conductor: fable-5
+
+- **V8 6/6 ✅:** M-020 cloud master-key fail-closed — `decideMasterKeySource` isCloud→`{source:"fail"}`
+  (constructor throw, boot non-zero; darwin mint yolu değişmedi; isCloud=`K_SERVICE||GOOGLE_CLOUD_RUN||≠darwin`)
+  + `install.sh` MASTER_KEY_B64 bootstrap (.env mint → compose env_file → container; fail-closed'un eşi).
+  M-036 `docs/deploy-guide.md` (karar-ağacı + local/Docker/compose/Helm-k8s + stack-update; komutlar
+  package.json/Makefile'dan doğrulandı). M-046 Linux=Docker-yol + `docker compose config -q` exit-0 +
+  ⚠ tam smoke CI-ubuntu-matrix notu. M-023 `bash -n` 0 + mktemp-d `DRY_RUN=1` exit-0 + `ollamas doctor`
+  healthy. M-024 rollback 5-bölüm sandbox-drill (gh-run-list 0, npm-pack-dry 5.5MB, tap-revert 1.31.0→1.30.4,
+  latest.json jq 1.30.4, launchd verify.sh RESPAWN-OK). M-022 14 koşu 11-exit-0 + ölü-link 0 + kırık
+  `npm run verify`→`npm run lint && npm run test` doc-fix (README/QUICKSTART).
+- **KANIT (conductor):**
+  ```text
+  $ npm run lint → tsc exit 0
+  $ npx vitest run → Tests 2213 passed | 22 skipped (2235) · 0 fail
+  $ npx vitest run tests/cloud-masterkey.test.ts tests/master-key.test.ts → 16 passed (16)
+  $ cd $(mktemp -d) && DRY_RUN=1 bash .../install.sh; echo exit=$? → exit=0
+  ```
+  → yorum: V8 kabulü karşılandı (fail-closed test + deploy-guide + drill kanıtları).
+- **DÜRÜST SAPMA (P-B):** M-023 GERÇEK install koşulmadı — install.sh repo compose stack'ine kurar;
+  :3000'de canlı dev server + mevcut container Restarting-loop'ta → canlı lane bozulurdu. DRY_RUN
+  drilli + doctor kanıtı verildi; gerçek temiz-koşum V9/M-042 (CI-matrix) kapsamına.
+- **Not:** M-020 implementasyonu ağaçta hazır bulundu (oturum-A'nın uncommitted V8 başlangıcı) —
+  subagent RED'i HEAD-worktree'de kanıtlayıp GREEN'i doğruladı (silip yeniden yazmadı). monitor/ops
+  exit-1 + make-gate shfmt = env/scripts-lane durumu, doc-dışı kök neden.
+- **45/50 görev, 8/10 versiyon.** Sonraki: V9 (M-041 CHANGELOG, M-049 error-tracking, M-043 link-sweep,
+  M-042 full-E2E conductor-koşumu).

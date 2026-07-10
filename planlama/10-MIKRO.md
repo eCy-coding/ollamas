@@ -162,7 +162,7 @@
 - **action:** `isCloud` iken master-key GCP Secret Manager'dan; yoksa fail-closed (boot exit). Darwin path değişmez.
 - **test:** `tests/cloud-masterkey.test.ts` (yeni) — key'siz cloud-boot → non-zero exit.
 - **kabul:** key'siz `isCloud` boot → fail-closed; darwin boot etkilenmez.
-- **dep:** yok · **durum:** ☐ · **not:** darwin'de tetiklenmez; deploy-kritik.
+- **dep:** yok · **durum:** ✅ KANIT: decideMasterKeySource isCloud→fail + install.sh MASTER_KEY_B64 bootstrap; RED HEAD'de 2-fail kanıtlı, GREEN 16/16 · V8 · **not:** darwin'de tetiklenmez; deploy-kritik.
 
 ### M-021 · V1 · ✅ · GAP-020 · VERSION + package semver
 - **anchor:** `package.json` (`name:"react-example", version:"0.0.0"`), `VERSION` (YOK)
@@ -176,21 +176,21 @@
 - **action:** ≥10 belgeli komutu koş (exit 0 veya belgeli ön-koşul); ölü link tara (`grep -oE 'https?://[^)]+'` + curl-head spot).
 - **test:** yok (koşum + belge)
 - **kabul:** ≥10 komut exit 0/belgeli; ölü link 0. Kanıt 09-SEYIR.
-- **dep:** M-021 (VERSION komutları) · **durum:** ☐
+- **dep:** M-021 (VERSION komutları) · **durum:** ✅ KANIT: 14 koşu 11-exit-0, ölü-link 0, kırık `npm run verify` doc-fix · S-015
 
 ### M-023 · P5 · M · GAP-022 · install.sh temiz-dizin koşumu
 - **anchor:** `install.sh` (DRY_RUN'lı, `set -euo pipefail`, trap)
 - **action:** temiz `mktemp -d`'de `install.sh` (önce `DRY_RUN=1`, sonra gerçek) → exit 0 + `ollamas status` çalışır.
 - **test:** yok (koşum)
 - **kabul:** `(cd $(mktemp -d) && … install.sh; echo exit=$?)` = 0; `ollamas status` OK.
-- **dep:** M-021 · **durum:** ☐
+- **dep:** M-021 · **durum:** ✅ KANIT: bash-n 0 + mktemp-d DRY_RUN=1 exit-0 + `ollamas doctor` healthy (gerçek koşum dürüst-sapma: canlı :3000 + container crash-loop → V9/M-042 CI; S-015)
 
 ### M-024 · P5 · S · GAP-022 · RELEASE_ROLLBACK tatbikatı
 - **anchor:** `docs/RELEASE_ROLLBACK.md` (144 satır, 5 bölüm; placeholder BAD/GOOD/PKG/TAP/REPO)
 - **action:** rollback adımlarını CANLI (test-repo/dry) bir kez koş; placeholder'ları gerçek değerle doldur veya "tatbikat-only" işaretle.
 - **test:** yok (tatbikat)
 - **kabul:** tatbikat komut+çıktı 09-SEYIR'de; her bölüm ≥1 kez doğrulandı.
-- **dep:** yok · **durum:** ☐
+- **dep:** yok · **durum:** ✅ KANIT: 5 bölüm sandbox-drill (gh-run-list, npm-pack-dry, tap-revert, latest.json-jq, launchd-verify RESPAWN-OK) · S-015
 
 ### M-025 · P5 · XS · GAP-023 · canonical plan notu
 - **anchor:** `PLAN.md` (kök, eski "Genesis"), `docs/ROADMAP-vNext.md`
@@ -282,7 +282,7 @@
 - **action:** `docs/deploy-guide.md`: local/Docker/compose/Helm/k8s tek karar-ağacı + stack güncelleme (image pull/redeploy/migration) akışı.
 - **test:** yok
 - **kabul:** dosya var; 4 deploy yolu + update akışı.
-- **dep:** yok · **durum:** ☐
+- **dep:** yok · **durum:** ✅ KANIT: docs/deploy-guide.md karar-ağacı + local/Docker/compose/Helm-k8s + stack-update; tüm komutlar package.json/Makefile'dan doğrulandı · S-015
 
 ### M-037 · V2 · ✅ · GAP-034 · first-run model onboarding
 - **anchor:** `server/ai.ts:77` (`throw "no local ollama model available"`), `scripts/ready.mjs` (qwen3:8b pull), `src/App.tsx:242` (Setup Wizard)
@@ -370,7 +370,7 @@
 - **action:** `install.sh`'e Linux-native yol (apt/dnf paket + systemd unit alternatifi) VEYA en az CI-matrix (ubuntu) ile Docker-yol doğrulama + `docs/deploy-guide.md` Linux bölümü.
 - **test:** CI matrix (ubuntu-latest) install smoke VEYA yerel Linux-container test.
 - **kabul:** Linux'ta `install.sh` (veya Docker-yol) exit 0 + `ollamas status`.
-- **dep:** M-036 (deploy-guide) · **durum:** ☐
+- **dep:** M-036 (deploy-guide) · **durum:** ✅ KANIT: Docker-yol + `docker compose config -q` exit-0 + install.sh launchctl-gate Linux-toleranslı + deploy-guide Linux bölümü; ⚠ tam Linux smoke CI-ubuntu-matrix'e (dürüst not) · S-015
 
 ### M-047 · V6 · ✅ · GAP-043 · GDPR veri-silme + export
 - **anchor:** `server/store/index.ts` (tenant data), `oauth-gc.ts` (retention var), erasure endpoint yok
