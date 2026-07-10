@@ -51,12 +51,17 @@ Derin-audit gerekçeyle elemiş; bunlara P0 açmak stale-severity ihlalidir (00-
 
 | Risk | Gerekçe adayı | Onay |
 |---|---|---|
-| gcm-no-tag-length semgrep ×2 | muhtemel FP (`setAuthTag` mevcut) — doğrula, FP ise nosemgrep+gerekçe | ☐ |
-| 3 moderate npm audit | canlı değer (2026-07-10); high/critical=0 — moderate'ler tek tek gerekçelenir | ☐ |
-| 13 skipped live-e2e | gerçek-infra gated; gerekçe belgeleme D6'da | ☐ |
+| gcm-no-tag-length semgrep ×2 | FP DOĞRULANDI: setAuthTag mevcut + canlı semgrep ERROR=0 (M-044) | ✅ Emre onayı 2026-07-10 (S-018) |
+| 3 moderate npm audit | canlı değer (2026-07-10); high/critical=0 | ✅ Emre onayı 2026-07-10 (S-018) |
+| 13 skipped live-e2e | gerçek-infra gated; 21 gated skip docs/TESTING.md gerekçeli (M-014) | ✅ Emre onayı 2026-07-10 (S-018) |
 
 ## §6 Politika
 
 - Yeni route eklerken: auth kararı (middleware/localhost-bind) PR açıklamasında zorunlu.
 - Yeni tool eklerken: `ToolTier` (safe/host/privileged/host_upstream) ataması + tier gerekçesi.
 - Key/kredensiyel repo'ya girmez; `git log -S` taraması 06-KOR-NOKTA #12'de periyodik.
+
+
+## §6 Nihai imza
+
+**§3 matrisi (T-01..T-12) + §5 kabul-edilen-riskler Emre (T0) tarafından onaylandı — 2026-07-10, GA-FINALIZE (S-018).** T-12 fixture-testi aynı oturumda eklendi; kalan tek koşul tag-CI kanıtı (D14).
