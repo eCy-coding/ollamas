@@ -22,7 +22,7 @@ import { createServer as createViteServer } from "vite";
 import { db, ChatSession } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
-import { keyedCloudProviders, catalogEntry, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
+import { keyedCloudProviders, catalogEntry, catalogBaseUrl, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { deriveCloudflareAccountId } from "./server/cloudflare";
 import { setCloudflareAccountId, getCloudflareAccountId } from "./server/provider-catalog";
 import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
@@ -1241,6 +1241,36 @@ async function initializeServer() {
           }
         } catch (e) {}
         return res.json(["gpt-4o-mini", "gpt-4o"]);
+      }
+
+      // Free-tier catalog providers (groq/cerebras/…) + custom-openai: all OpenAI-compatible.
+      // Chat already routes these (providers.ts); this branch makes them appear (and be usable)
+      // in the model dropdown too — previously they fell through to [] and looked broken.
+      const cat = catalogEntry(prov);
+      if (cat || prov === "custom-openai") {
+        const base = prov === "custom-openai"
+          ? (db.data.keys["custom-openai-endpoint"] || "").replace(/\/+$/, "")
+          : catalogBaseUrl(cat!.id);
+        const key = ProviderRouter.getDecryptedKey(prov === "custom-openai" ? "custom-openai" : cat!.id);
+        if (prov === "custom-openai" && !base) {
+          return res.json(["Set the custom OpenAI endpoint in the Vault first"]);
+        }
+        if (cat && !cat.keyless && !key) {
+          return res.json([`API key not set for ${cat.id} - please configure it in the Vault`]);
+        }
+        try {
+          const r = await fetch(`${base}/models`, {
+            headers: key ? { Authorization: `Bearer ${key}` } : {},
+            signal: AbortSignal.timeout(5000),
+          });
+          if (r.ok) {
+            const j = await r.json();
+            const names = (j.data || []).map((m: any) => m.id).filter(Boolean);
+            if (names.length) return res.json(names);
+          }
+        } catch { /* endpoint down — fall back to the documented default below */ }
+        // Never leave the dropdown empty: the catalog's default model is a safe, usable choice.
+        return res.json(cat ? [cat.defaultModel] : [`custom-openai models unavailable (${base})`]);
       }
 
       res.json([]);

@@ -82,6 +82,20 @@ describe('ReactAgentTab — ReAct Specialist', () => {
     expect(screen.getByRole('option', { name: /Gemini CLI \(Local\)/i })).toBeInTheDocument();
   });
 
+  // M-031 (V2): custom-openai + the free-tier catalog were routable in chat but missing from
+  // the picker, so a key you entered in the Vault could never be selected here. Both must appear.
+  it('offers the custom OpenAI-compatible endpoint in the picker (M-031)', async () => {
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    expect(screen.getByRole('option', { name: /Custom \(OpenAI-compatible\)/i })).toBeInTheDocument();
+  });
+
+  it('offers free-tier catalog providers (groq) in the picker (M-031)', async () => {
+    renderUI(<ReactAgentTab onNotify={onNotify} />);
+    await waitFor(() => expect(getMock).toHaveBeenCalled());
+    expect(screen.getByRole('option', { name: /Groq/i })).toBeInTheDocument();
+  });
+
   it('Enter submits the prompt; Shift+Enter does NOT', async () => {
     renderUI(<ReactAgentTab onNotify={onNotify} />);
     await waitFor(() => expect(getMock).toHaveBeenCalled());

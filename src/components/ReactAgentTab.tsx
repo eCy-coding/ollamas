@@ -217,7 +217,21 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     { id: "ollama-local", label: "Ollama (Local Engine)", icon: "🏠" },
     { id: "ollama-cloud", label: "Ollama Cloud Infrastructure", icon: "🌩️" },
     { id: "vllm", label: "vLLM (Local)", icon: "⚡" },
-    { id: "llamacpp", label: "llama.cpp (Local)", icon: "🦙" }
+    { id: "llamacpp", label: "llama.cpp (Local)", icon: "🦙" },
+    // Bring-your-own endpoint (LM Studio / vLLM / litellm / any OpenAI-compatible URL).
+    { id: "custom-openai", label: "Custom (OpenAI-compatible)", icon: "🔌" },
+    // Free-tier OpenAI-compatible catalog (server/provider-catalog.ts). Selectable once a key
+    // is set in the Vault; chat already routes these — the dropdown just surfaces them.
+    { id: "groq", label: "Groq", icon: "⚙️" },
+    { id: "cerebras", label: "Cerebras", icon: "🧠" },
+    { id: "zai", label: "Z.ai", icon: "🇿" },
+    { id: "sambanova", label: "SambaNova", icon: "🔷" },
+    { id: "nvidia-nim", label: "NVIDIA NIM", icon: "🟩" },
+    { id: "github-models", label: "GitHub Models", icon: "🐙" },
+    { id: "mistral", label: "Mistral", icon: "🌬️" },
+    { id: "cloudflare", label: "Cloudflare Workers AI", icon: "🟠" },
+    { id: "scaleway", label: "Scaleway", icon: "🟣" },
+    { id: "pollinations", label: "Pollinations (keyless)", icon: "🌸" }
   ];
 
   // Fetch real models whenever provider changes

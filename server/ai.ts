@@ -34,6 +34,12 @@ export const LOCAL_CODER_HINT = "coder";
 // /api/tags-order default can land on a 70B that contends → 0 tok/s; prefer the champion.
 export const MAC_MODEL_CHAMPION = process.env.MAC_MODEL_CHAMPION || "qwen3:8b";
 
+// First-run onboarding: when no local model is installed, tell the user exactly how to fix it
+// instead of throwing a dead-end "not available". `npm run ready` also pulls this on setup.
+export const NO_LOCAL_MODEL_HELP =
+  `No local ollama model installed. Run 'ollama pull ${MAC_MODEL_CHAMPION}' ` +
+  `(or 'npm run ready') to get started, then retry.`;
+
 // Default-model resolution is cached briefly so back-to-back calls don't hammer
 // /api/tags on every request.
 let defaultModelCache: { model: string; at: number } | null = null;
@@ -64,7 +70,7 @@ export async function listModels(): Promise<string[]> {
 /** Prefer a coder-tuned local model (qwen3-coder per orchestration vO6 M4 benchmark). */
 export async function resolveLocalCoder(): Promise<string> {
   const models = await listModels();
-  if (!models.length) throw new Error("no local ollama model available");
+  if (!models.length) throw new Error(NO_LOCAL_MODEL_HELP);
   return models.find((m) => m.includes(LOCAL_CODER_HINT)) ?? models[0];
 }
 
@@ -74,7 +80,7 @@ export async function resolveDefaultModel(): Promise<string> {
     return defaultModelCache.model;
   }
   const models = await listModels();
-  if (!models.length) throw new Error("no local ollama model available");
+  if (!models.length) throw new Error(NO_LOCAL_MODEL_HELP);
   // T1.4 (vNext): default to the benchmarked champion when installed, else first tag.
   // Avoids silently defaulting to a big contending model (0 tok/s) on the single-GPU Mac.
   const chosen = models.includes(MAC_MODEL_CHAMPION) ? MAC_MODEL_CHAMPION : models[0];
