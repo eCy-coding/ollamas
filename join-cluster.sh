@@ -7,14 +7,15 @@ DRY_RUN="${DRY_RUN:-0}"
 trap 'echo "[-] join-cluster failed (line $LINENO)"; exit 1' ERR
 
 echo "[INFO] Preparing LLM Mission Control Cluster Node..."
+# DRY rehearsal must stay dependency-free (runs on CI without ollama) — branch before probes.
+if [ "$DRY_RUN" = "1" ]; then
+  echo "[DRY] would check ollama, prompt ToS, then start: ./bin/hardware_orchestrator --daemon (if present)."
+  exit 0
+fi
+
 if ! command -v ollama &>/dev/null; then
   echo "[-] Error: Ollama not found."
   exit 1
-fi
-
-if [ "$DRY_RUN" = "1" ]; then
-  echo "[DRY] would prompt ToS, then start: ./bin/hardware_orchestrator --daemon (if present)."
-  exit 0
 fi
 
 echo "--- TERMS OF SERVICE ---"

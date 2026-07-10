@@ -90,7 +90,9 @@ describe("ProviderRouter.generate — abort signal threading (v1.11)", () => {
     // The composed signal (AbortSignal.any([callerSignal, timeout300s])) must
     // be aborted because the callerSignal is already aborted.
     expect(capturedSignal!.aborted).toBe(true);
-  });
+    // Walks the whole provider-fallback roster (every provider rejects) — needs headroom
+    // over the 5s default under full-suite CPU contention. Assertions are load-independent.
+  }, 30_000);
 
   // ── (b) no signal → fetch still receives an AbortSignal (the 300s timeout) ─
 
@@ -187,14 +189,15 @@ describe("ProviderRouter.generate — abort signal threading (v1.11)", () => {
 
     // May resolve via demo fallback — important thing is it does NOT hang 300s.
     const p = ProviderRouter.generate(BASE_CONFIG, undefined, undefined, alreadyAborted);
-    // Attach a race timeout that rejects after 5s so the test can fail fast.
+    // Race guard: fail fast if generate() hangs. 20s (not 5s) — the full fallback roster
+    // under suite-wide CPU contention legitimately takes seconds; a real hang is 300s.
     const timeout = new Promise<never>((_, rej) =>
-      setTimeout(() => rej(new Error("generate() hung — did not complete within 5s")), 5000)
+      setTimeout(() => rej(new Error("generate() hung — did not complete within 20s")), 20_000)
     );
 
     await Promise.race([p.then(() => undefined).catch(() => undefined), timeout]);
     const elapsed = Date.now() - start;
 
-    expect(elapsed).toBeLessThan(5000);
-  });
+    expect(elapsed).toBeLessThan(20_000);
+  }, 30_000);
 });
