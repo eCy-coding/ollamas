@@ -1,3 +1,5 @@
+> **canonical: `planlama/16-VERSIYON-YOLHARITASI.md`** — yürütme sırası (V1→V10). Bu dosya teknik-borç kaynağı (T-items).
+
 # ollamas vNext — council roadmap (evidence-only, single-answer)
 
 Produced by a 3-lens council (reliability / persistence / performance) under a strict mandate:

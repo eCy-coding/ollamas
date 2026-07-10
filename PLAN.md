@@ -1,3 +1,5 @@
+> **canonical: `planlama/16-VERSIYON-YOLHARITASI.md`** — yürütme sırası (V1→V10). Bu dosya tarihsel/arşiv.
+
 # Genesis Cluster Mesh Project - 2026 Architectural Roadmap
 
 ## Phase 1: Robust Orchestration (Current Focus)
