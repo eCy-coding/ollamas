@@ -62,3 +62,13 @@ chat-pilot render DONE → görsel-onay (Emre) + handoff-bundle testi (Export/Ha
 - Tasarım-fazı convergence (`00-DESIGN-MASTER`) **GREEN** olmadan implementasyon YOK.
 
 2026-07-11T01:20+03:00 design-system.handoff-bundle DONE — DesignSync ile 'eCy Design System' (019dd99c) canlı çekildi → docs/odyssey/handoff/design-system/ (colors_and_type.css + Components.jsx + ODYSSEY-TOKEN-MAP.md + BUNDLE-README); e2e %100-kullanım köprüsü kuruldu (Emre direktifi). Görsel-onay sütunu Emre'de.
+
+2026-07-11T01:35+03:00 CANLI-CHROME KEŞİF (Emre direktifi "yapılanları gör") — claude.ai/design gezildi.
+  BULGU (design-execution tablosu ESKİYMİŞ): Emre TÜM ODYSSEY panellerini ÇOKTAN tasarlamış (Projects listesi):
+  · # Ollamas Workspace Shell (tsx-kod, "şimdi")  · Ollamas complete workspace (2s)  · # Settings & Security Panel (3s, GÖRÜLDÜ: 5-nav + 2FA + aktif-oturum + Enforced-by-daemon trust-model + Tweaks-4state)
+  · # Hardware-Aware Model Cookbook (4s)  · Calendar panel (5s)  · Notes & Tasks Panel (5s)  · Documents panel (5s)
+  · Deep Research Panel (5s)  · Email triage panel (5s)  · Developer AI Workspace Shell (5s)  · AI Developer Workspace Chat (5s)
+  Hepsi eCy Design System temalı, production-kalite, 4-state (Tweaks preview) içeriyor.
+  ERİŞİM SINIRI: DesignSync yalnız "eCy Design System" (design-system tipi) verir; bu paneller ayrı PROJECT
+  tipi → DesignSync çekemez. Repo'ya alma yolu = her panelin "Handoff to Claude Code" export'u (Emre, tek-tık)
+  VEYA Chrome-görsel-referans-implementasyon. → EMRE KARARI bekliyor (handoff yöntemi).

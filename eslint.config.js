@@ -14,7 +14,13 @@ export default [
       'dist/**',
       'tests/**',
       'server.ts',
-      'server/**',
+      // NB: gitignore semantics — an ignored PARENT dir cannot be re-included via a
+      // child negation. Ignore server's direct children (`server/*`) instead of the
+      // whole subtree (`server/**`) so the O0 import-guard can re-include
+      // server/modules below (only the tests inside it stay ignored).
+      'server/*',
+      '!server/modules/',
+      'server/modules/**/__tests__/**',
       'src/styles/tokens.css',
       '*.config.{js,ts}',
       'eslint.config.js',
@@ -47,5 +53,44 @@ export default [
     // keeps a local token-scoped wrapper — all may use raw fetch by design.
     files: ['src/lib/apiClient.ts', 'src/components/GoogleDriveBrowser.tsx', 'src/components/GoogleSheetsBrowser.tsx', 'src/components/SaaSAdmin.tsx'],
     rules: { 'no-restricted-globals': 'off' },
+  },
+  {
+    // O0 store seam (02-o0-foundation.md §2.1 P6): module code reaches persistence
+    // ONLY through server/modules/_core/store.ts — direct server/store imports fail.
+    files: ['server/modules/**/*.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { sourceType: 'module' },
+      globals: { ...globals.node },
+    },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // Forbid the server/store persistence layer. Subpath forms
+              // (store/index|db-adapter|migrations|vector) exist ONLY under
+              // server/store — the _core/store FACADE has no such subpaths and a
+              // module's OWN sibling ./store is not an up-reference, so both stay
+              // allowed. Plus the bare up-directory forms that resolve to server/store.
+              group: [
+                '**/store/index', '**/store/index.*',
+                '**/store/db-adapter', '**/store/db-adapter.*',
+                '**/store/migrations', '**/store/migrations.*',
+                '**/store/vector', '**/store/vector.*',
+                '../store', '../../store', '../../../store',
+              ],
+              message: 'Modules access persistence ONLY via server/modules/_core/store (O0 INV, 02-o0-foundation.md §2.1).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The facade itself + the registry are the sanctioned infrastructure layer.
+    files: ['server/modules/_core/**/*.ts', 'server/modules/registry.ts', 'server/modules/index.ts'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 ];

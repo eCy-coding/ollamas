@@ -28,8 +28,8 @@ describe("M-012 migration version uniqueness", () => {
     expect(() => assertUniqueVersions(dup)).toThrow(/second/);
   });
 
-  test("MIGRATIONS versions are 1..6 contiguous (no accidental renumber)", () => {
+  test("MIGRATIONS versions are 1..7 contiguous (no accidental renumber)", () => {
     const versions = MIGRATIONS.map((m) => m.version).sort((a, b) => a - b);
-    expect(versions).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 });

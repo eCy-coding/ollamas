@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { 
   TelemetryCockpit 
 } from "./components/TelemetryCockpit";
@@ -29,7 +29,9 @@ import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { UsagePanel } from "./components/UsagePanel";
 import { OfflineBadge } from "./components/OfflineBadge";
 import { CapabilityProvider, CapabilityGate } from "./components/CapabilityGate";
-import { isTabEnabled } from "./lib/capabilities";
+import { isTabEnabled, hasCapability } from "./lib/capabilities";
+import { useModuleTabs } from "./lib/modules";
+import ModulePanel from "./components/ModulePanel";
 import { useLingui } from "@lingui/react";
 import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
@@ -37,6 +39,7 @@ import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
   MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch, Plug,
+  Box,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -63,6 +66,7 @@ export default function App() {
   const [telemetry, setTelemetry] = useState<HealthTelemetry | null>(null);
   const [activeTab, setActiveTab] = useState<string>("telemetry");
   const [notifications, setNotifications] = useState<{ id: string; msg: string; type: "success" | "error" | "info" }[]>([]);
+  const moduleTabs = useModuleTabs(); // O0: backend-driven module tabs (single registration path)
   const { _ } = useLingui();
   const perms = telemetry?.permissions ?? null; // vF11 — backend-granted capabilities (deny-by-default until known)
 
@@ -128,7 +132,16 @@ export default function App() {
     { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
     { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
     { id: "revenue", icon: <DollarSign className="w-4 h-4 text-green-400" /> },
-  ];
+    // O0: single append point — every backend-enabled module becomes a tab here.
+    // No per-module `activeTab === "..."` block: one generic <ModulePanel> slot
+    // renders them (kills the scattered-registration anti-pattern O0 targets).
+    ...moduleTabs.map((m) => ({
+      id: `module:${m.id}`,
+      icon: <Box className="w-4 h-4 text-cyan-300" />,
+      label: m.tab!.labelKey,
+      requiresCap: m.tab!.requiresCap,
+    })),
+  ] as { id: string; icon: ReactNode; label?: string; requiresCap?: import("./lib/capabilities").Capability }[];
 
   // Map header status badge
   const getHeaderBadge = () => {
@@ -216,7 +229,11 @@ export default function App() {
             <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-3.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
             <nav aria-label="Primary" className="flex flex-col gap-1.5">
               {tabs.map((tab) => {
-                const enabled = isTabEnabled(tab.id, perms);
+                // Module tabs AND-gate on their manifest requiresCap; static tabs
+                // use the capability map. Absent requiresCap → module tab always on.
+                const enabled = tab.requiresCap
+                  ? hasCapability(perms, tab.requiresCap)
+                  : isTabEnabled(tab.id, perms);
                 return (
                 <button
                   key={tab.id}
@@ -232,7 +249,9 @@ export default function App() {
                   } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
                 >
                   {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
-                  <span>{_(`app.tab.${tab.id}`)}</span>
+                  {/* Module tabs carry their own label (from the manifest); static
+                      tabs resolve via the i18n catalog. */}
+                  <span>{tab.label ?? _(`app.tab.${tab.id}`)}</span>
                 </button>
                 );
               })}
@@ -430,6 +449,16 @@ export default function App() {
           {activeTab === "revenue" && (
             <div className="animate-fade-in">
               <RevenueOps onNotify={notify} />
+            </div>
+          )}
+
+          {/* O0: single generic slot for ALL module tabs (id "module:<id>"). */}
+          {activeTab.startsWith("module:") && (
+            <div className="animate-fade-in">
+              <ModulePanel
+                id={activeTab.slice("module:".length)}
+                labelKey={moduleTabs.find((m) => `module:${m.id}` === activeTab)?.tab?.labelKey}
+              />
             </div>
           )}
         </div>

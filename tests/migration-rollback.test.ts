@@ -49,22 +49,24 @@ describe("M-045 migration rollback", () => {
   test("up → rollbackTo(0) removes all applied migrations + their schema objects", async () => {
     const db = await freshDb("full");
     await runMigrations(db);
-    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(await tableExists(db, "oauth_clients")).toBe(true);
     expect(await tableExists(db, "ukp_stage_events")).toBe(true);
+    expect(await tableExists(db, "module_demo_items")).toBe(true); // v7 (O0)
 
     const rolled = await rollbackTo(db, 0);
-    expect(rolled).toEqual([6, 5, 4, 3, 2, 1]); // newest-first unwind order
+    expect(rolled).toEqual([7, 6, 5, 4, 3, 2, 1]); // newest-first unwind order
     expect(await appliedVersions(db)).toEqual([]);
     expect(await tableExists(db, "oauth_clients")).toBe(false);
     expect(await tableExists(db, "ukp_stage_events")).toBe(false);
+    expect(await tableExists(db, "module_demo_items")).toBe(false);
   });
 
   test("partial rollbackTo(3) unwinds only versions > 3", async () => {
     const db = await freshDb("partial");
     await runMigrations(db);
     const rolled = await rollbackTo(db, 3);
-    expect(rolled).toEqual([6, 5, 4]);
+    expect(rolled).toEqual([7, 6, 5, 4]);
     expect(await appliedVersions(db)).toEqual([1, 2, 3]);
     // v4 created oauth_refresh_tokens → gone; v2 oauth_clients (≤3) → retained.
     expect(await tableExists(db, "oauth_refresh_tokens")).toBe(false);
@@ -76,16 +78,16 @@ describe("M-045 migration rollback", () => {
     await runMigrations(db);
     await rollbackTo(db, 0);
     const reapplied = await runMigrations(db);
-    expect(reapplied).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(reapplied).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     expect(await tableExists(db, "ukp_stage_events")).toBe(true);
   });
 
   test("rollbackTo above the current max is a no-op", async () => {
     const db = await freshDb("noop");
     await runMigrations(db);
-    const rolled = await rollbackTo(db, 6);
+    const rolled = await rollbackTo(db, 7);
     expect(rolled).toEqual([]);
-    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(await appliedVersions(db)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 });

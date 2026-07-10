@@ -44,6 +44,7 @@ import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
 import { registerHostScripts } from "./bin/host-bridge/register-host-scripts.mjs"; // scripts lane v5 register-seam
+import { mountEnabledModules } from "./server/modules"; // O0 module registry (INV-O0-1 — single /api/modules prefix)
 import { handleMcpRequest } from "./server/mcp/server";
 import { buildResourceMetadata, PROTECTED_RESOURCE_PATH, buildAuthServerMetadata, AUTH_SERVER_METADATA_PATH, REGISTRATION_PATH } from "./server/mcp/oauth-metadata";
 import { mcpDiscovery, MCP_DISCOVERY_PATH } from "./server/mcp/discovery";
@@ -291,6 +292,7 @@ app.use(
     // NARROW prefixes only: bare "/api/github" would also gate /api/github/webhook
     // (inbound FROM GitHub) and 403 it under SAAS_ENFORCE=1.
     "/api/github/actions", "/api/github/search", "/api/integrations",
+    "/api/modules", // INV-O0-1: ALL module routes live under this ONE prefix (O0 Faz 2)
   ],
   localOwnerGuard,
 );
@@ -3251,6 +3253,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     onRejectionSurvived: () => unhandledRejectionTotal.inc(),
   });
 }
+
+// O0: mount enabled modules LAST among the module-top-level routes (after the guard
+// app.use above → INV-O0-1 order; before vite middleware, which registers at boot time).
+mountEnabledModules(app);
 
 // Start full stack Express services — unless a caller opts out. In-process route tests
 // import `app` (top-level routes + middleware are already registered at module load) to

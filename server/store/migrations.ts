@@ -202,6 +202,31 @@ export const MIGRATIONS: Migration[] = [
       await db.exec("DROP INDEX IF EXISTS idx_ukp_stage_events_ts");
     },
   },
+  {
+    version: 7,
+    name: "o0_modules_foundation",
+    // O0 foundation (ODYSSEY 02-o0-foundation.md §2.5): modules_registry is a
+    // diagnostics/audit snapshot of module enablement (KN-O2 — .env toggles need
+    // a restart; this table makes the boot-time decision inspectable), and
+    // module_demo_items backs the demo template module (Faz 5). Version numbers
+    // for module tables come from the ledger comment in server/modules/registry.ts.
+    up: async (db) => {
+      await db.exec(`CREATE TABLE IF NOT EXISTS modules_registry (
+        id TEXT PRIMARY KEY,
+        enabled_snapshot INTEGER NOT NULL DEFAULT 0,
+        installed_at TEXT NOT NULL
+      )`);
+      await db.exec(`CREATE TABLE IF NOT EXISTS module_demo_items (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`);
+    },
+    down: async (db) => {
+      await db.exec("DROP TABLE IF EXISTS module_demo_items");
+      await db.exec("DROP TABLE IF EXISTS modules_registry");
+    },
+  },
 ];
 
 /** Fail fast on a duplicate migration version. A typo'd duplicate silently SKIPS on an
@@ -219,8 +244,10 @@ export function assertUniqueVersions(migrations: ReadonlyArray<{ version: number
 assertUniqueVersions(MIGRATIONS);
 
 /** Apply all pending migrations in order under a cross-replica lock. Idempotent:
- *  a second run (or a second replica) is a no-op once versions are recorded. */
-export async function runMigrations(db: DbClient): Promise<number[]> {
+ *  a second run (or a second replica) is a no-op once versions are recorded.
+ *  `migrations` defaults to the core ledger; O0 boot passes the COMBINED
+ *  core+module list (assertUniqueVersions is the caller's duty on custom lists). */
+export async function runMigrations(db: DbClient, migrations: Migration[] = MIGRATIONS): Promise<number[]> {
   const applied: number[] = [];
   await db.withLock(MIGRATION_LOCK_KEY, async () => {
     await db.exec(
@@ -229,7 +256,7 @@ export async function runMigrations(db: DbClient): Promise<number[]> {
     const done = new Set(
       (await db.query("SELECT version FROM schema_migrations")).rows.map((r) => Number(r.version))
     );
-    for (const m of [...MIGRATIONS].sort((a, b) => a.version - b.version)) {
+    for (const m of [...migrations].sort((a, b) => a.version - b.version)) {
       if (done.has(m.version)) continue;
       await m.up(db);
       await db.run("INSERT INTO schema_migrations (version, name, applied_at) VALUES (?,?,?)", [
@@ -248,8 +275,8 @@ export async function runMigrations(db: DbClient): Promise<number[]> {
  *  row is deleted so a later runMigrations() re-applies it cleanly. Returns the versions rolled
  *  back (descending). A migration that is applied but has no `down` is unrollable → throw (the
  *  caller must not lose track of an irreversible step). Idempotent: nothing above targetVersion
- *  is applied → no-op. */
-export async function rollbackTo(db: DbClient, targetVersion: number): Promise<number[]> {
+ *  is applied → no-op. `migrations` mirrors runMigrations (combined-list support). */
+export async function rollbackTo(db: DbClient, targetVersion: number, migrations: Migration[] = MIGRATIONS): Promise<number[]> {
   const rolledBack: number[] = [];
   await db.withLock(MIGRATION_LOCK_KEY, async () => {
     await db.exec(
@@ -259,7 +286,7 @@ export async function rollbackTo(db: DbClient, targetVersion: number): Promise<n
       (await db.query("SELECT version FROM schema_migrations")).rows.map((r) => Number(r.version))
     );
     // Newest-first: reverse dependency order (e.g. drop the child index before its table).
-    for (const m of [...MIGRATIONS].sort((a, b) => b.version - a.version)) {
+    for (const m of [...migrations].sort((a, b) => b.version - a.version)) {
       if (m.version <= targetVersion) continue;
       if (!done.has(m.version)) continue;
       if (!m.down) throw new Error(`Migration version ${m.version} (${m.name}) has no down() — cannot roll back`);

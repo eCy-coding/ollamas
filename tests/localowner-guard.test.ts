@@ -23,6 +23,8 @@ const GUARDED = [
   "/api/agent", "/api/keys", "/api/models", "/api/revenue", "/api/notify",
   "/api/ecysearcher", "/api/threatfeed", "/api/model-overrides",
   "/api/github/actions", "/api/github/search", "/api/integrations",
+  // O0 (INV-O0-1): the single module prefix — every /api/modules/<id>/* route inherits the guard.
+  "/api/modules",
 ];
 
 // The local-owner-only, no-per-tenant-auth surface that MUST be gated (12-TEST-PLANI §M-002).
@@ -32,6 +34,8 @@ const DANGEROUS = [
   "/api/generate", "/api/ai",
   // Writes per-model overrides incl. an injected system prompt → prompt-injection surface.
   "/api/model-overrides",
+  // O0 modules mount host-side handlers (store writes, vector upserts) with no per-tenant auth.
+  "/api/modules",
 ];
 
 beforeAll(async () => {
