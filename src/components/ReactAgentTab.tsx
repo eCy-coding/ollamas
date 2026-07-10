@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { ChatSession } from "../types";
 import { api, ApiError } from "../lib/apiClient";
-import { firstUsableModel } from "../lib/localModel";
+import { preferredOrFirstUsable } from "../lib/localModel";
 import { AgentMessage } from "./AgentMessage";
 import { ModelSettings } from "./ModelSettings";
 
@@ -241,7 +241,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     try {
       const list = await api.get<string[]>(`/api/models/${prov}`);
       setModelsList(list);
-      if (list.length > 0) setModel(firstUsableModel(list)); // skip cloud "no key" placeholders
+      if (list.length > 0) setModel((cur) => preferredOrFirstUsable(list, cur)); // keep a still-valid pick; skip cloud "no key" placeholders
     } catch (e) {
       if (e instanceof ApiError) {
         setModelsList([]);
@@ -776,7 +776,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <button
                   type="button"
                   onClick={stopRun}
-                  className="bg-rose-600 hover:bg-rose-500 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
+                  className="bg-rose-700 hover:bg-rose-600 text-white shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
                 >
                   <X className="w-4 h-4" />
                   <span>{_("react-agent.stop")}</span>

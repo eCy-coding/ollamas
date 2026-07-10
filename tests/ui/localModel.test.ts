@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { firstUsableModel, DEFAULT_LOCAL_PROVIDER } from "../../src/lib/localModel";
+import { firstUsableModel, preferredOrFirstUsable, DEFAULT_LOCAL_PROVIDER } from "../../src/lib/localModel";
 
 // MATH §8 — $0-local default. firstUsableModel picks the first REAL model, skipping the "no key" placeholder
 // strings a cloud provider returns, so the agent panels are usable out-of-box on the local engine.
@@ -20,5 +20,23 @@ describe("firstUsableModel — skip keyless-cloud placeholders", () => {
   });
   it("the default provider is the $0 local engine", () => {
     expect(DEFAULT_LOCAL_PROVIDER).toBe("ollama-local");
+  });
+});
+
+// Regression (e2e P1): loading the model list must NOT clobber a still-valid default selection —
+// new tags on the host (e.g. aligned "-ca" variants sorting first) reordered list[0] and silently
+// replaced qwen3:8b even though it was still installed.
+describe("preferredOrFirstUsable — keep a valid current selection", () => {
+  it("keeps the current model when it is still in the list", () => {
+    expect(preferredOrFirstUsable(["phi4-latest-ca:latest", "qwen3:8b"], "qwen3:8b")).toBe("qwen3:8b");
+  });
+  it("falls back to the first usable model when the current one is gone", () => {
+    expect(preferredOrFirstUsable(["gemini (API key not set)", "phi4:latest"], "qwen3:8b")).toBe("phi4:latest");
+  });
+  it("empty current → first usable", () => {
+    expect(preferredOrFirstUsable(["qwen3:8b"], "")).toBe("qwen3:8b");
+  });
+  it("empty list → empty string", () => {
+    expect(preferredOrFirstUsable([], "qwen3:8b")).toBe("");
   });
 });

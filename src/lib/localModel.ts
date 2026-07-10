@@ -13,3 +13,11 @@ export function firstUsableModel(list: readonly string[]): string {
   );
   return usable ?? list[0];
 }
+
+// A freshly loaded list must not clobber a still-valid selection: new host tags (e.g. aligned
+// "-ca" variants) can reorder list[0] and would otherwise silently replace the panel default.
+export function preferredOrFirstUsable(list: readonly string[], current: string): string {
+  if (!Array.isArray(list) || list.length === 0) return "";
+  if (current && list.includes(current)) return current;
+  return firstUsableModel(list);
+}

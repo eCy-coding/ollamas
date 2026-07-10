@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Play, ToggleLeft, ToggleRight, Sparkles, AlertCircle, CheckCircle2, RotateCw, Loader2, ArrowRight } from "lucide-react";
 import { api } from "../lib/apiClient";
-import { firstUsableModel } from "../lib/localModel";
+import { preferredOrFirstUsable } from "../lib/localModel";
 
 interface PipelineProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -92,10 +92,10 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
       const list: any = await api.get(`/api/models/${prov}`);
       setModelsList((prev) => ({ ...prev, [prov]: list }));
       if (list.length > 0) {
-        const pick = firstUsableModel(list); // skip keyless-cloud placeholders
-        if (prov === architectProv) setArchitectModel(pick);
-        if (prov === coderProv) setCoderModel(pick);
-        if (prov === reviewerProv) setReviewerModel(pick);
+        // Keep a still-installed default (qwen3:8b) instead of clobbering it with list[0].
+        if (prov === architectProv) setArchitectModel((cur) => preferredOrFirstUsable(list, cur));
+        if (prov === coderProv) setCoderModel((cur) => preferredOrFirstUsable(list, cur));
+        if (prov === reviewerProv) setReviewerModel((cur) => preferredOrFirstUsable(list, cur));
       }
     } catch (e) {
       console.error(`Failed to load models list for provider: ${prov}`);

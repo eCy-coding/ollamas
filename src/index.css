@@ -29,6 +29,12 @@
   --font-mono: var(--ollamas-font-mono);
 }
 
+/* a11y (WCAG AA, axe color-contrast): purple-300 (#dab2ff) is 1.78:1 on the light bg —
+   darken the utility only under the light theme; dark theme keeps the original tone. */
+[data-theme="light"] .text-purple-300 {
+  color: #7e22ce; /* tailwind purple-700 ≈ 6.4:1 on #ffffff */
+}
+
 @layer base {
   body {
     background-color: var(--color-immersive-bg);
