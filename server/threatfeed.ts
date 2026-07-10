@@ -67,9 +67,16 @@ const cleanText = (raw: string): string => {
 };
 
 // First matching tag's inner content; exact name first, then any-namespace-prefixed.
+// M-009 ReDoS audit: `name` is NEVER user input — every caller passes a fixed
+// literal tag name (title/link/pubDate/date/description/published/updated/summary/
+// content). The untrusted value is `block` (matched against), not the pattern. The
+// pattern is linear-time (lazy `[\s\S]*?`, single non-overlapping `[^>]*` before a
+// required `>`) so there is no catastrophic backtracking — RE2 is unnecessary.
 function tagContent(block: string, name: string): string {
   for (const pattern of [
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp — `name` is a fixed literal (not user input); pattern is linear-time. See M-009 note above.
     new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}\\s*>`, "i"),
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp — `name` is a fixed literal (not user input); pattern is linear-time. See M-009 note above.
     new RegExp(`<\\w+:${name}(?:\\s[^>]*)?>([\\s\\S]*?)</\\w+:${name}\\s*>`, "i"),
   ]) {
     const m = block.match(pattern);

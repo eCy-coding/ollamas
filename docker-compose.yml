@@ -7,6 +7,16 @@ services:
       dockerfile: Dockerfile
     container_name: llm-mission-control
     restart: unless-stopped
+    # Immutable container rootfs (M-011): the app only writes to the mounted data
+    # dir (MISSION_CONTROL_DATA_DIR, below) — everything else is read-only, so a
+    # compromised process can't tamper with the image. /tmp is a small in-memory
+    # tmpfs for node's transient scratch (no host disk, cleared on restart).
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    # Block setuid/setgid privilege escalation inside the container.
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
