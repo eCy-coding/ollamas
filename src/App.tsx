@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { 
   TelemetryCockpit 
 } from "./components/TelemetryCockpit";
@@ -143,6 +143,17 @@ export default function App() {
     })),
   ] as { id: string; icon: ReactNode; label?: string; requiresCap?: import("./lib/capabilities").Capability }[];
 
+  // ODYSSEY shell skin (visual only) — the flat `tabs` list above is untouched
+  // (order/ids/requiresCap/seam identical); this just labels the nav-rail
+  // section that begins at each id, matching design.html's grouped nav pattern.
+  // Section boundaries line up with the existing contiguous tab order, so no
+  // reordering is needed — only a header inserted above the first tab of a run.
+  const NAV_GROUP_START: Record<string, string> = {
+    telemetry: "app.sidebar.group.workspace",
+    files: "app.sidebar.group.integrations",
+    threatintel: "app.sidebar.group.ops",
+  };
+
   // Map header status badge
   const getHeaderBadge = () => {
     if (!telemetry) return <span className="text-immersive-text-dim animate-pulse text-xs font-mono">CONNECTING...</span>;
@@ -197,10 +208,10 @@ export default function App() {
         ))}
       </div>
 
-      {/* Global Header */}
-      <header className="border-b h-14 px-6 flex items-center justify-between gap-4 border-immersive-border bg-immersive-sidebar">
+      {/* Global Header — ODYSSEY shell skin: nav-rail top bar (brand + status + toolbelt) */}
+      <header className="sticky top-0 z-30 border-b h-14 px-6 flex items-center justify-between gap-4 border-immersive-border bg-immersive-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-immersive-sidebar/80">
         <div className="flex items-center gap-4">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-immersive-text-bright shadow-lg">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center text-immersive-text-bright shadow-lg shadow-cyan-500/20 ring-1 ring-white/10">
             <div className="w-4 h-4 border-2 border-white/90 rotate-45"></div>
           </div>
           <div className="flex flex-col">
@@ -212,7 +223,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 pl-3.5 border-l border-immersive-border">
           <OfflineBadge />
           {getHeaderBadge()}
           <LanguageToggle />
@@ -222,37 +233,49 @@ export default function App() {
 
       {/* Master Content Segment */}
       <main className="flex-1 w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        {/* Left Side Sidebar / Tab Controls */}
+
+        {/* Left Side Sidebar / Tab Controls — ODYSSEY shell skin: grouped nav-rail */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="p-4 rounded border bg-immersive-sidebar border-immersive-border">
-            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block mb-3.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
-            <nav aria-label="Primary" className="flex flex-col gap-1.5">
-              {tabs.map((tab) => {
+          <div className="p-3 rounded-xl border bg-immersive-sidebar border-immersive-border">
+            <span className="text-[10px] text-immersive-text-dim font-mono uppercase block px-1 mb-2.5 tracking-widest font-bold">{_('app.sidebar.explorer')}</span>
+            <nav aria-label="Primary" className="flex flex-col gap-0.5">
+              {tabs.map((tab, idx) => {
                 // Module tabs AND-gate on their manifest requiresCap; static tabs
                 // use the capability map. Absent requiresCap → module tab always on.
                 const enabled = tab.requiresCap
                   ? hasCapability(perms, tab.requiresCap)
                   : isTabEnabled(tab.id, perms);
+                // Visual-only section header (see NAV_GROUP_START above the return
+                // statement): first module tab picks up the "Modules" header even
+                // though its id isn't a static lookup key.
+                const isFirstModuleTab = tab.id.startsWith("module:") && !tabs[idx - 1]?.id.startsWith("module:");
+                const groupKey = NAV_GROUP_START[tab.id] ?? (isFirstModuleTab ? "app.sidebar.group.modules" : undefined);
+                const active = activeTab === tab.id;
                 return (
-                <button
-                  key={tab.id}
-                  onClick={() => { if (enabled) setActiveTab(tab.id); }}
-                  disabled={!enabled}
-                  aria-disabled={!enabled}
-                  aria-current={activeTab === tab.id ? "page" : undefined}
-                  title={enabled ? undefined : _('app.cap.locked')}
-                  className={`flex items-center gap-3 px-3 py-2 rounded text-xs font-medium font-mono transition-all text-left ${
-                    activeTab === tab.id
-                      ? "bg-indigo-500/10 text-status-accent border border-indigo-500/20"
-                      : "text-immersive-text-muted hover:text-immersive-text-bright hover:bg-white/5"
-                  } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
-                >
-                  {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
-                  {/* Module tabs carry their own labelKey (from the manifest);
-                      both static and module tabs resolve via the i18n catalog. */}
-                  <span>{_(tab.label ?? `app.tab.${tab.id}`)}</span>
-                </button>
+                <Fragment key={tab.id}>
+                  {groupKey && (
+                    <div className={`px-2 text-[10px] font-bold font-mono uppercase tracking-widest text-immersive-text-dim ${idx === 0 ? "pt-0.5 pb-1.5" : "pt-3.5 pb-1.5"}`}>
+                      {_(groupKey)}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { if (enabled) setActiveTab(tab.id); }}
+                    disabled={!enabled}
+                    aria-disabled={!enabled}
+                    aria-current={active ? "page" : undefined}
+                    title={enabled ? undefined : _('app.cap.locked')}
+                    className={`flex items-center gap-3 px-2.5 py-2 rounded-lg text-xs font-medium font-mono transition-all text-left border-l-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${
+                      active
+                        ? "bg-cyan-500/10 text-status-info border-cyan-400"
+                        : "border-transparent text-immersive-text-muted hover:text-immersive-text-bright hover:bg-white/5"
+                    } ${enabled ? "" : "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-immersive-text-muted"}`}
+                  >
+                    {enabled ? tab.icon : <Lock className="w-4 h-4 shrink-0" />}
+                    {/* Module tabs carry their own labelKey (from the manifest);
+                        both static and module tabs resolve via the i18n catalog. */}
+                    <span>{_(tab.label ?? `app.tab.${tab.id}`)}</span>
+                  </button>
+                </Fragment>
                 );
               })}
             </nav>
@@ -285,7 +308,7 @@ export default function App() {
         <div className="lg:col-span-3 space-y-6">
           
           {/* Top Status Indicators bar */}
-          <div className="bg-immersive-sidebar border border-immersive-border rounded px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 text-xs font-mono">
+          <div className="bg-immersive-sidebar border border-immersive-border rounded-xl px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 text-xs font-mono">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-immersive-text-dim">{_('app.status.activeHost')}</span>
               <span className="text-immersive-text-muted font-semibold">{telemetry ? telemetry.os.platform : "Loading..."}</span>

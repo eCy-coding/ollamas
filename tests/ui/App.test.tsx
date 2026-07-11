@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../../src/App';
 import { renderUI, mockFetch } from './helpers';
@@ -33,5 +33,17 @@ describe('App shell', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /Virtual Controller/i })).toBeInTheDocument(),
     );
+  });
+
+  // ODYSSEY shell skin — sidebar groups the flat tab list into labeled sections
+  // (visual only; same tabs, same order, same seam) so the nav reads like the
+  // design.html nav-rail instead of one long undifferentiated list.
+  it('groups the sidebar nav into labeled sections', async () => {
+    renderUI(<App />);
+    await screen.findByRole('button', { name: /Cockpit Dashboard/i });
+    const nav = screen.getByRole('navigation', { name: /Primary/i });
+    expect(within(nav).getByText(/Workspace/i)).toBeInTheDocument();
+    expect(within(nav).getByText(/Data & Integrations/i)).toBeInTheDocument();
+    expect(within(nav).getByText(/Ops & Security/i)).toBeInTheDocument();
   });
 });

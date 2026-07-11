@@ -24,6 +24,11 @@ export const messages: Record<string, string> = {
   'app.tab.selftest': 'Doğrulama Kapıları',
   'app.tab.revenue': 'Gelir / Kişisel Ops',
   'app.sidebar.explorer': 'Proje Gezgini',
+  // ODYSSEY kabuk kaplaması — nav-rail bölüm başlıkları (yalnız görsel gruplama, sekmeler/sıra aynı).
+  'app.sidebar.group.workspace': 'Çalışma Alanı',
+  'app.sidebar.group.integrations': 'Veri ve Entegrasyonlar',
+  'app.sidebar.group.ops': 'Operasyon ve Güvenlik',
+  'app.sidebar.group.modules': 'Modüller',
   'app.status.activeHost': 'Aktif Ana Makine:',
   'app.status.workspace': 'Çalışma Alanı:',
   'app.footer.copyright':

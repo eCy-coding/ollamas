@@ -25,6 +25,11 @@ export const messages: Record<string, string> = {
   'app.tab.automation': 'Virtual Controller',
   'app.tab.selftest': 'Verify Gates',
   'app.sidebar.explorer': 'Project Explorer',
+  // ODYSSEY shell skin — nav-rail section headers (visual grouping only, same tabs/order).
+  'app.sidebar.group.workspace': 'Workspace',
+  'app.sidebar.group.integrations': 'Data & Integrations',
+  'app.sidebar.group.ops': 'Ops & Security',
+  'app.sidebar.group.modules': 'Modules',
   'app.status.activeHost': 'Active Host:',
   'app.status.workspace': 'Workspace:',
   'app.footer.copyright':

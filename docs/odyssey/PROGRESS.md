@@ -193,3 +193,5 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T04:40Z O8.settings DONE server/modules/settings/ (v14, TOTP RFC6238 vektör-testli + SecureDB-encrypt) + SettingsPanel (5-section); RBAC 5-rol + tool-policy read-only + sessions + 2FA-lifecycle(time-inject-DI); 48 test; güvenlik-infra korundu (16 test)
 2026-07-11T04:40Z DALGA4 DONE tsc-0 FRESH 2537/0; 7 modül ModulePanel'de; migration v8-v14 benzersiz
 2026-07-11T05:00Z chat.visual DONE ReactAgentTab.tsx skin-only (message-bubbles/gradient-avatars/reasoning-trace/composer/diff-colorize + focus-rings a11y); state/contract/prop DOKUNULMADI; ReactAgentTab.test 21/21 + e2e agent-chat 6/6; tsc-0 FRESH 2537/0
+2026-07-11T05:20Z shell.visual DONE App.tsx nav-skin (grouped sections Workspace/Data/Ops/Modules + cyan-accent active-tab + focus-rings a11y + sticky-blur header); tab-state/module-seam/provider KORUNDU; TDD App.test + panels/keyboard/a11y e2e green; tsc-0 FRESH 2538/0
+2026-07-11T05:20Z ODYSSEY 9/9 PARÇA TAMAM — O0 + 7 modül + chat + shell
