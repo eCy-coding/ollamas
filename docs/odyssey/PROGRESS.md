@@ -192,3 +192,4 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T04:40Z O4.email DONE server/modules/email/ (v11, imapflow/nodemailer/mailparser inject-seam) + EmailPanel 5-state; rule-triage $0 + AI-summary/draft(qwen3:8b) + SMTP-send-privileged(503/502-gate, mock-count-asserted); 43 test
 2026-07-11T04:40Z O8.settings DONE server/modules/settings/ (v14, TOTP RFC6238 vektör-testli + SecureDB-encrypt) + SettingsPanel (5-section); RBAC 5-rol + tool-policy read-only + sessions + 2FA-lifecycle(time-inject-DI); 48 test; güvenlik-infra korundu (16 test)
 2026-07-11T04:40Z DALGA4 DONE tsc-0 FRESH 2537/0; 7 modül ModulePanel'de; migration v8-v14 benzersiz
+2026-07-11T05:00Z chat.visual DONE ReactAgentTab.tsx skin-only (message-bubbles/gradient-avatars/reasoning-trace/composer/diff-colorize + focus-rings a11y); state/contract/prop DOKUNULMADI; ReactAgentTab.test 21/21 + e2e agent-chat 6/6; tsc-0 FRESH 2537/0

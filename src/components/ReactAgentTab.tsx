@@ -3,7 +3,8 @@ import { useLingui } from "@lingui/react";
 import {
   ToggleLeft, ToggleRight, Check, X,
   Terminal, ShieldCheck, History, AlertCircle,
-  FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft, Copy
+  FileText, FolderGit, Search, Hammer, Braces, ArrowRight, CornerDownLeft, Copy,
+  ChevronDown, Sparkles
 } from "lucide-react";
 import { ChatSession } from "../types";
 import { api, ApiError } from "../lib/apiClient";
@@ -33,6 +34,23 @@ interface Message {
 
 interface ReactAgentTabProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
+}
+
+// Colorize a unified-diff string line-by-line (+/− prefix → ok/err token color). Pure
+// presentational helper (odyssey chat skin) — the diff CONTENT is untouched, only rendering.
+function renderDiffLines(diff: string): React.ReactNode {
+  return diff.split("\n").map((line, i) => {
+    const cls = line.startsWith("+")
+      ? "text-status-ok"
+      : line.startsWith("-")
+      ? "text-status-err"
+      : "text-immersive-text-muted";
+    return (
+      <div key={i} className={cls}>
+        {line.length > 0 ? line : " "}
+      </div>
+    );
+  });
 }
 
 export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
@@ -526,17 +544,17 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     <div className="space-y-6">
       
       {/* Upper Model Control Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-immersive-sidebar border border-immersive-border rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-immersive-sidebar border border-immersive-border rounded-xl p-4 shadow-sm">
         
         {/* Provider Choice */}
-        <div className="space-y-1.5Col">
+        <div className="space-y-1.5">
           <label htmlFor="react-agent-provider" className="text-[10px] font-mono text-immersive-text-dim uppercase tracking-wider font-bold">{_("react-agent.provider.label")}</label>
           <div className="relative">
             <select
               id="react-agent-provider"
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              className="w-full bg-immersive-panel border border-immersive-border-strong rounded px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/50 appearance-none cursor-pointer"
+              className="w-full bg-immersive-panel border border-immersive-border-strong rounded-lg px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/50 focus-visible:ring-2 focus-visible:ring-indigo-500/30 appearance-none cursor-pointer transition-colors"
             >
               {providers.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -544,6 +562,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </option>
               ))}
             </select>
+            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 text-immersive-text-dim absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
@@ -556,7 +575,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               disabled={loadingModels || modelsList.length === 0}
-              className="w-full bg-immersive-panel border border-immersive-border-strong rounded px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/50 disabled:opacity-50"
+              className="w-full bg-immersive-panel border border-immersive-border-strong rounded-lg px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/50 focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:opacity-50 appearance-none cursor-pointer transition-colors"
             >
               {loadingModels ? (
                 <option>{_("react-agent.model.loading")}</option>
@@ -568,14 +587,15 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 ))
               )}
             </select>
+            <ChevronDown aria-hidden="true" className="w-3.5 h-3.5 text-immersive-text-dim absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
           {/* Per-model overrides (M-038) live where the model is picked. */}
           <ModelSettings model={model} onNotify={onNotify} />
         </div>
 
         {/* Toggles & Actions */}
-        <div className="flex flex-col justify-end space-y-1">
-          <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded p-1 px-3">
+        <div className="flex flex-col justify-end space-y-1.5">
+          <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded-lg p-1 px-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-status-ok" />
               <span className="text-[11px] font-mono text-immersive-text-muted">{_("react-agent.autoApply.label")}</span>
@@ -585,7 +605,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 setAutoApply(!autoApply);
                 onNotify(autoApply ? _("react-agent.notify.autoApplyOff") : _("react-agent.notify.autoApplyOn"), "info");
               }}
-              className="text-immersive-text-muted hover:text-immersive-text-bright transition"
+              className="text-immersive-text-muted hover:text-immersive-text-bright transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
               title={_("react-agent.autoApply.title")}
             >
               {autoApply ? (
@@ -596,7 +616,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             </button>
           </div>
           {/* Self-check gate: an independent verifier model reviews the final answer (justdoit verify). */}
-          <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded p-1 px-3">
+          <div className="flex items-center justify-between border border-immersive-border bg-immersive-panel/40 rounded-lg p-1 px-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-status-warn" />
               <span className="text-[11px] font-mono text-immersive-text-muted">{_("react-agent.verify.label")}</span>
@@ -606,7 +626,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 setVerify(!verify);
                 onNotify(verify ? _("react-agent.verify.off") : _("react-agent.verify.on"), "info");
               }}
-              className="text-immersive-text-muted hover:text-immersive-text-bright transition"
+              className="text-immersive-text-muted hover:text-immersive-text-bright transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
               title={_("react-agent.verify.title")}
             >
               {verify ? (
@@ -623,7 +643,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
         {/* Sessions Sidebar Column picker (M6 / AC-A6) */}
-        <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 flex flex-col justify-start space-y-3 xl:col-span-1 h-[470px]">
+        <div className="bg-immersive-sidebar border border-immersive-border rounded-xl p-4 flex flex-col justify-start space-y-3 xl:col-span-1 h-[470px] shadow-sm">
           <div className="flex items-center justify-between pb-2 border-b border-immersive-border">
             <div className="flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-immersive-text-muted" />
@@ -632,7 +652,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             <button
               onClick={startNewSession}
               disabled={isLoading}
-              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none"
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-status-accent border border-indigo-500/20 font-mono text-[9px] rounded px-2 py-0.5 transition select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
             >
               {_("react-agent.sessions.new")}
             </button>
@@ -653,12 +673,14 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 return (
                   <div
                     key={sess.id}
-                    className={`group relative w-full p-2 rounded transition flex items-center justify-between border ${
+                    className={`group relative w-full p-2 rounded-lg transition flex items-center justify-between border ${
                       isActive
                         ? "bg-indigo-500/10 border-indigo-500/30 text-status-accent"
                         : "bg-immersive-panel/30 border-immersive-border hover:bg-immersive-panel/60 text-immersive-text-muted hover:text-immersive-text-bright"
                     }`}
                   >
+                    {/* Active-session accent strip — reinforces selection beyond color alone (V9 a11y). */}
+                    {isActive && <span aria-hidden="true" className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-indigo-500" />}
                     {/* Stretched-link: a single real button covers the whole row for
                         select; the delete button sits above it via z-index. Avoids
                         nested-interactive (FE a11y) while keeping native keyboard. */}
@@ -667,15 +689,15 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                       onClick={() => !isLoading && selectSession(sess.id)}
                       disabled={isLoading}
                       aria-label={`${_("react-agent.sessions.load")} ${sess.title}`}
-                      className="absolute inset-0 w-full rounded cursor-pointer text-left disabled:cursor-default"
+                      className="absolute inset-0 w-full rounded-lg cursor-pointer text-left disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
                     />
-                    <div className="flex flex-col min-w-0 pr-1 truncate">
+                    <div className="flex flex-col min-w-0 pr-1 pl-1 truncate">
                       <span className="text-xs font-mono font-medium truncate leading-tight group-hover:text-immersive-text-bright">{sess.title}</span>
                       <span className="text-[9px] text-immersive-text-dim font-mono mt-0.5">{formattedDate} • {shortModel}</span>
                     </div>
                     <button
                       onClick={(e) => deleteSession(e, sess.id)}
-                      className="relative z-10 opacity-0 group-hover:opacity-100 p-1 text-immersive-text-dim hover:text-status-err hover:bg-rose-500/10 rounded transition shrink-0"
+                      className="relative z-10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 text-immersive-text-dim hover:text-status-err hover:bg-rose-500/10 rounded transition shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
                       title={_("react-agent.sessions.delete")}
                       aria-label={`${_("react-agent.sessions.delete")} ${sess.title}`}
                     >
@@ -699,36 +721,37 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
               role="log"
               aria-live="polite"
               aria-label={_("react-agent.log.label")}
-              className="flex-1 bg-immersive-sidebar border border-immersive-border rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin"
+              className="flex-1 bg-immersive-sidebar border border-immersive-border rounded-xl p-4 h-[400px] overflow-y-auto space-y-4 scrollbar-thin shadow-sm"
             >
               {messages.filter(m => m.role === "user" || m.role === "assistant").map((m, idx) => (
-              <div 
+              <div
                 key={idx}
                 className={`flex gap-3 max-w-[85%] ${
                   m.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
                 }`}
               >
                 {/* Avatar Icon */}
-                <div className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
-                  m.role === "user" 
-                    ? "bg-indigo-500 text-immersive-text-bright" 
-                    : "bg-immersive-inset text-purple-300 border border-purple-500/20"
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 shadow-sm ${
+                  m.role === "user"
+                    ? "bg-indigo-500 text-immersive-text-bright"
+                    : "bg-gradient-to-br from-indigo-500 to-purple-400 text-white"
                 }`}>
-                  {m.role === "user" ? "U" : "A"}
+                  {m.role === "user" ? "U" : <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />}
                 </div>
 
-                {/* Content Bubble — assistant renders markdown/code; both copyable */}
-                <div className={`group/msg relative p-3 rounded-lg text-xs leading-relaxed ${
+                {/* Content Bubble — assistant renders markdown/code; both copyable.
+                    Asymmetric "tail" corner on the sender side (odyssey chat skin). */}
+                <div className={`group/msg relative p-3 text-xs leading-relaxed shadow-sm ${
                   m.role === "user"
-                    ? "bg-indigo-600 text-white font-medium whitespace-pre-wrap"
-                    : "bg-immersive-panel border border-immersive-border text-immersive-text-muted font-mono"
+                    ? "rounded-2xl rounded-br-md bg-indigo-600 text-white font-medium whitespace-pre-wrap"
+                    : "rounded-2xl rounded-bl-md bg-immersive-panel border border-immersive-border text-immersive-text-muted font-mono"
                 }`}>
                   <button
                     type="button"
                     onClick={() => copyText(m.content)}
                     aria-label={_("react-agent.copy")}
                     title={_("react-agent.copy")}
-                    className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 p-1 rounded text-current transition"
+                    className="absolute top-1 right-1 opacity-0 group-hover/msg:opacity-100 focus-visible:opacity-100 p-1 rounded text-current transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/50"
                   >
                     <Copy className="w-3 h-3" />
                   </button>
@@ -738,25 +761,37 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
               </div>
             ))}
-            
-            {/* Typing status bar */}
+
+            {/* Reasoning-trace status strip — soft/italic "thought" line, visually distinct from
+                tool-call cards via a left accent bar (odyssey chat skin, HANDOFF §6). */}
             {isLoading && (
-              <div className="flex items-center gap-3 mr-auto">
-                <div className="w-7 h-7 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xs text-status-accent animate-pulse">
-                  R
+              <div className="flex items-center gap-3 mr-auto max-w-[85%]">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-400 flex items-center justify-center text-white shrink-0 shadow-sm animate-pulse">
+                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
                 </div>
-                <div className="px-3.5 py-2.5 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-xs font-mono text-immersive-text-muted flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                <div className="relative pl-3 pr-3.5 py-2.5 rounded-lg rounded-bl-md bg-indigo-500/5 border border-indigo-500/10 text-xs font-mono text-immersive-text-muted italic flex items-center gap-2">
+                  <span aria-hidden="true" className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-indigo-400/70" />
                   <span>{currentStepInfo || _("react-agent.status.thinking")}</span>
+                  <span aria-hidden="true" className="inline-block w-1.5 h-3.5 bg-indigo-400 animate-pulse rounded-sm" />
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
 
-          {/* Interactive Chat Form — multi-line prompt: Enter runs, Shift+Enter = newline */}
+          {/* Interactive Chat Form — multi-line prompt: Enter runs, Shift+Enter = newline.
+              Unified composer "card" (odyssey chat skin): border/shadow/focus-within live on
+              the wrapper so the whole control reads as one surface, with a thin top pulse
+              while a run is in flight — purely presentational, driven by existing isLoading. */}
           <form onSubmit={handleSendMessage} className="space-y-1">
-            <div className="flex gap-2.5 items-stretch">
+            <div
+              className={`relative flex gap-2.5 items-stretch rounded-xl border bg-immersive-panel/40 p-1.5 shadow-sm transition-colors focus-within:ring-1 focus-within:ring-indigo-500/20 ${
+                isLoading ? "border-indigo-500/40" : "border-immersive-border-strong focus-within:border-indigo-500/40"
+              }`}
+            >
+              {isLoading && (
+                <span aria-hidden="true" className="absolute -top-px left-3 right-3 h-0.5 rounded-full bg-indigo-500/60 animate-pulse" />
+              )}
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -770,13 +805,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 disabled={isLoading}
                 rows={1}
                 aria-label={_("react-agent.input.placeholder")}
-                className="flex-1 resize-none bg-immersive-panel border border-immersive-border-strong rounded-lg px-4 py-3 text-xs font-mono text-immersive-text-bright outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 max-h-32"
+                className="flex-1 resize-none bg-transparent border-none rounded-lg px-3 py-2 text-xs font-mono text-immersive-text-bright outline-none max-h-32"
               />
               {isLoading ? (
                 <button
                   type="button"
                   onClick={stopRun}
-                  className="bg-rose-700 hover:bg-rose-600 text-white shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
+                  className="bg-rose-700 hover:bg-rose-600 text-white shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
                 >
                   <X className="w-4 h-4" />
                   <span>{_("react-agent.stop")}</span>
@@ -785,7 +820,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <button
                   type="submit"
                   disabled={!inputMessage.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold"
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-immersive-text-bright shrink-0 px-5 rounded-lg flex items-center justify-center gap-2 transition text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
                 >
                   <CornerDownLeft className="w-4 h-4" />
                   <span>{_("react-agent.execute")}</span>
@@ -800,14 +835,14 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
         <div className="space-y-4">
           
           {/* List of core Tools */}
-          <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 space-y-3">
+          <div className="bg-immersive-sidebar border border-immersive-border rounded-xl p-4 space-y-3 shadow-sm">
             <div className="flex items-center gap-2 pb-2 border-b border-immersive-border">
               <Hammer className="w-4 h-4 text-status-accent" />
               <h3 className="text-[10px] font-mono tracking-wider font-bold uppercase text-immersive-text-muted">{_("react-agent.tools.title")}</h3>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-2.5">
-              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
+              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded-lg border border-immersive-border transition-colors hover:border-immersive-border-strong">
                 <FolderGit className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">list_tree</h4>
@@ -815,7 +850,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
+              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded-lg border border-immersive-border transition-colors hover:border-immersive-border-strong">
                 <FileText className="w-4 h-4 text-status-info shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">read_file</h4>
@@ -823,7 +858,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
+              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded-lg border border-immersive-border transition-colors hover:border-immersive-border-strong">
                 <Braces className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">write_file</h4>
@@ -831,7 +866,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
+              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded-lg border border-immersive-border transition-colors hover:border-immersive-border-strong">
                 <Terminal className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">run_command</h4>
@@ -839,7 +874,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded border border-immersive-border">
+              <div className="flex items-start gap-2.5 p-2 bg-immersive-bg rounded-lg border border-immersive-border transition-colors hover:border-immersive-border-strong">
                 <Search className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-[10px] font-mono font-bold text-immersive-text-muted">grep_search</h4>
@@ -851,7 +886,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
           {/* Pending Approvals Widget */}
           {pendingApproval && (
-            <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 space-y-3">
+            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 space-y-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-status-warn shrink-0" />
                 <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-status-warn">{_("react-agent.approval.title")}</h4>
@@ -860,16 +895,17 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 {_("react-agent.approval.proposes")} <code className="bg-immersive-panel border border-immersive-border-strong px-1.5 py-0.5 rounded text-immersive-text-bright text-[10px]">{pendingApproval.path}</code>
               </p>
 
-              {/* Diff Viewer Card */}
-              <div className="bg-immersive-bg border border-immersive-border rounded p-2.5 max-h-48 overflow-y-auto font-mono text-[9px] text-immersive-text-muted whitespace-pre scrollbar-thin">
-                {pendingApproval.diff}
+              {/* Diff Viewer Card — +/− lines colorized (ok/err tokens) so additions/removals
+                  read at a glance, matching the odyssey chat design's diff preview. */}
+              <div className="bg-immersive-bg border border-immersive-border rounded-lg p-2.5 max-h-48 overflow-y-auto font-mono text-[9px] whitespace-pre scrollbar-thin">
+                {renderDiffLines(pendingApproval.diff)}
               </div>
 
               <div className="flex gap-2">
                 <button
                   onClick={approveWrite}
                   disabled={approving}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-45 text-immersive-text-bright py-2 rounded text-[10px] font-bold font-mono transition flex items-center justify-center gap-1.5"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-45 text-immersive-text-bright py-2 rounded-lg text-[10px] font-bold font-mono transition flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>{approving ? _("react-agent.approval.writing") : _("react-agent.approval.approve")}</span>
@@ -877,7 +913,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                 <button
                   onClick={cancelWrite}
                   disabled={approving}
-                  className="flex-1 bg-rose-950/40 hover:bg-rose-950 border border-rose-500/20 text-status-err py-2 rounded text-[10px] font-bold font-mono transition"
+                  className="flex-1 bg-rose-950/40 hover:bg-rose-950 border border-rose-500/20 text-status-err py-2 rounded-lg text-[10px] font-bold font-mono transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
                 >
                   {_("react-agent.approval.reject")}
                 </button>
@@ -890,7 +926,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
       {/* Run summary — surfaced from the server `done` event (steps · tok/s · clean-vs-truncated) */}
       {runStatus && !isLoading && (
-        <div className="flex items-center gap-3 flex-wrap text-[10px] font-mono bg-immersive-sidebar border border-immersive-border rounded-lg px-4 py-2.5">
+        <div className="flex items-center gap-3 flex-wrap text-[10px] font-mono bg-immersive-sidebar border border-immersive-border rounded-xl px-4 py-2.5 shadow-sm">
           <span className="text-immersive-text-muted">{traceSteps.length} {_("react-agent.summary.steps")}</span>
           {lastTokS > 0 && <span className="text-immersive-text-muted">· {lastTokS} {_("react-agent.summary.tokps")}</span>}
           <span
@@ -907,13 +943,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
 
       {/* Real-time Steps Trace execution stream */}
       {traceSteps.length > 0 && (
-        <div className="bg-immersive-sidebar border border-immersive-border rounded-lg p-4 space-y-4">
+        <div className="bg-immersive-sidebar border border-immersive-border rounded-xl p-4 space-y-4 shadow-sm">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-purple-400" />
             <h3 className="text-[11px] font-mono tracking-widest font-bold uppercase text-immersive-text-muted">{_("react-agent.trace.title")}</h3>
           </div>
 
-          <div className="overflow-x-auto border border-immersive-border rounded-md">
+          <div className="overflow-x-auto border border-immersive-border rounded-lg">
             <table className="w-full text-left font-mono text-immersive-text-muted border-collapse">
               <thead>
                 <tr className="bg-immersive-panel/50 border-b border-immersive-border text-[10px] uppercase text-immersive-text-muted text-left">
@@ -932,7 +968,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   return (
                   <React.Fragment key={idx}>
                   <tr
-                    className="hover:bg-white/[0.01] transition duration-200 cursor-pointer"
+                    className="hover:bg-immersive-panel/40 transition-colors duration-200 cursor-pointer"
                     onClick={() => setExpandedStep(isExpanded ? null : s.stepNum)}
                   >
                     <td className="px-4 py-3 text-status-accent font-bold whitespace-nowrap uppercase">
@@ -941,7 +977,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                         aria-expanded={isExpanded}
                         aria-label={isExpanded ? _("react-agent.trace.collapse") : _("react-agent.trace.expand")}
                         onClick={(e) => { e.stopPropagation(); setExpandedStep(isExpanded ? null : s.stepNum); }}
-                        className="flex items-center gap-1.5"
+                        className="flex items-center gap-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
                       >
                         <ArrowRight className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                         <span>{_("react-agent.trace.step")} {s.stepNum}</span>
@@ -985,7 +1021,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                               onClick={(e) => { e.stopPropagation(); copyText(typeof s.result === "string" ? s.result : JSON.stringify(s.result, null, 2)); }}
                               aria-label={_("react-agent.copy")}
                               title={_("react-agent.copy")}
-                              className="p-0.5 rounded text-immersive-text-dim hover:text-immersive-text-bright transition"
+                              className="p-0.5 rounded text-immersive-text-dim hover:text-immersive-text-bright transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
                             >
                               <Copy className="w-3 h-3" />
                             </button>
