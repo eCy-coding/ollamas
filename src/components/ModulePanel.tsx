@@ -5,6 +5,8 @@
 // per-module `activeTab === "..."` block (avoids the scattered-registration
 // anti-pattern O0 exists to kill).
 import CookbookPanel from "./CookbookPanel";
+import ResearchPanel from "./ResearchPanel";
+import NotesTasksPanel from "./NotesTasksPanel";
 
 interface ModulePanelProps {
   id: string;
@@ -16,6 +18,8 @@ export default function ModulePanel({ id, labelKey }: ModulePanelProps) {
   // point in App.tsx — no scattered `activeTab === "..."` blocks). Cookbook is the
   // pilot; later modules add a case or their own lazy-loaded panel.
   if (id === "cookbook") return <CookbookPanel />;
+  if (id === "research") return <ResearchPanel />;
+  if (id === "notes-tasks") return <NotesTasksPanel />;
 
   return (
     <section

@@ -178,3 +178,7 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T02:05Z PANEL.download DONE 7/9 design.html diskte (chat/research/documents/email/settings-2fa/cookbook/notes-tasks); calendar+shell impl-anı; DesignSync ana-thread, subagent'ta tool-yok
 
 2026-07-11T02:40Z O7.cookbook DONE (PILOT) server/modules/cookbook/{index,router,service,schema,store}.ts + CookbookPanel.tsx + i18n 196/196; hardware-detect(arm64→metal) + rule-base(FIT_RATIO 0.7 docs-pin) + bench(ToolRegistry choke-point) + pull-SSE(name-sanitize SSRF-red) + config→model-overrides bridge; 26 test; guard-inherit(/api/modules 403∧toggle-404); tsc-0 FRESH 2297/0
+
+2026-07-11T03:30Z O2.research DONE server/research/{searxng,summarize,planner,engine,report,pipeline}.ts + server/modules/research/ + ResearchPanel.tsx + deep_research MCP tool; SearXNG-opt + tavily-wire + rag-ingest + cited-synthesize; 44 test; guard-inherit+toggle; migration v12 via module (NOT core ledger)
+2026-07-11T03:30Z O5.notes-tasks DONE server/modules/notes-tasks/ (v8 notes+tasks, v9 reminders migrations) + NotesTasksPanel.tsx; CRUD+persist+reminders; 27 test; guard-inherit+toggle
+2026-07-11T03:30Z DALGA2.reconcile DONE conductor: research index migration-wire + ModulePanel notes eşleme + notes-panel mock undefined-safe (provider mount-get toleransı); tsc-0 FRESH 2368/0

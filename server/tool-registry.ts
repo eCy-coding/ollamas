@@ -785,6 +785,44 @@ const TOOLS: Record<string, ToolDef> = {
     },
   },
 
+  // O2 (docs/odyssey/05-features/research.md Faz 7): iterative, cited deep-research —
+  // query-decompose → multi-search (SearXNG→Tavily→DDG) → fetch → rag-ingest →
+  // cited-synthesize (server/research/{engine,pipeline}.ts). Same choke-point as
+  // web_search (:536) — no second dispatch path. tier:host (network + LLM cost);
+  // SaaS tenants get it only via explicit allowlist (P8/P10 parity).
+  deep_research: {
+    tier: "host",
+    schema: fn(
+      "deep_research",
+      "Iterative, cited deep research: decomposes the question into sub-queries, searches multiple rounds, fetches and summarizes sources, and synthesizes a report where every claim carries a [n] citation. Slower and more thorough than web_search — use for multi-step research questions, not a single quick fact.",
+      {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "The research question to investigate." },
+          deep: { type: "boolean", description: "Route synthesis to RESEARCH_DEEP_MODEL when configured (deeper, slower). Default false." },
+          maxRounds: { type: "number", description: "Cap on search rounds (default RESEARCH_MAX_ROUNDS)." },
+        },
+        required: ["question"],
+      },
+      {
+        type: "object",
+        properties: {
+          report: { type: "string" },
+          citations: { type: "array", items: { type: "object" } },
+          sources: { type: "array", items: { type: "object" } },
+        },
+        required: ["report", "sources"],
+      }
+    ),
+    invoke: async (args) => {
+      if (!args.question) throw new Error("Missing 'question'.");
+      const { runDeepResearch } = await import("./research/pipeline");
+      const maxRounds = Number(args.maxRounds) > 0 ? Math.floor(Number(args.maxRounds)) : undefined;
+      const result = await runDeepResearch(String(args.question), { deep: args.deep === true, maxRounds });
+      return { report: result.report.report, citations: result.report.citations, sources: result.sources };
+    },
+  },
+
   // Accurate token counting + cost estimate (js-tiktoken). Lets a cluster size a
   // prompt and price a call before/after running it. Grafted from feat/v1.8-bench.
   count_tokens: {
