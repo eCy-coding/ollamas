@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{{const W=new URLSearchParams(location.search).get("theme");if(W==="light"||W==="dark"){document.documentElement.dataset.theme=W}}{const W=()=>{try{if(document.querySelector('meta[name="color-scheme"]'))return;const V=getComputedStyle(document.documentElement).getPropertyValue("color-scheme").trim();if(V&&V!=="normal")return;const z=(j)=>{if(!j)return null;const H=getComputedStyle(j).backgroundColor.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);if(!H)return null;const F=H[4]==null?1:parseFloat(H[4])/(H[4].endsWith("%")?100:1);if(F<0.99)return null;return[+H[1],+H[2],+H[3]]};const G=z(document.body)||z(document.documentElement);if(!G)return;const K=(j)=>{const H=j/255;return H<=0.04045?H/12.92:((H+0.055)/1.055)**2.4};const D=0.2126*K(G[0])+0.7152*K(G[1])+0.0722*K(G[2]);document.documentElement.style.setProperty("color-scheme",D<0.4?"dark":"light")}catch{}};if(document.readyState==="complete")W();else window.addEventListener("load",W)}var b=[];var p=false;var O=30000;var n=3000;document.addEventListener("DOMContentLoaded",()=>{const W=window.Babel;const V="om-src-id";if(W&&W.registerPlugin&&!(W.availablePlugins&&W.availablePlugins[V])){W.registerPlugin(V,({types:D})=>({visitor:{JSXOpeningElement(j,H){const F=j.node;if(F.name&&F.name.type==="JSXMemberExpression")return;for(let Q=0;Q<F.attributes.length;Q++){const $=F.attributes[Q];if($.type==="JSXAttribute"&&$.name&&$.name.name==="data-om-id")return}const P=H.file&&H.file.opts&&H.file.opts.filename||"?";const R=F.loc&&F.loc.start;const J=`jsx:${P}:${F.start??0}:${R?R.line:0}:${R?R.column+1:0}`;F.attributes.push(D.jsxAttribute(D.jsxIdentifier("data-om-id"),D.stringLiteral(J)))}}}))}const z="om-text-extract";let G=false;if(p&&W&&W.registerPlugin&&!(W.availablePlugins&&W.availablePlugins[z])){const D=window.React;if(D&&D.useSyncExternalStore&&D.createElement){G=true;const j={};const H=new Set;let F=0;window.__omTextO=j;window.__omTextSet=(J)=>{for(const Q in J){const $=J[Q];if($==null)delete j[Q];else j[Q]=$}F++;H.forEach((Q)=>Q())};const P=(J)=>{H.add(J);return()=>H.delete(J)};const R=()=>F;window.__OmT=function J(Q){D.useSyncExternalStore(P,R,R);return D.createElement("span",{"data-om-text":Q.i,className:"__om-t"},Q.i in j?j[Q.i]:Q.children)};W.registerPlugin(z,({types:J})=>{const Q={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const $={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const Y=(q,M)=>J.logicalExpression("??",J.memberExpression(J.logicalExpression("||",J.memberExpression(J.identifier("window"),J.identifier("__omTextO")),J.objectExpression([])),J.stringLiteral(q),true),M);const Z=(q)=>q.file&&q.file.opts&&q.file.opts.filename||"?";const B=(q)=>q.file&&q.file.code||"";const U=(q,M)=>{const L=(X)=>X&&X.start!=null&&X.end!=null&&(X.type==="StringLiteral"||X.type==="TemplateLiteral"&&X.expressions.length===0)?[X.start,X.end]:null;const N=L(M);if(N)return N;if(M&&M.type==="Identifier"){const X=q.scope.getBinding(M.name);if(X&&X.constant&&X.path.node.type==="VariableDeclarator"){return L(X.path.node.init)}}return null};const x=(q,M,L)=>{const N=q.node;let X=false;const f=(w,A)=>{X=true;return J.jsxElement(J.jsxOpeningElement(J.jsxIdentifier("__OmT"),[J.jsxAttribute(J.jsxIdentifier("i"),J.stringLiteral(w))],false),J.jsxClosingElement(J.jsxIdentifier("__OmT")),[A],false)};const C=N.children.map((w)=>{if(w.type==="JSXText"){if(w.start==null||w.end==null)return w;const A=L.slice(w.start,w.end);const k=A.length-A.trimStart().length;const u=A.length-A.trimEnd().length;if(k+u>=A.length)return w;return f(`txt:${M}:${w.start+k}:${w.end-u}`,w)}if(w.type==="JSXExpressionContainer"){const A=U(q,w.expression);if(A)return f(`str:${M}:${A[0]}:${A[1]}`,w)}return w});if(X)N.children=C};return{visitor:{JSXOpeningElement(q,M){const L=q.node;const N=Z(M);const X={};for(let f=0;f<L.attributes.length;f++){const C=L.attributes[f];if(C.type!=="JSXAttribute"||!C.name)continue;const w=C.name.name;if(!$[w])continue;if(!C.value||C.value.type!=="StringLiteral")continue;if(C.value.start==null||C.value.end==null)continue;const A=`txt:${N}:${C.value.start}:${C.value.end}`;X[w]=A;C.value=J.jsxExpressionContainer(Y(A,J.stringLiteral(C.value.value)))}if(Object.keys(X).length){L.attributes.push(J.jsxAttribute(J.jsxIdentifier("data-om-text-attrs"),J.stringLiteral(JSON.stringify(X))))}},JSXElement(q,M){const L=q.node.openingElement;const N=L&&L.name&&L.name.name;if(N==="__OmT")return;if(typeof N==="string"&&Q[N])return;x(q,Z(M),B(M))},JSXFragment(q,M){x(q,Z(M),B(M))}}}})}}const K=G?["transform-react-jsx-source",V,z]:["transform-react-jsx-source",V];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((D,j)=>{const H=D.getAttribute("data-plugins")||"";const F=K.filter((P)=>H.indexOf(P)<0);if(F.length){D.setAttribute("data-plugins",H?`${H},${F.join(",")}`:F.join(","))}if(!D.hasAttribute("data-filename")){D.setAttribute("data-filename",D.getAttribute("src")||`inline-${j}`)}})});var v=window.parent;var g="not editable here — open the project in the Claude Design editor to save";var d=()=>Promise.resolve({persisted:false,noHost:true,reason:g});var S=d;var h="data/storage.json";var i=()=>{try{const W=new URL(document.baseURI);const V=W.pathname.match(/\/projects\/([^/]+)\/serve\//);if(V)return V[1];return W.hostname.split(".")[0]||""}catch{return location.hostname.split(".")[0]||""}};var o=()=>{try{const W=new URL(document.baseURI);const V=W.pathname.indexOf("/serve/");if(V>=0)return W.origin+W.pathname.slice(0,V+"/serve/".length)+h}catch{}return"./"+h};var I=null;var _=()=>{if(!I){I=fetch(o(),{cache:"no-store"}).then((W)=>{if(W.ok)return W.text();return W.status===404?"":null}).catch(()=>null).then((W)=>{if(W===null){I=null;return null}const V=new Map;if(!W)return V;let z;try{z=JSON.parse(W)}catch{console.warn("[omelette.storage] "+h+" is not valid JSON; treating the store as unreadable so a save cannot overwrite the "+"hand-edited bytes. Fix the JSON (or delete the file) to re-enable persistence.");I=null;return null}if(z===null||typeof z!=="object"||Array.isArray(z)){console.warn("[omelette.storage] "+h+" doesn't hold a JSON object; treating the store as unreadable so a save cannot "+"overwrite the hand-edited bytes. Make the top level a JSON object to re-enable persistence.");I=null;return null}const G=z;if("data"in G){const K=G.data;if(K===null||typeof K!=="object"||Array.isArray(K)){console.warn("[omelette.storage] "+h+' has a "data" field that is not a JSON object; treating the store as unreadable so a '+'save cannot overwrite the hand-edited bytes. Make "data" a JSON object to re-enable persistence.');I=null;return null}const D=G._meta;const j=D!==null&&typeof D==="object"?D.project:undefined;if(typeof j==="string"&&j!==""&&j!==i())return V;for(const H of Object.keys(K))V.set(H,K[H]);return V}for(const K of Object.keys(G)){if(K!=="_meta")V.set(K,G[K])}return V})}return I};var y=(W)=>S(h,JSON.stringify({_meta:{project:i(),version:1},data:Object.fromEntries(W)},null,2));var m=Promise.resolve();var T=(W)=>{const V=m.then(W);m=V.then(()=>{return},()=>{return});return V};var s=/sk-(?:ant-)?[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|xox[a-z]-[A-Za-z0-9][A-Za-z0-9-]{9,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;var a=/password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|credential/i;var r=(W,V,z)=>{if(s.test(V)||a.test(W)&&typeof z==="string"&&z.length>=8){console.warn('[omelette.storage] the value for "'+W+'" looks like a credential. The storage file is a plaintext project file — visible to '+"everyone with project access and copied when the project is duplicated. Do not store secrets here.")}};var l={persisted:false,reason:"could not load the existing store — not overwriting it"};var c={persisted:false,reason:"stored value changed since a failed read — re-read this key before saving"};var E=new Set;var t={get:(W)=>{if(typeof W!=="string"){return Promise.reject(new TypeError("storage.get: key must be a string"))}return T(_).then((V)=>{if(V===null){E.add(W);return null}E.delete(W);if(!V.has(W))return null;const z=V.get(W);return z==null?null:JSON.parse(JSON.stringify(z))})},set:(W,V)=>{if(typeof W!=="string"){return Promise.reject(new TypeError("storage.set: key must be a string"))}let z;try{z=JSON.stringify(V)}catch(K){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable ("+String(K)+")"))}if(z===undefined){return Promise.reject(new TypeError("storage.set: value must be JSON-serializable"))}r(W,z,V);const G=JSON.parse(z);return T(()=>_().then((K)=>{if(K===null)return l;if(E.has(W)){if(K.has(W))return c;E.delete(W)}K.set(W,G);return y(K)}))},delete:(W)=>{if(typeof W!=="string"){return Promise.reject(new TypeError("storage.delete: key must be a string"))}return T(()=>_().then((V)=>{if(V===null)return l;if(E.has(W)){if(V.has(W))return c;E.delete(W)}V.delete(W);return y(V)}))},keys:()=>T(_).then((W)=>W===null?[]:Array.from(W.keys()))};window.omelette={writeFile:(W,V)=>S(W,V).then((z)=>{if(!z.persisted&&!z.noHost){throw new Error(z.reason||"write failed")}}),storage:t};if(v&&v!==window){const W=(J,Q)=>{try{v.postMessage({__omelette_log:true,type:J,data:Q},"*")}catch{}};["log","warn","error"].forEach((J)=>{const Q=console[J];console[J]=(...$)=>{const Y=$.map((Z)=>{try{return typeof Z==="object"?JSON.stringify(Z):String(Z)}catch{try{return String(Z)}catch{return"[unstringifiable]"}}}).join(" ");W(J,Y);Q.apply(console,$)}});window.addEventListener("error",(J)=>{const Q=J.target;if(Q&&Q!==window&&Q.tagName){const $=Q.src||Q.href||"";W("resource_error",`${Q.tagName} failed to load: ${$}`)}else{W("error",`${J.message||"Unknown error"} at ${J.filename||"?"}:${J.lineno||0}:${J.colno||0}`)}},true);window.addEventListener("unhandledrejection",(J)=>{const Q=J.reason;const $=Q instanceof Error?`${Q.message} ${Q.stack}`:String(Q);W("error",`Unhandled rejection: ${$}`)});window.addEventListener("click",(J)=>{if(J.defaultPrevented||J.button!==0)return;if(J.metaKey||J.ctrlKey||J.shiftKey||J.altKey)return;const Q=J.composedPath?J.composedPath():[];const $=["button","input","select","textarea","summary","label"];let Y=null;for(const x of Q){if(!(x instanceof Element))continue;if(x.localName==="a"){if(!(x instanceof HTMLAnchorElement))return;Y=x;break}if($.indexOf(x.localName)!==-1)return}if(!Y)return;if(Y.isContentEditable)return;const Z=Y.closest("[contenteditable]");if(Z&&Z.getAttribute("contenteditable")!=="false")return;const B=(Y.getAttribute("target")||"_self").toLowerCase();if(B!=="_self"&&B!=="_top"&&B!=="_parent")return;let U;try{U=new URL(Y.href)}catch{return}if(U.protocol!=="http:"&&U.protocol!=="https:")return;if(location.origin==="null")return;if(U.origin===location.origin)return;J.preventDefault();window.open(U.href,"_blank","noopener,noreferrer")});const V=()=>{try{v.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(window.ResizeObserver)new ResizeObserver(V).observe(document.documentElement);const z=()=>{V();if(!document.querySelector('script[type="text/babel"],script[type="text/jsx"]'))return;const J=()=>document.getElementById("root")||document.querySelector("body > div[id]");const Q=J()?.firstElementChild??null;let $=0;const Y=()=>{const Z=J();if(Z&&Z.firstElementChild!==Q||++$>30){V();return}setTimeout(Y,100)};setTimeout(Y,100)};if(document.readyState==="complete")z();else window.addEventListener("load",z);const G={};let K=0;const D=(J)=>new Promise((Q,$)=>{if(!b.length){$(new Error("claude.complete: no parent origin"));return}const Y=`c${++K}`;const Z=()=>setTimeout(()=>{delete G[Y];$(new Error(`claude.complete: no data for ${O/1000}s`))},O);const B=Z();G[Y]={resolve:Q,reject:$,text:"",t:B,arm:Z};try{for(const U of b){v.postMessage({__om_api:true,id:Y,body:J},U)}}catch(U){clearTimeout(B);delete G[Y];$(U)}});const j=8;const H=async(J,Q)=>{if(!Array.isArray(J.messages)){throw new Error("claude.complete: tools require a messages array")}const $=J.messages.slice();const Y={...J,tools:J.tools.map((U)=>{if(U===null||typeof U!=="object")return U;const x={};for(const q of Object.keys(U)){if(typeof U[q]!=="function")x[q]=U[q]}return x})};const Z=Y.tool_choice;const B=Z!=null&&(Z.type==="any"||Z.type==="tool")?{...Y,tool_choice:Z.disable_parallel_tool_use!==undefined?{type:"auto",disable_parallel_tool_use:Z.disable_parallel_tool_use}:{type:"auto"}}:Y;for(let U=0;U<j;U++){const x=await D({...U===0?Y:B,messages:$});const q=x.message;const M=q&&Array.isArray(q.content)?q.content:null;const L=M?M.filter((X)=>X?.type==="tool_use"):[];if(q?.stop_reason!=="tool_use"||L.length===0){return x.text}const N=[];for(const X of L){const f=Q.get(X.name);if(!f){N.push({type:"tool_result",tool_use_id:X.id,content:`no handler for tool "${X.name}"`,is_error:true});continue}try{const C=await f(X.input);const w=typeof C==="string"?C:R(C)??"";N.push({type:"tool_result",tool_use_id:X.id,content:w})}catch(C){N.push({type:"tool_result",tool_use_id:X.id,content:String(C?.message??C??"tool handler failed"),is_error:true})}}$.push({role:"assistant",content:M},{role:"user",content:N})}throw new Error(`claude.complete: exceeded ${j} tool turns`)};window.claude={complete(J){const Q=J;if(Q!==null&&typeof Q==="object"&&Array.isArray(Q.tools)&&Q.tools.some(($)=>$!==null&&typeof $==="object"&&typeof $.run==="function")){const $=new Map;for(const Y of Q.tools){if(Y!==null&&typeof Y==="object"&&typeof Y.run==="function"){$.set(String(Y.name),Y.run)}}return H(Q,$)}return D(J).then(($)=>$.text)}};const F={};let P=0;S=(J,Q)=>new Promise(($)=>{if(!b.length){$({persisted:false,noHost:true,reason:g});return}const Y=`f${++P}`;const Z=setTimeout(()=>{delete F[Y];$({persisted:false,noHost:true,reason:g})},n);F[Y]={settle:$,t:Z};try{for(const B of b){v.postMessage({__om_file:true,id:Y,op:"write",path:J,content:Q},B)}}catch{clearTimeout(Z);delete F[Y];$({persisted:false,noHost:true,reason:g})}});const R=(J)=>{try{return JSON.stringify(J)}catch{return JSON.stringify(String(J))}};window.addEventListener("message",(J)=>{if(b.indexOf(J.origin)<0)return;if(J.source!==v)return;const Q=J.data;if(!Q)return;if(Q.type==="omelette-preview-refresh"){if(typeof Q.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(Q.token))return;const Z=Math.max(1,Math.floor((Q.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+Q.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+Z;return}if(Q.__om_file_r){const Z=F[Q.id];if(!Z)return;clearTimeout(Z.t);delete F[Q.id];Z.settle(Q.ok?{persisted:true}:{persisted:false,reason:Q.error||"write failed"});return}if(Q.__om_api_r){const Z=G[Q.id];if(!Z)return;if(Q.error!=null){clearTimeout(Z.t);delete G[Q.id];Z.reject(new Error(Q.error));return}if(Q.chunk!=null){clearTimeout(Z.t);Z.t=Z.arm();Z.text+=Q.chunk;return}if(Q.done){clearTimeout(Z.t);delete G[Q.id];Z.resolve({text:Q.text!=null?Q.text:Z.text,message:Q.message});return}return}if(!Q.__om_eval)return;const $=Q;const Y=(Z)=>{J.source.postMessage({...Z,__om_eval_r:1,id:$.id},J.origin)};try{const Z=(0,eval)($.code);if(Z&&typeof Z.then==="function"){Z.then((B)=>Y({ok:1,v:R(B)}),(B)=>Y({ok:0,e:String(B)}))}else{Y({ok:1,v:R(Z)})}}catch(Z){Y({ok:0,e:String(Z)})}})}})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@keyframes p-spin { to { transform: rotate(360deg); } }
+@keyframes p-sk { 0%,100% { opacity:.5 } 50% { opacity:1 } }
+@keyframes p-caret { 0%,100% { opacity:1 } 50% { opacity:0 } }
+*::-webkit-scrollbar { width:9px; height:9px; }
+*::-webkit-scrollbar-thumb { background:var(--p-border2); border-radius:9px; border:2px solid transparent; background-clip:content-box; }
+*::-webkit-scrollbar-track { background:transparent; }
+</style>
+</helmet>
+<div style="height:100%;width:100%;display:flex;overflow:hidden;font-family:'Inter',system-ui,sans-serif;background:var(--p-app);color:var(--p-text);font-size:14px;{{ themeVars }}">
+
+  <!-- ░░ NAV RAIL (shell hint) ░░ -->
+  <div style="width:52px;flex:0 0 auto;background:var(--p-rail);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:3px;border-right:1px solid rgba(255,255,255,0.05)">
+    <div style="width:30px;height:30px;border-radius:9px;background:linear-gradient(150deg,#6366f1,#4338ca);display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:8px;box-shadow:0 2px 8px rgba(99,102,241,0.5)">{{ I.spark }}</div>
+    <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#6b6d82;cursor:pointer" style-hover="background:rgba(255,255,255,0.05);color:#c7c9e6">{{ I.rMsg }}</div>
+    <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#6b6d82;cursor:pointer" style-hover="background:rgba(255,255,255,0.05);color:#c7c9e6">{{ I.rCode }}</div>
+    <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#6b6d82;cursor:pointer" style-hover="background:rgba(255,255,255,0.05);color:#c7c9e6">{{ I.rTerm }}</div>
+    <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;position:relative;color:#c7c9ff;background:rgba(99,102,241,0.18);cursor:pointer">
+      <div style="position:absolute;left:-9px;top:8px;bottom:8px;width:3px;border-radius:3px;background:#818cf8"></div>{{ I.rMail }}
+    </div>
+    <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#6b6d82;cursor:pointer" style-hover="background:rgba(255,255,255,0.05);color:#c7c9e6">{{ I.rFiles }}</div>
+    <div style="margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:6px">
+      <div style="width:38px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#6b6d82;cursor:pointer" style-hover="background:rgba(255,255,255,0.05);color:#c7c9e6">{{ I.rGear }}</div>
+      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(150deg,#f59e0b,#b45309);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff">A</div>
+    </div>
+  </div>
+
+  <!-- ░░ PANEL ░░ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--p-bg)">
+
+    <!-- panel top bar -->
+    <div style="height:46px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 12px 0 14px;border-bottom:1px solid var(--p-border);background:var(--p-bg)">
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 8px 4px 4px;border-radius:9px;cursor:pointer" style-hover="background:var(--p-hover)">
+        <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(150deg,#6366f1,#4338ca);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex:0 0 auto">A</div>
+        <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+          <div style="font-size:12.5px;font-weight:600;letter-spacing:-0.01em;line-height:1.2">alex@ollamas.dev</div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10.5px;line-height:1.2;color:var(--p-text3);font-family:'JetBrains Mono',monospace">
+            <span style="{{ acctDotStyle }}"></span>{{ acctLine }}
+          </div>
+        </div>
+        <span style="color:var(--p-text3);margin-left:2px">{{ I.chev2 }}</span>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <sc-if value="{{ showModel }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px;border:1px solid var(--p-border);background:var(--p-surface);font-family:'JetBrains Mono',monospace;font-size:11px">
+          <span style="color:var(--p-accent2);display:flex">{{ I.cpu13 }}</span>
+          <span style="color:var(--p-text)">qwen3:8b</span>
+          <span style="color:var(--p-text3)">· local</span>
+        </div>
+      </sc-if>
+      <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text)">{{ I.gear16 }}</div>
+    </div>
+
+    <!-- panel body -->
+    <div style="flex:1;min-height:0;display:flex;position:relative">
+
+      <!-- ── SIDEBAR (folders) ── -->
+      <div style="width:216px;flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--p-border);background:var(--p-bg);padding:12px 10px;overflow-y:auto">
+        <button style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:9px;padding:10px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 2px 10px rgba(99,102,241,0.35)" style-hover="background:var(--p-accent2)">{{ I.compose }} Compose</button>
+
+        <div style="{{ sideStyle }}">
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:var(--p-text3);padding:18px 8px 7px;display:flex;align-items:center;gap:6px">Triage <span style="color:var(--p-accent2);display:flex">{{ I.sparkSm }}</span></div>
+          <sc-for list="{{ smartViews }}" as="sv" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px" style-hover="background:var(--p-hover)">
+              <span style="{{ sv.iconStyle }}">{{ sv.icon }}</span>
+              <span style="flex:1;color:var(--p-text2);font-weight:500">{{ sv.label }}</span>
+              <span style="{{ sv.countStyle }}">{{ sv.count }}</span>
+            </div>
+          </sc-for>
+
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:var(--p-text3);padding:16px 8px 7px">Mailbox</div>
+          <sc-for list="{{ folders }}" as="f" hint-placeholder-count="6">
+            <div style="{{ f.rowStyle }}" style-hover="{{ f.hoverStyle }}">
+              <span style="{{ f.iconStyle }}">{{ f.icon }}</span>
+              <span style="{{ f.labelStyle }}">{{ f.label }}</span>
+              <span style="{{ f.countStyle }}">{{ f.count }}</span>
+            </div>
+          </sc-for>
+
+          <div style="font-size:10px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:var(--p-text3);padding:16px 8px 7px">Labels</div>
+          <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px" style-hover="background:var(--p-hover)">
+            <span style="width:9px;height:9px;border-radius:3px;background:var(--p-accent);flex:0 0 auto"></span><span style="color:var(--p-text2)">Work</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px" style-hover="background:var(--p-hover)">
+            <span style="width:9px;height:9px;border-radius:3px;background:var(--tri-wait);flex:0 0 auto"></span><span style="color:var(--p-text2)">Personal</span>
+          </div>
+        </div>
+
+        <div style="margin-top:auto;padding:10px 8px 2px;border-top:1px solid var(--p-border);display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">
+          <span style="display:flex">{{ I.cpu12 }}</span><span>triage · on-device</span>
+        </div>
+      </div>
+
+      <!-- ── NOT CONNECTED ── -->
+      <sc-if value="{{ isNC }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;padding:28px;overflow-y:auto;background:var(--p-bg)">
+          <div style="width:100%;max-width:452px;display:flex;flex-direction:column;align-items:center;text-align:center">
+            <div style="width:56px;height:56px;border-radius:16px;background:var(--p-accent-bg);border:1px solid var(--p-accent-bd);display:flex;align-items:center;justify-content:center;color:var(--p-accent2);margin-bottom:16px">{{ I.plug }}</div>
+            <div style="font-size:20px;font-weight:600;letter-spacing:-0.02em">Connect a mailbox</div>
+            <div style="font-size:13px;color:var(--p-text2);line-height:1.6;margin:8px 0 18px">Bring any provider — Mail speaks plain IMAP and SMTP. Triage, summaries, and drafts run locally on your machine.</div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:18px">
+              <div style="padding:6px 12px;border-radius:7px;border:1px solid var(--p-border2);background:var(--p-surface);font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">Fastmail</div>
+              <div style="padding:6px 12px;border-radius:7px;border:1px solid var(--p-border2);background:var(--p-surface);font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">Migadu</div>
+              <div style="padding:6px 12px;border-radius:7px;border:1px solid var(--p-border2);background:var(--p-surface);font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">Proton Bridge</div>
+              <div style="padding:6px 12px;border-radius:7px;border:1px solid var(--p-border2);background:var(--p-surface);font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">Gmail (IMAP)</div>
+              <div style="padding:6px 12px;border-radius:7px;border:1px solid var(--p-accent-bd);background:var(--p-accent-bg);font-size:12px;font-weight:600;color:var(--p-accent2);cursor:pointer">Custom</div>
+            </div>
+
+            <div style="width:100%;display:flex;flex-direction:column;gap:11px;text-align:left">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:11px;font-weight:500;color:var(--p-text3)">Email address</label>
+                <div style="background:var(--p-surface);border:1px solid var(--p-border2);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--p-text);font-family:'JetBrains Mono',monospace">you@example.com</div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:11px;font-weight:500;color:var(--p-text3)">IMAP server</label>
+                  <div style="background:var(--p-surface);border:1px solid var(--p-border2);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--p-text2);font-family:'JetBrains Mono',monospace">imap.example.com:993 · TLS</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                  <label style="font-size:11px;font-weight:500;color:var(--p-text3)">SMTP server</label>
+                  <div style="background:var(--p-surface);border:1px solid var(--p-border2);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--p-text2);font-family:'JetBrains Mono',monospace">smtp.example.com:587</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="font-size:11px;font-weight:500;color:var(--p-text3)">Password</label>
+                <div style="display:flex;align-items:center;gap:9px;background:var(--p-surface);border:1px solid var(--p-border2);border-radius:8px;padding:9px 11px">
+                  <span style="color:var(--p-text3);display:flex">{{ I.lock13 }}</span>
+                  <span style="letter-spacing:3px;color:var(--p-text2);font-size:14px">••••••••••••</span>
+                  <span style="margin-left:auto;font-size:10.5px;color:var(--p-text3)">Kept in OS keychain</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="width:100%;display:flex;gap:10px;align-items:flex-start;margin:14px 0 18px;padding:11px 13px;border-radius:10px;background:var(--tri-wait-bg);border:1px solid var(--p-border2);text-align:left">
+              <span style="color:var(--tri-wait);display:flex;margin-top:1px">{{ I.info15 }}</span>
+              <div style="font-size:12px;color:var(--p-text2);line-height:1.55"><b style="color:var(--p-text);font-weight:600">Using Gmail?</b> Its labels, categories, and metadata view stay in Gmail — this panel works over standard IMAP/SMTP, so triage stays provider-neutral.</div>
+            </div>
+
+            <div style="width:100%;display:flex;gap:10px">
+              <button style="flex:0 0 auto;background:transparent;color:var(--p-text2);border:1px solid var(--p-border2);border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="border-color:var(--p-accent-bd);color:var(--p-text)">Test connection</button>
+              <button style="flex:1;background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:9px;padding:10px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 2px 10px rgba(99,102,241,0.35)" style-hover="background:var(--p-accent2)">Connect &amp; sync</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── IMAP ERROR ── -->
+      <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;background:var(--p-bg)">
+          <div style="margin:16px;display:flex;gap:13px;padding:15px 16px;border-radius:12px;background:var(--p-danger-bg);border:1px solid var(--p-danger-bd)">
+            <span style="color:var(--p-danger);display:flex;margin-top:1px;flex:0 0 auto">{{ I.alert20 }}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600;color:var(--p-text)">Can't sign in to mail.ollamas.dev</div>
+              <div style="font-size:12.5px;color:var(--p-text2);margin:3px 0 9px">IMAP rejected the credentials for <span style="font-family:'JetBrains Mono',monospace">alex@ollamas.dev</span>. Your password was never stored — re-enter it to reconnect.</div>
+              <div style="display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--p-danger);background:rgba(0,0,0,0.22);border:1px solid var(--p-danger-bd);border-radius:6px;padding:5px 9px">535 5.7.8 · Authentication credentials rejected</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;flex:0 0 auto">
+              <button style="background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--p-accent2)">Retry</button>
+              <button style="background:transparent;color:var(--p-text2);border:1px solid var(--p-border2);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="color:var(--p-text)">Update credentials</button>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:6px">
+            <div style="width:52px;height:52px;border-radius:14px;background:var(--p-surface);border:1px solid var(--p-border);display:flex;align-items:center;justify-content:center;color:var(--p-text3);margin-bottom:6px">{{ I.lock24 }}</div>
+            <div style="font-size:15px;font-weight:600;color:var(--p-text2)">Mailbox locked</div>
+            <div style="font-size:12.5px;color:var(--p-text3);max-width:320px;line-height:1.55">We can't fetch messages until the connection is re-authenticated.</div>
+            <div style="font-size:11px;color:var(--p-text3);font-family:'JetBrains Mono',monospace;margin-top:6px">last synced 2h ago · cache cleared</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── LIST + READING (syncing / filled / compose) ── -->
+      <sc-if value="{{ splitView }}" hint-placeholder-val="{{ true }}">
+      <div style="width:366px;flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--p-border);background:var(--p-bg);min-height:0">
+        <!-- list header -->
+        <div style="flex:0 0 auto;padding:11px 14px 0">
+          <div style="display:flex;align-items:center;gap:8px;background:var(--p-surface);border:1px solid var(--p-border);border-radius:9px;padding:8px 11px">
+            <span style="color:var(--p-text3);display:flex">{{ I.search15 }}</span>
+            <span style="flex:1;font-size:12.5px;color:var(--p-text3)">Search mail — try “from:priya has:attachment”</span>
+            <span style="color:var(--p-text3);display:flex">{{ I.sliders14 }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 2px 2px">
+            <span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">Inbox</span>
+            <span style="font-size:12px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">{{ inboxCount }}</span>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--p-text3);padding:4px 8px;border-radius:7px;cursor:pointer" style-hover="background:var(--p-hover)"><span style="display:flex">{{ I.sliders14 }}</span>Triage order</div>
+          </div>
+        </div>
+
+        <!-- SYNCING: progress + skeleton -->
+        <sc-if value="{{ isSyncing }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:10px 16px 8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--p-text2)">
+              <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--p-border2);border-top-color:var(--p-accent);animation:p-spin 0.8s linear infinite"></div>
+              <span>Fetching messages</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;color:var(--p-text3)">214 / 380</span>
+            </div>
+            <div style="height:4px;border-radius:3px;background:var(--p-surface);margin-top:9px;overflow:hidden"><div style="width:56%;height:100%;background:var(--p-accent);border-radius:3px"></div></div>
+          </div>
+          <div style="flex:1;overflow:hidden;padding-top:4px">
+            <sc-for list="{{ skeleton }}" as="s" hint-placeholder-count="6">
+              <div style="display:flex;gap:11px;padding:13px 14px;border-bottom:1px solid var(--p-border);animation:p-sk 1.4s ease-in-out infinite">
+                <div style="width:30px;height:30px;border-radius:8px;background:var(--sk);flex:0 0 auto"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:7px;padding-top:2px">
+                  <div style="display:flex;gap:8px"><div style="width:40%;height:9px;border-radius:4px;background:var(--sk)"></div><div style="margin-left:auto;width:26px;height:9px;border-radius:4px;background:var(--sk)"></div></div>
+                  <div style="width:78%;height:9px;border-radius:4px;background:var(--sk)"></div>
+                  <div style="width:60%;height:8px;border-radius:4px;background:var(--sk)"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <!-- FILLED: filter chips + rows -->
+        <sc-if value="{{ isFilled }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:10px 14px 9px">
+            <div style="padding:5px 11px;border-radius:7px;font-size:12px;font-weight:600;background:var(--p-accent-bg);color:var(--p-accent2);border:1px solid var(--p-accent-bd);cursor:pointer">All</div>
+            <div style="padding:5px 11px;border-radius:7px;font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover)">Action <span style="color:var(--tri-action)">2</span></div>
+            <div style="padding:5px 11px;border-radius:7px;font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover)">Waiting <span style="color:var(--tri-wait)">2</span></div>
+            <div style="padding:5px 11px;border-radius:7px;font-size:12px;font-weight:500;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover)">Unread <span style="color:var(--p-text3)">2</span></div>
+          </div>
+          <div style="flex:1;overflow-y:auto;min-height:0">
+            <sc-for list="{{ rows }}" as="row" hint-placeholder-count="5">
+              <div style="{{ row.rowStyle }}" style-hover="{{ row.hoverStyle }}">
+                <div style="{{ row.avStyle }}">{{ row.initials }}</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="{{ row.dotStyle }}"></span>
+                    <span style="{{ row.senderStyle }}">{{ row.from }}</span>
+                    <span style="margin-left:auto;font-size:10.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace;flex:0 0 auto">{{ row.time }}</span>
+                  </div>
+                  <div style="{{ row.subjStyle }}">{{ row.subject }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0">
+                    <span style="color:var(--p-accent2);display:flex;flex:0 0 auto">{{ I.sparkSm }}</span>
+                    <span style="font-size:11.5px;color:var(--p-text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.blurb }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:7px;margin-top:1px">
+                    <span style="{{ row.triStyle }}">{{ row.triIcon }}{{ row.triLabel }}</span>
+                    <span style="{{ row.attachStyle }}">{{ row.attachMeta }}</span>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- READING COLUMN -->
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--p-bg);min-height:0">
+
+        <!-- SYNCING reading placeholder -->
+        <sc-if value="{{ isSyncing }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px">
+            <div style="width:26px;height:26px;border-radius:50%;border:2.5px solid var(--p-border2);border-top-color:var(--p-accent);animation:p-spin 0.8s linear infinite"></div>
+            <div style="font-size:14px;font-weight:600;color:var(--p-text2)">Syncing your inbox</div>
+            <div style="font-size:12.5px;color:var(--p-text3);max-width:300px;line-height:1.55">Reading, triage, and drafts run locally once messages arrive.</div>
+          </div>
+        </sc-if>
+
+        <!-- FILLED reading (message #1) -->
+        <sc-if value="{{ isFilled }}" hint-placeholder-val="{{ true }}">
+          <!-- reading header -->
+          <div style="flex:0 0 auto;padding:15px 20px 13px;border-bottom:1px solid var(--p-border)">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:17px;font-weight:600;letter-spacing:-0.015em;line-height:1.3">Re: PR #412 — streaming parser drops frames at EOF</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:2px;flex:0 0 auto">
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-accent2)">{{ I.reply17 }}</div>
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text)">{{ I.replyAll17 }}</div>
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text2);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text)">{{ I.fwd17 }}</div>
+                <div style="width:1px;height:18px;background:var(--p-border2);margin:0 4px"></div>
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.arch17 }}</div>
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.clock17 }}</div>
+                <div style="width:31px;height:31px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.more17 }}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:11px;margin-top:12px">
+              <div style="width:34px;height:34px;border-radius:9px;background:var(--p-accent-bg);color:var(--p-accent2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex:0 0 auto">PN</div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:baseline;gap:7px"><span style="font-size:13.5px;font-weight:600">Priya Nair</span><span style="font-size:11.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">&lt;priya@ollamas.dev&gt;</span></div>
+                <div style="font-size:11.5px;color:var(--p-text3)">to me · <span style="font-family:'JetBrains Mono',monospace">alex@ollamas.dev</span></div>
+              </div>
+              <div style="text-align:right;flex:0 0 auto">
+                <div style="font-size:11.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">Today · 9:24 AM</div>
+                <div style="font-size:11px;color:var(--p-text3);margin-top:2px">Thread · 4 messages</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:11px">
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;color:var(--tri-action);background:var(--tri-action-bg)">{{ I.flag12 }} Action</span>
+              <span style="font-size:11.5px;color:var(--p-text2)">Needs a reply</span>
+              <div style="flex:1"></div>
+              <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--p-text3);font-family:'JetBrains Mono',monospace"><span style="display:flex">{{ I.cpu12 }}</span>triaged locally · conf 0.94</span>
+            </div>
+          </div>
+
+          <!-- reading scroll body -->
+          <div style="flex:1;overflow-y:auto;min-height:0;padding:16px 20px 18px">
+            <!-- AI SUMMARY CARD -->
+            <div style="border-radius:13px;border:1px solid var(--p-accent-bd);background:var(--p-summary-bg);padding:15px 16px;position:relative;overflow:hidden">
+              <div style="position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,var(--p-accent),transparent)"></div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="color:var(--p-accent2);display:flex">{{ I.sSpark }}</span>
+                <span style="font-size:12px;font-weight:600;letter-spacing:0.03em;color:var(--p-text)">AI Summary</span>
+                <div style="flex:1"></div>
+                <div style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--p-border2);background:var(--p-bg);font-family:'JetBrains Mono',monospace;font-size:11px">
+                  <span style="display:flex;color:var(--p-text3)">{{ I.cpu12 }}</span><span style="color:var(--p-ok);font-weight:600">$0</span><span style="color:var(--p-text3)">·</span><span style="color:var(--p-accent2)">qwen3:8b</span>
+                </div>
+              </div>
+              <div style="font-size:13.5px;color:var(--p-text);line-height:1.62;margin:11px 0 13px">Priya is blocked on your review of <b style="font-weight:600">PR #412</b> before Friday's 10:00 UTC release. She pushed a fix for two EOF parser bugs on <span style="font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--p-code-bg);border:1px solid var(--p-border);border-radius:5px;padding:1px 5px;color:var(--p-accent2)">fix/parser-eof</span> and wants a 15-minute call Thursday at 3pm.</div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--p-text3);margin-bottom:7px">Key points</div>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+                <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--p-accent2);display:flex;margin-top:2px;flex:0 0 auto">{{ I.check12 }}</span><span style="font-size:12.5px;color:var(--p-text2);line-height:1.5;flex:1;min-width:0">Two failures: a multi-byte UTF-8 sequence split across chunks, and an empty final frame on close.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--p-accent2);display:flex;margin-top:2px;flex:0 0 auto">{{ I.check12 }}</span><span style="font-size:12.5px;color:var(--p-text2);line-height:1.5;flex:1;min-width:0">Fix lives on <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--p-accent2)">fix/parser-eof</span>, pending your approval.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--p-accent2);display:flex;margin-top:2px;flex:0 0 auto">{{ I.check12 }}</span><span style="font-size:12.5px;color:var(--p-text2);line-height:1.5;flex:1;min-width:0">Likely the same root cause behind this morning's prod 500s spike.</span></div>
+              </div>
+              <div style="display:flex;gap:7px;margin-bottom:13px">
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;background:var(--p-bg);border:1px solid var(--p-border);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--p-text2)"><span style="display:flex;color:var(--tri-action)">{{ I.clock12 }}</span>Fri 10:00 UTC</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:7px;background:var(--p-bg);border:1px solid var(--p-border);font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--p-text2)"><span style="display:flex;color:var(--tri-wait)">{{ I.cal12 }}</span>Thu 15:00</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:9px;background:var(--p-accent-bg);border:1px solid var(--p-accent-bd)">
+                <span style="color:var(--p-accent2);display:flex;flex:0 0 auto">{{ I.sCheck }}</span>
+                <div style="flex:1;min-width:0"><span style="font-size:11px;color:var(--p-text3)">Suggested · </span><span style="font-size:12.5px;color:var(--p-text);font-weight:500">Confirm Thu 3pm &amp; approve fix/parser-eof</span></div>
+                <span style="font-size:10.5px;font-weight:600;color:var(--p-accent2);font-family:'JetBrains Mono',monospace;flex:0 0 auto">draft ready ↓</span>
+              </div>
+            </div>
+
+            <!-- email body -->
+            <div style="padding:16px 2px 6px;font-size:13.5px;color:var(--p-text2);line-height:1.68">
+              <p style="margin:0 0 12px">Hey Alex — I need your eyes on <b style="color:var(--p-text);font-weight:600">PR #412</b> before we cut the Friday release. The streaming parser is dropping frames in two cases and I've got a fix up, but I want your sign-off before it ships.</p>
+              <p style="margin:0 0 8px">Reproduced two failures:</p>
+              <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 12px;padding-left:2px">
+                <div style="display:flex;gap:9px"><span style="color:var(--p-text3)">1.</span><span>A multi-byte UTF-8 sequence split across two chunks → truncated token downstream.</span></div>
+                <div style="display:flex;gap:9px"><span style="color:var(--p-text3)">2.</span><span>An empty final frame after the stream closes → the last token is dropped.</span></div>
+              </div>
+              <p style="margin:0 0 12px">Fix is on <span style="font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--p-code-bg);border:1px solid var(--p-border);border-radius:5px;padding:1px 5px;color:var(--p-accent2)">fix/parser-eof</span> — mostly buffering the tail until the sequence is complete. Can you grab 15 min Thursday at 3pm to walk it? If it's green I'll merge and tag.</p>
+              <div style="padding:8px 0 2px;color:var(--p-text3);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="color:var(--p-text2)"><span style="display:flex">{{ I.chevD }}</span>Show quoted text · 2 earlier messages</div>
+            </div>
+
+            <!-- attachments -->
+            <div style="display:flex;gap:10px;padding:6px 2px 2px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid var(--p-border2);background:var(--p-surface);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">
+                <span style="color:var(--p-accent2);display:flex">{{ I.attDiff }}</span>
+                <div><div style="font-size:12.5px;color:var(--p-text);font-weight:500">0001-fix-parser-eof.patch</div><div style="font-size:10.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">4.2 KB · diff</div></div>
+                <span style="color:var(--p-text3);display:flex;margin-left:4px">{{ I.dl14 }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid var(--p-border2);background:var(--p-surface);cursor:pointer" style-hover="border-color:var(--p-accent-bd)">
+                <span style="color:var(--p-text2);display:flex">{{ I.attTxt }}</span>
+                <div><div style="font-size:12.5px;color:var(--p-text);font-weight:500">eof-repro.log</div><div style="font-size:10.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">11 KB · text</div></div>
+                <span style="color:var(--p-text3);display:flex;margin-left:4px">{{ I.dl14 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- REPLY DRAFT EDITOR (docked) -->
+          <div style="flex:0 0 auto;border-top:1px solid var(--p-border2);background:var(--p-surface);padding:12px 20px 13px">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+              <span style="color:var(--p-text3);display:flex">{{ I.cReply }}</span>
+              <span style="font-size:12.5px;font-weight:600;color:var(--p-text)">Reply to Priya</span>
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:var(--p-accent-bg);color:var(--p-accent2);font-size:10.5px;font-weight:600">{{ I.cSpark }} AI draft</span>
+              <div style="flex:1"></div>
+              <div style="display:flex;background:var(--p-bg);border:1px solid var(--p-border);border-radius:7px;padding:2px">
+                <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;background:var(--p-accent-bg);color:var(--p-accent2)">Concise</span>
+                <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:500;color:var(--p-text3);cursor:pointer">Detailed</span>
+              </div>
+              <div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.cRegen }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--p-text3);padding-bottom:9px;border-bottom:1px solid var(--p-border)">
+              <span>To</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:var(--p-bg);border:1px solid var(--p-border2);color:var(--p-text2);font-family:'JetBrains Mono',monospace;font-size:11.5px"><span style="width:14px;height:14px;border-radius:50%;background:var(--p-accent-bg);color:var(--p-accent2);display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;font-family:Inter">P</span>priya@ollamas.dev</span>
+              <span style="margin-left:auto;color:var(--p-text3);cursor:pointer">Cc · Bcc</span>
+            </div>
+            <div style="font-size:13px;color:var(--p-text);line-height:1.6;padding:11px 0 12px;max-height:96px;overflow-y:auto">
+              <div>Hi Priya,</div>
+              <div style="margin-top:9px">Thursday at 3pm works — I'll take the 15 minutes. I'll pull <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--p-accent2)">fix/parser-eof</span> this afternoon, reproduce both cases, and approve if it's green so you can tag ahead of the Friday cut.</div>
+              <div style="margin-top:9px">One thing to check first: does the fix also cover the zero-length keep-alive frame? I suspect that's what's behind the prod 500s.<span style="display:inline-block;width:2px;height:15px;background:var(--p-accent);margin-left:1px;vertical-align:-3px;animation:p-caret 1.1s step-end infinite"></span></div>
+              <div style="margin-top:9px;color:var(--p-text2)">Talk soon,<br>Alex</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:11px;border-top:1px solid var(--p-border)">
+              <div style="display:flex;align-items:center;gap:2px">
+                <div style="width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.clip15 }}</div>
+                <button style="background:transparent;color:var(--p-text2);border:none;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer" style-hover="background:var(--p-hover)">Save draft</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace;margin-left:6px"><span style="display:flex">{{ I.cpu12 }}</span>drafted locally · $0</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+                <button style="display:flex;align-items:center;gap:8px;background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:9px;padding:8px 8px 8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,0.4)" style-hover="background:var(--p-accent2)">
+                  <span style="display:flex">{{ I.lock14 }}</span>Send
+                  <span style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,0.22);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.03em">SMTP</span>
+                </button>
+                <span style="font-size:9.5px;color:var(--p-text3);font-family:'JetBrains Mono',monospace">privileged · smtp.ollamas.dev:587 · STARTTLS</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      </sc-if>
+
+      <!-- ── COMPOSE MODAL OVERLAY ── -->
+      <sc-if value="{{ isCompose }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;background:rgba(3,4,10,0.62);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:20;padding:24px">
+          <div style="width:100%;max-width:620px;background:var(--p-surface);border:1px solid var(--p-border2);border-radius:15px;box-shadow:var(--p-shadow);display:flex;flex-direction:column;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--p-border)">
+              <span style="font-size:13.5px;font-weight:600">New message</span>
+              <div style="flex:1"></div>
+              <div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.x16 }}</div>
+            </div>
+            <div style="padding:14px 16px;display:flex;flex-direction:column;gap:0">
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;background:var(--p-accent-bg);border:1px solid var(--p-accent-bd);margin-bottom:13px">
+                <span style="color:var(--p-accent2);display:flex">{{ I.cSpark }}</span>
+                <span style="flex:1;font-size:12.5px;color:var(--p-text3)">Ask AI to draft — “decline politely, propose next week”</span>
+                <button style="background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:7px;padding:6px 13px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">Draft</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:9px 2px;border-bottom:1px solid var(--p-border);font-size:13px">
+                <span style="color:var(--p-text3);width:44px">To</span>
+                <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:var(--p-bg);border:1px solid var(--p-border2);color:var(--p-text2);font-family:'JetBrains Mono',monospace;font-size:11.5px">marcus@sonder.io <span style="color:var(--p-text3)">×</span></span>
+                <span style="color:var(--p-text3)">·</span>
+                <span style="flex:1;color:var(--p-text3);font-size:12.5px">add recipient</span>
+                <span style="color:var(--p-text3);font-size:12px;cursor:pointer">Cc · Bcc</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid var(--p-border);font-size:13px">
+                <span style="color:var(--p-text3);width:44px">Subject</span>
+                <span style="color:var(--p-text)">Re: Contract redline — §4.2</span>
+              </div>
+              <div style="padding:14px 2px;min-height:132px;font-size:13px;color:var(--p-text3);line-height:1.6">Write your message, or let AI draft it from the prompt above…<span style="display:inline-block;width:2px;height:15px;background:var(--p-accent);margin-left:1px;vertical-align:-3px;animation:p-caret 1.1s step-end infinite"></span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--p-border);background:var(--p-bg)">
+              <div style="width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.clip15 }}</div>
+              <div style="width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.link15 }}</div>
+              <div style="width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--p-text3);cursor:pointer" style-hover="background:var(--p-hover);color:var(--p-text2)">{{ I.img15 }}</div>
+              <div style="flex:1"></div>
+              <button style="background:transparent;color:var(--p-text2);border:none;padding:8px 12px;font-size:12.5px;font-weight:500;font-family:inherit;cursor:pointer;border-radius:7px" style-hover="background:var(--p-hover)">Save draft</button>
+              <button style="display:flex;align-items:center;gap:8px;background:var(--p-accent);color:var(--p-accent-fg);border:none;border-radius:9px;padding:8px 8px 8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;box-shadow:0 2px 12px rgba(99,102,241,0.4)" style-hover="background:var(--p-accent2)">
+                <span style="display:flex">{{ I.lock14 }}</span>Send<span style="display:inline-flex;padding:2px 7px;border-radius:6px;background:rgba(0,0,0,0.22);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600">SMTP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1340,&quot;height&quot;:812},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;notconnected&quot;,&quot;syncing&quot;,&quot;error&quot;,&quot;filled&quot;,&quot;compose&quot;],&quot;default&quot;:&quot;filled&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  icon(name, size, sw) {
+    const P = Component.PATHS[name] || [];
+    return React.createElement('svg', {
+      width: size || 16, height: size || 16, viewBox: '0 0 24 24',
+      fill: 'none', stroke: 'currentColor', strokeWidth: sw || 1.6,
+      strokeLinecap: 'round', strokeLinejoin: 'round',
+      style: { display: 'block', flex: '0 0 auto' }
+    }, P.map((p, i) => React.createElement(p[0], { key: i, ...p[1] })));
+  }
+
+  renderVals() {
+    const theme = this.props.theme || 'dark';
+    const view = this.props.view || 'filled';
+    const light = theme === 'light';
+
+    const DARK = {
+      '--p-app': '#0a0b10', '--p-rail': '#08090e', '--p-bg': '#0d0e15',
+      '--p-surface': '#12131c', '--p-raised': '#181927', '--p-hover': 'rgba(255,255,255,0.045)',
+      '--p-sel': 'rgba(99,102,241,0.14)', '--p-border': 'rgba(255,255,255,0.07)', '--p-border2': 'rgba(255,255,255,0.12)',
+      '--p-text': '#e8e9f0', '--p-text2': '#9a9cb0', '--p-text3': '#63657c',
+      '--p-accent': '#6366f1', '--p-accent2': '#a5b0ff', '--p-accent-fg': '#ffffff',
+      '--p-accent-bg': 'rgba(99,102,241,0.16)', '--p-accent-bd': 'rgba(99,102,241,0.42)',
+      '--tri-action': '#f8b74d', '--tri-action-bg': 'rgba(245,158,11,0.15)',
+      '--tri-wait': '#5cc8f5', '--tri-wait-bg': 'rgba(56,189,248,0.14)',
+      '--tri-arch': '#71738a', '--tri-arch-bg': 'rgba(255,255,255,0.05)',
+      '--p-danger': '#fb6b7e', '--p-danger-bg': 'rgba(244,63,94,0.15)', '--p-danger-bd': 'rgba(244,63,94,0.4)',
+      '--p-ok': '#38d9a9', '--p-ok-bg': 'rgba(16,185,129,0.15)',
+      '--p-summary-bg': 'linear-gradient(160deg, rgba(99,102,241,0.10), rgba(99,102,241,0.02) 60%, rgba(255,255,255,0.01))',
+      '--p-code-bg': 'rgba(99,102,241,0.10)',
+      '--sk': 'rgba(255,255,255,0.07)',
+      '--p-shadow': '0 28px 70px rgba(0,0,0,0.66), 0 6px 20px rgba(0,0,0,0.44)'
+    };
+    const LIGHT = {
+      '--p-app': '#e7e9ef', '--p-rail': '#1b1d28', '--p-bg': '#ffffff',
+      '--p-surface': '#f7f8fa', '--p-raised': '#eef0f5', '--p-hover': 'rgba(17,20,44,0.045)',
+      '--p-sel': 'rgba(99,102,241,0.10)', '--p-border': 'rgba(17,20,44,0.10)', '--p-border2': 'rgba(17,20,44,0.16)',
+      '--p-text': '#171923', '--p-text2': '#565a6c', '--p-text3': '#898da0',
+      '--p-accent': '#6366f1', '--p-accent2': '#4f46e5', '--p-accent-fg': '#ffffff',
+      '--p-accent-bg': 'rgba(99,102,241,0.10)', '--p-accent-bd': 'rgba(99,102,241,0.32)',
+      '--tri-action': '#b4610a', '--tri-action-bg': 'rgba(245,158,11,0.15)',
+      '--tri-wait': '#0e7fbf', '--tri-wait-bg': 'rgba(56,189,248,0.16)',
+      '--tri-arch': '#8a8da0', '--tri-arch-bg': 'rgba(17,20,44,0.05)',
+      '--p-danger': '#e11d48', '--p-danger-bg': 'rgba(225,29,72,0.09)', '--p-danger-bd': 'rgba(225,29,72,0.28)',
+      '--p-ok': '#059669', '--p-ok-bg': 'rgba(16,185,129,0.12)',
+      '--p-summary-bg': 'linear-gradient(160deg, rgba(99,102,241,0.07), rgba(99,102,241,0.015) 60%, #ffffff)',
+      '--p-code-bg': 'rgba(99,102,241,0.09)',
+      '--sk': 'rgba(17,20,44,0.06)',
+      '--p-shadow': '0 28px 70px rgba(20,22,44,0.20), 0 6px 20px rgba(20,22,44,0.12)'
+    };
+    const V = light ? LIGHT : DARK;
+    const themeVars = Object.keys(V).map(k => k + ':' + V[k]).join(';');
+
+    const isNC = view === 'notconnected';
+    const isError = view === 'error';
+    const isSyncing = view === 'syncing';
+    const isCompose = view === 'compose';
+    const isFilled = view === 'filled' || view === 'compose';
+    const splitView = isSyncing || isFilled;
+    const showModel = isFilled || isSyncing;
+
+    const ACCT = {
+      filled: { line: 'mail.ollamas.dev · IDLE', dot: 'var(--p-ok)', glow: true },
+      compose: { line: 'mail.ollamas.dev · IDLE', dot: 'var(--p-ok)', glow: true },
+      syncing: { line: 'Syncing INBOX…', dot: 'var(--tri-wait)' },
+      error: { line: 'Authentication rejected', dot: 'var(--p-danger)' },
+      notconnected: { line: 'Not connected', dot: 'var(--p-text3)' }
+    }[view] || { line: '', dot: 'var(--p-text3)' };
+
+    const acctDotStyle = {
+      width: '7px', height: '7px', borderRadius: '50%', background: ACCT.dot, flex: '0 0 auto',
+      boxShadow: ACCT.glow ? '0 0 7px ' + ACCT.dot : 'none'
+    };
+
+    const dim = isNC || isError;
+    const sideStyle = { display: 'flex', flexDirection: 'column', opacity: dim ? 0.4 : 1, pointerEvents: dim ? 'none' : 'auto' };
+
+    // ── smart views ──
+    const SV = [
+      { label: 'Action needed', ic: 'flag', count: '2', cv: '--tri-action' },
+      { label: 'Waiting', ic: 'clock', count: '2', cv: '--tri-wait' },
+      { label: 'Snoozed', ic: 'moon', count: '1', cv: '--tri-arch' }
+    ];
+    const smartViews = SV.map(s => ({
+      label: s.label,
+      count: isFilled ? s.count : '',
+      icon: this.icon(s.ic, 14, 1.8),
+      iconStyle: { color: 'var(' + s.cv + ')', display: 'flex', flex: '0 0 auto' },
+      countStyle: { fontSize: '11px', color: 'var(--p-text3)', fontFamily: "'JetBrains Mono',monospace" }
+    }));
+
+    // ── folders ──
+    const FLD = [
+      { label: 'Inbox', ic: 'inbox', count: '5', active: true },
+      { label: 'Sent', ic: 'send', count: '' },
+      { label: 'Drafts', ic: 'fileText', count: '3' },
+      { label: 'Archive', ic: 'archive', count: '' },
+      { label: 'Spam', ic: 'shieldAlert', count: '1' },
+      { label: 'Trash', ic: 'trash', count: '' }
+    ];
+    const folders = FLD.map(f => ({
+      label: f.label,
+      count: (isFilled && f.count) ? f.count : '',
+      icon: this.icon(f.ic, 16, 1.6),
+      rowStyle: {
+        display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 9px', borderRadius: '8px',
+        cursor: 'pointer', position: 'relative',
+        background: f.active ? 'var(--p-sel)' : 'transparent',
+        boxShadow: f.active ? 'inset 2px 0 0 var(--p-accent)' : 'none'
+      },
+      hoverStyle: { background: f.active ? 'var(--p-sel)' : 'var(--p-hover)' },
+      iconStyle: { color: f.active ? 'var(--p-accent2)' : 'var(--p-text3)', display: 'flex', flex: '0 0 auto' },
+      labelStyle: { flex: 1, fontSize: '13px', fontWeight: f.active ? 600 : 500, color: f.active ? 'var(--p-text)' : 'var(--p-text2)' },
+      countStyle: { fontSize: '11px', fontFamily: "'JetBrains Mono',monospace", color: f.active ? 'var(--p-accent2)' : 'var(--p-text3)', fontWeight: f.active ? 600 : 400 }
+    }));
+
+    // ── message rows ──
+    const AV = {
+      accent: { background: 'var(--p-accent-bg)', color: 'var(--p-accent2)' },
+      action: { background: 'var(--tri-action-bg)', color: 'var(--tri-action)' },
+      wait: { background: 'var(--tri-wait-bg)', color: 'var(--tri-wait)' },
+      ok: { background: 'var(--p-ok-bg)', color: 'var(--p-ok)' },
+      muted: { background: 'var(--p-hover)', color: 'var(--p-text2)' }
+    };
+    const TRI = {
+      action: { label: 'Action', v: '--tri-action', bgv: '--tri-action-bg', ic: 'flag' },
+      waiting: { label: 'Waiting', v: '--tri-wait', bgv: '--tri-wait-bg', ic: 'clock' },
+      archive: { label: 'Archive', v: '--tri-arch', bgv: '--tri-arch-bg', ic: 'archive' }
+    };
+    const MSG = [
+      { initials: 'PN', from: 'Priya Nair', avatar: 'accent', time: '9:24', subject: 'Re: PR #412 — streaming parser drops frames at EOF', blurb: "Blocked on your review before Friday's cut — wants 15 min Thu 3pm.", tri: 'action', unread: true, attach: 2, selected: true },
+      { initials: 'ML', from: 'Marcus Lee', avatar: 'action', time: '8:51', subject: 'Contract redline — local-first data clause (§4.2)', blurb: 'Needs sign-off on the data-residency clause by end of week.', tri: 'action', unread: true, attach: 1, selected: false },
+      { initials: 'DW', from: 'Dana Whitfield', avatar: 'ok', time: '8:12', subject: 'Re: Roadmap sync — moved to Thu 15:30', blurb: 'Awaiting your confirmation; the new slot clears your focus block.', tri: 'waiting', unread: false, attach: 0, selected: false },
+      { initials: 'WC', from: 'Woodpecker CI', avatar: 'muted', time: '7:47', subject: 'Pipeline #2214 failed on the arm64 runner', blurb: 'Flaky arm64 job — 2 reruns queued, no action needed yet.', tri: 'waiting', unread: false, attach: 0, selected: false },
+      { initials: 'TB', from: 'The Batch', avatar: 'muted', time: 'Mon', subject: 'Weekly digest #312 — local inference tricks', blurb: 'Auto-filed newsletter; lead story on 4-bit KV cache.', tri: 'archive', unread: false, attach: 0, selected: false }
+    ];
+    const rows = MSG.map(m => {
+      const tri = TRI[m.tri];
+      return {
+        initials: m.initials, from: m.from, time: m.time, subject: m.subject, blurb: m.blurb,
+        triLabel: tri.label, triIcon: this.icon(tri.ic, 11, 2),
+        rowStyle: {
+          display: 'flex', gap: '11px', padding: '11px 14px', cursor: 'pointer', position: 'relative',
+          borderBottom: '1px solid var(--p-border)',
+          background: m.selected ? 'var(--p-sel)' : 'transparent',
+          boxShadow: m.selected ? 'inset 2px 0 0 var(--p-accent)' : 'none'
+        },
+        hoverStyle: { background: m.selected ? 'var(--p-sel)' : 'var(--p-hover)' },
+        avStyle: Object.assign({}, AV[m.avatar], { width: '30px', height: '30px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 600, flex: '0 0 auto', letterSpacing: '0.02em' }),
+        dotStyle: { width: '6px', height: '6px', borderRadius: '50%', background: m.unread ? 'var(--p-accent)' : 'transparent', flex: '0 0 auto' },
+        senderStyle: { fontSize: '13px', fontWeight: m.unread ? 600 : 500, color: m.unread ? 'var(--p-text)' : 'var(--p-text2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+        subjStyle: { fontSize: '12.5px', fontWeight: m.unread ? 500 : 400, color: m.unread ? 'var(--p-text)' : 'var(--p-text2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+        triStyle: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 7px', borderRadius: '5px', fontSize: '10.5px', fontWeight: 600, color: 'var(' + tri.v + ')', background: 'var(' + tri.bgv + ')' },
+        attachStyle: { display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10.5px', color: 'var(--p-text3)', fontFamily: "'JetBrains Mono',monospace" },
+        attachMeta: m.attach ? React.createElement(React.Fragment, null, this.icon('paperclip', 11, 1.6), String(m.attach)) : null
+      };
+    });
+
+    // ── icon library ──
+    const I = {
+      spark: this.icon('sparkles', 16), rMsg: this.icon('messageSquare', 19), rCode: this.icon('code', 19),
+      rTerm: this.icon('terminal', 19), rMail: this.icon('mail', 19), rFiles: this.icon('folder', 19), rGear: this.icon('gear', 19),
+      chev2: this.icon('chevronsUpDown', 14), cpu13: this.icon('cpu', 13), gear16: this.icon('gear', 16),
+      compose: this.icon('penLine', 15), search15: this.icon('search', 15), sliders14: this.icon('slidersH', 14),
+      cpu12: this.icon('cpu', 12), sparkSm: this.icon('sparkles', 12),
+      reply17: this.icon('reply', 17), replyAll17: this.icon('replyAll', 17), fwd17: this.icon('forward', 17),
+      arch17: this.icon('archive', 17), clock17: this.icon('clock', 17), more17: this.icon('moreH', 17),
+      flag12: this.icon('flag', 12, 2), sSpark: this.icon('sparkles', 15), sCheck: this.icon('circleCheck', 15),
+      clock12: this.icon('clock', 12, 1.8), cal12: this.icon('calendar', 12, 1.8), check12: this.icon('check', 13, 2), chevD: this.icon('chevronDown', 14),
+      attDiff: this.icon('fileDiff', 17), attTxt: this.icon('fileText', 17), dl14: this.icon('download', 14),
+      cReply: this.icon('cornerUpLeft', 14), cSpark: this.icon('sparkles', 12), cRegen: this.icon('refreshCw', 13),
+      clip15: this.icon('paperclip', 15), lock14: this.icon('lock', 14), lock13: this.icon('lock', 13),
+      plug: this.icon('plug', 24), info15: this.icon('info', 15), alert20: this.icon('triangleAlert', 20), lock24: this.icon('lock', 22),
+      x16: this.icon('x', 16), link15: this.icon('link', 15), img15: this.icon('image', 15)
+    };
+
+    return {
+      themeVars, isNC, isError, isSyncing, isCompose, isFilled, splitView, showModel,
+      acctLine: ACCT.line, acctDotStyle, sideStyle, smartViews, folders, rows, I,
+      inboxCount: '5', skeleton: [0, 1, 2, 3, 4, 5]
+    };
+  }
+}
+
+Component.PATHS = {
+  mail: [['rect', { width: 20, height: 16, x: 2, y: 4, rx: 2 }], ['path', { d: 'm22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7' }]],
+  inbox: [['path', { d: 'M22 12h-6l-2 3h-4l-2-3H2' }], ['path', { d: 'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z' }]],
+  send: [['path', { d: 'M14.54 21.5a.5.5 0 0 0 .94-.02l6.5-19a.5.5 0 0 0-.64-.64l-19 6.5a.5.5 0 0 0-.02.94l7.9 3.18a2 2 0 0 1 1.11 1.1z' }], ['path', { d: 'm21.85 2.15-11 11' }]],
+  fileText: [['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }], ['path', { d: 'M14 2v6h6' }], ['path', { d: 'M16 13H8' }], ['path', { d: 'M16 17H8' }], ['path', { d: 'M10 9H8' }]],
+  fileDiff: [['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }], ['path', { d: 'M14 2v6h6' }], ['path', { d: 'M12 12v6' }], ['path', { d: 'M9 15h6' }]],
+  archive: [['rect', { width: 20, height: 5, x: 2, y: 3, rx: 1 }], ['path', { d: 'M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8' }], ['path', { d: 'M10 12h4' }]],
+  trash: [['path', { d: 'M3 6h18' }], ['path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6' }], ['path', { d: 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }], ['path', { d: 'M10 11v6' }], ['path', { d: 'M14 11v6' }]],
+  shieldAlert: [['path', { d: 'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z' }], ['path', { d: 'M12 8v4' }], ['path', { d: 'M12 16h.01' }]],
+  folder: [['path', { d: 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z' }]],
+  code: [['path', { d: 'm16 18 6-6-6-6' }], ['path', { d: 'm8 6-6 6 6 6' }]],
+  terminal: [['path', { d: 'm4 17 6-6-6-6' }], ['path', { d: 'M12 19h8' }]],
+  messageSquare: [['path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }]],
+  gear: [['path', { d: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' }], ['circle', { cx: 12, cy: 12, r: 3 }]],
+  search: [['circle', { cx: 11, cy: 11, r: 8 }], ['path', { d: 'm21 21-4.3-4.3' }]],
+  slidersH: [['line', { x1: 21, x2: 14, y1: 4, y2: 4 }], ['line', { x1: 10, x2: 3, y1: 4, y2: 4 }], ['line', { x1: 21, x2: 12, y1: 12, y2: 12 }], ['line', { x1: 8, x2: 3, y1: 12, y2: 12 }], ['line', { x1: 21, x2: 16, y1: 20, y2: 20 }], ['line', { x1: 12, x2: 3, y1: 20, y2: 20 }], ['line', { x1: 14, x2: 14, y1: 2, y2: 6 }], ['line', { x1: 8, x2: 8, y1: 10, y2: 14 }], ['line', { x1: 16, x2: 16, y1: 18, y2: 22 }]],
+  chevronsUpDown: [['path', { d: 'm7 15 5 5 5-5' }], ['path', { d: 'm7 9 5-5 5 5' }]],
+  chevronDown: [['path', { d: 'm6 9 6 6 6-6' }]],
+  cpu: [['rect', { width: 16, height: 16, x: 4, y: 4, rx: 2 }], ['rect', { width: 6, height: 6, x: 9, y: 9, rx: 1 }], ['path', { d: 'M15 2v2' }], ['path', { d: 'M15 20v2' }], ['path', { d: 'M2 15h2' }], ['path', { d: 'M2 9h2' }], ['path', { d: 'M20 15h2' }], ['path', { d: 'M20 9h2' }], ['path', { d: 'M9 2v2' }], ['path', { d: 'M9 20v2' }]],
+  sparkles: [['path', { d: 'M9.94 14.06A2 2 0 0 0 8.5 12.6l-5.9-1.52a.5.5 0 0 1 0-.96L8.5 8.6A2 2 0 0 0 9.94 7.16l1.52-5.9a.5.5 0 0 1 .96 0l1.52 5.9A2 2 0 0 0 15.4 8.6l5.9 1.52a.5.5 0 0 1 0 .96l-5.9 1.52a2 2 0 0 0-1.44 1.46l-1.52 5.9a.5.5 0 0 1-.96 0z' }], ['path', { d: 'M20 3v4' }], ['path', { d: 'M22 5h-4' }], ['path', { d: 'M4 17v2' }], ['path', { d: 'M5 18H3' }]],
+  refreshCw: [['path', { d: 'M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8' }], ['path', { d: 'M21 3v5h-5' }], ['path', { d: 'M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16' }], ['path', { d: 'M8 16H3v5' }]],
+  reply: [['path', { d: 'M9 17 4 12l5-5' }], ['path', { d: 'M20 18v-2a4 4 0 0 0-4-4H4' }]],
+  replyAll: [['path', { d: 'm7 17-5-5 5-5' }], ['path', { d: 'm12 17-5-5 5-5' }], ['path', { d: 'M22 18v-2a4 4 0 0 0-4-4H8' }]],
+  forward: [['path', { d: 'm15 17 5-5-5-5' }], ['path', { d: 'M4 18v-2a4 4 0 0 1 4-4h12' }]],
+  cornerUpLeft: [['path', { d: 'M9 14 4 9l5-5' }], ['path', { d: 'M20 20v-7a4 4 0 0 0-4-4H4' }]],
+  clock: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M12 6v6l4 2' }]],
+  moreH: [['circle', { cx: 12, cy: 12, r: 1 }], ['circle', { cx: 19, cy: 12, r: 1 }], ['circle', { cx: 5, cy: 12, r: 1 }]],
+  lock: [['rect', { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ['path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' }]],
+  paperclip: [['path', { d: 'm21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48' }]],
+  x: [['path', { d: 'M18 6 6 18' }], ['path', { d: 'm6 6 12 12' }]],
+  check: [['path', { d: 'M20 6 9 17l-5-5' }]],
+  circleCheck: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'm9 12 2 2 4-4' }]],
+  flag: [['path', { d: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z' }], ['path', { d: 'M4 22v-7' }]],
+  moon: [['path', { d: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z' }]],
+  calendar: [['path', { d: 'M8 2v4' }], ['path', { d: 'M16 2v4' }], ['rect', { width: 18, height: 18, x: 3, y: 4, rx: 2 }], ['path', { d: 'M3 10h18' }]],
+  triangleAlert: [['path', { d: 'm21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z' }], ['path', { d: 'M12 9v4' }], ['path', { d: 'M12 17h.01' }]],
+  plug: [['path', { d: 'M12 22v-5' }], ['path', { d: 'M9 8V2' }], ['path', { d: 'M15 8V2' }], ['path', { d: 'M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z' }]],
+  penLine: [['path', { d: 'M12 20h9' }], ['path', { d: 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z' }]],
+  download: [['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }], ['path', { d: 'm7 10 5 5 5-5' }], ['path', { d: 'M12 15V3' }]],
+  info: [['circle', { cx: 12, cy: 12, r: 10 }], ['path', { d: 'M12 16v-4' }], ['path', { d: 'M12 8h.01' }]],
+  link: [['path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }], ['path', { d: 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' }]],
+  image: [['rect', { width: 18, height: 18, x: 3, y: 3, rx: 2 }], ['circle', { cx: 9, cy: 9, r: 2 }], ['path', { d: 'm21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21' }]]
+};
+</script>
+</body>
+</html>
