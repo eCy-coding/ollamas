@@ -132,13 +132,16 @@ describe("runtime — memoizasyon + paralel batch (deterministik parite)", () =>
     expect(memoSize()).toBeGreaterThan(0);
   });
 
+  // Parallel batch verify over all CASES; under full-suite CPU contention the
+  // default 5s can be overrun (load-dependent flake). Headroom only — the parity
+  // assertions (batch == sequential, verdicts match) are unchanged.
   test("verifyMany paritesi: batch (paralel) == sıralı verify", async () => {
     const inputs = CASES.map((c) => c.input);
     clearMemo(); const batch = await verifyMany(inputs);
     clearMemo(); const seq = inputs.map((i) => verify(i));
     expect(batch).toEqual(seq);
     expect(batch.map((r) => r.verdict)).toEqual(CASES.map((c) => c.expect));
-  });
+  }, 30_000);
 
   test("dosya-hash cache geçersizleme: dosya değişince yeni verdict (bayat cache YOK)", () => {
     clearMemo();
