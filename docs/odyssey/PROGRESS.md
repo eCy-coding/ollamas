@@ -195,3 +195,16 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T05:00Z chat.visual DONE ReactAgentTab.tsx skin-only (message-bubbles/gradient-avatars/reasoning-trace/composer/diff-colorize + focus-rings a11y); state/contract/prop DOKUNULMADI; ReactAgentTab.test 21/21 + e2e agent-chat 6/6; tsc-0 FRESH 2537/0
 2026-07-11T05:20Z shell.visual DONE App.tsx nav-skin (grouped sections Workspace/Data/Ops/Modules + cyan-accent active-tab + focus-rings a11y + sticky-blur header); tab-state/module-seam/provider KORUNDU; TDD App.test + panels/keyboard/a11y e2e green; tsc-0 FRESH 2538/0
 2026-07-11T05:20Z ODYSSEY 9/9 PARÇA TAMAM — O0 + 7 modül + chat + shell
+
+## ODYSSEY KAPANIŞ (2026-07-11T05:30Z) — convergence_score → 1.0
+Full-E2E acceptance (conductor, tek-oturum):
+```
+vitest run          → 2538 passed / 22 skip / 0 fail
+PERF=1 conformance  → exit 0
+playwright a11y      → 8/8 (--workers=1; default-parallel 4-flake = FE-019/021 dokümante + ollama-503-busy paralel-yük, shell-dışı)
+playwright panels/keyboard/smoke → green (--workers=1)
+```
+**9/9 ODYSSEY parça DONE:** O0 foundation (module registry + /api/modules guard INV-O0-1 + per-collection vector + migration ledger) · 7 modül (cookbook O7, research O2+MCP, notes-tasks O5, documents O3, calendar O6, email O4, settings O8) — hepsi TDD + guard-inherit + env-toggle + i18n-parity + design.html-port · chat+shell görsel-yükseltme (skin-only, mevcut kontrat korundu).
+**Convergence:** her modül route+servis+UI+persistence + .env toggle + guard + kalite-kapısı GREEN → convergence_score = 1.0.
+**Commit zinciri (9):** 98e0049 O0 · 861b931 docs/design · d340223 O0-test · [cookbook] · 71e4b03 research+notes · 215e624 documents+calendar · 88903d3 email+settings · 6ba779c chat · b9e7d5a shell.
+**Deploy:** MODULE_* env-toggle (default OFF) → opt-in; mevcut 21 tab + kokpit bozulmadı. Push/tag YOK (lokal; outward Emre kararı).
