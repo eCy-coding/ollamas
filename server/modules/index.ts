@@ -6,6 +6,7 @@ import "./demo"; // side-effect: defineModule({ id: "demo", ... })
 import "./cookbook"; // side-effect: defineModule({ id: "cookbook", ... }) — O7 pilot
 import "./notes-tasks"; // side-effect: defineModule({ id: "notes-tasks", ... }) — O5
 import "./research"; // side-effect: defineModule({ id: "research", ... }) — O2 deep_research
+import "./calendar"; // side-effect: defineModule({ id: "calendar", ... }) — O6 CalDAV/ICS
 
 export {
   defineModule,

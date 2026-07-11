@@ -182,3 +182,7 @@ Bir modül **"parity"** ⇔ **6 kriterin tümü** GREEN:
 2026-07-11T03:30Z O2.research DONE server/research/{searxng,summarize,planner,engine,report,pipeline}.ts + server/modules/research/ + ResearchPanel.tsx + deep_research MCP tool; SearXNG-opt + tavily-wire + rag-ingest + cited-synthesize; 44 test; guard-inherit+toggle; migration v12 via module (NOT core ledger)
 2026-07-11T03:30Z O5.notes-tasks DONE server/modules/notes-tasks/ (v8 notes+tasks, v9 reminders migrations) + NotesTasksPanel.tsx; CRUD+persist+reminders; 27 test; guard-inherit+toggle
 2026-07-11T03:30Z DALGA2.reconcile DONE conductor: research index migration-wire + ModulePanel notes eşleme + notes-panel mock undefined-safe (provider mount-get toleransı); tsc-0 FRESH 2368/0
+
+2026-07-11T04:00Z O3.documents DONE server/modules/documents/ (v13) + DocumentsPanel; PDF(unpdf)/DOCX(mammoth)/XLSX(xlsx)/MD(marked) parse + viewer + sanitizeHtml(dompurify-siz) + rag-ingest(DOCUMENTS_RAG-gated); 44 test; guard+toggle; pure-JS deps
+2026-07-11T04:00Z O6.calendar DONE server/modules/calendar/ (v10, recurrence.ts RRULE D/W/M/Y) + CalendarPanel (week/month/day + drawer + 4-state, CalDAV-writable/google-ics-readonly, eCy-cyan spec-driven) + tests; guard+toggle
+2026-07-11T04:00Z DALGA3 DONE tsc-0 FRESH 2446/0; ModulePanel 5-modül reconcile temiz; migration v8/9/10/12/13 benzersiz

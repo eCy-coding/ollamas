@@ -7,6 +7,8 @@
 import CookbookPanel from "./CookbookPanel";
 import ResearchPanel from "./ResearchPanel";
 import NotesTasksPanel from "./NotesTasksPanel";
+import DocumentsPanel from "./DocumentsPanel";
+import CalendarPanel from "./CalendarPanel";
 
 interface ModulePanelProps {
   id: string;
@@ -20,6 +22,8 @@ export default function ModulePanel({ id, labelKey }: ModulePanelProps) {
   if (id === "cookbook") return <CookbookPanel />;
   if (id === "research") return <ResearchPanel />;
   if (id === "notes-tasks") return <NotesTasksPanel />;
+  if (id === "documents") return <DocumentsPanel />;
+  if (id === "calendar") return <CalendarPanel />;
 
   return (
     <section
