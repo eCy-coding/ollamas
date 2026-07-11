@@ -20,3 +20,8 @@
 
 ## i18n
 13. `src/locales/{en,tr}.ts` EŞİT anahtar sayısı (parity testi var); `<panel>.*` + `app.tab.<id>`.
+
+## Ek dersler (Dalga 2-4)
+14. **`useLingui()._` render'lar arası KARARSIZ ref** → useCallback/useEffect dep-array'e KOYMA (sonsuz-reload bug'ı, email panelinde yakalandı). Fallback string'i render katmanı versin.
+15. **Shared ledger/locales/ModulePanel additive + re-read-önce**: eşzamanlı ajanlar satır/anahtar/import interleave eder; migration versiyonu ön-atanmalı (v11↔v14 çakışma böyle önlendi).
+16. **Test zaman-bağımlılığı:** TOTP/replay-guard testleri gerçek Date.now'a karşı flake → `{now}` time-injection DI (production default Date.now), sabit-base ±adım (settings 2FA'da uygulandı; assertion zayıflatma DEĞİL).

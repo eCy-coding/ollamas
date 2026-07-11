@@ -9,6 +9,8 @@ import ResearchPanel from "./ResearchPanel";
 import NotesTasksPanel from "./NotesTasksPanel";
 import DocumentsPanel from "./DocumentsPanel";
 import CalendarPanel from "./CalendarPanel";
+import EmailPanel from "./EmailPanel";
+import SettingsPanel from "./SettingsPanel";
 
 interface ModulePanelProps {
   id: string;
@@ -24,6 +26,8 @@ export default function ModulePanel({ id, labelKey }: ModulePanelProps) {
   if (id === "notes-tasks") return <NotesTasksPanel />;
   if (id === "documents") return <DocumentsPanel />;
   if (id === "calendar") return <CalendarPanel />;
+  if (id === "email") return <EmailPanel />;
+  if (id === "settings") return <SettingsPanel />;
 
   return (
     <section

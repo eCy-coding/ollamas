@@ -15,10 +15,11 @@
 //   v7     O0 (this plan): modules_registry + module_demo_items
 //   v8–v9  O5 notes/tasks: notes, tasks, cron tables
 //   v10    O6 calendar: events/reminders
-//   v11    O8 security: tenants.role + totp_secrets
+//   v11    O4 email: module_email_messages (IMAP/SMTP triage cache)
 //   v12    O2 research: research_runs
 //   v13    O3 documents: module_documents
-//   v14+   free pool — claim sequentially from this ledger
+//   v14    O8 settings: totp/backup-codes/roles/tool-policy/prefs/sessions (module_settings_*)
+//   v15+   free pool — claim sequentially from this ledger
 // Module migrations are appended to the CORE ledger via allModuleMigrations();
 // assertUniqueVersions runs on the COMBINED list (KN-A7 mitigation).
 import express from "express";
