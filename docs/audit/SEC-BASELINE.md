@@ -35,3 +35,9 @@ Full-repo `semgrep --config .semgrep/` başta **9 hit** verdi → hepsi FP/scope
 | `bin/host-bridge/gate.mjs:36` `exec(s)` | DI step-runner (`opts.exec`, step-object alır), child_process değil | inline `nosemgrep: no-shell-exec` |
 
 **Sonuç:** rule shipped-surface'e (server/cli/orchestration/contract/bin) scope'landı → repo-wide **0 FP**, scratch-vuln hâlâ **1** (8e60fe2). Gate-flip (1.24.3) artık CI'yı FP ile kırmaz.
+
+## GATE-PROOF (1.24.3 µ2 — canlı CI iki-yön kanıt, eCy-coding/ollamas)
+CI `security / security-gate` job blocking doğrulandı (gitleaks + trivy@v0.36.0 + semgrep-CLI @1.157.0 `--config .semgrep/ --error`):
+- 🟢 **GREEN** (temiz feat/key-autonomy): https://github.com/eCy-coding/ollamas/actions/runs/28980567897 — 3 step geçti.
+- 🔴 **RED** (planted shell-exec `server/__sec_proof.ts`): https://github.com/eCy-coding/ollamas/actions/runs/28980848065 — Semgrep step X (`semgrep.no-shell-exec` planted-vuln'ü blocking yakaladı), gitleaks+trivy geçti; proof-branch sonrasında silindi.
+- Gate-yapı düzeltmesi: deprecated `semgrep-action@v1` (sadece 1-config koşup nosemgrep-line-above yoksayıyordu) → pinned CLI; kırık `trivy-action@0.28.0`→`@v0.36.0` (v-prefix tag).

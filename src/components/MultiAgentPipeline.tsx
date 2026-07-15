@@ -23,13 +23,16 @@ export const MultiAgentPipeline: React.FC<PipelineProps> = ({ onNotify, workspac
   const [maxIterations, setMaxIterations] = useState(2);
   const [writeFiles, setWriteFiles] = useState(true);
 
-  // Agent Role Configurations
-  const [architectProv, setArchitectProv] = useState("ollama-local");
-  const [architectModel, setArchitectModel] = useState("qwen3:8b");
-  const [coderProv, setCoderProv] = useState("ollama-local");
-  const [coderModel, setCoderModel] = useState("qwen3:8b");
-  const [reviewerProv, setReviewerProv] = useState("ollama-local");
-  const [reviewerModel, setReviewerModel] = useState("qwen3:8b");
+  // Agent Role Configurations — benchmark-picked cloud champions ($0, no local ollama).
+  // This session's live coding benchmark: groq 3/3 @293ms (fastest+correct → coder),
+  // cerebras 3/3 @655ms (reasoning/audit → architect+reviewer). Was ollama-local/qwen3:8b
+  // which loaded a 6.6GB local model (breaks $0) and is often offline.
+  const [architectProv, setArchitectProv] = useState("cerebras");
+  const [architectModel, setArchitectModel] = useState("gpt-oss-120b");
+  const [coderProv, setCoderProv] = useState("groq");
+  const [coderModel, setCoderModel] = useState("llama-3.3-70b-versatile");
+  const [reviewerProv, setReviewerProv] = useState("cerebras");
+  const [reviewerModel, setReviewerModel] = useState("gpt-oss-120b");
 
   // Dynamic model dropdown lists
   const [modelsList, setModelsList] = useState<Record<string, string[]>>({});

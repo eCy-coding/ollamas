@@ -1,0 +1,60 @@
+{
+  "_meta": {
+    "purpose": "ollamas self-repair kuyrugu. Claude (kullanici) teshis+prompt yazar; ollamas modelleri (groq/cerebras) kendi kodunu onarir. Claude kaynak-koda dokunmaz.",
+    "driver": "POST http://127.0.0.1:3000/api/agent/chat {provider:'groq', maxSteps:200}",
+    "economy": "list_tree YASAK; grep_search ile anchor bul; komple buyuk-dosya-oku YASAK (context-bloat=429/stall).",
+    "gate": "tsc0 / node -c + verify komutu yesil. sahte-yesil YOK.",
+    "standard_reached_when": "tum maddeler done + tsc0 + vitest yesil + 0 acik-kirmizi"
+  },
+  "queue": [
+    {
+      "id": "Y2c",
+      "severity": "yellow",
+      "file": "server.ts",
+      "apply": "replace-line",
+      "anchor": "ok = !!r.ok && !o?.error && !!text && text !== \"(empty answer)\";",
+      "what_wrong": "/api/odysseus/run consumer'i error-gomulu cevabi ok=true sayar. bridge answer'a '[odysseus error]' gomer ama text bos-degil oldugu icin ok true kalir.",
+      "why": "Y2-bridge errored-field'i MCP tool handler'i (content-only donus) atiyor; consumer'a ulasmiyor. AMA '[odysseus error]' isareti text'e gomulu.",
+      "how_fix": "ok atamasinin satir-sonu ';' oncesine ' && !text.includes(\"[odysseus error]\")' ekle. Boylece error-gomulu cevap ok=false olur (Y2 intent: cagiran taraf error'u gorur).",
+      "verify": "npx tsc --noEmit = 0 hata + grep '[odysseus error]' server.ts consumer'da var.",
+      "status": "done",
+      "qa_note": "LANDED via ecy-repair v2 (replace-line): cloud tek-satir snippet + anchor-replace deterministik (server.ts model'e GITMEDI, 429-yok). server.ts:3221 ok-gate'ine ' && !text.includes(\"[odysseus error]\")' eklendi. tsc0. diff-vs-backup=TEK satir (girinti korundu). Bridge:109 gomdugu marker ile consumer:3221 gate'i tam-eslesme. Vitest 2526 pass; 12 fail (calendar-panel+ReactAgentTab) PRE-EXISTING (backup'ta da fail, server.ts import-etmiyor — non-causation kanitli). eCy-harness ollamas-agent'in yapamadigi buyuk-dosya replace'i yapti."
+    },
+    {
+      "id": "Y2",
+      "severity": "yellow",
+      "file": "scripts/odysseus-bridge-mcp.mjs",
+      "anchor": "chunk.type === \"error\"",
+      "what_wrong": "stream 'error' chunk answer metnine gomuluyor (answer += '[odysseus error]...'), ust katman ok=true sanmaya devam ediyor.",
+      "why": "hata ayri bir alan yerine metne ekleniyor; /api/odysseus/run o.error kontrolu bunu yakalamaz.",
+      "how_fix": "chatStream donusune bir 'errored' boolean ekle (error chunk gelince true). answer'a gomme opsiyonel kalabilir ama return { ...errored } olsun. Boylece cagiran taraf error'u ayri gorur.",
+      "verify": "node -c scripts/odysseus-bridge-mcp.mjs (syntax) + grep 'errored' dosyada var.",
+      "status": "done",
+      "qa_note": "CYCLE-1 (mistral): ollamas errored-field ekledi (satir 70/89/103), node -c OK, bridge regresyon yok. Consumer-wiring follow-up = Y2c (ok-gate marker) ecy-repair v2 ile LANDED → Y2 tam kapandi (bridge errored + consumer ok=false gate)."
+    },
+    {
+      "id": "Y1",
+      "severity": "yellow",
+      "file": "scripts/odysseus-bridge-mcp.mjs",
+      "anchor": "const sessionCache = new Map()",
+      "what_wrong": "sessionCache omur-boyu, invalidation yok. odysseus restart olunca stale session-id sonsuza kullanilir -> hard error.",
+      "why": "createSession bir kez cache'lenir, hicbir kosulda temizlenmez.",
+      "how_fix": "chatStream icinde /api/chat_stream cagrisi 404/SESSION_NOT_FOUND donerse sessionCache.delete(key) + bir kez yeniden createSession ile retry. Basit tek-retry yeter.",
+      "verify": "node -c ok + grep 'sessionCache.delete' dosyada var.",
+      "status": "done",
+      "qa_note": "CYCLE-2: zai ollamas 404/SESSION_NOT_FOUND tek-retry ekledi AMA 'const r' yeniden-atadi (runtime TypeError). QA yakaladi -> re-prompt (groq) -> ollamas 'let r' yapti. node -c OK, bridge regresyon yok, Y2-errored korundu. QA-iterasyon calisti."
+    },
+    {
+      "id": "Y7",
+      "severity": "yellow",
+      "file": "server/providers.ts",
+      "anchor": "\"fleet\", \"ollama-local\", \"openrouter\"",
+      "what_wrong": "default provider zinciri local-first (fleet, ollama-local) cloud'dan ONCE. Headless/cloud deploy'da her istek localhost:11434 baglanti-hatasi yer (latency+gurultu). $0-Mac icin dogru, cloud icin footgun.",
+      "why": "zincir sabit local-first; headless-algilama yok.",
+      "how_fix": "Eger process.env.OLLAMAS_HEADLESS=='1' VEYA local ollama erisilemezse, cloud provider'lari (openrouter/gemini) basa al. Minimal: env-gated bir reorder. tsc0 koru.",
+      "verify": "npx tsc --noEmit = 0 hata.",
+      "status": "done",
+      "qa_note": "CYCLE-3: cerebras+mistral ikisi de step1 grep'te 429 (bu oturumda tum bucketlar tuketildi). Ayrica providers.ts 1509 satir=BUYUK dosya, write_file-full-replace context-bloat riski (ayri sorun). PACED wake-loop'ta fresh-bucket ile tekrar denenecek; buyuk-dosya icin node-insert/sed stratejisi. | 3.deneme(groq ReAct-tool-loop): agent text-yanit, tool cagirmadi, DEGISMEDI. Buyuk-dosya(1509 satir) free-tier-agent one-shot LANDMIYOR. Y7 dusuk-deger(env-gated) -> DEPRIORITIZE. Buyuk-dosya=paid-tier/reliable-tool-calling veya manual. | ✅ LANDED via ecy-repair: cloud kucuk-snippet + eCy-harness anchor-apply(deterministik,dosya-model-e-gitmedi,rate-limit-yok) + tsc0. ollamas-agent 3x yapamadigini eCy-harness yapti. env-gated=default-noop runtime-safe."
+    }
+  ]
+}

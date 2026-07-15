@@ -1,6 +1,6 @@
 # MASTER_TASKLIST.md — persistent task list (auto-generated, do not hand-edit)
 
-> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-01T22:17:39Z. The operator's recurring master-directive as
+> Auto: `tsx orchestration/bin/tasklist.ts` · 2026-07-12T07:52:39Z. The operator's recurring master-directive as
 > durable acceptance-criteria + live DONE/next. Refreshed by autopilot + `/tasklist`. Map: `.claude/BRAIN.md`.
 
 ## A. Master-directive acceptance (14/14)
@@ -35,7 +35,7 @@
 
 ## B. Current status
 - CODE_PLAN streams: **6/6 DONE** (docs/CODINGS_STATUS.md)
-- THINK: 0 PROVEN · 27 NEEDS_RESEARCH (PROBLEM_REGISTRY.json)
+- THINK: 0 PROVEN · 0 NEEDS_RESEARCH (PROBLEM_REGISTRY.json)
 - Full-repo gate: ✅ green, NO GATE_SKIP
 
 ## C. DONE log (vO history)
@@ -53,12 +53,12 @@
 - vO27 — final 3 streams complete (6/6, single-flight/require-env) (`6ea7926`)
 - vO28 — self-heal flaky root-fix (gate clean, no GATE_SKIP) (`6082ddc`)
 
-## D. Next-task queue (0 P1 safe-additive · 20 total) — see FLEET_NEXT.md
-- recent: 665945c fix(orchestration): e2e loop reaches CONVERGED — reconcile next-queue vs applied-state (vO31)
-- recent: a0c85e2 feat(orchestration): e2e convergence loop (/loop) — runs autopilot until converged, bounded
-- recent: a6f3d54 feat(orchestration): persistent MASTER_TASKLIST.md + auto-refresh generator (/tasklist)
-- recent: 6082ddc fix(host-bridge): self-heal probe fail-fast (5000→1500) — kills the recurring flaky, NO GATE_SKIP
-- recent: 6ea7926 feat: complete final 3 streams — real code + gated tests (6/6 DONE, no QUEUED)
+## D. Next-task queue (0 P1 safe-additive · 0 total) — see FLEET_NEXT.md
+- recent: 655897d fix(odyssey): register documents in module barrel — Dalga3 clobber dropped the import
+- recent: 0b8766b docs(odyssey): handoff bundle completeness — panel support.js + email showcase
+- recent: 89abd2b docs(odyssey): ODYSSEY program complete — 9/9 parts, convergence 1.0, full-E2E acceptance green
+- recent: a0012c3 docs(odyssey): ODYSSEY program complete — 9/9 parts, convergence 1.0, full-E2E acceptance green
+- recent: b9e7d5a feat(odyssey): shell/nav visual upgrade — grouped nav + eCy-cyan accent [shell.visual]
 
 > Convergence = all acceptance ✅ + gate clean + next-queue drained. This file is the durable source of
 > truth across sessions; the plan file is scratch.
