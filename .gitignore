@@ -46,3 +46,9 @@
 .claude/subagent-audit.log
 .lighthouseci/
 .sync/
+audit-out/
+coverage/
+dist-plugin/
+orchestration/.orchestra-*-enabled
+playwright-report/
+scripts-live.err
