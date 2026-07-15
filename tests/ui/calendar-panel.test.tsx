@@ -5,7 +5,7 @@
 // TEST-MOCK note (PIPELINE-LESSONS handoff): `get` must tolerate a non-string
 // endpoint arg — provider mounts (theme/i18n) may call api.get during effects
 // unrelated to this panel.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderUI } from './helpers';
 
@@ -61,6 +61,17 @@ describe('CalendarPanel — 4 states + view switch + source chips + drawer', () 
     post.mockReset();
     put.mockReset();
     del.mockReset();
+    // CalendarPanel defaults its view anchor to `new Date()` (real wall clock).
+    // The fixture events below are pinned to 2026-07-06 — fake only `Date` (not
+    // timers) so the default week/month/day view renders the same range the
+    // fixtures were authored against, independent of the real system date.
+    // `waitFor`/`fireEvent` still use real timers and keep working normally.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-06T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loading/syncing: shows a status indicator before data resolves', async () => {

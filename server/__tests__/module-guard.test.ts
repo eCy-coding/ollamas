@@ -81,8 +81,23 @@ describe("INV-O0-1 behavioral — localOwnerGuard covers the module surface", ()
 });
 
 describe("INV-O0-1 structural — router-stack scan (KN-O3: internal API, secondary defense)", () => {
+  // Express 4.22 defines `app.router` as a getter that unconditionally THROWS
+  // ("'app.router' is deprecated!") — a `??` fallback never gets a chance to
+  // run because merely reading the property already raises. `app._router` is
+  // the live base router in this Express major. Guard the read so this also
+  // keeps working unmodified on an Express 5 install, where `app.router` is a
+  // plain (non-throwing) property and `app._router` is gone.
+  const baseRouter = (a: any): any => {
+    try {
+      if (a.router) return a.router;
+    } catch {
+      // Express 4's deprecated throwing getter — fall through to `_router`.
+    }
+    return a._router;
+  };
+
   const moduleLayers = () =>
-    ((app as any)._router.stack as any[]).filter((l) => l?.handle?.__moduleId);
+    (baseRouter(app).stack as any[]).filter((l) => l?.handle?.__moduleId);
 
   test("no module-stamped layer registers a path outside /api/modules", () => {
     const layers = moduleLayers();
@@ -98,7 +113,7 @@ describe("INV-O0-1 structural — router-stack scan (KN-O3: internal API, second
   });
 
   test("ordering (KN-A9): localOwnerGuard layer sits BEFORE every module layer", () => {
-    const stack = (app as any)._router.stack as any[];
+    const stack = baseRouter(app).stack as any[];
     const guardIdx = stack.findIndex(
       (l) => l?.handle?.name === "localOwnerGuard" && l.regexp?.test("/api/modules/x"),
     );
