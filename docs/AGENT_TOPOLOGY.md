@@ -60,6 +60,22 @@ Concurrency ≠ role count. Most pipelines are **sequential** (coder needs the e
 - **Route by role:** coding→qwen3:8b · planning/analysis→a reasoning tier (cloud) · ops/monitor→deterministic script (no LLM) · never qwen3:4b for graded work.
 - **Default to 1 agent**; escalate to the 3–4 parallel fan-out ONLY for research/audit/wide-independent work — that is the only place the ~15× token cost returns value.
 
+## 6. Measured routing policy (wired into `agent-dispatch.mjs`)
+Two independent measurements agree, so the Tier-3 dispatcher now CONSUMES them instead of hardcoding a model:
+- My `agent-bench.mjs` (coding+monitor) and the conductor's `combo-bench` (4 harder tasks → `orchestration/MODEL_SELECTION.json`) both rank **qwen3:8b = "cheapest 100%"** — the efficient default.
+- combo-bench also found **ensemble = no gain** (best-of-N / majority-vote cost 3× calls for 0 correctness where the single best already scores 100% — reserve only for task classes scoring <100%). Matches the ">45% base-accuracy → more agents hurt" finding.
+
+**Resolution order (`--model` > `OLLAMAS_MODEL` > `--role` > default):**
+
+| selector | model | source |
+|----------|-------|--------|
+| (none) | **qwen3:8b** | combo-bench cheapest-100% default — $0 local |
+| `--role reviewer` | qwen3:8b | `MODEL_SELECTION.json` roles.reviewer |
+| `--role coder` / `architect` | qwen3-coder:480b-cloud **iff `OLLAMAS_ALLOW_CLOUD=1`**, else qwen3:8b | roles, cloud-guarded |
+| ops / monitor | — (no LLM) | deterministic `system-monitor.mjs` |
+
+Graceful: missing `MODEL_SELECTION.json` or unknown role → qwen3:8b. The **$0 local default is preserved**; the cloud 480b model is opt-in via `OLLAMAS_ALLOW_CLOUD`. `agent-fleet.mjs` already runs 1 local + N cloud (gemini) workers (GPU-aware) — left unchanged.
+
 ## Sources
 - [Anthropic — How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)
 - [Cognition — Don't Build Multi-Agents](https://cognition.com/blog/dont-build-multi-agents)

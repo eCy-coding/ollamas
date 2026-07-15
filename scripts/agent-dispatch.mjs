@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-check
 // agent-dispatch — drive the local ollamas ReAct agent as a calibrated sub-agent.
 //
 // Hands a task to /api/agent/chat (real host tools: write_host_file + macos_terminal
@@ -10,28 +9,38 @@
 //
 // Usage:
 //   node scripts/agent-dispatch.mjs "<task>" [--model qwen3:8b] [--provider ollama-local]
-//                                            [--root <abs-write-root>] [--steps 10] [--json]
+//                              [--role coder|reviewer|architect] [--root <abs-write-root>] [--steps 10] [--json]
 //   echo "<task>" | node scripts/agent-dispatch.mjs --model qwen3-coder:30b
-//   node scripts/agent-dispatch.mjs "<task>" --remote desktop-ert7724 [--port 8090]
 //
 // Env: OLLAMAS_URL (default http://127.0.0.1:8090), OLLAMAS_TIMEOUT_MS (default 180000).
 
-const args = process.argv.slice(2);
-const opt = (/** @type {string} */ flag, /** @type {any} */ def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
-const has = (/** @type {string} */ flag) => args.includes(flag);
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-// Target host: --remote <host>[:--port] overrides OLLAMAS_URL (fleet dispatch — drive the ReAct
-// loop ON a remote worker; body/SSE/report/exit semantics stay identical). Default = local.
-const REMOTE = opt("--remote", null);
-const PORT = opt("--port", "8090");
-const URL = REMOTE ? `http://${REMOTE}:${PORT}` : (process.env.OLLAMAS_URL || "http://127.0.0.1:8090");
-// Provider: --provider flag > OLLAMAS_PROVIDER env > ollama-local default. (env knob lets the
-// harness pin a provider, e.g. gemini/ollama-cloud, without editing this script.)
-const PROVIDER = opt("--provider", process.env.OLLAMAS_PROVIDER || "ollama-local");
-// ollama-local → bench-proven qwen3:8b default (docs/AGENT_TOPOLOGY.md: fastest correct on
-// coding; avoid qwen3:4b = demo-suspected). Override with --model or OLLAMAS_MODEL; other
-// providers keep their own default (empty → omitted). ready.mjs guarantees qwen3:8b is pulled.
-const MODEL = opt("--model", PROVIDER === "ollama-local" ? (process.env.OLLAMAS_MODEL || "qwen3:8b") : (process.env.OLLAMAS_MODEL || ""));
+const args = process.argv.slice(2);
+const opt = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
+const has = (flag) => args.includes(flag);
+
+const URL = process.env.OLLAMAS_URL || "http://127.0.0.1:8090";
+const PROVIDER = opt("--provider", "ollama-local");
+const ROLE = opt("--role", "");
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
+// Measured routing: --role maps to the conductor's combo-bench winner per role
+// (orchestration/MODEL_SELECTION.json → champions.combination.roles). Resolution order:
+//   --model > OLLAMAS_MODEL > role-model > qwen3:8b  (combo-bench "cheapest 100%" default;
+//   docs/AGENT_TOPOLOGY.md: avoid qwen3:4b = demo-suspected). Missing file/role → "".
+// …-cloud role models used ONLY when OLLAMAS_ALLOW_CLOUD is set (keep the $0 local default).
+function roleModel(role) {
+  if (!role) return "";
+  try {
+    const j = JSON.parse(readFileSync(join(REPO, "orchestration", "MODEL_SELECTION.json"), "utf8"));
+    const m = j?.champions?.combination?.roles?.[role]?.model || "";
+    return (m.endsWith("-cloud") && !process.env.OLLAMAS_ALLOW_CLOUD) ? "" : m;
+  } catch { return ""; }
+}
+const MODEL = opt("--model", "")
+  || (PROVIDER === "ollama-local" ? (process.env.OLLAMAS_MODEL || roleModel(ROLE) || "qwen3:8b") : "");
 const STEPS = Number(opt("--steps", "10"));
 const TIMEOUT = Number(process.env.OLLAMAS_TIMEOUT_MS || "180000");
 const ROOT = opt("--root", `${process.env.HOME}/.llm-mission-control/agent-work`);
@@ -40,8 +49,8 @@ const JSON_OUT = has("--json");
 // The task is the first non-flag arg, or stdin.
 const positional = args.filter((a, i) => !a.startsWith("--") && (i === 0 || !args[i - 1].startsWith("--")));
 let task = positional[0];
-if (!task && !process.stdin.isTTY) task = (await import("node:fs")).readFileSync(0, "utf8").trim();
-if (!task) { console.error("usage: agent-dispatch \"<task>\" [--model m] [--provider p] [--root dir] [--steps n] [--remote host] [--port p] [--json]"); process.exit(2); }
+if (!task && !process.stdin.isTTY) task = readFileSync(0, "utf8").trim();
+if (!task) { console.error("usage: agent-dispatch \"<task>\" [--model m] [--provider p] [--root dir] [--steps n] [--json]"); process.exit(2); }
 
 // eCyPro calibration: my standards, injected into the task so the sub-agent matches
 // the main-thread quality bar (root-cause, evidence, terse, real output, clear verdict).
@@ -59,13 +68,9 @@ const STANDARDS = [
   task,
 ].join("\n");
 
-// --no-apply: dispatch read-only (autoApply:false → write_file returns a diff, never saves). Used by the
-// fleet so a PROPOSE worker can READ the repo workspace but cannot mutate it. Default stays autoApply:true.
-const NO_APPLY = has("--no-apply");
-const body = JSON.stringify({ provider: PROVIDER, ...(MODEL ? { model: MODEL } : {}), autoApply: !NO_APPLY, maxSteps: STEPS,
+const body = JSON.stringify({ provider: PROVIDER, ...(MODEL ? { model: MODEL } : {}), autoApply: true, maxSteps: STEPS,
   messages: [{ role: "user", content: STANDARDS }] });
 
-/** @type {{url:string,provider:string,model:string,root:string,steps:{n:number,tool:string,ok:boolean,out:string}[],messages:string[],files:string[],errors:string[],demoSuspected:boolean}} */
 const report = { url: URL, provider: PROVIDER, model: MODEL || "(provider default)", root: ROOT, steps: [], messages: [], files: [], errors: [], demoSuspected: false };
 
 const ac = new AbortController();
@@ -75,7 +80,7 @@ try {
   const res = await fetch(`${URL}/api/agent/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body, signal: ac.signal,
   });
-  if (!res.ok || !res.body) { console.error(`dispatch failed: HTTP ${res.status}`); process.exit(1); }
+  if (!res.ok) { console.error(`dispatch failed: HTTP ${res.status}`); process.exit(1); }
 
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -105,7 +110,7 @@ try {
       }
     }
   }
-} catch (/** @type {any} */ e) {
+} catch (e) {
   report.errors.push(ac.signal.aborted ? `timeout after ${TIMEOUT}ms` : (e?.message || String(e)));
 } finally {
   clearTimeout(timer);

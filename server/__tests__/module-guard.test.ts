@@ -7,7 +7,7 @@
 // Runs against the REAL exported app (OLLAMAS_NO_AUTOBOOT=1, M-050 pattern);
 // fake ModuleDefs are mounted onto it in-test — the demo module (Faz 5) is not
 // required for the invariant to hold.
-import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import http from "node:http";
 import type { Server } from "node:http";
 import express from "express";
@@ -21,8 +21,15 @@ let defineModule: typeof import("../modules/registry").defineModule;
 beforeAll(async () => {
   process.env.OLLAMAS_NO_AUTOBOOT = "1";
   delete process.env.SAAS_ENFORCE;
+  // Immune to prior tests that booted the app singleton / left modules in the process-global
+  // registry: reset the module cache so this suite gets a FRESH app + clean registry. Without
+  // this, another test importing server (or mounting modules) before us pollutes the shared
+  // singleton and the guard-layer invariants read a stale app.
+  vi.resetModules();
+  const reg = await import("../modules/registry");
+  reg._resetModulesForTest();
   ({ app } = await import("../../server"));
-  ({ mountEnabledModules, defineModule } = await import("../modules/registry"));
+  ({ mountEnabledModules, defineModule } = reg);
   // Fake modules for the invariant tests (registered AFTER the real server's own
   // mount — the /api/modules listing route is already present, WeakSet-deduped).
   defineModule({

@@ -1,0 +1,39 @@
+# Plain Prometheus scrape config (for installs WITHOUT the Prometheus Operator).
+# Drop these jobs into your prometheus.yml `scrape_configs:`. Two variants:
+#   (1) static  — single host/VM or docker-compose (set the target).
+#   (2) k8s pod — annotation-based discovery (matches the pod annotations added in
+#       deploy/k8s/ollamas.yaml). Use the Operator ServiceMonitor instead where available.
+scrape_configs:
+  # (1) static / docker-compose / VM
+  - job_name: ollamas-static
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["ollamas:3000"]   # <-- set host:port (compose service name or VM IP)
+        labels: { app: ollamas }
+
+  # (2) Kubernetes pods, annotation-based (prometheus.io/scrape on the pod/Service)
+  - job_name: ollamas-k8s
+    scrape_interval: 30s
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: ollamas
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod

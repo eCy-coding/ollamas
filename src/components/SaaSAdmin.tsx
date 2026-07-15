@@ -41,6 +41,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   const hdr = () => ({ "Content-Type": "application/json", "x-admin-token": adminToken });
   const thdr = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${tenantKey}` });
   const tapi = async (p: string, init?: RequestInit) => {
+    // eslint-disable-next-line no-restricted-globals -- intentional tenant-token wrapper (consolidation into apiClient tracked for a later vF)
     const r = await fetch(p, { ...init, headers: { ...thdr(), ...(init?.headers || {}) } });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `${r.status}`);
     return r.json();
@@ -87,6 +88,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
   };
 
   const api = async (path: string, init?: RequestInit) => {
+    // eslint-disable-next-line no-restricted-globals -- intentional admin-token wrapper (consolidation into apiClient tracked for a later vF)
     const res = await fetch(path, { ...init, headers: { ...hdr(), ...(init?.headers || {}) } });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
@@ -99,7 +101,7 @@ export const SaaSAdmin: React.FC<Props> = ({ onNotify }) => {
     try {
       setPlans(await api("/api/saas/plans"));
       setTenants(await api("/api/saas/tenants"));
-      setGateway(await (await fetch("/api/mcp/upstreams")).json());
+      setGateway(await api("/api/mcp/upstreams"));
       setAudit(await api("/api/saas/audit?limit=10"));
     } catch (e: any) {
       onNotify(`SaaS admin: ${e.message}`, "error");

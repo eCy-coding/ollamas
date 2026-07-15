@@ -6,15 +6,15 @@
  * BENCH/OPTIMAL/depgraph/adopt JSON) → classify → DETERMİNİSTİK öncelik motoru tek-eylem seç →
  * reconcile delta → CONDUCTOR.md (birleşik durum + 🎯 tek-eylem + optimal-prompt). Lane'i act ETMEZ (§3).
  *
- * Çalıştır: tsx orchestration/bin/conduct.ts [--json] [--gate]
- * Exit: RED bulgu → 1 YALNIZ --gate ile (CI/pre-commit). Aksi 0 (RED, CONDUCTOR.md + JSON action.tier ile taşınır).
+ * Çalıştır: tsx orchestration/bin/conduct.ts [--json]
+ * Exit: RED bulgu → 1 (gate); aksi 0.
  */
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collect, type CockpitSnapshot } from "./lib/collect";
 import {
-  classify, prioritize, reconcile, buildConductorReport, TIERS, freshRedLanes,
+  classify, prioritize, reconcile, buildConductorReport, TIERS,
   type Finding, type ClassifyInput,
 } from "./lib/conduct";
 import {
@@ -29,10 +29,6 @@ const ORCH_DIR = join(HERE, "..");
 const MC = join(homedir(), ".llm-mission-control");
 const STATE = join(ORCH_DIR, "conduct-state.jsonl");
 const JSON_OUT = process.argv.includes("--json");
-// --gate: RED-tier action → exit 1 (CI/pre-commit hard gate). Default OFF: a RED finding is a
-// SIGNAL (carried by CONDUCTOR.md + JSON action.tier), NOT a process failure — so the 0-manuel
-// autopilot chain (calls without --gate) doesn't false-fail when a RED action is legitimately found.
-const GATE = process.argv.includes("--gate");
 
 function readJson(p: string): any { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } }
 function readMcJson(name: string): any { const f = join(MC, name); return existsSync(f) ? readJson(f) : null; }
@@ -75,8 +71,7 @@ async function main(): Promise<void> {
     depgraphMissing: depgraphMissing(),
     driftCount: 0, // drift.ts DEPGRAPH'a yazıyor; MISSING-only şimdilik (drift soft-warn RISK-ORCH-011)
     benchRegressions: (bench?.regressions ?? []).map((r: any) => ({ model: r.model, dropPct: r.dropPct })),
-    // vO9 roll-up + vO41 tazelik-gate: bayat QUALITY.json (ör. silinmiş worktree) phantom-RED üretmesin.
-    redLanes: freshRedLanes(quality, Number(process.env.FUSE_STALE_MIN || 60)),
+    redLanes: Array.isArray(quality?.redLanes) ? quality.redLanes : [], // vO9: quality.ts roll-up (tsc-fail/test-failed) → RED-lane sinyali
   };
   const baseFindings: Finding[] = classify(ci);
 
@@ -134,7 +129,10 @@ async function main(): Promise<void> {
   appendFileSync(STATE, JSON.stringify({ ts: snap.ts, kinds: findings.map((f) => f.kind), action: action?.kind ?? null }) + "\n");
   console.error(`[conduct] ${findings.length} bulgu, eylem=${action ? action.tier + ":" + action.lane : "yok"}, delta +${delta.added.length}/-${delta.resolved.length}.`);
 
-  if (GATE && action?.tier === "RED") process.exit(1);
+  // RED gate: standalone/CI exits 1 on a RED action. --no-gate skips it (artifact already
+  // written above) so the autopilot's read-only refresh isn't mislabelled as a crash; a real
+  // crash still exits non-zero. The RED finding stays visible in CONDUCTOR.md regardless.
+  if (action?.tier === "RED" && !process.argv.includes("--no-gate")) process.exit(1);
 }
 
 main();

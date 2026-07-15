@@ -1,0 +1,63 @@
+# Prometheus alert rules for the ollamas multi-tenant MCP gateway.
+# Every expression uses a metric that is actually registered in server/metrics.ts:
+#   http_request_duration_ms (histogram)   mcp_tool_calls_total{ok}      ukp_stage_events_total
+#   ollamas_db_pool_connections{state}      ollamas_webhook_queue_depth   ollamas_migration_version
+#   ollamas_shutdown_total                  + prom-client default process metrics
+# Thresholds are conservative starting points — tune per traffic in values/your SLOs.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ollamas
+  labels:
+    app: ollamas
+    release: prometheus
+spec:
+  groups:
+    - name: ollamas.availability
+      rules:
+        - alert: OllamasTargetDown
+          expr: up{job=~".*ollamas.*"} == 0
+          for: 5m
+          labels: { severity: critical, app: ollamas }
+          annotations:
+            summary: "ollamas gateway target down"
+            description: "Prometheus cannot scrape an ollamas instance for 5m ({{ $labels.instance }})."
+    - name: ollamas.saturation
+      rules:
+        - alert: OllamasDbPoolExhausted
+          # pg pool has zero idle AND callers are waiting → connection starvation.
+          expr: |
+            (max(ollamas_db_pool_connections{state="idle"}) == 0)
+            and (max(ollamas_db_pool_connections{state="waiting"}) > 0)
+          for: 5m
+          labels: { severity: warning, app: ollamas }
+          annotations:
+            summary: "Postgres pool exhausted"
+            description: "0 idle connections with waiters for 5m — raise DB_POOL_SIZE or scale out."
+        - alert: OllamasWebhookQueueBacklog
+          expr: max(ollamas_webhook_queue_depth) > 100
+          for: 10m
+          labels: { severity: warning, app: ollamas }
+          annotations:
+            summary: "Webhook delivery backlog"
+            description: "{{ $value }} webhook deliveries pending for 10m — worker stalled or downstream failing."
+    - name: ollamas.errors
+      rules:
+        - alert: OllamasToolErrorRateHigh
+          # >5% of choke-point tool calls failing over 10m.
+          expr: |
+            sum(rate(mcp_tool_calls_total{ok="false"}[5m]))
+            / clamp_min(sum(rate(mcp_tool_calls_total[5m])), 1) > 0.05
+          for: 10m
+          labels: { severity: warning, app: ollamas }
+          annotations:
+            summary: "MCP tool-call error rate > 5%"
+            description: "Tool failures exceed 5% of calls for 10m — inspect upstream MCP / provider health."
+        - alert: OllamasHttpP99LatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (le) (rate(http_request_duration_ms_bucket[5m]))) > 2000
+          for: 10m
+          labels: { severity: warning, app: ollamas }
+          annotations:
+            summary: "HTTP p99 latency > 2s"
+            description: "p99 request latency above 2000ms for 10m ({{ $value | humanize }}ms)."
