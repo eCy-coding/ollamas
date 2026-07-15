@@ -1,0 +1,34 @@
+[automator-probe] → qwen3-coder-64k:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3-coder-64k_latest
+[automator-probe]   ❌ nothing 0 file(s) []  verdict=INCOMPLETE
+[automator-probe] → qwen3:8b-16k (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3_8b-16k
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → ollamas-reviewer:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/ollamas-reviewer_latest
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → qwen2.5vl:32b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen2.5vl_32b
+[automator-probe]   ✅ produced 6 file(s) [applescript,other,readme,shell]  verdict=OK
+[automator-probe] → qwen2.5vl:7b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen2.5vl_7b
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → qwen3:8b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3_8b
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → qwen3:30b-a3b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3_30b-a3b
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=INCOMPLETE
+[automator-probe] → deepseek-r1:32b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/deepseek-r1_32b
+[automator-probe]   ❌ nothing 0 file(s) []  verdict=DONE
+[automator-probe] → qwen3-coder:30b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3-coder_30b
+[automator-probe]   ❌ nothing 0 file(s) []  verdict=INCOMPLETE
+[automator-probe] → qwen3:4b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3_4b
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → gpt-oss:20b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/gpt-oss_20b
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=DONE
+[automator-probe] → phi4:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/phi4_latest
+[automator-probe]   ✅ produced 5 file(s) [applescript,other,readme,shell]  verdict=DONE
+[automator-probe] → kimi-k2.5:cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/kimi-k2.5_cloud
+[automator-probe]   ❌ nothing 0 file(s) []  verdict=INCOMPLETE
+[automator-probe] → gpt-oss:20b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/gpt-oss_20b-cloud
+[automator-probe]   ✅ produced 5 file(s) [applescript,readme,shell]  verdict=DONE
+[automator-probe] → gpt-oss:120b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/gpt-oss_120b-cloud
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=DONE
+[automator-probe] → qwen3-coder:480b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/qwen3-coder_480b-cloud
+[automator-probe]   ✅ produced 4 file(s) [applescript,readme,shell]  verdict=OK
+[automator-probe] → llama3.3:70b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-automator/llama3.3_70b
+[automator-probe]   ❌ nothing 0 file(s) []  verdict=INCOMPLETE

@@ -2,7 +2,7 @@
   "chip": "Apple M4 Max",
   "ramGb": 52,
   "cores": 16,
-  "ts": "2026-07-03T09:42:45.070Z",
+  "ts": "2026-07-11T10:41:38.436Z",
   "stale": false,
   "selection": {
     "model": "qwen3-coder:30b",
@@ -18,17 +18,6 @@
     }
   },
   "champions": {
-    "mac": {
-      "model": "qwen3-coder:30b",
-      "device": "mac",
-      "n": 1,
-      "medianTokS": 114.6,
-      "p95": 114.6,
-      "mad": 0,
-      "min": 114.6,
-      "max": 114.6,
-      "correctRatio": 1
-    },
     "combination": {
       "policy": "implementer-verifier",
       "measuredBy": "scripts/combo-bench.mjs",
@@ -66,15 +55,7 @@
       "source": "~/.llm-mission-control/combo-bench.json"
     }
   },
-  "regressions": [
-    {
-      "model": "qwen3:4b",
-      "device": "mac",
-      "baseTokS": 111,
-      "medianTokS": 92.3,
-      "dropPct": 16.8
-    }
-  ],
+  "regressions": [],
   "freeApiTier": [
     {
       "id": "groq",
@@ -97,6 +78,15 @@
       "trainsOnData": false
     },
     {
+      "id": "zai",
+      "model": "glm-4.7-flash",
+      "caps": [
+        "code",
+        "long-ctx"
+      ],
+      "trainsOnData": false
+    },
+    {
       "id": "sambanova",
       "model": "Meta-Llama-3.3-70B-Instruct",
       "caps": [
@@ -110,6 +100,25 @@
       "caps": [
         "code",
         "tools"
+      ],
+      "trainsOnData": false
+    },
+    {
+      "id": "mistral",
+      "model": "mistral-small-latest",
+      "caps": [
+        "code",
+        "tools"
+      ],
+      "trainsOnData": true
+    },
+    {
+      "id": "cloudflare",
+      "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "caps": [
+        "code",
+        "embed",
+        "image"
       ],
       "trainsOnData": false
     }

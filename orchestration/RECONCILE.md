@@ -1,5 +1,5 @@
 # RECONCILE — autonomous fleet reconcile loop (vO23)
-<!-- AUTO reconcile.ts · 2026-07-04T11:00:46.021Z · regenerate: tsx orchestration/bin/reconcile.ts -->
+<!-- AUTO reconcile.ts · 2026-07-12T07:52:44.463Z · regenerate: tsx orchestration/bin/reconcile.ts -->
 
 > Level-based reconcile (K8s-operator pattern): desired-vs-actual → tek sonraki aksiyon. Benchmark-driven, soru yok.
 

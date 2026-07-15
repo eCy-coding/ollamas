@@ -1,83 +1,68 @@
 # CONDUCTOR — Zero-Touch Orkestrasyon (otonom)
 
 > `conduct.ts` üretti. 0 manuel seçim/işlem: tüm araçlar koşuldu, öncelik motoru tek eylem seçti.
-> 2026-07-04T11:00:20.403Z · Bulgular: COMPLETENESS:1 · STALE:8 · Delta: değişiklik yok (idempotent — son koşuyla aynı)
+> 2026-07-12T07:52:39.415Z · Bulgular: COMPLETENESS:6 · STALE:20 · Delta: değişiklik yok (idempotent — son koşuyla aynı)
 
 ## Birleşik durum
 | Lane | Şu an | → Sıradaki | dirty | idle |
 |------|-------|-----------|-------|------|
-| `backend` | P4 Migration drift fix — migrations.ts v4 guarde | — | 84△ | ✓ |
-| `colab` | P4 Migration drift fix — migrations.ts v4 guarde | — | 13△ | ✓ |
-| `fix/audit-security` | P4 Migration drift fix — migrations.ts v4 guarde | — | 3△ | 💤 |
+| `backend` | P4 Migration drift fix — migrations.ts v4 guarde | — | 40△ | 💤 |
+| `odysseus` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `cockpit` | P4 Migration drift fix — migrations.ts v4 guarde | — | 5△ | 💤 |
+| `colab` | P4 Migration drift fix — migrations.ts v4 guarde | — | 12△ | 💤 |
+| `integration/all-lanes` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `cookbook` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `documents` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `fix/audit-security` | P4 Migration drift fix — migrations.ts v4 guarde | — | 2△ | 💤 |
+| `fable` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | 💤 |
+| `flow` | P4 Migration drift fix — migrations.ts v4 guarde | — | 11△ | 💤 |
 | `verify/gwv2-all-lanes` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `gwv` | P4 Migration drift fix — migrations.ts v4 guarde | — | 2△ | 💤 |
+| `agent/odysseus-task-1` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | 💤 |
+| `research` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `revenue` | P4 Migration drift fix — migrations.ts v4 guarde | — | 2△ | 💤 |
+| `shell` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | 💤 |
+| `v` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
+| `ux` | P4 Migration drift fix — migrations.ts v4 guarde | — | 5△ | 💤 |
+| `ux` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | 💤 |
 | `fix/binary-architecture-calibration` | P4 Migration drift fix — migrations.ts v4 guarde | — | 12△ | 💤 |
-| `fix/audit-cont` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | ✓ |
-| `claude/cool-cohen-b245ee` | P4 Migration drift fix — migrations.ts v4 guarde | — | 1△ | 💤 |
-| `claude/determined-bartik-0090ba` | P4 Migration drift fix — migrations.ts v4 guarde | — | 4△ | 💤 |
-| `claude/loving-varahamihira-77d4a9` | ✅ Faz 12 v1.3 (Postgres + async store, multi rep | — | 1△ | 💤 |
-| `claude/naughty-kowalevski-2ccc35` | ✅ Faz 12 v1.3 (Postgres + async store, multi rep | — | 566△ | 💤 |
-| `req-sweep` | P4 Migration drift fix — migrations.ts v4 guarde | — | 31△ | ✓ |
-| `(detached)` | P4 Migration drift fix — migrations.ts v4 guarde | — | 0△ | 💤 |
 
-**Bench:** veri yok · **Optimal:** qwen3-coder:30b num_ctx=8192 · **Lane:** 12 · **Toplam:** 716△ 8💤 80✗
+**Bench:** veri yok · **Optimal:** qwen3-coder:30b num_ctx=8192 · **Lane:** 20 · **Toplam:** 95△ 20💤 325✗
 
 ## 🎯 SIRADAKI TEK EYLEM (priority engine seçti)
 **Tier:** COMPLETENESS · **Lane:** orchestration
 
-**Durum:** Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…
+**Durum:** v1.25 (.4 lane landing araç eşlemesi (roadmap coherence borç kapanı) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)
 
-**Eylem:** yeşil parçayı commit'le (per-file git add + conventional)
+**Eylem:** v1.25 durumunu DONE'a güncelle (roadmap-gerçek reconcile)
 
 ## Tüm bulgular (öncelik sırası)
-1. **[COMPLETENESS]** orchestration: Commit'siz yeşil iş (built-not-shipped): .autopilot-refresh.json, AUTOPILOT.md, CLAUDE_DISPATCH.md, CONDUCTOR.md, COUNCIL_ROSTER.json, CRITIC.json…
-2. **[STALE]** fix/audit-security: fix/audit-security 210s commitsiz (idle)
-3. **[STALE]** verify/gwv2-all-lanes: verify/gwv2-all-lanes 326s commitsiz (idle)
-4. **[STALE]** fix/binary-architecture-calibration: fix/binary-architecture-calibration 314s commitsiz (idle)
-5. **[STALE]** claude/cool-cohen-b245ee: claude/cool-cohen-b245ee 240s commitsiz (idle)
-6. **[STALE]** claude/determined-bartik-0090ba: claude/determined-bartik-0090ba 214s commitsiz (idle)
-7. **[STALE]** claude/loving-varahamihira-77d4a9: claude/loving-varahamihira-77d4a9 372s commitsiz (idle)
-8. **[STALE]** claude/naughty-kowalevski-2ccc35: claude/naughty-kowalevski-2ccc35 327s commitsiz (idle)
-9. **[STALE]** (detached): (detached) 240s commitsiz (idle)
+1. **[COMPLETENESS]** orchestration: v1.28 (.1 build/catalog + keys + orchestra araç eşlemesi (roadmap c) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)
+2. **[COMPLETENESS]** orchestration: v1.25 (.4 lane landing araç eşlemesi (roadmap coherence borç kapanı) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)
+3. **[COMPLETENESS]** orchestration: conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (2 distinktif kelime) — olası duplicate
+4. **[COMPLETENESS]** orchestration: fleet-conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (3 distinktif kelime) — olası duplicate
+5. **[COMPLETENESS]** orchestration: Commit'siz yeşil iş (built-not-shipped): TASKS.json, CALIBRATION.md
+6. **[COMPLETENESS]** orchestration: lib/fleet-prompt.ts: test'siz export → groundedPrompt
+7. **[STALE]** cockpit: cockpit 81s commitsiz (idle)
+8. **[STALE]** colab: colab 191s commitsiz (idle)
+9. **[STALE]** fix/audit-security: fix/audit-security 399s commitsiz (idle)
+10. **[STALE]** fable: fable 119s commitsiz (idle)
+11. **[STALE]** flow: flow 189s commitsiz (idle)
+12. **[STALE]** verify/gwv2-all-lanes: verify/gwv2-all-lanes 515s commitsiz (idle)
+13. **[STALE]** gwv: gwv 55s commitsiz (idle)
+14. **[STALE]** revenue: revenue 82s commitsiz (idle)
+15. **[STALE]** v: v 56s commitsiz (idle)
+16. **[STALE]** ux: ux 52s commitsiz (idle)
+17. **[STALE]** fix/binary-architecture-calibration: fix/binary-architecture-calibration 503s commitsiz (idle)
+18. **[STALE]** ux: ux 46s commitsiz (idle)
+19. **[STALE]** integration/all-lanes: integration/all-lanes 37s commitsiz (idle)
+20. **[STALE]** cookbook: cookbook 34s commitsiz (idle)
+21. **[STALE]** documents: documents 34s commitsiz (idle)
+22. **[STALE]** research: research 34s commitsiz (idle)
+23. **[STALE]** shell: shell 13s commitsiz (idle)
+24. **[STALE]** agent/odysseus-task-1: agent/odysseus-task-1 12s commitsiz (idle)
+25. **[STALE]** backend: backend 11s commitsiz (idle)
+26. **[STALE]** odysseus: odysseus 10s commitsiz (idle)
 
 ## Optimal working-prompt (seçili eyleme hazır)
-# OLLAMAS — OPTIMAL WORKING PROMPT (self-optimizing, portable)
-
-> Bu blok nereye yapıştırılırsa orada ollamas için EN-VERİMLİ seçimle çalışmaya başlar.
-> `optimize.ts` üretti — benchmark-driven, deterministik. Bench/calibration değişince seçim otomatik güncellenir.
-
-<context>
-Donanım: Apple M4 Max · 52GB unified · 16 core · arm64.
-Proje: ollamas (yerel MCP gateway + tools-as-SaaS). Çalışma prensipleri: choke-point tek-dispatch, TDD, evidence-first, no-vibe-code, zero-dep, correctness>hız.
-</context>
-
-<selected-runtime>
-Model: **qwen3-coder:30b** — benchmark-seçili (114.6 tok/s, doğru; correctness-gate ✓; skor 0.913).
-Gerekçe: correct 1 + tok 114.6/114.6 + vram-fit 0.57
-Optimal Ollama/MLX config:
-  num_ctx=8192  num_gpu=999  num_thread=12  keep_alive=30m  quant=Q4_K_M
-Runtime: Apple Silicon → Ollama ≥0.19 MLX backend (num_gpu=999 tüm-Metal); warm-model (keep_alive) reload latency'yi siler.
-</selected-runtime>
-
-<task>
-Verilen görevi bu model+config ile yürüt. Yeni görev gelince önce `tsx orchestration/bin/optimize.ts` koş → o anki en-verimli seçimi al.
-</task>
-
-<constraints>
-- Kod-bütünlüğü: ollamas choke-point (ToolRegistry.execute) tek-dispatch; TDD (test önce); evidence-first (çalışıyor=komut çıktısı göster).
-- No vibe-code: hazır OSS adopt (MIT/Apache kopya+attribution, GPL ref-only); zero-dep tercih.
-- Correctness > hız: yanlış-ama-hızlı model diskalifiye (correctness-gate 0.7).
-- Kalite kapısı: typecheck + lint + test taze koşu → conventional commit.
-</constraints>
-
-<format>
-Sıra: READ → PLAN → TDD → BUILD → VERIFY(kanıt) → SHIP. Çıktı net, token-yalın.
-</format>
-
-<example>
-İyi: "qwen3-coder:30b num_ctx=8192 ile koştum → test 12/12 yeşil (çıktı altta)."
-Kötü: "Çalışıyor." (kanıtsız — reddet.)
-</example>
-
-<next-action>
-yeşil parçayı commit'le (per-file git add + conventional)
-</next-action>
+Model: qwen3-coder:30b (114.6 tok/s) · config {"num_ctx":8192,"num_gpu":999,"num_thread":12,"keep_alive":"30m","quant":"Q4_K_M"}

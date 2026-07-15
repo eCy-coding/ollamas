@@ -560,6 +560,13 @@
     "acceptance": "slow upstream aborts after timeout"
   },
   {
+    "id": "backend-account",
+    "lane": "backend",
+    "target": "server/account.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
     "id": "backend-agent-events",
     "lane": "backend",
     "target": "server/agent-events.ts",
@@ -661,6 +668,13 @@
     "id": "backend-embed-catalog",
     "lane": "backend",
     "target": "server/embed-catalog.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-error-tracking",
+    "lane": "backend",
+    "target": "server/error-tracking.ts",
     "goal": "add JSDoc or an input-validation guard to the primary exported function",
     "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
@@ -861,6 +875,258 @@
     "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
   {
+    "id": "backend-model-overrides",
+    "lane": "backend",
+    "target": "server/model-overrides.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store",
+    "lane": "backend",
+    "target": "server/modules/_core/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-recurrence",
+    "lane": "backend",
+    "target": "server/modules/calendar/recurrence.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router",
+    "lane": "backend",
+    "target": "server/modules/calendar/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema",
+    "lane": "backend",
+    "target": "server/modules/calendar/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service",
+    "lane": "backend",
+    "target": "server/modules/calendar/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-2",
+    "lane": "backend",
+    "target": "server/modules/calendar/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-2",
+    "lane": "backend",
+    "target": "server/modules/cookbook/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-2",
+    "lane": "backend",
+    "target": "server/modules/cookbook/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-2",
+    "lane": "backend",
+    "target": "server/modules/cookbook/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-3",
+    "lane": "backend",
+    "target": "server/modules/cookbook/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-3",
+    "lane": "backend",
+    "target": "server/modules/demo/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-3",
+    "lane": "backend",
+    "target": "server/modules/demo/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-4",
+    "lane": "backend",
+    "target": "server/modules/demo/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-4",
+    "lane": "backend",
+    "target": "server/modules/documents/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-4",
+    "lane": "backend",
+    "target": "server/modules/documents/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-3",
+    "lane": "backend",
+    "target": "server/modules/documents/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-5",
+    "lane": "backend",
+    "target": "server/modules/documents/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-5",
+    "lane": "backend",
+    "target": "server/modules/email/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-5",
+    "lane": "backend",
+    "target": "server/modules/email/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-4",
+    "lane": "backend",
+    "target": "server/modules/email/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-6",
+    "lane": "backend",
+    "target": "server/modules/email/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-6",
+    "lane": "backend",
+    "target": "server/modules/notes-tasks/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-6",
+    "lane": "backend",
+    "target": "server/modules/notes-tasks/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-5",
+    "lane": "backend",
+    "target": "server/modules/notes-tasks/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-7",
+    "lane": "backend",
+    "target": "server/modules/notes-tasks/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-registry",
+    "lane": "backend",
+    "target": "server/modules/registry.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-7",
+    "lane": "backend",
+    "target": "server/modules/research/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-7",
+    "lane": "backend",
+    "target": "server/modules/research/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-6",
+    "lane": "backend",
+    "target": "server/modules/research/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-8",
+    "lane": "backend",
+    "target": "server/modules/research/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-router-8",
+    "lane": "backend",
+    "target": "server/modules/settings/router.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-schema-8",
+    "lane": "backend",
+    "target": "server/modules/settings/schema.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-service-7",
+    "lane": "backend",
+    "target": "server/modules/settings/service.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-store-9",
+    "lane": "backend",
+    "target": "server/modules/settings/store.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-totp",
+    "lane": "backend",
+    "target": "server/modules/settings/totp.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
     "id": "backend-oauth-gc",
     "lane": "backend",
     "target": "server/oauth-gc.ts",
@@ -889,6 +1155,48 @@
     "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
   {
+    "id": "backend-engine",
+    "lane": "backend",
+    "target": "server/research/engine.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-pipeline",
+    "lane": "backend",
+    "target": "server/research/pipeline.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-planner",
+    "lane": "backend",
+    "target": "server/research/planner.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-report",
+    "lane": "backend",
+    "target": "server/research/report.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-searxng",
+    "lane": "backend",
+    "target": "server/research/searxng.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-summarize",
+    "lane": "backend",
+    "target": "server/research/summarize.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
     "id": "backend-revenue",
     "lane": "backend",
     "target": "server/revenue.ts",
@@ -913,6 +1221,13 @@
     "id": "backend-migrations",
     "lane": "backend",
     "target": "server/store/migrations.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
+    "id": "backend-vector",
+    "lane": "backend",
+    "target": "server/store/vector.ts",
     "goal": "add JSDoc or an input-validation guard to the primary exported function",
     "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
@@ -973,6 +1288,13 @@
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
   {
+    "id": "frontend-calendarpanel",
+    "lane": "frontend",
+    "target": "src/components/CalendarPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
     "id": "frontend-capabilitygate",
     "lane": "frontend",
     "target": "src/components/CapabilityGate.tsx",
@@ -994,9 +1316,30 @@
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
   {
+    "id": "frontend-cookbookpanel",
+    "lane": "frontend",
+    "target": "src/components/CookbookPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-documentspanel",
+    "lane": "frontend",
+    "target": "src/components/DocumentsPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
     "id": "frontend-ecysearcherpanel",
     "lane": "frontend",
     "target": "src/components/ECySearcherPanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-emailpanel",
+    "lane": "frontend",
+    "target": "src/components/EmailPanel.tsx",
     "goal": "add a null/empty-data guard or an aria-label to the main exported component",
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
@@ -1071,9 +1414,30 @@
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
   {
+    "id": "frontend-modelsettings",
+    "lane": "frontend",
+    "target": "src/components/ModelSettings.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-modulepanel",
+    "lane": "frontend",
+    "target": "src/components/ModulePanel.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
     "id": "frontend-multiagentpipeline",
     "lane": "frontend",
     "target": "src/components/MultiAgentPipeline.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-notestaskspanel",
+    "lane": "frontend",
+    "target": "src/components/NotesTasksPanel.tsx",
     "goal": "add a null/empty-data guard or an aria-label to the main exported component",
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
@@ -1088,6 +1452,13 @@
     "id": "frontend-reactagenttab",
     "lane": "frontend",
     "target": "src/components/ReactAgentTab.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-researchpanel",
+    "lane": "frontend",
+    "target": "src/components/ResearchPanel.tsx",
     "goal": "add a null/empty-data guard or an aria-label to the main exported component",
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
@@ -1116,6 +1487,13 @@
     "id": "frontend-selftestgates",
     "lane": "frontend",
     "target": "src/components/SelfTestGates.tsx",
+    "goal": "add a null/empty-data guard or an aria-label to the main exported component",
+    "acceptance": "tsc clean; component renders safely on empty/undefined input"
+  },
+  {
+    "id": "frontend-settingspanel",
+    "lane": "frontend",
+    "target": "src/components/SettingsPanel.tsx",
     "goal": "add a null/empty-data guard or an aria-label to the main exported component",
     "acceptance": "tsc clean; component renders safely on empty/undefined input"
   },
@@ -1256,6 +1634,13 @@
     "id": "frontend-firebase",
     "lane": "frontend",
     "target": "src/lib/firebase.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "frontend-modules",
+    "lane": "frontend",
+    "target": "src/lib/modules.ts",
     "goal": "add a unit test for a pure exported function in this file",
     "acceptance": "new assertion passes; tsc clean"
   },
@@ -1540,6 +1925,13 @@
     "acceptance": "JSDoc present; no behavior change"
   },
   {
+    "id": "scripts-env-contract",
+    "lane": "scripts",
+    "target": "scripts/env-contract.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
     "id": "scripts-gemini-pool-check",
     "lane": "scripts",
     "target": "scripts/gemini-pool-check.mjs",
@@ -1554,11 +1946,25 @@
     "acceptance": "JSDoc present; no behavior change"
   },
   {
+    "id": "scripts-perf-smoke",
+    "lane": "scripts",
+    "target": "scripts/perf-smoke.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
+  },
+  {
     "id": "scripts-provider-bench",
     "lane": "scripts",
     "target": "scripts/provider-bench.mjs",
     "goal": "add a JSDoc block to the main exported function documenting its params and return",
     "acceptance": "JSDoc present; no behavior change"
+  },
+  {
+    "id": "scripts-route-usage",
+    "lane": "scripts",
+    "target": "scripts/route-usage.ts",
+    "goal": "add JSDoc or an input-validation guard to the primary exported function",
+    "acceptance": "tsc clean; guard/JSDoc present; no behavior change"
   },
   {
     "id": "orchestration-align-sweep",
@@ -1634,6 +2040,13 @@
     "id": "orchestration-build-plan",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/build-plan.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-build-tasks-core",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/build-tasks-core.ts",
     "goal": "add a unit test for a pure exported function in this file",
     "acceptance": "new assertion passes; tsc clean"
   },
@@ -1750,6 +2163,13 @@
     "acceptance": "new assertion passes; tsc clean"
   },
   {
+    "id": "orchestration-dod-lanes",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/dod-lanes.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
     "id": "orchestration-dod",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/dod.ts",
@@ -1834,6 +2254,13 @@
     "acceptance": "new assertion passes; tsc clean"
   },
   {
+    "id": "orchestration-gen-catalog-core",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/gen-catalog-core.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
     "id": "orchestration-gpu-lock",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/gpu-lock.ts",
@@ -1851,6 +2278,13 @@
     "id": "orchestration-heartbeat",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/heartbeat.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-hierarchy",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/hierarchy.ts",
     "goal": "add a unit test for a pure exported function in this file",
     "acceptance": "new assertion passes; tsc clean"
   },
@@ -1879,6 +2313,13 @@
     "id": "orchestration-judge",
     "lane": "orchestration",
     "target": "orchestration/bin/lib/judge.ts",
+    "goal": "add a unit test for a pure exported function in this file",
+    "acceptance": "new assertion passes; tsc clean"
+  },
+  {
+    "id": "orchestration-keys-health-core",
+    "lane": "orchestration",
+    "target": "orchestration/bin/lib/keys-health-core.ts",
     "goal": "add a unit test for a pure exported function in this file",
     "acceptance": "new assertion passes; tsc clean"
   },

@@ -57,3 +57,27 @@
 {"ts":"2026-07-04T10:38:49.619Z","action":"skip","fingerprint":"0efa8b219f3d","reason":"24h bütçe dolu (6/6 spawn)"}
 {"ts":"2026-07-04T10:41:18.827Z","action":"skip","fingerprint":"bf0f0a906760","reason":"24h bütçe dolu (6/6 spawn)"}
 {"ts":"2026-07-04T10:56:11.458Z","action":"skip","fingerprint":"6e173ff61ee2","reason":"24h bütçe dolu (6/6 spawn)"}
+{"ts":"2026-07-10T00:53:32.883Z","action":"skip","fingerprint":"2ea0c4082ed7","reason":"churn-guard: hedef stabilite bekliyor (crit:roadmap-drift:v1.28 birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T01:07:37.304Z","action":"skip","fingerprint":"c1c1f23a9e3e","reason":"churn-guard: hedef stabilite bekliyor (red:ux birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T08:41:56.122Z","action":"skip","fingerprint":"8271362850b0","reason":"churn-guard: hedef stabilite bekliyor (crit:roadmap-drift:v1.25 birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T09:03:44.839Z","action":"dry","fingerprint":"8271362850b0","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T09:38:31.991Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T09:47:53.071Z","action":"skip","fingerprint":"c2bc1db40408","reason":"churn-guard: hedef stabilite bekliyor (gate:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T09:56:58.686Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T10:13:37.836Z","action":"dry","fingerprint":"d1e75e966184","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T10:30:05.912Z","action":"skip","fingerprint":"c2bc1db40408","reason":"churn-guard: hedef stabilite bekliyor (gate:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T10:50:44.947Z","action":"skip","fingerprint":"8271362850b0","reason":"churn-guard: hedef stabilite bekliyor (crit:roadmap-drift:v1.25 birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T11:24:31.399Z","action":"dry","fingerprint":"8271362850b0","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T11:37:55.241Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T11:45:57.730Z","action":"skip","fingerprint":"66b12c3cf9ed","reason":"churn-guard: hedef stabilite bekliyor (gate:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T11:53:10.052Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T12:01:18.410Z","action":"dry","fingerprint":"d1e75e966184","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T13:25:39.143Z","action":"skip","fingerprint":"8271362850b0","reason":"churn-guard: hedef stabilite bekliyor (crit:roadmap-drift:v1.25 birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T13:47:58.509Z","action":"dry","fingerprint":"8271362850b0","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T17:14:51.491Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T17:21:03.267Z","action":"dry","fingerprint":"8271362850b0","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T17:51:39.588Z","action":"skip","fingerprint":"d1e75e966184","reason":"churn-guard: hedef stabilite bekliyor (red:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T17:58:58.322Z","action":"skip","fingerprint":"66b12c3cf9ed","reason":"churn-guard: hedef stabilite bekliyor (gate:integration/all-lanes birkaç bağımsız değerlendirmede kalıcı olmalı)"}
+{"ts":"2026-07-10T18:08:51.165Z","action":"dry","fingerprint":"d1e75e966184","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-10T18:53:40.643Z","action":"dry","fingerprint":"8271362850b0","reason":"dry-run — aktivasyon: touch orchestration/.claude-dispatch-enabled + --go"}
+{"ts":"2026-07-11T22:56:44.516Z","action":"skip","fingerprint":"8271362850b0","reason":"churn-guard: hedef stabilite bekliyor (crit:roadmap-drift:v1.25 birkaç bağımsız değerlendirmede kalıcı olmalı)"}

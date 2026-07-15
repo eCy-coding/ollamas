@@ -1,12 +1,12 @@
 {
-  "ts": "2026-07-04T11:05:13.895Z",
+  "ts": "2026-07-12T07:52:31.097Z",
   "score": 95,
   "findings": [
     {
       "tier": "COMPLETENESS",
       "lane": "orchestration",
-      "kind": "dod:uncommitted-green:9 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…",
+      "kind": "dod:uncommitted-green:2 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): TASKS.json, CALIBRATION.md",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "severity": 40,
       "concurrent": false

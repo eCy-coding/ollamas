@@ -1,0 +1,33 @@
+[automator-loop] round 1 — 17 model (steps 6)
+[automator-loop]     qwen3-coder-64k:latest   nothing
+[automator-loop]     qwen3:8b-16k             ♻️ recurring(launchd)
+[automator-loop]     ollamas-reviewer:latest  ♻️ recurring(launchd)
+[automator-loop]     qwen2.5vl:32b            ♻️ recurring(launchd)
+[automator-loop]     qwen2.5vl:7b             nothing
+[automator-loop]     qwen3:8b                 ♻️ recurring(launchd)
+[automator-loop]     qwen3:30b-a3b            ♻️ recurring(launchd)
+[automator-loop]     deepseek-r1:32b          nothing
+[automator-loop]     qwen3-coder:30b          nothing
+[automator-loop]     qwen3:4b                 nothing
+[automator-loop]     gpt-oss:20b              ♻️ recurring(launchd)
+[automator-loop]     phi4:latest              ♻️ recurring(launchd)
+[automator-loop]     kimi-k2.5:cloud          nothing
+[automator-loop]     gpt-oss:20b-cloud        ♻️ recurring(launchd)
+[automator-loop]     gpt-oss:120b-cloud       ♻️ recurring(launchd)
+[automator-loop]     qwen3-coder:480b-cloud   ♻️ recurring(launchd)
+[automator-loop]     llama3.3:70b             nothing
+[automator-loop] round 2 — retry 7 pending (steps 8)
+[automator-loop]     qwen3-coder-64k:latest   nothing
+[automator-loop]     qwen2.5vl:7b             ♻️ recurring(launchd)
+[automator-loop]     deepseek-r1:32b          nothing
+[automator-loop]     qwen3-coder:30b          nothing
+[automator-loop]     qwen3:4b                 nothing
+[automator-loop]     kimi-k2.5:cloud          nothing
+[automator-loop]     llama3.3:70b             nothing
+[automator-loop] round 3 — retry 6 pending (steps 10)
+[automator-loop]     qwen3-coder-64k:latest   nothing
+[automator-loop]     deepseek-r1:32b          nothing
+[automator-loop]     qwen3-coder:30b          nothing
+[automator-loop]     qwen3:4b                 nothing
+[automator-loop]     kimi-k2.5:cloud          nothing
+[automator-loop]     llama3.3:70b             nothing

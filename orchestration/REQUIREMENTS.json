@@ -1,22 +1,214 @@
 {
-  "ts": "2026-07-04T11:05:42.576Z",
-  "readiness": 97,
+  "ts": "2026-07-12T07:52:39.471Z",
+  "readiness": 44,
   "top": {
     "criticality": "COMPLETENESS",
-    "source": "dod",
-    "target": "dod:uncommitted-green:9 dosya",
-    "detail": "Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…",
-    "action": "yeşil parçayı commit'le (per-file git add + conventional)",
-    "score": 40
+    "source": "conduct+critic",
+    "target": "crit:roadmap-drift:v1.25",
+    "detail": "v1.25 (.4 lane landing araç eşlemesi (roadmap coherence borç kapanı) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+    "action": "v1.25 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+    "score": 70
   },
   "requirements": [
     {
       "criticality": "COMPLETENESS",
-      "source": "dod",
-      "target": "dod:uncommitted-green:9 dosya",
-      "detail": "Commit'siz yeşil iş (built-not-shipped): COUNCIL_ROSTER.json, CRITIC.json, CRITIC.md, DOD.json, DOD.md, QUALITY.json…",
+      "source": "conduct+critic",
+      "target": "crit:roadmap-drift:v1.25",
+      "detail": "v1.25 (.4 lane landing araç eşlemesi (roadmap coherence borç kapanı) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+      "action": "v1.25 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+      "score": 70
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+critic",
+      "target": "crit:roadmap-drift:v1.28",
+      "detail": "v1.28 (.1 build/catalog + keys + orchestra araç eşlemesi (roadmap c) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+      "action": "v1.28 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+      "score": 70
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+critic",
+      "target": "crit:duplication:conduct.ts↔orchestra.ts",
+      "detail": "conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (2 distinktif kelime) — olası duplicate",
+      "action": "conduct.ts/orchestra.ts dedup ya da rol ayrımını netleştir",
+      "score": 45
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+critic",
+      "target": "crit:duplication:fleet-conduct.ts↔orchestra.ts",
+      "detail": "fleet-conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (3 distinktif kelime) — olası duplicate",
+      "action": "fleet-conduct.ts/orchestra.ts dedup ya da rol ayrımını netleştir",
+      "score": 45
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+dod",
+      "target": "dod:uncommitted-green:2 dosya",
+      "detail": "Commit'siz yeşil iş (built-not-shipped): TASKS.json, CALIBRATION.md",
       "action": "yeşil parçayı commit'le (per-file git add + conventional)",
       "score": 40
+    },
+    {
+      "criticality": "COMPLETENESS",
+      "source": "conduct+critic",
+      "target": "crit:coverage-gap:lib/fleet-prompt.ts",
+      "detail": "lib/fleet-prompt.ts: test'siz export → groundedPrompt",
+      "action": "lib/fleet-prompt.ts için test ekle (groundedPrompt)",
+      "score": 20
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:cockpit",
+      "detail": "cockpit 81s commitsiz (idle)",
+      "action": "cockpit: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:colab",
+      "detail": "colab 191s commitsiz (idle)",
+      "action": "colab: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:fable",
+      "detail": "fable 119s commitsiz (idle)",
+      "action": "fable: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:fix/audit-security",
+      "detail": "fix/audit-security 399s commitsiz (idle)",
+      "action": "fix/audit-security: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:fix/binary-architecture-calibration",
+      "detail": "fix/binary-architecture-calibration 503s commitsiz (idle)",
+      "action": "fix/binary-architecture-calibration: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:flow",
+      "detail": "flow 189s commitsiz (idle)",
+      "action": "flow: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:gwv",
+      "detail": "gwv 55s commitsiz (idle)",
+      "action": "gwv: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:revenue",
+      "detail": "revenue 82s commitsiz (idle)",
+      "action": "revenue: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:ux",
+      "detail": "ux 52s commitsiz (idle)",
+      "action": "ux: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:v",
+      "detail": "v 56s commitsiz (idle)",
+      "action": "v: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:verify/gwv2-all-lanes",
+      "detail": "verify/gwv2-all-lanes 515s commitsiz (idle)",
+      "action": "verify/gwv2-all-lanes: sıradaki versiyonu planla (durağan)",
+      "score": 49
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:integration/all-lanes",
+      "detail": "integration/all-lanes 37s commitsiz (idle)",
+      "action": "integration/all-lanes: sıradaki versiyonu planla (durağan)",
+      "score": 37
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:cookbook",
+      "detail": "cookbook 34s commitsiz (idle)",
+      "action": "cookbook: sıradaki versiyonu planla (durağan)",
+      "score": 34
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:documents",
+      "detail": "documents 34s commitsiz (idle)",
+      "action": "documents: sıradaki versiyonu planla (durağan)",
+      "score": 34
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:research",
+      "detail": "research 34s commitsiz (idle)",
+      "action": "research: sıradaki versiyonu planla (durağan)",
+      "score": 34
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:shell",
+      "detail": "shell 13s commitsiz (idle)",
+      "action": "shell: sıradaki versiyonu planla (durağan)",
+      "score": 13
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:agent/odysseus-task-1",
+      "detail": "agent/odysseus-task-1 12s commitsiz (idle)",
+      "action": "agent/odysseus-task-1: sıradaki versiyonu planla (durağan)",
+      "score": 12
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:backend",
+      "detail": "backend 11s commitsiz (idle)",
+      "action": "backend: sıradaki versiyonu planla (durağan)",
+      "score": 11
+    },
+    {
+      "criticality": "STALE",
+      "source": "conduct",
+      "target": "stale:odysseus",
+      "detail": "odysseus 10s commitsiz (idle)",
+      "action": "odysseus: sıradaki versiyonu planla (durağan)",
+      "score": 10
     }
   ]
 }

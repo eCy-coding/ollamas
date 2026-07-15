@@ -1,5 +1,46 @@
 {
-  "ts": "2026-07-04T11:05:13.622Z",
-  "score": 100,
-  "findings": []
+  "ts": "2026-07-12T07:52:30.703Z",
+  "score": 62,
+  "findings": [
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:roadmap-drift:v1.28",
+      "detail": "v1.28 (.1 build/catalog + keys + orchestra araç eşlemesi (roadmap c) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+      "action": "v1.28 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+      "severity": 70
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:roadmap-drift:v1.25",
+      "detail": "v1.25 (.4 lane landing araç eşlemesi (roadmap coherence borç kapanı) 'planned' ama eşleşen araç/artefakt VAR — muhtemelen yapıldı (roadmap bayat)",
+      "action": "v1.25 durumunu DONE'a güncelle (roadmap-gerçek reconcile)",
+      "severity": 70
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:coverage-gap:lib/fleet-prompt.ts",
+      "detail": "lib/fleet-prompt.ts: test'siz export → groundedPrompt",
+      "action": "lib/fleet-prompt.ts için test ekle (groundedPrompt)",
+      "severity": 20
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:conduct.ts↔orchestra.ts",
+      "detail": "conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (2 distinktif kelime) — olası duplicate",
+      "action": "conduct.ts/orchestra.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    },
+    {
+      "tier": "COMPLETENESS",
+      "lane": "orchestration",
+      "kind": "crit:duplication:fleet-conduct.ts↔orchestra.ts",
+      "detail": "fleet-conduct.ts ve orchestra.ts ayırt-edici amaç-örtüşmesi (3 distinktif kelime) — olası duplicate",
+      "action": "fleet-conduct.ts/orchestra.ts dedup ya da rol ayrımını netleştir",
+      "severity": 45
+    }
+  ]
 }

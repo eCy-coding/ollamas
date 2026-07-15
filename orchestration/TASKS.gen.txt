@@ -1,3 +1,4 @@
+backend|server/account.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/agent-events.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/ai.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/alignment.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
@@ -20,6 +21,7 @@ backend|server/ecysearch.ts|add JSDoc or an input-validation guard to the primar
 backend|server/ecysearcher-proxy.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/ecysearcher.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/embed-catalog.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/error-tracking.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/files.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/gemini-cli.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/github-actions.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
@@ -52,6 +54,42 @@ backend|server/memory-stats.ts|add JSDoc or an input-validation guard to the pri
 backend|server/metrics.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/middleware/auth.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/middleware/rate-limit.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/model-overrides.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/_core/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/calendar/recurrence.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/calendar/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/calendar/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/calendar/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/calendar/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/cookbook/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/cookbook/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/cookbook/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/cookbook/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/demo/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/demo/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/demo/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/documents/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/documents/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/documents/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/documents/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/email/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/email/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/email/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/email/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/notes-tasks/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/notes-tasks/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/notes-tasks/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/notes-tasks/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/registry.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/research/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/research/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/research/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/research/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/settings/router.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/settings/schema.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/settings/service.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/settings/store.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/modules/settings/totp.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/notify.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/oauth-gc.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/openapi.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
@@ -62,10 +100,17 @@ backend|server/provider-errors.ts|add JSDoc or an input-validation guard to the 
 backend|server/providers.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/quota-persist.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/rag.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/engine.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/pipeline.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/planner.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/report.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/searxng.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/research/summarize.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/revenue.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/selftest-plan.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/store/db-adapter.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/store/migrations.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
+backend|server/store/vector.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/stt-catalog.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/telemetry.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 backend|server/terminal.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
@@ -77,10 +122,14 @@ backend|server/webhooks/outbound.ts|add JSDoc or an input-validation guard to th
 frontend|src/App.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/AgentMessage.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/BackupControl.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/CalendarPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/CapabilityGate.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/ClusterManager.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/CommandLineTerminal.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/CookbookPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/DocumentsPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/ECySearcherPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/EmailPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/ErrorFallback.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/FileTransfer.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/GitHubActionsPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
@@ -91,13 +140,18 @@ frontend|src/components/GoogleDriveBrowser.tsx|add a null/empty-data guard or an
 frontend|src/components/GoogleSheetsBrowser.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/IntegrationsPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/KeyVault.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/ModelSettings.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/ModulePanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/MultiAgentPipeline.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/NotesTasksPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/ObservabilityPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/ReactAgentTab.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/ResearchPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/RevenueOps.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/SaaSAdmin.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/SecurityPolicies.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/SelfTestGates.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
+frontend|src/components/SettingsPanel.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/Skeleton.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/Sparkline.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/components/TelemetryCockpit.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
@@ -123,6 +177,7 @@ frontend|src/lib/apiClient.ts|add a unit test for a pure exported function in th
 frontend|src/lib/capabilities.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 frontend|src/lib/firebase.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 frontend|src/lib/i18n.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+frontend|src/lib/modules.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 frontend|src/lib/observability.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 frontend|src/lib/theme.tsx|add a null/empty-data guard or an aria-label to the main exported component|tsc clean; component renders safely on empty/undefined input
 frontend|src/lib/usage.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
@@ -177,9 +232,12 @@ scripts|scripts/dispatch-bench-run.mjs|add a JSDoc block to the main exported fu
 scripts|scripts/dispatch-merge.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
 scripts|scripts/ecysearcher-lane.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
 scripts|scripts/ecysearcher-mcp.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
+scripts|scripts/env-contract.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 scripts|scripts/gemini-pool-check.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
 scripts|scripts/gemini-provision.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
+scripts|scripts/perf-smoke.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 scripts|scripts/provider-bench.mjs|add a JSDoc block to the main exported function documenting its params and return|JSDoc present; no behavior change
+scripts|scripts/route-usage.ts|add JSDoc or an input-validation guard to the primary exported function|tsc clean; guard/JSDoc present; no behavior change
 orchestration|orchestration/bin/lib/align-sweep.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/autofix.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/automator-best.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
@@ -191,6 +249,7 @@ orchestration|orchestration/bin/lib/backoff.ts|add a unit test for a pure export
 orchestration|orchestration/bin/lib/bench.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/benchprompt.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/build-plan.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/build-tasks-core.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/chrome-probe.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/claims.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/claude-constitution.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
@@ -208,6 +267,7 @@ orchestration|orchestration/bin/lib/dispatchbench.ts|add a unit test for a pure 
 orchestration|orchestration/bin/lib/dispatchdoctor.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/dispatchsim.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/doctor.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/dod-lanes.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/dod.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/drift.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/driftguard.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
@@ -221,13 +281,16 @@ orchestration|orchestration/bin/lib/fuse.ts|add a unit test for a pure exported 
 orchestration|orchestration/bin/lib/gate.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/gemini-quota.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/gemini.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/gen-catalog-core.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/gpu-lock.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/graph.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/heartbeat.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/hierarchy.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/horizon.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/import-guard.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/joker.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/judge.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
+orchestration|orchestration/bin/lib/keys-health-core.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/licenses.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/loop.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean
 orchestration|orchestration/bin/lib/metrics.ts|add a unit test for a pure exported function in this file|new assertion passes; tsc clean

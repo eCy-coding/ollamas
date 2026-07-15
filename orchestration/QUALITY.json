@@ -1,40 +1,20 @@
 {
-  "ts": "2026-07-04T11:05:42.316Z",
+  "ts": "2026-07-12T07:52:30.458Z",
   "lanes": [
     {
       "lane": "backend",
-      "branch": "chore/p1-hardening",
-      "tsc": "pass",
+      "branch": "feat/v-final-train",
+      "tsc": "skip",
       "tscErrors": 0,
       "testLast": "passed",
-      "testTs": "2026-06-29T00:24:20.336Z",
-      "testStale": true,
-      "dirty": 52
-    },
-    {
-      "lane": "colab",
-      "branch": "feat/colab-gpu",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
+      "testTs": "2026-07-11T20:04:52.010Z",
       "testStale": false,
-      "dirty": 13
+      "dirty": 40
     },
     {
-      "lane": "fix/audit-security",
-      "branch": "fix/audit-security",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "passed",
-      "testTs": "2026-06-25T16:32:03.445Z",
-      "testStale": true,
-      "dirty": 3
-    },
-    {
-      "lane": "verify/gwv2-all-lanes",
-      "branch": "verify/gwv2-all-lanes",
-      "tsc": "pass",
+      "lane": "odysseus",
+      "branch": "feat/odysseus-bridge",
+      "tsc": "skip",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -42,9 +22,19 @@
       "dirty": 0
     },
     {
-      "lane": "fix/binary-architecture-calibration",
-      "branch": "fix/binary-architecture-calibration",
-      "tsc": "pass",
+      "lane": "cockpit",
+      "branch": "feat/cockpit-v1",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 5
+    },
+    {
+      "lane": "colab",
+      "branch": "feat/colab-gpu",
+      "tsc": "skip",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
@@ -52,80 +42,170 @@
       "dirty": 12
     },
     {
-      "lane": "fix/audit-cont",
-      "branch": "fix/audit-cont",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 1
-    },
-    {
-      "lane": "claude/cool-cohen-b245ee",
-      "branch": "claude/cool-cohen-b245ee",
+      "lane": "integration/all-lanes",
+      "branch": "integration/all-lanes",
       "tsc": "skip",
       "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
+      "testLast": "passed",
+      "testTs": "2026-07-10T18:41:41.089Z",
       "testStale": false,
-      "dirty": 1
+      "dirty": 0
     },
     {
-      "lane": "claude/determined-bartik-0090ba",
-      "branch": "claude/determined-bartik-0090ba",
-      "tsc": "skip",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 4
-    },
-    {
-      "lane": "claude/loving-varahamihira-77d4a9",
-      "branch": "claude/loving-varahamihira-77d4a9",
-      "tsc": "skip",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 1
-    },
-    {
-      "lane": "claude/naughty-kowalevski-2ccc35",
-      "branch": "claude/naughty-kowalevski-2ccc35",
-      "tsc": "skip",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 566
-    },
-    {
-      "lane": "req-sweep",
-      "branch": "req-sweep",
-      "tsc": "pass",
-      "tscErrors": 0,
-      "testLast": "unknown",
-      "testTs": "",
-      "testStale": false,
-      "dirty": 10
-    },
-    {
-      "lane": "(detached)",
-      "branch": "(detached)",
+      "lane": "cookbook",
+      "branch": "feat/cookbook-panel",
       "tsc": "skip",
       "tscErrors": 0,
       "testLast": "unknown",
       "testTs": "",
       "testStale": false,
       "dirty": 0
+    },
+    {
+      "lane": "documents",
+      "branch": "feat/documents-panel",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
+    },
+    {
+      "lane": "fix/audit-security",
+      "branch": "fix/audit-security",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "passed",
+      "testTs": "2026-06-25T16:32:03.445Z",
+      "testStale": true,
+      "dirty": 2
+    },
+    {
+      "lane": "fable",
+      "branch": "feat/fable-do-calibration",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "flow",
+      "branch": "feat/flow-v1",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 11
+    },
+    {
+      "lane": "verify/gwv2-all-lanes",
+      "branch": "verify/gwv2-all-lanes",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
+    },
+    {
+      "lane": "gwv",
+      "branch": "feat/gwv2-cherrypick",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 2
+    },
+    {
+      "lane": "agent/odysseus-task-1",
+      "branch": "agent/odysseus-task-1",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "research",
+      "branch": "feat/research-panel",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
+    },
+    {
+      "lane": "revenue",
+      "branch": "feat/revenue-first-payment",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 2
+    },
+    {
+      "lane": "shell",
+      "branch": "feat/shell-s0",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "v",
+      "branch": "feat/v2-shipgate",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 0
+    },
+    {
+      "lane": "ux",
+      "branch": "feat/ux-e2e",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "passed",
+      "testTs": "2026-07-10T04:15:23.526Z",
+      "testStale": true,
+      "dirty": 5
+    },
+    {
+      "lane": "ux",
+      "branch": "feat/ux-quality-v2",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 1
+    },
+    {
+      "lane": "fix/binary-architecture-calibration",
+      "branch": "fix/binary-architecture-calibration",
+      "tsc": "skip",
+      "tscErrors": 0,
+      "testLast": "unknown",
+      "testTs": "",
+      "testStale": false,
+      "dirty": 12
     }
   ],
   "redLanes": [],
   "totals": {
-    "green": 2,
+    "green": 0,
     "red": 0,
-    "unknown": 10
+    "unknown": 20
   }
 }

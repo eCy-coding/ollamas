@@ -1,0 +1,34 @@
+[automator-daily] → qwen3-coder-64k:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3-coder-64k_latest
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=INCOMPLETE
+[automator-daily] → qwen3:8b-16k (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3_8b-16k
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=INCOMPLETE
+[automator-daily] → ollamas-reviewer:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/ollamas-reviewer_latest
+[automator-daily]   ✅ produced 4 file(s) · ♻️ recurring(launchd)  verdict=INCOMPLETE
+[automator-daily] → qwen2.5vl:32b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen2.5vl_32b
+[automator-daily]   ✅ produced 4 file(s) · ♻️ recurring(launchd)  verdict=INCOMPLETE
+[automator-daily] → qwen2.5vl:7b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen2.5vl_7b
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=OK
+[automator-daily] → qwen3:8b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3_8b
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=INCOMPLETE
+[automator-daily] → qwen3:30b-a3b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3_30b-a3b
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=INCOMPLETE
+[automator-daily] → deepseek-r1:32b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/deepseek-r1_32b
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=DONE
+[automator-daily] → qwen3-coder:30b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3-coder_30b
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=INCOMPLETE
+[automator-daily] → qwen3:4b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3_4b
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=DONE
+[automator-daily] → gpt-oss:20b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/gpt-oss_20b
+[automator-daily]   ✅ produced 1 file(s) · one-off  verdict=INCOMPLETE
+[automator-daily] → phi4:latest (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/phi4_latest
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=OK
+[automator-daily] → kimi-k2.5:cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/kimi-k2.5_cloud
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=INCOMPLETE
+[automator-daily] → gpt-oss:20b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/gpt-oss_20b-cloud
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=DONE
+[automator-daily] → gpt-oss:120b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/gpt-oss_120b-cloud
+[automator-daily]   ✅ produced 2 file(s) · ♻️ recurring(launchd)  verdict=BLOCKED
+[automator-daily] → qwen3-coder:480b-cloud (ollama-cloud) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/qwen3-coder_480b-cloud
+[automator-daily]   ✅ produced 3 file(s) · ♻️ recurring(launchd)  verdict=DONE
+[automator-daily] → llama3.3:70b (ollama-local) → /Users/emrecnyngmail.com/Desktop/ollamas-daily/llama3.3_70b
+[automator-daily]   ❌ nothing 0 file(s) · one-off  verdict=INCOMPLETE
