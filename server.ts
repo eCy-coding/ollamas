@@ -934,11 +934,14 @@ async function initializeServer() {
     // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
     // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
     // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
-    // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
-    await Promise.all(upstreams.map(async (cfg) => {
+    // Non-blocking BACKGROUND connect (perf): a slow npx cold-start (fs/memory/thinking/
+    // everything hit -32001 at cold boot, then recover) must NOT delay boot. Boot returns
+    // immediately; each upstream's tools merge as it resolves, and startSupervisor() below
+    // handles reconnect. Capability is preserved — nothing is pruned, only deferred.
+    void Promise.all(upstreams.map(async (cfg) => {
       const r = await superviseUpstream(cfg);
       console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-    }));
+    })).catch((e: any) => console.warn(`[MCP-Consume] background connect error: ${e?.message}`));
     // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
     // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
     const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
@@ -1767,6 +1770,14 @@ async function initializeServer() {
     const ac = new AbortController();
     res.on("close", () => { if (!res.writableFinished) ac.abort(); });
 
+    // Hang-guard: a provider/tool call inside the ReAct loop has no per-call timeout, so a
+    // hung free-cloud provider or stalled tool would freeze the loop — it never emits `done`,
+    // the response never ends, and the client button stays stuck on "running". This generous
+    // ceiling aborts a stalled run so generate/execute throw AbortError → catch → res.end().
+    // Long legit multi-step work finishes well under it; env-tunable.
+    const RUN_TIMEOUT_MS = Number(process.env.AGENT_RUN_TIMEOUT_MS) || 1_200_000; // 20 min
+    const runTimer = setTimeout(() => { if (!res.writableFinished) ac.abort(); }, RUN_TIMEOUT_MS);
+
     const sendEvent = (type: string, payload: any) => {
       res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
     };
@@ -1995,14 +2006,20 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         }
       }
 
+      clearTimeout(runTimer);
       res.end();
     } catch (err: any) {
-      // Client disconnected — abort is expected, not an error.
+      clearTimeout(runTimer);
+      // Abort = client disconnect OR hang-guard/stall timeout firing. Emit a terminal
+      // `done` so the client resets cleanly (a hung run aborted by the timeout must not
+      // look like a silent stall to the UI), then end.
       if (err?.name === "AbortError" || ac.signal.aborted) {
+        try { sendEvent("done", { text: "", status: "aborted" }); } catch { /* stream already closed */ }
         res.end();
         return;
       }
       sendEvent("error", { message: err?.message || "Execution loop failure." });
+      try { sendEvent("done", { text: "", status: "error" }); } catch { /* stream already closed */ }
       res.end();
     }
   });
@@ -3162,6 +3179,357 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
     }
 
     res.json(report);
+  });
+
+  // ----------------------------------------------------
+  // ODYSSEUS PANEL (deterministic, NO-LLM) — user-facing GET /odysseus
+  // Rule-router -> ToolRegistry.execute("mcp__odysseus__*") in-process, reusing the
+  // same "local" ctx the ReAct agent uses (no allowedTiers => host_upstream allowed).
+  // ----------------------------------------------------
+  app.post("/api/odysseus/run", async (req, res) => {
+    const b = req.body || {};
+    const ROUTES: Record<string, [string, Record<string, any>]> = {
+      chat: ["odysseus_chat", { prompt: b.prompt, model: b.model }],
+      research: ["odysseus_research", { query: b.query, model: b.model }],
+      agent: ["odysseus_agent_task", { task: b.task, workspace: b.workspace, model: b.model }],
+      health: ["odysseus_health", {}],
+    };
+    const entry = ROUTES[b.type];
+    if (!entry) return res.status(400).json({ ok: false, error: `unknown type '${b.type}'` });
+    const [tool, raw] = entry;
+    const args: Record<string, any> = {};
+    for (const [k, v] of Object.entries(raw)) if (v !== undefined && v !== null && v !== "") args[k] = v;
+    if (b.type !== "health" && !args.model) args.model = "ollamas-auto";
+    try {
+      // Free cloud (pollinations) occasionally streams an empty answer; retry up to
+      // 3x for content tools so the user panel is reliable. health returns once.
+      const tries = b.type === "health" ? 1 : 3;
+      let text = "";
+      let ok = false;
+      for (let i = 0; i < tries; i++) {
+        const r = await ToolRegistry.execute("mcp__odysseus__" + tool, args, {
+          isLive: CURRENT_MODE !== "demo",
+          workspaceRoot: db.data.workspacePath,
+          autoApply: true,
+          deps: TOOL_DEPS,
+          tenantId: "local",
+        });
+        const o: any = r.output;
+        text = typeof o === "string" ? o
+          : Array.isArray(o?.content) ? o.content.map((c: any) => c?.text ?? "").join(" ").trim()
+          : (o?.text ?? o?.error ?? JSON.stringify(o));
+        ok = !!r.ok && !o?.error && !!text && text !== "(empty answer)" && !text.includes("[odysseus error]");
+        if (ok || b.type === "health") break;
+      }
+      res.json({ ok, result: text });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+    }
+  });
+
+  app.get("/odysseus", (_req, res) => {
+    res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Odysseus · ollamas</title><style>
+:root{--bg:#050A14;--surf:#0D1B2E;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--ok:#00C896;--bad:#F5576C}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:32px 18px}
+main{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#00D4FF,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;color:#050A14}
+h1{font-size:21px;margin:0;letter-spacing:-.02em}.sub{color:var(--fg2);font-size:12.5px;margin-top:2px}
+.badge{margin-left:auto;font:600 12px/1 ui-monospace,monospace;padding:6px 11px;border-radius:99px;border:1px solid var(--line)}
+.badge.ok{color:var(--ok);border-color:rgba(0,200,150,.4);background:rgba(0,200,150,.08)}
+.badge.bad{color:var(--bad);border-color:rgba(245,87,108,.4);background:rgba(245,87,108,.08)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+label{font-size:12px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+select,textarea,input{width:100%;background:#0a1626;border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:11px 13px;font:inherit}
+textarea{min-height:96px;resize:vertical}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:140px}
+button{background:var(--cyan);color:#050A14;font-weight:700;border:0;border-radius:9px;padding:12px 20px;cursor:pointer;font-size:14px}
+button:disabled{opacity:.5;cursor:progress}
+.out{white-space:pre-wrap;background:#0a1626;border:1px solid var(--line);border-radius:9px;padding:14px;min-height:60px;font:13.5px/1.6 ui-monospace,monospace;color:#cfe}
+.meta{font:11px/1 ui-monospace,monospace;color:var(--fg2)}
+footer{color:#536882;font-size:11.5px;text-align:center;font-family:ui-monospace,monospace}
+</style></head><body><main>
+<header><div class="logo">e</div><div><h1>Odysseus</h1><div class="sub">ollamas :3000 → odysseus → cloud · $0 · yapay-zekasız deterministik</div></div><span id="badge" class="badge">kontrol…</span></header>
+<div class="card">
+<div><label for="act">İşlem</label><select id="act" onchange="syncFields()">
+<option value="chat">Sohbet — Odysseus'a soru sor</option>
+<option value="research">Araştırma — derin araştırma (web)</option>
+<option value="agent">Ajan Görevi — otonom araç-kullanan görev</option>
+</select></div>
+<div id="wsWrap" style="display:none"><label for="ws">Çalışma dizini (opsiyonel)</label><input id="ws" placeholder="/path/to/workspace"></div>
+<div><label id="inLbl" for="inp">Mesaj</label><textarea id="inp" placeholder="Yazın…"></textarea></div>
+<div class="row"><div><button id="go" onclick="run()">Çalıştır ▸</button></div><div class="meta" id="meta" style="align-self:center;text-align:right"></div></div>
+</div>
+<div class="card"><label>Sonuç</label><div id="out" class="out">—</div></div>
+<footer>deterministik: kural-router → ollamas /api/odysseus/run → mcp__odysseus__* · LLM yok</footer>
+</main><script>
+const $=id=>document.getElementById(id);
+function syncFields(){const a=$('act').value;$('inLbl').textContent=a==='research'?'Araştırma sorusu':a==='agent'?'Görev':'Mesaj';$('wsWrap').style.display=a==='agent'?'':'none';}
+async function call(body){const r=await fetch('/api/odysseus/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
+async function health(){try{const d=await call({type:'health'});const b=$('badge');const ok=d.ok&&/healthy/.test(d.result||'');b.textContent=ok?'● bağlı':'● bağlantı yok';b.className='badge '+(ok?'ok':'bad');}catch{$('badge').textContent='● bağlantı yok';$('badge').className='badge bad';}}
+async function run(){const a=$('act').value,v=$('inp').value.trim();if(!v){$('out').textContent='Lütfen bir metin girin.';return;}
+const body={type:a};body[a==='research'?'query':a==='agent'?'task':'prompt']=v;if(a==='agent'&&$('ws').value.trim())body.workspace=$('ws').value.trim();
+$('go').disabled=true;$('out').textContent='Odysseus çalışıyor…';$('meta').textContent='';const t=Date.now();
+try{const d=await call(body);$('out').textContent=d.ok?(d.result||'(boş yanıt)'):('HATA: '+(d.error||d.result||'bilinmeyen'));$('meta').textContent=(d.ok?'✓':'✗')+' '+((Date.now()-t)/1000).toFixed(1)+'s';}
+catch(e){$('out').textContent='HATA: '+e;}finally{$('go').disabled=false;}}
+syncFields();health();setInterval(health,30000);
+</script></body></html>`);
+  });
+
+  // ----------------------------------------------------
+  // ORCHESTRA COUNCIL — 4-owner weighted deliberation (deterministic orchestration).
+  // Parallel model-seats (ollamas=groq ∥ odysseus=gemini ∥ claudecode=github-models),
+  // score (verifiable=checkAnswer / open=judge), weighted synthesis, reward-ledger + levels.
+  // ecy (%30) = human/constitution weight applied to the reward + synthesis values.
+  // ----------------------------------------------------
+  const COUNCIL_LEDGER = path.join(os.homedir(), ".ollamas", "council-ledger.json");
+  const COUNCIL_OWNERS: Array<{ owner: string; weight: number; kind: string; provider?: string }> = [
+    { owner: "ollamas", weight: 0.25, kind: "provider", provider: "groq" },
+    { owner: "odysseus", weight: 0.23, kind: "odysseus" },
+    { owner: "claudecode", weight: 0.22, kind: "provider", provider: "github-models" },
+  ];
+  const COUNCIL_LEVELS = [
+    { level: 5, name: "Orkestra", min: 300 }, { level: 4, name: "Usta", min: 150 },
+    { level: 3, name: "Kalibre", min: 75 }, { level: 2, name: "Uyumlu", min: 25 },
+    { level: 1, name: "Çırak", min: 0 },
+  ];
+  const readCouncilLedger = (): any => {
+    try { return JSON.parse(fs.readFileSync(COUNCIL_LEDGER, "utf8")); }
+    catch { return { rewards: { ecy: 0, ollamas: 0, odysseus: 0, claudecode: 0 }, tasks: 0, calibration: {}, history: [] }; }
+  };
+  const writeCouncilLedger = (l: any) => {
+    try { fs.mkdirSync(path.dirname(COUNCIL_LEDGER), { recursive: true }); fs.writeFileSync(COUNCIL_LEDGER, JSON.stringify(l, null, 2)); } catch { /* best-effort */ }
+  };
+  const councilLevel = (total: number) => COUNCIL_LEVELS.find((l) => total >= l.min) || COUNCIL_LEVELS[COUNCIL_LEVELS.length - 1];
+
+  const councilSeatAnswer = async (seat: { owner: string; kind: string; provider?: string }, task: string): Promise<string> => {
+    if (seat.kind === "odysseus") {
+      for (let i = 0; i < 3; i++) {
+        if (i) await new Promise((r) => setTimeout(r, 1500)); // space retries: odysseus/gemini empties under burst
+        const r = await ToolRegistry.execute("mcp__odysseus__odysseus_chat", { prompt: task, model: "ollamas-auto" }, {
+          isLive: CURRENT_MODE !== "demo", workspaceRoot: db.data.workspacePath, autoApply: true, deps: TOOL_DEPS, tenantId: "local",
+        });
+        const o: any = r.output;
+        const t = typeof o === "string" ? o : Array.isArray(o?.content) ? o.content.map((c: any) => c?.text ?? "").join(" ").trim() : (o?.text ?? "");
+        if (t && t !== "(empty answer)") return t;
+      }
+      return "";
+    }
+    // Provider seats (ollamas=groq, claudecode=github-models) — mirror the odysseus
+    // seat's retry. github-models/groq throttle under the 3-seat concurrent burst and
+    // empty on a single shot, which silently zeroed the claudecode seat every round.
+    // singleAttempt stays (pins THIS provider — no cross-provider fallback that would
+    // falsify the seat's identity); we just retry the same provider up to 3x.
+    for (let i = 0; i < 3; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 1500));
+      const g: any = await ProviderRouter.generate({ provider: seat.provider, messages: [{ role: "user", content: task }], stream: false, singleAttempt: true } as any);
+      const t = g?.text ?? "";
+      if (t && t !== "(empty answer)") return t;
+    }
+    // Last resort: free-tier providers (github-models, gemini) auth-flap intermittently,
+    // so the pinned provider can be dead for a whole round. Drop singleAttempt on a final
+    // attempt → the router falls back to any live provider. Keeps the seat alive (council
+    // never silently zeroes a seat); diversity drops only while the pinned provider is down.
+    try {
+      const g: any = await ProviderRouter.generate({ provider: seat.provider, messages: [{ role: "user", content: task }], stream: false } as any);
+      const t = g?.text ?? "";
+      if (t && t !== "(empty answer)") return t;
+    } catch { /* all providers down — seat empty this round */ }
+    return "";
+  };
+
+  const councilJudge = async (task: string, answer: string): Promise<number> => {
+    if (!answer) return 0;
+    // Robust: 3 judges run concurrently per solve; a single provider under that burst
+    // sometimes empties → score 0. Try cerebras first (handles concurrency well), groq
+    // fallback. Only a parsed number wins; empty/throw → next provider.
+    const prompt = `Rate 0.0-1.0 how well this answer solves the task. Reply ONLY one decimal number.\nTASK: ${task}\nANSWER: ${answer}`;
+    for (const prov of ["cerebras", "groq", "gemini"]) {
+      try {
+        const g: any = await ProviderRouter.generate({ provider: prov, messages: [{ role: "user", content: prompt }], stream: false, singleAttempt: true } as any);
+        const m = String(g?.text ?? "").match(/(\d?\.\d+|\d)/);
+        if (m) { const v = parseFloat(m[1]); if (!isNaN(v)) return Math.max(0, Math.min(1, v)); }
+      } catch { /* next provider */ }
+    }
+    return 0;
+  };
+
+  app.post("/api/council/solve", async (req, res) => {
+    const b = req.body || {};
+    const task = String(b.task || "").trim();
+    if (!task) return res.status(400).json({ ok: false, error: "task required" });
+    const verifiable = !!b.verifiable && b.expect != null;
+    try {
+      // Perf: per-seat 6s timeout — a slow seat (e.g. odysseus's extra hops) no longer
+      // gates the whole council; it returns "" (best-effort) and synthesis proceeds with
+      // the seats that answered in time. Weighted synth is already resilient to an empty seat.
+      const seatTimeout = <T>(pr: Promise<T>, ms: number, fallback: T) =>
+        Promise.race([pr, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+      const answers = await Promise.all(COUNCIL_OWNERS.map((s) => seatTimeout(councilSeatAnswer(s, task), 6000, "").catch(() => "")));
+      // Perf+reliability: verifiable → local checkAnswer (no API). Open → ONE judge call
+      // rating ALL seats at once (was 3 concurrent judges → burst → intermittent 0-scores).
+      let scores: number[];
+      if (verifiable) {
+        scores = answers.map((a) => (a && checkAnswer(a, String(b.expect)) ? 1 : 0));
+      } else {
+        scores = new Array(answers.length).fill(0);
+        const filled = answers.map((a, i) => ({ i, a })).filter((x) => x.a);
+        if (filled.length) {
+          const L = ["A", "B", "C", "D", "E"];
+          const jp = `Her yanıtı GÖREV'i çözme kalitesine göre puanla. SADECE ${filled.length} skoru İKİ ONDALIKLI, virgülle ayırarak yaz (örn: 0.90,0.75,1.00). Başka hiçbir şey yazma.\nGÖREV: ${task}\n` +
+            filled.map((x, k) => `[${L[k]}] ${x.a}`).join("\n");
+          // Wide fallback: free providers hit daily/rate limits under heavy use. Try many
+          // (incl. less-used github-models/mistral/zai/sambanova) so the judge finds a live one.
+          for (const prov of ["cerebras", "groq", "gemini", "github-models", "mistral", "zai", "sambanova"]) {
+            try {
+              const g: any = await ProviderRouter.generate({ provider: prov, messages: [{ role: "user", content: jp }], stream: false, singleAttempt: true } as any);
+              // Parse ONLY decimals (0.90, 1.00) — force 2-decimal output so no stray integer
+              // from the answer text misaligns the scores.
+              const nums = [...String(g?.text ?? "").matchAll(/[01]\.\d\d?/g)].map((m) => parseFloat(m[0])).filter((v) => v >= 0 && v <= 1);
+              if (nums.length >= filled.length) { filled.forEach((x, k) => { scores[x.i] = nums[k]; }); break; }
+            } catch { /* next provider */ }
+          }
+          // Graceful degradation: free providers get rate-limited/degraded under heavy daily
+          // use → judge returns empty (all-zero). An answered seat scoring 0 is almost always
+          // judge-unavailable, not a terrible answer. Give answered seats a neutral 0.7 so
+          // ranking + reward degrade gracefully instead of collapsing to a weight-only tie.
+          if (scores.every((v) => v === 0)) filled.forEach((x) => { scores[x.i] = 0.7; });
+        }
+      }
+      const seats = COUNCIL_OWNERS.map((s, i) => ({ owner: s.owner, weight: s.weight, score: Math.round(scores[i] * 100) / 100, answer: answers[i] }));
+      const ranked = seats.map((s) => ({ ...s, w: s.weight * (s.score || 0.01) })).sort((a, c) => c.w - a.w);
+      const synthPrompt = `Sen 4-sahipli orkestra konseyinin sentezcisisin. ecy-değerleri: Doğruluk>hız, kısa-öz kanıtlı, $0/cloud.\nGÖREV: ${task}\n\nKoltuk yanıtları (ağırlık=pay×skor, yüksek baskın):\n${ranked.map((s) => `• ${s.owner} (ağırlık ${s.w.toFixed(2)}, skor ${s.score}): ${s.answer || "(boş)"}`).join("\n")}\n\nBu yanıtları ağırlıklarına göre birleştirip TEK en-iyi, kısa-öz, doğru final yanıtı ver. Sadece final yanıtı yaz.`;
+      let synth = "";
+      // Synth on cerebras (separate pool) so gemini's tight 10-RPM free budget is left to
+      // the odysseus seat (which speaks gemini) instead of being split synth+odysseus.
+      try { const sg: any = await ProviderRouter.generate({ provider: "cerebras", messages: [{ role: "user", content: synthPrompt }], stream: false, singleAttempt: true } as any); synth = sg?.text ?? ""; } catch { /* fall back below */ }
+      if (!synth) synth = ranked[0]?.answer || "";
+      const diff = Number(b.difficulty ?? 1.0) || 1.0;
+      const led = readCouncilLedger();
+      const bestScore = Math.max(0, ...seats.map((s) => s.score));
+      seats.forEach((s) => { led.rewards[s.owner] = (led.rewards[s.owner] || 0) + s.score * s.weight * diff * 10; });
+      led.rewards.ecy = (led.rewards.ecy || 0) + bestScore * 0.30 * diff * 10;
+      led.tasks = (led.tasks || 0) + 1;
+      const ttype = String(b.type || "genel");
+      led.calibration = led.calibration || {};
+      led.calibration[ttype] = led.calibration[ttype] || {};
+      const winner = ranked[0]?.owner;
+      if (winner) led.calibration[ttype][winner] = (led.calibration[ttype][winner] || 0) + 1;
+      let total = 0; for (const v of Object.values(led.rewards)) total += Number(v);
+      const lvl = councilLevel(total);
+      led.level = lvl.level; led.level_name = lvl.name; led.total_reward = Math.round(total * 10) / 10;
+      led.history = (led.history || []).slice(-49); led.history.push({ task: task.slice(0, 80), winner, bestScore, verifiable });
+      writeCouncilLedger(led);
+      res.json({ ok: true, answer: synth, seats, winner, ecy_weight: 0.30, level: lvl.level, level_name: lvl.name, total_reward: led.total_reward, rewards: led.rewards });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: String(e?.message ?? e) });
+    }
+  });
+
+  app.get("/api/council/ledger", (_req, res) => {
+    const led = readCouncilLedger();
+    let total = 0; for (const v of Object.values(led.rewards || {})) total += Number(v);
+    const lvl = councilLevel(total);
+    res.json({ ...led, total_reward: Math.round(total * 10) / 10, level: lvl.level, level_name: lvl.name, next: COUNCIL_LEVELS.filter((l) => l.min > total).slice(-1)[0] || null });
+  });
+
+  app.get("/council", (_req, res) => {
+    res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Orkestra Konseyi · ollamas</title><style>
+:root{--bg:#050A14;--surf:#0D1B2E;--raised:#132338;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--violet:#7B5EA7;--ok:#00C896;--warn:#F5A623}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:30px 18px}
+main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#00D4FF,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;color:#050A14}
+h1{font-size:20px;margin:0}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
+.lvl{margin-left:auto;text-align:right}.lvl .b{font:700 13px/1 ui-monospace,monospace;color:var(--cyan)}.lvl .t{font:11px/1 ui-monospace,monospace;color:var(--fg2);margin-top:4px}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:11px}
+label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+textarea{width:100%;min-height:74px;background:#0a1626;border:1px solid var(--line);border-radius:9px;color:var(--fg);padding:11px 13px;font:inherit;resize:vertical}
+button{background:var(--cyan);color:#050A14;font-weight:700;border:0;border-radius:9px;padding:11px 20px;cursor:pointer;align-self:flex-start}button:disabled{opacity:.5;cursor:progress}
+.seats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.seat{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px}
+.seat.win{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}
+.seat .o{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:6px}.seat .o .w{margin-left:auto;font:11px/1 ui-monospace,monospace;color:var(--violet)}
+.seat .sc{height:5px;background:#0a1626;border-radius:3px;margin:8px 0;overflow:hidden}.seat .sc>i{display:block;height:100%;background:var(--ok)}
+.seat .a{font:11.5px/1.5 ui-monospace,monospace;color:var(--fg2);max-height:74px;overflow:auto;white-space:pre-wrap}
+.out{white-space:pre-wrap;background:#0a1626;border:1px solid var(--cyan);border-radius:9px;padding:14px;font:13.5px/1.6 ui-monospace,monospace;color:#dff}
+.rew{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.rew>div{background:var(--raised);border:1px solid var(--line);border-radius:9px;padding:9px 11px}.rew .k{font:10px/1 ui-monospace,monospace;color:var(--fg2);text-transform:uppercase}.rew .v{font:700 15px/1 ui-monospace,monospace;margin-top:5px}
+.bar{height:4px;background:#0a1626;border-radius:2px;margin-top:6px;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#00D4FF,#7B5EA7)}
+.meta{font:11px/1 ui-monospace,monospace;color:var(--fg2);text-align:right}
+footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center}
+</style></head><body><main>
+<header><div class="logo">e</div><div><h1>Orkestra Konseyi</h1><div class="sub">ecy %30 · ollamas %25 · odysseus %23 · claudecode %22 — ağırlıklı council, $0 cloud</div></div>
+<div class="lvl"><div class="b" id="lvl">L?</div><div class="t" id="lvlt">…</div></div></header>
+<div class="card"><label for="task">Görev</label><textarea id="task" placeholder="Konseye bir görev ver — 4 sahip eş-zamanlı çözer, ağırlıklı sentezler…"></textarea>
+<div style="display:flex;gap:12px;align-items:center"><button id="go" onclick="solve()">Konseyi Çalıştır ▸</button><span class="meta" id="meta" style="flex:1"></span></div></div>
+<div class="card"><label>Sentez (en-iyi yanıt)</label><div id="out" class="out">—</div>
+<label style="margin-top:6px">Koltuklar</label><div class="seats" id="seats"></div></div>
+<div class="card"><label>Ödül & Seviye</label><div class="rew" id="rew"></div></div>
+<footer>deterministik ağırlıklı council · /api/council/solve → groq ∥ odysseus/gemini ∥ github-GPT4o → gemini-sentez · BRAIN.md anayasa</footer>
+</main><script>
+const $=id=>document.getElementById(id);const OW={ecy:.30,ollamas:.25,odysseus:.23,claudecode:.22};
+async function ledger(){try{const d=await(await fetch('/api/council/ledger')).json();$('lvl').textContent='L'+d.level;$('lvlt').textContent=(d.level_name||'')+' · '+(d.total_reward||0)+' pt'+(d.next?(' → L'+d.next.level+' @'+d.next.min):'');const r=d.rewards||{};$('rew').innerHTML=['ecy','ollamas','odysseus','claudecode'].map(o=>{const v=Math.round((r[o]||0)*10)/10;const pct=Math.min(100,v/3);return '<div><div class="k">'+o+' '+(OW[o]*100)+'%</div><div class="v">'+v+'</div><div class="bar"><i style="width:'+pct+'%"></i></div></div>'}).join('');}catch(e){}}
+async function solve(){const t=$('task').value.trim();if(!t){$('out').textContent='Görev gir.';return;}$('go').disabled=true;$('out').textContent='Konsey çalışıyor — 4 sahip eş-zamanlı…';$('seats').innerHTML='';$('meta').textContent='';const s=Date.now();
+try{const d=await(await fetch('/api/council/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:t})})).json();
+if(!d.ok){$('out').textContent='HATA: '+(d.error||'?');return;}$('out').textContent=d.answer||'(boş)';
+$('seats').innerHTML=(d.seats||[]).map(x=>'<div class="seat'+(x.owner===d.winner?' win':'')+'"><div class="o">'+x.owner+(x.owner===d.winner?' 🏆':'')+'<span class="w">'+Math.round(x.weight*100)+'%</span></div><div class="sc"><i style="width:'+Math.round((x.score||0)*100)+'%"></i></div><div class="a">'+(x.answer?x.answer.replace(/</g,"&lt;"):'(boş)')+'</div></div>').join('');
+$('meta').textContent='✓ kazanan: '+d.winner+' · '+((Date.now()-s)/1000).toFixed(1)+'s · L'+d.level+' '+d.level_name;ledger();}
+catch(e){$('out').textContent='HATA: '+e;}finally{$('go').disabled=false;}}
+ledger();setInterval(ledger,15000);
+</script></body></html>`);
+  });
+
+  // ----------------------------------------------------
+  // OpenAI-compat shim (/v1) — lets odysseus (or any OpenAI client) use ollamas' reliable
+  // vault-keyed multi-cloud routing as its model backend. Tries several reliable cloud
+  // providers until one returns non-empty (no local ollama). Fixes odysseus flakiness from
+  // a single degraded/rate-limited free provider.
+  // ----------------------------------------------------
+  const V1_PROVIDERS = ["groq", "gemini", "cerebras", "github-models", "sambanova"];
+  const v1Gen = async (p: string, messages: any[]): Promise<string> => {
+    const g: any = await ProviderRouter.generate({ provider: p, messages, stream: false, singleAttempt: true } as any);
+    const t = (g?.text ?? "").trim();
+    if (!t) throw new Error("empty");
+    return t;
+  };
+  // Perf: RACE the two fastest providers in parallel (first non-empty wins) instead of
+  // sequential-await. A slow/empty groq no longer blocks — cerebras answers concurrently.
+  // Falls back to the remaining providers (raced) only if both leaders fail.
+  const reliableGenerate = async (messages: any[]): Promise<string> => {
+    // Leaders = cerebras+gemini (fast, and NOT groq): keeps groq's burst budget free for the
+    // council seat + 3 concurrent judges that already use groq. groq stays in the fallback tier.
+    try {
+      return await Promise.any(["cerebras", "gemini"].map((p) => v1Gen(p, messages)));
+    } catch { /* both leaders failed → race the rest incl. groq */ }
+    try {
+      return await Promise.any(["groq", "github-models", "sambanova"].map((p) => v1Gen(p, messages)));
+    } catch { return ""; }
+  };
+  app.get("/v1/models", (_req, res) => {
+    res.json({ object: "list", data: [{ id: "ollamas-auto", object: "model", owned_by: "ollamas" }, ...V1_PROVIDERS.map((p) => ({ id: p, object: "model", owned_by: "ollamas" }))] });
+  });
+  app.post("/v1/chat/completions", async (req, res) => {
+    const b = req.body || {};
+    const messages = Array.isArray(b.messages) ? b.messages : [];
+    const id = "chatcmpl-" + Date.now().toString(36);
+    try {
+      const content = await reliableGenerate(messages);
+      if (b.stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+      } else {
+        res.json({ id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: "ollamas-auto", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: { message: String(e?.message ?? e), type: "server_error" } });
+    }
   });
 
   // ----------------------------------------------------

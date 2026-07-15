@@ -5,12 +5,28 @@
       "name": "ukp",
       "transport": "stdio",
       "command": "python3",
-      "args": ["/Users/emrecnyngmail.com/Desktop/uk-pipeline/ukp.py", "--mcp-server"],
-      "allowedTools": ["hesapla", "sorgu", "kume", "seyir", "selftest", "smart", "planla"],
+      "args": [
+        "/Users/emrecnyngmail.com/Desktop/uk-pipeline/ukp.py",
+        "--mcp-server"
+      ],
+      "allowedTools": [
+        "hesapla",
+        "sorgu",
+        "kume",
+        "seyir",
+        "selftest",
+        "smart",
+        "planla"
+      ],
       "webhook": {
         "emits": "stage-events",
         "format": "standard-webhooks-hmac",
-        "events": ["lookahead", "dogrula", "repair", "escalate"],
+        "events": [
+          "lookahead",
+          "dogrula",
+          "repair",
+          "escalate"
+        ],
         "envOptIn": "UKP_WEBHOOK",
         "receiverTodo": "POST /api/ingest/stage-events (HMAC-verify X-Ukp-Signature) — ollamas-lane"
       }
@@ -19,36 +35,105 @@
       "name": "fs",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/emrecnyngmail.com/Desktop/ollamas"],
-      "allowedTools": ["read_file", "list_directory", "directory_tree", "search_files", "get_file_info"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/emrecnyngmail.com/Desktop/ollamas",
+        "/Users/emrecnyngmail.com/ollamas-odysseus-orchestrator",
+        "/Users/emrecnyngmail.com/pinokio/api/odysseus.pinokio.git",
+        "/Users/emrecnyngmail.com/khoj-secondbrain",
+        "/Users/emrecnyngmail.com/.local/bin",
+        "/Users/emrecnyngmail.com/.ollamas"
+      ],
+      "allowedTools": [
+        "read_file",
+        "list_directory",
+        "directory_tree",
+        "search_files",
+        "get_file_info",
+        "write_file",
+        "edit_file",
+        "create_directory",
+        "move_file"
+      ]
     },
     {
       "name": "memory",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "allowedTools": ["read_graph", "search_nodes", "open_nodes", "create_entities", "create_relations", "add_observations"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "allowedTools": [
+        "read_graph",
+        "search_nodes",
+        "open_nodes",
+        "create_entities",
+        "create_relations",
+        "add_observations"
+      ]
     },
     {
       "name": "thinking",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
-      "allowedTools": ["sequentialthinking"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "allowedTools": [
+        "sequentialthinking"
+      ]
     },
     {
       "name": "everything",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-everything"],
-      "allowedTools": ["echo", "add", "printEnv", "longRunningOperation"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ],
+      "allowedTools": [
+        "echo",
+        "add",
+        "printEnv",
+        "longRunningOperation"
+      ]
     },
     {
       "name": "ecysearcher",
       "transport": "stdio",
       "command": "node",
-      "args": ["/Users/emrecnyngmail.com/Desktop/ollamas/scripts/ecysearcher-mcp.mjs"],
-      "allowedTools": ["ecysearcher_search", "ecysearcher_domain", "ecysearcher_ip", "ecysearcher_threats"]
+      "args": [
+        "/Users/emrecnyngmail.com/Desktop/ollamas/scripts/ecysearcher-mcp.mjs"
+      ],
+      "allowedTools": [
+        "ecysearcher_search",
+        "ecysearcher_domain",
+        "ecysearcher_ip",
+        "ecysearcher_threats"
+      ]
+    },
+    {
+      "name": "odysseus",
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/emrecnyngmail.com/Desktop/ollamas/scripts/odysseus-bridge-mcp.mjs"
+      ],
+      "env": {
+        "ODYSSEUS_URL": "http://127.0.0.1:7860",
+        "ODYSSEUS_MODEL": "openai-fast",
+        "ODYSSEUS_ENDPOINT_ID": "eef6b03e",
+        "ODYSSEUS_AGENT_WORKSPACE": "/Users/emrecnyngmail.com/Desktop/ollamas-odysseus-wt"
+      },
+      "allowedTools": [
+        "odysseus_health",
+        "odysseus_chat",
+        "odysseus_research",
+        "odysseus_agent_task"
+      ]
     }
   ],
   "tools": {
@@ -82,8 +167,14 @@
       "category": "Input",
       "capability": "TerminalAutomation",
       "entryPoint": "host-bridge:7345/run",
-      "requiresEnv": ["HOST_BRIDGE_URL", "HOST_BRIDGE_TOKEN"],
-      "targets": ["iterm2", "terminal"],
+      "requiresEnv": [
+        "HOST_BRIDGE_URL",
+        "HOST_BRIDGE_TOKEN"
+      ],
+      "targets": [
+        "iterm2",
+        "terminal"
+      ],
       "selfHealing": false
     },
     "desktop_commander": {

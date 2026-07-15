@@ -549,6 +549,12 @@ export class ProviderRouter {
     // skipped by the hasKey gate at dispatch, so listing them costs nothing until a key
     // is added — then they participate in latency-ordered failover automatically.
     const defaults = ["fleet", "ollama-local", "openrouter", "gemini", "gemini-cli", "openai", "ollama-cloud", ...Object.keys(PROVIDER_CATALOG), "demo"];
+  if (process.env.OLLAMAS_HEADLESS === "1") { 
+  const local = defaults.filter((p) => p === "fleet" || p === "ollama-local"); 
+  const rest = defaults.filter((p) => p !== "fleet" && p !== "ollama-local"); 
+  defaults.length = 0; 
+  defaults.push(...rest, ...local); 
+}
     // Keep the Gemini family ADJACENT and FIRST when a gemini provider is requested: an exhausted
     // gemini API-key pool (429/cooled) self-sustains on the KEYLESS gemini-cli OAuth binary (same
     // Gemini family, 1000/day, no paste/rotation) BEFORE dropping to local — minimum-manual
