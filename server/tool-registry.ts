@@ -13,6 +13,7 @@ import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
 import { brainRemember, brainRecall, brainAssertFact, brainFactsAbout, brainIngest, parseExtraction, TIER_WEIGHT, type MemoryTier } from "./brain";
+import { evalUntrusted } from "./sandbox";
 import { countTokens, estimateCost } from "./tokens";
 import { runTestgen, runAudit, generateStorefront } from "./revenue";
 import { contractApprove, contractReject, contractSuspend, contractResume, contractRevoke, contractRotate, contractList } from "./contract";
@@ -942,6 +943,39 @@ const TOOLS: Record<string, ToolDef> = {
         facts,
         ns: args.ns ? String(args.ns) : undefined,
       });
+    },
+  },
+
+  // B4: sandboxed JS execution (server/sandbox.ts, quickjs-emscripten WASM).
+  // tier:safe — the code runs in a disposable QuickJS runtime with no host
+  // bindings (no fetch/process/require), a wall-clock interrupt handler and a
+  // memory cap, so it is safe even for an untrusted/low-plan caller. The tool
+  // layer still clamps the caller-supplied timeout/memory below the sandbox's
+  // own defaults so a caller can't ask for an oversized budget.
+  sandbox_eval: {
+    tier: "safe",
+    schema: fn(
+      "sandbox_eval",
+      "Evaluate untrusted JavaScript in a sandboxed QuickJS-WASM context (no filesystem/network/process access). Returns the JSON-serializable value of the last expression. Use for arithmetic, data transforms and small algorithms — not for anything needing host I/O.",
+      {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "JavaScript source to evaluate." },
+          timeout_ms: { type: "number", description: "Wall-clock timeout in ms (default 2000, capped at 5000)." },
+          input: { description: "Optional JSON value exposed inside the sandbox as the global INPUT." },
+        },
+        required: ["code"],
+      },
+      {
+        type: "object",
+        properties: { ok: { type: "boolean" }, value: {}, error: { type: "string" }, durationMs: { type: "number" } },
+        required: ["ok", "durationMs"],
+      }
+    ),
+    invoke: async (args) => {
+      if (!args.code) throw new Error("Missing 'code'.");
+      const timeoutMs = Math.min(Number(args.timeout_ms) > 0 ? Math.floor(Number(args.timeout_ms)) : 2000, 5000);
+      return await evalUntrusted(String(args.code), { timeoutMs, memoryLimitMb: 64, input: args.input });
     },
   },
 
