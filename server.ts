@@ -60,6 +60,7 @@ import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingD
 import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "./server/key-health";
+import { startJobs, stopJobs, getJobsSnapshot } from "./server/jobs";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { registerContractRoutes, poolStatusReport as contractPoolStatus } from "./server/contract";
@@ -923,6 +924,9 @@ async function initializeServer() {
   // sweep recovered cooldowns, so the vaulted key supply self-heals with zero operator action.
   // Feeds the GET /api/keys/health convergence signal. Opt-widen via KEY_HEALTH_SOURCES.
   startKeyHealth();
+  // Durable job queue + croner scheduler (B1): poll-claim-execute loop with backoff
+  // retry, plus a daily db-backup cron. Feeds the GET /api/jobs snapshot.
+  startJobs();
 
   // --- MCP gateway: CONNECT to upstream MCP servers (consume side, Faz 1) ---
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
@@ -1295,6 +1299,13 @@ async function initializeServer() {
   // snapshot before the first tick). NEVER exposes a key value.
   app.get("/api/keys/health", (_req, res) => {
     res.json(getKeyHealth() ?? liveCheapSnapshot());
+  });
+
+  // Durable job queue snapshot (B1): per-state counts + the most recent jobs
+  // (pending/running/done/failed, newest first). Cheap — served from the
+  // always-running poll loop's cached snapshot (server/jobs.ts).
+  app.get("/api/jobs", (_req, res) => {
+    res.json(getJobsSnapshot());
   });
 
   /**
@@ -3595,6 +3606,7 @@ ledger();setInterval(ledger,15000);
       stopWebhookWorker();
       stopOAuthGc();
       stopKeyHealth();
+      await stopJobs(); // finishes any in-flight job, claims no new one, closes its DbClient
       stopSupervisor();
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
       await new Promise<void>((resolve) => server.close(() => resolve()));

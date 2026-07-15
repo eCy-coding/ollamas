@@ -58,6 +58,7 @@
     "@types/pg": "^8.20.0",
     "@vitejs/plugin-react": "^5.0.4",
     "ajv": "^8.20.0",
+    "croner": "^10.0.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.14.0",
