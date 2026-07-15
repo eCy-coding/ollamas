@@ -1,40 +1,48 @@
-node_modules/
-build/
-dist/
-# Canonical binary-folder architecture: artifacts/bin (native binaries) and
-# artifacts/manifest.json are build-generated (make build-all). Not committed.
-artifacts/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
-.ephemeral-data/
-.colab-data/
-**/.master_key
-test-results/
-playwright-report/
-.playwright/
+# Ignore Go modules
+/go/pkg/
+/go/cache/
 
-# vF3 lighthouse-ci local reports
-.lighthouseci/
+# Ignore build output
+/bin/
+/coverage.out
+/.build/
 
-# generated/scratch (detection 2026-06-27): audit output, sync cache, stderr dumps
-audit-out/
-.sync/
-*.err
+# Ignore Docker
+/Dockerfile
+/docker-compose.yml
 
-# generated harness plugin bundle (built from .claude/ via build-plugin.sh)
-dist-plugin/
-.claude/last-context-snapshot.md
-.claude/last-turn.md
-.claude/settings.json.bak
-.claude/subagent-audit.log
-.claude/notifications.log
-.claude/harness-ops-report.md
-.claude/harness-ops.out.log
-.claude/harness-ops.err.log
+# Ignore test coverage
+/coverage.out
+
+# Ignore IDE files
+/.vscode/
+/.idea/
+/.DS_Store
+
+# Ignore build artifacts
+/*.log
+/*.pid
+
+# Ignore config files
+/configs/*.yaml
+/configs/*.toml
+
+# Ignore test files
+/test/
+/e2e/
+
+# Ignore docs
+/docs/
+
+# Ignore build logs
+/*.log
+/*.tmp
+# session/harness artifacts (Claude Code + daemons) — not committed
 .claude/.harness-ops-state
-
-# orchestration runtime state (regenerated per run; not source)
-orchestration/seyir/gpu-lock.json
+.claude/harness-ops*.log
+.claude/harness-ops-report.md
+.claude/last-context-snapshot.md
+.claude/notifications.log
+.claude/subagent-audit.log
+.lighthouseci/
+.sync/
