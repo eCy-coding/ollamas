@@ -24,6 +24,7 @@ import { setToolSupport, toolSupportSnapshot, hydrateToolSupport } from "./capab
 import { recordRequestEvent } from "./telemetry";
 import { resolveModelTuning, resolveKeepAlive, withSystemOverride } from "./model-overrides";
 import { randomUUID } from "node:crypto";
+import { withLlmSpan } from "./tracing";
 
 // Types
 export interface ProviderMessage {
@@ -358,7 +359,21 @@ export class ProviderRouter {
           ? (t: string) => { if (!firstChunkAt) firstChunkAt = Date.now(); onStreamChunk(t); }
           : undefined;
         try {
-          const result = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
+          // B2: the ONE span for the in-house fetch-based LLM call — wraps executeProvider
+          // (the single choke-point every provider branch funnels through), not scattered
+          // per-provider. Dynamic gen_ai.* usage attrs are attached once the call returns.
+          const result = await withLlmSpan(
+            "llm.generate",
+            { provider: prov, model: resolvedConfig.model, "gen_ai.operation.name": "chat", retryAttempt: attempt },
+            async (span) => {
+              const r = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
+              span.setAttribute("gen_ai.response.model", r.modelUsed || "");
+              if (r.tokensIn !== undefined) span.setAttribute("gen_ai.usage.input_tokens", r.tokensIn);
+              if (r.tokensOut !== undefined) span.setAttribute("gen_ai.usage.output_tokens", r.tokensOut);
+              if (r.tokensPerSec !== undefined) span.setAttribute("llm.tok_per_sec", r.tokensPerSec);
+              return r;
+            },
+          );
           lastAttemptMs = Date.now() - attemptStart;
           // Passive capability learning: a tools request that SUCCEEDED proves support.
           if (config.tools?.length) { setToolSupport(prov, resolvedConfig.model || "", true); this.persistUsageDebounced(); }

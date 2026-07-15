@@ -1,4 +1,6 @@
 import "dotenv/config"; // load .env into process.env before any provider/key read (getDecryptedKey fallback)
+import "./server/tracing"; // MUST be first (B2): boots NodeSDK's http auto-instrumentation before http is required below — see server/tracing.ts header (express instrumentation deliberately excluded, breaks Function.name)
+import { getTraceSnapshot, shutdownTracing } from "./server/tracing";
 import express from "express";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -1306,6 +1308,13 @@ async function initializeServer() {
   // always-running poll loop's cached snapshot (server/jobs.ts).
   app.get("/api/jobs", (_req, res) => {
     res.json(getJobsSnapshot());
+  });
+
+  // Distributed tracing snapshot (B2): last RING_BUFFER_MAX finished spans
+  // (auto http/express + manual LLM-call spans) from the in-process ring
+  // buffer — cheap, no external collector required. See server/tracing.ts.
+  app.get("/api/traces", (_req, res) => {
+    res.json(getTraceSnapshot());
   });
 
   /**
@@ -3611,6 +3620,7 @@ ledger();setInterval(ledger,15000);
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await closeStore();
+      await shutdownTracing(); // flush + stop the OTel SDK (B2)
       clearTimeout(force);
       console.log("[Shutdown] clean exit");
       process.exit(0);
