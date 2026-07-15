@@ -95,7 +95,12 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
   // Synchronous in-flight guard: the `isLoading` STATE flag has a one-tick race (two
   // submits in the same tick both read isLoading=false). A ref flips immediately.
   const runningRef = useRef(false);
-  useEffect(() => () => { mountedRef.current = false; abortRef.current?.abort(); }, []);
+  // Stall-watchdog: if the SSE stream goes silent (server/provider/tool hang with no
+  // per-call timeout) the run never emits `done` and the button would stay stuck on
+  // "running". This timer, re-armed on every event, aborts a silent run so the UI self-recovers.
+  const stallRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const STALL_MS = 180_000;
+  useEffect(() => () => { mountedRef.current = false; abortRef.current?.abort(); if (stallRef.current) clearTimeout(stallRef.current); }, []);
 
   const loadSessions = async () => {
     setLoadingSessions(true);
@@ -310,6 +315,19 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // Re-armed on every SSE event; aborts only if the stream goes silent (server hang) so the
+    // button never stays stuck on "running" and the next message can start.
+    const armStall = () => {
+      if (stallRef.current) clearTimeout(stallRef.current);
+      stallRef.current = setTimeout(() => {
+        if (ctrl.signal.aborted) return;
+        ctrl.abort();
+        runningRef.current = false;
+        if (mountedRef.current) { setIsLoading(false); setRunStatus("limit"); setCurrentStepInfo(""); }
+      }, STALL_MS);
+    };
+    armStall();
+
     try {
       let chunkBuffer = "";
 
@@ -321,7 +339,9 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
           messages: history,
           autoApply,
           verify,
-          maxSteps: 10,
+          // Task-driven: the agent stops on its own completion (done/complete) + the verify
+          // gate — not an artificial low cap. High ceiling is just a runaway guard.
+          maxSteps: 200,
           sessionId
         },
         {
@@ -331,6 +351,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
             const lines = chunkBuffer.split("\n\n");
             // Keep the last partial line if not completed
             chunkBuffer = lines.pop() || "";
+            armStall(); // fresh data → reset the silence watchdog
 
             for (const line of lines) {
               if (!line.trim() || !line.startsWith("data: ")) continue;
@@ -415,6 +436,13 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
                   setRunStatus(limit ? "limit" : "complete");
                   // Tell the user when the run was TRUNCATED at the step cap (not a clean finish).
                   if (limit) onNotify(_("react-agent.notify.truncated"), "info");
+                  // Un-stick the button THE MOMENT the run reports done — don't wait for the
+                  // stream to close in `finally`. The server can hold the SSE open after `done`
+                  // (verifier gate, session save), which would otherwise leave the button stuck
+                  // on "running" and block the next message. This is the fix for the reported hang.
+                  runningRef.current = false;
+                  if (mountedRef.current) setIsLoading(false);
+                  if (stallRef.current) { clearTimeout(stallRef.current); stallRef.current = null; }
                 }
                 else if (parsed.type === "error") {
                   onNotify(`${_("react-agent.notify.agentReasoner")} ${parsed.message}`, "error");
@@ -433,6 +461,7 @@ export function ReactAgentTab({ onNotify }: ReactAgentTabProps) {
       onNotify(`${_("react-agent.notify.runtimeFailed")} ${err.message}`, "error");
       setCurrentStepInfo(_("react-agent.step.disrupted"));
     } finally {
+      if (stallRef.current) { clearTimeout(stallRef.current); stallRef.current = null; }
       runningRef.current = false;
       if (mountedRef.current && !ctrl.signal.aborted) {
         setIsLoading(false);
