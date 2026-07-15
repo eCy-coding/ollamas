@@ -39,7 +39,10 @@ describe("autoconnectGitHub — writes vault, never leaks token", () => {
 
   beforeEach(async () => {
     for (const f of [DB, `${DB}-wal`, `${DB}-shm`]) try { fs.unlinkSync(f); } catch {}
-    process.env.MISSION_CONTROL_DATA_DIR = os.tmpdir();
+    // izole veri-dizini (paylaşımlı os.tmpdir() önceki-koşudan şifreli-store bırakıyordu → "no master key" fail)
+    // + deterministik test master-key (şifreleme/decrypt çalışsın)
+    process.env.MISSION_CONTROL_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "ollamas-int-"));
+    process.env.MASTER_KEY_B64 = Buffer.alloc(32, 7).toString("base64");
     vi.resetModules();
     store = await import("../server/db");
     mod = await import("../server/integrations");
