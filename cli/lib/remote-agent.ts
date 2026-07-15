@@ -60,7 +60,7 @@ export interface DispatchTask {
 }
 
 const DEFAULT_TIMEOUT_MS = 180_000; // agent-dispatch.mjs:30 OLLAMAS_TIMEOUT_MS default
-const DEFAULT_MAX_STEPS = 10; // agent-dispatch.mjs:29 --steps default
+const DEFAULT_MAX_STEPS = Number(process.env.OLLAMAS_MAX_STEPS) || 40; // raised from 10 so executors run long
 const DEFAULT_PROVIDER = "ollama-local"; // agent-dispatch.mjs:24
 
 // eCyPro calibration standards prepended to every dispatched task — verbatim mirror of

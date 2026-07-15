@@ -24,7 +24,7 @@ const HELP = `ollamas agent [task] — drive the ReAct agent loop
 options:
   -m, --model <m>      override model           -p, --provider <p>  override provider
   -s, --session <id>   resume a session, or 'new' to create one
-      --max-steps <n>  ReAct step cap (default 8)
+      --max-steps <n>  ReAct step cap (default 40, or $OLLAMAS_MAX_STEPS)
       --yolo           auto-apply writes (no approval prompt)
       --safe           prompt before each write (default)
       --timeout <ms>   per-round stream timeout (default 300000)
@@ -94,7 +94,7 @@ export async function runAgent(argv: string[]): Promise<number> {
   const opts: AgentOpts = {
     provider: (values.provider as string) || cfg.provider,
     model: (values.model as string) || cfg.model,
-    maxSteps: values["max-steps"] ? Number(values["max-steps"]) : 8,
+    maxSteps: values["max-steps"] ? Number(values["max-steps"]) : Number(process.env.OLLAMAS_MAX_STEPS) || 40,
     autoApply: !!values.yolo, // --safe / default => false => approval prompts
     sessionId,
     timeoutMs: values.timeout ? Number(values.timeout) : undefined,

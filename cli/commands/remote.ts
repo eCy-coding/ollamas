@@ -648,7 +648,7 @@ async function runDispatch(args: string[]): Promise<number> {
   if (!rawTasks.length) { process.stderr.write('usage: ollamas remote dispatch "<task>"... | --epic <file|-> [--root dir] [--json]\n'); return 2; }
 
   const root = (values.root as string) || `${homedir()}/.llm-mission-control/agent-work`;
-  const maxSteps = Number(values["max-steps"] ?? "10");
+  const maxSteps = Number(values["max-steps"] ?? process.env.OLLAMAS_MAX_STEPS ?? "40");
   const port = Number(values.port ?? "8090");
   const timeoutMs = values["timeout-ms"] ? Number(values["timeout-ms"]) : undefined;
   const provider = values.provider as string | undefined;

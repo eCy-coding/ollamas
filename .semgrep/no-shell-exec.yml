@@ -48,8 +48,8 @@ rules:
     # test files.) Keeps the gate focused on real attack surface, noise-free.
     paths:
       exclude:
-        - ".claude/**"
-        - "scripts/**"
-        - "tests/**"
+        - "**/.claude/**"
+        - "**/scripts/**"
+        - "**/tests/**"
         - "**/*.test.ts"
         - "**/*.test.mjs"

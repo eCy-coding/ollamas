@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+/**
+ * Enforces Conventional Commits specification for commit messages.
+ * See https://www.conventionalcommits.org/en/v1.0.0/
+ */
+const commitlint = require('commitlint');
+const chalk = require('chalk');
+
+const commitMessage = process.argv[2];
+
+const commitlintOptions = {
+  parserOpts: {
+    headerPattern: /^(\w*)(?:\((\w*)\))?: (.*)$/,
+    headerCorrespondence: ['type', 'scope', 'subject'],
+  },
+  rules: {
+    'type-enum': [2, 'always', ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert']],
+    'subject-full-stop': [0, 'never'],
+    'subject-case': [0, 'never'],
+  },
+};
+
+commitlint
+  .lint(commitMessage, commitlintOptions)
+  .then((result) => {
+    if (result.valid) {
+      console.log(chalk.green('Commit message is valid'));
+    } else {
+      console.log(chalk.red('Commit message is invalid'));
+      process.exit(1);
+    }
+  })
+  .catch((error) => {
+    console.error(chalk.red('Error occurred while validating commit message'), error);
+    process.exit(1);
+  });

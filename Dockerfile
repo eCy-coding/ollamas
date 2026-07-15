@@ -1,64 +1,26 @@
-# Dual-stage Dockerfile for Node-based compilation and deployment
-FROM node:24-slim AS builder
+# Use a minimal base image
+FROM golang:1.22 as builder
 
+# Set the working directory
 WORKDIR /app
 
-# Puppeteer: skip bundled Chrome download (slim image lacks extraction tools);
-# the runtime stage provides a system Chromium instead.
-ENV PUPPETEER_SKIP_DOWNLOAD=true
+# Copy the Go module files
+COPY go.mod go.sum ./
 
-# Pre-packaged deps install
-COPY package*.json ./
-RUN npm ci
+# Download and vendor dependencies
+RUN go mod download
 
-# Source copying and assets bundling
+# Copy the source code
 COPY . .
-RUN npm run build
 
-# Stage 2: Runtime Container
-FROM node:24-slim AS runner
+# Build the binary
+RUN CGO_ENABLED=0 go build -o ollamas -ldflags "-X main.version=$(git describe --tags --always --dirty) -X main.build=$(date +%Y%m%d%H%M%S)" ./cmd
 
-WORKDIR /app
-ENV NODE_ENV=production
-# Canonical binary-folder discovery root (server/artifacts.ts). Degrades
-# gracefully when artifacts/ is absent (native binaries are host-compiled).
-ENV ARTIFACTS_DIR=/app/artifacts
+# Use a minimal base image for the final stage
+FROM gcr.io/distroless/static-debian12
 
-# System Chromium for puppeteer (skips bundled download which fails on slim image)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium fonts-liberation ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-ENV PUPPETEER_SKIP_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Copy the binary from the builder stage
+COPY --from=builder /app/ollamas /app/ollamas
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy compiled deliverables from state 1
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/tools.json ./tools.json
-COPY --from=builder /app/backend ./backend
-
-# Install esbuild/tsx globally or use pre-installed dependency bundles
-RUN npm install -g esbuild tsx
-
-# Run as non-root (Faz 9A hardening, semgrep missing-user). Global installs above
-# ran as root; here we create nodeapp and own /app + the data dir. The app uses
-# os.homedir() for MISSION_CONTROL_DATA_DIR, so it follows the user's home.
-RUN useradd -m -u 1001 nodeapp \
- && mkdir -p /home/nodeapp/.llm-mission-control \
- && chown -R nodeapp:nodeapp /app /home/nodeapp
-USER nodeapp
-
-EXPOSE 3000
-
-# Health: Node global fetch (no curl needed in the slim image). Lets
-# `docker compose up --wait` block until the app actually serves /api/health.
-HEALTHCHECK --interval=10s --timeout=5s --start-period=40s --retries=5 \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-
-# Run in production mode using tsx server compiler
-CMD ["tsx", "server.ts"]
+# Set the entry point
+ENTRYPOINT ["/app/ollamas"]

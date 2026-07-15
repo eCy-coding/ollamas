@@ -16,7 +16,14 @@
   Stop:    launchctl unload ~/Library/LaunchAgents/com.ollamas.server.plist   (kill switch)
 
   NOTE: stop any foreground dev server on :3000 first, or the daemon's bind will EADDRINUSE.
-  The <string> node path is machine-specific (mise); regenerate with `which node` if it changes.
+  The <string> node path is machine-specific; regenerate with `which node` if it changes.
+
+  E-launchd-01: ProgramArguments MUST exec `node` directly, never `/bin/bash`. A background
+  LaunchAgent whose top-level binary is /bin/bash fails getcwd()/chdir() into ~/Desktop/* with
+  "Operation not permitted" (TCC denies bash access to the Desktop folder for headless daemons;
+  node already holds that access on this machine). Confirmed live 2026-07-10: bash-wrapped
+  version crash-looped (exit 126) while this direct-node form ran clean. run-server.sh is kept
+  for interactive/manual use only — do not reintroduce it as ProgramArguments[0].
 -->
 <plist version="1.0">
 <dict>
@@ -24,8 +31,12 @@
   <string>com.ollamas.server</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>/Users/emrecnyngmail.com/Desktop/ollamas/ops/launchd/run-server.sh</string>
+    <string>/usr/local/bin/node</string>
+    <string>--require</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/tsx/dist/preflight.cjs</string>
+    <string>--import</string>
+    <string>file:///Users/emrecnyngmail.com/Desktop/ollamas/node_modules/tsx/dist/loader.mjs</string>
+    <string>server.ts</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>

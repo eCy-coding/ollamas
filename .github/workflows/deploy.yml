@@ -1,4 +1,4 @@
-name: E2E
+name: Deploy
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  e2e-tests:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,14 +17,10 @@ jobs:
         run: |
           pnpm install
 
-      - name: Start local stack
+      - name: Terraform apply
         run: |
-          pnpm run docker:compose up -d
+          pnpm run terraform:apply
 
-      - name: Run E2E tests
+      - name: Helm upgrade
         run: |
-          pnpm run test:e2e
-
-      - name: Stop local stack
-        run: |
-          pnpm run docker:compose down
+          pnpm run helm:upgrade

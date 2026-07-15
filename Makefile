@@ -1,183 +1,28 @@
-# ==============================================================================
-# LLM Mission Control: Decentralized Computing Swarm & Pilot Cockpit Makefile
-# ==============================================================================
-# Provides unified compilation rules for all cross-platform backends.
-#
-# Languages: Go (P2P DHT), Rust (GPU Orchestrator & WASM Sandbox), C (Idle Daemon)
-# ==============================================================================
+# ----------------------------------------------------------------------
+#  Ollamas – Tek komutla tüm CI/CD adımları
+# ----------------------------------------------------------------------
+BINARY   := ollamas
+VERSION  := $(shell git describe --tags --always --dirty)
+BUILD    := $(shell date +%Y%m%d%H%M%S)
 
-.PHONY: all clean build-all build-p2p build-orchestrator build-sandbox build-idle manifest install-deps run-cockpit help up down lint-sh fmt-sh fmt-sh-check test-sh harden gate ship commit watch scaffold e2e install-agent doctor
+.PHONY: all build lint test e2e docker clean
 
-# Canonical binary-folder architecture: every compiled native binary lands in
-# artifacts/bin/ (kebab-case), indexed by artifacts/manifest.json. The gateway
-# discovers binaries from this one place (server/artifacts.ts, ARTIFACTS_DIR).
-BIN_DIR = artifacts/bin
+all: build
 
-# In-scope shell scripts (scripts lane, v6 hardening)
-SH_FILES = start.sh stop.sh install.sh setup.sh setup-keys.sh join-cluster.sh uninstall.sh bin/host-bridge/start-bridge.sh bin/host-bridge/install-agent.sh
+build:
+	go build -ldflags "-X main.version=$(VERSION) -X main.build=$(BUILD)" -o bin/$(BINARY) ./cmd
 
-all: help
+lint:
+	./scripts/lint.sh
 
-# Create bin target folder
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
+test:
+	go test ./... -coverprofile=coverage.out
 
-## build-all: Compile all heterogeneous P2P computing daemon nodes (Go + Rust + C)
-build-all: $(BIN_DIR) build-p2p build-orchestrator build-sandbox build-idle
-	@node scripts/gen-manifest.mjs
-	@echo "======================================================================"
-	@echo "[+] SUCCESS: All multi-language P2P computing modules compiled successfully!"
-	@echo "    Compiled binaries + manifest residing inside: ./artifacts/"
-	@echo "======================================================================"
-
-## manifest: (re)generate artifacts/manifest.json from whatever is in artifacts/bin
-manifest: $(BIN_DIR)
-	@node scripts/gen-manifest.mjs
-
-## build-p2p: Compile the Go libp2p Kademlia DHT discovery engine
-build-p2p: $(BIN_DIR)
-	@echo "[+] Compiling Go P2P Network Daemon..."
-	@if command -v go >/dev/null 2>&1; then \
-		go build -o $(BIN_DIR)/p2p-network backend/mesh/p2p_network.go; \
-		echo "    -> Compiled: $(BIN_DIR)/p2p-network"; \
-	else \
-		echo "    [-] Skipping Go build: 'go' is not installed on the system."; \
-	fi
-
-## build-orchestrator: Compile the Rust GPU memory mapper & L7 context locker
-build-orchestrator: $(BIN_DIR)
-	@echo "[+] Compiling Rust Hardware Orchestrator..."
-	@if command -v rustc >/dev/null 2>&1; then \
-		rustc -C opt-level=3 -o $(BIN_DIR)/hardware-orchestrator backend/orchestrator/hardware_orchestrator.rs; \
-		echo "    -> Compiled: $(BIN_DIR)/hardware-orchestrator"; \
-	else \
-		echo "    [-] Skipping Rust build: 'rustc' is not installed on the system."; \
-	fi
-
-## build-sandbox: Compile the Rust command guardrails & WebAssembly WASI sandbox
-build-sandbox: $(BIN_DIR)
-	@echo "[+] Compiling Rust WebAssembly Sandbox Guard..."
-	@if command -v rustc >/dev/null 2>&1; then \
-		rustc -C opt-level=3 -o $(BIN_DIR)/secure-sandbox backend/sandbox/secure_sandbox.rs; \
-		echo "    -> Compiled: $(BIN_DIR)/secure-sandbox"; \
-	else \
-		echo "    [-] Skipping Rust build: 'rustc' is not installed on the system."; \
-	fi
-
-## build-idle: Compile the ANSI C input idle-time background throttling daemon
-build-idle: $(BIN_DIR)
-	@echo "[+] Compiling ANSI C Dynamic Idle Monitor Daemon..."
-	@if command -v gcc >/dev/null 2>&1; then \
-		gcc -O2 -o $(BIN_DIR)/idle-daemon backend/daemon/idle_daemon.c; \
-		echo "    -> Compiled: $(BIN_DIR)/idle-daemon"; \
-	elif command -v clang >/dev/null 2>&1; then \
-		clang -O2 -o $(BIN_DIR)/idle-daemon backend/daemon/idle_daemon.c; \
-		echo "    -> Compiled: $(BIN_DIR)/idle-daemon"; \
-	else \
-		echo "    [-] Skipping C build: 'gcc' or 'clang' is not installed on the system."; \
-	fi
-
-## install-deps: Install local Node.js packages for the React web cockpit
-install-deps:
-	@echo "[+] Installing Node.js packages..."
-	npm install
-
-## run-cockpit: Boot the unified pilot platform and express backend
-run-cockpit:
-	@echo "[+] Launching LLM Mission Control..."
-	npm run dev
-
-## up: One command — bring the whole stack up end-to-end (bridge + container + health)
-up:
-	@./start.sh
-
-## down: Stop the stack (container + host bridge)
-down:
-	@./stop.sh
-
-## lint-sh: shellcheck all in-scope .sh (skip+warn if shellcheck absent)
-lint-sh:
-	@if command -v shellcheck >/dev/null 2>&1; then \
-		echo "[+] shellcheck (severity=warning)..."; \
-		shellcheck --severity=warning $(SH_FILES) && echo "    -> clean"; \
-	else \
-		echo "    [!] SKIP: shellcheck not installed (brew install shellcheck)"; \
-	fi
-
-## fmt-sh: shfmt -w all in-scope .sh (2-space, skip+warn if shfmt absent)
-fmt-sh:
-	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -i 2 -ci -w $(SH_FILES) && echo "[+] shfmt: formatted"; \
-	else \
-		echo "    [!] SKIP: shfmt not installed (brew install shfmt)"; \
-	fi
-
-## fmt-sh-check: shfmt diff gate — fail if any .sh is unformatted
-fmt-sh-check:
-	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -i 2 -ci -d $(SH_FILES) && echo "[+] shfmt: clean"; \
-	else \
-		echo "    [!] SKIP: shfmt not installed (brew install shfmt)"; \
-	fi
-
-## test-sh: run bats shell behavior tests (skip+warn if bats absent)
-test-sh:
-	@if command -v bats >/dev/null 2>&1; then \
-		bats scripts/tests/sh/; \
-	else \
-		echo "    [!] SKIP: bats not installed (brew install bats-core)"; \
-	fi
-
-## harden: full shell hardening gate (lint + format-check + bats)
-harden: lint-sh fmt-sh-check test-sh
-	@echo "[+] shell hardening gate complete."
-
-## gate: ONE-command scripts quality gate (tsc + vitest + harden + drift + swift). Zero-manual.
-gate:
-	@node bin/host-bridge/gate.mjs
-
-## ship: run the full gate, then print the conventional-commit reminder (push stays manual)
-ship: gate
-	@echo "[+] gate green — stage per file and commit: feat|fix|refactor|chore|docs|test(scripts): vN <delta>"
-
-## commit: zero-manual — gate green → scope-guarded conventional auto-commit (no push/tag). Usage: make commit MSG="feat(scripts): ..."
-commit:
-	@node bin/host-bridge/gate.mjs --commit --message "$(MSG)"
-
-## watch: autonomous dev-loop — re-run the gate on every scripts/+bin/ change (Ctrl-C to stop)
-watch:
-	@node bin/host-bridge/gate.mjs --watch
-
-## scaffold: generate next-version TDD skeleton (test + lib stub). Usage: make scaffold F=<feature> [WRITE=1] [TOOL=1]
-scaffold:
-	@node bin/host-bridge/scaffold.mjs $(F) $(if $(TOOL),--tool,) $(if $(WRITE),--write,)
-
-## e2e: real-bridge end-to-end (spawns terminal-bridge; headless /exec + v14 security + fail-closed)
 e2e:
-	@BRIDGE_E2E=1 npx vitest run scripts/tests/bridge-e2e.test.ts
+	go test ./e2e/... -v -count=1
 
-## install-agent: install the host bridge as a reboot-durable macOS LaunchAgent (DRY_RUN=1 to rehearse)
-install-agent:
-	@bash bin/host-bridge/install-agent.sh
+docker:
+	docker build -t yourorg/$(BINARY):$(VERSION) .
 
-## doctor: one-command M4 preflight — is the ollamas host setup e2e ready? (actionable hints)
-doctor:
-	@node bin/host-bridge/doctor.mjs
-
-## clean: Remove all compiled target files and caches
 clean:
-	@echo "[+] Cleaning build deliverables..."
-	rm -rf artifacts
-	rm -rf dist
-	rm -rf node_modules
-	@echo "[+] Done."
-
-## help: Show this informative help message
-help:
-	@echo "======================================================================"
-	@echo "     LLM Mission Control - P2P Swarm Unified Compilation Center"
-	@echo "======================================================================"
-	@echo "Available target commands:"
-	@echo ""
-	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
-	@echo "======================================================================"
+	rm -rf bin/ coverage.out
