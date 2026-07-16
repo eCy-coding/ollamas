@@ -63,7 +63,7 @@ export default defineConfig({
           environment: 'node',
           // GW-2 (v1.29.3): co-located gateway verify suites (server/**, host-bridge mjs)
           // run in the same deterministic node lane as tests/**.
-          include: ['tests/**/*.test.ts', 'server/**/*.test.ts', 'bin/host-bridge/**/*.test.mjs'],
+          include: ['tests/**/*.test.ts', 'server/**/*.test.ts', 'bin/host-bridge/**/*.test.mjs', 'eval/**/*.test.ts'],
           exclude: ['tests/ui/**', ...(RUN_E2E ? [] : E2E_GLOBS)],
         },
       },

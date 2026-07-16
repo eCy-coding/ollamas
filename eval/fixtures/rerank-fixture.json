@@ -1,0 +1,152 @@
+[
+  {
+    "id": "q1-france-capital",
+    "query": "What is the capital of France?",
+    "relevantId": "c5",
+    "candidates": [
+      { "id": "c1", "text": "Bananas are a good source of potassium and dietary fiber." },
+      { "id": "c2", "text": "The Eiffel Tower was completed in 1889 for the World's Fair." },
+      { "id": "c3", "text": "France shares land borders with Germany, Spain, and Italy." },
+      { "id": "c4", "text": "The French Revolution began in 1789 and reshaped Europe." },
+      { "id": "c5", "text": "Paris is the capital and most populous city of France." },
+      { "id": "c6", "text": "Lyon is known for its gastronomy and silk-weaving history." },
+      { "id": "c7", "text": "The euro became the official currency of France in 2002." },
+      { "id": "c8", "text": "Mount Everest is the tallest mountain above sea level." }
+    ]
+  },
+  {
+    "id": "q2-photosynthesis",
+    "query": "How do plants convert sunlight into energy?",
+    "relevantId": "c6",
+    "candidates": [
+      { "id": "c1", "text": "Photosynthesis occurs mainly in the chloroplasts of plant cells." },
+      { "id": "c2", "text": "Solar panels convert sunlight into electricity using photovoltaic cells." },
+      { "id": "c3", "text": "Deserts receive very little annual rainfall on average." },
+      { "id": "c4", "text": "Chlorophyll absorbs light most strongly in the blue and red wavelengths." },
+      { "id": "c5", "text": "Cellular respiration releases energy stored in glucose molecules." },
+      { "id": "c6", "text": "Plants use chlorophyll to capture sunlight and convert it into chemical energy via photosynthesis." },
+      { "id": "c7", "text": "The moon has no atmosphere to scatter sunlight." },
+      { "id": "c8", "text": "Coral reefs rely on symbiotic algae for a portion of their energy." }
+    ]
+  },
+  {
+    "id": "q3-http-status",
+    "query": "What HTTP status code means the resource was not found?",
+    "relevantId": "c2",
+    "candidates": [
+      { "id": "c1", "text": "HTTP 200 OK indicates the request succeeded." },
+      { "id": "c2", "text": "HTTP 404 Not Found means the server could not locate the requested resource." },
+      { "id": "c3", "text": "HTTP 500 Internal Server Error indicates a generic server-side failure." },
+      { "id": "c4", "text": "TCP is a connection-oriented transport protocol." },
+      { "id": "c5", "text": "REST APIs typically use JSON as the payload format." },
+      { "id": "c6", "text": "HTTP 301 Moved Permanently redirects clients to a new URL." },
+      { "id": "c7", "text": "DNS resolves domain names into IP addresses." },
+      { "id": "c8", "text": "WebSockets provide full-duplex communication over a single TCP connection." }
+    ]
+  },
+  {
+    "id": "q4-mrr-metric",
+    "query": "How is Mean Reciprocal Rank calculated in information retrieval?",
+    "relevantId": "c4",
+    "candidates": [
+      { "id": "c1", "text": "Precision measures the fraction of retrieved documents that are relevant." },
+      { "id": "c2", "text": "Recall measures the fraction of relevant documents that were retrieved." },
+      { "id": "c3", "text": "NDCG discounts relevance scores logarithmically by rank position." },
+      { "id": "c4", "text": "Mean Reciprocal Rank averages the reciprocal of the rank of the first relevant result across queries." },
+      { "id": "c5", "text": "A confusion matrix summarizes classifier predictions versus ground truth." },
+      { "id": "c6", "text": "F1 score is the harmonic mean of precision and recall." },
+      { "id": "c7", "text": "Cross-validation splits data into folds to estimate generalization error." },
+      { "id": "c8", "text": "Gradient descent iteratively updates parameters to minimize a loss function." }
+    ]
+  },
+  {
+    "id": "q5-water-boiling",
+    "query": "At what temperature does water boil at sea level?",
+    "relevantId": "c3",
+    "candidates": [
+      { "id": "c1", "text": "Water freezes at 0 degrees Celsius at standard atmospheric pressure." },
+      { "id": "c2", "text": "Ice is less dense than liquid water, so it floats." },
+      { "id": "c3", "text": "Water boils at 100 degrees Celsius (212 Fahrenheit) at sea-level atmospheric pressure." },
+      { "id": "c4", "text": "Boiling point decreases with altitude due to lower atmospheric pressure." },
+      { "id": "c5", "text": "Steam carries more thermal energy than boiling water at the same temperature." },
+      { "id": "c6", "text": "Salt dissolved in water raises its boiling point slightly." },
+      { "id": "c7", "text": "The human body is roughly 60 percent water by weight." },
+      { "id": "c8", "text": "Copper is an excellent conductor of both heat and electricity." }
+    ]
+  },
+  {
+    "id": "q6-git-rebase",
+    "query": "What does git rebase do differently from git merge?",
+    "relevantId": "c7",
+    "candidates": [
+      { "id": "c1", "text": "git commit records a snapshot of staged changes to the repository." },
+      { "id": "c2", "text": "git clone copies a remote repository to a local directory." },
+      { "id": "c3", "text": "git status shows the state of the working directory and staging area." },
+      { "id": "c4", "text": "git branch lists, creates, or deletes branches." },
+      { "id": "c5", "text": "git stash temporarily shelves uncommitted changes." },
+      { "id": "c6", "text": "git merge creates a new commit that joins two branch histories together." },
+      { "id": "c7", "text": "git rebase replays commits from one branch onto another, producing a linear history instead of a merge commit." },
+      { "id": "c8", "text": "git tag marks a specific commit, often for releases." }
+    ]
+  },
+  {
+    "id": "q7-vector-embedding",
+    "query": "What is a vector embedding used for in semantic search?",
+    "relevantId": "c8",
+    "candidates": [
+      { "id": "c1", "text": "A hash table maps keys to values via a hash function." },
+      { "id": "c2", "text": "B-trees are commonly used for database indexing." },
+      { "id": "c3", "text": "SQL joins combine rows from two or more tables based on a related column." },
+      { "id": "c4", "text": "Regular expressions match patterns in text using a formal syntax." },
+      { "id": "c5", "text": "A bloom filter is a space-efficient probabilistic membership test." },
+      { "id": "c6", "text": "Tokenization splits text into words or subword units before model input." },
+      { "id": "c7", "text": "Caching stores frequently accessed data to reduce latency." },
+      { "id": "c8", "text": "A vector embedding maps text to a dense numeric vector so that semantically similar text ends up close together, enabling semantic search via nearest-neighbor lookup." }
+    ]
+  },
+  {
+    "id": "q8-mitochondria",
+    "query": "Why is the mitochondrion called the powerhouse of the cell?",
+    "relevantId": "c1",
+    "candidates": [
+      { "id": "c1", "text": "Mitochondria generate most of the cell's ATP through oxidative phosphorylation, earning the nickname powerhouse of the cell." },
+      { "id": "c2", "text": "The nucleus houses the cell's genetic material in most eukaryotes." },
+      { "id": "c3", "text": "Ribosomes translate messenger RNA into proteins." },
+      { "id": "c4", "text": "The Golgi apparatus modifies and packages proteins for secretion." },
+      { "id": "c5", "text": "Lysosomes contain enzymes that break down cellular waste." },
+      { "id": "c6", "text": "The cell membrane regulates what enters and exits the cell." },
+      { "id": "c7", "text": "Vacuoles store water, nutrients, and waste products in plant cells." },
+      { "id": "c8", "text": "Endoplasmic reticulum synthesizes lipids and processes proteins." }
+    ]
+  },
+  {
+    "id": "q9-inflation-definition",
+    "query": "What does inflation mean in economics?",
+    "relevantId": "c5",
+    "candidates": [
+      { "id": "c1", "text": "GDP measures the total value of goods and services produced in a country." },
+      { "id": "c2", "text": "Unemployment rate is the share of the labor force without a job but seeking one." },
+      { "id": "c3", "text": "A central bank sets monetary policy, including interest rates." },
+      { "id": "c4", "text": "A trade deficit occurs when imports exceed exports." },
+      { "id": "c5", "text": "Inflation is the rate at which the general price level of goods and services rises over time, eroding purchasing power." },
+      { "id": "c6", "text": "The stock market aggregates buyers and sellers of company shares." },
+      { "id": "c7", "text": "A recession is commonly defined as two consecutive quarters of negative GDP growth." },
+      { "id": "c8", "text": "Fiscal policy refers to government spending and taxation decisions." }
+    ]
+  },
+  {
+    "id": "q10-jwt-purpose",
+    "query": "What is a JWT used for in web authentication?",
+    "relevantId": "c4",
+    "candidates": [
+      { "id": "c1", "text": "OAuth 2.0 is an authorization framework for delegated access." },
+      { "id": "c2", "text": "Cookies are small pieces of data stored by the browser on behalf of a website." },
+      { "id": "c3", "text": "CORS controls which origins are allowed to make cross-origin requests." },
+      { "id": "c4", "text": "A JWT (JSON Web Token) is a compact, signed token that encodes claims, commonly used to authenticate and authorize API requests without server-side session state." },
+      { "id": "c5", "text": "TLS encrypts data in transit between a client and a server." },
+      { "id": "c6", "text": "bcrypt is a password-hashing function designed to be slow to resist brute force." },
+      { "id": "c7", "text": "CSRF tokens protect against cross-site request forgery attacks." },
+      { "id": "c8", "text": "Rate limiting throttles the number of requests a client can make in a window." }
+    ]
+  }
+]

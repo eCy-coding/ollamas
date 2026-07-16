@@ -5,7 +5,7 @@ BINARY   := ollamas
 VERSION  := $(shell git describe --tags --always --dirty)
 BUILD    := $(shell date +%Y%m%d%H%M%S)
 
-.PHONY: all build lint test e2e docker clean
+.PHONY: all build lint test e2e docker clean eval-providers eval-rerank
 
 all: build
 
@@ -26,3 +26,13 @@ docker:
 
 clean:
 	rm -rf bin/ coverage.out
+
+## eval-providers: regenerate catalog-derived promptfoo matrix + run the $0 smoke eval (dev-time npx, no runtime dep)
+eval-providers:
+	@node scripts/gen-promptfoo-providers.mjs
+	@npx -y promptfoo@latest eval -c eval/promptfooconfig.yaml --no-cache --no-progress-bar
+
+## eval-rerank: B5 rerank uplift eval — MRR@5 with rerank ON vs OFF (downloads the cross-encoder
+## model on first run; MANUAL/live only, never part of the vitest gate)
+eval-rerank:
+	@npx tsx scripts/eval-rerank.mjs
