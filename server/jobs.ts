@@ -120,20 +120,40 @@ export async function enqueue(client: DbClient, name: string, payload: unknown =
 
 /** Atomically claim the single most-due pending job (pending → running) so two
  *  workers never double-run it. pg: FOR UPDATE SKIP LOCKED. sqlite: single-writer
- *  select-then-conditional-update (mirrors claimDeliveries in server/store/index.ts). */
-export async function claimNext(client: DbClient, nowMs = Date.now()): Promise<Job | null> {
+ *  select-then-conditional-update (mirrors claimDeliveries in server/store/index.ts).
+ *
+ *  `registeredNames`, when passed, restricts the candidate pool to job names that
+ *  currently have a registered handler (C2r — jobs claim loop skips unregistered
+ *  handlers). This makes the loop ordering-proof: a pending row whose handler
+ *  hasn't registered yet (e.g. a side-effect import still resolving, or a genuine
+ *  typo) is left untouched — no attempt burn, no last_error, no transient
+ *  pending→running→pending flap — instead of being claimed and immediately failed
+ *  by runClaimedJob's "no handler registered" path. Omit the param (undefined) to
+ *  keep the old unrestricted-claim behavior (existing callers/tests). An explicit
+ *  empty array means "nothing registered yet" — skip claiming entirely without a
+ *  DB round-trip. */
+export async function claimNext(client: DbClient, nowMs = Date.now(), registeredNames?: string[]): Promise<Job | null> {
   const now = new Date(nowMs).toISOString();
+  if (registeredNames && registeredNames.length === 0) return null;
   if (client.dialect === "pg") {
+    if (registeredNames) {
+      const sql = `UPDATE jobs SET state='running', updated_at=$1
+        WHERE id = (SELECT id FROM jobs WHERE state='pending' AND run_at <= $2 AND name = ANY($3) ORDER BY run_at FOR UPDATE SKIP LOCKED LIMIT 1)
+        RETURNING *`;
+      const r = await client.query(sql, [now, now, registeredNames]);
+      return r.rows[0] ? rowToJob(r.rows[0]) : null;
+    }
     const sql = `UPDATE jobs SET state='running', updated_at=$1
       WHERE id = (SELECT id FROM jobs WHERE state='pending' AND run_at <= $2 ORDER BY run_at FOR UPDATE SKIP LOCKED LIMIT 1)
       RETURNING *`;
     const r = await client.query(sql, [now, now]);
     return r.rows[0] ? rowToJob(r.rows[0]) : null;
   }
-  const row = (await client.query(
-    "SELECT id FROM jobs WHERE state='pending' AND run_at <= ? ORDER BY run_at LIMIT 1",
-    [now],
-  )).rows[0];
+  const selectSql = registeredNames
+    ? `SELECT id FROM jobs WHERE state='pending' AND run_at <= ? AND name IN (${registeredNames.map(() => "?").join(",")}) ORDER BY run_at LIMIT 1`
+    : "SELECT id FROM jobs WHERE state='pending' AND run_at <= ? ORDER BY run_at LIMIT 1";
+  const selectParams = registeredNames ? [now, ...registeredNames] : [now];
+  const row = (await client.query(selectSql, selectParams)).rows[0];
   if (!row) return null;
   const upd = await client.run("UPDATE jobs SET state='running', updated_at=? WHERE id=? AND state='pending'", [now, row.id]);
   if (upd.changes === 0) return null; // raced with another claimant
@@ -183,6 +203,7 @@ export function registerJobHandler(name: string, fn: JobHandler): void {
 /** Test-only: clear the registry between test files that register fakes. */
 export function _resetHandlersForTest(): void {
   handlers.clear();
+  warnedUnregisteredNames.clear();
 }
 
 /** Run a single already-claimed job through its registered handler, then mark
@@ -393,11 +414,38 @@ async function refreshSnapshot(c: DbClient): Promise<void> {
   snapshot = { counts, recent, updatedAt: Date.now(), running: !stopping, recurring: getRecurringSnapshot() };
 }
 
-async function pollTick(c: DbClient): Promise<void> {
-  const job = await claimNext(c);
+/** Names we've already warned about having pending rows but no registered handler
+ *  (C2r) — logged once per name, not once per poll tick, to avoid log spam while a
+ *  handler module is still loading or a job name is simply mistyped. */
+const warnedUnregisteredNames = new Set<string>();
+
+/** Best-effort, cheap-on-average diagnostic: once claimNext (scoped to registered
+ *  names) finds nothing to run, check whether that's because there ARE pending
+ *  rows sitting behind an unregistered handler name, and warn once per name so a
+ *  genuine typo/missing-registration doesn't fail silently forever. Never throws —
+ *  a warning is not worth risking the poll loop over. */
+async function warnUnregisteredPendingOnce(c: DbClient, registeredNames: string[]): Promise<void> {
+  try {
+    const rows = (await c.query("SELECT DISTINCT name FROM jobs WHERE state='pending'", [])).rows;
+    for (const r of rows) {
+      const name = r.name as string;
+      if (registeredNames.includes(name) || warnedUnregisteredNames.has(name)) continue;
+      warnedUnregisteredNames.add(name);
+      console.warn(`[Jobs] pending job(s) named "${name}" have no registered handler yet — left pending, not failed (C2r)`);
+    }
+  } catch { /* diagnostic only, never fail the loop over it */ }
+}
+
+/** Exported for tests (C2r): drive one claim-run-refresh cycle of the durable
+ *  queue loop directly, without waiting on startJobs()'s real setTimeout schedule. */
+export async function pollTick(c: DbClient): Promise<void> {
+  const registeredNames = Array.from(handlers.keys());
+  const job = await claimNext(c, Date.now(), registeredNames);
   if (job) {
     inFlight = runClaimedJob(c, job).finally(() => { inFlight = null; });
     await inFlight;
+  } else {
+    void warnUnregisteredPendingOnce(c, registeredNames);
   }
   await refreshSnapshot(c);
 }

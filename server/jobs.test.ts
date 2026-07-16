@@ -22,6 +22,7 @@ import {
   registerJobHandler,
   _resetHandlersForTest,
   runClaimedJob,
+  pollTick,
   startJobs,
   stopJobs,
   getJobsSnapshot,
@@ -208,6 +209,60 @@ describe("handler registry + runClaimedJob", () => {
     const [row] = await listRecentJobs(db, 5);
     expect(row.state).toBe("failed");
     expect(row.last_error).toMatch(/no handler registered/);
+    await db.close();
+  });
+});
+
+describe("claim loop skips unregistered handlers — boot ordering race (C2r)", () => {
+  test("claimNext(client, now, []) — nothing registered yet — claims nothing; pending row untouched", async () => {
+    const db = await freshDb("claim-skip-empty-registry");
+    await enqueue(db, "oauth-gc", {});
+    const job = await claimNext(db, Date.now(), []);
+    expect(job).toBeNull();
+    const [row] = await listRecentJobs(db, 5);
+    expect(row.state).toBe("pending");
+    expect(row.attempts).toBe(0);
+    expect(row.last_error).toBeNull();
+    await db.close();
+  });
+
+  test("claimNext(client, now, registeredNames) skips a pending job whose name isn't in the list, claims one that is", async () => {
+    const db = await freshDb("claim-skip-selective");
+    await enqueue(db, "oauth-gc", {}, { runAt: new Date(Date.now() - 5_000) });
+    await enqueue(db, "db-backup", {}, { runAt: new Date(Date.now() - 1_000) });
+    const job = await claimNext(db, Date.now(), ["db-backup"]);
+    expect(job).not.toBeNull();
+    expect(job!.name).toBe("db-backup");
+    const rows = await listRecentJobs(db, 5);
+    const oauthRow = rows.find((r) => r.name === "oauth-gc")!;
+    expect(oauthRow.state).toBe("pending");
+    expect(oauthRow.attempts).toBe(0);
+    expect(oauthRow.last_error).toBeNull();
+    await db.close();
+  });
+
+  test("pollTick never claims/fails a pending job whose handler isn't registered yet; " +
+    "once registered, the next tick runs it to done (reproduces the oauth-gc boot race)", async () => {
+    const db = await freshDb("polltick-late-handler");
+    await enqueue(db, "late-handler", { x: 1 });
+
+    // Tick #1: handler not registered yet — must stay pending, untouched.
+    await pollTick(db);
+    let [row] = await listRecentJobs(db, 5);
+    expect(row.state).toBe("pending");
+    expect(row.attempts).toBe(0);
+    expect(row.last_error).toBeNull();
+
+    // Register the handler (mirrors server/oauth-gc.ts's side-effect import landing).
+    const seen: any[] = [];
+    registerJobHandler("late-handler", (payload) => { seen.push(payload); });
+
+    // Tick #2: now runs to completion.
+    await pollTick(db);
+    [row] = await listRecentJobs(db, 5);
+    expect(row.state).toBe("done");
+    expect(row.attempts).toBe(0);
+    expect(seen).toEqual([{ x: 1 }]);
     await db.close();
   });
 });
