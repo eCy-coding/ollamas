@@ -16,7 +16,8 @@ describe("catalog: new free providers (T9-F4)", () => {
 
   it("pollinations is keyless (reachable with no key → 0-manual)", () => {
     const e = catalogEntry("pollinations")!;
-    expect(e.baseUrl).toBe("https://gen.pollinations.ai/v1");
+    // text host = the anonymous-capable endpoint (gen.pollinations.ai 401s keyless traffic).
+    expect(e.baseUrl).toBe("https://text.pollinations.ai/v1");
     expect(e.keyless).toBe(true);
   });
 

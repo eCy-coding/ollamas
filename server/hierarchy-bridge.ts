@@ -25,6 +25,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { parsePolicy, resolveTierForClass, type HierarchyPolicy, type Tier } from "../orchestration/bin/lib/hierarchy";
 import { RingBuffer } from "./telemetry";
+import { hierarchyRecommendationsTotal } from "./metrics";
 
 export type HierarchyMode = "off" | "advisory" | "enforce";
 
@@ -178,6 +179,7 @@ export function getHierarchyRecommendation(taskClass: string, opts?: { wilsonLow
   if (requestedMode === "enforce" && rec.mode === "advisory") {
     console.warn(`[HierarchyBridge] enforce requested but forced to advisory (${rec.policyReason}) for taskClass="${taskClass}"`);
   }
+  hierarchyRecommendationsTotal.labels(rec.tier, rec.mode).inc();
   recommendationRing.push({ ...rec, ts: Date.now() });
   return rec;
 }

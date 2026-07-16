@@ -59,10 +59,11 @@ import { decorateCatalog } from "./server/mcp/catalog";
 import { getFeedItems } from "./server/threatfeed";
 import { validateUpstreamConfig } from "./server/mcp/upstream-guard";
 import { initStore, closeStore, pingStore, poolStats, migrationVersion, pendingDeliveryCount, createTenant, issueApiKey, revokeApiKey, listPlans, recordUsage, monthToDateUsage, usageTimeseries, getTenant, listTenants, listKeys, recordAudit, listAudit, addUpstreamServer, listUpstreamServers, deleteUpstreamServer, allUpstreamServers, addWebhook, listWebhooks, deleteWebhook, listDeliveries, registerClient, resolveKey, getClient, saveOAuthToken, verifyClientSecret, recordStageEvent, listStageEvents } from "./server/store";
-import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/webhooks/outbound";
-import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
+import { verifyWebhook } from "./server/webhooks/outbound"; // also registers the webhook-retry recurring loop (C2, side effect)
+import "./server/oauth-gc"; // registers the "oauth-gc" durable job handler (C2, side effect — scheduled by server/jobs.ts)
 import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "./server/key-health";
 import { startJobs, stopJobs, getJobsSnapshot } from "./server/jobs";
+import { getSemanticCacheSnapshot } from "./server/semantic-cache";
 import { getHierarchySnapshot } from "./server/hierarchy-bridge";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -919,10 +920,10 @@ async function initializeServer() {
   registerStoreMetrics({ poolStats, migrationVersion, pendingDeliveryCount });
   // Idempotently provision Stripe Meter/Price if a key is set (no-op otherwise, Faz 9C).
   ensureBillingConfig().then(c => c && console.log(`[Billing] Stripe meter+price ready (${c.meterId}).`)).catch(e => console.warn(`[Billing] setup skipped: ${e?.message}`));
-  // Background outbound-webhook delivery worker (Faz 11B).
-  startWebhookWorker();
-  // Periodic OAuth retention sweeper — delete expired codes/tokens (Faz 26).
-  startOAuthGc();
+  // Background outbound-webhook delivery worker (Faz 11B) + OAuth retention sweeper
+  // (Faz 26) are now started as part of startJobs() below (C2: webhook-retry is a
+  // registerRecurring in-memory loop, oauth-gc is a croner-scheduled durable job) —
+  // both already registered via the side-effect imports above.
   // Always-running API-key autonomy loop: periodically re-discover/reconnect keys (env+gh) and
   // sweep recovered cooldowns, so the vaulted key supply self-heals with zero operator action.
   // Feeds the GET /api/keys/health convergence signal. Opt-widen via KEY_HEALTH_SOURCES.
@@ -1309,6 +1310,12 @@ async function initializeServer() {
   // always-running poll loop's cached snapshot (server/jobs.ts).
   app.get("/api/jobs", (_req, res) => {
     res.json(getJobsSnapshot());
+  });
+
+  // Semantic LLM response cache snapshot (C4): enabled flag, threshold/TTL config,
+  // and event counts (hit_exact|hit_semantic|miss|store) — see server/semantic-cache.ts.
+  app.get("/api/cache", async (_req, res) => {
+    res.json(await getSemanticCacheSnapshot());
   });
 
   // Distributed tracing snapshot (B2): last RING_BUFFER_MAX finished spans
@@ -3620,10 +3627,9 @@ ledger();setInterval(ledger,15000);
     const force = setTimeout(() => { console.warn("[Shutdown] grace timeout — forcing exit"); process.exit(1); }, graceMs);
     force.unref?.();
     try {
-      stopWebhookWorker();
-      stopOAuthGc();
       stopKeyHealth();
-      await stopJobs(); // finishes any in-flight job, claims no new one, closes its DbClient
+      await stopJobs(); // finishes any in-flight job, claims no new one, closes its DbClient; also
+                         // halts the webhook-retry recurring loop + oauth-gc cron (C2 migration)
       stopSupervisor();
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
       await new Promise<void>((resolve) => server.close(() => resolve()));

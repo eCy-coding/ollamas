@@ -94,6 +94,56 @@ export const ecysearcherReady = new client.Gauge({
   registers: [register],
 });
 
+// --- C2: periodic-loop migration (jobs/tracing/hierarchy) ---
+
+/** Durable-job + in-memory recurring-loop executions (server/jobs.ts), by job/loop
+ * name and outcome (done|failed). Covers both runClaimedJob (durable queue) and
+ * runRecurringTick (sub-minute in-memory loops, e.g. webhook retry). */
+export const jobsRunsTotal = new client.Counter({
+  name: "ollamas_jobs_runs_total",
+  help: "Job queue and recurring-loop executions, by name and outcome",
+  labelNames: ["name", "outcome"],
+  registers: [register],
+});
+
+/** Duration of each job/recurring-loop execution in milliseconds, same label set
+ * as jobsRunsTotal so a slow/failing job is identifiable by name+outcome. */
+export const jobsDurationMs = new client.Histogram({
+  name: "ollamas_jobs_duration_ms",
+  help: "Job queue and recurring-loop execution duration in milliseconds, by name and outcome",
+  labelNames: ["name", "outcome"],
+  buckets: [10, 50, 100, 250, 500, 1000, 5000, 15000, 30000, 60000],
+  registers: [register],
+});
+
+/** Spans exported through the tracing ring-buffer bridge (server/tracing.ts's
+ * RingBufferBridgeExporter) — one increment per finished span, mirrors what
+ * lands in GET /api/traces. */
+export const tracingSpansExportedTotal = new client.Counter({
+  name: "ollamas_tracing_spans_exported_total",
+  help: "Spans exported through the tracing ring-buffer bridge",
+  registers: [register],
+});
+
+/** Hierarchy-bridge tier recommendations computed (server/hierarchy-bridge.ts's
+ * getHierarchyRecommendation), by resolved tier and the mode actually applied
+ * (advisory|enforce|off — enforce only when the policy is usable). */
+export const hierarchyRecommendationsTotal = new client.Counter({
+  name: "ollamas_hierarchy_recommendations_total",
+  help: "Hierarchy-bridge tier recommendations computed, by tier and applied mode",
+  labelNames: ["tier", "mode"],
+  registers: [register],
+});
+
+/** Semantic LLM response cache events (server/semantic-cache.ts, C4 — default OFF
+ *  via SEMANTIC_CACHE=1), by outcome: hit_exact | hit_semantic | miss | store. */
+export const semanticCacheEventsTotal = new client.Counter({
+  name: "ollamas_semantic_cache_events_total",
+  help: "Semantic LLM response cache events, by outcome (hit_exact|hit_semantic|miss|store)",
+  labelNames: ["outcome"],
+  registers: [register],
+});
+
 /**
  * Pull-time gauges sourced from the store at scrape (prom-client async collect).
  * Lazily registered once at boot so this module has no import cycle with the store.
