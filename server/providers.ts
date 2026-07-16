@@ -25,6 +25,7 @@ import { recordRequestEvent } from "./telemetry";
 import { resolveModelTuning, resolveKeepAlive, withSystemOverride } from "./model-overrides";
 import { randomUUID } from "node:crypto";
 import { withLlmSpan } from "./tracing";
+import { getHierarchyRecommendation, reorderChainForTier } from "./hierarchy-bridge";
 
 // Types
 export interface ProviderMessage {
@@ -50,6 +51,9 @@ export interface GenerateConfig {
   // Sovereign privacy: exclude every provider whose FREE tier trains on prompts (gemini
   // free tier, …) from the fallback chain. Local tiers always remain available.
   privateMode?: boolean;
+  // B7: task-class label for the dormant hierarchy tier-router bridge (server/hierarchy-bridge.ts).
+  // Defaults to "chat" when absent. Advisory-only by default — see hierarchy-bridge.ts header.
+  taskClass?: string;
 }
 
 export interface ToolCall {
@@ -314,7 +318,15 @@ export class ProviderRouter {
     signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
-    const providersToTry = this.effectiveChain(config);
+    let providersToTry = this.effectiveChain(config);
+    // B7 — hierarchy tier-router bridge (server/hierarchy-bridge.ts, advisory-only by default).
+    // Cheap: HIERARCHY_ROUTING="0" (default off-path check inside the bridge) short-circuits
+    // before any disk read. Advisory mode NEVER reorders providersToTry — only "enforce" (which
+    // itself is unreachable unless the on-disk policy is present + non-degenerate) does.
+    const hierarchyRec = getHierarchyRecommendation(config.taskClass || "chat");
+    if (hierarchyRec.mode === "enforce") {
+      providersToTry = reorderChainForTier(providersToTry, hierarchyRec.tier);
+    }
     let lastError: Error | null = null;
     const requestId = randomUUID();
     let prevProv: string | undefined; // provider the current attempt fell back FROM (telemetry)
@@ -364,7 +376,16 @@ export class ProviderRouter {
           // per-provider. Dynamic gen_ai.* usage attrs are attached once the call returns.
           const result = await withLlmSpan(
             "llm.generate",
-            { provider: prov, model: resolvedConfig.model, "gen_ai.operation.name": "chat", retryAttempt: attempt },
+            {
+              provider: prov, model: resolvedConfig.model, "gen_ai.operation.name": "chat", retryAttempt: attempt,
+              // B7: advisory-or-enforce tier recommendation, attached whenever the bridge is
+              // not fully OFF — visible on every span regardless of whether it altered routing.
+              ...(hierarchyRec.mode !== "off" ? {
+                "hierarchy.recommended_tier": hierarchyRec.tier,
+                "hierarchy.mode": hierarchyRec.mode,
+                "hierarchy.reason": hierarchyRec.reason,
+              } : {}),
+            },
             async (span) => {
               const r = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
               span.setAttribute("gen_ai.response.model", r.modelUsed || "");

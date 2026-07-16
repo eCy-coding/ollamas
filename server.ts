@@ -63,6 +63,7 @@ import { startWebhookWorker, stopWebhookWorker, verifyWebhook } from "./server/w
 import { startOAuthGc, stopOAuthGc } from "./server/oauth-gc";
 import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "./server/key-health";
 import { startJobs, stopJobs, getJobsSnapshot } from "./server/jobs";
+import { getHierarchySnapshot } from "./server/hierarchy-bridge";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
 import { registerContractRoutes, poolStatusReport as contractPoolStatus } from "./server/contract";
@@ -1315,6 +1316,13 @@ async function initializeServer() {
   // buffer — cheap, no external collector required. See server/tracing.ts.
   app.get("/api/traces", (_req, res) => {
     res.json(getTraceSnapshot());
+  });
+
+  // Hierarchy tier-router bridge snapshot (B7): current mode (off/advisory/enforce),
+  // whether the on-disk HIERARCHY_POLICY is structurally + statistically usable, and the
+  // last 100 recommendations. Advisory-only by default — see server/hierarchy-bridge.ts.
+  app.get("/api/hierarchy", (_req, res) => {
+    res.json(getHierarchySnapshot());
   });
 
   /**
