@@ -44,8 +44,10 @@ export function parseCatalog(tsSource) {
 }
 
 // Eval-side base-URL overrides for ANONYMOUS (keyless) access — escape hatch for when a
-// catalog baseUrl breaks for anonymous traffic before the catalog itself is fixed. Empty on
-// this branch: server/provider-catalog.ts is used as-is (no known anonymous-traffic break).
+// catalog baseUrl breaks for anonymous traffic before the catalog itself is fixed.
+// Empty since 2026-07-16: the pollinations 401 finding (gen.pollinations.ai rejects
+// anonymous traffic) was fixed at the root in server/provider-catalog.ts (gen → text
+// host, ported from ollamas-integrate-wt), so no override is needed here.
 export const KEYLESS_BASE_OVERRIDES = {};
 
 export function selectProviders(entries, env, { all = false } = {}) {

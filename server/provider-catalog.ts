@@ -64,18 +64,6 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     toolCalling: "probe",
     resetBoundary: "rolling",
   },
-  sambanova: {
-    id: "sambanova",
-    baseUrl: "https://api.sambanova.ai/v1",
-    envKey: "SAMBANOVA_API_KEY",
-    signupUrl: "https://cloud.sambanova.ai/apis",
-    defaultModel: "Meta-Llama-3.3-70B-Instruct",
-    limits: { perMin: 20, perDay: 0 },
-    trainsOnData: false,
-    maxContext: 16_384,
-    toolCalling: "probe",
-    resetBoundary: "rolling",
-  },
   "nvidia-nim": {
     id: "nvidia-nim",
     baseUrl: "https://integrate.api.nvidia.com/v1",
@@ -128,6 +116,66 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     toolCalling: "probe",
     resetBoundary: "utc-midnight",
   },
+  pollinations: {
+    id: "pollinations",
+    // text host serves ANONYMOUS traffic; gen.pollinations.ai/v1 returns 401 without a
+    // token (verified 2026-07-15) — gen would silently kill the keyless tier.
+    baseUrl: "https://text.pollinations.ai/v1",
+    envKey: "POLLINATIONS_TOKEN", // optional — a token lifts the per-IP limit but is NOT required
+    signupUrl: "https://pollinations.ai", // no signup needed; page documents optional token tiers
+    defaultModel: "openai", // Pollinations' default OpenAI-compat pooled model alias
+    limits: { perMin: 15, perDay: 0 }, // per-IP hourly throttle, opaque — the 429 cooldown backstops
+    trainsOnData: false,
+    maxContext: 32_000,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+    keyless: true, // reachable with NO key (per-IP) → true 0-manual fallback tier
+  },
+  cohere: {
+    id: "cohere",
+    // Official OpenAI-compat bridge (docs.cohere.com/docs/compatibility-api).
+    baseUrl: "https://api.cohere.ai/compatibility/v1",
+    envKey: "COHERE_API_KEY",
+    signupUrl: "https://dashboard.cohere.com/api-keys",
+    defaultModel: "command-r7b-12-2024",
+    limits: { perMin: 20, perDay: 0 }, // free tier is 1,000 req/MONTH (shared across models) — no daily figure
+    // CAUTIOUS default: trial-key terms have historically allowed usage for improvement.
+    // Verified-safe → flip to false with a source.
+    trainsOnData: true,
+    maxContext: 128_000,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+  },
+  huggingface: {
+    id: "huggingface",
+    // HF Inference Providers router (OpenAI-compat). Free tier ≈ $0.10/month credits —
+    // a thin last-resort key'd tier, kept low in the chain.
+    baseUrl: "https://router.huggingface.co/v1",
+    envKey: "HF_TOKEN",
+    signupUrl: "https://huggingface.co/settings/tokens",
+    defaultModel: "meta-llama/Llama-3.2-3B-Instruct",
+    limits: { perMin: 5, perDay: 0 }, // credit-based, not RPM-published — conservative
+    // Requests fan out to third-party partner providers with varying data terms.
+    trainsOnData: true,
+    maxContext: 16_384,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+  },
+  // ── Demoted tail (2026-07: upstream index moved both to "trial credits" — free tier
+  // likely ending). Insertion order feeds the fallback chain, so keeping them last
+  // de-prioritizes without removing them.
+  sambanova: {
+    id: "sambanova",
+    baseUrl: "https://api.sambanova.ai/v1",
+    envKey: "SAMBANOVA_API_KEY",
+    signupUrl: "https://cloud.sambanova.ai/apis",
+    defaultModel: "Meta-Llama-3.3-70B-Instruct",
+    limits: { perMin: 20, perDay: 0 },
+    trainsOnData: false,
+    maxContext: 16_384,
+    toolCalling: "probe",
+    resetBoundary: "rolling",
+  },
   scaleway: {
     id: "scaleway",
     baseUrl: "https://api.scaleway.ai/v1",
@@ -139,19 +187,6 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     maxContext: 128_000,
     toolCalling: "probe",
     resetBoundary: "rolling",
-  },
-  pollinations: {
-    id: "pollinations",
-    baseUrl: "https://gen.pollinations.ai/v1",
-    envKey: "POLLINATIONS_TOKEN", // optional — a token lifts the per-IP limit but is NOT required
-    signupUrl: "https://pollinations.ai", // no signup needed; page documents optional token tiers
-    defaultModel: "openai", // Pollinations' default OpenAI-compat pooled model alias
-    limits: { perMin: 15, perDay: 0 }, // per-IP hourly throttle, opaque — the 429 cooldown backstops
-    trainsOnData: false,
-    maxContext: 32_000,
-    toolCalling: "probe",
-    resetBoundary: "rolling",
-    keyless: true, // reachable with NO key (per-IP) → true 0-manual fallback tier
   },
 };
 
@@ -246,6 +281,8 @@ const CATALOG_CAPABILITIES: Record<string, readonly string[]> = {
   mistral: ["code", "tools"],
   scaleway: ["code", "long-ctx"],   // 128K ctx, EU-hosted, no-train
   pollinations: ["code", "fast"],   // keyless per-IP fallback tier
+  cohere: ["code", "long-ctx"],     // command-r7b 128K ctx; 1K req/mo shared quota
+  huggingface: ["code"],            // thin credit tier, last-resort key'd fallback
 };
 
 const LEGACY_CAPABILITIES: Record<string, readonly string[]> = {
