@@ -24,6 +24,11 @@ const RESEARCH_TIMEOUT_MS = Number(process.env.ODYSSEUS_RESEARCH_TIMEOUT_MS || 9
 
 // One bridge session per (model, mode) so repeated calls reuse context cheaply.
 const sessionCache = new Map();
+// Long-lived agent sessions accumulate completed-task history until the model
+// starts imitating past answers instead of issuing real tool calls (silent
+// "simulated exec": narrates success, writes nothing). Rotate after N uses.
+const sessionUses = new Map();
+const AGENT_SESSION_MAX_USES = Number(process.env.ODYSSEUS_AGENT_SESSION_MAX_USES || 6);
 
 async function createSession(model) {
   // When pinned to a specific Odysseus endpoint, the caller's generic model
@@ -48,9 +53,23 @@ async function getSession(model, mode, lane) {
   // chat tool and the research tool share one session — research reports then
   // bled into chat answers. Separate them with an explicit lane.
   const key = `${model}::${mode}::${lane || "c"}`;
-  if (sessionCache.has(key)) return sessionCache.get(key);
+  if (sessionCache.has(key)) {
+    if (mode === "agent") {
+      const uses = (sessionUses.get(key) || 0) + 1;
+      if (uses >= AGENT_SESSION_MAX_USES) {
+        sessionCache.delete(key);
+        sessionUses.delete(key);
+      } else {
+        sessionUses.set(key, uses);
+        return sessionCache.get(key);
+      }
+    } else {
+      return sessionCache.get(key);
+    }
+  }
   const id = await createSession(model);
   sessionCache.set(key, id);
+  sessionUses.set(key, 1);
   return id;
 }
 
