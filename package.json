@@ -51,6 +51,7 @@
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^2.4.0",
+    "@huggingface/transformers": "^4.2.0",
     "@lingui/core": "^6.4.0",
     "@lingui/react": "^6.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -88,6 +89,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-error-boundary": "^6.1.2",
+    "semantic-chunking": "^2.7.0",
     "sqlite-vec": "^0.1.9",
     "stripe": "^22.2.1",
     "swagger-jsdoc": "^6.3.0",
