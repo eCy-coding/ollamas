@@ -135,6 +135,15 @@ export const hierarchyRecommendationsTotal = new client.Counter({
   registers: [register],
 });
 
+/** Semantic LLM response cache events (server/semantic-cache.ts, C4 — default OFF
+ *  via SEMANTIC_CACHE=1), by outcome: hit_exact | hit_semantic | miss | store. */
+export const semanticCacheEventsTotal = new client.Counter({
+  name: "ollamas_semantic_cache_events_total",
+  help: "Semantic LLM response cache events, by outcome (hit_exact|hit_semantic|miss|store)",
+  labelNames: ["outcome"],
+  registers: [register],
+});
+
 /**
  * Pull-time gauges sourced from the store at scrape (prom-client async collect).
  * Lazily registered once at boot so this module has no import cycle with the store.

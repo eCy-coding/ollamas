@@ -63,6 +63,7 @@ import { verifyWebhook } from "./server/webhooks/outbound"; // also registers th
 import "./server/oauth-gc"; // registers the "oauth-gc" durable job handler (C2, side effect — scheduled by server/jobs.ts)
 import { startKeyHealth, stopKeyHealth, getKeyHealth, liveCheapSnapshot } from "./server/key-health";
 import { startJobs, stopJobs, getJobsSnapshot } from "./server/jobs";
+import { getSemanticCacheSnapshot } from "./server/semantic-cache";
 import { getHierarchySnapshot } from "./server/hierarchy-bridge";
 import { authMiddleware } from "./server/middleware/auth";
 import { rateLimitMiddleware } from "./server/middleware/rate-limit";
@@ -1309,6 +1310,12 @@ async function initializeServer() {
   // always-running poll loop's cached snapshot (server/jobs.ts).
   app.get("/api/jobs", (_req, res) => {
     res.json(getJobsSnapshot());
+  });
+
+  // Semantic LLM response cache snapshot (C4): enabled flag, threshold/TTL config,
+  // and event counts (hit_exact|hit_semantic|miss|store) — see server/semantic-cache.ts.
+  app.get("/api/cache", async (_req, res) => {
+    res.json(await getSemanticCacheSnapshot());
   });
 
   // Distributed tracing snapshot (B2): last RING_BUFFER_MAX finished spans

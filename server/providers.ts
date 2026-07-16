@@ -26,6 +26,7 @@ import { resolveModelTuning, resolveKeepAlive, withSystemOverride } from "./mode
 import { randomUUID } from "node:crypto";
 import { withLlmSpan } from "./tracing";
 import { getHierarchyRecommendation, reorderChainForTier } from "./hierarchy-bridge";
+import { semanticCacheLookup, semanticCacheStore, type CacheParams, type StoredResult } from "./semantic-cache";
 
 // Types
 export interface ProviderMessage {
@@ -318,6 +319,25 @@ export class ProviderRouter {
     signal?: AbortSignal
   ): Promise<GenerateResult> {
     const start = Date.now();
+    // C4 — semantic LLM response cache (server/semantic-cache.ts, default OFF via
+    // SEMANTIC_CACHE=1). Only consulted for non-streaming, non-validation requests: a
+    // streamed caller expects chunk-by-chunk delivery (a cached string can't replay
+    // that), and singleAttempt is the /api/keys/test key-validation path — caching it
+    // would mask a real provider failure behind a stale cached "success". The lookup
+    // itself is failure-isolated (never throws — see semanticCacheLookup); a cache
+    // outage always degrades to a normal miss, never breaks generation.
+    const cacheEligible = !onStreamChunk && !config.singleAttempt;
+    const cacheParams: CacheParams = { model: config.model, messages: config.messages, temperature: config.temperature, numCtx: config.numCtx, tools: config.tools };
+    if (cacheEligible) {
+      const cached = await withLlmSpan("llm.cache", { provider: config.provider, model: config.model, "gen_ai.operation.name": "chat" }, async (span) => {
+        const hit = await semanticCacheLookup(cacheParams);
+        span.setAttribute("cache.outcome", hit ? hit.outcome : "miss");
+        return hit;
+      });
+      if (cached) {
+        return { ...cached.result, latencyMs: Date.now() - start };
+      }
+    }
     let providersToTry = this.effectiveChain(config);
     // B7 — hierarchy tier-router bridge (server/hierarchy-bridge.ts, advisory-only by default).
     // Cheap: HIERARCHY_ROUTING="0" (default off-path check inside the bridge) short-circuits
@@ -433,6 +453,15 @@ export class ProviderRouter {
               retryCount: attempt, keyId: used ? keyId(used) : undefined,
               stream: !!wrappedChunk, tokPerSec: lastAttemptMs > 0 ? tokensOut / (lastAttemptMs / 1000) : undefined,
             });
+          }
+          // C4: store the successful result under its exact-hash id (no-op unless
+          // SEMANTIC_CACHE=1; internally failure-isolated — see semanticCacheStore).
+          if (cacheEligible) {
+            const stored: StoredResult = {
+              text: result.text, source: result.source, modelUsed: result.modelUsed,
+              tokensPerSec: result.tokensPerSec, tokens: result.tokens, tokensIn: result.tokensIn, tokensOut: result.tokensOut,
+            };
+            await semanticCacheStore(cacheParams, stored);
           }
           return { ...result, latencyMs: elapsed };
         } catch (err: any) {
