@@ -52,3 +52,7 @@ dist-plugin/
 orchestration/.orchestra-*-enabled
 playwright-report/
 scripts-live.err
+# semantic-chunking ONNX model cache — must never land in cwd/repo (rag.ts
+# redirects RAG_CHUNK_MODEL_PATH to ~/.llm-mission-control/models, but guard
+# against the library's own "./models" default too)
+/models/

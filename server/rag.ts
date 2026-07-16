@@ -9,6 +9,8 @@
 import { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
 import { pickEmbedProvider, buildEmbedRequest, parseEmbedResponse } from "./embed-catalog";
+import { rerankCandidates, type Scorer } from "./rerank";
+import { withLlmSpan } from "./tracing";
 
 export type Embedder = (text: string) => Promise<number[]>;
 
@@ -59,6 +61,69 @@ export function resolveEmbedder(
     }
   };
   return { embed, providerId: entry.id };
+}
+
+// ── Chunking seam (RAG_SEMANTIC_CHUNK) ──────────────────────────────────────
+// createRagStore()/RagStore stay untouched (sqlite-vec store "as-is" — one
+// vector per indexed id, unchanged contract for existing callers). Chunking
+// is a layer on top, applied by the module-level ragIndex() wrapper below.
+
+export type Chunker = (text: string) => Promise<string[]> | string[];
+
+/** Fixed-size fallback splitter — pure, no model, always available. Used as
+ *  the default chunking strategy (RAG_SEMANTIC_CHUNK unset/0) and as the
+ *  safety net when the semantic chunker's model fails to load. */
+export function fixedSizeChunk(text: string, maxChars = 1200): string[] {
+  const t = text.trim();
+  if (!t) return [];
+  const chunks: string[] = [];
+  for (let i = 0; i < t.length; i += maxChars) chunks.push(t.slice(i, i + maxChars));
+  return chunks;
+}
+
+let _semanticChunkitPromise: Promise<typeof import("semantic-chunking")> | null = null;
+function loadChunkit(): Promise<typeof import("semantic-chunking")> {
+  if (!_semanticChunkitPromise) _semanticChunkitPromise = import("semantic-chunking");
+  return _semanticChunkitPromise;
+}
+
+/** Sentence-embedding based semantic chunker (jparkerweb/semantic-chunking,
+ *  MIT). Downloads an ONNX sentence-embedding model on first call — never
+ *  call this directly from a unit test; go through chunkText() (default
+ *  RAG_SEMANTIC_CHUNK unset/0, or pass deps.chunker). */
+export async function semanticChunk(text: string): Promise<string[]> {
+  const { chunkit } = await loadChunkit();
+  const results = (await chunkit([{ document_text: text }], {
+    maxTokenSize: Number(process.env.RAG_CHUNK_MAX_TOKENS) || 500,
+    logging: false,
+    // Default LOCAL_MODEL_PATH is "./models" (repo cwd) — redirect ONNX
+    // downloads next to the RAG db instead of polluting the working tree.
+    localModelPath: process.env.RAG_CHUNK_MODEL_PATH || `${process.env.HOME}/.llm-mission-control/models`,
+  })) as { text: string }[];
+  return results.map((r) => r.text).filter(Boolean);
+}
+
+/**
+ * Chunk `text` for indexing. `RAG_SEMANTIC_CHUNK=1` opts into the model-backed
+ * semantic chunker (ONNX download cost — default OFF); any load/runtime
+ * failure falls back to the fixed-size splitter and logs a warning, never
+ * throws. `deps.chunker` overrides both paths for deterministic tests.
+ */
+export async function chunkText(
+  text: string,
+  env: NodeJS.ProcessEnv = process.env,
+  deps: { chunker?: Chunker } = {},
+): Promise<string[]> {
+  if (deps.chunker) return deps.chunker(text);
+  if (env.RAG_SEMANTIC_CHUNK === "1") {
+    try {
+      const chunks = await semanticChunk(text);
+      if (chunks.length > 0) return chunks;
+    } catch (e: any) {
+      console.warn(`[RAG] semantic chunking failed (${e?.message ?? e}) → fixed-size fallback`);
+    }
+  }
+  return fixedSizeChunk(text);
 }
 
 const f32 = (v: number[]) => new Uint8Array(new Float32Array(v).buffer);
@@ -172,5 +237,46 @@ function store(): RagStore {
   }
   return _store;
 }
-export const ragIndex = (docId: string, text: string) => store().index(docId, text);
-export const ragSearch = (query: string, k?: number) => store().search(query, k);
+/** Index `text` under `docId`, chunking it first (RAG_SEMANTIC_CHUNK=1 opt-in,
+ *  default OFF → single chunk, byte-identical to the pre-chunking behavior).
+ *  Multi-chunk documents are stored as `${docId}#0`, `${docId}#1`, … so the
+ *  RagStore's doc_id-unique contract is untouched; the returned `id` is
+ *  always the caller's original docId. */
+export async function ragIndex(
+  docId: string,
+  text: string,
+  opts: { env?: NodeJS.ProcessEnv; chunker?: Chunker } = {},
+): Promise<{ id: string; dim: number; chunks?: number }> {
+  const env = opts.env ?? process.env;
+  const chunks = await chunkText(text, env, { chunker: opts.chunker });
+  if (chunks.length <= 1) {
+    const r = await store().index(docId, chunks[0] ?? text);
+    return r;
+  }
+  let dim = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    const r = await store().index(`${docId}#${i}`, chunks[i]);
+    dim = r.dim;
+  }
+  return { id: docId, dim, chunks: chunks.length };
+}
+
+/** Semantic search over the top-k index. Overfetches (k, capped) candidates
+ *  from the vector store, then reranks with a local cross-encoder
+ *  (RAG_RERANK=0 disables, default ON with graceful fallback — see
+ *  rerank.ts). The whole rerank step (including model scoring) is wrapped in
+ *  a single tracing span, mirroring brain.ts's llm.embed seam. */
+export async function ragSearch(
+  query: string,
+  k = 5,
+  opts: { env?: NodeJS.ProcessEnv; scorer?: Scorer } = {},
+): Promise<{ id: string; text: string; distance: number }[]> {
+  const env = opts.env ?? process.env;
+  if (env.RAG_RERANK === "0") return store().search(query, k);
+  const overfetch = Math.max(k, Math.min(k * 4, 50));
+  const candidates = await store().search(query, overfetch);
+  if (candidates.length === 0) return candidates;
+  return withLlmSpan("rerank", { k, candidates: candidates.length }, () =>
+    rerankCandidates(query, candidates, { topN: k, scorer: opts.scorer, env }),
+  );
+}

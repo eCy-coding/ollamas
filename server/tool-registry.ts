@@ -12,6 +12,8 @@ import { runPre, runPost } from "./tool-interceptors";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
+import { brainRemember, brainRecall, brainAssertFact, brainFactsAbout, brainIngest, parseExtraction, TIER_WEIGHT, type MemoryTier } from "./brain";
+import { evalUntrusted } from "./sandbox";
 import { countTokens, estimateCost } from "./tokens";
 import { runTestgen, runAudit, generateStorefront } from "./revenue";
 import { contractApprove, contractReject, contractSuspend, contractResume, contractRevoke, contractRotate, contractList } from "./contract";
@@ -782,6 +784,198 @@ const TOOLS: Record<string, ToolDef> = {
       if (!args.query) throw new Error("Missing 'query'.");
       const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
       return { results: await ragSearch(String(args.query), k) };
+    },
+  },
+
+  // Tur 4: Brain v1 (server/brain.ts) — tiered semantic memory + bi-temporal facts on
+  // the rag.ts sqlite-vec machinery. The AGENT is the distiller (Letta pattern): it
+  // extracts memories/facts from an episode and writes through these tools. Writes
+  // are host tier; reads are safe. Routed through the choke-point.
+  brain_remember: {
+    tier: "host",
+    schema: fn(
+      "brain_remember",
+      "Store one durable memory in the agent brain. Tiers: core (identity/preferences), procedural (how-to), learned (verified lessons), episodic (what happened), working (short-lived). Upserts by id.",
+      {
+        type: "object",
+        properties: {
+          tier: { type: "string", enum: Object.keys(TIER_WEIGHT), description: "Memory tier." },
+          content: { type: "string", description: "The memory text to embed and store." },
+          id: { type: "string", description: "Optional stable id (re-remembering the same id replaces it)." },
+          ns: { type: "string", description: "Optional namespace (default 'default')." },
+        },
+        required: ["tier", "content"],
+      },
+      { type: "object", properties: { id: { type: "string" }, dim: { type: "number" } }, required: ["id", "dim"] }
+    ),
+    invoke: async (args) => {
+      if (!args.tier || !args.content) throw new Error("Missing 'tier' or 'content'.");
+      return await brainRemember({
+        tier: String(args.tier) as MemoryTier,
+        content: String(args.content),
+        id: args.id ? String(args.id) : undefined,
+        ns: args.ns ? String(args.ns) : undefined,
+      });
+    },
+  },
+
+  brain_recall: {
+    tier: "safe",
+    schema: fn(
+      "brain_recall",
+      "Semantic recall from the agent brain. Ranks by closeness × tier weight × recency (fresh core facts first, stale working notes last).",
+      {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Natural-language query." },
+          k: { type: "number", description: "How many memories to return. Default 5." },
+          tier: { type: "string", enum: Object.keys(TIER_WEIGHT), description: "Optional tier filter." },
+          ns: { type: "string", description: "Optional namespace (default 'default')." },
+        },
+        required: ["query"],
+      },
+      { type: "object", properties: { results: { type: "array", items: { type: "object" } } } }
+    ),
+    invoke: async (args) => {
+      if (!args.query) throw new Error("Missing 'query'.");
+      const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
+      return {
+        results: await brainRecall(String(args.query), {
+          k,
+          tier: args.tier ? (String(args.tier) as MemoryTier) : undefined,
+          ns: args.ns ? String(args.ns) : undefined,
+        }),
+      };
+    },
+  },
+
+  brain_fact_assert: {
+    tier: "host",
+    schema: fn(
+      "brain_fact_assert",
+      "Assert a subject–predicate–object fact. Bi-temporal: a changed object supersedes (invalidates) the previous fact instead of overwriting history; re-asserting the same fact is a no-op.",
+      {
+        type: "object",
+        properties: {
+          subject: { type: "string" },
+          predicate: { type: "string" },
+          object: { type: "string" },
+          episode_id: { type: "string", description: "Optional source episode/session id." },
+          ns: { type: "string", description: "Optional namespace (default 'default')." },
+        },
+        required: ["subject", "predicate", "object"],
+      },
+      {
+        type: "object",
+        properties: { changed: { type: "boolean" }, invalidated: { type: "number" } },
+        required: ["changed", "invalidated"],
+      }
+    ),
+    invoke: async (args) => {
+      if (!args.subject || !args.predicate || !args.object) throw new Error("Missing 'subject', 'predicate' or 'object'.");
+      return await brainAssertFact({
+        subject: String(args.subject),
+        predicate: String(args.predicate),
+        object: String(args.object),
+        episodeId: args.episode_id ? String(args.episode_id) : undefined,
+        ns: args.ns ? String(args.ns) : undefined,
+      });
+    },
+  },
+
+  brain_facts: {
+    tier: "safe",
+    schema: fn(
+      "brain_facts",
+      "List the facts known about a subject. Point-in-time capable: pass 'at' (epoch ms) to see what was true THEN instead of now.",
+      {
+        type: "object",
+        properties: {
+          subject: { type: "string" },
+          at: { type: "number", description: "Optional epoch-ms timestamp for a historical view." },
+          ns: { type: "string", description: "Optional namespace (default 'default')." },
+        },
+        required: ["subject"],
+      },
+      { type: "object", properties: { facts: { type: "array", items: { type: "object" } } } }
+    ),
+    invoke: async (args) => {
+      if (!args.subject) throw new Error("Missing 'subject'.");
+      return {
+        facts: brainFactsAbout(String(args.subject), {
+          at: args.at !== undefined ? Number(args.at) : undefined,
+          ns: args.ns ? String(args.ns) : undefined,
+        }),
+      };
+    },
+  },
+
+  brain_ingest: {
+    tier: "host",
+    schema: fn(
+      "brain_ingest",
+      "Batch-write a distilled episode into the brain: memories (tiered) + facts (bi-temporal), all tagged with the episode id. Accepts either structured arrays or a raw LLM extraction string (reasoning-leakage tolerated).",
+      {
+        type: "object",
+        properties: {
+          episode_id: { type: "string", description: "Session/episode id the distillation came from." },
+          memories: { type: "array", items: { type: "object" }, description: "[{tier, content}] rows." },
+          facts: { type: "array", items: { type: "object" }, description: "[{subject, predicate, object}] rows." },
+          raw: { type: "string", description: "Alternative: raw extraction reply to parse (last JSON object wins)." },
+          ns: { type: "string", description: "Optional namespace (default 'default')." },
+        },
+        required: ["episode_id"],
+      },
+      {
+        type: "object",
+        properties: { memories: { type: "number" }, facts: { type: "number" } },
+        required: ["memories", "facts"],
+      }
+    ),
+    invoke: async (args) => {
+      if (!args.episode_id) throw new Error("Missing 'episode_id'.");
+      const extracted = args.raw ? parseExtraction(String(args.raw)) : { memories: [], facts: [] };
+      const memories = Array.isArray(args.memories) && args.memories.length ? args.memories : extracted.memories;
+      const facts = Array.isArray(args.facts) && args.facts.length ? args.facts : extracted.facts;
+      return await brainIngest({
+        episodeId: String(args.episode_id),
+        memories,
+        facts,
+        ns: args.ns ? String(args.ns) : undefined,
+      });
+    },
+  },
+
+  // B4: sandboxed JS execution (server/sandbox.ts, quickjs-emscripten WASM).
+  // tier:safe — the code runs in a disposable QuickJS runtime with no host
+  // bindings (no fetch/process/require), a wall-clock interrupt handler and a
+  // memory cap, so it is safe even for an untrusted/low-plan caller. The tool
+  // layer still clamps the caller-supplied timeout/memory below the sandbox's
+  // own defaults so a caller can't ask for an oversized budget.
+  sandbox_eval: {
+    tier: "safe",
+    schema: fn(
+      "sandbox_eval",
+      "Evaluate untrusted JavaScript in a sandboxed QuickJS-WASM context (no filesystem/network/process access). Returns the JSON-serializable value of the last expression. Use for arithmetic, data transforms and small algorithms — not for anything needing host I/O.",
+      {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "JavaScript source to evaluate." },
+          timeout_ms: { type: "number", description: "Wall-clock timeout in ms (default 2000, capped at 5000)." },
+          input: { description: "Optional JSON value exposed inside the sandbox as the global INPUT." },
+        },
+        required: ["code"],
+      },
+      {
+        type: "object",
+        properties: { ok: { type: "boolean" }, value: {}, error: { type: "string" }, durationMs: { type: "number" } },
+        required: ["ok", "durationMs"],
+      }
+    ),
+    invoke: async (args) => {
+      if (!args.code) throw new Error("Missing 'code'.");
+      const timeoutMs = Math.min(Number(args.timeout_ms) > 0 ? Math.floor(Number(args.timeout_ms)) : 2000, 5000);
+      return await evalUntrusted(String(args.code), { timeoutMs, memoryLimitMb: 64, input: args.input });
     },
   },
 
