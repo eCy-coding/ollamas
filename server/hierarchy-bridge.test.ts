@@ -17,6 +17,7 @@ import {
   type HierarchyMode,
 } from "./hierarchy-bridge";
 import type { HierarchyPolicy } from "../orchestration/bin/lib/hierarchy";
+import { register as metricsRegister } from "./metrics";
 
 function goodPolicy(overrides: Partial<HierarchyPolicy> = {}): HierarchyPolicy {
   return {
@@ -223,6 +224,29 @@ describe("getHierarchyRecommendation — mode routing via env + disk policy", ()
     process.env.HIERARCHY_POLICY_PATH = file;
     expect(() => getHierarchyRecommendation("codegen")).not.toThrow();
     expect(getHierarchyRecommendation("codegen").mode).toBe("advisory");
+  });
+});
+
+describe("metrics (C2) — hierarchy recommendations exported via server/metrics.ts", () => {
+  test("getHierarchyRecommendation increments ollamas_hierarchy_recommendations_total{tier,mode}", async () => {
+    process.env.HIERARCHY_ROUTING = "enforce";
+    process.env.HIERARCHY_POLICY_PATH = writePolicyFile(goodPolicy());
+    const before = (await metricsRegister.getSingleMetric("ollamas_hierarchy_recommendations_total")!.get()).values
+      .find((v) => v.labels.tier === "local" && v.labels.mode === "enforce")?.value ?? 0;
+    getHierarchyRecommendation("codegen"); // resolves to tier="local", mode="enforce" per goodPolicy()
+    const after = (await metricsRegister.getSingleMetric("ollamas_hierarchy_recommendations_total")!.get()).values
+      .find((v) => v.labels.tier === "local" && v.labels.mode === "enforce")?.value ?? 0;
+    expect(after).toBe(before + 1);
+  });
+
+  test('mode "0" (fully off) records no metric sample — matches "no ring-buffer entry" behavior', async () => {
+    const before = (await metricsRegister.getSingleMetric("ollamas_hierarchy_recommendations_total")!.get()).values
+      .find((v) => v.labels.tier === "local" && v.labels.mode === "off")?.value ?? 0;
+    process.env.HIERARCHY_ROUTING = "0";
+    getHierarchyRecommendation("codegen");
+    const after = (await metricsRegister.getSingleMetric("ollamas_hierarchy_recommendations_total")!.get()).values
+      .find((v) => v.labels.tier === "local" && v.labels.mode === "off")?.value ?? 0;
+    expect(after).toBe(before); // "off" short-circuits before the metric increment, same as the ring buffer
   });
 });
 

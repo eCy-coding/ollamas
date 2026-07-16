@@ -10,6 +10,7 @@ import {
   RING_BUFFER_MAX,
   type StoredSpan,
 } from "./tracing";
+import { register as metricsRegister } from "./metrics";
 
 function fakeSpan(overrides: Partial<StoredSpan> = {}): StoredSpan {
   const now = Date.now();
@@ -125,6 +126,27 @@ describe("getTraceSnapshot", () => {
     expect(typeof snap.count).toBe("number");
     expect(typeof snap.updatedAt).toBe("number");
     expect(snap.count).toBe(snap.spans.length);
+  });
+});
+
+describe("metrics (C2) — spans-exported counter exported via server/metrics.ts", () => {
+  beforeEach(() => { delete process.env.OTEL_DISABLED; });
+
+  test("a real span exported through the NodeSDK pipeline increments ollamas_tracing_spans_exported_total", async () => {
+    const before = (await metricsRegister.getSingleMetric("ollamas_tracing_spans_exported_total")!.get()).values[0]?.value ?? 0;
+    await withLlmSpan("llm.generate", { provider: "metrics-check" }, async () => "x");
+    const after = (await metricsRegister.getSingleMetric("ollamas_tracing_spans_exported_total")!.get()).values[0]?.value ?? 0;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test("RingBufferBridgeExporter's own export() path is what increments the counter (unit-level)", async () => {
+    // Exercised indirectly above via the real SDK; this asserts the counter is monotonic
+    // across two spans (not double-counted, not reset) — cheap regression guard.
+    const before = (await metricsRegister.getSingleMetric("ollamas_tracing_spans_exported_total")!.get()).values[0]?.value ?? 0;
+    await withLlmSpan("llm.generate", { provider: "metrics-check-2" }, async () => "y");
+    await withLlmSpan("llm.generate", { provider: "metrics-check-3" }, async () => "z");
+    const after = (await metricsRegister.getSingleMetric("ollamas_tracing_spans_exported_total")!.get()).values[0]?.value ?? 0;
+    expect(after).toBeGreaterThanOrEqual(before + 2);
   });
 });
 

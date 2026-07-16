@@ -25,8 +25,11 @@ import {
   startJobs,
   stopJobs,
   getJobsSnapshot,
+  registerRecurring,
+  _resetRecurringForTest,
   type Job,
 } from "./jobs";
+import { register as metricsRegister, jobsRunsTotal, jobsDurationMs } from "./metrics";
 
 const files: string[] = [];
 
@@ -41,7 +44,7 @@ async function freshDb(tag: string): Promise<DbClient> {
   return db;
 }
 
-afterEach(() => _resetHandlersForTest());
+afterEach(() => { _resetHandlersForTest(); _resetRecurringForTest(); });
 afterAll(async () => {
   await stopJobs();
   for (const file of files) for (const f of [file, `${file}-wal`, `${file}-shm`]) try { fs.unlinkSync(f); } catch {}
@@ -302,6 +305,130 @@ describe("startJobs / stopJobs loop", () => {
     await stopJobs();
     // after stop, snapshot resets to the cheap empty shape
     expect(getJobsSnapshot().running).toBe(false);
+    try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
+  }, 10_000);
+});
+
+describe("registerRecurring (C2 — sub-minute in-memory loops, no durable row per tick)", () => {
+  afterEach(async () => { await stopJobs(); });
+
+  test("a registered recurring loop runs on its own timer once started, independent of the durable DbClient", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-recurring-runs-${process.pid}-${Date.now()}.db`);
+    process.env.JOBS_BOOT_DELAY_MS = "50000"; // keep the durable poll loop from touching anything here
+    let calls = 0;
+    registerRecurring("test-recurring-runs", 10, () => { calls++; });
+    startJobs();
+    await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(2), { timeout: 2000 });
+    const entry = getJobsSnapshot().recurring.find((r) => r.name === "test-recurring-runs");
+    expect(entry).toBeDefined();
+    expect(entry!.everyMs).toBe(10);
+    expect(entry!.runs).toBeGreaterThanOrEqual(2);
+    expect(entry!.errors).toBe(0);
+    expect(entry!.running).toBe(true);
+    expect(entry!.lastRunAt).not.toBeNull();
+    expect(typeof entry!.lastDurationMs).toBe("number");
+    try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
+  }, 10_000);
+
+  test("onStart fires once, before the first interval tick", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-recurring-onstart-${process.pid}-${Date.now()}.db`);
+    process.env.JOBS_BOOT_DELAY_MS = "50000";
+    let onStartCalls = 0;
+    let tickCalls = 0;
+    registerRecurring("test-recurring-onstart", 100_000, () => { tickCalls++; }, { onStart: () => { onStartCalls++; } });
+    startJobs();
+    await vi.waitFor(() => expect(onStartCalls).toBe(1), { timeout: 2000 });
+    expect(tickCalls).toBe(0); // interval (100s) hasn't fired yet — only onStart ran
+    try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
+  }, 10_000);
+
+  test("error isolation — a throwing tick increments errors but keeps the loop running for the next tick", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-recurring-errors-${process.pid}-${Date.now()}.db`);
+    process.env.JOBS_BOOT_DELAY_MS = "50000";
+    let calls = 0;
+    registerRecurring("test-recurring-errors", 10, () => { calls++; throw new Error("boom"); });
+    startJobs();
+    await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(2), { timeout: 2000 });
+    const entry = getJobsSnapshot().recurring.find((r) => r.name === "test-recurring-errors");
+    expect(entry!.errors).toBeGreaterThanOrEqual(2);
+    expect(entry!.runs).toBe(0); // a throwing tick counts as an error, not a run
+    expect(entry!.lastError).toContain("boom");
+    try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
+  }, 10_000);
+
+  test("snapshot fields are present even before startJobs() runs (registered but not yet started)", () => {
+    registerRecurring("test-recurring-unstarted", 5000, () => {});
+    const entry = getJobsSnapshot().recurring.find((r) => r.name === "test-recurring-unstarted");
+    expect(entry).toEqual({
+      name: "test-recurring-unstarted", everyMs: 5000, runs: 0, errors: 0,
+      lastRunAt: null, lastDurationMs: null, lastError: null, running: false,
+    });
+  });
+
+  test("stopJobs() halts further ticks", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-recurring-stop-${process.pid}-${Date.now()}.db`);
+    process.env.JOBS_BOOT_DELAY_MS = "50000";
+    let calls = 0;
+    registerRecurring("test-recurring-stop", 10, () => { calls++; });
+    startJobs();
+    await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(1), { timeout: 2000 });
+    await stopJobs();
+    const afterStop = calls;
+    expect(getJobsSnapshot().recurring.find((r) => r.name === "test-recurring-stop")?.running).toBe(false);
+    await new Promise((r) => setTimeout(r, 60));
+    expect(calls).toBe(afterStop); // no further ticks after stop
+    try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
+  }, 10_000);
+});
+
+describe("metrics (C2) — jobs runs/duration exported via server/metrics.ts", () => {
+  test("runClaimedJob (durable path) records a 'done' outcome", async () => {
+    const db = await freshDb("metrics-done");
+    registerJobHandler("metrics-echo", () => {});
+    await enqueue(db, "metrics-echo", {});
+    const job = (await claimNext(db)) as Job;
+    const before = (await metricsRegister.getSingleMetric("ollamas_jobs_runs_total")!.get()).values
+      .filter((v) => v.labels.name === "metrics-echo" && v.labels.outcome === "done")
+      .reduce((n, v) => n + v.value, 0);
+    await runClaimedJob(db, job);
+    const after = (await metricsRegister.getSingleMetric("ollamas_jobs_runs_total")!.get()).values
+      .filter((v) => v.labels.name === "metrics-echo" && v.labels.outcome === "done")
+      .reduce((n, v) => n + v.value, 0);
+    expect(after).toBe(before + 1);
+    const durationSample = (await metricsRegister.getSingleMetric("ollamas_jobs_duration_ms")!.get()).values
+      .find((v) => v.labels.name === "metrics-echo" && v.labels.outcome === "done" && (v as any).metricName?.endsWith("_count"));
+    expect(durationSample).toBeDefined();
+    await db.close();
+  });
+
+  test("runClaimedJob (durable path) records a 'failed' outcome for a throwing handler", async () => {
+    const db = await freshDb("metrics-failed");
+    registerJobHandler("metrics-boom", () => { throw new Error("boom"); });
+    await enqueue(db, "metrics-boom", {}, { maxAttempts: 5 });
+    const job = (await claimNext(db)) as Job;
+    await runClaimedJob(db, job);
+    const failedCount = (await metricsRegister.getSingleMetric("ollamas_jobs_runs_total")!.get()).values
+      .find((v) => v.labels.name === "metrics-boom" && v.labels.outcome === "failed");
+    expect(failedCount?.value).toBeGreaterThanOrEqual(1);
+    await db.close();
+  });
+
+  test("registerRecurring ticks are also recorded under the same metric names", async () => {
+    delete process.env.DATABASE_URL;
+    process.env.SAAS_DB_PATH = path.join(os.tmpdir(), `ollamas-recurring-metrics-${process.pid}-${Date.now()}.db`);
+    process.env.JOBS_BOOT_DELAY_MS = "50000";
+    registerRecurring("metrics-recurring", 10, () => {});
+    startJobs();
+    await vi.waitFor(async () => {
+      const values = (await metricsRegister.getSingleMetric("ollamas_jobs_runs_total")!.get()).values;
+      const sample = values.find((v) => v.labels.name === "metrics-recurring" && v.labels.outcome === "done");
+      expect(sample?.value).toBeGreaterThanOrEqual(1);
+    }, { timeout: 2000 });
+    await stopJobs();
     try { fs.unlinkSync(process.env.SAAS_DB_PATH); } catch {}
   }, 10_000);
 });

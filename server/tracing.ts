@@ -31,6 +31,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { RingBuffer } from "./telemetry";
+import { tracingSpansExportedTotal } from "./metrics";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 export type SpanStatusLabel = "unset" | "ok" | "error";
@@ -106,6 +107,7 @@ function toAttributeRecord(attrs: Attributes): Record<string, string | number | 
  *  through exactly one path — no double-recording. */
 class RingBufferBridgeExporter implements SpanExporter {
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
+    tracingSpansExportedTotal.inc(spans.length);
     for (const s of spans) {
       const ctx = s.spanContext();
       ringExporter.push({

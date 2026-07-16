@@ -18,6 +18,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { Cron } from "croner";
 import { createAdapter, type DbClient } from "./store/db-adapter";
+import { jobsRunsTotal, jobsDurationMs } from "./metrics";
 
 export type JobState = "pending" | "running" | "done" | "failed";
 
@@ -192,17 +193,136 @@ export async function runClaimedJob(
   job: Job,
   backoffOpts: { baseBackoffMs?: number; maxBackoffMs?: number } = {},
 ): Promise<void> {
+  const t0 = Date.now();
+  const record = (outcome: "done" | "failed") => {
+    jobsRunsTotal.labels(job.name, outcome).inc();
+    jobsDurationMs.labels(job.name, outcome).observe(Date.now() - t0);
+  };
   const handler = handlers.get(job.name);
   if (!handler) {
     await markJobFailed(client, job, `no handler registered for "${job.name}"`, backoffOpts.baseBackoffMs, backoffOpts.maxBackoffMs);
+    record("failed");
     return;
   }
   try {
     await handler(job.payload);
     await markJobDone(client, job.id);
+    record("done");
   } catch (e: any) {
     await markJobFailed(client, job, String(e?.message ?? e), backoffOpts.baseBackoffMs, backoffOpts.maxBackoffMs);
+    record("failed");
   }
+}
+
+// ── Recurring in-memory loops (C2) ──────────────────────────────────────────────
+// Sub-minute recurrence (webhook retry @30s, formerly server/webhooks/outbound.ts's
+// own setInterval) must NOT enqueue a durable jobs-table row per tick — that's sqlite
+// churn for no benefit (nothing about a 15s/30s tick needs to survive a restart; the
+// underlying work it drives, e.g. webhook_deliveries, is already itself durable).
+// registerRecurring centralizes these loops into jobs.ts (one module owns every
+// periodic timer + its graceful shutdown) while keeping them off the durable queue —
+// each entry gets its own real `setInterval` (same fire-on-schedule semantics the
+// original per-module timers had: ticks are NOT awaited/serialized against each
+// other, matching setInterval's normal fire-regardless-of-previous-tick behavior),
+// started/stopped centrally by startJobs()/stopJobs(), with run/error/last-run
+// bookkeeping surfaced via getJobsSnapshot() and the same jobsRunsTotal /
+// jobsDurationMs metrics as durable jobs.
+export interface RecurringOptions {
+  /** Runs once, fire-and-forget, when the loop starts (mirrors e.g. the webhook
+   *  worker's boot-time reclaimStranded() call, which runs once at start, separate
+   *  from — and before — the first interval tick). Errors are swallowed. */
+  onStart?: () => Promise<void> | void;
+}
+
+export interface RecurringSnapshotEntry {
+  name: string;
+  everyMs: number;
+  runs: number;
+  errors: number;
+  lastRunAt: number | null;
+  lastDurationMs: number | null;
+  lastError: string | null;
+  running: boolean;
+}
+
+interface RecurringEntry extends RecurringSnapshotEntry {
+  handler: () => Promise<void> | void;
+  onStart?: () => Promise<void> | void;
+  timer: ReturnType<typeof setInterval> | null;
+}
+
+const recurringJobs = new Map<string, RecurringEntry>();
+
+/** Register a sub-minute in-memory recurring loop. Registration is idempotent-safe
+ *  to call at module load time (mirrors registerJobHandler); the timer itself is
+ *  only created once startJobs() runs (and torn down by stopJobs()). Calling this
+ *  twice for the same name replaces the handler but preserves run/error counters. */
+export function registerRecurring(name: string, everyMs: number, handler: () => Promise<void> | void, opts: RecurringOptions = {}): void {
+  const existing = recurringJobs.get(name);
+  if (existing) {
+    existing.everyMs = everyMs;
+    existing.handler = handler;
+    existing.onStart = opts.onStart;
+    return;
+  }
+  recurringJobs.set(name, {
+    name, everyMs, handler, onStart: opts.onStart, timer: null,
+    runs: 0, errors: 0, lastRunAt: null, lastDurationMs: null, lastError: null, running: false,
+  });
+}
+
+/** Test-only: clear registered recurring loops between test files. */
+export function _resetRecurringForTest(): void {
+  for (const entry of recurringJobs.values()) if (entry.timer) clearInterval(entry.timer);
+  recurringJobs.clear();
+}
+
+async function runRecurringTick(entry: RecurringEntry): Promise<void> {
+  const t0 = Date.now();
+  try {
+    await entry.handler();
+    entry.runs++;
+    entry.lastError = null;
+    jobsRunsTotal.labels(entry.name, "done").inc();
+  } catch (e: any) {
+    entry.errors++;
+    entry.lastError = String(e?.message ?? e).slice(0, 500);
+    jobsRunsTotal.labels(entry.name, "failed").inc();
+    console.warn(`[Jobs] recurring "${entry.name}" tick failed: ${entry.lastError.slice(0, 120)}`);
+  } finally {
+    entry.lastDurationMs = Date.now() - t0;
+    entry.lastRunAt = Date.now();
+    jobsDurationMs.labels(entry.name, entry.lastError ? "failed" : "done").observe(entry.lastDurationMs);
+  }
+}
+
+/** Start every registered recurring loop's timer (idempotent per-entry). Called by
+ *  startJobs(); has no dependency on jobs.ts's own DbClient — recurring handlers
+ *  (e.g. webhook retry) own their own IO, exactly as before this migration. */
+function startRecurringLoops(): void {
+  for (const entry of recurringJobs.values()) {
+    if (entry.timer) continue; // already running
+    if (entry.onStart) Promise.resolve(entry.onStart()).catch(() => {});
+    entry.timer = setInterval(() => { void runRecurringTick(entry); }, entry.everyMs);
+    entry.timer.unref?.();
+    entry.running = true;
+  }
+}
+
+/** Stop every recurring loop's timer (graceful shutdown). Does not await an
+ *  in-flight tick — matches the original per-module stop*() functions, which only
+ *  ever cleared the interval. */
+function stopRecurringLoops(): void {
+  for (const entry of recurringJobs.values()) {
+    if (entry.timer) { clearInterval(entry.timer); entry.timer = null; }
+    entry.running = false;
+  }
+}
+
+function getRecurringSnapshot(): RecurringSnapshotEntry[] {
+  return Array.from(recurringJobs.values()).map(({ name, everyMs, runs, errors, lastRunAt, lastDurationMs, lastError, running }) => (
+    { name, everyMs, runs, errors, lastRunAt, lastDurationMs, lastError, running }
+  ));
 }
 
 // ── db-backup job: copy the sqlite db file(s) to var/backups/<ts>/, prune to 7 ──
@@ -256,11 +376,13 @@ export interface JobsSnapshot {
   recent: Job[];
   updatedAt: number;
   running: boolean;
+  recurring: RecurringSnapshotEntry[];
 }
 
 let client: DbClient | null = null;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let cronTask: InstanceType<typeof Cron> | null = null;
+let oauthGcCronTask: InstanceType<typeof Cron> | null = null;
 let snapshot: JobsSnapshot | null = null;
 let inFlight: Promise<void> | null = null;
 let stopping = false;
@@ -268,7 +390,7 @@ let consecutiveFailures = 0;
 
 async function refreshSnapshot(c: DbClient): Promise<void> {
   const [counts, recent] = await Promise.all([countsByState(c), listRecentJobs(c, 20)]);
-  snapshot = { counts, recent, updatedAt: Date.now(), running: !stopping };
+  snapshot = { counts, recent, updatedAt: Date.now(), running: !stopping, recurring: getRecurringSnapshot() };
 }
 
 async function pollTick(c: DbClient): Promise<void> {
@@ -286,6 +408,11 @@ async function pollTick(c: DbClient): Promise<void> {
 export function startJobs(): void {
   if (client || pollTimer) return;
   stopping = false;
+  // Sub-minute in-memory loops (e.g. webhook retry) have no dependency on jobs.ts's
+  // own DbClient — start them synchronously, exactly as their previous standalone
+  // startXWorker() functions did, so a slow/failing durable-queue DB init below
+  // never delays them.
+  startRecurringLoops();
   const pollMs = Number(process.env.JOBS_POLL_INTERVAL_MS || 5_000);
   const maxBackoffMs = Number(process.env.JOBS_MAX_BACKOFF_MS || 300_000);
   const bootDelay = Number(process.env.JOBS_BOOT_DELAY_MS || 2_000);
@@ -314,8 +441,21 @@ export function startJobs(): void {
       client = c;
       await refreshSnapshot(c);
       cronTask = new Cron(process.env.JOBS_BACKUP_CRON || "0 3 * * *", { unref: true }, () => {
-        if (client) void enqueue(client, "db-backup", {});
+        if (client) void enqueue(client, "db-backup", {}).catch(() => {});
       });
+      // OAuth retention sweeper (Faz 26, migrated from server/oauth-gc.ts's own
+      // setInterval in C2): low-frequency (hourly by default) — a durable row per
+      // run is cheap, unlike the sub-minute recurring loops above. Croner-scheduled
+      // (OAUTH_GC_CRON, default hourly on the hour) + one immediate durable enqueue
+      // right now, mirroring the old startOAuthGc()'s "sweep once at boot, don't
+      // wait a full interval". The "oauth-gc" handler itself is registered by
+      // server/oauth-gc.ts (imported for its side effect) — never-throws by design,
+      // so this durable job always ends up "done", matching the old fire-and-forget
+      // `.catch(() => {})` semantics.
+      oauthGcCronTask = new Cron(process.env.OAUTH_GC_CRON || "0 * * * *", { unref: true }, () => {
+        if (client) void enqueue(client, "oauth-gc", {}).catch(() => {});
+      });
+      void enqueue(c, "oauth-gc", {}).catch(() => {}); // boot-time immediate sweep enqueue — never let this race a test/shutdown DB close into an unhandled rejection
       schedule(bootDelay);
     } catch (e: any) {
       console.warn(`[Jobs] init failed: ${String(e?.message ?? e).slice(0, 120)}`);
@@ -325,18 +465,24 @@ export function startJobs(): void {
 
 /** Stop the loop (graceful shutdown). Idempotent. Finishes any in-flight job
  *  (awaited) but claims no new one — matches the Faz 13A drain contract used by
- *  stopWebhookWorker/stopOAuthGc/stopKeyHealth. */
+ *  stopKeyHealth. Also halts every registerRecurring loop (e.g. webhook-retry) and
+ *  the oauth-gc cron — both migrated onto this module in C2. */
 export async function stopJobs(): Promise<void> {
   stopping = true;
+  stopRecurringLoops();
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
   if (cronTask) { cronTask.stop(); cronTask = null; }
+  if (oauthGcCronTask) { oauthGcCronTask.stop(); oauthGcCronTask = null; }
   if (inFlight) await inFlight;
   if (client) { await client.close().catch(() => {}); client = null; }
   snapshot = null;
 }
 
 /** Cached snapshot for GET /api/jobs (never null — a cheap empty shape before
- *  the first tick populates it, mirroring key-health's liveCheapSnapshot). */
+ *  the first tick populates it, mirroring key-health's liveCheapSnapshot). Always
+ *  includes the LIVE recurring-loop snapshot (not cached) since those loops run
+ *  independently of the durable-queue poll tick that populates the rest. */
 export function getJobsSnapshot(): JobsSnapshot {
-  return snapshot ?? { counts: { pending: 0, running: 0, done: 0, failed: 0 }, recent: [], updatedAt: Date.now(), running: false };
+  const base = snapshot ?? { counts: { pending: 0, running: 0, done: 0, failed: 0 } as Record<JobState, number>, recent: [], updatedAt: Date.now(), running: false, recurring: [] };
+  return { ...base, recurring: getRecurringSnapshot() };
 }

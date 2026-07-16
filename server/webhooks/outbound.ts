@@ -5,6 +5,7 @@
 
 import crypto from "node:crypto";
 import { claimDeliveries, markDelivery, getWebhookSecret, getWebhookUrl, reclaimStranded, reclaimStale } from "../store";
+import { registerRecurring } from "../jobs";
 
 const MAX_ATTEMPTS = Number(process.env.WEBHOOK_RETRY_MAX_ATTEMPTS || 5);
 const TIMEOUT_MS = Number(process.env.WEBHOOK_REQUEST_TIMEOUT_MS || 15000);
@@ -71,21 +72,23 @@ export async function processDeliveries(): Promise<number> {
   return rows.length;
 }
 
-let timer: ReturnType<typeof setInterval> | null = null;
-/** Start the background delivery worker (idempotent). */
-export function startWebhookWorker(): void {
-  if (timer) return;
-  const interval = Number(process.env.WEBHOOK_WORKER_INTERVAL_MS || 30000);
-  // Recover deliveries left 'claimed' by a previous crash before we start fresh.
-  reclaimStranded().catch(() => {});
+// C2: migrated off its own setInterval onto server/jobs.ts's registerRecurring —
+// sub-minute recurrence (30s default) stays in-memory (no durable jobs-table row
+// per tick; the deliveries this drives are already durable via webhook_deliveries).
+// Registration here is a module-load side effect (mirrors registerJobHandler's
+// self-registering pattern elsewhere); the actual timer is started/stopped
+// centrally by server/jobs.ts's startJobs()/stopJobs().
+registerRecurring(
+  "webhook-retry",
+  Number(process.env.WEBHOOK_WORKER_INTERVAL_MS || 30000),
   // Each tick: requeue claims stranded mid-run by a crash (older than the stale window)
   // BEFORE claiming new ones, so a crashed delivery re-fires without a restart.
-  timer = setInterval(() => {
-    reclaimStale().catch(() => {}).then(() => processDeliveries().catch(() => {}));
-  }, interval);
-  timer.unref?.();
-}
-/** Stop the background delivery worker (idempotent) — called on graceful shutdown. */
-export function stopWebhookWorker(): void {
-  if (timer) { clearInterval(timer); timer = null; }
-}
+  async () => {
+    await reclaimStale().catch(() => {});
+    await processDeliveries().catch(() => {});
+  },
+  {
+    // Recover deliveries left 'claimed' by a previous crash, once, before the first tick.
+    onStart: () => { void reclaimStranded().catch(() => {}); },
+  },
+);
