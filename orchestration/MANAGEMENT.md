@@ -79,6 +79,30 @@ swaps its backend to `/api/brain/*` — call sites do not change.
   makes re-dispatching to the failed actor impossible (`reason: "recurrence-avoid"`).
 - **Memory as input**: the brief's `## RELEVANT MEMORY` block carries `recall(goal, 3)` lessons.
 
+## v3 — Learned Authority (authorities built like machine learning)
+
+Authorities and responsibilities are TRAINED, not hardcoded (`bin/lib/org-learn.ts`,
+RESEARCH-ORG.md §v3). The loop is: **train → gate → dispatch → record → retrain.**
+
+- **The model.** `trainPolicy(ledger, {now})` retrains the whole policy from the brain ledger —
+  per actor: Wilson lower bound over its outcomes → curriculum ladder
+  `observe → propose → apply-gated → trusted` (defaults: apply-gated at n≥5 & w≥0.6, trusted at
+  n≥15 & w≥0.8; demotion to observe at n≥5 & w<0.3 — **demotion always wins**; a recurrence inside
+  the last 20 outcomes caps at propose). Weights artifact: `ORG_POLICY.json` (written by
+  `bin/org-train.ts`, which also remembers the training run in the brain).
+- **Exploration/exploitation.** `selectActor(band, policy, mode)` — explore = UCB1 (untried actor
+  bids ∞ → deterministic cold-start coverage), exploit = Wilson. Always confined to the cheapest
+  cost band; learning never buys a tier upgrade.
+- **The gate.** `allowedAction(policy, actorId, "observe"|"propose"|"apply")` enforces
+  responsibility: unknown actor defaults to propose; "apply" needs rank ≥ apply-gated.
+  **"trusted" removes only the extra review pass — fleet-apply (tsc + tests + revert-on-red)
+  remains mandatory for every apply, and markers/launchd remain T0-only.**
+- **Evaluation.** `learningCurve(episodes)` — per-round success, improvement verdict (last third ≥
+  first third) and cumulative regret. The sandbox asserts the curve improves and that the seeded
+  improver is promoted while the decliner is held down.
+- **Retrain cadence.** Online: `npx tsx orchestration/bin/org-train.ts` after any episode (the
+  sandbox retrains every round automatically). The conductor loads `ORG_POLICY.json` advisorily.
+
 ## Sustained sandbox + continuous operation
 
 ```bash

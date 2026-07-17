@@ -243,6 +243,11 @@ export interface AssignOpts {
   stats?: Map<string, ActorStat>;
   /** Actors that already failed this task (OTP restart-ELSEWHERE): never re-dispatched to. */
   avoid?: string[];
+  /**
+   * v3 learned policy + bandit mode: "explore" delegates the band pick to a UCB1 selector supplied by
+   * the caller (org-learn selectActor via this hook — organization.ts stays dependency-free upward).
+   */
+  bandPick?: (band: Actor[]) => Actor;
 }
 
 /** Evidence needs n>=3 before it may influence routing (thin evidence bids neutral — never chases noise). */
@@ -276,6 +281,15 @@ export function assignRole(chart: OrgChart, task: TaskSpec, opts?: AssignOpts): 
     let reason: Assignment["reason"] = avoid.size > 0 && capable[0] && avoid.has(capable[0].id)
       ? "recurrence-avoid"
       : "capability-match";
+    // v3 explore hook (UCB1 via org-learn.selectActor): the caller owns the selector; still confined
+    // to the cheapest band, so exploration can never buy an upgrade to a more expensive tier.
+    if (opts?.bandPick && band.length > 1) {
+      const chosen = opts.bandPick(band);
+      if (band.some((a) => a.id === chosen.id) && chosen.id !== pick.id) {
+        return toAssignment(chosen, "evidence-weighted");
+      }
+      return toAssignment(pick, reason);
+    }
     if (opts?.stats && band.length > 1) {
       const score = (a: Actor): number => {
         const s = opts.stats!.get(a.id);

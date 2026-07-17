@@ -99,6 +99,34 @@ from `actorStats(ledger)`.
 *Reference:* [Wilson score interval overview](https://insightful-data-lab.com/2025/08/20/wilson-score-interval/) ·
 [Wilson lower bound for rating/ranking](https://medium.com/tech-that-works/wilson-lower-bound-score-and-bayesian-approximation-for-k-star-scale-rating-to-rate-products-c67ec6e30060)
 
+## v3 addendum — machine-learning instruments for LEARNED authority
+
+The v3 requirement — authorities and responsibilities *built like machine learning* — is grounded in
+five instruments (all idea-only, implemented from the equations in `bin/lib/org-learn.ts`):
+
+- **UCB1 multi-armed bandit** — Auer, Cesa-Bianchi & Fischer, "Finite-time Analysis of the Multiarmed
+  Bandit Problem," Machine Learning 47:235-256, 2002. Score = mean + √(2·ln N / n); untried arm → ∞
+  (optimistic cold-start). Guarantees logarithmic regret — the exploration/exploitation balance for
+  picking an actor within the cheapest cost band. **ADOPT (idea)** → `ucb1()` + `selectActor(mode:
+  "explore")`. [Springer](https://link.springer.com/article/10.1023/A:1013689704352) ·
+  [PDF](https://homes.di.unimi.it/~cesabian/Pubblicazioni/ml-02.pdf)
+- **Thompson sampling** — W.R. Thompson, Biometrika 25(3/4):285-294, 1933. Bayesian
+  probability-of-best selection. idea-only: needs randomness, and determinism is a law of this
+  codebase (injected clocks, no Math.random) — UCB1 gives deterministic exploration instead.
+  [Biometrika](https://academic.oup.com/biomet/article-abstract/25/3-4/285/200862)
+- **Reinforcement-learning reward loop** — Sutton & Barto, *Reinforcement Learning: An Introduction*,
+  MIT Press. The dispatch ritual is the environment step; gated-apply green = reward, gate-red /
+  recurrence = penalty; `trainPolicy` is the policy-improvement step run online after every episode.
+  **ADOPT (idea)** — reward shaping only, no TD machinery.
+- **Online learning** (Cesa-Bianchi & Lugosi, *Prediction, Learning, and Games*) — the policy is
+  retrained from the full accumulated ledger every round (no separate train/test phase); the sandbox
+  measures the resulting **learning curve** (per-round success + cumulative regret vs the best final
+  rate) and requires late rounds ≥ early rounds. **ADOPT (idea)** → `learningCurve()`.
+- **Curriculum learning** (Bengio et al., ICML 2009) — idea-only: the authority ladder
+  observe → propose → apply-gated → trusted is a curriculum — an actor earns harder (more
+  consequential) work only after proving the easier tier; demotion wins over promotion, and no
+  learned level ever bypasses the deterministic gates (tsc+tests+revert-on-red stay mandatory).
+
 ## The synthesis (what v2 actually does)
 **Contract-Net-lite bidding** (evidence-weighted `assignRole`) + **MAPE-K** (sandbox rounds over the
 ledger-as-Knowledge) + **OTP restart-elsewhere** (recurrence → route-away) layered onto the already-

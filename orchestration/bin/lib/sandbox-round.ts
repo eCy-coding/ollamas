@@ -20,6 +20,7 @@ import {
   type OrgChart, type PreventionRule, type TaskSpec, type LedgerEntry, type ErrorEntryProposal,
   type DispatchOutcome,
 } from "./organization";
+import { selectActor, type OrgPolicy } from "./org-learn";
 
 export interface RoundInput {
   chart: OrgChart;
@@ -32,6 +33,13 @@ export interface RoundInput {
   downActors: string[];
   nextErrorSeq: number;
   ts: string;
+  /**
+   * v3 learning episode (both required to activate): the policy retrained by the shell each round
+   * (online learning) + deterministic per-round success schedules per learn actor (NO Math.random —
+   * e.g. improver [F,F,T,T,…], decliner [T,T,F,F,…]). When absent, behavior is identical to v2.
+   */
+  policy?: OrgPolicy;
+  schedules?: Record<string, boolean[]>;
 }
 
 export interface RoundDispatch {
@@ -48,6 +56,8 @@ export interface RoundResult {
   newProposals: ErrorEntryProposal[];
   violations: string[];
   nextErrorSeq: number;
+  /** v3: learn-wave episode stats for the learning curve (absent when learning is not activated). */
+  learn?: { ok: number; total: number; actors: string[] };
 }
 
 /** Accumulated ERR-ORG proposals become live prevention knowledge for later rounds (distill step). */
@@ -153,15 +163,59 @@ export function runRound(input: RoundInput): RoundResult {
     }
   }
 
+  // v3 LEARNING EPISODE (additive — inactive without policy+schedules, so v2 behavior is unchanged).
+  // Three learn dispatches per round through the UCB1 selector: round 1 explores (cold-start ∞ +
+  // within-round bandit updates ⇒ every learn actor gets tried), later rounds exploit. Outcomes come
+  // from the deterministic schedules; failure text varies per round (distinct cold-start causes, so
+  // the recurrence cap — which is exercised by sb-stubborn — does not mask the promotion path).
+  let learn: RoundResult["learn"];
+  if (input.policy && input.schedules) {
+    const local: OrgPolicy = { ...input.policy, bandit: { ...input.policy.bandit } };
+    const mode = round === 1 ? "explore" as const : "exploit" as const;
+    let ok = 0;
+    const actors: string[] = [];
+    for (let i = 1; i <= LEARN_PER_ROUND; i++) {
+      const task: TaskSpec = { id: `sb-learn${i}-r${round}`, goal: "run the scheduled learning probe", cls: "learn" };
+      const a = assignRole(chart, task, { bandPick: (band) => selectActor(band, local, mode) });
+      actors.push(a.actorId);
+      const sched = input.schedules[a.actorId];
+      const success = sched ? sched[Math.min(round - 1, sched.length - 1)] : true;
+      newLedger.push({ type: "dispatch", tier: "episodic", ts, taskId: task.id, actorId: a.actorId, summary: `dispatch ${task.id} → ${a.actorId}` });
+      const o: DispatchOutcome = success
+        ? { taskId: task.id, actorId: a.actorId, ok: true, summary: "learn probe ok", ts }
+        : { taskId: task.id, actorId: a.actorId, ok: false, summary: `learn probe failed (round ${round})`, ts, error: `cold-start failure in round ${round} probe ${i}` };
+      const rec = recordOutcome(o, { rulesApplied: [], nextErrorSeq: seq });
+      newLedger.push(rec.ledger);
+      if (rec.registryAppend) { newProposals.push(rec.registryAppend); seq += 1; }
+      const b = local.bandit[a.actorId] ?? { n: 0, ok: 0 };
+      local.bandit[a.actorId] = { n: b.n + 1, ok: b.ok + (success ? 1 : 0) }; // within-round bandit update
+      if (success) ok += 1;
+    }
+    learn = { ok, total: LEARN_PER_ROUND, actors };
+    if (round === 1 && new Set(actors).size !== LEARN_PER_ROUND) {
+      violations.push(`round 1: UCB1 cold-start did not cover ${LEARN_PER_ROUND} distinct learn actors (got ${actors.join(",")})`);
+    }
+  }
+
   // ANALYZE: wave-level invariants.
-  if (newLedger.length !== waveFor(round).length * 2) {
-    violations.push(`round ${round}: ledger delta ${newLedger.length} ≠ ${waveFor(round).length * 2} (dispatch+outcome per task)`);
+  const expectedDelta = waveFor(round).length * 2 + (learn ? LEARN_PER_ROUND * 2 : 0);
+  if (newLedger.length !== expectedDelta) {
+    violations.push(`round ${round}: ledger delta ${newLedger.length} ≠ ${expectedDelta} (dispatch+outcome per task)`);
   }
   const ids = newProposals.map((p) => p.id);
   if (new Set(ids).size !== ids.length) violations.push(`round ${round}: duplicate ERR-ORG ids in proposals`);
 
-  return { dispatches, newLedger, newProposals, violations, nextErrorSeq: seq };
+  return { dispatches, newLedger, newProposals, violations, nextErrorSeq: seq, ...(learn ? { learn } : {}) };
 }
+
+export const LEARN_PER_ROUND = 3;
+
+/** Deterministic learning schedules (index = round-1; last value repeats beyond the array). */
+export const LEARN_SCHEDULES: Record<string, boolean[]> = {
+  improver: [false, false, true, true, true, true, true, true, true, true],
+  decliner: [true, true, false, false, false, false, false, false, false, false],
+  steady: Array(10).fill(true),
+};
 
 /** The synthetic sandbox org chart (raw JSON shape — parsed by parseOrgChart in the shell/tests). */
 export const SANDBOX_CHART_JSON = {
@@ -176,6 +230,9 @@ export const SANDBOX_CHART_JSON = {
     { id: "librarian", kind: "model", role: "Sandbox Librarian", duties: ["embed"], capabilities: ["embed", "vision"], reportsTo: "conductor", escalatesTo: "conductor", model: "nomic-embed-text", costRank: 0 },
     { id: "odysseus", kind: "service", role: "Sandbox External", duties: ["research"], capabilities: ["research"], reportsTo: "emre", escalatesTo: "conductor", costRank: 0, knownFaults: [{ id: "ORG-FAULT-ODY-001", note: "Bridge returns ok:true even when the response text embeds an error — scan payload before recording success." }] },
     { id: "transcriber", kind: "model", role: "Sandbox Transcriber", duties: ["transcribe"], capabilities: ["transcribe"], reportsTo: "conductor", escalatesTo: "conductor", model: "whisper", costRank: 0 },
+    { id: "improver", kind: "model", role: "Learn probe — improves after cold start", duties: ["learn"], capabilities: ["learn"], reportsTo: "conductor", escalatesTo: "conductor", costRank: 0 },
+    { id: "decliner", kind: "model", role: "Learn probe — degrades over time", duties: ["learn"], capabilities: ["learn"], reportsTo: "conductor", escalatesTo: "conductor", costRank: 0 },
+    { id: "steady", kind: "model", role: "Learn probe — consistently good", duties: ["learn"], capabilities: ["learn"], reportsTo: "conductor", escalatesTo: "conductor", costRank: 0 },
   ],
 };
 

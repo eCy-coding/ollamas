@@ -61,6 +61,12 @@ rules + recalled memory) are the worker interface.
 Council seats are merged from `COUNCIL_ROSTER.json` at load time — the roster remains their single
 source of truth; `ORG_CHART.json` never duplicates them.
 
+**Authority is learned, not listed (v3).** The table above fixes each actor's *role*; each actor's
+*authority level* (`observe → propose → apply-gated → trusted`) is trained from its ledger evidence by
+`bin/lib/org-learn.ts trainPolicy` and stored in `ORG_POLICY.json` — promotion needs proven Wilson
+evidence, demotion always wins, a recurrence caps authority, and no learned level ever bypasses the
+deterministic gates (see MANAGEMENT.md "Learned Authority").
+
 ## 3. The dispatch ritual (every task, no exceptions)
 
 ```

@@ -41,6 +41,7 @@ import { nextPending, mark, summary, laneSummary, statusOf, type Progress } from
 import { assignRole, consultErrors, faultsAsRules, recordOutcome, type TaskSpec } from "./lib/organization";
 import { loadOrgChart, loadPreventionRules, nextErrorSeq, proposeErrorEntry } from "./lib/org-io";
 import { remember, recall } from "./lib/brain-ledger";
+import { statsFromPolicy, type OrgPolicy } from "./lib/org-learn";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -171,7 +172,8 @@ function orgRecordOutcome(taskId: string, ok: boolean, summaryText: string, erro
     const ts = new Date().toISOString();
     const rec = recordOutcome({ taskId, actorId: "conductor", ok, summary: summaryText, ts, error },
       { rulesApplied: [], nextErrorSeq: nextErrorSeq(ORCH_DIR) });
-    remember(rec.ledger.tier, `${rec.ledger.type} ${taskId}: ${summaryText}`, { ok }, ts);
+    remember(rec.ledger.tier, `${rec.ledger.type} ${taskId}: ${summaryText}`,
+      { ok, actorId: "conductor", taskId, ...(rec.ledger.sig ? { sig: rec.ledger.sig } : {}) }, ts);
     if (rec.registryAppend) proposeErrorEntry(rec.registryAppend, ORCH_DIR);
   } catch { /* best-effort */ }
 }
@@ -184,7 +186,9 @@ function orgBrief(state: OrchestraState, slot: string, goalText: string, target:
   try {
     const chart = loadOrgChart(ORCH_DIR);
     const task: TaskSpec = { id: slot, goal: goalText, cls: "repair", tags: [target] };
-    const a = assignRole(chart, task);
+    // v3 learned policy (advisory): trained weights bias the pick inside the cheapest band only.
+    const policy = readJson(join(ORCH_DIR, "ORG_POLICY.json")) as OrgPolicy | null;
+    const a = assignRole(chart, task, policy ? { stats: statsFromPolicy(policy) } : undefined);
     const hits = consultErrors([...loadPreventionRules(), ...faultsAsRules(a)], task);
     remember("episodic", `dispatch ${slot} → ${a.actorId} (${state.conductor_model})`,
       { rules: hits.map((h) => h.id), target });
