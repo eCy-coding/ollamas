@@ -3762,6 +3762,65 @@ ledger();setInterval(ledger,15000);
   });
 }
 
+// ----------------------------------------------------
+// ORG management layer (orchestration/ORGANIZATION.md) — read-only status surface, registered at
+// module top level so in-process tests reach it under OLLAMAS_NO_AUTOBOOT=1. JSON overview mirrors
+// /api/brain/overview (ungated, tolerant); the /org panel mirrors the odysseus/council panel shape.
+// Sources: ORG_CHART.json + learned ORG_POLICY.json (org-train) + ~/.ollamas/brain-ledger.jsonl +
+// SANDBOX-ORG/CALIBRATION-ORG verdicts.
+// ----------------------------------------------------
+app.get("/api/org/overview", async (req, res) => {
+  try {
+    const recent = Math.min(Math.max(Number(req.query.recent) || 20, 1), 100);
+    const { orgOverview } = await import("./server/org-status");
+    res.json(orgOverview({ recent }));
+  } catch (err: any) { res.status(500).json({ error: err?.message || "org overview failed" }); }
+});
+
+app.get("/org", (_req, res) => {
+  res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>ORG · Yönetim Katmanı · ollamas</title><style>
+:root{--bg:#050A14;--surf:#0D1B2E;--raised:#132338;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--violet:#7B5EA7;--ok:#00C896;--warn:#F5A623;--bad:#FF5470}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:30px 18px}
+main{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#00D4FF,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;color:#050A14}
+h1{font-size:20px;margin:0}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:11px}
+label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{font:700 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 12px;border:1px solid var(--line);background:var(--raised)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}
+table{width:100%;border-collapse:collapse;font:12.5px/1.5 ui-monospace,monospace}
+th{color:var(--fg2);text-transform:uppercase;font-size:10px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.05)}
+.auth{font-weight:700;border-radius:6px;padding:2px 8px;display:inline-block}
+.auth.trusted{color:#050A14;background:var(--ok)}.auth.apply-gated{color:var(--ok);border:1px solid var(--ok)}
+.auth.propose{color:var(--cyan);border:1px solid var(--cyan)}.auth.observe{color:var(--bad);border:1px solid var(--bad)}.auth.none{color:var(--fg2)}
+.ledger{max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.rec{background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:11.5px/1.5 ui-monospace,monospace}
+.rec .t{color:var(--fg2);font-size:10px}.rec.learned{border-color:var(--violet)}
+footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center}
+</style></head><body><main>
+<header><div class="logo">e</div><div><h1>ORG — Yönetim &amp; Organizasyon Katmanı</h1><div class="sub">roller sabit · yetkiler ÖĞRENİLİR (wilson curriculum + UCB1) · her işlem brain-ledger'da</div></div></header>
+<div class="card"><label>Sağlık / Kanıt</label><div class="badges" id="badges">yükleniyor…</div></div>
+<div class="card"><label>Aktörler — rol · öğrenilmiş yetki · kanıt</label><div style="overflow-x:auto"><table><thead><tr><th>aktör</th><th>tür</th><th>rol</th><th>maliyet</th><th>yetki</th><th>wilson</th><th>n</th></tr></thead><tbody id="actors"></tbody></table></div></div>
+<div class="card"><label>Brain Ledger (son işlemler)</label><div class="ledger" id="ledger"></div></div>
+<footer>consult-errors → assign → brief → dispatch → record → distill · orchestration/MANAGEMENT.md · /api/org/overview</footer>
+</main><script>
+const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/</g,"&lt;");
+async function load(){try{const d=await(await fetch('/api/org/overview?recent=30')).json();
+const b=[];const v=d.sandboxVerdict||'';b.push('<span class="badge '+(v.includes('GREEN')?'ok':v?'bad':'dim')+'">sandbox: '+esc(v||'yok')+'</span>');
+const c=d.calibrationVerdict||'';b.push('<span class="badge '+(c.includes('GREEN')?'ok':c?'bad':'dim')+'">kalibrasyon: '+esc(c||'yok')+'</span>');
+b.push('<span class="badge dim">policy: '+(d.policyTrainedAt?esc(d.policyTrainedAt)+' · '+d.policySamples+' örnek':'eğitilmemiş')+'</span>');
+b.push('<span class="badge dim">ledger: '+d.ledgerCounts.total+' kayıt · '+d.ledgerCounts.learned+' learned</span>');
+$('badges').innerHTML=b.join('');
+$('actors').innerHTML=(d.actors||[]).map(a=>{const lvl=a.authority||'none';
+return '<tr><td><b>'+esc(a.id)+'</b></td><td>'+esc(a.kind)+'</td><td>'+esc(a.role)+'</td><td>r'+a.costRank+'</td><td><span class="auth '+esc(lvl)+'" title="'+esc(a.authorityReason||'')+'">'+esc(lvl)+'</span></td><td>'+(a.wilson==null?'—':a.wilson.toFixed(2))+'</td><td>'+(a.n==null?'—':a.n)+'</td></tr>';}).join('');
+$('ledger').innerHTML=(d.ledgerTail||[]).slice().reverse().map(r=>'<div class="rec '+esc(r.tier)+'"><div class="t">'+esc(r.ts)+' · '+esc(r.tier)+'</div>'+esc(r.fact)+'</div>').join('')||'<div class="rec">ledger boş</div>';
+}catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>';}}
+load();setInterval(load,15000);
+</script></body></html>`);
+});
+
 // O0: mount enabled modules LAST among the module-top-level routes (after the guard
 // app.use above → INV-O0-1 order; before vite middleware, which registers at boot time).
 mountEnabledModules(app);

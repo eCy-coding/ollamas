@@ -1,99 +1,99 @@
 {
   "version": 1,
-  "trainedAt": "2026-07-17T21:44:04.274Z",
-  "samples": 36,
+  "trainedAt": "2026-07-17T21:57:52.729Z",
+  "samples": 48,
   "authorities": {
     "conductor": {
       "level": "apply-gated",
-      "wilson": 0.7008472464490406,
-      "n": 9,
-      "reason": "promoted: wilson 0.70 ≥ 0.6 over n=9"
+      "wilson": 0.7574992425007574,
+      "n": 12,
+      "reason": "promoted: wilson 0.76 ≥ 0.6 over n=12"
     },
     "joker": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "vision": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "librarian": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "odysseus": {
       "level": "observe",
-      "wilson": 0.1876128068994087,
-      "n": 6,
-      "reason": "demoted: wilson 0.19 < 0.3 over n=6"
+      "wilson": 0.2152125268244419,
+      "n": 8,
+      "reason": "demoted: wilson 0.22 < 0.3 over n=8"
     },
     "ecym": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "cloud-pool": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "seat:reasoning": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     },
     "seat:cheap-triage": {
       "level": "propose",
-      "wilson": 0.4384939195509822,
-      "n": 3,
-      "reason": "default: insufficient evidence (n=3, wilson 0.44)"
+      "wilson": 0.5100999795960008,
+      "n": 4,
+      "reason": "default: insufficient evidence (n=4, wilson 0.51)"
     }
   },
   "bandit": {
     "conductor": {
-      "n": 9,
-      "ok": 9
+      "n": 12,
+      "ok": 12
     },
     "joker": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "vision": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "librarian": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "odysseus": {
-      "n": 6,
-      "ok": 3
+      "n": 8,
+      "ok": 4
     },
     "ecym": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "cloud-pool": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "seat:reasoning": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     },
     "seat:cheap-triage": {
-      "n": 3,
-      "ok": 3
+      "n": 4,
+      "ok": 4
     }
   }
 }
