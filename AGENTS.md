@@ -183,4 +183,7 @@ kodu yazmaz, koordine eder). Operating-model'in birinci-sınıf parçası — bo
   → `.claude/settings.json` hook (SessionStart→autopilot + model-soru→benchmark-kanıtlı cevap) +
   launchd agent (bench-değişim + 30dk periyodik). Path'ler script-konumundan dinamik (portable, vO16).
 - **Sözleşme:** `orchestration/ORCHESTRATION_AGENTS.md` (§0-§15+). Kanıt: `orchestration/SEYIR_DEFTERI_ORCHESTRATION.md`.
+- **Yönetim/organizasyon (ORG layer):** roller + en-ucuz-yetkin routing + dispatch-öncesi hata-registry
+  ön-kontrolü + her işlem brain-ledger'a. Charter `orchestration/ORGANIZATION.md`, master prompt
+  `orchestration/MANAGEMENT.md`, makine şeması `orchestration/ORG_CHART.json`.
 - **Test:** `npx vitest run --config orchestration/vitest.config.ts` (root suite'ten izole, ERR-SCR-002).

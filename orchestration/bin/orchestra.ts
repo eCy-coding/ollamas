@@ -38,6 +38,9 @@ import { hasSearchReplace } from "./lib/search-replace";
 import { orderStreams, proposalHeader, applyToken, ORCHESTRA_SLOT } from "./lib/orchestra-repair";
 import { resolveTask, type Task } from "./lib/task-catalog";
 import { nextPending, mark, summary, laneSummary, statusOf, type Progress } from "./lib/task-progress";
+import { assignRole, consultErrors, faultsAsRules, recordOutcome, type TaskSpec } from "./lib/organization";
+import { loadOrgChart, loadPreventionRules, nextErrorSeq, proposeErrorEntry } from "./lib/org-io";
+import { remember } from "./lib/brain-ledger";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -158,6 +161,39 @@ function saveProgress(p: Progress): void {
   try { mkdirSync(STATE_DIR, { recursive: true }); writeFileSync(PROGRESS, JSON.stringify(p, null, 2) + "\n"); } catch { /* best-effort */ }
 }
 
+/**
+ * Management ritual glue (ORGANIZATION.md §3) — every dispatch/outcome is remembered in the brain
+ * ledger; a HARD failure additionally produces an ERR-ORG registry-append PROPOSAL. Fully tolerant:
+ * the management layer is advisory on this path and must never kill or block the loop.
+ */
+function orgRecordOutcome(taskId: string, ok: boolean, summaryText: string, error?: string): void {
+  try {
+    const ts = new Date().toISOString();
+    const rec = recordOutcome({ taskId, actorId: "conductor", ok, summary: summaryText, ts, error },
+      { rulesApplied: [], nextErrorSeq: nextErrorSeq(ORCH_DIR) });
+    remember(rec.ledger.tier, `${rec.ledger.type} ${taskId}: ${summaryText}`, { ok }, ts);
+    if (rec.registryAppend) proposeErrorEntry(rec.registryAppend, ORCH_DIR);
+  } catch { /* best-effort */ }
+}
+
+/**
+ * consult-errors → assign → brief: returns the NEVER-REPEAT suffix for the grounded prompt and records
+ * the dispatch (episodic). Empty suffix on any management-layer failure (plain dispatch degrades fine).
+ */
+function orgBrief(state: OrchestraState, slot: string, goalText: string, target: string): string {
+  try {
+    const chart = loadOrgChart(ORCH_DIR);
+    const task: TaskSpec = { id: slot, goal: goalText, cls: "repair", tags: [target] };
+    const a = assignRole(chart, task);
+    const hits = consultErrors([...loadPreventionRules(), ...faultsAsRules(a)], task);
+    remember("episodic", `dispatch ${slot} → ${a.actorId} (${state.conductor_model})`,
+      { rules: hits.map((h) => h.id), target });
+    return hits.length
+      ? `\n\n## NEVER REPEAT (prevention rules — violating any of these is a defect)\n${hits.map((r) => `- [${r.id}] ${r.rule}`).join("\n")}`
+      : "";
+  } catch { return ""; }
+}
+
 async function repairPropose(state: OrchestraState): Promise<void> {
   // Resolve the target: (1) the 100-task catalog (task's OWN real target + goal), else (2) a FOCUS stream.
   let slot = "", target = "", content = "", goalText = "", catalogId = "";
@@ -175,22 +211,34 @@ async function repairPropose(state: OrchestraState): Promise<void> {
   if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${slot} (${target})`); return; }
 
   try {
-    const prompt = groundedPrompt(goalText, target, content);
+    const prompt = groundedPrompt(goalText + orgBrief(state, slot, goalText, target), target, content);
     const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: REPAIR_MS, num_ctx: 8192 });
-    if (!hasSearchReplace(r.text)) { log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`); return; }
+    if (!hasSearchReplace(r.text)) {
+      log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`);
+      try { remember("episodic", `outcome ${slot}: no actionable SEARCH/REPLACE (transient, retry)`, { ok: false }); } catch { /* best-effort */ }
+      return;
+    }
     const dir = join(FLEET_WORK, `${slot}.${ORCHESTRA_SLOT}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "PROPOSAL.md"), `${proposalHeader(slot, state.conductor_model)}\n\n${r.text}\n`);
     if (catalogId) saveProgress(mark(loadProgress(), catalogId, "proposed"));
     log(`  ↳ REPAIR: ${state.conductor_model} → ${slot}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
+    orgRecordOutcome(slot, true, `PROPOSAL written by ${state.conductor_model}`);
     if (APPLY) {
       try {
         const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(slot)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
         if (catalogId) saveProgress(mark(loadProgress(), catalogId, "done")); // gated apply landed green → done
         log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
-      } catch (e) { log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`); }
+        orgRecordOutcome(slot, true, "gated apply landed green");
+      } catch (e) {
+        log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`);
+        orgRecordOutcome(slot, false, "gate red → reverted", (e as Error).message.slice(0, 160));
+      }
     }
-  } catch (e) { log(`  ↳ REPAIR: dispatch failed (${(e as Error).message.slice(0, 80)}) — will retry`); }
+  } catch (e) {
+    log(`  ↳ REPAIR: dispatch failed (${(e as Error).message.slice(0, 80)}) — will retry`);
+    try { remember("episodic", `outcome ${slot}: dispatch failed (transient, retry) — ${(e as Error).message.slice(0, 120)}`, { ok: false }); } catch { /* best-effort */ }
+  }
 }
 
 /** G2: last council verdict. Only an EXPLICIT HOLD holds; missing/EXECUTE → proceed (never stall the loop). */
@@ -269,6 +317,7 @@ async function tick(): Promise<OrchestraState> {
   // (no queued task, no blocking signal) → hold at MONITORING instead of burning a repair on no-consensus.
   if (state.phase === "COUNCIL_DEBATE" && !hasTask && !isBlocking(actionTier) && councilDecision() === "HOLD") {
     log(`  ↳ council HOLD (uzlaşı yok) → MONITORING (repair yakma)`);
+    try { remember("episodic", "council verdict HOLD (no consensus) → MONITORING", { phase: state.phase }, ts); } catch { /* best-effort */ }
     next = "MONITORING";
   }
   // I2 (iter-8): autonomous backlog-drain — idle + AUTODRAIN marker → pull the next PENDING catalog task so the

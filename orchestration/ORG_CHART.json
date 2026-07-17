@@ -1,0 +1,170 @@
+{
+  "_schema": {
+    "description": "Machine-readable organization chart for the ollamas ecosystem. The single source of truth for WHO does WHAT: every structural actor (service, CLI, core model) carries a role, explicit duties, capability tags for routing, a reporting line, and an escalation path. Council model seats are NOT duplicated here — they are merged in at load time from COUNCIL_ROSTER.json (see councilRoster) so the two files can never drift. Parsed and validated by orchestration/bin/lib/organization.ts parseOrgChart().",
+    "fields": {
+      "id": "unique actor id (kebab-case)",
+      "kind": "operator | service | cli | model | pool",
+      "role": "one-line organizational role",
+      "duties": "explicit responsibilities (array of strings)",
+      "capabilities": "routing tags matched against TaskSpec.class/tags",
+      "reportsTo": "actor id this actor reports to (chain of command)",
+      "escalatesTo": "actor id (or tier) that takes over when this actor fails or is out of depth",
+      "endpoint": "network endpoint when kind=service",
+      "model": "ollama model tag when kind=model",
+      "costRank": "0=free-local, 1=free-cloud, 2=external-service, 3=paid — routing prefers the LOWEST rank that has the capability",
+      "knownFaults": "documented faults consulted before dispatch (never repeat)"
+    }
+  },
+  "version": 1,
+  "ts": "2026-07-18T00:00:00Z",
+  "councilRoster": "COUNCIL_ROSTER.json",
+  "actors": [
+    {
+      "id": "emre",
+      "kind": "operator",
+      "role": "T0 Commander — final decision authority, architecture approval, all outward-facing actions",
+      "duties": [
+        "Approve/reject outward-facing mutations (publish, launchd, symlink, commit policy)",
+        "Resolve escalations that exhaust the model hierarchy",
+        "Own the mission and priorities"
+      ],
+      "capabilities": ["decision", "approval"],
+      "reportsTo": null,
+      "escalatesTo": null,
+      "costRank": 3
+    },
+    {
+      "id": "ollamas",
+      "kind": "service",
+      "role": "Mission Control — the blackboard and choke-point of the whole organization",
+      "duties": [
+        "Serve the single HTTP/MCP surface (:3000) every other actor talks through",
+        "Route model traffic via ProviderRouter (server/providers.ts) and the hierarchy bridge",
+        "Gate every tool call through ToolRegistry.execute (tenant/plan/OAuth/abort)",
+        "Host the council scoring and the shared state (blackboard) all lanes read"
+      ],
+      "capabilities": ["mission-control", "routing", "tool-gate", "blackboard"],
+      "reportsTo": "emre",
+      "escalatesTo": "emre",
+      "endpoint": "http://127.0.0.1:3000",
+      "costRank": 0
+    },
+    {
+      "id": "conductor",
+      "kind": "model",
+      "role": "Orchestra Conductor — runs the autonomous FSM build loop (BOOTSTRAP→COUNCIL→BENCHMARK→DEPLOY|REPAIR→MONITORING)",
+      "duties": [
+        "Drive each FSM tick: observe read-only signals, decide, dispatch bounded side-effects",
+        "Author grounded SEARCH/REPLACE proposals in REPAIR (PROPOSE-not-mutate)",
+        "Never break the tree: gated apply (tsc+tests) with revert-on-red",
+        "Consult the error registries BEFORE every dispatch; log every dispatch to the brain ledger"
+      ],
+      "capabilities": ["conduct", "code", "repair"],
+      "reportsTo": "ollamas",
+      "escalatesTo": "joker",
+      "model": "qwen3-coder:30b",
+      "costRank": 0,
+      "knownFaults": [
+        {
+          "id": "ORG-FAULT-CONDUCTOR-001",
+          "note": "A 30b model cold-loads >12s and a REPAIR generation needs >25s — short probe/generation timeouts cause false-down failover thrash. Keep PROBE_MS/REPAIR_MS generous (orchestra.ts:67-68)."
+        }
+      ]
+    },
+    {
+      "id": "joker",
+      "kind": "model",
+      "role": "Joker — warm standby conductor (supervisor-tree restart semantics) and fast verifier seat",
+      "duties": [
+        "Stay warm (1-token keepalive each BOOTSTRAP tick) for sub-second failover",
+        "Take over the FSM from persisted state when the conductor dies (OOM/uninstalled/unreachable)",
+        "Serve the fast-verify council seat when not conducting"
+      ],
+      "capabilities": ["conduct-standby", "review", "fast-verify"],
+      "reportsTo": "conductor",
+      "escalatesTo": "emre",
+      "model": "qwen3:8b",
+      "costRank": 0
+    },
+    {
+      "id": "odysseus",
+      "kind": "service",
+      "role": "External Specialist — research/agent tasks via the MCP bridge (consumed, not owned)",
+      "duties": [
+        "Answer research/agent/chat calls through /api/odysseus/run → mcp__odysseus__* tools",
+        "Provide the weighted council seat registered in server.ts",
+        "Stay health-probed (:7860/api/health) before any dispatch"
+      ],
+      "capabilities": ["research", "external-agent", "chat"],
+      "reportsTo": "ollamas",
+      "escalatesTo": "conductor",
+      "endpoint": "http://127.0.0.1:7860",
+      "costRank": 2,
+      "knownFaults": [
+        {
+          "id": "ORG-FAULT-ODY-001",
+          "note": "Bridge returns ok:true even when the response TEXT embeds an error (SELF-REPAIR.json:16-38). Never trust ok alone — scan the payload for error markers before recording success."
+        },
+        {
+          "id": "ORG-FAULT-ODY-002",
+          "note": "Reasoning-mode models can return an empty final message over the bridge; treat empty text as a failure, not a success (chain gotcha: reasoning-model-boş)."
+        }
+      ]
+    },
+    {
+      "id": "ecym",
+      "kind": "cli",
+      "role": "Personal Router — Emre's personal executive (CLASSIFY→ROUTE over local persona + bridges)",
+      "duties": [
+        "Classify personal/file/coding/factual requests and route to the cheapest capable lane",
+        "Keep the ecy persona (qwen3:8b Modelfile) and ecy-brain semantic memory in sync",
+        "Bridge to ollamas (:3000) and odysseus (:7860) via ecy-io for tool execution"
+      ],
+      "capabilities": ["personal", "classify", "bridge"],
+      "reportsTo": "emre",
+      "escalatesTo": "ollamas",
+      "costRank": 0
+    },
+    {
+      "id": "vision",
+      "kind": "model",
+      "role": "Vision Analyst — UI/screenshot/diagram understanding",
+      "duties": ["Analyze frontend screenshots, diagrams and visual QC tasks"],
+      "capabilities": ["vision"],
+      "reportsTo": "conductor",
+      "escalatesTo": "conductor",
+      "model": "qwen2.5vl:32b",
+      "costRank": 0
+    },
+    {
+      "id": "librarian",
+      "kind": "model",
+      "role": "Librarian — embeddings for semantic search, duplicate detection and brain recall",
+      "duties": ["Serve nomic-embed-text embeddings for search/dedupe/recall (cosine, threshold 0.70 convention)"],
+      "capabilities": ["embed", "search"],
+      "reportsTo": "conductor",
+      "escalatesTo": "conductor",
+      "model": "nomic-embed-text:latest",
+      "costRank": 0
+    },
+    {
+      "id": "cloud-pool",
+      "kind": "pool",
+      "role": "Surge Capacity — free cloud providers behind ProviderRouter (pollinations/gemini/openrouter/…)",
+      "duties": [
+        "Absorb load the local GPU cannot take (single-GPU FIFO truth: 1 local + N cloud)",
+        "Provide fallback when a local model is down; never the first choice for $0 sovereignty"
+      ],
+      "capabilities": ["surge", "chat", "code"],
+      "reportsTo": "ollamas",
+      "escalatesTo": "emre",
+      "costRank": 1,
+      "knownFaults": [
+        {
+          "id": "ORG-FAULT-POOL-001",
+          "note": "Pollinations queues at concurrency 1 (pollinations-kuyruk-1) — do not fan out parallel calls to it; rotate providers on 429/empty."
+        }
+      ]
+    }
+  ]
+}

@@ -93,7 +93,7 @@ export default defineConfig({
         test: {
           name: 'orchestra',
           environment: 'node',
-          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale,task-catalog,task-progress,deps,math-properties,bench,optimize,benchmark-honesty,hierarchy,claude-dispatch,dod-lanes,lane-triage,converge,finish,build-tasks,calibrate,deps-doctor,gen-catalog,keys-health,orchestra,refresh-catalog}.test.ts'],
+          include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale,task-catalog,task-progress,deps,math-properties,bench,optimize,benchmark-honesty,hierarchy,claude-dispatch,dod-lanes,lane-triage,converge,finish,build-tasks,calibrate,deps-doctor,gen-catalog,keys-health,orchestra,refresh-catalog,organization}.test.ts'],
         },
       },
     ],
