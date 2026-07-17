@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Worktree-local pre-push (brain lane): capture memory BEFORE anything leaves the machine.
+# Capture is best-effort and never blocks the push (no shared pre-push gate exists).
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+npx tsx scripts/brain-git-capture.ts push || true
+exit 0

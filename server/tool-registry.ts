@@ -12,7 +12,11 @@ import { runPre, runPost } from "./tool-interceptors";
 import type { FilesystemManager } from "./files";
 import type { TerminalManager } from "./terminal";
 import { ragIndex, ragSearch } from "./rag";
-import { brainRemember, brainRecall, brainAssertFact, brainFactsAbout, brainIngest, parseExtraction, TIER_WEIGHT, type MemoryTier } from "./brain";
+import { brainRemember, brainRecall, brainAssertFact, brainFactsAbout, brainIngest, brainSearchFacts, brainSweep, brainConsolidate, brainHealth, brainStats, parseExtraction, TIER_WEIGHT, type MemoryTier } from "./brain";
+/** H1: namespace resolution for brain tools — a tenant ctx FORCES `tenant:<id>`;
+ *  caller-supplied ns only applies for the local owner (no tenant). */
+const brainNs = (args: { ns?: unknown }, ctx?: { tenantId?: string }): string | undefined =>
+  ctx?.tenantId ? `tenant:${ctx.tenantId}` : args.ns ? String(args.ns) : undefined;
 import { evalUntrusted } from "./sandbox";
 import { countTokens, estimateCost } from "./tokens";
 import { runTestgen, runAudit, generateStorefront } from "./revenue";
@@ -789,8 +793,12 @@ const TOOLS: Record<string, ToolDef> = {
 
   // Tur 4: Brain v1 (server/brain.ts) — tiered semantic memory + bi-temporal facts on
   // the rag.ts sqlite-vec machinery. The AGENT is the distiller (Letta pattern): it
-  // extracts memories/facts from an episode and writes through these tools. Writes
-  // are host tier; reads are safe. Routed through the choke-point.
+  // extracts memories/facts from an episode and writes them through these tools.
+  // Writes are host tier; reads are safe. Routed through the choke-point.
+  //
+  // H1 tenant isolation (security): under a tenant ctx the namespace is FORCED to
+  // `tenant:<id>` and any caller-supplied `ns` is ignored — a tenant can never read
+  // or write another namespace (Faz 24 ownership discipline applied to memory).
   brain_remember: {
     tier: "host",
     schema: fn(
@@ -808,13 +816,13 @@ const TOOLS: Record<string, ToolDef> = {
       },
       { type: "object", properties: { id: { type: "string" }, dim: { type: "number" } }, required: ["id", "dim"] }
     ),
-    invoke: async (args) => {
+    invoke: async (args, ctx) => {
       if (!args.tier || !args.content) throw new Error("Missing 'tier' or 'content'.");
       return await brainRemember({
         tier: String(args.tier) as MemoryTier,
         content: String(args.content),
         id: args.id ? String(args.id) : undefined,
-        ns: args.ns ? String(args.ns) : undefined,
+        ns: brainNs(args, ctx),
       });
     },
   },
@@ -836,14 +844,14 @@ const TOOLS: Record<string, ToolDef> = {
       },
       { type: "object", properties: { results: { type: "array", items: { type: "object" } } } }
     ),
-    invoke: async (args) => {
+    invoke: async (args, ctx) => {
       if (!args.query) throw new Error("Missing 'query'.");
       const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
       return {
         results: await brainRecall(String(args.query), {
           k,
           tier: args.tier ? (String(args.tier) as MemoryTier) : undefined,
-          ns: args.ns ? String(args.ns) : undefined,
+          ns: brainNs(args, ctx),
         }),
       };
     },
@@ -871,14 +879,14 @@ const TOOLS: Record<string, ToolDef> = {
         required: ["changed", "invalidated"],
       }
     ),
-    invoke: async (args) => {
+    invoke: async (args, ctx) => {
       if (!args.subject || !args.predicate || !args.object) throw new Error("Missing 'subject', 'predicate' or 'object'.");
       return await brainAssertFact({
         subject: String(args.subject),
         predicate: String(args.predicate),
         object: String(args.object),
         episodeId: args.episode_id ? String(args.episode_id) : undefined,
-        ns: args.ns ? String(args.ns) : undefined,
+        ns: brainNs(args, ctx),
       });
     },
   },
@@ -887,26 +895,55 @@ const TOOLS: Record<string, ToolDef> = {
     tier: "safe",
     schema: fn(
       "brain_facts",
-      "List the facts known about a subject. Point-in-time capable: pass 'at' (epoch ms) to see what was true THEN instead of now.",
+      "Look up facts: pass 'subject' for an exact listing, or 'query' for semantic search over embedded facts. Point-in-time capable: pass 'at' (epoch ms) to see what was true THEN instead of now.",
       {
         type: "object",
         properties: {
-          subject: { type: "string" },
+          subject: { type: "string", description: "Exact subject to list facts for." },
+          query: { type: "string", description: "Alternative: natural-language semantic fact search (v2)." },
+          k: { type: "number", description: "Semantic mode: how many facts. Default 5." },
           at: { type: "number", description: "Optional epoch-ms timestamp for a historical view." },
           ns: { type: "string", description: "Optional namespace (default 'default')." },
         },
-        required: ["subject"],
       },
       { type: "object", properties: { facts: { type: "array", items: { type: "object" } } } }
     ),
+    invoke: async (args, ctx) => {
+      const at = args.at !== undefined ? Number(args.at) : undefined;
+      const ns = brainNs(args, ctx);
+      if (args.query) {
+        const k = Number(args.k) > 0 ? Math.floor(Number(args.k)) : 5;
+        return { facts: await brainSearchFacts(String(args.query), { k, ns, at }) };
+      }
+      if (!args.subject) throw new Error("Pass 'subject' (exact) or 'query' (semantic).");
+      return { facts: brainFactsAbout(String(args.subject), { at, ns }) };
+    },
+  },
+
+  brain_sweep: {
+    tier: "host",
+    schema: fn(
+      "brain_sweep",
+      "Brain hygiene: delete expired working-tier memories (default TTL 7 days) and promote episodic memories recalled often (default 3+) to the learned tier.",
+      {
+        type: "object",
+        properties: {
+          working_ttl_days: { type: "number", description: "Working-tier TTL in days. Default 7." },
+          min_access: { type: "number", description: "Promotion threshold (recall count). Default 3." },
+        },
+      },
+      {
+        type: "object",
+        properties: { swept: { type: "number" }, promoted: { type: "number" } },
+        required: ["swept", "promoted"],
+      }
+    ),
     invoke: async (args) => {
-      if (!args.subject) throw new Error("Missing 'subject'.");
-      return {
-        facts: brainFactsAbout(String(args.subject), {
-          at: args.at !== undefined ? Number(args.at) : undefined,
-          ns: args.ns ? String(args.ns) : undefined,
-        }),
-      };
+      const ttlDays = Number(args.working_ttl_days) > 0 ? Number(args.working_ttl_days) : 7;
+      const minAccess = Number(args.min_access) > 0 ? Math.floor(Number(args.min_access)) : 3;
+      const { swept } = brainSweep({ workingTtlMs: ttlDays * 86_400_000 });
+      const { promoted } = brainConsolidate({ minAccess });
+      return { swept, promoted };
     },
   },
 
@@ -932,17 +969,51 @@ const TOOLS: Record<string, ToolDef> = {
         required: ["memories", "facts"],
       }
     ),
-    invoke: async (args) => {
+    invoke: async (args, ctx) => {
       if (!args.episode_id) throw new Error("Missing 'episode_id'.");
       const extracted = args.raw ? parseExtraction(String(args.raw)) : { memories: [], facts: [] };
       const memories = Array.isArray(args.memories) && args.memories.length ? args.memories : extracted.memories;
       const facts = Array.isArray(args.facts) && args.facts.length ? args.facts : extracted.facts;
+      // Fact rows may carry their own ns — under a tenant ctx they are overridden too.
+      const ns = brainNs(args, ctx);
       return await brainIngest({
         episodeId: String(args.episode_id),
         memories,
-        facts,
-        ns: args.ns ? String(args.ns) : undefined,
+        facts: ctx?.tenantId ? facts.map((f: any) => ({ ...f, ns })) : facts,
+        ns,
       });
+    },
+  },
+
+  brain_health: {
+    tier: "safe",
+    schema: fn(
+      "brain_health",
+      "Brain self-diagnosis: probes recent learned/core memories by their own content (top-1 must be itself). selfHitRate below the threshold means the embedding space drifted (model swap/decay) — report-only, suggests re-embedding. Includes tier stats.",
+      {
+        type: "object",
+        properties: {
+          probes: { type: "number", description: "How many recent memories to probe. Default 8." },
+          threshold: { type: "number", description: "Drift threshold on self-hit rate. Default 0.8." },
+        },
+      },
+      {
+        type: "object",
+        properties: {
+          selfHitRate: { type: "number" },
+          drift: { type: "boolean" },
+          probes: { type: "number" },
+          stats: { type: "object" },
+        },
+        required: ["selfHitRate", "drift", "probes"],
+      }
+    ),
+    invoke: async (args) => {
+      const h = await brainHealth({
+        probes: Number(args.probes) > 0 ? Math.floor(Number(args.probes)) : undefined,
+        threshold: Number(args.threshold) > 0 ? Number(args.threshold) : undefined,
+      });
+      return { ...h, stats: brainStats() };
     },
   },
 

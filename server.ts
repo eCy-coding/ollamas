@@ -1325,6 +1325,56 @@ async function initializeServer() {
     res.json(getTraceSnapshot());
   });
 
+  // Brain (ported from integrate-wt, B-pattern): read-only overview bundle for the
+  // admin panel / BrainPanel — stats + recent memories + live/superseded facts +
+  // drift-probe health. Local-owner surface.
+  app.get("/api/brain/overview", async (req, res) => {
+    try {
+      const recent = Math.min(Math.max(Number(req.query.recent) || 20, 1), 100);
+      const { brainOverview } = await import("./server/brain");
+      res.json(await brainOverview({ recent }));
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "brain overview failed" });
+    }
+  });
+
+  // Brain entity graph — reified S-P-O facts as nodes/edges with degree centrality,
+  // for the live brain map (docs/BRAIN-ENGINE.md). ?limit caps nodes; ?at gives a
+  // historical snapshot (bi-temporal).
+  app.get("/api/brain/graph", async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+      const at = req.query.at !== undefined ? Number(req.query.at) : undefined;
+      const { brainGraph } = await import("./server/brain");
+      res.json(await brainGraph({ limit, at }));
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "brain graph failed" });
+    }
+  });
+
+  // Distill a stored session into durable memories/facts on demand.
+  app.post("/api/brain/distill/:id", async (req, res) => {
+    const sess = (db.data.sessions || []).find(s => s.id === req.params.id);
+    if (!sess) return res.status(404).json({ error: "session not found" });
+    try {
+      const { distillSession } = await import("./server/brain-distill");
+      const out = await distillSession(sess, {
+        generate: async (messages) => {
+          const r = await ProviderRouter.generate({
+            provider: process.env.BRAIN_DISTILL_PROVIDER || sess.providerId,
+            model: process.env.BRAIN_DISTILL_MODEL || sess.modelId,
+            messages,
+            stream: false,
+          } as any);
+          return r.text || "";
+        },
+      });
+      res.json({ sessionId: sess.id, ...out });
+    } catch (err: any) {
+      res.status(502).json({ error: err?.message || "distill failed" });
+    }
+  });
+
   // Hierarchy tier-router bridge snapshot (B7): current mode (off/advisory/enforce),
   // whether the on-disk HIERARCHY_POLICY is structurally + statistically usable, and the
   // last 100 recommendations. Advisory-only by default — see server/hierarchy-bridge.ts.
@@ -1851,9 +1901,26 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 - Quality gate before any commit: typecheck (lint_format) ✓ + shell_check ✓ + run_tests fresh ✓ → only then git_commit (conventional).
 - Evidence over assertion: never claim something works without running it and showing output. Record notable steps via logbook.`;
 
+    // Brain auto-recall (2026 SOTA, default ON — BRAIN_AUTO_RECALL=0 opts out): relevant
+    // operator memory is injected into the system prompt every agent turn. Best-effort
+    // with a hard 4s cap ($0 local embed) — the agent never blocks on its memory.
+    const { activeOn: brainActiveOn, buildTurnMemory: brainBuildTurnMemory } = await import("./server/brain-active");
+    let brainBlock = "";
+    if (brainActiveOn(process.env.BRAIN_AUTO_RECALL)) {
+      const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+      if (lastUserMsg && typeof lastUserMsg.content === "string" && lastUserMsg.content.trim()) {
+        const { buildBrainContext } = await import("./server/brain-context");
+        const { brainRecall, brainSearchFacts } = await import("./server/brain");
+        brainBlock = await Promise.race([
+          buildBrainContext(lastUserMsg.content, { recall: brainRecall, searchFacts: brainSearchFacts }),
+          new Promise<string>((r) => setTimeout(() => r(""), 4000)),
+        ]).catch(() => "");
+      }
+    }
+
     let activeHistory = [...messages];
     if (!activeHistory.some(m => m.role === "system")) {
-      activeHistory.unshift({ role: "system", content: customSystemPrompt });
+      activeHistory.unshift({ role: "system", content: brainBlock ? `${customSystemPrompt}\n\n${brainBlock}` : customSystemPrompt });
     }
 
     try {
@@ -2038,6 +2105,43 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
             sess.title = firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : "");
           }
           db.save();
+
+          // Brain per-turn retain (default ON, BRAIN_AUTO_RETAIN=0 opts out): the last
+          // user+assistant exchange lands in the working tier async — embed-only, no LLM.
+          if (brainActiveOn(process.env.BRAIN_AUTO_RETAIN)) {
+            const turnMem = brainBuildTurnMemory(sess.messages, sess.id);
+            if (turnMem) {
+              setImmediate(async () => {
+                try {
+                  const { brainRemember } = await import("./server/brain");
+                  await brainRemember(turnMem);
+                } catch (e: any) { console.warn(`[brain] retain failed (${e?.message ?? e})`); }
+              });
+            }
+          }
+
+          // Brain periodic distill (default ON, BRAIN_AUTO_DISTILL=0 opts out): every
+          // 10th message the session is distilled into durable memories/facts on the
+          // $0 keyless floor. Fire-and-forget — never delays the response.
+          if (brainActiveOn(process.env.BRAIN_AUTO_DISTILL) && sess.messages.length > 0 && sess.messages.length % 10 === 0) {
+            const snapshot = { id: sess.id, messages: [...sess.messages] };
+            setImmediate(async () => {
+              try {
+                const { resolveDistillProvider } = await import("./server/brain-active");
+                const { distillSession } = await import("./server/brain-distill");
+                await distillSession(snapshot, {
+                  generate: async (messages) => {
+                    const r = await ProviderRouter.generate({
+                      provider: resolveDistillProvider(process.env),
+                      model: process.env.BRAIN_DISTILL_MODEL || "openai",
+                      messages, stream: false,
+                    } as any);
+                    return r.text || "";
+                  },
+                });
+              } catch (e: any) { console.warn(`[brain] auto-distill failed (${e?.message ?? e})`); }
+            });
+          }
         }
       }
 

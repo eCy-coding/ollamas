@@ -23,8 +23,8 @@ function mkDeps(over: Partial<ToolDeps> = {}): ToolDeps {
 const ctx = (over: Partial<ToolCtx> = {}): ToolCtx => ({ isLive: true, workspaceRoot: "/ws", autoApply: false, deps: mkDeps(), ...over });
 
 describe("ToolRegistry choke-point", () => {
-  test("exposes all 42 built-in workspace tools", () => {
-    expect(ToolRegistry.schemas().length).toBe(42); // +bench_model(v1.8) +mac_power(v1.9) +eval_prompt(v1.12) +rag_index/rag_search(v1.13) +count_tokens(graft) +upload_file/download_file(updown) +test_generate/code_audit/storefront_generate(revenue-ops Faz19) +contract_admin(contract vK2) +deep_research(O2 Faz7) +brain_remember/brain_recall/brain_fact_assert/brain_facts/brain_ingest(brain v1 Tur4) +sandbox_eval(quickjs WASM B4)
+  test("exposes all 44 built-in workspace tools", () => {
+    expect(ToolRegistry.schemas().length).toBe(44); // +bench_model(v1.8) +mac_power(v1.9) +eval_prompt(v1.12) +rag_index/rag_search(v1.13) +count_tokens(graft) +upload_file/download_file(updown) +test_generate/code_audit/storefront_generate(revenue-ops Faz19) +contract_admin(contract vK2) +deep_research(O2 Faz7) +brain_remember/brain_recall/brain_fact_assert/brain_facts/brain_ingest(brain v1 Tur4) +sandbox_eval(quickjs WASM B4) +brain_sweep/brain_health(brain full port, B-pattern 2026-07-18)
   });
 
   test("unknown tool → ok:false, not a throw", async () => {

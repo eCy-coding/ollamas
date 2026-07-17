@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Worktree-local pre-merge-commit (brain lane): capture memory BEFORE the merge commit,
+# then chain to the shared pre-commit gate (git runs pre-merge-commit INSTEAD of
+# pre-commit for merges — without the chain, merges would dodge the gate).
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+npx tsx scripts/brain-git-capture.ts merge || true
+COMMON_HOOK="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+if [ -x "$COMMON_HOOK" ]; then exec "$COMMON_HOOK" "$@"; fi
+exit 0

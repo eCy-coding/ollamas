@@ -1,7 +1,6 @@
-// Brain v1 (Tur 4, ported from integrate-wt commit 6ec3b29) — tiered semantic
-// memory + bi-temporal facts for the agent. Built on the exact rag.ts machinery
-// (dedicated sqlite-vec DatabaseSync, injectable embedder, dim/provider guards)
-// so the zero-new-dep and choke-point laws hold.
+// Brain v1 (Tur 4) — tiered semantic memory + bi-temporal facts for the agent.
+// Built on the exact rag.ts machinery (dedicated sqlite-vec DatabaseSync, injectable
+// embedder, dim/provider guards) so the zero-new-dep and choke-point laws hold.
 //
 // Design lineage (docs/COMPLEMENTARY-REPOS research, 2026-07-16):
 //   • agentmem blueprint — five memory tiers in ONE sqlite file, hybrid recall
@@ -13,9 +12,10 @@
 // Recall score = closeness × tier weight × recency. Closeness = 1/(1+distance);
 // recency halves roughly every ~30 days so working notes fade and core facts persist.
 import { DatabaseSync } from "node:sqlite";
+import { statSync } from "node:fs";
 import * as sqliteVec from "sqlite-vec";
 import { type Embedder, embedText, resolveEmbedder } from "./rag";
-import { withLlmSpan } from "./tracing";
+import { createEmbedCache, type EmbedCache } from "./embed-cache";
 
 export type MemoryTier = "core" | "procedural" | "learned" | "episodic" | "working";
 
@@ -66,40 +66,148 @@ export interface Extraction {
 }
 
 export interface BrainStore {
-  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number }>;
-  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string }): Promise<BrainRecallHit[]>;
+  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean }>;
+  /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
+   *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
+   *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
+  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean }): Promise<BrainRecallHit[]>;
   assertFact(f: BrainFactInput): Promise<{ changed: boolean; invalidated: number }>;
   factsAbout(subject: string, opts?: { ns?: string; at?: number }): BrainFact[];
+  /** Semantic fact search (v2): KNN over embedded "subject predicate object" strings,
+   *  filtered to facts VALID at `at` (default now) — history stays searchable. */
+  searchFacts(query: string, opts?: { k?: number; ns?: string; at?: number }): Promise<(BrainFact & { distance: number })[]>;
+  /** Forgetting (v2): delete working-tier memories older than the TTL. Also caps
+   *  the persistent embed cache (P1, BRAIN_EMBED_CACHE_CAP, default 5000) and
+   *  importance-prunes cold episodic/working rows (P4): importance =
+   *  tier_weight × tierRecency × usageBoost; below the threshold the row falls off.
+   *  core/learned/procedural are NEVER auto-pruned. BRAIN_PRUNE=0 opts out. */
+  sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; embedEvicted?: number };
+  /** Consolidation (v2+v3): promote hot episodic memories to learned, then merge
+   *  duplicate learned contents (normalized) into the oldest row, summing hits. */
+  consolidate(opts?: { minAccess?: number }): { promoted: number; merged: number };
+  /** Drift probe (v3): recall each recent learned/core memory by its own content —
+   *  top-1 must be itself. selfHitRate below the threshold ⇒ the embedding space
+   *  no longer matches the stored vectors (model swap/decay). Report-only. */
+  health(opts?: { probes?: number; threshold?: number }): Promise<{ selfHitRate: number; drift: boolean; probes: number }>;
   ingest(batch: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }): Promise<{ memories: number; facts: number }>;
-  stats(): { memories: Record<MemoryTier, number>; facts: number };
+  stats(): { memories: Record<MemoryTier, number>; facts: number; namespaces: number; dbBytes: number };
+  /** One read-only bundle for the admin panel / viewer: stats + recent memories +
+   *  live facts + superseded history + a drift-probe health snapshot. */
+  overview(opts?: { recent?: number }): Promise<BrainOverview>;
+  /** Entity graph (V1) for the namespace: live facts + recent superseded, reified into
+   *  nodes/edges with degree centrality. Feeds the live brain map. */
+  graph(opts?: { ns?: string; at?: number; limit?: number }): Promise<BrainGraph>;
   close(): void;
+}
+
+export interface BrainOverview {
+  stats: { memories: Record<MemoryTier, number>; facts: number; namespaces: number; dbBytes: number };
+  memories: { id: string; tier: MemoryTier; content: string; hits: number; createdAt: number }[];
+  facts: { subject: string; predicate: string; object: string; episodeId: string | null }[];
+  history: { subject: string; predicate: string; object: string; invalidatedAt: number }[];
+  health: { selfHitRate: number; drift: boolean; probes: number };
 }
 
 const f32 = (v: number[]) => new Uint8Array(new Float32Array(v).buffer);
 const DEFAULT_NS = "default";
 
-/** Recency multiplier: 1.0 fresh → ~0.5 at 30 days → asymptotically small. */
-const recency = (createdAt: number, now: number) => {
-  const ageDays = Math.max(0, now - createdAt) / 86_400_000;
-  return 1 / (1 + ageDays / 30);
+export interface GraphNode { id: string; label: string; degree: number; live: boolean }
+export interface GraphEdge { source: string; target: string; predicate: string; live: boolean }
+export interface BrainGraph { nodes: GraphNode[]; edges: GraphEdge[] }
+
+/** Entity reification (V1, 2026 SOTA graph memory) — fold flat bi-temporal S-P-O facts
+ *  into an entity graph: distinct subjects/objects become nodes, predicates become edges,
+ *  and degree (incident edge count) is a cheap centrality/importance signal. A node is
+ *  `live` if it touches at least one non-invalidated fact. id is case-normalized (so
+ *  "Emre"=="emre"), label keeps the first-seen original casing. */
+export function buildGraph(facts: BrainFact[]): BrainGraph {
+  const nodes = new Map<string, GraphNode>();
+  const edges: GraphEdge[] = [];
+  const touch = (raw: string, live: boolean) => {
+    const id = raw.toLowerCase().trim();
+    const n = nodes.get(id);
+    if (!n) nodes.set(id, { id, label: raw, degree: 1, live });
+    else { n.degree++; n.live = n.live || live; }
+    return id;
+  };
+  for (const f of facts) {
+    const live = f.invalidatedAt == null;
+    const s = touch(f.subject, live);
+    const o = touch(f.object, live);
+    edges.push({ source: s, target: o, predicate: f.predicate, live });
+  }
+  return { nodes: [...nodes.values()], edges };
+}
+
+/** Sanitize a natural-language query into a safe FTS5 MATCH expression: keep alnum
+ *  tokens, OR them, drop punctuation/operators that would be parsed as FTS5 syntax. */
+export function ftsQuery(q: string): string {
+  const tokens = (q.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).slice(0, 16);
+  if (tokens.length === 0) throw new Error("no searchable tokens");
+  return tokens.map((t) => `"${t}"`).join(" OR ");
+}
+
+/** Reciprocal Rank Fusion (W1, 2026 hybrid retrieval) — fuse N ranked id lists by
+ *  rank position alone, sidestepping vector/BM25 score incompatibility. An id ranked
+ *  by MULTIPLE retrievers rises. k0=60 is the standard damping constant. Returns top-k ids. */
+export function rrfFuseMany(lists: string[][], k: number, k0 = 60): string[] {
+  const score = new Map<string, number>();
+  for (const list of lists) {
+    list.forEach((id, i) => score.set(id, (score.get(id) ?? 0) + 1 / (k0 + i + 1)));
+  }
+  return [...score.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map(([id]) => id);
+}
+
+export function rrfFuse(vecRanked: string[], ftsRanked: string[], k: number, k0 = 60): string[] {
+  return rrfFuseMany([vecRanked, ftsRanked], k, k0);
+}
+
+/** Recency half-life is a TIER property (P3): a scratchpad note goes stale in a day,
+ *  a verified lesson stays relevant for months, identity never decays. Multiplier is
+ *  1.0 fresh → 0.5 at one half-life → asymptotically small. */
+export const TIER_HALF_LIFE_DAYS: Record<MemoryTier, number> = {
+  core: Infinity,
+  learned: 90,
+  procedural: 90,
+  episodic: 7,
+  working: 1,
 };
 
+export const tierRecency = (createdAt: number, now: number, tier: MemoryTier) => {
+  const halfLife = TIER_HALF_LIFE_DAYS[tier];
+  if (!Number.isFinite(halfLife)) return 1;
+  const ageDays = Math.max(0, now - createdAt) / 86_400_000;
+  return 1 / (1 + ageDays / halfLife);
+};
+
+/** Usage reinforcement (P3): often-recalled memories rank higher. Bounded at +12% —
+ *  strictly below the smallest adjacent tier-weight ratio (core/learned = 1.13) — so
+ *  no amount of heat lets a lower tier outrank a higher one at equal distance+recency.
+ *  The tier ORDER contract stays intact. */
+export const usageBoost = (hits: number) => 1 + 0.12 * (1 - 1 / (1 + Math.log1p(Math.max(0, hits))));
+
 export function createBrainStore(
-  opts: { dbPath?: string; embed?: Embedder; embedProvider?: string; now?: () => number } = {},
+  opts: { dbPath?: string; embed?: Embedder; embedProvider?: string; now?: () => number; workingCap?: number } = {},
 ): BrainStore {
+  const workingCap = opts.workingCap ?? 64;
   const dbPath = opts.dbPath || process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
   const rawEmbed = opts.embed || embedText;
   const embedProvider = opts.embedProvider || "ollama-local";
-  // Single tracing seam (mirrors providers.ts's one withLlmSpan call site): every
-  // outbound embed call funnels through here, whether it originates from
-  // remember/ingest or recall, so instrumentation stays a single wrap, not
-  // scattered across each store method.
-  const embed: Embedder = (text) =>
-    withLlmSpan("llm.embed", { provider: embedProvider, model: "embed" }, () => rawEmbed(text));
   const now = opts.now || Date.now;
   const db = new DatabaseSync(dbPath, { allowExtension: true });
   db.enableLoadExtension(true);
   sqliteVec.load(db);
+  // Concurrency (T1): WAL lets a reader (viewer, admin panel, another store handle)
+  // run alongside a writer without "database is locked"; busy_timeout retries a
+  // transient lock instead of throwing. Without these, any concurrent access crashed.
+  db.exec("PRAGMA journal_mode=WAL");
+  db.exec("PRAGMA busy_timeout=5000");
+  // P1 embed-cache: identical text is embedded once per provider (recall, dedup and
+  // retain re-embed the same strings constantly). Deterministic → no TTL, size-capped
+  // in sweep(). BRAIN_EMBED_CACHE=0 opts out.
+  const embedCache: EmbedCache | null =
+    process.env.BRAIN_EMBED_CACHE !== "0" ? createEmbedCache({ db, provider: embedProvider, now }) : null;
+  const embed = embedCache ? embedCache.wrap(rawEmbed) : rawEmbed;
   db.exec(`CREATE TABLE IF NOT EXISTS brain_memories (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     mem_id TEXT UNIQUE NOT NULL,
@@ -107,8 +215,14 @@ export function createBrainStore(
     content TEXT NOT NULL,
     source TEXT,
     ns TEXT NOT NULL DEFAULT '${DEFAULT_NS}',
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    last_access INTEGER,
+    access_count INTEGER NOT NULL DEFAULT 0
   )`);
+  // v1 → v2 migration: columns may be missing on an existing brain.db.
+  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0"]) {
+    try { db.exec(`ALTER TABLE brain_memories ADD COLUMN ${col}`); } catch { /* already there */ }
+  }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_facts (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     subject TEXT NOT NULL,
@@ -122,10 +236,32 @@ export function createBrainStore(
   db.exec(`CREATE INDEX IF NOT EXISTS brain_facts_sp ON brain_facts(ns, subject, predicate)`);
   db.exec(`CREATE TABLE IF NOT EXISTS brain_meta (k TEXT PRIMARY KEY, v TEXT)`);
 
-  let dim: number | null = (() => {
+  // W1 hybrid retrieval: an FTS5 keyword index over content, keyed by the memory rowid
+  // (unindexed, so it is stored but not tokenized). Feature-detected — if this SQLite
+  // build lacks FTS5, recall gracefully stays vector-only. Backfilled for v1-v3 dbs by
+  // copying any existing rows on first open.
+  let hasFts = false;
+  try {
+    db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS brain_fts USING fts5(content, mem_rowid UNINDEXED)");
+    const ftsCount = (db.prepare("SELECT COUNT(*) AS n FROM brain_fts").get() as { n: number }).n;
+    const memCount = (db.prepare("SELECT COUNT(*) AS n FROM brain_memories").get() as { n: number }).n;
+    if (ftsCount === 0 && memCount > 0) {
+      const ins = db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)");
+      for (const r of db.prepare("SELECT rowid, content FROM brain_memories").all() as { rowid: number; content: string }[]) {
+        ins.run(r.content, r.rowid);
+      }
+    }
+    hasFts = true;
+  } catch { hasFts = false; }
+
+  const readDim = () => {
     const r = db.prepare("SELECT v FROM brain_meta WHERE k='dim'").get() as { v?: string } | undefined;
     return r?.v ? Number(r.v) : null;
-  })();
+  };
+  let dim: number | null = readDim();
+  // A store handle opened before the first write caches dim=null; another connection
+  // (writer) may set it since. Re-read lazily so a long-lived reader picks it up.
+  const refreshDim = () => { if (dim === null) dim = readDim(); return dim; };
 
   // Same consistency discipline as rag.ts: an index is bound to the provider that built it.
   const ensureProvider = () => {
@@ -145,52 +281,143 @@ export function createBrainStore(
   const ensureVec = (d: number) => {
     if (dim === null) {
       db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS brain_vec USING vec0(embedding float[${d}])`);
+      db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS brain_fact_vec USING vec0(embedding float[${d}])`);
       db.prepare("INSERT OR REPLACE INTO brain_meta(k,v) VALUES('dim',?)").run(String(d));
       dim = d;
     } else if (dim !== d) {
       throw new Error(`brain embedding dim mismatch: store=${dim} got=${d} (re-create the brain db to change models)`);
+    } else {
+      // v1 → v2: a v1 store has brain_vec but not brain_fact_vec yet.
+      db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS brain_fact_vec USING vec0(embedding float[${d}])`);
     }
   };
 
-  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number }> => {
+  const deleteMemRow = (rowid: number) => {
+    db.prepare("DELETE FROM brain_vec WHERE rowid=?").run(BigInt(rowid));
+    if (hasFts) db.prepare("DELETE FROM brain_fts WHERE mem_rowid=?").run(BigInt(rowid));
+    db.prepare("DELETE FROM brain_memories WHERE rowid=?").run(BigInt(rowid));
+  };
+
+  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean }> => {
     if (!TIERS.includes(m.tier)) throw new Error(`invalid tier '${m.tier}' (${TIERS.join("/")})`);
     if (!m.content?.trim()) throw new Error("empty memory content");
     ensureProvider();
+    const explicitId = !!m.id;
     const id = m.id || `mem-${crypto.randomUUID()}`;
+    const ns = m.ns || DEFAULT_NS;
     const vec = await embed(m.content);
     ensureVec(vec.length);
-    const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
-    if (prior?.rowid !== undefined) {
-      db.prepare("DELETE FROM brain_vec WHERE rowid=?").run(BigInt(prior.rowid));
-      db.prepare("DELETE FROM brain_memories WHERE rowid=?").run(BigInt(prior.rowid));
+
+    // W2 semantic write-dedup (AUDN-lite): for an AUTO-id write (no explicit id), if a
+    // near-duplicate already exists in the same ns+tier, MERGE into it instead of adding
+    // a polluting row. Core is exempt (identity/preference must never silently collapse).
+    // Disable with BRAIN_DEDUP=0. Explicit ids keep exact-upsert semantics.
+    const dedupOn = process.env.BRAIN_DEDUP !== "0" && !explicitId && m.tier !== "core" && dim !== null;
+    if (dedupOn) {
+      const maxDist = Number(process.env.BRAIN_DEDUP_DISTANCE) || 0.08; // ≈ cosine 0.92
+      const near = db
+        .prepare(
+          `SELECT m.rowid AS rowid, m.content AS content, m.access_count AS hits, v.distance AS distance
+           FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT 8) v
+           JOIN brain_memories m ON m.rowid = v.rowid
+           WHERE m.ns=? AND m.tier=?`,
+        )
+        .all(f32(vec), ns, m.tier) as { rowid: number; content: string; hits: number; distance: number }[];
+      const dup = near.find((r) => r.distance <= maxDist);
+      if (dup) {
+        // Keep the richer (longer) content; bump heat. No new row → recall stays clean.
+        const keepContent = m.content.length > dup.content.length ? m.content : dup.content;
+        db.prepare("UPDATE brain_memories SET content=?, access_count=access_count+1, last_access=? WHERE rowid=?")
+          .run(keepContent, now(), BigInt(dup.rowid));
+        if (hasFts) {
+          db.prepare("DELETE FROM brain_fts WHERE mem_rowid=?").run(BigInt(dup.rowid));
+          db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(keepContent, BigInt(dup.rowid));
+        }
+        const keepId = (db.prepare("SELECT mem_id FROM brain_memories WHERE rowid=?").get(BigInt(dup.rowid)) as { mem_id: string }).mem_id;
+        return { id: keepId, dim: vec.length, merged: true };
+      }
     }
+
+    const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
+    if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
       .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at) VALUES(?,?,?,?,?,?)")
-      .run(id, m.tier, m.content, m.source ?? null, m.ns || DEFAULT_NS, now());
-    db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(BigInt(ins.lastInsertRowid), f32(vec));
+      .run(id, m.tier, m.content, m.source ?? null, ns, now());
+    const rowid = BigInt(ins.lastInsertRowid);
+    db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
+    if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(m.content, rowid);
+    // v3 ring buffer: working is a bounded scratchpad — beyond the cap, the oldest
+    // working rows in this namespace fall off (their vectors + fts too).
+    if (m.tier === "working") {
+      const over = db
+        .prepare(
+          "SELECT rowid FROM brain_memories WHERE tier='working' AND ns=? ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?",
+        )
+        .all(ns, workingCap) as { rowid: number }[];
+      for (const r of over) deleteMemRow(r.rowid);
+    }
     return { id, dim: vec.length };
   };
 
   return {
     remember: rememberOne,
 
-    async recall(query, { k = 5, tier, ns } = {}) {
+    async recall(query, { k = 5, tier, ns, fresh, graphExpand } = {}) {
       ensureProvider();
-      if (dim === null) return []; // nothing remembered yet
-      const vec = await embed(query);
+      if (refreshDim() === null) return []; // nothing remembered yet (re-reads for concurrent writers)
+      const vec = await (fresh ? rawEmbed : embed)(query);
       ensureVec(vec.length);
-      // Overfetch the KNN (tier/ns filtering happens after the vector stage), then
-      // re-rank by closeness × tier weight × recency and cut to k.
-      const rows = db
+      const over = k * 4 + 16;
+      // W1 hybrid: vector KNN candidates ∪ FTS5 BM25 candidates, fused by RRF. FTS surfaces
+      // keyword/id matches the embedder misses; the vector arm keeps semantic recall.
+      const vecRows = db
         .prepare(
-          `SELECT m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
-                  v.distance AS distance, m.ns AS ns
+          `SELECT m.rowid AS rowid, m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
+                  v.distance AS distance, m.ns AS ns, m.access_count AS hits
            FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
            JOIN brain_memories m ON m.rowid = v.rowid`,
         )
-        .all(f32(vec), k * 4 + 16) as unknown as (BrainRecallHit & { ns: string })[];
+        .all(f32(vec), over) as unknown as (BrainRecallHit & { ns: string; rowid: number; hits: number })[];
+      const memFts = (q: string, limit: number): string[] => {
+        try {
+          const rows = db
+            .prepare(
+              `SELECT m.mem_id AS id FROM brain_fts f JOIN brain_memories m ON m.rowid = f.mem_rowid
+               WHERE brain_fts MATCH ? ORDER BY f.rank LIMIT ?`,
+            )
+            .all(ftsQuery(q), limit) as { id: string }[];
+          return rows.map((r) => r.id);
+        } catch { return []; } // malformed FTS query (e.g. only punctuation) → skip this arm
+      };
+      const ftsIds: string[] = hasFts ? memFts(query, over) : [];
+      // P3 graph expansion (opt-in): 1-hop over the fact graph — semantically-near facts
+      // name entities; memories MENTIONING those entities become a third RRF arm. Widens
+      // the candidate set beyond what the query's own vector/keywords can reach.
+      let graphIds: string[] = [];
+      if (graphExpand && hasFts) {
+        const seeds: (BrainFact & { distance: number })[] = await this.searchFacts(query, { k: 4, ns });
+        const entities = [...new Set(seeds.flatMap((f) => [f.subject, f.object]).map((e) => e.toLowerCase().trim()))].slice(0, 6);
+        graphIds = entities.flatMap((e) => memFts(e, 3));
+      }
+      // Attach any FTS/graph-only hits (not already in the vector set) so RRF can rank them.
+      const byId = new Map(vecRows.map((r) => [r.id, r]));
+      const missing = [...new Set([...ftsIds, ...graphIds])].filter((id) => !byId.has(id));
+      if (missing.length) {
+        const ph = missing.map(() => "?").join(",");
+        const extra = db
+          .prepare(
+            `SELECT m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt, m.ns AS ns,
+                    m.access_count AS hits
+             FROM brain_memories m WHERE m.mem_id IN (${ph})`,
+          )
+          .all(...missing) as unknown as (BrainRecallHit & { ns: string; hits: number })[];
+        for (const r of extra) byId.set(r.id, { ...r, distance: 1 } as any); // no vector distance → neutral
+      }
+      const lists = [vecRows.map((r) => r.id), ftsIds, graphIds].filter((l) => l.length > 0);
+      const fusedIds = lists.length > 1 ? rrfFuseMany(lists, over) : vecRows.map((r) => r.id);
+      const rows = fusedIds.map((id) => byId.get(id)).filter(Boolean) as (BrainRecallHit & { ns: string; hits: number })[];
       const t = now();
-      return rows
+      const hits = rows
         .filter((r) => (!tier || r.tier === tier) && r.ns === (ns || DEFAULT_NS))
         .map((r) => ({
           id: r.id,
@@ -198,10 +425,15 @@ export function createBrainStore(
           content: r.content,
           distance: r.distance,
           createdAt: r.createdAt,
-          score: (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * recency(r.createdAt, t),
+          score:
+            (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
         }))
         .sort((a, b) => b.score - a.score)
         .slice(0, k);
+      // v2: access accounting feeds consolidate() — recalled memories get hotter.
+      const bump = db.prepare("UPDATE brain_memories SET access_count=access_count+1, last_access=? WHERE mem_id=?");
+      for (const h of hits) bump.run(t, h.id);
+      return hits;
     },
 
     async assertFact(f) {
@@ -222,10 +454,120 @@ export function createBrainStore(
         db.prepare("UPDATE brain_facts SET invalidated_at=? WHERE rowid=?").run(t, BigInt(c.rowid));
         invalidated++;
       }
-      db.prepare(
+      ensureProvider();
+      // v2: facts are embedded ("subject predicate object") for semantic search. The
+      // vector stays after invalidation so point-in-time search still works.
+      const vec = await embed(`${f.subject} ${f.predicate} ${f.object}`);
+      ensureVec(vec.length);
+      const ins = db.prepare(
         "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from) VALUES(?,?,?,?,?,?)",
       ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, t);
+      db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(ins.lastInsertRowid), f32(vec));
       return { changed: true, invalidated };
+    },
+
+    async searchFacts(query, { k = 5, ns, at } = {}) {
+      ensureProvider();
+      if (refreshDim() === null) return []; // nothing embedded yet (re-reads for concurrent writers)
+      const vec = await embed(query);
+      ensureVec(vec.length);
+      const t = at ?? now();
+      const rows = db
+        .prepare(
+          `SELECT f.subject AS subject, f.predicate AS predicate, f.object AS object,
+                  f.episode_id AS episodeId, f.ns AS ns, f.valid_from AS validFrom,
+                  f.invalidated_at AS invalidatedAt, v.distance AS distance
+           FROM (SELECT rowid, distance FROM brain_fact_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
+           JOIN brain_facts f ON f.rowid = v.rowid
+           WHERE f.ns=? AND f.valid_from<=? AND (f.invalidated_at IS NULL OR f.invalidated_at>?)
+           ORDER BY v.distance
+           LIMIT ?`,
+        )
+        .all(f32(vec), k * 4 + 16, ns || DEFAULT_NS, t, t, k) as unknown as (BrainFact & { distance: number })[];
+      return rows;
+    },
+
+    sweep({ workingTtlMs = 7 * 86_400_000, pruneThreshold } = {}) {
+      const cutoff = now() - workingTtlMs;
+      const expired = db
+        .prepare("SELECT rowid FROM brain_memories WHERE tier='working' AND created_at<?")
+        .all(cutoff) as { rowid: number }[];
+      for (const r of expired) deleteMemRow(r.rowid);
+      // P4 importance-prune: unbounded episodic growth is the remaining leak (working
+      // has TTL + ring). A row's importance uses the SAME maths recall ranks with, so
+      // "too unimportant to keep" ≡ "would rank near-zero anyway". Heat extends life.
+      // Only episodic/working are candidates — core/learned/procedural never auto-die.
+      let pruned = 0;
+      if (process.env.BRAIN_PRUNE !== "0") {
+        const thr = pruneThreshold ?? (Number(process.env.BRAIN_PRUNE_THRESHOLD) || 0.15);
+        const t = now();
+        const candidates = db
+          .prepare(
+            "SELECT rowid, tier, created_at AS createdAt, access_count AS hits FROM brain_memories WHERE tier IN ('episodic','working')",
+          )
+          .all() as { rowid: number; tier: MemoryTier; createdAt: number; hits: number }[];
+        for (const c of candidates) {
+          const importance = TIER_WEIGHT[c.tier] * tierRecency(c.createdAt, t, c.tier) * usageBoost(c.hits);
+          if (importance < thr) {
+            deleteMemRow(c.rowid);
+            pruned++;
+          }
+        }
+      }
+      // P1: same maintenance pass also caps the persistent embed cache.
+      const embedEvicted = embedCache
+        ? embedCache.sweep({ cap: Number(process.env.BRAIN_EMBED_CACHE_CAP) || undefined }).evicted
+        : 0;
+      return { swept: expired.length, pruned, embedEvicted };
+    },
+
+    consolidate({ minAccess = 3 } = {}) {
+      // agentmem "skill crystallization": episodes recalled often become learned lessons.
+      const r = db
+        .prepare("UPDATE brain_memories SET tier='learned' WHERE tier='episodic' AND access_count>=?")
+        .run(minAccess);
+      // v3 dedupe: identical learned contents (case/whitespace-normalized) collapse into
+      // the OLDEST row; hits sum so consolidation never loses heat.
+      const learned = db
+        .prepare("SELECT rowid, ns, content, access_count FROM brain_memories WHERE tier='learned' ORDER BY created_at, rowid")
+        .all() as { rowid: number; ns: string; content: string; access_count: number }[];
+      const keep = new Map<string, { rowid: number; hits: number }>();
+      let merged = 0;
+      for (const row of learned) {
+        const key = `${row.ns} ${row.content.toLowerCase().replace(/\s+/g, " ").trim()}`;
+        const first = keep.get(key);
+        if (!first) {
+          keep.set(key, { rowid: row.rowid, hits: row.access_count });
+          continue;
+        }
+        first.hits += row.access_count;
+        db.prepare("UPDATE brain_memories SET access_count=? WHERE rowid=?").run(first.hits, BigInt(first.rowid));
+        deleteMemRow(row.rowid);
+        merged++;
+      }
+      return { promoted: Number(r.changes), merged };
+    },
+
+    async health({ probes = 8, threshold = 0.8 } = {}) {
+      const rows = db
+        .prepare(
+          "SELECT mem_id AS id, content FROM brain_memories WHERE tier IN ('learned','core') ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        )
+        .all(probes) as { id: string; content: string }[];
+      if (rows.length === 0) return { selfHitRate: 1, drift: false, probes: 0 };
+      let hits = 0;
+      for (const p of rows) {
+        const top = await this.recall(p.content, { k: 1, fresh: true });
+        if (top[0]?.id === p.id) hits++;
+      }
+      const selfHitRate = hits / rows.length;
+      const drift = selfHitRate < threshold;
+      if (drift) {
+        console.warn(
+          `[brain] DRIFT: self-hit ${(selfHitRate * 100).toFixed(0)}% < ${threshold * 100}% — embedding space no longer matches stored vectors; consider re-embedding the store`,
+        );
+      }
+      return { selfHitRate, drift, probes: rows.length };
     },
 
     factsAbout(subject, { ns, at } = {}) {
@@ -265,7 +607,50 @@ export function createBrainStore(
       }[];
       for (const r of rows) if (r.tier in memories) memories[r.tier] = Number(r.n);
       const f = db.prepare("SELECT COUNT(*) AS n FROM brain_facts WHERE invalidated_at IS NULL").get() as { n: number };
-      return { memories, facts: Number(f.n) };
+      const nsRow = db.prepare("SELECT COUNT(DISTINCT ns) AS n FROM brain_memories").get() as { n: number };
+      let dbBytes = 0;
+      try { dbBytes = statSync(dbPath).size; } catch { /* in-memory / not yet flushed */ }
+      return { memories, facts: Number(f.n), namespaces: Number(nsRow.n), dbBytes };
+    },
+
+    async overview({ recent = 20 } = {}) {
+      const memories = db
+        .prepare(
+          "SELECT mem_id AS id, tier, content, access_count AS hits, created_at AS createdAt FROM brain_memories ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        )
+        .all(recent) as BrainOverview["memories"];
+      const facts = db
+        .prepare(
+          "SELECT subject, predicate, object, episode_id AS episodeId FROM brain_facts WHERE invalidated_at IS NULL ORDER BY valid_from DESC LIMIT ?",
+        )
+        .all(recent) as BrainOverview["facts"];
+      const history = db
+        .prepare(
+          "SELECT subject, predicate, object, invalidated_at AS invalidatedAt FROM brain_facts WHERE invalidated_at IS NOT NULL ORDER BY invalidated_at DESC LIMIT ?",
+        )
+        .all(Math.min(recent, 10)) as BrainOverview["history"];
+      return { stats: this.stats(), memories, facts, history, health: await this.health() };
+    },
+
+    async graph({ ns, at, limit = 200 } = {}) {
+      const t = at ?? now();
+      // Live facts valid at t + a bounded tail of recently-superseded ones (so the map
+      // can show history as dashed edges). Reified into an entity graph.
+      const rows = db
+        .prepare(
+          `SELECT subject, predicate, object, episode_id AS episodeId, ns, valid_from AS validFrom, invalidated_at AS invalidatedAt
+           FROM brain_facts
+           WHERE ns=? AND valid_from<=? AND (invalidated_at IS NULL OR invalidated_at>?)
+           ORDER BY valid_from DESC LIMIT ?`,
+        )
+        .all(ns || DEFAULT_NS, t, t, limit) as unknown as BrainFact[];
+      const superseded = db
+        .prepare(
+          `SELECT subject, predicate, object, episode_id AS episodeId, ns, valid_from AS validFrom, invalidated_at AS invalidatedAt
+           FROM brain_facts WHERE ns=? AND invalidated_at IS NOT NULL ORDER BY invalidated_at DESC LIMIT ?`,
+        )
+        .all(ns || DEFAULT_NS, Math.min(limit, 30)) as unknown as BrainFact[];
+      return buildGraph([...rows, ...superseded]);
     },
 
     close() {
@@ -309,19 +694,40 @@ export const EXTRACTION_PROMPT = `Distill this conversation into durable memory.
 Tiers: core=identity/preferences that rarely change, procedural=how-to steps, learned=verified lessons/gotchas, episodic=what happened, working=short-lived context.
 Facts are subject–predicate–object triples for things that may CHANGE over time (assignments, versions, preferences). Extract only what is worth recalling weeks later; omit chit-chat.`;
 
+// Deterministic offline embedder (BRAIN_EMBED_FAKE=1): 8-dim hash-bucket vector.
+// For tests and no-ollama dev shells — NOT semantically meaningful, only stable.
+const fakeHashEmbed: Embedder = async (text) => {
+  const v = new Array(8).fill(0);
+  for (let i = 0; i < text.length; i++) v[text.charCodeAt(i) % 8] += 1;
+  const norm = Math.hypot(...v) || 1;
+  return v.map((x) => x / norm);
+};
+
 // Process-wide default store for the tools (rag.ts convention): embedder resolves
 // from the EMBED_PROVIDER pin with local-ollama terminal fallback.
 let _store: BrainStore | null = null;
 function store(): BrainStore {
   if (!_store) {
-    const r = resolveEmbedder();
-    _store = createBrainStore({ embed: r.embed, embedProvider: r.providerId });
+    if (process.env.BRAIN_EMBED_FAKE === "1") {
+      _store = createBrainStore({ embed: fakeHashEmbed, embedProvider: "fake-hash" });
+    } else {
+      const r = resolveEmbedder();
+      _store = createBrainStore({ embed: r.embed, embedProvider: r.providerId });
+    }
   }
   return _store;
 }
 export const brainRemember = (m: BrainMemoryInput) => store().remember(m);
-export const brainRecall = (q: string, o?: { k?: number; tier?: MemoryTier; ns?: string }) => store().recall(q, o);
+export const brainRecall = (q: string, o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean }) =>
+  store().recall(q, o);
 export const brainAssertFact = (f: BrainFactInput) => store().assertFact(f);
 export const brainFactsAbout = (s: string, o?: { ns?: string; at?: number }) => store().factsAbout(s, o);
 export const brainIngest = (b: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }) =>
   store().ingest(b);
+export const brainSearchFacts = (q: string, o?: { k?: number; ns?: string; at?: number }) => store().searchFacts(q, o);
+export const brainSweep = (o?: { workingTtlMs?: number }) => store().sweep(o);
+export const brainConsolidate = (o?: { minAccess?: number }) => store().consolidate(o);
+export const brainHealth = (o?: { probes?: number; threshold?: number }) => store().health(o);
+export const brainStats = () => store().stats();
+export const brainOverview = (o?: { recent?: number }) => store().overview(o);
+export const brainGraph = (o?: { ns?: string; at?: number; limit?: number }) => store().graph(o);

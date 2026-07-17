@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Autonomous brain maintenance ("sleep-time compute"): daily 04:00 sweep + consolidate
+     + drift check. Non-destructive beyond working-tier decay; core/learned/procedural are
+     never evicted. Exit 3 on drift (a wrapper may alarm). No credentials.
+     Points at the integrate worktree until feat/complementary-integrations merges to the
+     main checkout; after merge switch both paths back to $HOME/Desktop/ollamas.
+     Activate once:  cp scripts/com.ollamas.brain-maintain.plist ~/Library/LaunchAgents/ &&
+                     launchctl load ~/Library/LaunchAgents/com.ollamas.brain-maintain.plist  -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ollamas.brain-maintain</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Desktop/ollamas" &amp;&amp; exec npx tsx scripts/brain-maintain.ts</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>WorkingDirectory</key><string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>StandardOutPath</key><string>/tmp/ollamas-brain-maintain.log</string>
+  <key>StandardErrorPath</key><string>/tmp/ollamas-brain-maintain.log</string>
+  <key>ProcessType</key><string>Background</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+</dict>
+</plist>

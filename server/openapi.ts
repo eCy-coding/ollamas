@@ -97,6 +97,17 @@ export const openApiSpec = swaggerJsdoc({
         delete: { tags: ["Agent"], summary: "Delete an agent session", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "{ success, deleted }", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, deleted: { type: "boolean" } } } } } } } },
       },
       "/api/agent/sessions/{id}/events": { get: { tags: ["Agent"], summary: "Live-tail a running agent session over SSE (replay ?after=<id>, read-only)", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, { name: "after", in: "query", required: false, schema: { type: "integer", default: -1 } }], responses: { "200": { description: "text/event-stream of appended session steps" }, "404": { description: "Agent session not found" } } } },
+      // Brain overview — read-only panel bundle (stats + memories + facts + history + health).
+      "/api/brain/overview": { get: { tags: ["Agent"], summary: "Brain panel bundle: tier stats + recent memories + live/superseded facts + drift health (local-owner, read-only)", parameters: [{ name: "recent", in: "query", required: false, schema: { type: "integer", default: 20, minimum: 1, maximum: 100 } }], responses: { "200": { description: "{ stats, memories[], facts[], history[], health }", ...jsonObj }, "500": { description: "overview failed" } } } },
+
+      // Brain entity graph — reified facts (nodes/edges + degree) for the live brain map.
+      "/api/brain/graph": { get: { tags: ["Agent"], summary: "Brain entity graph: S-P-O facts reified into nodes+edges with degree centrality (local-owner, read-only)", parameters: [{ name: "limit", in: "query", required: false, schema: { type: "integer", default: 200, minimum: 1, maximum: 1000 } }, { name: "at", in: "query", required: false, schema: { type: "integer" }, description: "epoch-ms for a historical (bi-temporal) snapshot" }], responses: { "200": { description: "{ nodes:[{id,label,degree,live}], edges:[{source,target,predicate,live}] }", ...jsonObj }, "500": { description: "graph failed" } } } },
+
+      // Brain v2/v3 — session distillation into tiered memories + bi-temporal facts (docs/BRAIN-ENGINE.md).
+      "/api/brain/distill/{id}": { post: { tags: ["Agent"], summary: "Distill a saved session's transcript into brain memories + facts (BRAIN_DISTILL_PROVIDER/MODEL; best-effort)", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "Agent session id" }], responses: { "200": { description: "{ sessionId, memories, facts, skipped }", content: { "application/json": { schema: { type: "object", properties: { sessionId: { type: "string" }, memories: { type: "integer" }, facts: { type: "integer" }, skipped: { type: "boolean" } } } } } }, "404": { description: "session not found" }, "502": { description: "distill LLM call failed" } } } },
+
+      // v1.29.4 batch3 — provider API-key vault + pool (local-owner). Key VALUES are encrypted at
+      // rest and never returned; responses are masked/boolean status only.
 
       // v1.29.4 batch3 — provider API-key vault + pool (local-owner). Key VALUES are encrypted at
       // rest and never returned; responses are masked/boolean status only.

@@ -1,0 +1,44 @@
+# eval/brain-distill-config.yaml — distillation quality gate (brain v3, hand-maintained;
+# NOT generated). Proves the EXTRACTION_PROMPT contract holds on the $0 keyless floor:
+# the model must emit a parseable extraction with valid tiers and at least one memory.
+# Run: make eval-brain
+description: brain distillation extraction contract ($0 keyless)
+
+providers:
+  - id: openai:chat:openai
+    label: pollinations
+    config:
+      apiBaseUrl: https://text.pollinations.ai/v1
+      apiKey: keyless
+      max_tokens: 400
+      temperature: 0
+
+prompts:
+  - |
+    {{system}}
+
+    CONVERSATION:
+    {{transcript}}
+
+tests:
+  - description: distillation yields valid tiers and at least one memory + one fact
+    vars:
+      system: |
+        Distill this conversation into durable memory. Reply ONLY a JSON object:
+        {"memories":[{"tier":"core|procedural|learned|episodic|working","content":"..."}],"facts":[{"subject":"...","predicate":"...","object":"..."}]}
+        Tiers: core=identity/preferences that rarely change, procedural=how-to steps, learned=verified lessons/gotchas, episodic=what happened, working=short-lived context.
+        Facts are subject-predicate-object triples for things that may CHANGE over time. Extract only what is worth recalling weeks later; omit chit-chat.
+      transcript: |
+        user: Deploy sürecimiz nasıl işliyor?
+        assistant: make ship komutu önce gate'i (tsc + lint + test) koşar, yeşilse release eder. Gate kırmızıysa commit bloklanır.
+        user: Anladım. Bir de ben artık groq yerine cerebras kullanmak istiyorum, onu varsayılan yap.
+        assistant: Tamam, varsayılan provider cerebras olarak ayarlandı.
+    assert:
+      # Last {...} span must parse and satisfy the extraction contract.
+      - type: javascript
+        value: |
+          const o = JSON.parse(output.slice(output.lastIndexOf('{"memories'), output.lastIndexOf('}') + 1) || output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1));
+          const tiers = ['core','procedural','learned','episodic','working'];
+          const memsOk = Array.isArray(o.memories) && o.memories.length >= 1 && o.memories.every(m => tiers.includes(m.tier) && typeof m.content === 'string');
+          const factsOk = Array.isArray(o.facts) && o.facts.length >= 1 && o.facts.every(f => f.subject && f.predicate && f.object);
+          return memsOk && factsOk;

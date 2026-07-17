@@ -36,6 +36,12 @@ const decodeCursor = (c?: string) => (c ? parseInt(Buffer.from(c, "base64").toSt
 export const MCP_SERVER_NAME = "ollamas-gateway";
 export const MCP_SERVER_VERSION = "1.6.0";
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
+
+// H2 (brain port): the operator's memory is NOT for external MCP clients. brain_*
+// tools are hidden from tools/list AND refused at tools/call unless the operator
+// explicitly opts in with BRAIN_MCP_EXPOSE=1.
+export const brainMcpAllowed = (name: string, env: { BRAIN_MCP_EXPOSE?: string }): boolean =>
+  !name.startsWith("brain_") || env.BRAIN_MCP_EXPOSE === "1";
 // Advertise only what we implement (Faz 14A): tools/resources/prompts/
 // completions + structured logging. listChanged is false (stateless transport).
 export const MCP_CAPABILITIES = {
@@ -92,7 +98,7 @@ export function buildServer(ctx: ToolCtx): Server {
 
   // --- tools/list (per-tenant visibility + cursor pagination) ---
   server.setRequestHandler(ListToolsRequestSchema, async (req) => {
-    const all = ToolRegistry.list(allowed, ctx.tenantId);
+    const all = ToolRegistry.list(allowed, ctx.tenantId).filter((t) => brainMcpAllowed(t.name, process.env));
     const start = decodeCursor(req.params?.cursor);
     const page = all.slice(start, start + PAGE);
     const tools = page.map((t) => {
@@ -123,6 +129,12 @@ export function buildServer(ctx: ToolCtx): Server {
   // into the choke-point so an in-flight tool returns promptly as cancelled.
   server.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const { name, arguments: args } = req.params;
+    if (!brainMcpAllowed(name, process.env)) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ error: `tool_not_permitted: '${name}' is not exposed over MCP (set BRAIN_MCP_EXPOSE=1 to allow)` }) }],
+        isError: true,
+      };
+    }
     const progressToken = (req.params?._meta as any)?.progressToken;
     const onProgress = progressToken
       ? (progress: number, total?: number, message?: string) =>

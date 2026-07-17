@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Worktree-local pre-commit (brain lane): 1) capture memory into the brain (best-effort),
+# 2) chain to the SHARED quality gate (.git common hooks) — the gate stays authoritative.
+# Installed per-worktree by scripts/install-brain-hooks.sh; other lanes are untouched.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# 1) Brain capture — must never block the commit.
+npx tsx scripts/brain-git-capture.ts commit || true
+
+# 2) Shared gate (typecheck + lint + full test). Missing gate → allow (same as vanilla git).
+COMMON_HOOK="$(git rev-parse --git-common-dir)/hooks/pre-commit"
+if [ -x "$COMMON_HOOK" ]; then exec "$COMMON_HOOK" "$@"; fi
+exit 0

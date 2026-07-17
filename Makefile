@@ -36,3 +36,41 @@ eval-providers:
 ## model on first run; MANUAL/live only, never part of the vitest gate)
 eval-rerank:
 	@npx tsx scripts/eval-rerank.mjs
+# ---------------- Brain (ported from integrate-wt, B-pattern 2026-07-18) ----------------
+.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap
+
+## brain-show: live viewer — stats + memories + facts (+ Q="soru" semantic query)
+brain-show:
+	@npx tsx scripts/brain-show.ts $(Q)
+
+## brain-hooks: OPT-IN git-capture hooks (chains the shared pre-commit gate; not auto-installed)
+brain-hooks:
+	@bash scripts/install-brain-hooks.sh
+
+## eval-brain: distillation extraction contract on the $0 keyless floor (promptfoo)
+eval-brain:
+	@npx -y promptfoo@latest eval -c eval/brain-distill-config.yaml --no-cache --no-progress-bar
+
+## brain-e2e: full live chain — $0 LLM → distill → sqlite-vec → semantic recall (exit 0/1)
+brain-e2e:
+	@npx tsx scripts/brain-e2e.ts
+
+## brain-sync-registry: pull orchestration's proven THINK lessons into the brain (one-way read, idempotent)
+brain-sync-registry:
+	@npx tsx scripts/brain-sync-registry.ts
+
+## brain-maintain: autonomous sleep-time maintenance — consolidate + sweep/prune + drift + backup (exit 3 on drift)
+brain-maintain:
+	@npx tsx scripts/brain-maintain.ts
+
+## brain-backup: verified daily snapshot of brain.db (row-count checked, 7-day retention)
+brain-backup:
+	@npx tsx scripts/brain-backup.ts
+
+## eval-brain-mrr: retrieval quality — MRR over the golden fixture, live local embedder (exit 1 under floor)
+eval-brain-mrr:
+	@npx tsx scripts/brain-eval-mrr.ts
+
+## brain-bootstrap: 0-manual — install git-capture hooks + load the daily maintenance agent (idempotent)
+brain-bootstrap:
+	@bash scripts/brain-bootstrap.sh

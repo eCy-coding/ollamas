@@ -1,0 +1,42 @@
+{
+  "memories": [
+    { "id": "g-deploy", "tier": "procedural", "content": "ollamas deploys with make ship: typecheck, fresh vitest run, then launchctl kickstart com.ollamas.server" },
+    { "id": "g-embed", "tier": "learned", "content": "brain embeddings use nomic-embed-text on local ollama; the store is pinned to one embed provider" },
+    { "id": "g-wal", "tier": "learned", "content": "brain.db runs SQLite WAL mode with busy_timeout 5000 so concurrent readers never hit database is locked" },
+    { "id": "g-tiers", "tier": "core", "content": "memory tiers rank core above learned above procedural above episodic above working" },
+    { "id": "g-dedup", "tier": "learned", "content": "semantic write-dedup merges near-duplicate memories within distance 0.08 instead of inserting a new row" },
+    { "id": "g-rrf", "tier": "learned", "content": "recall fuses vector KNN and FTS5 BM25 candidate lists with reciprocal rank fusion, damping constant 60" },
+    { "id": "g-facts", "tier": "learned", "content": "facts are bi-temporal subject predicate object edges; a new assertion supersedes the old one without deleting history" },
+    { "id": "g-launchd", "tier": "procedural", "content": "brain maintenance runs daily at 04:00 via launchd plist com.ollamas.brain-maintain" },
+    { "id": "g-mcp", "tier": "learned", "content": "brain tools are hidden from external MCP clients unless BRAIN_MCP_EXPOSE is set to 1" },
+    { "id": "g-tenant", "tier": "learned", "content": "tenant requests are namespace-jailed: brainNs forces ns to tenant id, callers cannot read another tenant's memories" },
+    { "id": "g-ring", "tier": "learned", "content": "the working tier is a ring buffer capped at 64 rows per namespace; the oldest rows fall off" },
+    { "id": "g-drift", "tier": "learned", "content": "the drift probe recalls each recent memory by its own content; a low self-hit rate means the embedding space moved" },
+    { "id": "g-distill", "tier": "procedural", "content": "conversation transcripts are distilled every 10 messages into durable memories and facts via a keyless pollinations model" },
+    { "id": "g-council", "tier": "episodic", "content": "the council endpoint solves a task with three parallel seats, a judge, and a reward ledger" },
+    { "id": "g-catalog", "tier": "learned", "content": "the provider catalog syncs weekly from the cheahjs free-llm list via make provider-sync" },
+    { "id": "g-emre", "tier": "core", "content": "Emre is the operator; responses are Turkish, code and commits are English" },
+    { "id": "g-zerodep", "tier": "core", "content": "the zero-new-dependency law: only node builtins plus sqlite-vec; no new npm runtime packages" },
+    { "id": "g-backup", "tier": "procedural", "content": "brain backups snapshot brain.db daily into the backups folder, verify row counts, and keep seven days" },
+    { "id": "g-hooks", "tier": "learned", "content": "git commits are captured into the brain by a pre-commit hook with a three second timeout, best effort" },
+    { "id": "g-recency", "tier": "learned", "content": "recency decay is per tier: working halves in a day, episodic in a week, learned in ninety days, core never" }
+  ],
+  "queries": [
+    { "q": "how do I deploy ollamas to production?", "expect": "g-deploy" },
+    { "q": "which embedding model does the brain use?", "expect": "g-embed" },
+    { "q": "why don't concurrent readers crash with database is locked?", "expect": "g-wal" },
+    { "q": "what is the ranking order of memory tiers?", "expect": "g-tiers" },
+    { "q": "what happens when I write a near-duplicate memory?", "expect": "g-dedup" },
+    { "q": "how are keyword and vector search results combined?", "expect": "g-rrf" },
+    { "q": "how does the brain handle a fact that changed over time?", "expect": "g-facts" },
+    { "q": "when does automatic brain maintenance run?", "expect": "g-launchd" },
+    { "q": "can external MCP clients see the brain tools?", "expect": "g-mcp" },
+    { "q": "can one tenant read another tenant's memories?", "expect": "g-tenant" },
+    { "q": "how many rows can the working scratchpad hold?", "expect": "g-ring" },
+    { "q": "how do we detect that the embedding space drifted?", "expect": "g-drift" },
+    { "q": "how are long conversations turned into durable memory?", "expect": "g-distill" },
+    { "q": "are we allowed to add a new npm dependency?", "expect": "g-zerodep" },
+    { "q": "how long are database backups retained?", "expect": "g-backup" },
+    { "q": "do old scratchpad notes decay faster than lessons?", "expect": "g-recency" }
+  ]
+}
