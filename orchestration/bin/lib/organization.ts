@@ -47,7 +47,7 @@ export interface Assignment {
   actorId: string;
   model?: string;
   costRank: number;
-  reason: "capability-match" | "escalate-no-capable";
+  reason: "capability-match" | "escalate-no-capable" | "evidence-weighted" | "recurrence-avoid";
   escalatesTo: string | null;
   knownFaults: KnownFault[];
 }
@@ -81,6 +81,8 @@ export interface LedgerEntry {
   ok?: boolean;
   summary: string;
   rulesApplied?: string[];
+  /** Failure signature (errorSignature) — set on failed outcomes so recurrence is countable. */
+  sig?: string;
 }
 
 /** PROPOSE-mode error-registry append (written as a proposal file, gated — never a direct mutation). */
@@ -93,7 +95,7 @@ export interface ErrorEntryProposal {
   root_cause: string;
   evidence: string;
   prevention_rule: string;
-  recurrence_count: 0;
+  recurrence_count: number;
 }
 
 const VALID_KINDS: ReadonlySet<string> = new Set(["operator", "service", "cli", "model", "pool"]);
@@ -194,29 +196,107 @@ export function mergeRosterSeats(chart: OrgChart, seats: RosterSeat[]): OrgChart
   return { ...chart, actors: [...chart.actors, ...merged] };
 }
 
+/** Per-actor outcome evidence from the brain ledger (Contract-Net-lite "bid" — RESEARCH-ORG.md §1). */
+export interface ActorStat { n: number; ok: number; wilson: number; }
+
+/**
+ * Wilson score LOWER bound for a binomial success rate (z=1.96 ≈ 95%). The standard small-n-honest
+ * ranking instrument (RESEARCH-ORG.md): an actor with 1/1 does not outrank one with 9/10. n=0 → 0.
+ */
+export function wilsonLower(successes: number, n: number, z = 1.96): number {
+  if (n <= 0) return 0;
+  const p = successes / n;
+  const z2 = z * z;
+  const denom = 1 + z2 / n;
+  const center = p + z2 / (2 * n);
+  const margin = z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n));
+  return Math.max(0, (center - margin) / denom);
+}
+
+/** Aggregate outcome entries per actorId → evidence stats (dispatch-type entries are ignored). */
+export function actorStats(entries: LedgerEntry[]): Map<string, ActorStat> {
+  const m = new Map<string, ActorStat>();
+  for (const e of entries) {
+    if (e.type !== "outcome" || typeof e.ok !== "boolean") continue;
+    const s = m.get(e.actorId) ?? { n: 0, ok: 0, wilson: 0 };
+    s.n += 1;
+    if (e.ok) s.ok += 1;
+    m.set(e.actorId, s);
+  }
+  for (const s of m.values()) s.wilson = wilsonLower(s.ok, s.n);
+  return m;
+}
+
+/** Deterministic failure signature: actor + sorted top error tokens (recurrence key). */
+export function errorSignature(o: DispatchOutcome): string {
+  const tokens = Array.from(new Set(tokenize(o.error ?? o.summary))).sort().slice(0, 6);
+  return `${o.actorId}:${tokens.join("-")}`;
+}
+
+/** How many past failures share this signature (0 = first time; ≥1 = recurrence → harden + route away). */
+export function detectRecurrence(entries: LedgerEntry[], sig: string): number {
+  return entries.filter((e) => e.type === "outcome" && e.ok === false && e.sig === sig).length;
+}
+
+export interface AssignOpts {
+  /** Evidence from actorStats(ledger) — enables the Contract-Net-lite wilson tie-break. */
+  stats?: Map<string, ActorStat>;
+  /** Actors that already failed this task (OTP restart-ELSEWHERE): never re-dispatched to. */
+  avoid?: string[];
+}
+
+/** Evidence needs n>=3 before it may influence routing (thin evidence bids neutral — never chases noise). */
+const MIN_EVIDENCE_N = 3;
+
 /**
  * Assign a task to the CHEAPEST capable actor: capability match on task.cls (exact tag), then costRank
  * ascending, then chart order (stable). Operators are never auto-assigned (T0 is a human).
- * No capable actor → escalate: route to the conductor if present, else the first non-operator actor,
- * with reason "escalate-no-capable" so callers surface it instead of silently guessing.
+ * v2 (backward-compatible, RESEARCH-ORG.md synthesis):
+ * - opts.stats → within the cheapest cost band, wilson-lower-bound tie-break (reason "evidence-weighted"
+ *   when evidence actually changed the pick). Evidence never routes to a MORE EXPENSIVE band.
+ * - opts.avoid → actors that failed this task are excluded (reason "recurrence-avoid" when the default
+ *   winner was avoided). All capable actors avoided → escalate via the cheapest avoided actor's ladder.
+ * No capable actor at all → conductor (or first non-operator), reason "escalate-no-capable".
  */
-export function assignRole(chart: OrgChart, task: TaskSpec): Assignment {
-  const candidates = chart.actors
+export function assignRole(chart: OrgChart, task: TaskSpec, opts?: AssignOpts): Assignment {
+  const capable = chart.actors
     .filter((a) => a.kind !== "operator" && a.capabilities.includes(task.cls))
     .sort((x, y) => x.costRank - y.costRank);
-  const pick = candidates[0];
-  if (pick) {
-    return {
-      actorId: pick.id, model: pick.model, costRank: pick.costRank,
-      reason: "capability-match", escalatesTo: pick.escalatesTo, knownFaults: pick.knownFaults,
-    };
+  const avoid = new Set(opts?.avoid ?? []);
+  const candidates = capable.filter((a) => !avoid.has(a.id));
+
+  const toAssignment = (a: Actor, reason: Assignment["reason"]): Assignment => ({
+    actorId: a.id, model: a.model, costRank: a.costRank,
+    reason, escalatesTo: a.escalatesTo, knownFaults: a.knownFaults,
+  });
+
+  if (candidates.length > 0) {
+    const band = candidates.filter((a) => a.costRank === candidates[0].costRank);
+    let pick = band[0];
+    let reason: Assignment["reason"] = avoid.size > 0 && capable[0] && avoid.has(capable[0].id)
+      ? "recurrence-avoid"
+      : "capability-match";
+    if (opts?.stats && band.length > 1) {
+      const score = (a: Actor): number => {
+        const s = opts.stats!.get(a.id);
+        return s && s.n >= MIN_EVIDENCE_N ? s.wilson : 0; // thin evidence bids neutral
+      };
+      const best = [...band].sort((x, y) => score(y) - score(x))[0];
+      if (best.id !== pick.id && score(best) > score(pick)) { pick = best; reason = "evidence-weighted"; }
+    }
+    return toAssignment(pick, reason);
   }
+
+  // Every capable actor is avoided → climb the cheapest avoided actor's escalation ladder.
+  if (capable.length > 0) {
+    const ladder = capable[0].escalatesTo;
+    const esc = ladder ? chart.actors.find((a) => a.id === ladder && a.kind !== "operator") : undefined;
+    if (esc) return toAssignment(esc, "recurrence-avoid");
+  }
+
   const fallback = chart.actors.find((a) => a.id === "conductor") ?? chart.actors.find((a) => a.kind !== "operator");
   if (!fallback) throw new Error(`assignRole: no dispatchable actor in chart for class "${task.cls}"`);
-  return {
-    actorId: fallback.id, model: fallback.model, costRank: fallback.costRank,
-    reason: "escalate-no-capable", escalatesTo: fallback.escalatesTo, knownFaults: fallback.knownFaults,
-  };
+  return toAssignment(fallback, capable.length > 0 ? "recurrence-avoid" : "escalate-no-capable");
 }
 
 const STOPWORDS = new Set(["the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "is", "be", "not"]);
@@ -249,21 +329,30 @@ export function faultsAsRules(a: Assignment): PreventionRule[] {
 }
 
 /**
- * Build the worker brief: role header + goal + a verbatim NEVER-REPEAT block. The rules are quoted
- * exactly (no paraphrase) — the brief is the enforcement surface of law #5/#7 (ORGANIZATION.md).
+ * Build the worker brief (MetaGPT-style SOP — RESEARCH-ORG.md §8): role header + goal + a verbatim
+ * NEVER-REPEAT block + optional RELEVANT MEMORY (recalled brain-ledger lessons, injected by the IO
+ * boundary — this module stays pure). The rules are quoted exactly (no paraphrase) — the brief is the
+ * enforcement surface of law #5/#7 (ORGANIZATION.md).
  */
-export function buildDispatchPrompt(chart: OrgChart, a: Assignment, task: TaskSpec, rules: PreventionRule[]): string {
+export function buildDispatchPrompt(
+  chart: OrgChart, a: Assignment, task: TaskSpec, rules: PreventionRule[],
+  lessons?: Array<{ fact: string }>,
+): string {
   const actor = chart.actors.find((x) => x.id === a.actorId);
   const duties = actor?.duties.map((d) => `- ${d}`).join("\n") ?? "";
   const never = rules.length
     ? ["## NEVER REPEAT (prevention rules — violating any of these is a defect)",
        ...rules.map((r) => `- [${r.id}] ${r.rule}`)].join("\n")
     : "## NEVER REPEAT\n- (no matching registered errors for this task)";
+  const memory = lessons && lessons.length
+    ? `## RELEVANT MEMORY (recalled from the brain ledger)\n${lessons.map((l) => `- ${l.fact}`).join("\n")}`
+    : "";
   return [
     `# ROLE: ${actor?.role ?? a.actorId}`,
     duties ? `## DUTIES\n${duties}` : "",
     `## TASK ${task.id}\n${task.goal}`,
     never,
+    memory,
     "## LAWS\n- PROPOSE, don't mutate (gates apply; red reverts)\n- Evidence before claims\n- Report blockers up the chain, never guess",
   ].filter(Boolean).join("\n\n");
 }
@@ -274,8 +363,9 @@ export function buildDispatchPrompt(chart: OrgChart, a: Assignment, task: TaskSp
  */
 export function recordOutcome(
   outcome: DispatchOutcome,
-  opts: { rulesApplied: string[]; nextErrorSeq: number },
+  opts: { rulesApplied: string[]; nextErrorSeq: number; recurrenceCount?: number },
 ): { ledger: LedgerEntry; registryAppend?: ErrorEntryProposal } {
+  const sig = outcome.ok ? undefined : errorSignature(outcome);
   const ledger: LedgerEntry = {
     type: "outcome",
     tier: outcome.ok ? "episodic" : "learned",
@@ -285,9 +375,12 @@ export function recordOutcome(
     ok: outcome.ok,
     summary: outcome.summary,
     rulesApplied: opts.rulesApplied,
+    ...(sig ? { sig } : {}),
   };
   if (outcome.ok) return { ledger };
+  const recurrence = opts.recurrenceCount ?? 0;
   const id = `ERR-ORG-${String(opts.nextErrorSeq).padStart(3, "0")}`;
+  const base = `Before re-dispatching "${outcome.taskId}"-class work to ${outcome.actorId}, address: ${(outcome.error ?? outcome.summary).slice(0, 160)}`;
   return {
     ledger,
     registryAppend: {
@@ -295,11 +388,14 @@ export function recordOutcome(
       ts: outcome.ts,
       file: `dispatch ${outcome.taskId} → ${outcome.actorId}`,
       category: "dispatch",
-      severity: "med",
+      severity: recurrence > 0 ? "high" : "med",
       root_cause: outcome.error ?? outcome.summary,
       evidence: outcome.summary,
-      prevention_rule: `Before re-dispatching "${outcome.taskId}"-class work to ${outcome.actorId}, address: ${(outcome.error ?? outcome.summary).slice(0, 160)}`,
-      recurrence_count: 0,
+      // A recurrence hardens the rule (law #7): same signature seen before → mandatory route-away.
+      prevention_rule: recurrence > 0
+        ? `RECURRENCE ×${recurrence + 1} (${sig}): ${base} — do NOT re-dispatch to ${outcome.actorId}; route via its escalation ladder.`
+        : base,
+      recurrence_count: recurrence,
     },
   };
 }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ollamas management-layer sandbox soak — macOS LaunchAgent (DOC ARTEFAKT).
+  YÜKLENMEZ varsayılan: launchctl load = system değişiklik = T0 (Emre) kararı.
+  StartInterval 3600s (1sa): tam izole 5-round soak (org-sandbox.ts), gerçek repo/ledger'a
+  dokunmaz (fingerprint-guard); RED çıktı = SANDBOX-ORG.md + err.log'da görünür.
+  Yükleme (Emre, tek komut): launchctl load ~/Library/LaunchAgents/com.ollamas.orchestration.org-sandbox.plist
+  (önce: cp orchestration/org-sandbox.plist ~/Library/LaunchAgents/com.ollamas.orchestration.org-sandbox.plist)
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ollamas.orchestration.org-sandbox</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/bin/org-sandbox.ts</string>
+    <string>--rounds</string>
+    <string>5</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/org-sandbox.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/org-sandbox.err.log</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

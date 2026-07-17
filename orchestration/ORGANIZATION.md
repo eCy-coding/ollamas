@@ -33,6 +33,16 @@ organizational patterns, each already latent in the codebase and now made explic
 
 No new frameworks are imported. $0, zero-dep, local-first.
 
+**v2 — academic grounding pass (`RESEARCH-ORG.md`, 10 models surveyed, cited).** Three additional
+idea-adoptions landed in the engine: **Contract-Net-lite** (Smith 1980) — every capable actor
+implicitly bids its ledger evidence (Wilson lower bound of its success rate) and `assignRole` awards
+within the cheapest cost band (thin evidence n<3 bids neutral); **MAPE-K** (Kephart & Chess 2003) —
+the sandbox harness (`bin/org-sandbox.ts`) runs Monitor→Analyze→Plan→Execute rounds over the ledger
+as Knowledge; **OTP restart-elsewhere** — an actor that failed a task is never re-dispatched to it
+(recurrence detection via failure signatures; a second same-signature failure hardens the proposal to
+`RECURRENCE ×N` and forces the escalation ladder). MetaGPT-style SOP briefs (role + duties + verbatim
+rules + recalled memory) are the worker interface.
+
 ## 2. The organization (who does what)
 
 | Actor | Kind | Role | Reports to | Escalates to |

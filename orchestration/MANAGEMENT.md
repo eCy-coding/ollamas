@@ -63,5 +63,35 @@ npx tsx orchestration/bin/calibrate-org.ts                # dispatch ritual e2e 
 tail ~/.ollamas/brain-ledger.jsonl                        # the memory trail exists and grows
 ```
 
-The brain ledger is the adapter for the full 5-tier brain (integrate worktree); after the parent-lane
-ff-merge, `brain-ledger.ts` swaps its backend to `/api/brain/*` — call sites do not change.
+The brain ledger is the adapter for the full 5-tier brain (integrate worktree); when the parent lane
+lands the full brain in main (T0 decision pending — plain ff is no longer possible), `brain-ledger.ts`
+swaps its backend to `/api/brain/*` — call sites do not change.
+
+## v2 — evidence-based routing & never-repeat, made measurable
+
+- **Contract-Net-lite** (`RESEARCH-ORG.md` §1): pass `actorStats(ledger)` into
+  `assignRole(chart, task, { stats })` — within the cheapest cost band the highest Wilson lower bound
+  wins (`reason: "evidence-weighted"`). Evidence never buys an upgrade to a more expensive band, and
+  n<3 bids neutral.
+- **Recurrence route-away** (OTP restart-elsewhere): `errorSignature(outcome)` keys every failure;
+  `detectRecurrence(ledger, sig)` ≥1 → `recordOutcome(..., { recurrenceCount })` hardens the proposal
+  (`RECURRENCE ×N`, severity high) and `assignRole(..., { avoid: failedActorsFor(ledger, taskId) })`
+  makes re-dispatching to the failed actor impossible (`reason: "recurrence-avoid"`).
+- **Memory as input**: the brief's `## RELEVANT MEMORY` block carries `recall(goal, 3)` lessons.
+
+## Sustained sandbox + continuous operation
+
+```bash
+npx tsx orchestration/bin/org-sandbox.ts --rounds 10          # isolated soak — must print ALL GREEN
+npx tsx orchestration/bin/org-sandbox.ts --watch 600          # continuous MAPE-K watcher (foreground)
+```
+
+The sandbox is FULLY isolated (mkdtemp chart+ledger+proposals; fingerprint guard proves the real repo
+and `~/.ollamas` ledger are untouched). Each round injects chaos — actor-down, seeded repeat-failure,
+a deliberate recurrence override — and asserts: route-away from failed/down actors, verbatim rule
+injection from accumulated proposals, recurrence hardening, evidence-weighted routing, monotonic
+ledger growth, unique ERR-ORG ids. Report: `SANDBOX-ORG.md`.
+
+**Always-on (T0-gated):** `orchestration/org-sandbox.plist` is a ready LaunchAgent template
+(label `com.ollamas.orchestration.org-sandbox`, hourly 5-round soak). Activation is Emre's call:
+`cp orchestration/org-sandbox.plist ~/Library/LaunchAgents/com.ollamas.orchestration.org-sandbox.plist && launchctl load ~/Library/LaunchAgents/com.ollamas.orchestration.org-sandbox.plist`.

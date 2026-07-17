@@ -40,7 +40,7 @@ import { resolveTask, type Task } from "./lib/task-catalog";
 import { nextPending, mark, summary, laneSummary, statusOf, type Progress } from "./lib/task-progress";
 import { assignRole, consultErrors, faultsAsRules, recordOutcome, type TaskSpec } from "./lib/organization";
 import { loadOrgChart, loadPreventionRules, nextErrorSeq, proposeErrorEntry } from "./lib/org-io";
-import { remember } from "./lib/brain-ledger";
+import { remember, recall } from "./lib/brain-ledger";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -188,9 +188,11 @@ function orgBrief(state: OrchestraState, slot: string, goalText: string, target:
     const hits = consultErrors([...loadPreventionRules(), ...faultsAsRules(a)], task);
     remember("episodic", `dispatch ${slot} → ${a.actorId} (${state.conductor_model})`,
       { rules: hits.map((h) => h.id), target });
-    return hits.length
+    const lessons = recall(goalText, 3); // memory is a dispatch INPUT (MAPE-K Knowledge), not an archive
+    const memory = lessons.length ? `\n\n## RELEVANT MEMORY (brain ledger)\n${lessons.map((l) => `- ${l.fact}`).join("\n")}` : "";
+    return (hits.length
       ? `\n\n## NEVER REPEAT (prevention rules — violating any of these is a defect)\n${hits.map((r) => `- [${r.id}] ${r.rule}`).join("\n")}`
-      : "";
+      : "") + memory;
   } catch { return ""; }
 }
 
