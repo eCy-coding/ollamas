@@ -16,7 +16,10 @@ const EVENTS_FILE = "task-tracker.events.jsonl";
 const STATE_FILE = "task-tracker.json";
 
 function stateDir(): string {
-  return process.env.ORG_STATE_DIR || join(homedir(), ".ollamas");
+  // Isolation chain: ORG_STATE_DIR (org/sandbox seam) → ORCHESTRA_STATE_DIR (orchestra tests
+  // isolate ONLY this one — without honoring it, a test's enqueueCli leaks a start event into
+  // the REAL tracker; observed live: gate-run vitest wrote "fix the thing" into ~/.ollamas).
+  return process.env.ORG_STATE_DIR || process.env.ORCHESTRA_STATE_DIR || join(homedir(), ".ollamas");
 }
 
 /** Replay the whole event log (tolerant: bad lines skipped). Null when no events yet. */

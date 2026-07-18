@@ -92,6 +92,20 @@ describe("applyEvent replay", () => {
     expect(s.title).toBe("(unknown run)");
     expect(s.tokensOut).toBe(5);
   });
+  it("stamped event for a DIFFERENT run is dropped (concurrent producers never cross-pollute)", () => {
+    let s = applyEvent(null, { type: "start", ts: T0, runId: "ollamas:task-A", title: "A", source: "ollamas", items: [{ id: "x", label: "x" }] })!;
+    s = applyEvent(s, { type: "item", ts: iso(1), runId: "ollamas:task-B", id: "x", status: "done" }); // stale B event
+    expect(s.items[0].status).toBe("pending"); // untouched
+    s = applyEvent(s, { type: "item", ts: iso(2), runId: "ollamas:task-A", id: "x", status: "done" }); // own event
+    expect(s.items[0].status).toBe("done");
+    s = applyEvent(s, { type: "finish", ts: iso(3), runId: "ollamas:task-B" });
+    expect(s.finished).toBe(false); // foreign finish dropped
+  });
+  it("unstamped events keep last-run semantics (shell producers)", () => {
+    let s = applyEvent(null, { type: "start", ts: T0, runId: "r1", title: "A", source: "ecym" })!;
+    s = applyEvent(s, { type: "note", ts: iso(1), note: "n" });
+    expect(s.note).toBe("n");
+  });
 });
 
 describe("rendering", () => {

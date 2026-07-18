@@ -28,11 +28,11 @@ export interface TrackerState {
 
 export type TrackerEvent =
   | { type: "start"; ts: string; runId: string; title: string; source: TrackerState["source"]; items?: Array<{ id: string; label: string }> }
-  | { type: "items"; ts: string; items: Array<{ id: string; label: string }> }
-  | { type: "item"; ts: string; id: string; status: ItemStatus; label?: string }
-  | { type: "tokens"; ts: string; n: number }
-  | { type: "note"; ts: string; note: string; phase?: string }
-  | { type: "finish"; ts: string };
+  | { type: "items"; ts: string; runId?: string; items: Array<{ id: string; label: string }> }
+  | { type: "item"; ts: string; runId?: string; id: string; status: ItemStatus; label?: string }
+  | { type: "tokens"; ts: string; runId?: string; n: number }
+  | { type: "note"; ts: string; runId?: string; note: string; phase?: string }
+  | { type: "finish"; ts: string; runId?: string };
 
 export function startRun(
   title: string, source: TrackerState["source"],
@@ -77,10 +77,14 @@ export function finishRun(s: TrackerState, ts: string): TrackerState {
   return { ...s, finished: true, updatedAt: ts };
 }
 
-/** Fold one event into state. `state=null` only accepts a "start"; other events on null are dropped
- *  to an empty placeholder run (tolerant replay — a truncated log must never crash the viewer). */
+/** Fold one event into state. `state=null` only accepts a "start"; other events on null fold into a
+ *  placeholder run (tolerant replay — a truncated log must never crash the viewer). A non-start event
+ *  STAMPED with a runId that does not match the current run is DROPPED — concurrent producers (daemon
+ *  vs manual tick vs ecym) must not cross-pollute each other's runs. Unstamped events keep the old
+ *  last-run semantics (shell producers). */
 export function applyEvent(state: TrackerState | null, ev: TrackerEvent): TrackerState {
   if (ev.type === "start") return startRun(ev.title, ev.source, ev.items ?? [], ev.ts, ev.runId);
+  if (state && ev.runId && ev.runId !== state.runId) return state; // stale producer — drop
   const s = state ?? startRun("(unknown run)", "ollamas", [], ev.ts);
   switch (ev.type) {
     case "items": return setItems(s, ev.items, ev.ts);

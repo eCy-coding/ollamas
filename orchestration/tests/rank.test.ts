@@ -15,6 +15,15 @@ describe("severityWeight / boostSeverity", () => {
     expect(severityWeight("blocker")).toBeGreaterThan(severityWeight("high"));
     expect(severityWeight("low")).toBeGreaterThan(severityWeight("info"));
   });
+  // orchestration-rank (catalog): her Severity → tam ağırlık eşlemesi (ORDER index+1 sözleşmesi).
+  // Attribution: claude-conductor (model-blocked escalation — 30b test yerine unused export üretti).
+  it("her Severity kendi ağırlığına eşlenir (info=1 … blocker=5)", () => {
+    expect(severityWeight("info")).toBe(1);
+    expect(severityWeight("low")).toBe(2);
+    expect(severityWeight("med")).toBe(3);
+    expect(severityWeight("high")).toBe(4);
+    expect(severityWeight("blocker")).toBe(5);
+  });
   it("boost bir seviye yükseltir, blocker'da tavanlanır", () => {
     expect(boostSeverity("med")).toBe("high");
     expect(boostSeverity("blocker")).toBe("blocker");

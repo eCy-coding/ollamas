@@ -211,31 +211,42 @@ const FSM_ITEMS = [
   { id: "GATE", label: "Gate (tsc+test) + kayıt" },
 ];
 
+/** Deterministic run id per task — every producer working on the same task stamps the same run, so
+ *  concurrent producers (daemon tick vs manual --once vs tests) can never cross-pollute runs. */
+const runIdForTask = (task: string): string => `ollamas:${task}`;
+
 function trkStart(task: string): void {
   try {
     resetRun();
     emitEvent({
-      type: "start", ts: new Date().toISOString(), runId: `ollamas-${Date.now()}`,
+      type: "start", ts: new Date().toISOString(), runId: runIdForTask(task),
       title: `"${task}" işleniyor`, source: "ollamas",
       items: [{ id: `task:${task}`, label: `Görev: ${task}` }, ...FSM_ITEMS],
     });
   } catch { /* best-effort */ }
 }
 
-function trkPhase(phase: string, note: string): void {
+function trkPhase(phase: string, note: string, task?: string | null): void {
   try {
     const ts = new Date().toISOString();
+    const runId = task ? runIdForTask(task) : undefined;
     const idx = FSM_ITEMS.findIndex((f) => f.id === phase);
     if (idx >= 0) {
-      for (let i = 0; i < idx; i++) emitEvent({ type: "item", ts, id: FSM_ITEMS[i].id, status: "done" as ItemStatus });
-      emitEvent({ type: "item", ts, id: phase, status: "active" as ItemStatus });
+      for (let i = 0; i < idx; i++) emitEvent({ type: "item", ts, runId, id: FSM_ITEMS[i].id, status: "done" as ItemStatus });
+      emitEvent({ type: "item", ts, runId, id: phase, status: "active" as ItemStatus });
     }
-    emitEvent({ type: "note", ts, note, phase });
+    emitEvent({ type: "note", ts, runId, note, phase });
   } catch { /* best-effort */ }
 }
 
-function trkEvent(ev: { type: "item"; id: string; status: ItemStatus } | { type: "tokens"; n: number } | { type: "note"; note: string } | { type: "finish" }): void {
-  try { emitEvent({ ...ev, ts: new Date().toISOString() } as Parameters<typeof emitEvent>[0]); } catch { /* best-effort */ }
+function trkEvent(
+  ev: { type: "item"; id: string; status: ItemStatus } | { type: "tokens"; n: number } | { type: "note"; note: string } | { type: "finish" },
+  task?: string | null,
+): void {
+  try {
+    const runId = task ? runIdForTask(task) : undefined;
+    emitEvent({ ...ev, ts: new Date().toISOString(), ...(runId ? { runId } : {}) } as Parameters<typeof emitEvent>[0]);
+  } catch { /* best-effort */ }
 }
 
 async function repairPropose(state: OrchestraState): Promise<void> {
@@ -254,11 +265,11 @@ async function repairPropose(state: OrchestraState): Promise<void> {
   if (!slot) { log("  ↳ REPAIR: no grounded target (catalog/FOCUS) — skip"); return; }
   if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${slot} (${target})`); return; }
 
-  trkPhase("REPAIR", `${slot} için ${state.conductor_model} grounded proposal üretiyor`);
+  trkPhase("REPAIR", `${slot} için ${state.conductor_model} grounded proposal üretiyor`, slot);
   try {
     const prompt = groundedPrompt(goalText + orgBrief(state, slot, goalText, target), target, content);
     const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: REPAIR_MS, num_ctx: 8192 });
-    trkEvent({ type: "tokens", n: Math.round((r.tokS * r.ms) / 1000) || Math.round(r.text.length / 4) });
+    trkEvent({ type: "tokens", n: Math.round((r.tokS * r.ms) / 1000) || Math.round(r.text.length / 4) }, slot);
     if (!hasSearchReplace(r.text)) {
       log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`);
       try { remember("episodic", `outcome ${slot}: no actionable SEARCH/REPLACE (transient, retry)`, { ok: false }); } catch { /* best-effort */ }
@@ -270,19 +281,19 @@ async function repairPropose(state: OrchestraState): Promise<void> {
     if (catalogId) saveProgress(mark(loadProgress(), catalogId, "proposed"));
     log(`  ↳ REPAIR: ${state.conductor_model} → ${slot}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
     orgRecordOutcome(slot, true, `PROPOSAL written by ${state.conductor_model}`);
-    trkEvent({ type: "item", id: "REPAIR", status: "done" });
-    trkEvent({ type: "note", note: `${slot} PROPOSAL hazır${APPLY ? " — gate koşuyor" : " (apply kapalı)"}` });
+    trkEvent({ type: "item", id: "REPAIR", status: "done" }, slot);
+    trkEvent({ type: "note", note: `${slot} PROPOSAL hazır${APPLY ? " — gate koşuyor" : " (apply kapalı)"}` }, slot);
     if (APPLY) {
       try {
         const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(slot)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
         if (catalogId) saveProgress(mark(loadProgress(), catalogId, "done")); // gated apply landed green → done
         log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
         orgRecordOutcome(slot, true, "gated apply landed green");
-        trkEvent({ type: "item", id: "GATE", status: "done" });
+        trkEvent({ type: "item", id: "GATE", status: "done" }, slot);
       } catch (e) {
         log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`);
         orgRecordOutcome(slot, false, "gate red → reverted", (e as Error).message.slice(0, 160));
-        trkEvent({ type: "item", id: "GATE", status: "failed" });
+        trkEvent({ type: "item", id: "GATE", status: "failed" }, slot);
       }
     }
   } catch (e) {
@@ -364,8 +375,8 @@ async function tick(): Promise<OrchestraState> {
   // Clear a completed current_task (proposed/done) so the loop advances (drain picks the next pending below).
   if (curDone) {
     log(`  ↳ görev tamam: ${curTask!.id} (${statusOf(loadProgress(), curTask!.id)}) → sıradaki`);
-    trkEvent({ type: "item", id: `task:${state.current_task}`, status: "done" });
-    trkEvent({ type: "finish" });
+    trkEvent({ type: "item", id: `task:${state.current_task}`, status: "done" }, state.current_task);
+    trkEvent({ type: "finish" }, state.current_task);
     state = { ...state, current_task: null };
   }
   // G2 (STEP 2 wiring): leaving COUNCIL_DEBATE with an explicit council HOLD and nothing forcing work
@@ -384,7 +395,7 @@ async function tick(): Promise<OrchestraState> {
   }
   if (shouldResetRetry(next)) state.retry_count = 0;
   if (next === "COUNCIL_DEBATE" || next === "BENCHMARK_VALIDATION") {
-    trkPhase(next, next === "COUNCIL_DEBATE" ? "Konsey görevi değerlendiriyor" : "Benchmark sinyalleri doğrulanıyor");
+    trkPhase(next, next === "COUNCIL_DEBATE" ? "Konsey görevi değerlendiriyor" : "Benchmark sinyalleri doğrulanıyor", state.current_task ?? state.pending_actions[0]);
   }
   if (next === "COUNCIL_DEBATE" && state.pending_actions.length) state = dequeueTask(state);
   state.history = pruneHistory(state.history, { ts, phase: next, note: `action=${actionTier ?? "clean"}${isBlocking(actionTier) ? "!" : ""} conv=${converged ? 1 : 0}` });
