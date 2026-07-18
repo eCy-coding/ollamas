@@ -583,6 +583,58 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     selftest: () =>
       expectThat(existsSync(path.join(process.cwd(), "scripts/brain-services.ts")), "runner present", "runner missing"),
   },
+  {
+    id: "e2e-proof", kind: "io", role: "master proof: one synthetic signal through EVERY layer", deps: ["brain-bus", "memory-store", "fact-store", "portable", "consistency"],
+    source: "server/brain-services.ts",
+    selftest: async () => {
+      // Full chain on a THROWAWAY store, selftest ns only (production memory is
+      // never touched): bus emit → subscriber fold → store write (redaction gate
+      // live on the path) → hybrid recall → fact assert → export/restore →
+      // consistency-clean. Any broken layer breaks this one test.
+      const { registerBrainSubscribers } = await import("./brain-subscribers");
+      const { emit } = await import("./brain-bus");
+      const { exportBrain } = await import("./brain-portable");
+      const { checkConsistencyAt } = await import("./brain-consistency");
+      const dbPath = tmpDb();
+      const b = createBrainStore({ dbPath, embed: fakeEmbed, embedProvider: "selftest-fake" });
+      let subs: import("./brain-subscribers").BrainSubscribers;
+      try {
+        subs = registerBrainSubscribers(
+          {
+            remember: (m) => b.remember({ ...m, ns: "selftest" }),
+            assertFact: (f) => b.assertFact({ ...f, ns: "selftest" }),
+          },
+          { champion: () => "e2e-model" },
+          { intervalMs: 1e9 },
+        );
+      } catch (e) {
+        b.close();
+        return { ok: false, evidence: `subscribers busy: ${(e as Error).message}` };
+      }
+      try {
+        const token = "ghp_" + "z9Y8x7W6v5U4t3S2r1Q0p9O8n7M6l5K4j3I2";
+        emit({ type: "tool.outcome", source: "e2e", at: Date.now(), payload: { tool: `probe ${token}`, ok: true } });
+        await new Promise((r) => setTimeout(r, 0));
+        const flush = await subs.flushNow();
+        const hits = await b.recall("tool probe", { k: 3, ns: "selftest" });
+        const masked = hits.length > 0 && hits.every((h) => !h.content.includes(token));
+        const facts = b.factsAbout("ollamas", { ns: "selftest" });
+        const dump = exportBrain(dbPath);
+        const clean = checkConsistencyAt(dbPath);
+        const ok =
+          flush.tools === 1 && flush.polledFacts === 1 && hits.length > 0 && masked &&
+          facts.some((f) => f.object === "e2e-model") && dump.memories.length >= 1 && clean.total === 0 && !clean.error;
+        return expectThat(
+          ok,
+          "bus→fold→write(redacted)→recall→fact→export→consistency ALL green",
+          `flush=${JSON.stringify(flush)} hits=${hits.length} masked=${masked} facts=${facts.length} clean=${clean.total}`,
+        );
+      } finally {
+        subs.stop();
+        b.close();
+      }
+    },
+  },
 ];
 
 export interface RegistryValidation {

@@ -5,10 +5,11 @@ import { describe, test, expect } from "vitest";
 import { BRAIN_SERVICES, validateBrainRegistry, registrySummary } from "../server/brain-services";
 
 describe("brain service registry (S27)", () => {
-  test("structure: unique ids, resolvable deps", () => {
-    const v = validateBrainRegistry(BRAIN_SERVICES);
+  test("structure: EXACTLY 50 services, unique ids, resolvable deps", () => {
+    const v = validateBrainRegistry(BRAIN_SERVICES, { expectCount: 50 });
     expect(v.problems).toEqual([]);
     expect(v.ok).toBe(true);
+    expect(BRAIN_SERVICES).toHaveLength(50);
   });
 
   test("expectCount contract catches a wrong total", () => {

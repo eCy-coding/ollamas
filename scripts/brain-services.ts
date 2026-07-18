@@ -14,7 +14,7 @@ async function main() {
   const list = process.argv.includes("--list");
   const offline = process.argv.includes("--offline") || process.env.OFFLINE === "1";
 
-  const v = validateBrainRegistry(BRAIN_SERVICES);
+  const v = validateBrainRegistry(BRAIN_SERVICES, { expectCount: 50 });
   if (!v.ok) {
     console.error(JSON.stringify({ event: "brain.services.invalid", problems: v.problems }));
     process.exit(1);

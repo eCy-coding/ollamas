@@ -1,4 +1,9 @@
-# BRAIN-SERVICES — 25 Kritik Servisin Kataloğu (tek gerçeklik kaynağı)
+# BRAIN-SERVICES — 50 Kritik Servisin Kataloğu (tek gerçeklik kaynağı)
+
+> **50-servis kontratı:** `server/brain-services.ts` registry'si TAM 50 servis beyan eder
+> (`validateBrainRegistry {expectCount:50}`); her biri canlılığını KANITLAYAN bir selftest taşır.
+> Koşucu: `make brain-services` (OFFLINE=1 :3000 probe'larını atlar) — kırmızıda exit 1.
+> S26-S50 entegrasyon katmanı aşağıda §S26-S50'de.
 
 > Mimari karar (T0, 2026-07-18): 25 servis **modüler in-process** — tek server (:3000) +
 > mevcut launchd daemon'ları arkasında tanımlı-kontratlı modüller. 25 ayrı daemon
@@ -55,7 +60,39 @@
 | S24 | brain-redact | `server/brain-redact.ts` — `rememberOne` TEK enforcement noktası (tüm yazım yolları); repo-geneli gitleaks/secretlint kuralları yeniden kullanılır; enforce=maskeli persist+embed / report / 0; `BRAIN_REDACT_EMAIL=1` | tests/brain-redact.test.ts; log `brain.redact` |
 | S25 | brain-consistency | `server/brain-consistency.ts` — rapor-only invariant bekçisi: canlı-fact tekilliği, vec/fts sync (bağlantı sqlite-vec YÜKLEMELİ — düz bağlantı vec0 okuyamaz), case-variant özneler; maintain'e binmiş, exit 0 kalır; `BRAIN_CONSISTENCY=0` | `make brain-check` |
 
-## Destek yüzeyleri (25 sayımı dışında)
+## §S26-S50 — Entegrasyon katmanı (brain ↔ TÜM ollamas, 2026-07-18 ikinci tur)
+
+**Belirleyici kural:** kaynakta dayanıklı depo yoksa (callback/geçiş/pure-sonuç) sinyal ANINDA kaybolur → S26 bus üstünden event-driven agregat; dayanıklı kaynaklar (jsonl/katalog/db/policy-dosyası) gece maintain'de cursor'lı batch. Tüm yazımlar store choke-point'inden (redaction+AUDN+ns-jail), `ops` ns'e (chat/org kirlenmez), `deterministicId` + günlük `budgetAllow` ile.
+
+| # | Servis | Kontrat |
+|---|---|---|
+| S26 | brain-bus | tipli pub/sub; emit asla throw/blok etmez; `getBusStats` dead-letter görünürlüğü |
+| S27 | service-registry | ServiceSpec[50], validate unique/deps/tam-50 |
+| S28 | services-runner | `make brain-services` — selftest sweep, exit-1-on-red |
+| S29 | seyir-ingest | jsonl byte-cursor tail → episodic (telemetri-gürültüsü filtreli) |
+| S30 | tool-outcome | onUsage → GÜNLÜK tool-başına procedural (bin çağrı = 1 satır) |
+| S31 | error-memory | recordError emit → signature-dedup günlük learned |
+| S32 | provider-facts | key-health snapshot POLL → yalnız-değişim fact |
+| S33 | council-memory | scoreCouncil emit → model-başına günlük learned ortalama |
+| S34 | job-outcome | job record emit → günlük episodic rollup |
+| S35 | upstream-facts | MCP supervisor snapshot POLL → durum fact'leri |
+| S36 | kev-facts | KEV katalog delta (seen-set sınırlı) → fact |
+| S37 | champion-fact | şampiyon POLL → supersede'li fact |
+| S38 | hierarchy-snapshot | policy dosyası content-hash değişiminde → procedural |
+| S39 | recall-api | `POST /api/brain/recall` dış sorgu yüzeyi |
+| S40 | facts-api | `GET /api/brain/facts?subject&at` bi-temporal sorgu |
+| S41 | rag-bridge | rag_docs → konu fact'leri (seen-set) |
+| S42 | session-link | source=sessionId sorgusu — `GET /api/brain/session/:id` + distill emit |
+| S43 | tenant-seed | tenant create → kendi ns'ine core tohum + ops fact |
+| S44 | align-memory | verifier verdict emit → günlük learned |
+| S45 | bus-metrics | bus event/handled/failed/denied gauge'ları /metrics'te |
+| S46 | ingest-budget | kaynak-başına günlük yazım bütçesi (BRAIN_INGEST_BUDGET) |
+| S47 | restore-drill | haftalık DR kanıtı: dump→throwaway-restore→recall smoke |
+| S48 | pressure-governor | db/episodic/cache bütçe izleme → rapor-only öneri |
+| S49 | xns-recall | admin cross-ns (env+loopback çift kilit; kullanım fact'lenir) |
+| S50 | e2e-proof | usta selftest: bus→fold→write(redacted)→recall→fact→export→consistency tek zincirde |
+
+## Destek yüzeyleri (50 sayımı dışında)
 semantic-cache (LLM-yanıt katmanı, `SEMANTIC_CACHE=1` + near-miss telemetri) · brain-sync-registry (PROBLEM_REGISTRY→learned) · maintain-orkestratörü (launchd 04:00, sıra: consolidate→sweep→health→consistency→mrr→backup) · MCP-gate (`BRAIN_MCP_EXPOSE`) · tenant-ns-jail (`brainNs`) · git-hook zinciri (paylaşımlı gate korunur).
 
 ## Bilinen sınırlar (dürüstlük)
