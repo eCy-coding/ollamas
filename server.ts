@@ -3976,6 +3976,14 @@ app.post("/api/brain/recall", async (req, res) => {
       }),
     ]);
     if (bounded === null) return res.status(503).json({ error: "embedder busy — retry shortly" });
+    // Tur-6 shadow evaluation: a sampled counterfactual arm (graphExpand flipped)
+    // re-ranks the same query async and logs ranking agreement (RBO). GPU-polite,
+    // fire-and-forget — the response above never waits on it.
+    if (!graphExpand) {
+      void import("./server/brain-shadow").then(({ maybeShadowEval }) =>
+        maybeShadowEval(query, bounded, (q, o) => brain.brainRecall(q, { ...o, ns })),
+      ).catch(() => {});
+    }
     res.json({ hits: bounded });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "brain recall failed" });

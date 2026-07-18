@@ -363,3 +363,38 @@ describe("Brain — belief revision (Tur-5: negation supersedes contradicted mem
     }
   });
 });
+
+describe("Brain — shadow evaluation (Tur-6: counterfactual recall telemetry)", () => {
+  test("rbo: identical ranking → 1, disjoint → 0, partial overlap in between", async () => {
+    const { rbo } = await import("./brain-shadow");
+    expect(rbo(["a", "b", "c"], ["a", "b", "c"])).toBeCloseTo(1, 5);
+    expect(rbo(["a", "b"], ["x", "y"])).toBe(0);
+    const partial = rbo(["a", "b", "c"], ["a", "x", "y"]);
+    expect(partial).toBeGreaterThan(0);
+    expect(partial).toBeLessThan(1);
+    expect(rbo([], [])).toBe(1); // two empty rankings agree vacuously
+  });
+
+  test("maybeShadowEval: samples, skips under GPU load, logs rbo of the counterfactual arm", async () => {
+    const { maybeShadowEval } = await import("./brain-shadow");
+    const live = [{ id: "a" }, { id: "b" }];
+    const alt = [{ id: "b" }, { id: "a" }];
+    const calls: any[] = [];
+    const events: any[] = [];
+    const shadowRecall = async (_q: string, opts: any) => { calls.push(opts); return alt as any; };
+    // GPU busy → never runs, regardless of sampling
+    await maybeShadowEval("q", live as any, shadowRecall, { rate: 1, rng: () => 0, llmActive: () => true, emit: (e) => events.push(e) });
+    expect(calls).toHaveLength(0);
+    // idle + sampled → runs the counterfactual arm and emits rbo
+    await maybeShadowEval("q", live as any, shadowRecall, { rate: 1, rng: () => 0, llmActive: () => false, emit: (e) => events.push(e) });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].graphExpand).toBe(true); // counterfactual flips the graph arm
+    expect(events).toHaveLength(1);
+    expect(events[0].event).toBe("brain.shadow");
+    expect(events[0].rbo).toBeGreaterThan(0);
+    expect(events[0].rbo).toBeLessThan(1);
+    // not sampled → skipped silently
+    await maybeShadowEval("q", live as any, shadowRecall, { rate: 0.01, rng: () => 0.9, llmActive: () => false, emit: (e) => events.push(e) });
+    expect(calls).toHaveLength(1);
+  });
+});
