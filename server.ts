@@ -1330,33 +1330,6 @@ async function initializeServer() {
     res.json(getTraceSnapshot());
   });
 
-  // Brain (ported from integrate-wt, B-pattern): read-only overview bundle for the
-  // admin panel / BrainPanel — stats + recent memories + live/superseded facts +
-  // drift-probe health. Local-owner surface.
-  app.get("/api/brain/overview", async (req, res) => {
-    try {
-      const recent = Math.min(Math.max(Number(req.query.recent) || 20, 1), 100);
-      const { brainOverview } = await import("./server/brain");
-      res.json(await brainOverview({ recent }));
-    } catch (err: any) {
-      res.status(500).json({ error: err?.message || "brain overview failed" });
-    }
-  });
-
-  // Brain entity graph — reified S-P-O facts as nodes/edges with degree centrality,
-  // for the live brain map (docs/BRAIN-ENGINE.md). ?limit caps nodes; ?at gives a
-  // historical snapshot (bi-temporal).
-  app.get("/api/brain/graph", async (req, res) => {
-    try {
-      const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
-      const at = req.query.at !== undefined ? Number(req.query.at) : undefined;
-      const { brainGraph } = await import("./server/brain");
-      res.json(await brainGraph({ limit, at }));
-    } catch (err: any) {
-      res.status(500).json({ error: err?.message || "brain graph failed" });
-    }
-  });
-
   // Distill a stored session into durable memories/facts on demand.
   app.post("/api/brain/distill/:id", async (req, res) => {
     const sess = (db.data.sessions || []).find(s => s.id === req.params.id);
@@ -1377,19 +1350,6 @@ async function initializeServer() {
       res.json({ sessionId: sess.id, ...out });
     } catch (err: any) {
       res.status(502).json({ error: err?.message || "distill failed" });
-    }
-  });
-
-  // Brain write choke-point for out-of-process producers (org conductor mirror,
-  // one-shot imports). Same contract as brainRemember: explicit ids are idempotent
-  // upserts, auto-ids go through AUDN dedup; createdAt lets imports keep event time.
-  app.post("/api/brain/remember", async (req, res) => {
-    try {
-      const { id, tier, content, source, ns, createdAt } = req.body || {};
-      const { brainRemember } = await import("./server/brain");
-      res.json(await brainRemember({ id, tier, content, source, ns, createdAt }));
-    } catch (err: any) {
-      res.status(400).json({ error: err?.message || "brain remember failed" });
     }
   });
 
@@ -3867,6 +3827,111 @@ $('badges').innerHTML=b.join('');
 $('actors').innerHTML=(d.actors||[]).map(a=>{const lvl=a.authority||'none';
 return '<tr><td><b>'+esc(a.id)+'</b></td><td>'+esc(a.kind)+'</td><td>'+esc(a.role)+'</td><td>r'+a.costRank+'</td><td><span class="auth '+esc(lvl)+'" title="'+esc(a.authorityReason||'')+'">'+esc(lvl)+'</span></td><td>'+(a.wilson==null?'—':a.wilson.toFixed(2))+'</td><td>'+(a.n==null?'—':a.n)+'</td></tr>';}).join('');
 $('ledger').innerHTML=(d.ledgerTail||[]).slice().reverse().map(r=>'<div class="rec '+esc(r.tier)+'"><div class="t">'+esc(r.ts)+' · '+esc(r.tier)+'</div>'+esc(r.fact)+'</div>').join('')||'<div class="rec">ledger boş</div>';
+}catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>';}}
+load();setInterval(load,15000);
+</script></body></html>`);
+});
+
+// ----------------------------------------------------
+// BRAIN surface — module top level like /org (the /org lesson: routes inside
+// initializeServer are unreachable for OLLAMAS_NO_AUTOBOOT in-process tests).
+// ----------------------------------------------------
+
+// Read-only overview bundle: stats + recent memories + live/superseded facts +
+// drift-probe health. Local-owner surface.
+app.get("/api/brain/overview", async (req, res) => {
+  try {
+    const recent = Math.min(Math.max(Number(req.query.recent) || 20, 1), 100);
+    const { brainOverview } = await import("./server/brain");
+    res.json(await brainOverview({ recent }));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain overview failed" });
+  }
+});
+
+// Brain entity graph — reified S-P-O facts as nodes/edges with degree centrality,
+// for the live brain map (docs/BRAIN-ENGINE.md). ?limit caps nodes; ?at gives a
+// historical snapshot (bi-temporal).
+app.get("/api/brain/graph", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+    const at = req.query.at !== undefined ? Number(req.query.at) : undefined;
+    const { brainGraph } = await import("./server/brain");
+    res.json(await brainGraph({ limit, at }));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain graph failed" });
+  }
+});
+
+// Brain write choke-point for out-of-process producers (org conductor mirror,
+// one-shot imports). Same contract as brainRemember: explicit ids are idempotent
+// upserts, auto-ids go through AUDN dedup; createdAt lets imports keep event time.
+app.post("/api/brain/remember", async (req, res) => {
+  try {
+    const { id, tier, content, source, ns, createdAt } = req.body || {};
+    const { brainRemember } = await import("./server/brain");
+    res.json(await brainRemember({ id, tier, content, source, ns, createdAt }));
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || "brain remember failed" });
+  }
+});
+
+// BRAIN panel (G3) — read-only introspection over /api/brain/overview + /api/brain/graph,
+// same self-contained inline-HTML shape as /org (module top level: reachable under
+// OLLAMAS_NO_AUTOBOOT=1 in-process tests, no vite/frontend build involved).
+app.get("/brain", (_req, res) => {
+  res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>BRAIN · 5-Tier Hafıza · ollamas</title><style>
+:root{--bg:#050A14;--surf:#0D1B2E;--raised:#132338;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--violet:#7B5EA7;--ok:#00C896;--warn:#F5A623;--bad:#FF5470}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:30px 18px}
+main{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#00C896,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;color:#050A14}
+h1{font-size:20px;margin:0}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:11px}
+label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{font:700 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 12px;border:1px solid var(--line);background:var(--raised)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}
+.tiers{display:flex;gap:8px;flex-wrap:wrap}.tier{flex:1;min-width:100px;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+.tier b{font-size:20px;display:block}.tier span{font-size:10.5px;color:var(--fg2);text-transform:uppercase}
+.mems{max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.rec{background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:11.5px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
+.rec .t{color:var(--fg2);font-size:10px}.rec.learned{border-color:var(--violet)}.rec.core{border-color:var(--cyan)}
+svg{width:100%;height:auto;background:var(--raised);border-radius:8px}
+table{width:100%;border-collapse:collapse;font:12.5px/1.5 ui-monospace,monospace}
+td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05)}td.p{color:var(--fg2)}
+footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center}
+</style></head><body><main>
+<header><div class="logo">B</div><div><h1>BRAIN — 5-Tier Hafıza + Bi-temporal Graf</h1><div class="sub">core → learned → procedural → episodic → working · hybrid RRF recall · auto retain/distill</div></div></header>
+<div class="card"><label>Sağlık / Boyut</label><div class="badges" id="badges">yükleniyor…</div></div>
+<div class="card"><label>Tier Dağılımı</label><div class="tiers" id="tiers"></div></div>
+<div class="card"><label>Entity Graf (canlı fact'ler · degree ∝ boyut)</label><div id="graph"></div></div>
+<div class="card"><label>Canlı Fact'ler</label><div style="overflow-x:auto"><table><tbody id="facts"></tbody></table></div></div>
+<div class="card"><label>Son Hafızalar</label><div class="mems" id="mems"></div></div>
+<footer>/api/brain/overview · /api/brain/graph · bakım: launchd brain-maintain 04:00 (sweep→consolidate→health→backup)</footer>
+</main><script>
+const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/</g,"&lt;");
+function drawGraph(g){const ns=(g.nodes||[]).slice(0,40),es=(g.edges||[]).filter(e=>ns.find(n=>n.id===e.source)&&ns.find(n=>n.id===e.target));
+if(!ns.length){$('graph').innerHTML='<div class="rec">graf boş</div>';return}
+const W=900,H=480,cx=W/2,cy=H/2;ns.sort((a,b)=>b.degree-a.degree);const hub=ns[0],rest=ns.slice(1);
+const pos={};pos[hub.id]=[cx,cy];rest.forEach((n,i)=>{const a=2*Math.PI*i/rest.length;const r=150+((i%3)*45);pos[n.id]=[cx+r*Math.cos(a),cy+r*0.72*Math.sin(a)];});
+let s='<svg viewBox="0 0 '+W+' '+H+'">';
+for(const e of es){const p1=pos[e.source],p2=pos[e.target];if(!p1||!p2)continue;
+s+='<line x1="'+p1[0]+'" y1="'+p1[1]+'" x2="'+p2[0]+'" y2="'+p2[1]+'" stroke="'+(e.live?'#00C896':'#536882')+'" stroke-width="1" '+(e.live?'':'stroke-dasharray="4 3" ')+'opacity=".55"><title>'+esc(e.predicate)+'</title></line>';}
+for(const n of ns){const p=pos[n.id],r=5+2.2*Math.sqrt(n.degree);
+s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+(n.live?'#00D4FF':'#536882')+'" opacity=".9"><title>'+esc(n.label)+' (degree '+n.degree+')</title></circle>';
+s+='<text x="'+p[0]+'" y="'+(p[1]-r-4)+'" text-anchor="middle" fill="#F0F4FF" font-size="10.5" font-family="ui-monospace,monospace">'+esc(String(n.label).slice(0,20))+'</text>';}
+$('graph').innerHTML=s+'</svg>';}
+async function load(){try{const[o,g]=await Promise.all([fetch('/api/brain/overview?recent=30').then(r=>r.json()),fetch('/api/brain/graph?limit=60').then(r=>r.json())]);
+const h=o.health||{},b=[];
+b.push('<span class="badge '+(h.drift?'bad':'ok')+'">self-hit: '+Math.round((h.selfHitRate??0)*100)+'% · '+(h.drift?'DRIFT':'sağlıklı')+' ('+h.probes+' probe)</span>');
+const tot=Object.values(o.stats.memories||{}).reduce((a,c)=>a+c,0);
+b.push('<span class="badge dim">'+tot+' hafıza · '+o.stats.facts+' canlı fact · '+o.stats.namespaces+' ns</span>');
+b.push('<span class="badge dim">db: '+(o.stats.dbBytes/1048576).toFixed(1)+' MB</span>');
+$('badges').innerHTML=b.join('');
+$('tiers').innerHTML=['core','learned','procedural','episodic','working'].map(t=>'<div class="tier"><b>'+(o.stats.memories[t]||0)+'</b><span>'+t+'</span></div>').join('');
+drawGraph(g);
+$('facts').innerHTML=(o.facts||[]).map(f=>'<tr><td><b>'+esc(f.subject)+'</b></td><td class="p">'+esc(f.predicate)+'</td><td>'+esc(f.object)+'</td></tr>').join('')||'<tr><td>fact yok</td></tr>';
+$('mems').innerHTML=(o.memories||[]).map(m=>'<div class="rec '+esc(m.tier)+'"><div class="t">'+esc(m.tier)+' · hit '+m.hits+' · '+new Date(m.createdAt).toLocaleString('tr-TR')+'</div>'+esc(String(m.content).slice(0,300))+'</div>').join('')||'<div class="rec">hafıza yok</div>';
 }catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>';}}
 load();setInterval(load,15000);
 </script></body></html>`);
