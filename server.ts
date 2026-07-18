@@ -3863,6 +3863,19 @@ app.get("/api/brain/graph", async (req, res) => {
   }
 });
 
+// S21 brain gauges on /metrics (module top level like the brain routes; NO_AUTOBOOT
+// in-process tests scrape them too). stats runs lazily inside collect() at scrape
+// time — the brain db opens on first scrape, never at boot. Best-effort wiring.
+void (async () => {
+  try {
+    const { brainStats } = await import("./server/brain");
+    const { registerBrainMetrics } = await import("./server/brain-metrics");
+    registerBrainMetrics({ stats: brainStats });
+  } catch (e: any) {
+    console.warn(`[brain] metrics wiring skipped (${e?.message ?? e})`);
+  }
+})();
+
 // Brain write choke-point for out-of-process producers (org conductor mirror,
 // one-shot imports). Same contract as brainRemember: explicit ids are idempotent
 // upserts, auto-ids go through AUDN dedup; createdAt lets imports keep event time.

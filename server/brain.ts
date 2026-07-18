@@ -93,7 +93,14 @@ export interface BrainStore {
    *  no longer matches the stored vectors (model swap/decay). Report-only. */
   health(opts?: { probes?: number; threshold?: number }): Promise<{ selfHitRate: number; drift: boolean; probes: number }>;
   ingest(batch: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }): Promise<{ memories: number; facts: number }>;
-  stats(): { memories: Record<MemoryTier, number>; facts: number; namespaces: number; dbBytes: number };
+  stats(): {
+    memories: Record<MemoryTier, number>;
+    facts: number;
+    factsSuperseded: number;
+    namespaces: number;
+    embedCacheRows: number;
+    dbBytes: number;
+  };
   /** One read-only bundle for the admin panel / viewer: stats + recent memories +
    *  live facts + superseded history + a drift-probe health snapshot. */
   overview(opts?: { recent?: number }): Promise<BrainOverview>;
@@ -643,10 +650,22 @@ export function createBrainStore(
       }[];
       for (const r of rows) if (r.tier in memories) memories[r.tier] = Number(r.n);
       const f = db.prepare("SELECT COUNT(*) AS n FROM brain_facts WHERE invalidated_at IS NULL").get() as { n: number };
+      const fs = db.prepare("SELECT COUNT(*) AS n FROM brain_facts WHERE invalidated_at IS NOT NULL").get() as { n: number };
       const nsRow = db.prepare("SELECT COUNT(DISTINCT ns) AS n FROM brain_memories").get() as { n: number };
+      let embedCacheRows = 0;
+      try {
+        embedCacheRows = Number((db.prepare("SELECT COUNT(*) AS n FROM embed_cache").get() as { n: number }).n);
+      } catch { /* BRAIN_EMBED_CACHE=0 → table absent */ }
       let dbBytes = 0;
       try { dbBytes = statSync(dbPath).size; } catch { /* in-memory / not yet flushed */ }
-      return { memories, facts: Number(f.n), namespaces: Number(nsRow.n), dbBytes };
+      return {
+        memories,
+        facts: Number(f.n),
+        factsSuperseded: Number(fs.n),
+        namespaces: Number(nsRow.n),
+        embedCacheRows,
+        dbBytes,
+      };
     },
 
     async overview({ recent = 20 } = {}) {
@@ -754,8 +773,22 @@ function store(): BrainStore {
   return _store;
 }
 export const brainRemember = (m: BrainMemoryInput) => store().remember(m);
-export const brainRecall = (q: string, o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean }) =>
-  store().recall(q, o);
+export const brainRecall = async (
+  q: string,
+  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean },
+) => {
+  // S21: latency observed HERE (external choke-point) and not inside recall(),
+  // so the drift probe's internal this.recall() calls never skew the histogram.
+  const t0 = Date.now();
+  try {
+    return await store().recall(q, o);
+  } finally {
+    try {
+      const { observeRecallLatency } = await import("./brain-metrics");
+      observeRecallLatency(Date.now() - t0);
+    } catch { /* metrics absent → recall unaffected */ }
+  }
+};
 export const brainAssertFact = (f: BrainFactInput) => store().assertFact(f);
 export const brainFactsAbout = (s: string, o?: { ns?: string; at?: number }) => store().factsAbout(s, o);
 export const brainIngest = (b: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }) =>
