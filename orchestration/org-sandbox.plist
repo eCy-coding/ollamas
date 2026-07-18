@@ -14,7 +14,10 @@
   <string>com.ollamas.orchestration.org-sandbox</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/.bin/tsx</string>
+    <!-- E-launchd-01 pattern (see ops/launchd/com.ollamas.server.plist): exec node DIRECTLY —
+         tsx's `#!/usr/bin/env node` shebang fails under launchd's minimal PATH (env: node: not found). -->
+    <string>/Users/emrecnyngmail.com/.local/share/mise/installs/node/lts/bin/node</string>
+    <string>/Users/emrecnyngmail.com/Desktop/ollamas/node_modules/tsx/dist/cli.mjs</string>
     <string>/Users/emrecnyngmail.com/Desktop/ollamas/orchestration/bin/org-sandbox.ts</string>
     <string>--rounds</string>
     <string>5</string>
