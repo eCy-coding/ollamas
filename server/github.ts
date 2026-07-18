@@ -26,6 +26,44 @@ function parseRateLimit(headers: { get(n: string): string | null }): RateLimit |
   return { remaining: Number(remaining), limit: Number(headers.get("x-ratelimit-limit") ?? 0), reset: Number(headers.get("x-ratelimit-reset") ?? 0) };
 }
 
+/** Result of a live GitHub token check (v14). Never carries the token value. */
+export interface GhTokenCheck {
+  ok: boolean;
+  login?: string;
+  tokenType: "classic" | "fine-grained" | "unknown";
+  scopes: string[];
+  status?: number;
+  error?: string;
+}
+
+/** Classify a GitHub token by prefix (Bearer works for all — this is only for UX hints). */
+export function ghTokenType(token: string): GhTokenCheck["tokenType"] {
+  if (token.startsWith("github_pat_")) return "fine-grained";
+  if (/^gh[po]_/.test(token)) return "classic";
+  return "unknown";
+}
+
+/**
+ * Live-validate a GitHub token via GET /user (v14). Confirms the token is real and
+ * returns the authenticated login. Classic tokens also report their `x-oauth-scopes`;
+ * fine-grained tokens return none (permissions are per-endpoint) — that's honest, not
+ * a failure. Injectable fetch for tests. NEVER logs or returns the token value.
+ */
+export async function validateGitHubToken(token: string, fetchImpl: GhFetch = fetch as unknown as GhFetch): Promise<GhTokenCheck> {
+  const tokenType = ghTokenType(token);
+  if (!token) return { ok: false, tokenType, scopes: [], error: "no token provided" };
+  try {
+    const res = await fetchImpl(`${GH_API}/user`, { method: "GET", headers: ghHeaders(token) });
+    if (res.status === 401) return { ok: false, tokenType, scopes: [], status: 401, error: "token geçersiz veya süresi dolmuş" };
+    if (!res.ok) return { ok: false, tokenType, scopes: [], status: res.status, error: `GitHub /user ${res.status}` };
+    const body = JSON.parse(await res.text()) as { login?: string };
+    const scopes = (res.headers.get("x-oauth-scopes") || "").split(",").map((s) => s.trim()).filter(Boolean);
+    return { ok: true, login: body.login, tokenType, scopes };
+  } catch (err) {
+    return { ok: false, tokenType, scopes: [], error: (err as Error)?.message || "network error" };
+  }
+}
+
 export interface Finding {
   file?: string;
   name?: string;

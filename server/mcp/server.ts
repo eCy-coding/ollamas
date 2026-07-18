@@ -20,6 +20,7 @@ import type { Request, Response } from "express";
 import { ToolRegistry, type ToolCtx, type ToolTier } from "../tool-registry";
 import { PROMPTS, getPrompt, completeArg } from "./prompts";
 import { getFederatedRoots } from "./client";
+import { ensureUpstream, getUpstreamStatus } from "./supervisor";
 import { SubscriptionRegistry } from "./subscriptions";
 import { flattenTreeFiles } from "../files";
 
@@ -97,6 +98,10 @@ export function buildServer(ctx: ToolCtx): Server {
   });
 
   // --- tools/list (per-tenant visibility + cursor pagination) ---
+  // Faz B3: needs NO change for the now-backgrounded upstream connect — this is simply
+  // eventually-correct. A client that calls tools/list a few seconds after boot (or
+  // after any reconnect) already sees the full, current ToolRegistry snapshot; there is
+  // no listChanged notification to wire (MCP_CAPABILITIES.tools.listChanged is false).
   server.setRequestHandler(ListToolsRequestSchema, async (req) => {
     const all = ToolRegistry.list(allowed, ctx.tenantId).filter((t) => brainMcpAllowed(t.name, process.env));
     const start = decodeCursor(req.params?.cursor);
@@ -140,7 +145,21 @@ export function buildServer(ctx: ToolCtx): Server {
       ? (progress: number, total?: number, message?: string) =>
           server.notification({ method: "notifications/progress", params: { progressToken, progress, total, message } }).catch(() => {})
       : undefined;
-    const def = ToolRegistry.info(name);
+    let def = ToolRegistry.info(name);
+    // Faz B3: boot now connects upstream MCP servers in the background (server.ts's
+    // void-wrapped MCP-Consume block) instead of blocking app.listen, so a request for
+    // a real upstream tool can legitimately land before that upstream's connect has
+    // registered it. Bridge the gap ONLY for the `mcp__<server>__*` shape: if the tool
+    // is missing but its server IS under supervision, hold this call for that upstream's
+    // in-flight connect (bounded, never throws) and retry the lookup once before falling
+    // through to the normal "Unrecognized framework tool" error below.
+    if (!def && name.startsWith("mcp__")) {
+      const upstream = getUpstreamStatus().find((s) => name.startsWith(`mcp__${s.name}__`));
+      if (upstream) {
+        await ensureUpstream(upstream.name);
+        def = ToolRegistry.info(name);
+      }
+    }
     // Faz 18: server→client elicitation/sampling, wired ONLY when the connected
     // client advertises the matching capability (bidirectional stdio). Undefined
     // otherwise → tools fall back (e.g. write_file halt) — no HTTP regression.

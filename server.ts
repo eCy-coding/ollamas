@@ -21,7 +21,9 @@ import os from "os";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
-import { db, ChatSession } from "./server/db";
+import type { ViteDevServer } from "vite";
+import type { Server as HttpServer } from "node:http";
+import { db, ChatSession, flushPendingSave } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, catalogBaseUrl, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
@@ -35,7 +37,7 @@ import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
-import { parseRepoSlug, rerunFailedJobs, cancelRun } from "./server/github";
+import { parseRepoSlug, rerunFailedJobs, cancelRun, validateGitHubToken } from "./server/github";
 import { getRuns, getJobs, getWorkflows, getLog, dispatch, detectRepoSlug } from "./server/github-actions";
 import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
@@ -98,6 +100,10 @@ import { buildFleetView } from "./server/cockpit";
 import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
 import { rankMacModels } from "./server/cockpit-models";
 import { checkAnswer, scoreCouncil } from "./server/council";
+import { registerCookbookRoutes } from "./server/cookbook";
+import { registerResearchRoutes, isSafeUrl } from "./server/research";
+import { registerEcymRoutes } from "./server/ecym";
+import { registerPanelAssistRoutes, distillPanel, PANEL_IDS, type PanelId } from "./server/panel-assist";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -639,7 +645,23 @@ app.post("/api/github/actions/dispatch", async (req, res) => {
 // eCySearcher Flask stack so the threat-intel tab has live data even when the
 // docker stack is down. Lazy 15-min TTL cache; ?refresh=1 forces a refetch.
 app.get("/api/threatfeed", async (req, res) => {
-  res.json(await getFeedItems({ refresh: req.query.refresh === "1" }));
+  // Merge operator-added custom feeds (v12 gap #9) with the curated sources.
+  const extra = (db.data.threatFeeds ?? [])
+    .filter((f) => isSafeUrl(f.url))
+    .map((f) => ({ id: `custom-${f.source}`, title: f.source, url: f.url, kind: "rss" as const }));
+  res.json(await getFeedItems({ refresh: req.query.refresh === "1", extra }));
+});
+
+// Add a custom threat feed (v12 gap #9) — SSRF-guarded (no loopback/private hosts).
+app.post("/api/threatfeed/sources", async (req, res) => {
+  const b = req.body as { source?: unknown; url?: unknown };
+  const source = String(b?.source ?? "").trim().slice(0, 60);
+  const url = String(b?.url ?? "").trim();
+  if (!source || !isSafeUrl(url)) { res.status(400).json({ error: "source + a public https feed url required" }); return; }
+  db.data.threatFeeds = (db.data.threatFeeds ?? []).filter((f) => f.source !== source);
+  db.data.threatFeeds.push({ source, url });
+  db.save();
+  res.json({ ok: true, count: db.data.threatFeeds.length });
 });
 
 // eCySearcher threat-intel subsystem (docker-compose stack). SUPERVISOR control routes — single
@@ -792,6 +814,18 @@ app.post("/api/revenue/storefront", (req, res) => {
   try { res.json(generateStorefront(req.body || {})); } catch (e) { res.status(500).json({ ok: false, output: String((e as Error).message) }); }
 });
 
+// Cookbook — hardware-aware recipe runner (P1). New /api/cookbook/* routes, localOwnerGuard'd.
+registerCookbookRoutes(app, db, localOwnerGuard);
+
+// Deep research — question → plan → web-search → summarize → cited report (SSE). localOwnerGuard'd.
+registerResearchRoutes(app, localOwnerGuard);
+
+// eCy Studio — distills bench evidence + working principles into ecy:latest (SSE). localOwnerGuard'd.
+registerEcymRoutes(app, db, localOwnerGuard);
+
+// eCym control plane — 5 panel specialists (assist + per-panel distill), SSE. localOwnerGuard'd.
+registerPanelAssistRoutes(app, db, localOwnerGuard);
+
 /**
  * Every way ollama might be reachable — try each until one answers. `host.docker.internal` only resolves
  * INSIDE a container; on the host `127.0.0.1`/`localhost` work. Trying all makes the health/models/detect
@@ -902,6 +936,21 @@ export function createAdminGuard(): express.RequestHandler {
 // aggregation surfaces through the existing GET /metrics output and getErrorStats().
 app.use(errorTrackingMiddleware);
 
+// FIX B5: extracted + exported so it's independently unit-testable (no full server boot
+// needed). `server.close(cb)`'s callback only fires once every open connection is gone —
+// an attached SSE client (/api/cockpit/stream, /api/telemetry/stream) never closes on its
+// own, so that callback previously never fired and the SHUTDOWN_GRACE_MS force-exit timer
+// fired on every restart. closeIdleConnections() drops keep-alives immediately;
+// closeAllConnections() after `graceMs` is the hard cut for anything still attached
+// (SSE included), which finally lets `closed` resolve.
+export function drainHttp(server: HttpServer, graceMs = 2000): Promise<void> {
+  const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+  server.closeIdleConnections?.();
+  const forceTimer = setTimeout(() => server.closeAllConnections?.(), graceMs);
+  forceTimer.unref?.();
+  return closed;
+}
+
 // Dynamic start wrapper
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
@@ -941,32 +990,55 @@ async function initializeServer() {
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
   // into ToolRegistry as `mcp__<server>__<tool>`. Best-effort — a dead upstream
   // never blocks boot.
+  //
+  // FIX B3: boot must never AWAIT this block — a single dead/slow upstream (e.g. a
+  // stdio command that isn't installed, or an http URL with nothing listening) used to
+  // add its full connect timeout to boot latency, and the 6-row tenant loop below was
+  // sequential on top of that (measured 12.7s; worst case far higher). During all of it
+  // there was no port and no /api/health — total outage. The whole body is now fire-
+  // and-forget (`void (async () => { … })()`): app.listen (below) and /api/health (module
+  // top-level) are reachable immediately, independent of how long any upstream takes.
+  // Upstreams that finish later self-register into ToolRegistry via superviseUpstream();
+  // tools/list needs NO change for this (see the comment on ListToolsRequestSchema in
+  // server/mcp/server.ts) — it is simply eventually-correct a few seconds after boot. A
+  // tools/call that lands mid-connect for a specific upstream tool is bridged by
+  // ensureUpstream() (server/mcp/server.ts), which holds that one call (bounded) instead
+  // of 404ing on a tool that is seconds away from existing.
   try {
     const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
     const upstreams: UpstreamConfig[] = reg.mcpServers || [];
-    // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
-    // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
-    // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
-    // Non-blocking BACKGROUND connect (perf): a slow npx cold-start (fs/memory/thinking/
-    // everything hit -32001 at cold boot, then recover) must NOT delay boot. Boot returns
-    // immediately; each upstream's tools merge as it resolves, and startSupervisor() below
-    // handles reconnect. Capability is preserved — nothing is pruned, only deferred.
-    void Promise.all(upstreams.map(async (cfg) => {
-      const r = await superviseUpstream(cfg);
-      console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-    })).catch((e: any) => console.warn(`[MCP-Consume] background connect error: ${e?.message}`));
-    // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
-    // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
-    const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
-    for (const u of eagerTenants ? await allUpstreamServers() : []) {
-      // Defense-in-depth: re-validate persisted tenant rows in case a row was
-      // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
-      const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
-      if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); continue; }
-      const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
-      console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
-    }
-    if (!eagerTenants) console.log(`[MCP-Consume] eager tenant connect deferred (MCP_CONSUME_EAGER=0)`);
+    void (async () => {
+      // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
+      // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
+      // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
+      // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
+      await Promise.all(upstreams.map(async (cfg) => {
+        const r = await superviseUpstream(cfg);
+        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
+      }));
+      // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
+      // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
+      const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
+      const tenantRows = eagerTenants ? await allUpstreamServers() : [];
+      // Bounded-parallel (concurrency 3, was fully sequential): a 6-row tenant table no
+      // longer sums 6 connect-timeouts, but a plain chunker still caps how many `npx`/
+      // stdio subprocesses spawn at once (avoids a 6-way simultaneous spawn storm).
+      const TENANT_CONNECT_CONCURRENCY = 3;
+      for (let i = 0; i < tenantRows.length; i += TENANT_CONNECT_CONCURRENCY) {
+        await Promise.allSettled(tenantRows.slice(i, i + TENANT_CONNECT_CONCURRENCY).map(async (u) => {
+          // Defense-in-depth: re-validate persisted tenant rows in case a row was
+          // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
+          const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
+          if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); return; }
+          const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
+          console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
+        }));
+      }
+      if (!eagerTenants) console.log(`[MCP-Consume] eager tenant connect deferred (MCP_CONSUME_EAGER=0)`);
+    })().catch((e: any) => console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`));
+    // Synchronous, OUTSIDE the void-wrapped block above: the periodic health/reconnect
+    // loop must start immediately, not wait on the (possibly minutes-long, against a
+    // hung upstream) connect fan-out above.
     startSupervisor(); // periodic health/reconnect (opt-in via MCP_HEALTH_INTERVAL_MS)
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
@@ -1369,6 +1441,12 @@ async function initializeServer() {
     res.json(getHierarchySnapshot());
   });
 
+  // v15 buddy-system: who's covering for whom. Per-provider live/saturated/cooled/absent +
+  // the active buddy + whether every cloud provider is down (→ riding $0-local ollama). No values.
+  app.get("/api/keys/buddy-status", (_req, res) => {
+    res.json(ProviderRouter.buddyStatus());
+  });
+
   /**
    * key-doctor (T3-F3): discover candidate keys already on this machine (env / macOS
    * keychain / gh CLI) -> validate against the real provider -> connect to the vault ->
@@ -1415,6 +1493,12 @@ async function initializeServer() {
       db.logSecurity("permission_change", `Key vault configured: ${provider}`, "Decrypted credentials saved securely at rest", "info");
     }
     db.save();
+    // GitHub (repo): live-validate on save so the UI can show the real login / a clear
+    // error instead of a blind "success". Never blocks the save; never logs the token.
+    if (provider === "github" && key) {
+      const gh = await validateGitHubToken(key);
+      return res.json({ success: true, github: { ok: gh.ok, tokenType: gh.tokenType, ...(gh.login ? { login: gh.login } : {}), ...(gh.scopes.length ? { scopes: gh.scopes } : {}), ...(gh.ok ? {} : { error: gh.error }) } });
+    }
     res.json({ success: true });
   });
 
@@ -1437,6 +1521,23 @@ async function initializeServer() {
     // the literal "undefined" key → corrupted store on disk. Reject early.
     if (!provider || typeof provider !== "string") {
       return res.status(400).json({ error: "provider required" });
+    }
+    // GitHub (repo) is NOT an LLM provider — validate the token against the real GitHub
+    // API (GET /user) instead of the chat path (which false-positives via the demo lane).
+    if (provider === "github") {
+      let tok = typeof key === "string" && key ? key : "";
+      if (!tok) { try { tok = db.decrypt(db.data.keys["github"] || ""); } catch { /* absent */ } }
+      const r = await validateGitHubToken(tok);
+      return res.json({
+        success: r.ok,
+        tokenType: r.tokenType,
+        ...(r.login ? { login: r.login } : {}),
+        ...(r.scopes.length ? { scopes: r.scopes } : {}),
+        ...(r.ok ? {} : { error: r.error }),
+        ...(r.ok && r.tokenType === "fine-grained"
+          ? { warning: "Fine-grained token — Actions/Arama için repo seçimi + Actions(R/W)+Contents+Metadata izinleri gerekir." }
+          : {}),
+      });
     }
     const testConfig = {
       provider,
@@ -2101,7 +2202,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           if (firstUserMsg && typeof firstUserMsg.content === "string" && sess.title === "New ReAct Session") {
             sess.title = firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : "");
           }
-          db.save();
+          // B6-debounce: fires on EVERY ReAct step/turn — chat history is replayable/non-
+          // credential data, so a bounded (500ms trailing / 2s maxWait) coalesced write is
+          // safe here, unlike vault/key/security writes which must stay immediate. Drained
+          // by flushPendingSave() on shutdown so the last turn is never lost on exit.
+          db.saveDebounced();
 
           // Brain per-turn retain (default ON, BRAIN_AUTO_RETAIN=0 opts out): the last
           // user+assistant exchange lands in the working tier async — embed-only, no LLM.
@@ -2352,7 +2457,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         db.data.sessions = [];
       }
       db.data.sessions.unshift(newSession);
-      db.save();
+      // B6-debounce: a new empty session is replayable/non-credential chat data (unlike
+      // vault/key/security/cluster writes, which stay immediate). Coalesced write is safe;
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
       res.json(newSession);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to create agent session" });
@@ -2364,10 +2472,35 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       const { id } = req.params;
       const initialCount = (db.data.sessions || []).length;
       db.data.sessions = (db.data.sessions || []).filter(s => s.id !== id);
-      db.save();
+      // B6-debounce: session deletion is replayable/non-credential chat data — worst case
+      // on a crash before flush, the deleted session reappears (no security/vault impact).
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
       res.json({ success: true, deleted: (db.data.sessions || []).length < initialCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to delete session" });
+    }
+  });
+
+  // Chat panel (v10): persist a session's messages/title after each exchange.
+  app.put("/api/agent/sessions/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const session = (db.data.sessions || []).find(s => s.id === id);
+      if (!session) return res.status(404).json({ error: "session not found" });
+      const { messages, title, modelId } = req.body || {};
+      if (Array.isArray(messages)) session.messages = messages;
+      if (typeof title === "string" && title.trim()) session.title = title.trim().slice(0, 120);
+      if (typeof modelId === "string" && modelId.trim()) session.modelId = modelId.trim();
+      session.updatedAt = new Date().toISOString();
+      // B6-debounce: fires on every chat-panel message append — chat history is replayable/
+      // non-credential data, so a bounded coalesced write (500ms trailing / 2s maxWait) is
+      // safe here, unlike vault/key/security/cluster writes which stay immediate.
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
+      res.json({ success: true, session });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update session" });
     }
   });
 
@@ -3731,8 +3864,13 @@ ledger();setInterval(ledger,15000);
   // VITE & STATIC FILES SERVING
   // ----------------------------------------------------
 
+  // FIX B5: hoisted to function scope (was a `const vite` local to this `if` block) so
+  // `shutdown` below can close it. Left unclosed, its HMR websocket/watchers/dep-optimizer
+  // survive the hard `process.exit` — the documented "Port 24678 already in use" +
+  // blank-page-after-restart symptom.
+  let viteServer: ViteDevServer | null = null;
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    viteServer = await createViteServer({
       // HMR off by default: the fleet serves this for USE, and the derived-port HMR
       // WebSocket (PORT+20000) flaps in middleware mode → the Vite client reload-loops
       // the page every few seconds while idle. `VITE_HMR=true` re-enables it (per-instance
@@ -3743,7 +3881,7 @@ ledger();setInterval(ledger,15000);
       },
       appType: "spa",
     });
-    app.use(vite.middlewares);
+    app.use(viteServer.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -3772,6 +3910,21 @@ ledger();setInterval(ledger,15000);
         console.log(`[KeyDoctor] boot scan: +${connected.length} connected${connected.length ? ` (${connected.join(",")})` : ""} · ${s("already").length} already · ${invalid.length} invalid${invalid.length ? ` (${invalid.join(",")})` : ""} · ${s("absent").length} absent`);
       })
       .catch((e) => console.warn(`[KeyDoctor] boot scan skipped: ${String(e?.message ?? e).slice(0, 80)}`));
+
+    // eCym panel-brief auto-distill (v13-D) — OPT-IN (ECYM_AUTODISTILL=1) so boot never
+    // adds surprise GPU load. Fills only panels that have no distilled brief yet; fail-soft
+    // (DDG rate-limit keeps the fallback). Sequential via distillPanel's own GPU mutex.
+    if (process.env.ECYM_AUTODISTILL === "1") {
+      void (async () => {
+        const missing = (PANEL_IDS as readonly PanelId[]).filter((id) => !db.data.panelBriefs?.[id]);
+        if (!missing.length) return;
+        console.log(`[eCym] auto-distill: ${missing.length} panel brief(s) → ${missing.join(",")}`);
+        for (const id of missing) {
+          try { for await (const _ of distillPanel(db, id)) { /* drain — persistence is inside */ } }
+          catch (e) { console.warn(`[eCym] distill ${id} skipped: ${String((e as Error)?.message ?? e).slice(0, 80)}`); }
+        }
+      })();
+    }
   });
 
   // Graceful shutdown (Faz 13A): on SIGTERM/SIGINT (K8s rolling deploy) stop
@@ -3792,7 +3945,17 @@ ledger();setInterval(ledger,15000);
                          // halts the webhook-retry recurring loop + oauth-gc cron (C2 migration)
       stopSupervisor();
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      // FIX B5: close vite BEFORE the HTTP drain — its HMR ws/watchers/dep-optimizer must
+      // not survive the process (best-effort; a vite close failure must not abort shutdown).
+      await viteServer?.close().catch(() => {});
+      // FIX B5: drainHttp() actually resolves even with an SSE client attached
+      // (/api/cockpit/stream, /api/telemetry/stream never call res.end() on their own) —
+      // previously `server.close(cb)`'s callback waited on that connection forever, so the
+      // grace timer above fired `process.exit(1)` on every restart instead of this clean path.
+      await drainHttp(server, 2000);
+      // FIX B5: flush the debounced chat-turn writer (server/db.ts) so a save still
+      // in-flight when SIGTERM lands isn't lost.
+      await flushPendingSave();
       await closeStore();
       await shutdownTracing(); // flush + stop the OTel SDK (B2)
       clearTimeout(force);

@@ -182,9 +182,13 @@ export function _resetCache(): void { cache.clear(); }
 
 export interface FeedSourceStatus { id: string; title: string; items: number; fetchedAt: string | null; error?: string; }
 
-export async function getFeedItems(opts: { refresh?: boolean; fetchImpl?: FetchLike; now?: () => number } = {}): Promise<{ items: FeedItem[]; sources: FeedSourceStatus[] }> {
+export async function getFeedItems(opts: { refresh?: boolean; fetchImpl?: FetchLike; now?: () => number; extra?: FeedDef[] } = {}): Promise<{ items: FeedItem[]; sources: FeedSourceStatus[] }> {
   const now = opts.now ?? Date.now;
-  const due = FEEDS.filter((f) => {
+  // Curated sources + operator-added custom feeds (v12 gap #9). Curated ids win on
+  // collision; only genuinely-new ids are appended.
+  const seen = new Set(FEEDS.map((f) => f.id));
+  const allFeeds = [...FEEDS, ...(opts.extra ?? []).filter((f) => f.url && !seen.has(f.id))];
+  const due = allFeeds.filter((f) => {
     if (opts.refresh) return true;
     const c = cache.get(f.id);
     return !c || now() - c.fetchedAt > TTL_MS;
@@ -197,11 +201,11 @@ export async function getFeedItems(opts: { refresh?: boolean; fetchImpl?: FetchL
     else cache.set(f.id, { items: prev?.items ?? [], fetchedAt: prev?.fetchedAt ?? 0, lastError: "fetch failed" });
   }));
 
-  const sources: FeedSourceStatus[] = FEEDS.map((f) => {
+  const sources: FeedSourceStatus[] = allFeeds.map((f) => {
     const c = cache.get(f.id);
     return { id: f.id, title: f.title, items: c?.items.length ?? 0, fetchedAt: c?.fetchedAt ? new Date(c.fetchedAt).toISOString() : null, ...(c?.lastError ? { error: c.lastError } : {}) };
   });
-  const items = FEEDS
+  const items = allFeeds
     .flatMap((f) => (cache.get(f.id)?.items ?? []).slice(0, PER_SOURCE_CAP))
     .sort((a, b) => (b.dateIso || "0").localeCompare(a.dateIso || "0"))
     .slice(0, TOTAL_CAP);

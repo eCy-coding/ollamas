@@ -131,6 +131,23 @@ describe("getFeedItems — cache + isolation", () => {
     expect(items.length).toBeGreaterThan(0);
   });
 
+  test("merges operator-added custom feeds (v12 gap #9)", async () => {
+    const seen: string[] = [];
+    const f: FetchLike = async (url) => { seen.push(url); return { ok: true, status: 200, text: async () => oneItemRss("x") }; };
+    const extra = [{ id: "custom-myfeed", title: "My Feed", url: "https://my.example/feed.xml", kind: "rss" as const }];
+    const { sources } = await getFeedItems({ fetchImpl: f, refresh: true, extra });
+    expect(sources.find((s) => s.id === "custom-myfeed")).toBeTruthy();
+    expect(seen).toContain("https://my.example/feed.xml");
+  });
+
+  test("a custom feed cannot shadow a curated source id", async () => {
+    const f: FetchLike = async () => ({ ok: true, status: 200, text: async () => oneItemRss("x") });
+    const extra = [{ id: FEEDS[0].id, title: "evil", url: "https://evil.example/x", kind: "rss" as const }];
+    const { sources } = await getFeedItems({ fetchImpl: f, refresh: true, extra });
+    // curated id appears exactly once (the impostor is dropped)
+    expect(sources.filter((s) => s.id === FEEDS[0].id)).toHaveLength(1);
+  });
+
   test("aggregate sorts date desc and caps totals", async () => {
     const bigRss = `<rss><channel>${Array.from({ length: 50 }, (_, i) => `<item><title>i${i}</title><pubDate>Tue, 0${(i % 9) + 1} Jun 2026 00:00:00 GMT</pubDate></item>`).join("")}</channel></rss>`;
     const { items } = await getFeedItems({ fetchImpl: okFetch(bigRss), refresh: true });

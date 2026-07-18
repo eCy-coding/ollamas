@@ -2,6 +2,7 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import { Plug, Loader2, RefreshCw, CheckCircle2, AlertTriangle, CircleAlert, Zap } from "lucide-react";
 import { api } from "../lib/apiClient";
 import { useAuth } from "../hooks/useAuth";
+import { AssistDrawer } from "./AssistDrawer";
 
 // "Entegrasyonlar" tab — on-demand health matrix + a 0-paste GitHub connect
 // (pulls the gh CLI token into the vault). Each row shows purpose + a one-step
@@ -57,6 +58,21 @@ export default function IntegrationsPanel({ onNotify }: { onNotify?: (msg: strin
   const allRows = [...rows, googleRow];
   const githubNeedsSetup = rows.find((r) => r.id === "github")?.status !== "ok";
 
+  // Compact (<3000 char) snapshot of the full health matrix for the eCy specialist
+  // (triage worst-first + step-by-step fix). Long detail/fix are trimmed.
+  const buildContext = () =>
+    JSON.stringify(
+      allRows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        detail: (r.detail || "").slice(0, 160),
+        fix: r.fix ? r.fix.slice(0, 160) : undefined,
+        purpose: (r.purpose || "").slice(0, 120),
+        lane: r.lane,
+      }))
+    ).slice(0, 2800);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm text-slate-300">
@@ -66,6 +82,8 @@ export default function IntegrationsPanel({ onNotify }: { onNotify?: (msg: strin
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Yenile
         </button>
       </div>
+
+      <AssistDrawer panelId="integrations" context={buildContext} label="eCy ile düzelt" disabled={busy || rows.length === 0} />
 
       {githubNeedsSetup && (
         <div className="rounded border border-cyan-800 bg-cyan-950/20 p-3 space-y-2">

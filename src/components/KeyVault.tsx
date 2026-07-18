@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink, Radar } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { AssistDrawer } from "./AssistDrawer";
 
 interface KeyVaultProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -14,6 +15,10 @@ const KEY_PAGE: Record<string, string> = {
   anthropic: "https://console.anthropic.com/settings/keys",
   openrouter: "https://openrouter.ai/keys",
   "ollama-cloud": "https://ollama.com/settings/keys",
+  // GitHub repo (Actions/Search/audit): classic token pre-scoped for repo + workflow.
+  github: "https://github.com/settings/tokens/new?scopes=repo,workflow&description=ollamas",
+  // GitHub Models (LLM inference) needs a token with the "Models" permission, NOT repo.
+  "github-models": "https://github.com/settings/personal-access-tokens",
 };
 
 // Rich display names; providers absent here (future catalog entries) fall back to their id.
@@ -28,7 +33,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   zai: "Zhipu GLM (z.ai)",
   sambanova: "SambaNova",
   "nvidia-nim": "NVIDIA NIM",
-  "github-models": "GitHub Models",
+  github: "GitHub (repo)",
+  "github-models": "GitHub Models (LLM)",
   cloudflare: "Cloudflare Workers AI",
   mistral: "Mistral",
 };
@@ -70,7 +76,9 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [masks, setMasks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
-  const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string }>>({});
+  const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string; detail?: string }>>({});
+  // v15 buddy-system: which providers cover for each other + the active buddy.
+  const [buddy, setBuddy] = useState<{ activeBuddy: string; allCloudCooled: boolean; providers: Array<{ id: string; state: string }> } | null>(null);
   const [pool, setPool] = useState<Record<string, PoolEntry>>({});
   const [alerts, setAlerts] = useState<Array<{ provider: string; worstPct: number; live: number }>>([]);
   // "Scan & Connect" (T6): one click harvests machine keys via /api/keys/doctor.
@@ -107,9 +115,14 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     } catch { /* gateway down — leave prior state */ }
   };
 
+  const loadBuddy = async () => {
+    try { setBuddy(await api.get("/api/keys/buddy-status")); } catch { /* leave prior */ }
+  };
+
   useEffect(() => {
     loadMasks();
     loadPool(); // authoritative initial paint
+    loadBuddy(); // v15: buddy-system status (who covers for whom)
     // vNEXT-D3: ride the live cockpit SSE (≤2s) — it now carries per-provider worstPct/allApproaching
     // + keyAlerts. The 15s poll is SLOWED to 60s as a graceful fallback (non-breaking: if any SSE
     // field is missing or the stream errors, the poll authoritatively backfills the full shape).
@@ -230,22 +243,26 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     const endpoint = provider === "custom-openai" ? inputs["custom-openai-endpoint"] : undefined;
 
     try {
-      const data = await api.post<{ success: boolean; latencyMs?: number; error?: string }>(
+      const data = await api.post<{ success: boolean; latencyMs?: number; error?: string; login?: string; tokenType?: string; warning?: string }>(
         "/api/keys/test",
         { provider, key: keyVal, customEndpoint: endpoint },
       );
       if (data.success) {
+        // GitHub (repo) returns the authenticated login (+ a fine-grained permission hint)
+        // instead of an LLM latency — surface it so "connected" is real, not blind.
+        const detail = data.login ? `bağlandı: ${data.login}${data.warning ? ` · ${data.warning}` : ""}` : undefined;
         setPingStatus((prev) => ({
           ...prev,
-          [provider]: { ok: true, latency: data.latencyMs },
+          [provider]: { ok: true, latency: data.latencyMs, detail },
         }));
-        onNotify(`${provider} connection verified!`, "success");
+        onNotify(data.login ? `GitHub bağlandı: ${data.login}` : `${provider} connection verified!`, "success");
+        if (data.warning) onNotify(data.warning, "info");
       } else {
         setPingStatus((prev) => ({
           ...prev,
           [provider]: { ok: false, err: data.error },
         }));
-        onNotify(`${provider} reachability failed. Check keys.`, "error");
+        onNotify(`${provider}: ${data.error ?? "reachability failed. Check keys."}`, "error");
       }
     } catch (e: any) {
       setPingStatus((prev) => ({ ...prev, [provider]: { ok: false, err: e.message } }));
@@ -292,6 +309,10 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     // even before/independent of the /api/keys/pool fetch — account_id is pinned server-side, so
     // pasting the Workers-AI token here is the only step. Kept in baseIds → no catalog-row dup.
     { id: "cloudflare", label: "Cloudflare Workers AI", placeholder: "Key: CLOUDFLARE_API_TOKEN", desc: "Workers AI — free ~10K neurons/day · paste the Workers-AI token (account_id auto-resolved)" },
+    // GitHub REPO integration (Actions/Search/audit) — writes keys["github"], live-validated
+    // on Test/Save. Key↗ opens a classic token pre-scoped for repo+workflow. Fine-grained
+    // github_pat_… also works (needs Actions R/W + Contents + Metadata on the target repo).
+    { id: "github", label: "GitHub (repo)", placeholder: "ghp_… veya github_pat_… (repo+workflow)", desc: "Actions/Arama/audit için repo erişimi · Key↗ classic token (repo+workflow) açar; fine-grained için Actions+Contents+Metadata izni ver. Test canlı doğrular." },
   ];
   const baseIds = new Set(BASE_ROWS.map((r) => r.id));
   const catalogRows = (Object.entries(pool) as Array<[string, PoolEntry]>)
@@ -307,6 +328,37 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     ...catalogRows,
     { id: "custom-openai", label: "Custom OpenAI compatible", placeholder: "Bearer token", desc: "Connect local wrappers, LM Studio, or vLLM hosts" },
   ];
+
+  // eCy key-hygiene context: MASKED METADATA ONLY. Never reads inputs[] (the raw key the
+  // operator typed) — only the already-masked mask string (…last4), pool burn counts, the
+  // key-doctor source (env/keychain/gh/vault/manual), rate-limit flags, and ping state. If a
+  // field could carry a raw secret it is EXCLUDED. Kept compact (<3000 chars) for the SSE call.
+  const buildContext = (): string => {
+    const rows = providers
+      .filter((p) => p.id !== "custom-openai-endpoint")
+      .map((p) => {
+        const id = p.id;
+        const masked = masks[id]; // already redacted server-side (…last4) — safe to surface
+        const configured = !!masked;
+        const ph = pool[id];
+        if (!configured && !ph) return null; // nothing to advise on — skip to stay compact
+        const source = doctorReport?.providers?.[id]?.source ?? (configured ? "manual" : "unknown");
+        const approaching = !!ph?.allApproaching || alerts.some((a) => a.provider === id);
+        const ping = pingStatus[id];
+        const parts = [id, configured ? "active" : "inactive", `src=${source}`];
+        if (masked) parts.push(`mask=${masked}`);
+        if (ph && ph.total > 0) parts.push(`pool=${ph.live}/${ph.total}`);
+        if (ph) parts.push(`burn=${Math.round((ph.worstPct ?? 0) * 100)}%`);
+        if (approaching) parts.push("rate-limit-approaching");
+        if (ph?.trainsOnData) parts.push("trains-on-data");
+        if (ping) parts.push(ping.ok ? `ping=ok${ping.latency ? `(${ping.latency}ms)` : ""}` : "ping=fail");
+        return parts.join(" ");
+      })
+      .filter((line): line is string => line !== null);
+    const header = `KeyVault key-hygiene snapshot — ${rows.length} provider(s), masked metadata only (no raw keys).`;
+    return [header, ...rows].join("\n").slice(0, 3000);
+  };
+  const noProvidersLoaded = Object.keys(masks).length === 0 && Object.keys(pool).length === 0;
 
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
@@ -335,6 +387,27 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
             Deep
           </button>
         </div>
+      </div>
+
+      {/* v15 buddy-system: models cover for each other — who's live + the active buddy. */}
+      {buddy && Array.isArray(buddy.providers) && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 bg-immersive-inset border border-immersive-border rounded text-[11px] font-mono">
+          <span className="text-immersive-text-dim">🤝 Çalışma arkadaşları:</span>
+          <b className="text-status-ok">{buddy.providers.filter((p) => p.state === "live").length} canlı</b>
+          {buddy.providers.filter((p) => p.state === "saturated").length > 0 && (
+            <span className="text-status-warn">· {buddy.providers.filter((p) => p.state === "saturated").length} dolu</span>
+          )}
+          <span className="text-immersive-text-muted">· aktif buddy:</span>
+          <b className="text-status-accent">{buddy.activeBuddy}</b>
+          {buddy.allCloudCooled
+            ? <span className="ml-auto text-status-warn">tüm cloud düştü → $0-local ollama devrede</span>
+            : <span className="ml-auto text-immersive-text-muted">$0-local her zaman hazır</span>}
+        </div>
+      )}
+
+      {/* eCy key-hygiene / rotation advice — driven from MASKED per-provider metadata only. */}
+      <div className="mb-4">
+        <AssistDrawer panelId="keys" context={buildContext} label="eCy hijyen tavsiyesi" disabled={noProvidersLoaded} />
       </div>
 
       <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-3.5 rounded mb-6 text-[10px] text-immersive-text-muted font-mono leading-relaxed">
@@ -462,16 +535,16 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
                 {/* Ping Result Indicators */}
                 {testReport && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-mono">
+                  <div className="mt-2 flex items-start gap-1.5 text-[10px] font-mono">
                     {testReport.ok ? (
-                      <span className="text-status-ok flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Online ({testReport.latency}ms)
+                      <span className="text-status-ok flex items-start gap-1">
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                        {testReport.detail ?? `Online (${testReport.latency}ms)`}
                       </span>
                     ) : (
-                      <span className="text-status-err flex items-center gap-1 group relative">
-                        <XCircle className="w-3.5 h-3.5" />
-                        Ping Failed
+                      <span className="text-status-err flex items-start gap-1 group relative">
+                        <XCircle className="w-3.5 h-3.5 shrink-0" />
+                        {testReport.err ?? "Ping Failed"}
                       </span>
                     )}
                   </div>

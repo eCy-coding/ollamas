@@ -12,6 +12,8 @@
 // verdicts and the pool's count-only status. Nothing here can leak a secret.
 import type { DoctorReport, CandidateStatus, CandidateSource } from "./key-doctor";
 import { runDoctor, productionDoctorDeps } from "./key-doctor";
+import { execFileSync } from "node:child_process";
+import { attemptProvision, provisionEnabled, type ProvisionDeps } from "./buddy-provision";
 import { keySignupUrl, keyedCloudProviders, catalogEntry } from "./provider-catalog";
 import { ProviderRouter } from "./providers";
 
@@ -180,10 +182,42 @@ export function parseSources(raw: string | undefined): CandidateSource[] {
 let snapshot: KeyHealthSnapshot | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let consecutiveFailures = 0;
+// v15 buddy-system: drop-triggered rescan (debounced). scheduleNow re-fires the loop ASAP.
+let lastRescanMs = 0;
+let scheduleNow: (() => void) | null = null;
+const RESCAN_DEBOUNCE_MS = Number(process.env.KEY_RESCAN_DEBOUNCE_MS || 60_000);
+
+/**
+ * v15: run the discovery scan NOW instead of waiting for the ~15min steady tick — e.g. a
+ * provider just went dark (last live key cooled), so harvest any machine key (env/keychain/gh)
+ * immediately so a buddy can be restored fast. Debounced to ≤1 per RESCAN_DEBOUNCE_MS so a
+ * burst of failures triggers a single scan. Returns true if it actually kicked a rescan.
+ */
+export function triggerKeyRescan(reason: string, now: () => number = Date.now): boolean {
+  if (!timer || !scheduleNow) return false;          // loop not started → nothing to reschedule
+  const t = now();
+  if (t - lastRescanMs < RESCAN_DEBOUNCE_MS) return false; // debounce the failure burst
+  lastRescanMs = t;
+  console.warn(`[KeyHealth] rescan triggered: ${reason}`);
+  scheduleNow();
+  return true;
+}
 
 /** Cached snapshot for GET /api/keys/health (null until the first tick populates it). */
 export function getKeyHealth(): KeyHealthSnapshot | null {
   return snapshot;
+}
+
+// v15 layer 3: mint keys from ALREADY-authed tooling (gh) into the pool. Opt-in, account-free.
+// Reuses key-doctor's vault sink (encrypt + save + keychain-mirror). Gemini minting from gcloud
+// stays the manual `npm run gemini:provision` (documented) → mintGeminiKey omitted here.
+function productionProvisionDeps(): ProvisionDeps {
+  const { vault } = productionDoctorDeps();
+  return {
+    hasKey: (p) => vault.hasPrimary(p) || ProviderRouter.keyPoolStatus(p).total > 0,
+    ghToken: async () => { try { return String(execFileSync("gh", ["auth", "token"], { timeout: 5000 })).trim() || null; } catch { return null; } },
+    addKey: async (provider, key) => { if (vault.hasPrimary(provider)) vault.addToPool(provider, key); else vault.savePrimary(provider, key); },
+  };
 }
 
 async function tick(): Promise<void> {
@@ -197,6 +231,17 @@ async function tick(): Promise<void> {
     { sources: parseSources(process.env.KEY_HEALTH_SOURCES), dryRun: false },
     productionDoctorDeps(),
   );
+  // v15 layer 3 (opt-in): after machine-key discovery, if a keyed provider is STILL absent,
+  // try minting from already-authed tooling (gh). Default OFF → zero behavior change.
+  if (provisionEnabled()) {
+    const dark = keyedCloudProviders().filter((p) => ProviderRouter.keyPoolStatus(p).total === 0);
+    if (dark.length) {
+      try {
+        const r = await attemptProvision(dark[0], productionProvisionDeps());
+        if (r.provisioned.length) console.warn(`[Buddy] provisioned from authed tooling: ${r.provisioned.join(",")}`);
+      } catch { /* fail-soft — provisioning is best-effort */ }
+    }
+  }
   snapshot = summarizeFromDoctor(
     report,
     Date.now(),
@@ -230,6 +275,10 @@ export function startKeyHealth(): void {
     }
   };
   schedule(bootDelay); // first scan shortly after boot — never blocks app.listen
+  // v15 buddy-system: let a drop-trigger re-fire the loop immediately (clear the pending
+  // steady-state timer, run now), and route provider-went-dark events into a debounced rescan.
+  scheduleNow = () => { if (timer) { clearTimeout(timer); timer = null; } schedule(0); };
+  ProviderRouter.onPoolExhausted = (prov) => { triggerKeyRescan(`pool-exhausted:${prov}`); };
 }
 
 /** Stop the loop (graceful shutdown). Idempotent. */

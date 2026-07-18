@@ -58,7 +58,34 @@ export async function listModels(): Promise<string[]> {
   const bases = [...new Set([ollamaHost(), "http://127.0.0.1:11434", "http://localhost:11434"])];
   for (const base of bases) {
     try {
-      const res = await fetch(`${base}/api/tags`);
+      // Hot-path localhost probe (runs on every generate() call): bound it so a
+      // resolvable-but-blackholed OLLAMA_HOST (e.g. host.docker.internal outside
+      // docker) can't hang the request indefinitely — fail fast to the next base.
+      const res = await fetch(`${base}/api/tags`, {
+        signal: AbortSignal.timeout(Number(process.env.OLLAMA_PROBE_TIMEOUT_MS) || 1500),
+      });
+      if (!res.ok) continue;
+      const data: any = await res.json();
+      return (data.models || []).map((m: any) => m.name);
+    } catch { /* unreachable base — try next */ }
+  }
+  return [];
+}
+
+/**
+ * Names of the models ollama currently has RESIDENT (warm) — from /api/ps.
+ * Used to pick an already-loaded model and avoid a cold model-swap on the single GPU.
+ * Same host-probe strategy as listModels(); [] if ollama is unreachable.
+ */
+export async function loadedModelNames(): Promise<string[]> {
+  const bases = [...new Set([ollamaHost(), "http://127.0.0.1:11434", "http://localhost:11434"])];
+  for (const base of bases) {
+    try {
+      // Hot-path localhost probe (runs on EVERY panel-assist request): bound it so a
+      // resolvable-but-blackholed OLLAMA_HOST can't hang the request indefinitely.
+      const res = await fetch(`${base}/api/ps`, {
+        signal: AbortSignal.timeout(Number(process.env.OLLAMA_PROBE_TIMEOUT_MS) || 1500),
+      });
       if (!res.ok) continue;
       const data: any = await res.json();
       return (data.models || []).map((m: any) => m.name);

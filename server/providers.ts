@@ -289,6 +289,119 @@ function buildSignal(callerSignal?: AbortSignal, timeoutMs = Number(process.env.
   return callerSignal ? AbortSignal.any([callerSignal, timeout]) : timeout;
 }
 
+// FIX A2 — a tagged abort reason set ONLY by stallGuard's own timers. Distinguishes an internal
+// guard-driven stall (which deserves the "is the daemon actually reachable?" honesty check below)
+// from a genuine caller cancellation or a real connection-level failure — neither of which should
+// ever be relabeled as a "stall".
+class ProviderStallError extends Error {
+  constructor(public readonly kind: "first-token" | "idle" | "total", message: string) {
+    super(message);
+    this.name = "ProviderStallError";
+  }
+}
+
+function stallReasonLabel(kind: ProviderStallError["kind"]): string {
+  if (kind === "first-token") return "no first token";
+  if (kind === "idle") return "idle mid-generation";
+  return "total timeout";
+}
+
+// FIX A2 — replaces buildSignal for the ollama-local call site with a guard that can tell a
+// genuinely dead daemon apart from a live one that's simply mid-model-load/eviction (measured:
+// PROVIDER_TIMEOUT_MS's 300s default masked a 17-minute stall behind a mislabeled "unreachable").
+//   - total (PROVIDER_TIMEOUT_MS, default 300s): unconditional backstop, always active.
+//   - first-token (PROVIDER_FIRST_TOKEN_TIMEOUT_MS, default 45s): STREAMING only — a cold 5-8GB
+//     model load can legitimately take tens of seconds before the first token appears.
+//   - idle (PROVIDER_IDLE_TIMEOUT_MS, default 30s): STREAMING only — rearmed by progress() after
+//     every successful chunk read, so a healthy slow (~1 tok/s) generation never trips it.
+// Non-streaming gets ONLY the total backstop: a short first-byte timer would kill legitimate long
+// non-stream generations (e.g. distillPanel's compress) — await fetch() there doesn't resolve
+// until the ENTIRE reply is generated, so the total timer is the only honest guard available.
+function stallGuard(callerSignal: AbortSignal | undefined, streaming: boolean): {
+  signal: AbortSignal;
+  progress: () => void;
+  dispose: () => void;
+} {
+  const totalMs = Number(process.env.PROVIDER_TIMEOUT_MS) || 300000;
+  const firstTokenMs = Number(process.env.PROVIDER_FIRST_TOKEN_TIMEOUT_MS) || 45000;
+  const idleMs = Number(process.env.PROVIDER_IDLE_TIMEOUT_MS) || 30000;
+
+  const controller = new AbortController();
+  const totalTimer = setTimeout(
+    () => controller.abort(new ProviderStallError("total", `Provider call exceeded total timeout (${totalMs}ms)`)),
+    totalMs,
+  );
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  if (streaming) {
+    idleTimer = setTimeout(
+      () => controller.abort(new ProviderStallError("first-token", `No first token received within ${firstTokenMs}ms`)),
+      firstTokenMs,
+    );
+  }
+
+  const progress = () => {
+    if (!streaming) return;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(
+      () => controller.abort(new ProviderStallError("idle", `Idle for ${idleMs}ms with no further output`)),
+      idleMs,
+    );
+  };
+
+  const dispose = () => {
+    clearTimeout(totalTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+  };
+
+  let signal: AbortSignal = controller.signal;
+  if (callerSignal) {
+    if (typeof AbortSignal.any === "function") {
+      signal = AbortSignal.any([controller.signal, callerSignal]);
+    } else {
+      // Node without AbortSignal.any (defensive fallback — this repo's baseline already
+      // relies on it elsewhere, but wire both explicitly rather than silently drop caller cancel).
+      if (callerSignal.aborted) controller.abort(callerSignal.reason);
+      else callerSignal.addEventListener("abort", () => controller.abort(callerSignal.reason), { once: true });
+      signal = controller.signal;
+    }
+  }
+
+  return { signal, progress, dispose };
+}
+
+// Races a pending reader.read() against the stall-guard's signal so a hung read (no further
+// data, nothing else watching the connection) is cut at the guard's timeout instead of pinning
+// the loop forever. Explicit rather than relying on the underlying stream implementation to tie
+// abort → body-cancel together itself (real fetch/undici does; this holds regardless).
+function readOrAbort<T>(read: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    read.then(
+      (v) => { signal.removeEventListener("abort", onAbort); resolve(v); },
+      (e) => { signal.removeEventListener("abort", onAbort); reject(e); },
+    );
+  });
+}
+
+// FIX A2 — honest failure label. A raw guard-triggered abort says nothing about WHY: the ollama
+// daemon could be dead, or it could be alive and simply mid-model-load/eviction. Before surfacing
+// `unreachableFallback`, cheaply probe /api/ps (never blocks on inference) to tell the two apart.
+// Runs ONLY on the failure path (never on the happy path), and ONLY for a guard-tagged stall —
+// callers must not invoke this for a genuine connection refusal or caller cancellation.
+async function honestOllamaError(host: string, model: string, err: ProviderStallError, unreachableFallback: string): Promise<Error> {
+  let reachable = false;
+  try {
+    await fetch(`${host}/api/ps`, { signal: AbortSignal.timeout(1000) });
+    reachable = true;
+  } catch {
+    reachable = false;
+  }
+  if (!reachable) return new Error(unreachableFallback);
+  return new Error(`Ollama inference stalled (${stallReasonLabel(err.kind)}) — daemon reachable; likely model load/eviction for ${model}`);
+}
+
 export class ProviderRouter {
   /**
    * Whether the demo provider may be used as a CHAIN FALLBACK (when every real
@@ -351,8 +464,17 @@ export class ProviderRouter {
     let lastError: Error | null = null;
     const requestId = randomUUID();
     let prevProv: string | undefined; // provider the current attempt fell back FROM (telemetry)
+    // FIX A4 — chain-wide total deadline (default 120s, PROVIDER_CHAIN_DEADLINE_MS). Gates only
+    // STARTING a new provider attempt after at least one has already failed: `lastError` is null
+    // on the very first iteration, so the first provider is always attempted regardless of this
+    // deadline, and an in-flight healthy stream is never aborted by it.
+    const chainDeadline = start + (Number(process.env.PROVIDER_CHAIN_DEADLINE_MS) || 120000);
 
     for (const prov of providersToTry) {
+      if (lastError && Date.now() > chainDeadline) {
+        lastError = new Error(`Fallback chain deadline exceeded (${Date.now() - start}ms); last: ${lastError.message}`);
+        break;
+      }
       const resolvedConfig = { ...config, provider: prov };
       // A model name belongs to its provider: "gemini-2.0-flash" is meaningless to
       // ollama (404 "model not found") and would cascade the whole chain to demo.
@@ -491,6 +613,9 @@ export class ProviderRouter {
             const live = this.liveKeyCount(prov);
             // Token NAMES/positions ok to log; VALUES never.
             console.warn(`[KeyPool] ${prov} key#${attempt + 1} ${isQuota ? "quota" : "auth"}-exhausted → ${live} live key(s) remain`);
+            // v15 buddy-system: the provider just went dark (last live key cooled) → ask the
+            // health loop to immediately harvest any machine key so a buddy can be restored fast.
+            if (live === 0) { try { ProviderRouter.onPoolExhausted?.(prov); } catch { /* best-effort self-heal */ } }
             if (live > 0 && attempt + 1 < attempts) { rotated = true; continue; } // retry same provider, next key
           } else if (cloudKeyed) {
             // Passive capability learning: a 400/422 on a TOOLS request marks this
@@ -639,7 +764,40 @@ export class ProviderRouter {
       : initial === "gemini-cli" ? ["gemini-cli", "gemini"]
       : [initial];
     const rest = defaults.filter((p) => !front.includes(p));
-    return [...front, ...this.orderRestByLatency(rest, (p) => this.getLatency(p))];
+    return [...front, ...this.orderRestByLatency(rest, (p) => this.getLatency(p), (p) => this.healthPenalty(p))];
+  }
+
+  // v15 buddy-system: how "unavailable" a KEYED cloud provider is right now, for proactive
+  // reordering. 0 = healthy, 1 = every live key ≥80% (about to 429), 2 = all keys cooled.
+  // Providers with no keyed pool (keyless like pollinations, local, unconfigured) return 0 —
+  // they're never demoted; keyless/local are the always-available buddies + $0 safety net.
+  public static healthPenalty(provider: string): number {
+    const pool = this.keyPool(provider);
+    if (pool.length === 0) return 0;
+    if (this.keyPoolStatus(provider).live === 0) return 2;
+    return this.poolSaturation(provider).allApproaching ? 1 : 0;
+  }
+
+  // v15 buddy-system status for the UI: who's live/saturated/cooled/absent, which buddy is
+  // actually serving, and whether every cloud provider is down (→ riding $0-local). No values.
+  public static buddyStatus(): {
+    providers: Array<{ id: string; state: "live" | "saturated" | "cooled" | "absent"; worstPct: number; live: number; total: number }>;
+    activeBuddy: string;
+    allCloudCooled: boolean;
+  } {
+    const LEGACY = ["gemini", "openai", "openrouter", "anthropic", "ollama-cloud"];
+    const catalogKeyed = Object.keys(PROVIDER_CATALOG).filter((id) => !catalogEntry(id)?.keyless);
+    const ids = [...new Set([...LEGACY, ...catalogKeyed])];
+    const providers = ids.map((id) => {
+      const { total, live } = this.keyPoolStatus(id);
+      if (total === 0) return { id, state: "absent" as const, worstPct: 0, live: 0, total: 0 };
+      const sat = this.poolSaturation(id);
+      const state = live === 0 ? "cooled" as const : sat.allApproaching ? "saturated" as const : "live" as const;
+      return { id, state, worstPct: Math.round(sat.worstPct * 100) / 100, live, total };
+    });
+    const liveCloud = providers.filter((p) => p.state === "live" || p.state === "saturated").map((p) => p.id);
+    const activeBuddy = this.getFallbackChain("ollama-local").find((p) => liveCloud.includes(p)) ?? "ollama-local ($0)";
+    return { providers, activeBuddy, allCloudCooled: liveCloud.length === 0 };
   }
 
   // vNext T2.2: order the fallback TAIL by measured latency WITHOUT breaking invariants —
@@ -647,13 +805,22 @@ export class ProviderRouter {
   // adjacent. Only the cloud tier reorders, fastest-first; providers with no fresh latency
   // (getLatency = -1) sort last via Infinity, so a cold cache preserves the original order
   // (zero behavior change until real measurements exist). Pure (getLatency injected) → tested.
-  public static orderRestByLatency(rest: string[], getLatency: (p: string) => number): string[] {
+  public static orderRestByLatency(
+    rest: string[],
+    getLatency: (p: string) => number,
+    // v15 buddy-system: proactively demote a saturated/cooled provider BELOW its healthy
+    // buddies BEFORE it 429s. 0 = healthy, 1 = ≥80% saturated, 2 = all keys cooled. Keyless/
+    // local/demo return 0 (never demoted — they're the always-available buddies). Default
+    // () => 0 keeps the pure latency behavior for existing callers/tests.
+    getHealthPenalty: (p: string) => number = () => 0,
+  ): string[] {
     const EARLY = ["fleet", "ollama-local"];
     const early = rest.filter((p) => EARLY.includes(p));
     const hasDemo = rest.includes("demo");
     const cloud = rest.filter((p) => !EARLY.includes(p) && p !== "demo");
     const lat = (p: string) => { const v = getLatency(p); return v < 0 ? Infinity : v; };
-    const sorted = [...cloud].sort((a, b) => lat(a) - lat(b)); // stable: equal/unmeasured keep order
+    // Health penalty dominates latency: a healthy slow buddy beats a fast saturated one.
+    const sorted = [...cloud].sort((a, b) => (getHealthPenalty(a) - getHealthPenalty(b)) || (lat(a) - lat(b)));
     // Keep the gemini family adjacent: pin gemini-cli immediately after gemini if both present.
     const gi = sorted.indexOf("gemini"), ci = sorted.indexOf("gemini-cli");
     if (gi >= 0 && ci >= 0 && ci !== gi + 1) {
@@ -808,6 +975,11 @@ export class ProviderRouter {
   // validated as the EXACT key that serves the ping — without mutating the vault or being
   // overshadowed by the least-loaded pool selection. Set+cleared around a single test call.
   public static testKeyOverride: { provider: string; key: string } | null = null;
+
+  // v15 buddy-system hook: set by key-health.startKeyHealth. Fired (best-effort) when a keyed
+  // provider's last live key cools (live→0) so the health loop can rescan machine keys NOW.
+  // A callback (not a direct import) avoids a providers↔key-health cycle.
+  public static onPoolExhausted: ((provider: string) => void) | null = null;
 
   public static getDecryptedKey(provider: string): string {
     const o = this.testKeyOverride;
@@ -1054,112 +1226,134 @@ export class ProviderRouter {
         const genStart = Date.now(); // wall-clock fallback for tok/s when ollama omits eval_duration
         let response: Response | undefined;
         let connErr: any = null;
-        for (const host of ollamaHosts) {
-          try {
-            response = await fetch(`${host}/api/chat`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: reqBody,
-              signal: buildSignal(signal), // Compose caller cancellation with 300s timeout (L12)
-            });
-            break; // got an HTTP response (even an error status) — stop host probing
-          } catch (e) {
-            connErr = e; // connection-level failure → try next host candidate
-          }
-        }
-        if (!response) {
-          throw new Error(`Ollama Local unreachable on [${ollamaHosts.join(", ")}]: ${connErr?.message || connErr}`);
-        }
-
-        if (!response.ok) {
-          const errMsg = await response.text().catch(() => "");
-          throw new Error(`Ollama Local returned status ${response.status}: ${errMsg || response.statusText}`);
-        }
-
-        if (onStreamChunk && response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let accumulated = "";
-          let fullText = "";
-          let streamToolCalls: any[] | undefined;
-          // Map accumulated ollama tool_calls into the ToolCall shape (mirrors the
-          // non-stream branch); fall back to text-embedded tool calls. The streaming
-          // branch used to forward only content and silently drop tool_calls.
-          const mapStreamCalls = (): ToolCall[] | undefined => {
-            let tc = streamToolCalls?.map((t: any) => ({
-              id: t.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
-              name: t.function?.name,
-              arguments: typeof t.function?.arguments === "string" ? safeJsonObj(t.function.arguments) : t.function?.arguments,
-            }));
-            if (!tc || tc.length === 0) tc = extractTextToolCalls(fullText) ?? tc;
-            return tc;
-          };
-
-          while (true) {
-            abortIfCancelled(signal); // never drain a backend past a caller abort
-            const { done, value } = await reader.read();
-            if (done) break;
-            accumulated += decoder.decode(value, { stream: true });
-
-            // Ollama streams JSON line-by-line
-            const lines = accumulated.split("\n");
-            accumulated = lines.pop() || "";
-
-            for (const line of lines) {
-              if (!line.trim()) continue;
-              try {
-                const parsed = JSON.parse(line);
-                if (parsed?.message?.tool_calls?.length) streamToolCalls = parsed.message.tool_calls;
-                const chunkText = parsed?.message?.content || "";
-                if (chunkText) {
-                  onStreamChunk(chunkText);
-                  fullText += chunkText;
-                }
-                if (parsed.done && parsed.eval_count) {
-                  // Capture the token count even when the done chunk omits eval_duration
-                  // (compute tps only when we can) so the billing meter never under-counts.
-                  return {
-                    text: fullText, source: "ollama_local", modelUsed: usedModel,
-                    tokens: parsed.eval_count,
-                    tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : parsed.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000),
-                    toolCalls: mapStreamCalls(),
-                  };
-                }
-              } catch (e) {
-                // Keep moving on parse anomalies
-              }
+        let usedHost = ollamaHosts[0];
+        const streaming = !!onStreamChunk;
+        // FIX A2 — split-timeout stall guard replaces buildSignal here: total backstop always on,
+        // first-token/idle guards additionally on for streaming (see stallGuard doc above).
+        const guard = stallGuard(signal, streaming);
+        try {
+          for (const host of ollamaHosts) {
+            try {
+              response = await fetch(`${host}/api/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: reqBody,
+                signal: guard.signal, // Compose caller cancellation + stall guard (FIX A2, was buildSignal/L12)
+              });
+              usedHost = host;
+              break; // got an HTTP response (even an error status) — stop host probing
+            } catch (e) {
+              connErr = e; // connection-level failure → try next host candidate
             }
           }
-          return { text: fullText, source: "ollama_local", modelUsed: usedModel, toolCalls: mapStreamCalls() };
-        } else {
-          const resultJson = await response.json();
-          let reply = resultJson?.message?.content || "";
-          
-          // L6: If reasoning model returns empty, fallback if it gave a thinking key
-          if (!reply && resultJson?.message?.thinking) {
-            reply = resultJson.message.thinking;
-          }
-          // tok/s: prefer ollama's eval timing; fall back to wall-clock effective rate when
-          // eval_duration is absent (so the dispatch bench never under-reports tok/s as 0).
-          let tokensPerSec: number | undefined;
-          if (resultJson.eval_count) {
-            tokensPerSec = resultJson.eval_duration
-              ? resultJson.eval_count / (resultJson.eval_duration / 1e9)
-              : resultJson.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000);
+          if (!response) {
+            const fallback = `Ollama Local unreachable on [${ollamaHosts.join(", ")}]: ${connErr?.message || connErr}`;
+            // Only a guard-tagged stall gets the honesty probe — a real connection refusal is
+            // already an honest "unreachable" and needs no /api/ps round-trip to confirm.
+            throw connErr instanceof ProviderStallError ? await honestOllamaError(usedHost, usedModel, connErr, fallback) : new Error(fallback);
           }
 
-          let toolCalls: ToolCall[] | undefined;
-          if (resultJson?.message?.tool_calls) {
-            toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
-              id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
-              name: tc.function?.name,
-              arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
-            }));
+          if (!response.ok) {
+            const errMsg = await response.text().catch(() => "");
+            throw new Error(`Ollama Local returned status ${response.status}: ${errMsg || response.statusText}`);
           }
-          // Fallback: some models emit tool calls as text — recover them.
-          if (!toolCalls || toolCalls.length === 0) toolCalls = extractTextToolCalls(reply) ?? toolCalls;
 
-          return { text: reply, source: "ollama_local", modelUsed: usedModel, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
+          if (onStreamChunk && response.body) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulated = "";
+            let fullText = "";
+            let streamToolCalls: any[] | undefined;
+            // Map accumulated ollama tool_calls into the ToolCall shape (mirrors the
+            // non-stream branch); fall back to text-embedded tool calls. The streaming
+            // branch used to forward only content and silently drop tool_calls.
+            const mapStreamCalls = (): ToolCall[] | undefined => {
+              let tc = streamToolCalls?.map((t: any) => ({
+                id: t.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
+                name: t.function?.name,
+                arguments: typeof t.function?.arguments === "string" ? safeJsonObj(t.function.arguments) : t.function?.arguments,
+              }));
+              if (!tc || tc.length === 0) tc = extractTextToolCalls(fullText) ?? tc;
+              return tc;
+            };
+
+            while (true) {
+              abortIfCancelled(signal); // never drain a backend past a caller abort
+              const { done, value } = await readOrAbort(reader.read(), guard.signal); // FIX A2: cut a hung read at the guard's timeout
+              guard.progress(); // a successful read rearms the idle timer — healthy slow generation never trips it
+              if (done) break;
+              accumulated += decoder.decode(value, { stream: true });
+
+              // Ollama streams JSON line-by-line
+              const lines = accumulated.split("\n");
+              accumulated = lines.pop() || "";
+
+              for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                  const parsed = JSON.parse(line);
+                  if (parsed?.message?.tool_calls?.length) streamToolCalls = parsed.message.tool_calls;
+                  const chunkText = parsed?.message?.content || "";
+                  if (chunkText) {
+                    onStreamChunk(chunkText);
+                    fullText += chunkText;
+                  }
+                  if (parsed.done && parsed.eval_count) {
+                    // Capture the token count even when the done chunk omits eval_duration
+                    // (compute tps only when we can) so the billing meter never under-counts.
+                    return {
+                      text: fullText, source: "ollama_local", modelUsed: usedModel,
+                      tokens: parsed.eval_count,
+                      tokensPerSec: parsed.eval_duration ? parsed.eval_count / (parsed.eval_duration / 1e9) : parsed.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000),
+                      toolCalls: mapStreamCalls(),
+                    };
+                  }
+                } catch (e) {
+                  // Keep moving on parse anomalies
+                }
+              }
+            }
+            return { text: fullText, source: "ollama_local", modelUsed: usedModel, toolCalls: mapStreamCalls() };
+          } else {
+            const resultJson = await response.json();
+            let reply = resultJson?.message?.content || "";
+
+            // L6: If reasoning model returns empty, fallback if it gave a thinking key
+            if (!reply && resultJson?.message?.thinking) {
+              reply = resultJson.message.thinking;
+            }
+            // tok/s: prefer ollama's eval timing; fall back to wall-clock effective rate when
+            // eval_duration is absent (so the dispatch bench never under-reports tok/s as 0).
+            let tokensPerSec: number | undefined;
+            if (resultJson.eval_count) {
+              tokensPerSec = resultJson.eval_duration
+                ? resultJson.eval_count / (resultJson.eval_duration / 1e9)
+                : resultJson.eval_count / Math.max(0.001, (Date.now() - genStart) / 1000);
+            }
+
+            let toolCalls: ToolCall[] | undefined;
+            if (resultJson?.message?.tool_calls) {
+              toolCalls = resultJson.message.tool_calls.map((tc: any) => ({
+                id: tc.id || `tc-${crypto.randomUUID().slice(0, 8)}`,
+                name: tc.function?.name,
+                arguments: typeof tc.function?.arguments === "string" ? safeJsonObj(tc.function.arguments) : tc.function?.arguments
+              }));
+            }
+            // Fallback: some models emit tool calls as text — recover them.
+            if (!toolCalls || toolCalls.length === 0) toolCalls = extractTextToolCalls(reply) ?? toolCalls;
+
+            return { text: reply, source: "ollama_local", modelUsed: usedModel, tokensPerSec, tokens: resultJson.eval_count, toolCalls };
+          }
+        } catch (err) {
+          // FIX A2 honest label: only a guard-tagged stall gets relabeled — a bad HTTP status,
+          // a genuine caller cancellation, or any other error is rethrown exactly as-is.
+          if (err instanceof ProviderStallError) {
+            const fallback = `Ollama Local unreachable on [${usedHost}]: ${err.message}`;
+            throw await honestOllamaError(usedHost, usedModel, err, fallback);
+          }
+          throw err;
+        } finally {
+          guard.dispose(); // clears both timers on every exit path — success, throw, or early return
         }
       }
 

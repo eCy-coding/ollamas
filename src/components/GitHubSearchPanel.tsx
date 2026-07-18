@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Search, Loader2, ExternalLink, Star, AlertTriangle, CircleDot, GitPullRequest, FileCode2, FolderGit2, Compass, RefreshCw } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { AssistDrawer } from "./AssistDrawer";
 
 // "GitHub Arama" tab — first-party GitHub keyword search (repos / issues+PRs /
 // code) over the REST Search API. Replaces the old external-iframe supervisor.
@@ -75,6 +76,18 @@ export default function GitHubSearchPanel({ onNotify }: { onNotify?: (msg: strin
   const pickType = (t: SearchType) => { setType(t); if (q.trim()) run(t); };
 
   const lowRate = data?.rateLimit && data.rateLimit.remaining < 3;
+  const hasResults = Boolean(data?.ok && data.items.length > 0);
+
+  // Compact metadata of the CURRENT search results for the eCy specialist to
+  // rank/explain — top 15 items, descriptions trimmed; JSON.stringify drops keys
+  // with an undefined value so absent license/desc stay out of the ~3500-char cap.
+  const buildContext = () => {
+    const rows = (data?.items ?? []).slice(0, 15).map((it: any) =>
+      type === "repos" ? { full_name: it.full_name, desc: it.description ? String(it.description).trim().slice(0, 140) : undefined, stars: it.stargazers_count, lang: it.language, license: it.license?.spdx_id || it.license?.key || undefined }
+      : type === "issues" ? { title: it.title ? String(it.title).trim().slice(0, 140) : undefined, state: it.state, number: it.number, repo: repoFromUrl(it.repository_url) }
+      : { repo: it.repository?.full_name, path: it.path });
+    return JSON.stringify({ query: q.trim(), type, total: data?.total ?? 0, items: rows });
+  };
 
   return (
     <div className="space-y-3">
@@ -154,6 +167,9 @@ export default function GitHubSearchPanel({ onNotify }: { onNotify?: (msg: strin
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Ara
         </button>
       </div>
+
+      {/* eCy uzmanına mevcut sonuçları sırala/açıkla dedirt — sonuç yoksa pasif */}
+      <AssistDrawer panelId="search" context={buildContext} disabled={!hasResults} />
 
       {err && (
         <div className="flex items-start gap-2 text-xs text-rose-300 bg-rose-950/20 border border-rose-800 rounded p-2">

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { GitBranch, Loader2, RefreshCw, ExternalLink, RotateCw, XCircle, ChevronRight, ChevronDown, AlertTriangle, FileText, Play } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { AssistDrawer } from "./AssistDrawer";
 
 // "GitHub Actions" tab — lists workflow runs with status/conclusion badges,
 // drill-down to jobs/steps, and (with a github vault token) re-run / cancel.
@@ -159,6 +160,41 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
   const lowRate = data?.rateLimit && data.rateLimit.remaining < 10;
   const visibleRuns = (data?.runs || []).filter((r) => !failuresOnly || r.conclusion === "failure" || r.conclusion === "timed_out");
 
+  // The expanded run is the "selected" one; the CI specialist diagnoses it from
+  // its jobs/steps and the tail of whichever job log the user has opened (a failed
+  // job wins). buildContext() → compact (<3800 char) metadata for POST /panel/:id.
+  const selectedRun = expanded != null ? (data?.runs || []).find((r) => r.id === expanded) ?? null : null;
+  const selectedJobs = expanded != null ? jobs[expanded] : undefined;
+  const loadedLog = (() => {
+    if (!selectedJobs) return null;
+    const withLog = selectedJobs.filter((j) => logs[j.id] && !logs[j.id]!.loading && logs[j.id]!.text);
+    if (withLog.length === 0) return null;
+    return { job: withLog.find((j) => j.conclusion === "failure") ?? withLog[0]! };
+  })();
+
+  const buildContext = (): string => {
+    const r = selectedRun;
+    if (!r) return "Seçili çalışma yok — teşhis için bir workflow çalışmasını genişletin.";
+    const head: string[] = [
+      `RUN: ${r.name || r.display_title || "(workflow)"} #${r.run_number ?? "?"}`,
+      `durum=${r.status || "?"} sonuç=${r.conclusion || "?"} dal=${r.head_branch || "?"} olay=${r.event || "?"}`,
+    ];
+    if (r.head_commit?.message) head.push(`commit: ${r.head_commit.message.split("\n")[0]}`);
+    for (const j of selectedJobs || []) {
+      head.push(`- job: ${j.name || "(job)"} → ${j.conclusion || j.status || "?"}`);
+      for (const s of j.steps || []) {
+        if (s.conclusion && s.conclusion !== "success") head.push(`    ✗ ${s.number}. ${s.name} · ${s.conclusion}`);
+      }
+    }
+    const header = head.join("\n");
+    if (!loadedLog) return header.slice(0, 3800);
+    // Keep the log tail (diagnosis-critical) intact; trim the header if the sum overflows.
+    const tail = (logs[loadedLog.job.id]?.text || "").slice(-2500);
+    const block = `\nLOG (${loadedLog.job.name || "job"}, son ${tail.length} char):\n${tail}`;
+    const headMax = Math.max(0, 3800 - block.length);
+    return (header.length > headMax ? header.slice(0, headMax) : header) + block;
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm text-slate-300">
@@ -299,6 +335,12 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
                         )}
                       </div>
                     ))}
+                    <AssistDrawer
+                      panelId="github-actions"
+                      context={buildContext}
+                      label="eCy ile teşhis"
+                      disabled={!selectedRun || !loadedLog}
+                    />
                   </div>
                 )}
               </li>

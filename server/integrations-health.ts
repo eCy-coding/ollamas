@@ -3,6 +3,7 @@
 // probes (checkAvailable, getFeedItems, searchGitHub) — no new heavy code.
 import { checkAvailable } from "./mcp/catalog";
 import { getFeedItems, type FetchLike } from "./threatfeed";
+import { validateGitHubToken, type GhTokenCheck } from "./github";
 
 export type Status = "ok" | "needs-setup" | "degraded";
 export interface IntegrationStatus {
@@ -13,14 +14,21 @@ export async function checkIntegrations(opts: {
   token: string;
   isAvailable?: (cmd: string) => boolean;
   feedFetch?: FetchLike;
+  ghValidate?: (token: string) => Promise<GhTokenCheck>;
 }): Promise<IntegrationStatus[]> {
   const isAvailable = opts.isAvailable ?? checkAvailable;
   const out: IntegrationStatus[] = [];
 
-  // 1. GitHub — the token gates Actions writes, code search, job logs, dispatch.
-  out.push(opts.token
-    ? { id: "github", title: "GitHub", status: "ok", detail: "Token bağlı — Actions/arama/log/dispatch aktif.", purpose: "CI görünürlüğü + kod/depo araması + audit-teslimatı.", lane: "revenue/ops" }
-    : { id: "github", title: "GitHub", status: "needs-setup", detail: "Vault'ta GitHub token yok.", fix: "‘GitHub'ı otomatik bağla (gh CLI)’ butonu, veya PAT yapıştır.", purpose: "CI görünürlüğü + kod/depo araması + audit-teslimatı.", lane: "revenue/ops" });
+  // 1. GitHub — LIVE-validate the token (not presence-only) so an invalid/expired key
+  // shows red with a reason, not a false green. Token gates Actions/search/log/dispatch.
+  const ghValidate = opts.ghValidate ?? validateGitHubToken;
+  const gh = opts.token ? await ghValidate(opts.token) : null;
+  out.push(
+    !opts.token
+      ? { id: "github", title: "GitHub", status: "needs-setup", detail: "Vault'ta GitHub token yok.", fix: "Donanım Kasası → ‘GitHub (repo)’ satırına PAT yapıştır, veya Entegrasyonlar → gh CLI otomatik bağla.", purpose: "CI görünürlüğü + kod/depo araması + audit-teslimatı.", lane: "revenue/ops" }
+      : gh!.ok
+        ? { id: "github", title: "GitHub", status: "ok", detail: `Token bağlı${gh!.login ? ` (${gh!.login})` : ""} — Actions/arama/log/dispatch aktif.`, purpose: "CI görünürlüğü + kod/depo araması + audit-teslimatı.", lane: "revenue/ops" }
+        : { id: "github", title: "GitHub", status: "degraded", detail: `Token doğrulanamadı: ${gh!.error ?? "geçersiz"}.`, fix: "Donanım Kasası → ‘GitHub (repo)’ → yeni PAT yapıştır + Test et.", purpose: "CI görünürlüğü + kod/depo araması + audit-teslimatı.", lane: "revenue/ops" });
 
   // 2/3. MCP runtimes — npx (node) + uvx (Python) drive the one-click catalog.
   const npx = isAvailable("npx");
@@ -35,10 +43,10 @@ export async function checkIntegrations(opts: {
     out.push({ id: "threat-feed", title: "Tehdit Akışı", status: live > 0 ? "ok" : "degraded", detail: `${live}/${feed.sources.length} kaynak canlı.`, purpose: "Tehdit-İstihbaratı sekmesine bağımsız CVE/güvenlik beslemesi.", lane: "security" });
   } catch { out.push({ id: "threat-feed", title: "Tehdit Akışı", status: "degraded", detail: "besleme alınamadı.", purpose: "Tehdit-İstihbaratı beslemesi.", lane: "security" }); }
 
-  // 5. GitHub Search — anon works but rate-limited + no code search; token lifts it.
-  out.push(opts.token
+  // 5. GitHub Search — anon works but rate-limited + no code search; a VALID token lifts it.
+  out.push(gh?.ok
     ? { id: "github-search", title: "GitHub Arama/Standart", status: "ok", detail: "Authed — 30/dk, kod araması + Standart Tarama aktif.", purpose: "Kendini-geliştiren keşif (adopt-fit görev listesi).", lane: "discovery" }
-    : { id: "github-search", title: "GitHub Arama/Standart", status: "degraded", detail: "Anon — 10/dk, kod araması kapalı.", fix: "GitHub token bağla (yukarı).", purpose: "Kendini-geliştiren keşif (adopt-fit görev listesi).", lane: "discovery" });
+    : { id: "github-search", title: "GitHub Arama/Standart", status: "degraded", detail: opts.token ? "Token geçersiz — anon 10/dk, kod araması kapalı." : "Anon — 10/dk, kod araması kapalı.", fix: "GitHub token bağla (yukarı).", purpose: "Kendini-geliştiren keşif (adopt-fit görev listesi).", lane: "discovery" });
 
   return out;
 }
