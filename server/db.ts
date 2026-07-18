@@ -231,6 +231,13 @@ export class SecureDB {
   public data: DBConfig;
   /** Reported source of the AES master key (name only, never a value). See MasterKeySourceLabel. */
   public readonly masterKeySource: MasterKeySourceLabel;
+  // B6 — debounced-writer state (per-instance, not module-global, so multiple SecureDB
+  // instances — e.g. in tests — never cross-contaminate each other's pending timers).
+  private pendingSaveTimer?: NodeJS.Timeout;
+  private pendingSaveMaxWaitTimer?: NodeJS.Timeout;
+  private pendingSaveWaiters: Array<() => void> = [];
+  // B6 — fires once per instance the first time trim() actually drops data (no warning spam).
+  private sessionsTrimWarned = false;
 
   constructor() {
     // 1. Resolve storage path
@@ -334,8 +341,82 @@ export class SecureDB {
 
   public save(newData: DBConfig = this.data): void {
     this.data = newData;
+    this.trim(this.data);
     // Atomic temp+rename — a crash mid-write must never truncate config.json (the vault).
     atomicWriteFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+  }
+
+  /**
+   * B6 — cap `sessions`/`messages` on every save() so all 26 call sites are covered with ZERO
+   * call-site edits. `sessions` held EVERY message of EVERY chat and was uncapped (unlike
+   * `securityLog`, capped at 500 above) — JSON.stringify + a synchronous atomic write of that
+   * on every chat turn was a measured multi-hundred-ms event-loop freeze, and it also inflated
+   * the cockpit SSE's per-2s activitySummary scan over every session. Sessions are newest-first
+   * (call sites `unshift`) → keep the newest N sessions and, per session, the newest 500
+   * messages (the tail — messages are appended in chat order, oldest first).
+   */
+  private trim(cfg: DBConfig): void {
+    if (!Array.isArray(cfg.sessions)) return;
+    const maxSessions = Number(process.env.OLLAMAS_MAX_SESSIONS) || 100;
+    let dropped = false;
+
+    if (cfg.sessions.length > maxSessions) {
+      cfg.sessions = cfg.sessions.slice(0, maxSessions);
+      dropped = true;
+    }
+    for (const session of cfg.sessions) {
+      if (Array.isArray(session.messages) && session.messages.length > 500) {
+        session.messages = session.messages.slice(-500);
+        dropped = true;
+      }
+    }
+
+    if (dropped && !this.sessionsTrimWarned) {
+      this.sessionsTrimWarned = true;
+      console.warn(
+        `[db] trimmed sessions on save (cap: ${maxSessions} sessions, 500 messages/session) — oldest chat data was dropped from config.json`
+      );
+    }
+  }
+
+  // B6 — debounced writer: coalesces bursts of high-frequency saves (one per chat turn, many
+  // turns within a few seconds) into a single physical write. `save()` itself is UNCHANGED —
+  // it stays synchronous/immediate, because vault/key/security writes must remain durable-now.
+  // This only wraps it for call sites that can tolerate a short, bounded delay (chat-turn
+  // persistence). Trailing 500ms: a burst that goes quiet flushes shortly after the last call.
+  // maxWait 2000ms: a session that never goes quiet (continuous back-to-back turns) still
+  // flushes at least every 2s, so staleness (and data-loss window on crash) stays bounded.
+  public saveDebounced(newData: DBConfig = this.data): void {
+    this.data = newData;
+    if (this.pendingSaveTimer) clearTimeout(this.pendingSaveTimer);
+    this.pendingSaveTimer = setTimeout(() => this.flushDebouncedSave(), 500);
+    this.pendingSaveTimer.unref?.();
+    if (!this.pendingSaveMaxWaitTimer) {
+      this.pendingSaveMaxWaitTimer = setTimeout(() => this.flushDebouncedSave(), 2000);
+      this.pendingSaveMaxWaitTimer.unref?.();
+    }
+  }
+
+  /** Fires the single physical write (whichever of trailing/maxWait elapses first), cancels
+   *  the other pending timer, and wakes anyone awaiting flushPendingSave(). */
+  private flushDebouncedSave(): void {
+    if (this.pendingSaveTimer) { clearTimeout(this.pendingSaveTimer); this.pendingSaveTimer = undefined; }
+    if (this.pendingSaveMaxWaitTimer) { clearTimeout(this.pendingSaveMaxWaitTimer); this.pendingSaveMaxWaitTimer = undefined; }
+    this.save(this.data);
+    const waiters = this.pendingSaveWaiters;
+    this.pendingSaveWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  /** Awaits any pending debounced save, forcing it to write NOW rather than waiting out the
+   *  timer — so shutdown can drain it before the process exits. No-op (resolves immediately,
+   *  no extra write) when nothing is pending. */
+  public flushPendingSave(): Promise<void> {
+    if (!this.pendingSaveTimer && !this.pendingSaveMaxWaitTimer) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.pendingSaveWaiters.push(resolve);
+      this.flushDebouncedSave();
+    });
   }
 
   /**
@@ -399,3 +480,10 @@ export class SecureDB {
 
 // Export single shared instance
 export const db = new SecureDB();
+
+/** Convenience wrapper around the shared `db` singleton's flushPendingSave (B6) — for shutdown
+ *  hooks (`import { flushPendingSave } from "./server/db"`) that just need to drain the last
+ *  debounced chat-turn write before the process exits, without importing `db` itself. */
+export function flushPendingSave(): Promise<void> {
+  return db.flushPendingSave();
+}

@@ -5,7 +5,9 @@
  * DETERMINISTIC panel→specialist binding (not an LLM router — routing would waste a
  * full generate on the single GPU to re-derive a route already known from the panel
  * id). "Control" = owns the registry, the distilled knowledge briefs, persona
- * preservation, and a FIFO GPU mutex that serializes overlapping panel streams.
+ * preservation, and a FIFO GPU mutex that serializes the load/prefill/first-token
+ * window of overlapping panel streams (see withGpu + assistStream for why only
+ * that window, not the full stream, needs to be held).
  *
  * Runtime uses ONE warm base (ecy:latest) + a per-panel SYSTEM brief injected via
  * ai.ts AiOptions.system — zero model-reload thrash on a single warm slot. The brief
@@ -164,9 +166,29 @@ export async function* assistStream(db: DBLike, panelId: PanelId, contextText: s
   // The persona rides `system`, so any warm family member is an equivalent specialist.
   const baked = db.data.ecymSpecialists?.[panelId]?.model;
   const model = pickAssistModel(await loaded().catch(() => []), baked);
-  // Serialize the whole stream behind the mutex so panels queue rather than thrash.
-  const gen = await withGpu(async () => stream(prompt, { model, system, temperature: 0.3 }));
-  for await (const chunk of gen) yield chunk;
+  // `stream` is an async generator function: CALLING it just constructs the generator
+  // object and does not run any of its body (no fetch, no GPU work) until the first
+  // `.next()`. Wrapping the call itself in withGpu() — as this used to do — resolved
+  // the mutex instantly and let the real inference run unserialized; that's the bug.
+  //
+  // With one GPU slot / OLLAMA_NUM_PARALLEL=1, ollama already serializes decode across
+  // requests for the SAME resident model — that part needs no help from us. The actual
+  // hazard we must guard against is two DIFFERENT model tags racing the load/evict
+  // window on the single slot, and that race is over by the first token (once a model
+  // is loaded and has emitted a token, the swap has already happened). So we only need
+  // to hold the mutex from generator-start through the first token, then release it and
+  // stream the rest outside the lock. Holding the mutex for the entire stream would add
+  // pure latency with no extra protection, and can deadlock a FIFO queue if an SSE
+  // client stops draining mid-stream (its slot never frees for the next queued job).
+  const inner = stream(prompt, { model, system, temperature: 0.3 });
+  const first = await withGpu(() => inner.next());
+  try {
+    if (first.done) return;
+    yield first.value;
+    for await (const chunk of inner) yield chunk;
+  } finally {
+    await inner.return?.(undefined);
+  }
 }
 
 export interface DistillEvent { stage: "plan" | "search" | "compress" | "done" | "error"; status: "running" | "done" | "fail"; text?: string; brief?: string }

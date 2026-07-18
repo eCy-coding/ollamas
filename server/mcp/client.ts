@@ -156,6 +156,12 @@ const builtinNames = new Set(ToolRegistry.list().filter(t => t.tier !== "host_up
  *  `owner` (a tenantId) is given, the merged tools are tenant-scoped (Faz 24):
  *  visible to and invokable by only that tenant. Omit for global/shared upstreams. */
 export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Promise<UpstreamResult> {
+  // FIX B1: hoisted above the try so a timed-out/failed connect can still be
+  // closed from the catch below. Every SDK call the SDK makes defaults to a
+  // 60s timeout, so three unguarded sequential calls (connect/listTools/
+  // roots-list) could previously burn up to 180s on one dead upstream — and,
+  // for stdio, leave the spawned child process running forever.
+  let transport: StdioClientTransport | StreamableHTTPClientTransport | undefined;
   try {
     const samplingOn = SAMPLING_ENABLED();
     const client = new Client(
@@ -170,13 +176,16 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     // the hostname at connect time — a DNS-rebind (public at check, private at
     // connect) is not pinned. Closing it needs a custom fetch/agent that pins the
     // vetted IP; tracked as a documented residual, not silently ignored.
-    const transport =
+    transport =
       cfg.transport === "stdio"
         ? new StdioClientTransport({ command: cfg.command!, args: cfg.args || [], env: cfg.env })
         : new StreamableHTTPClientTransport(new URL(cfg.url!));
 
-    await client.connect(transport);
-    const { tools } = await client.listTools();
+    // FIX B1: explicit bounded timeouts — a dead/hung upstream must fail fast
+    // instead of inheriting the SDK's 60s-per-call default.
+    const connectTimeoutMs = Number(process.env.MCP_CONNECT_TIMEOUT_MS) || 15000;
+    await client.connect(transport, { timeout: connectTimeoutMs });
+    const { tools } = await client.listTools(undefined, { timeout: 10000 });
 
     // Pin the manifest (sorted name+description) and flag changes vs a prior connect.
     const manifest = tools.map((t) => `${t.name} ${t.description || ""}`).sort().join("");
@@ -238,7 +247,7 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     // v1.11 Phase A: fetch upstream roots for expose-side aggregation. Best-effort —
     // an upstream that does not implement roots/list will reject → store [].
     try {
-      const { roots: fetchedRoots } = await client.request({ method: "roots/list" }, ListRootsResultSchema);
+      const { roots: fetchedRoots } = await client.request({ method: "roots/list" }, ListRootsResultSchema, { timeout: 5000 });
       upstreamRoots.set(cfg.name, (fetchedRoots || []).map((r) => ({ uri: r.uri, name: r.name || r.uri })));
     } catch {
       upstreamRoots.set(cfg.name, []);
@@ -251,6 +260,10 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
       ...(flagged.size ? { flagged: [...flagged] } : {}),
     };
   } catch (err: any) {
+    // FIX B1: a connect/listTools/registration failure must not leak the spawned
+    // upstream process (stdio) or dangling connection (http). Best-effort — never
+    // let a close() failure mask or replace the original connect error.
+    try { await transport?.close(); } catch { /* best-effort */ }
     return { name: cfg.name, ok: false, tools: 0, error: err?.message || String(err) };
   }
 }

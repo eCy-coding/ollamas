@@ -29,12 +29,20 @@ export interface SupervisedStatus {
 interface Supervised extends SupervisedStatus {
   cfg: UpstreamConfig;
   owner?: string; // tenantId — preserved across reconnects (Faz 24 isolation)
+  /** Single-flight guard: an in-flight reconnect for THIS upstream, so two callers
+   *  (e.g. overlapping ticks) racing on the same down upstream share one reconnect
+   *  instead of spawning duplicate subprocesses. */
+  connecting?: Promise<void>;
 }
 
 const supervised = new Map<string, Supervised>();
 // rawToolName -> set of upstreams exposing it (cross-upstream collision surfacing).
 const toolOwners = new Map<string, Set<string>>();
 let timer: ReturnType<typeof setInterval> | null = null;
+// Module-level guard: a tick still in flight (e.g. serially awaiting pingUpstream +
+// reconnect across many upstreams) suppresses the next interval firing instead of
+// stacking a second concurrent tickOnce() on top of it.
+let ticking = false;
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 const now = () => Date.now();
@@ -107,12 +115,20 @@ export async function superviseUpstream(cfg: UpstreamConfig, owner?: string): Pr
 
 /** Reconnect a supervised upstream: drop its stale tools, then reconnect + re-register
  *  with the SAME owner (tenant isolation preserved). */
-async function reconnect(s: Supervised): Promise<void> {
+async function doReconnect(s: Supervised): Promise<void> {
   ToolRegistry.unregisterByPrefix(`mcp__${s.cfg.name}__`);
   await disconnectUpstream(s.cfg.name);
   s.reconnects++;
   const r = await connectUpstream(s.cfg, s.owner);
   applyResult(s, r);
+}
+
+/** Single-flight wrapper around doReconnect: concurrent callers for the SAME upstream
+ *  (e.g. two overlapping ticks racing a down upstream) share one in-flight reconnect
+ *  instead of each spawning a fresh subprocess against the same target. */
+function reconnect(s: Supervised): Promise<void> {
+  s.connecting ??= doReconnect(s).finally(() => { s.connecting = undefined; });
+  return s.connecting;
 }
 
 /** One supervision pass: ping healthy upstreams, retry due ones, re-arm open circuits. */
@@ -131,16 +147,28 @@ export async function tickOnce(t = now()): Promise<void> {
   }
 }
 
-/** Start the periodic health-check (opt-in via MCP_HEALTH_INTERVAL_MS>0; default off). */
-export function startSupervisor(intervalMs = num(process.env.MCP_HEALTH_INTERVAL_MS, 0)): void {
+/** Start the periodic health-check. Defaults to 30s — opt out with the explicit
+ *  literal MCP_HEALTH_INTERVAL_MS="0" (any other/unset value uses the 30s default). */
+export function startSupervisor(
+  intervalMs = process.env.MCP_HEALTH_INTERVAL_MS === "0" ? 0 : num(process.env.MCP_HEALTH_INTERVAL_MS, 30000)
+): void {
   if (timer || !(intervalMs > 0)) return;
-  timer = setInterval(() => { void tickOnce(); }, intervalMs);
+  timer = setInterval(() => {
+    if (ticking) return; // previous tick still running (many upstreams) — skip this firing
+    ticking = true;
+    void tickOnce().finally(() => { ticking = false; });
+  }, intervalMs);
   if (typeof timer.unref === "function") timer.unref(); // never keep the process alive
 }
 
 /** Stop the supervisor (graceful shutdown; mirrors stopWebhookWorker). */
 export function stopSupervisor(): void {
   if (timer) { clearInterval(timer); timer = null; }
+}
+
+/** Whether the periodic health-check loop is currently armed (tests). */
+export function isSupervisorRunning(): boolean {
+  return timer !== null;
 }
 
 export function getUpstreamStatus(): SupervisedStatus[] {
@@ -165,6 +193,7 @@ export async function removeUpstream(name: string): Promise<void> {
 /** Reset all supervisor state (tests). */
 export function resetSupervisor(): void {
   stopSupervisor();
+  ticking = false;
   supervised.clear();
   toolOwners.clear();
 }

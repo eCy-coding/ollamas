@@ -98,3 +98,52 @@ describe("collisions + remove", () => {
     expect(disconnectUpstream).toHaveBeenCalledWith("a");
   });
 });
+
+// B2 regression (bug 1): startSupervisor's default was 0 (opt-in), so the loop never
+// started and the whole backoff/circuit-breaker machinery above was dead code unless an
+// operator explicitly set MCP_HEALTH_INTERVAL_MS. Default is now 30s; "0" stays the
+// explicit opt-out.
+describe("startSupervisor — default interval (B2 bug 1)", () => {
+  afterEach(() => sup.stopSupervisor());
+
+  test("the health-check loop starts when MCP_HEALTH_INTERVAL_MS is unset", () => {
+    delete process.env.MCP_HEALTH_INTERVAL_MS;
+    expect(sup.isSupervisorRunning()).toBe(false);
+    sup.startSupervisor();
+    expect(sup.isSupervisorRunning()).toBe(true);
+  });
+
+  test('the loop does NOT start when MCP_HEALTH_INTERVAL_MS="0" (explicit opt-out)', () => {
+    process.env.MCP_HEALTH_INTERVAL_MS = "0";
+    sup.startSupervisor();
+    expect(sup.isSupervisorRunning()).toBe(false);
+    delete process.env.MCP_HEALTH_INTERVAL_MS;
+  });
+});
+
+// B2 regression (bug 2): setInterval's tick callback didn't await tickOnce(), so with
+// ~12 upstreams a slow tick (serial ping+reconnect) could outlive the interval and
+// overlap the next tick — two concurrent tickOnce() passes then both try to reconnect
+// the same down upstream, spawning duplicate subprocesses. reconnect() must be
+// single-flight per upstream regardless of which caller raced in.
+describe("overlapping ticks — single-flight reconnect (B2 bug 2)", () => {
+  test("two concurrent tickOnce() calls reconnect a down upstream exactly once", async () => {
+    connectUpstream.mockResolvedValueOnce(fail("loc2"));
+    await sup.superviseUpstream(cfg("loc2")); // degraded, nextRetryAt computed
+    expect(status("loc2").state).toBe("degraded");
+
+    // The reconnect attempt itself resolves ~100ms later (mirrors a real spawn/connect
+    // taking real time) — long enough that a second overlapping tick would otherwise
+    // race in and start its own reconnect before the first one lands.
+    connectUpstream.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(fail("loc2")), 100))
+    );
+
+    const t = FAR();
+    await Promise.all([sup.tickOnce(t), sup.tickOnce(t)]);
+
+    expect(connectUpstream).toHaveBeenCalledTimes(2); // 1 initial supervise + exactly 1 reconnect
+    expect(disconnectUpstream).toHaveBeenCalledTimes(1); // reconnect drops the old conn exactly once
+    expect(status("loc2").reconnects).toBe(1);
+  });
+});
