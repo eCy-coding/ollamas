@@ -82,6 +82,8 @@ export const ECY_PRINCIPLES = [
   "Honest uncertainty: say 'I don't know' instead of inventing facts.",
   "Prefer reuse over rebuild; smallest correct change wins.",
   "Never fake success; report failures plainly.",
+  "For computable questions (arithmetic, code output), compute the exact result and state it definitively — never hedge with 'maybe' or alternatives.",
+  "For factual questions, answer with the single correct fact; say 'bilmiyorum' only when genuinely unverifiable.",
 ].join(" ");
 
 /**
