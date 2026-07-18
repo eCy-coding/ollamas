@@ -74,6 +74,11 @@ import { runBilling, computeRun, handleWebhook, ensureBillingConfig, ensureCusto
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// S1 session-end distill state: per-session idle timer + the message count already
+// covered by a distill (periodic %10 or a previous idle fire). Entries die when the
+// timer fires; timers are unref'd so they never hold the process open.
+const brainIdleDistill = new Map<string, { timer?: NodeJS.Timeout; distilledLen: number }>();
+
 // Seyir Defteri (logbook): append a structured entry to the mounted volume so
 // host tools + the app share one ship's log. Fire-and-forget; never throws.
 const SEYIR_DIR = process.env.MISSION_CONTROL_DATA_DIR || path.join(os.homedir(), ".llm-mission-control");
@@ -2154,6 +2159,39 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
                 });
               } catch (e: any) { console.warn(`[brain] auto-distill failed (${e?.message ?? e})`); }
             });
+          }
+
+          // S1 session-end distill: short sessions (<10 msgs) and trailing messages
+          // never hit the %10 cadence, so they were never consolidated. Re-arm an idle
+          // timer each turn; when the session goes quiet, distill once if anything
+          // landed since the last distill of any kind.
+          if (brainActiveOn(process.env.BRAIN_AUTO_DISTILL)) {
+            const { shouldIdleDistill, idleDistillMs } = await import("./server/brain-active");
+            const st = brainIdleDistill.get(sess.id) || { distilledLen: 0 };
+            if (sess.messages.length % 10 === 0) st.distilledLen = sess.messages.length;
+            if (st.timer) clearTimeout(st.timer);
+            const snapLen = sess.messages.length;
+            const snapshot = { id: sess.id, messages: [...sess.messages] };
+            st.timer = setTimeout(async () => {
+              brainIdleDistill.delete(sess.id);
+              if (!shouldIdleDistill(snapLen, st.distilledLen)) return;
+              try {
+                const { resolveDistillProvider } = await import("./server/brain-active");
+                const { distillSession } = await import("./server/brain-distill");
+                await distillSession(snapshot, {
+                  generate: async (messages) => {
+                    const r = await ProviderRouter.generate({
+                      provider: resolveDistillProvider(process.env),
+                      model: process.env.BRAIN_DISTILL_MODEL || "openai",
+                      messages, stream: false,
+                    } as any);
+                    return r.text || "";
+                  },
+                });
+              } catch (e: any) { console.warn(`[brain] idle distill failed (${e?.message ?? e})`); }
+            }, idleDistillMs(process.env));
+            st.timer.unref?.();
+            brainIdleDistill.set(sess.id, st);
           }
         }
       }

@@ -36,3 +36,16 @@ export function resolveDistillProvider(env: { BRAIN_DISTILL_PROVIDER?: string })
 
 /** Opt-out flag reader: a brain active-behavior is ON unless explicitly set to "0". */
 export const activeOn = (v: string | undefined): boolean => v !== "0";
+
+/** Session-end distill (S1): the %10 periodic cadence never fires for short sessions
+ *  (<10 msgs) or trailing messages after the last multiple of 10 — those sessions were
+ *  never consolidated at all. An idle timer (re-armed each turn) closes that hole:
+ *  fire only when messages actually landed since the last distill of any kind. */
+export const shouldIdleDistill = (len: number, distilledLen: number): boolean =>
+  len > 0 && len > distilledLen;
+
+/** Idle window before a quiet session counts as ended (default 10 min). */
+export const idleDistillMs = (env: { BRAIN_DISTILL_IDLE_MS?: string }): number => {
+  const n = Number(env.BRAIN_DISTILL_IDLE_MS);
+  return Number.isFinite(n) && n > 0 ? n : 600_000;
+};

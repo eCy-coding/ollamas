@@ -75,6 +75,17 @@ describe("Brain — tiered memories (sqlite-vec)", () => {
     b.close();
   });
 
+  test("session-end distill decision: fires only when new messages landed", async () => {
+    const { shouldIdleDistill, idleDistillMs } = await import("../server/brain-active");
+    expect(shouldIdleDistill(3, 0)).toBe(true); // short session, never distilled → fire
+    expect(shouldIdleDistill(13, 10)).toBe(true); // 3 trailing msgs after the %10 pass
+    expect(shouldIdleDistill(10, 10)).toBe(false); // periodic pass already covered it
+    expect(shouldIdleDistill(0, 0)).toBe(false); // empty session
+    expect(idleDistillMs({})).toBe(600_000);
+    expect(idleDistillMs({ BRAIN_DISTILL_IDLE_MS: "5000" })).toBe(5000);
+    expect(idleDistillMs({ BRAIN_DISTILL_IDLE_MS: "junk" })).toBe(600_000);
+  });
+
   test("createdAt override keeps original event time for imports", async () => {
     const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
     const then = Date.parse("2026-01-01T00:00:00Z");
