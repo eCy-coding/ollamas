@@ -95,8 +95,8 @@ const ok = (evidence: string): SelftestResult => ({ ok: true, evidence });
 const fail = (evidence: string): SelftestResult => ({ ok: false, evidence });
 const expect = (cond: boolean, good: string, bad: string): SelftestResult => (cond ? ok(good) : fail(bad));
 
-// ── the 25 ───────────────────────────────────────────────────────────────────────────────────────
-export const SERVICES: ServiceSpec[] = [
+// ── core 25 (the management/organization principle itself; 26-50 live in services-ext.ts) ───────
+export const CORE_SERVICES: ServiceSpec[] = [
   {
     id: "org-chart", kind: "pure", role: "Role registry: parse + council-roster merge", deps: [],
     source: "orchestration/bin/lib/organization.ts",
@@ -370,10 +370,19 @@ export const SERVICES: ServiceSpec[] = [
   },
 ];
 
-/** Registry integrity: exactly 25, unique ids, resolvable deps, valid kinds. Returns problem list. */
+// The complementary half (26-50: FSM core, proposal engine, quality/security gates, license,
+// model selection, provider policy, self-policing, coordination) lives in services-ext.ts.
+import { SERVICES_EXT } from "./services-ext";
+
+/** The full 50-service registry: 25 core (management principle) + 25 complementary (whole surface). */
+export const SERVICES: ServiceSpec[] = [...CORE_SERVICES, ...SERVICES_EXT];
+
+export const EXPECTED_SERVICE_COUNT = 50;
+
+/** Registry integrity: exactly 50, unique ids, resolvable deps, valid kinds. Returns problem list. */
 export function validateRegistry(specs: ServiceSpec[] = SERVICES): string[] {
   const problems: string[] = [];
-  if (specs.length !== 25) problems.push(`expected 25 services, got ${specs.length}`);
+  if (specs.length !== EXPECTED_SERVICE_COUNT) problems.push(`expected ${EXPECTED_SERVICE_COUNT} services, got ${specs.length}`);
   const ids = new Set<string>();
   for (const s of specs) {
     if (ids.has(s.id)) problems.push(`duplicate id "${s.id}"`);
@@ -387,10 +396,10 @@ export function validateRegistry(specs: ServiceSpec[] = SERVICES): string[] {
   return problems;
 }
 
-/** The tracker event stream for a health run — the 25-item live checklist (`ollamas follow`). */
+/** The tracker event stream for a health run — the 50-item live checklist (`ollamas follow`). */
 export function healthRunEvents(runId: string, ts: string): TrackerEvent {
   return {
-    type: "start", ts, runId, title: "25 µ-servis sağlık taraması", source: "ollamas",
+    type: "start", ts, runId, title: `${EXPECTED_SERVICE_COUNT} µ-servis sağlık taraması`, source: "ollamas",
     items: SERVICES.map((s) => ({ id: s.id, label: `${s.id} — ${s.role}` })),
   };
 }

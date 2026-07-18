@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { SERVICES, NETWORK_SERVICES, validateRegistry, healthRunEvents } from "../bin/lib/services";
 
 describe("service registry integrity", () => {
-  it("exactly 25 services, unique ids, resolvable deps, valid kinds", () => {
+  it("exactly 50 services, unique ids, resolvable deps, valid kinds", () => {
     expect(validateRegistry()).toEqual([]);
-    expect(SERVICES).toHaveLength(25);
+    expect(SERVICES).toHaveLength(50);
   });
   it("network services are registered separately (4 real daemons)", () => {
     expect(NETWORK_SERVICES.map((n) => n.id)).toEqual(["net:ollamas", "net:odysseus", "net:pulse", "net:ollama"]);
@@ -15,14 +15,14 @@ describe("service registry integrity", () => {
     const dangling = SERVICES.map((s, i) => (i === 0 ? { ...s, deps: ["ghost-service"] } : s));
     expect(validateRegistry(dangling).some((p) => p.includes("unknown service"))).toBe(true);
   });
-  it("health run start event is a 25-item checklist", () => {
+  it("health run start event is a 50-item checklist", () => {
     const ev = healthRunEvents("r", "2026-07-18T12:00:00Z");
     expect(ev.type).toBe("start");
-    expect(ev.type === "start" && ev.items).toHaveLength(25);
+    expect(ev.type === "start" && ev.items).toHaveLength(50);
   });
 });
 
-describe("every in-process selftest passes (25/25, one by one)", () => {
+describe("every in-process selftest passes (50/50, one by one)", () => {
   for (const s of SERVICES) {
     it(`${s.id} (${s.kind}) — ${s.role}`, async () => {
       const r = await s.selftest();

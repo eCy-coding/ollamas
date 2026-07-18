@@ -103,14 +103,14 @@ RESEARCH-ORG.md §v3). The loop is: **train → gate → dispatch → record →
 - **Retrain cadence.** Online: `npx tsx orchestration/bin/org-train.ts` after any episode (the
   sandbox retrains every round automatically). The conductor loads `ORG_POLICY.json` advisorily.
 
-## The 25 critical µ-services
+## The 50 critical µ-services
 
-The whole working principle decomposes into 25 single-responsibility services under one contract
+The whole working principle decomposes into 50 single-responsibility services under one contract
 (`SERVICES.md`, `bin/lib/services.ts`): `id · kind · role · deps · selftest()`. Health-check them
-one by one — the run streams as a live 25-item checklist in `ollamas follow`:
+one by one — the run streams as a live 50-item checklist in `ollamas follow`:
 
 ```bash
-tsx orchestration/bin/services.ts --health   # 25 selftests + 4 network probes → SERVICE_REGISTRY.json
+tsx orchestration/bin/services.ts --health   # 50 selftests + 4 network probes → SERVICE_REGISTRY.json
 ```
 
 ## Sustained sandbox + continuous operation
