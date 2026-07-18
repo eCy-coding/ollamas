@@ -12,6 +12,7 @@ Bu doküman brain'in ollamas'a NE KADAR entegre olduğunu YALANSIZ anlatır — 
 | Per-turn retain | **ON** | `BRAIN_AUTO_RETAIN=0` | Her turn sonrası user+assistant exchange'i working-tier'a async yaz (embed-only, $0, LLM YOK) |
 | A-MAC admission gate | **ON** | `BRAIN_ADMIT=0` | Retain öncesi salience/utility skoru (`admissionScore`, pure/embed-free): gürültü turn'lar ("tamam", "hi") satır+vektör+embedder maliyeti ödemez; eşik `BRAIN_ADMIT_MIN` (default 0.1) |
 | Write-behind embed | **ON** | `BRAIN_DEFER_EMBED=0` | remember embed'i `BRAIN_EMBED_WRITE_TIMEOUT_MS` (4s) bütçesinde dener; embedder meşgulse satır VEKTÖRSÜZ dayanıklı yazılır (FTS anında indeksler → hybrid recall BM25 kolu bulur), vektör gece maintain `backfillEmbeddings()` ile gelir. Kör nokta: backfill'e kadar semantik-only sorgular satırı ıskalar (bilinçli trade-off) |
+| GPU-aware backfill gate | **ON** | — | `server/gpu-coordinator.ts`: her `ollama-local` generation `beginLLM/endLLM` bracket'ı (choke-point `executeProvider`); backfill LLM aktifken (+`GPU_QUIET_MS` 2s pencere) TAMAMEN erteler, kuyruk `BRAIN_BACKFILL_BOUNDARY` (50) aşarsa açlık-koruması tek küçük batch zorlar; idle batch 16; item-arası re-check |
 | Periyodik distill | **ON** | `BRAIN_AUTO_DISTILL=0` | Her 10 mesajda durable extraction; provider default keyless pollinations ($0) |
 | Otonom bakım | **ON** (launchd) | — | Günlük 04:00 sweep+consolidate+drift |
 | MCP expose | **OFF** | `BRAIN_MCP_EXPOSE=1` | brain_* dış MCP istemcilerine kapalı (operatör hafızası güvenliği) |

@@ -266,3 +266,42 @@ describe("Brain — deferred embedding (write-behind under embedder contention)"
     }
   });
 });
+
+describe("Brain — GPU-aware backfill gate (Tur-4: LLM-active defers embedding)", () => {
+  test("gpu-coordinator: active while a generation runs and within the quiet window", async () => {
+    const { beginLLM, endLLM, llmActive, resetGpuCoordinatorForTest } = await import("./gpu-coordinator");
+    resetGpuCoordinatorForTest();
+    expect(llmActive(1_000_000)).toBe(false);
+    beginLLM(1_000_000);
+    expect(llmActive(1_000_500)).toBe(true); // mid-generation
+    endLLM(1_001_000);
+    expect(llmActive(1_002_000)).toBe(true); // quiet window (default 2s) still hot
+    expect(llmActive(1_004_000)).toBe(false); // quiet window elapsed
+    resetGpuCoordinatorForTest();
+  });
+
+  test("backfill defers while the LLM is active, drains when idle, forces past the boundary", async () => {
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    let active = true;
+    const b = createBrainStore({ dbPath: tmpDb(), embed, llmActive: () => active });
+    await b.remember({ id: "m-base", tier: "learned", content: "deploy uses make ship" });
+    hang = true;
+    process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS = "120";
+    try {
+      for (let i = 0; i < 4; i++) await b.remember({ id: `m-p${i}`, tier: "episodic", content: `pending note ${i}` });
+      hang = false;
+      expect(await b.backfillEmbeddings()).toBe(0); // GPU busy → defer entirely
+      process.env.BRAIN_BACKFILL_BOUNDARY = "3"; // 4 pending > boundary → starvation guard
+      expect(await b.backfillEmbeddings({ limit: 2 })).toBe(2); // forced single small batch
+      delete process.env.BRAIN_BACKFILL_BOUNDARY;
+      expect(await b.backfillEmbeddings()).toBe(0); // back under boundary, still busy → defer
+      active = false;
+      expect(await b.backfillEmbeddings()).toBe(2); // idle → drain the rest
+    } finally {
+      delete process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS;
+      delete process.env.BRAIN_BACKFILL_BOUNDARY;
+      b.close();
+    }
+  });
+});

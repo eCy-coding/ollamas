@@ -16,6 +16,7 @@ import { statSync } from "node:fs";
 import * as sqliteVec from "sqlite-vec";
 import { type Embedder, embedText, resolveEmbedder } from "./rag";
 import { createEmbedCache, type EmbedCache } from "./embed-cache";
+import { llmActive } from "./gpu-coordinator";
 
 export type MemoryTier = "core" | "procedural" | "learned" | "episodic" | "working";
 
@@ -81,7 +82,9 @@ export interface BrainStore {
    *  vector arrives via backfillEmbeddings(). dim is 0 for a deferred write. */
   remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean }>;
   /** Write-behind drain: embed pending rows in small batches; aborts on the first
-   *  failure (embedder still busy) and retries next maintain pass. Returns rows indexed. */
+   *  failure (embedder still busy) and retries next maintain pass. GPU-gated (Tur-4):
+   *  defers entirely while a local generation is active, unless the pending queue
+   *  exceeds BRAIN_BACKFILL_BOUNDARY (starvation guard). Returns rows indexed. */
   backfillEmbeddings(opts?: { limit?: number }): Promise<number>;
   /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
    *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
@@ -215,7 +218,7 @@ export const tierRecency = (createdAt: number, now: number, tier: MemoryTier) =>
 export const usageBoost = (hits: number) => 1 + 0.12 * (1 - 1 / (1 + Math.log1p(Math.max(0, hits))));
 
 export function createBrainStore(
-  opts: { dbPath?: string; embed?: Embedder; embedProvider?: string; now?: () => number; workingCap?: number } = {},
+  opts: { dbPath?: string; embed?: Embedder; embedProvider?: string; now?: () => number; workingCap?: number; llmActive?: () => boolean } = {},
 ): BrainStore {
   const workingCap = opts.workingCap ?? 64;
   const dbPath = opts.dbPath || process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
@@ -580,15 +583,30 @@ export function createBrainStore(
       return rows;
     },
 
-    async backfillEmbeddings({ limit = 32 } = {}) {
+    async backfillEmbeddings({ limit = 16 } = {}) {
       // Write-behind drain (Tur-3): pending rows get their vectors in small batches
       // when the embedder frees up. Abort on the first failure — the embedder is still
       // contended; the next sweep/maintain pass retries. Never spins.
+      // GPU gate (Tur-4): while a local generation runs (gpu-coordinator), draining
+      // would steal unified-memory bandwidth from the chat LLM — defer entirely,
+      // UNLESS the pending queue exceeds BRAIN_BACKFILL_BOUNDARY (default 50): then
+      // one small batch is forced through so deferred rows can never starve.
+      const gpuBusy = opts.llmActive ?? llmActive;
+      const boundary = Number(process.env.BRAIN_BACKFILL_BOUNDARY) || 50;
+      const pendingTotal = Number(
+        (db.prepare("SELECT COUNT(*) AS n FROM brain_memories WHERE pending_embed=1").get() as { n: number }).n,
+      );
+      if (pendingTotal === 0) return 0;
+      const forced = pendingTotal > boundary;
+      if (gpuBusy() && !forced) return 0;
       const pending = db
         .prepare("SELECT rowid, content FROM brain_memories WHERE pending_embed=1 ORDER BY rowid LIMIT ?")
         .all(limit) as { rowid: number; content: string }[];
       let indexed = 0;
       for (const p of pending) {
+        // Re-check between items (unless forced): a generation that started mid-drain
+        // reclaims the GPU immediately — the rest waits for the next pass.
+        if (!forced && indexed > 0 && gpuBusy()) break;
         try {
           const v = await embedWithBudget(p.content);
           ensureVec(v.length);

@@ -27,6 +27,7 @@ import { randomUUID } from "node:crypto";
 import { withLlmSpan } from "./tracing";
 import { getHierarchyRecommendation, reorderChainForTier } from "./hierarchy-bridge";
 import { semanticCacheLookup, semanticCacheStore, type CacheParams, type StoredResult } from "./semantic-cache";
+import { beginLLM, endLLM } from "./gpu-coordinator";
 
 // Types
 export interface ProviderMessage {
@@ -407,7 +408,16 @@ export class ProviderRouter {
               } : {}),
             },
             async (span) => {
-              const r = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
+              // GPU coordinator (Tur-4): local generations own the unified-memory GPU —
+              // background embedding backfill yields while this bracket is open.
+              const localGpu = prov === "ollama-local";
+              if (localGpu) beginLLM();
+              let r: Awaited<ReturnType<typeof this.executeProvider>>;
+              try {
+                r = await this.executeProvider(resolvedConfig, wrappedChunk, signal);
+              } finally {
+                if (localGpu) endLLM();
+              }
               span.setAttribute("gen_ai.response.model", r.modelUsed || "");
               if (r.tokensIn !== undefined) span.setAttribute("gen_ai.usage.input_tokens", r.tokensIn);
               if (r.tokensOut !== undefined) span.setAttribute("gen_ai.usage.output_tokens", r.tokensOut);
