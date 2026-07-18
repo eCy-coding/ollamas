@@ -68,11 +68,20 @@ async function widen(question: string, first: BrainRecallHit[], deps: AskDeps): 
 export async function askBrain(question: string, deps: AskDeps): Promise<AskResult> {
   const q = (question || "").trim();
   if (!q) return { answer: "", sources: [], confidence: 0, mode: "hybrid", abstained: true };
-  const nsList = deps.ns ? [deps.ns] : (deps.namespaces?.() ?? ["default"]).slice(0, 6);
+  // Knowledge-bearing namespaces lead the sweep: fresh episodic noise (git captures)
+  // must not shadow taught/curated answers in the lexical arm.
+  const NS_PRIORITY = ["knowledge", "universe", "research"];
+  const rawNs = deps.ns ? [deps.ns] : (deps.namespaces?.() ?? ["default"]);
+  const nsList = [...new Set([...NS_PRIORITY.filter((n) => rawNs.includes(n)), ...rawNs])].slice(0, 6);
   const perNs = await Promise.all(
     nsList.map((n) => deps.recall(q, { k: nsList.length > 1 ? 4 : 8, graphExpand: true, ns: n }).catch(() => [] as BrainRecallHit[])),
   );
-  const first = perNs.flat().sort((a, b) => b.score - a.score).slice(0, 8);
+  const byId = new Map<string, BrainRecallHit>();
+  for (const h of perNs.flat()) {
+    const prev = byId.get(h.id);
+    if (!prev || h.score > prev.score) byId.set(h.id, h);
+  }
+  const first = [...byId.values()].sort((a, b) => b.score - a.score).slice(0, 8);
   const hits = (await widen(q, first, deps)).slice(0, 10);
   const mode: AskResult["mode"] = hits.some((h) => h.lexical) ? "lexical" : "hybrid";
   let live: string | null = null;
