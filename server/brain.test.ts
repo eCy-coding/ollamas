@@ -217,3 +217,52 @@ describe("Brain — overview resilience (degrade-alive health)", () => {
     b.close();
   });
 });
+
+describe("Brain — deferred embedding (write-behind under embedder contention)", () => {
+  test("remember survives a hanging embedder: durable row, FTS-visible, backfilled by sweep", async () => {
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    const b = createBrainStore({ dbPath: tmpDb(), embed });
+    await b.remember({ id: "m-base", tier: "learned", content: "deploy uses make ship" });
+    hang = true;
+    process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS = "150";
+    try {
+      const r = await b.remember({ id: "m-def", tier: "episodic", content: "likes espresso" });
+      expect(r.deferred).toBe(true);
+      hang = false;
+      // Vector arm can't see it yet — the FTS arm surfaces it at neutral distance.
+      const ftsHits = await b.recall("espresso", { k: 5 });
+      expect(ftsHits.map((h) => h.id)).toContain("m-def");
+      const swept = b.sweep();
+      const backfilled = await b.backfillEmbeddings();
+      expect(backfilled).toBe(1);
+      // Now the vector arm ranks it by real distance (VECTORS maps it to the coffee axis).
+      const vecHits = await b.recall("query_coffee", { k: 2 });
+      expect(vecHits[0]?.id).toBe("m-def");
+      expect(swept.swept).toBe(0);
+    } finally {
+      delete process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS;
+      b.close();
+    }
+  });
+
+  test("BRAIN_DEFER_EMBED=0 restores fail-fast writes; backfill aborts while contended", async () => {
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    const b = createBrainStore({ dbPath: tmpDb(), embed });
+    await b.remember({ id: "m-base", tier: "learned", content: "deploy uses make ship" });
+    hang = true;
+    process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS = "150";
+    try {
+      process.env.BRAIN_DEFER_EMBED = "0";
+      await expect(b.remember({ id: "m-x", tier: "episodic", content: "likes espresso" })).rejects.toThrow(/timed out/);
+      delete process.env.BRAIN_DEFER_EMBED;
+      await b.remember({ id: "m-y", tier: "episodic", content: "prefers tea" }); // deferred
+      expect(await b.backfillEmbeddings()).toBe(0); // embedder still down → abort, no spin
+    } finally {
+      delete process.env.BRAIN_DEFER_EMBED;
+      delete process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS;
+      b.close();
+    }
+  });
+});

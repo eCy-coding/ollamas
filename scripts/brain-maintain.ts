@@ -80,6 +80,14 @@ async function main() {
     }
     const consolidate = b.consolidate(); // promote hot episodic BEFORE prune can see it
     const sweep = b.sweep();
+    // Write-behind drain: rows written while the embedder was contended get their
+    // vectors now (sleep-time = the embedder is idle). Best-effort, never fatal.
+    try {
+      const backfilled = await b.backfillEmbeddings();
+      if (backfilled > 0) console.log(JSON.stringify({ event: "brain.embed.backfill", indexed: backfilled }));
+    } catch (e: any) {
+      console.warn(`[brain] embed backfill skipped (${e?.message ?? e})`);
+    }
     const health = await b.health();
     // P4: daily verified snapshot rides the same sleep-time pass. Best-effort — a
     // failed backup warns loudly but never blocks the drift alarm path.

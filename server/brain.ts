@@ -77,7 +77,12 @@ export interface Extraction {
 }
 
 export interface BrainStore {
-  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean }>;
+  /** `deferred` = the embedder was contended: the row is durable (FTS-indexed) but its
+   *  vector arrives via backfillEmbeddings(). dim is 0 for a deferred write. */
+  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean }>;
+  /** Write-behind drain: embed pending rows in small batches; aborts on the first
+   *  failure (embedder still busy) and retries next maintain pass. Returns rows indexed. */
+  backfillEmbeddings(opts?: { limit?: number }): Promise<number>;
   /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
    *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
    *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
@@ -231,6 +236,20 @@ export function createBrainStore(
   const embedCache: EmbedCache | null =
     process.env.BRAIN_EMBED_CACHE !== "0" ? createEmbedCache({ db, provider: embedProvider, now }) : null;
   const embed = embedCache ? embedCache.wrap(rawEmbed) : rawEmbed;
+  // Per-write embed budget: the write path never waits on the embedder longer than
+  // BRAIN_EMBED_WRITE_TIMEOUT_MS (default 4s). A timed-out embed keeps running in the
+  // background and lands in the embed cache — the later backfill then hits it for free.
+  const embedWithBudget = (text: string): Promise<number[]> => {
+    const ms = Number(process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS) || 4000;
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error(`embed timed out after ${ms}ms`)), ms);
+      (t as { unref?: () => void }).unref?.();
+      embed(text).then(
+        (v) => { clearTimeout(t); resolve(v); },
+        (e) => { clearTimeout(t); reject(e); },
+      );
+    });
+  };
   db.exec(`CREATE TABLE IF NOT EXISTS brain_memories (
     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
     mem_id TEXT UNIQUE NOT NULL,
@@ -243,7 +262,9 @@ export function createBrainStore(
     access_count INTEGER NOT NULL DEFAULT 0
   )`);
   // v1 → v2 migration: columns may be missing on an existing brain.db.
-  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0"]) {
+  // pending_embed (write-behind): 1 = durable row awaiting its vector (embedder was
+  // contended at write time); backfillEmbeddings() indexes it when the embedder frees up.
+  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0"]) {
     try { db.exec(`ALTER TABLE brain_memories ADD COLUMN ${col}`); } catch { /* already there */ }
   }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_facts (
@@ -321,7 +342,7 @@ export function createBrainStore(
     db.prepare("DELETE FROM brain_memories WHERE rowid=?").run(BigInt(rowid));
   };
 
-  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean }> => {
+  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean }> => {
     if (!TIERS.includes(m.tier)) throw new Error(`invalid tier '${m.tier}' (${TIERS.join("/")})`);
     if (!m.content?.trim()) throw new Error("empty memory content");
     // S24 redaction gate — the ONE enforcement point every write path funnels
@@ -340,15 +361,26 @@ export function createBrainStore(
     const explicitId = !!m.id;
     const id = m.id || `mem-${crypto.randomUUID()}`;
     const ns = m.ns || DEFAULT_NS;
-    const vec = await embed(content);
-    ensureVec(vec.length);
+    // Write-behind (Tur-3 research): a contended embedder (chat LLM holding VRAM) must
+    // not lose the memory. The write embeds within BRAIN_EMBED_WRITE_TIMEOUT_MS
+    // (default 4s); past that the row lands durably WITHOUT a vector (FTS still indexes
+    // it → the hybrid recall's BM25 arm finds it at neutral distance) and
+    // backfillEmbeddings() adds the vector later. BRAIN_DEFER_EMBED=0 → fail-fast.
+    const deferOn = process.env.BRAIN_DEFER_EMBED !== "0";
+    let vec: number[] | null = null;
+    try {
+      vec = await embedWithBudget(content);
+    } catch (e) {
+      if (!deferOn) throw e;
+    }
+    if (vec) ensureVec(vec.length);
 
     // W2 semantic write-dedup (AUDN-lite): for an AUTO-id write (no explicit id), if a
     // near-duplicate already exists in the same ns+tier, MERGE into it instead of adding
     // a polluting row. Core is exempt (identity/preference must never silently collapse).
     // Disable with BRAIN_DEDUP=0. Explicit ids keep exact-upsert semantics.
     const dedupOn = process.env.BRAIN_DEDUP !== "0" && !explicitId && m.tier !== "core" && dim !== null;
-    if (dedupOn) {
+    if (dedupOn && vec) {
       const maxDist = Number(process.env.BRAIN_DEDUP_DISTANCE) || 0.08; // ≈ cosine 0.92
       const near = db
         .prepare(
@@ -376,10 +408,10 @@ export function createBrainStore(
     const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
-      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count) VALUES(?,?,?,?,?,?,?)")
-      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0);
+      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count, pending_embed) VALUES(?,?,?,?,?,?,?,?)")
+      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0, vec ? 0 : 1);
     const rowid = BigInt(ins.lastInsertRowid);
-    db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
+    if (vec) db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
     if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(content, rowid);
     // v3 ring buffer: working is a bounded scratchpad — beyond the cap, the oldest
     // working rows in this namespace fall off (their vectors + fts too).
@@ -391,7 +423,7 @@ export function createBrainStore(
         .all(ns, workingCap) as { rowid: number }[];
       for (const r of over) deleteMemRow(r.rowid);
     }
-    return { id, dim: vec.length };
+    return vec ? { id, dim: vec.length } : { id, dim: 0, deferred: true };
   };
 
   return {
@@ -546,6 +578,29 @@ export function createBrainStore(
         )
         .all(f32(vec), k * 4 + 16, ns || DEFAULT_NS, t, t, k) as unknown as (BrainFact & { distance: number })[];
       return rows;
+    },
+
+    async backfillEmbeddings({ limit = 32 } = {}) {
+      // Write-behind drain (Tur-3): pending rows get their vectors in small batches
+      // when the embedder frees up. Abort on the first failure — the embedder is still
+      // contended; the next sweep/maintain pass retries. Never spins.
+      const pending = db
+        .prepare("SELECT rowid, content FROM brain_memories WHERE pending_embed=1 ORDER BY rowid LIMIT ?")
+        .all(limit) as { rowid: number; content: string }[];
+      let indexed = 0;
+      for (const p of pending) {
+        try {
+          const v = await embedWithBudget(p.content);
+          ensureVec(v.length);
+          db.prepare("DELETE FROM brain_vec WHERE rowid=?").run(BigInt(p.rowid));
+          db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(BigInt(p.rowid), f32(v));
+          db.prepare("UPDATE brain_memories SET pending_embed=0 WHERE rowid=?").run(BigInt(p.rowid));
+          indexed++;
+        } catch {
+          break;
+        }
+      }
+      return indexed;
     },
 
     sweep({ workingTtlMs = 7 * 86_400_000, pruneThreshold } = {}) {
