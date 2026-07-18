@@ -60,7 +60,17 @@ interface DBLike {
 type Guard = (req: Request, res: Response, next: () => void) => void;
 
 // Only these targets may ever be created/rebuilt — never arbitrary model names.
-export const ECYM_WHITELIST = ["ecy:latest", "ecy:candidate"] as const;
+// The 5 panel specialists (v12 hybrid "bake") share ecy's qwen3:8b-16k base blob —
+// each is a thin Modelfile overlay (its own SYSTEM brief), created on explicit demand.
+export const ECYM_WHITELIST = [
+  "ecy:latest",
+  "ecy:candidate",
+  "ecy-github:latest",
+  "ecy-actions:latest",
+  "ecy-integrations:latest",
+  "ecy-threat:latest",
+  "ecy-vault:latest",
+] as const;
 export type EcymModelName = (typeof ECYM_WHITELIST)[number];
 export const DEFAULT_ECYM_BASE = "qwen3:8b-16k"; // measured current base of ecy:latest
 
@@ -216,6 +226,8 @@ export function recordEcymVersion(db: DBLike, v: EcymVersion): void {
 interface DistillDeps {
   runCreate?: (modelfilePath: string, model: EcymModelName) => Promise<string>;
   probe?: (model: EcymModelName) => Promise<boolean>;
+  /** Persona for a NEW specialist tag (v12). Ignored if the target already exists (its persona is preserved). */
+  identity?: string;
 }
 
 function defaultRunCreate(modelfilePath: string, model: EcymModelName): Promise<string> {
@@ -255,10 +267,15 @@ export async function* distillEcym(db: DBLike, target: string, deps: DistillDeps
   yield { stage: "plan", status: "done", text: `base=${base} (${reason}) · num_ctx=${config.num_ctx} thread=${config.num_thread}` };
 
   yield { stage: "modelfile", status: "running" };
-  // Preserve Emre's existing eCy persona verbatim; only the principles+params refresh.
-  const identity = await getCurrentSystem("ecy:latest");
+  // Persona resolution: preserve THIS model's existing persona verbatim if the tag
+  // already exists; else use the caller-supplied specialist identity (v12 bake); else
+  // fall back to eCy's own persona. Rebuilding ecy:latest thus never loses Emre's voice.
+  const preserved = await getCurrentSystem(model);
+  const identity = preserved || deps.identity || (await getCurrentSystem("ecy:latest"));
   const modelfile = buildEcymModelfile({ base, config, sys, identity });
-  const dir = path.join(db.data.workspacePath, ".ecym");
+  // Per-model subdir so parallel/specialist Modelfiles don't clobber each other.
+  const safeName = model.replace(/[^a-z0-9]+/gi, "-");
+  const dir = path.join(db.data.workspacePath, ".ecym", safeName);
   const mfPath = path.join(dir, "Modelfile");
   // The write stays inside the workspace — same containment rule as FilesystemManager.
   if (!path.resolve(mfPath).startsWith(path.resolve(db.data.workspacePath) + path.sep)) {

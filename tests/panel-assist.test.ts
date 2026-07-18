@@ -8,6 +8,9 @@ import {
   assistStream,
   distillPanel,
   withGpu,
+  SPECIALIST_TAG,
+  buildSpecialistIdentity,
+  panelModel,
 } from "../server/panel-assist";
 
 function mockDb(briefs?: Record<string, { brief: string; ts: string; sources: string[] }>) {
@@ -94,6 +97,26 @@ describe("panel-assist — distillPanel (search → compress → store)", () => 
     expect(evs.some((e) => e.status === "fail")).toBe(true);
     // no brief stored on failure — the fallback keeps serving
     expect((db.data.panelBriefs as Record<string, unknown> | undefined)?.["search"]).toBeUndefined();
+  });
+});
+
+describe("panel-assist — hybrid bake binding", () => {
+  it("maps each panel to its literal ecy-<panel>:latest tag", () => {
+    expect(SPECIALIST_TAG.search).toBe("ecy-github:latest");
+    expect(SPECIALIST_TAG.keys).toBe("ecy-vault:latest");
+    expect(Object.keys(SPECIALIST_TAG).sort()).toEqual([...PANEL_IDS].sort());
+  });
+  it("bakes the persona from role + current brief", () => {
+    const db = mockDb({ keys: { brief: "VAULT-BRIEF", ts: "t", sources: [] } });
+    const identity = buildSpecialistIdentity(db, "keys");
+    expect(identity).toContain(PANEL_BRIEFS["keys"].role);
+    expect(identity).toContain("VAULT-BRIEF");
+  });
+  it("runtime model = shared base until baked, then the registered tag", () => {
+    const db = mockDb();
+    expect(panelModel(db, "search")).toBe("ecy:latest");
+    (db.data as { ecymSpecialists?: Record<string, { model?: string }> }).ecymSpecialists = { search: { model: "ecy-github:latest" } };
+    expect(panelModel(db, "search")).toBe("ecy-github:latest");
   });
 });
 

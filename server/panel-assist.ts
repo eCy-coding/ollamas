@@ -17,6 +17,7 @@
 import type { Request, Response } from "express";
 import { generateTextStream, generateText, type AiOptions } from "./ai";
 import { searchWeb, type Source } from "./research";
+import { distillEcym } from "./ecym";
 
 export const PANEL_IDS = ["search", "github-actions", "integrations", "threatintel", "keys"] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
@@ -88,7 +89,32 @@ export function buildAssistPrompt(panelId: PanelId, contextText: string, brief: 
 
 interface PanelBriefStore { brief: string; ts: string; sources: string[] }
 // Structural (no index signature) so the real SecureDB (DBConfig.panelBriefs?) assigns cleanly.
-interface DBLike { data: { panelBriefs?: Record<string, PanelBriefStore> }; save: () => void }
+interface DBLike {
+  data: {
+    panelBriefs?: Record<string, PanelBriefStore>;
+    ecymSpecialists?: Record<string, { model?: string }>;
+  };
+  save: () => void;
+}
+
+// v12 hybrid "bake": each panel's literal specialist tag (shares ecy's base blob).
+export const SPECIALIST_TAG: Record<PanelId, string> = {
+  search: "ecy-github:latest",
+  "github-actions": "ecy-actions:latest",
+  integrations: "ecy-integrations:latest",
+  threatintel: "ecy-threat:latest",
+  keys: "ecy-vault:latest",
+};
+
+/** The persona baked into a specialist tag = role + current (distilled or fallback) brief. */
+export function buildSpecialistIdentity(db: DBLike, panelId: PanelId): string {
+  return `${PANEL_BRIEFS[panelId].role}\n\n${resolveBrief(db, panelId)}`;
+}
+
+/** Runtime model for a panel: the baked tag once registered, else the shared warm base. */
+export function panelModel(db: DBLike, panelId: PanelId): string {
+  return db.data.ecymSpecialists?.[panelId]?.model || ECY_BASE;
+}
 
 /** Read the distilled brief for a panel, or the hardcoded fallback (never empty). */
 export function resolveBrief(db: DBLike, panelId: PanelId): string {
@@ -114,8 +140,10 @@ export async function* assistStream(db: DBLike, panelId: PanelId, contextText: s
   const stream = deps.stream ?? generateTextStream;
   const brief = resolveBrief(db, panelId);
   const { system, prompt } = buildAssistPrompt(panelId, contextText, brief);
+  // Baked specialist tag once registered (hybrid), else the shared warm base.
+  const model = panelModel(db, panelId);
   // Serialize the whole stream behind the mutex so panels queue rather than thrash.
-  const gen = await withGpu(async () => stream(prompt, { model: ECY_BASE, system, temperature: 0.3 }));
+  const gen = await withGpu(async () => stream(prompt, { model, system, temperature: 0.3 }));
   for await (const chunk of gen) yield chunk;
 }
 
@@ -207,6 +235,34 @@ export function registerPanelAssistRoutes(app: { get: Function; post: Function }
       res.end();
     } catch (err) {
       res.write(`data: ${JSON.stringify({ stage: "error", status: "fail", text: (err as Error)?.message || "distill failed" })}\n\n`);
+      res.end();
+    }
+  });
+
+  // Hybrid "bake": materialize a real ecy-<panel>:latest tag from the current brief
+  // (persona = role + brief) via the whitelisted ecym create path, then bind it in the
+  // registry so future assist calls run the baked specialist. GPU/disk write → Emre-gated.
+  app.post("/api/ecym/panel/:id/bake", guard, async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    if (!isPanelId(id)) { res.status(404).json({ error: "unknown panel" }); return; }
+    const tag = SPECIALIST_TAG[id];
+    const identity = buildSpecialistIdentity(db, id);
+    sse(res);
+    try {
+      let created = false;
+      for await (const ev of distillEcym(db as unknown as Parameters<typeof distillEcym>[0], tag, { identity })) {
+        if (ev.stage === "done") created = true; // create succeeded (probe may still be soft-fail on GPU contention)
+        res.write(`data: ${JSON.stringify(ev)}\n\n`);
+      }
+      if (created) {
+        db.data.ecymSpecialists = db.data.ecymSpecialists ?? {};
+        db.data.ecymSpecialists[id] = { model: tag };
+        db.save();
+        res.write(`data: ${JSON.stringify({ stage: "registered", status: "done", text: `${id} → ${tag}` })}\n\n`);
+      }
+      res.end();
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ stage: "error", status: "fail", text: (err as Error)?.message || "bake failed" })}\n\n`);
       res.end();
     }
   });

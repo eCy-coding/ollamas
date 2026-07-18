@@ -112,7 +112,7 @@ describe("ecym — distill loop (deps injected, no real ollama)", () => {
     expect(stages).toContain("create:done");
     expect(stages).toContain("probe:done");
     expect(evs[evs.length - 1]).toMatchObject({ stage: "done", status: "done" });
-    expect(runCreate).toHaveBeenCalledWith(expect.stringContaining(".ecym/Modelfile"), "ecy:candidate");
+    expect(runCreate).toHaveBeenCalledWith(expect.stringContaining("ecy-candidate/Modelfile"), "ecy:candidate");
     expect(db.data.ecymVersions).toHaveLength(1);
     expect(db.data.ecymVersions![0].probeOk).toBe(true);
   });
@@ -134,9 +134,22 @@ describe("ecym — distill loop (deps injected, no real ollama)", () => {
     expect(db.data.ecymVersions![0].probeOk).toBe(false);
   });
 
-  it("whitelist constant covers exactly the ecy family", () => {
-    expect([...ECYM_WHITELIST]).toEqual(["ecy:latest", "ecy:candidate"]);
+  it("whitelist covers the ecy core + the 5 panel specialists (nothing else)", () => {
+    expect([...ECYM_WHITELIST]).toEqual([
+      "ecy:latest", "ecy:candidate",
+      "ecy-github:latest", "ecy-actions:latest", "ecy-integrations:latest",
+      "ecy-threat:latest", "ecy-vault:latest",
+    ]);
     expect(ECY_IDENTITY).toContain("local");
+  });
+
+  it("bakes a NEW specialist with the supplied identity, preserving nothing (fresh tag)", async () => {
+    const db = mockDb();
+    const runCreate = vi.fn(async () => "ok");
+    const evs = await drain(distillEcym(db, "ecy-vault:latest", { runCreate, probe: async () => true, identity: "You are eCy-Vault." }));
+    // create was called with the vault-specialist Modelfile path (per-model subdir)
+    expect(runCreate).toHaveBeenCalledWith(expect.stringContaining("ecy-vault"), "ecy-vault:latest");
+    expect(evs[evs.length - 1]).toMatchObject({ stage: "done" });
   });
 });
 
