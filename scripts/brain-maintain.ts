@@ -68,6 +68,22 @@ async function main() {
         console.warn(`[brain] backup FAILED (${e?.message ?? e})`);
       }
     }
+    // S2 nightly retrieval-quality watch: the drift probe covers the embedding space,
+    // not ranking regressions — a bad retrieval change can keep selfHitRate at 1.0
+    // while recall quality craters. The golden-set MRR rides the same nightly pass
+    // (throwaway db, live brain untouched); below-floor joins the exit-3 alarm path.
+    // BRAIN_MRR_NIGHTLY=0 opts out; an eval failure (embedder hiccup) only warns.
+    let mrrBelowFloor = false;
+    if (process.env.BRAIN_MRR_NIGHTLY !== "0") {
+      try {
+        const { runMrrEval } = await import("./brain-eval-mrr");
+        const mrr = await runMrrEval();
+        console.log(JSON.stringify(mrr));
+        mrrBelowFloor = !mrr.pass;
+      } catch (e: any) {
+        console.warn(`[brain] nightly mrr eval skipped (${e?.message ?? e})`);
+      }
+    }
     const report = buildMaintainReport({ sweep, consolidate, health });
     console.log(JSON.stringify({
       event: "brain.maintain",
@@ -77,8 +93,11 @@ async function main() {
     if (report.drift) {
       console.warn(`[brain] DRIFT — self-hit ${(report.selfHitRate * 100).toFixed(0)}%; re-embed the store to realign.`);
     }
+    if (mrrBelowFloor) {
+      console.warn("[brain] MRR below floor — retrieval quality regressed; inspect the notTop1 list above.");
+    }
     b.close();
-    process.exit(report.exitCode);
+    process.exit(mrrBelowFloor && report.exitCode === 0 ? 3 : report.exitCode);
   } catch (e: any) {
     b.close();
     console.warn(`[brain] maintain skipped (${e?.message ?? e})`);

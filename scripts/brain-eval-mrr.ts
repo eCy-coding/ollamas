@@ -26,9 +26,24 @@ export function computeMrr(ranks: (number | null)[]): number {
   return sum / ranks.length;
 }
 
-async function main() {
-  const fixturePath = process.argv[2] || path.join(HERE, "../eval/brain-mrr-fixture.json");
-  const fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as Fixture;
+export interface MrrEvalResult {
+  event: "brain.eval.mrr";
+  provider: string;
+  queries: number;
+  k: number;
+  mrr: number;
+  floor: number;
+  pass: boolean;
+  notTop1: { q: string; expect: string; got: string[] }[];
+}
+
+/** Seed a throwaway db from the golden fixture with the real embedder, recall each
+ *  query, fold into MRR. Callable from the CLI below AND from brain-maintain (S2
+ *  nightly retrieval-quality watch) — the live brain.db is never touched. */
+export async function runMrrEval(fixturePath?: string): Promise<MrrEvalResult> {
+  const fixture = JSON.parse(
+    readFileSync(fixturePath || path.join(HERE, "../eval/brain-mrr-fixture.json"), "utf8"),
+  ) as Fixture;
   const k = Number(process.env.BRAIN_MRR_K) || 5;
   const floor = Number(process.env.BRAIN_MRR_FLOOR) || 0.6;
 
@@ -46,23 +61,26 @@ async function main() {
       if (idx !== 0) misses.push({ q, expect, got: hits.map((h) => h.id).slice(0, 3) });
     }
     const mrr = computeMrr(ranks);
-    console.log(
-      JSON.stringify({
-        event: "brain.eval.mrr",
-        provider: r.providerId,
-        queries: fixture.queries.length,
-        k,
-        mrr: Number(mrr.toFixed(4)),
-        floor,
-        pass: mrr >= floor,
-        notTop1: misses,
-      }),
-    );
-    process.exit(mrr >= floor ? 0 : 1);
+    return {
+      event: "brain.eval.mrr",
+      provider: r.providerId,
+      queries: fixture.queries.length,
+      k,
+      mrr: Number(mrr.toFixed(4)),
+      floor,
+      pass: mrr >= floor,
+      notTop1: misses,
+    };
   } finally {
     b.close();
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+async function main() {
+  const result = await runMrrEval(process.argv[2]);
+  console.log(JSON.stringify(result));
+  process.exit(result.pass ? 0 : 1);
 }
 
 if (process.argv[1] && process.argv[1].endsWith("brain-eval-mrr.ts")) {
