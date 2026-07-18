@@ -12,6 +12,8 @@
 // verdicts and the pool's count-only status. Nothing here can leak a secret.
 import type { DoctorReport, CandidateStatus, CandidateSource } from "./key-doctor";
 import { runDoctor, productionDoctorDeps } from "./key-doctor";
+import { execFileSync } from "node:child_process";
+import { attemptProvision, provisionEnabled, type ProvisionDeps } from "./buddy-provision";
 import { keySignupUrl, keyedCloudProviders, catalogEntry } from "./provider-catalog";
 import { ProviderRouter } from "./providers";
 
@@ -206,6 +208,18 @@ export function getKeyHealth(): KeyHealthSnapshot | null {
   return snapshot;
 }
 
+// v15 layer 3: mint keys from ALREADY-authed tooling (gh) into the pool. Opt-in, account-free.
+// Reuses key-doctor's vault sink (encrypt + save + keychain-mirror). Gemini minting from gcloud
+// stays the manual `npm run gemini:provision` (documented) → mintGeminiKey omitted here.
+function productionProvisionDeps(): ProvisionDeps {
+  const { vault } = productionDoctorDeps();
+  return {
+    hasKey: (p) => vault.hasPrimary(p) || ProviderRouter.keyPoolStatus(p).total > 0,
+    ghToken: async () => { try { return String(execFileSync("gh", ["auth", "token"], { timeout: 5000 })).trim() || null; } catch { return null; } },
+    addKey: async (provider, key) => { if (vault.hasPrimary(provider)) vault.addToPool(provider, key); else vault.savePrimary(provider, key); },
+  };
+}
+
 async function tick(): Promise<void> {
   // Recovery: evict cooldowns that expired so a recovered key rejoins the live pool this tick.
   try {
@@ -217,6 +231,17 @@ async function tick(): Promise<void> {
     { sources: parseSources(process.env.KEY_HEALTH_SOURCES), dryRun: false },
     productionDoctorDeps(),
   );
+  // v15 layer 3 (opt-in): after machine-key discovery, if a keyed provider is STILL absent,
+  // try minting from already-authed tooling (gh). Default OFF → zero behavior change.
+  if (provisionEnabled()) {
+    const dark = keyedCloudProviders().filter((p) => ProviderRouter.keyPoolStatus(p).total === 0);
+    if (dark.length) {
+      try {
+        const r = await attemptProvision(dark[0], productionProvisionDeps());
+        if (r.provisioned.length) console.warn(`[Buddy] provisioned from authed tooling: ${r.provisioned.join(",")}`);
+      } catch { /* fail-soft — provisioning is best-effort */ }
+    }
+  }
   snapshot = summarizeFromDoctor(
     report,
     Date.now(),
