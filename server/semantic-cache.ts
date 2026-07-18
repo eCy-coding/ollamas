@@ -191,6 +191,7 @@ export async function lookupCache(deps: CacheDeps, cfg: CacheParams, nowMs = Dat
     // (candidates arrive ordered by distance ascending, i.e. cosine descending).
     const threshold = resolveThreshold(env);
     const candidates = await deps.vec.query(prompt, resolveSearchK(env));
+    let nearMiss: number | null = null; // best below-threshold cosine among valid candidates
     for (const c of candidates) {
       if (c.id === id) continue; // already resolved (hit or expired-deleted) above
       const row = (await deps.db.query("SELECT * FROM semantic_cache WHERE id = ?", [c.id])).rows[0];
@@ -201,6 +202,13 @@ export async function lookupCache(deps: CacheDeps, cfg: CacheParams, nowMs = Dat
       if (cosine >= threshold) {
         return { result: JSON.parse(row.response), outcome: "hit_semantic" };
       }
+      if (nearMiss === null || cosine > nearMiss) nearMiss = cosine;
+    }
+    // Near-miss telemetry: hit_semantic has stayed 0 in production and the 0.95 threshold
+    // is a guess — this one-line log is the evidence a future threshold change must cite.
+    // Only the interesting band (within 0.1 of the threshold) logs, so misses stay quiet.
+    if (nearMiss !== null && nearMiss >= threshold - 0.1) {
+      console.info(JSON.stringify({ event: "semantic_cache.near_miss", cosine: Number(nearMiss.toFixed(4)), threshold, model: cfg.model }));
     }
     return null;
   } catch (e: any) {

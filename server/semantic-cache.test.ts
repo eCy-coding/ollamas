@@ -1,7 +1,7 @@
 // server/semantic-cache.test.ts — TDD suite for the in-house semantic LLM
 // response cache (C4). Pure core (lookupCache/storeCache/cleanupExpiredCache) with
 // injected fake embedder + temp sqlite — no network, no real ollama.
-import { describe, test, expect, afterAll, afterEach } from "vitest";
+import { describe, test, expect, afterAll, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -168,6 +168,28 @@ describe("lookupCache / storeCache (injected sqlite + fake embedder)", () => {
     const hit = await lookupCache(d, query);
     expect(hit).toBeNull();
     close();
+  });
+
+  test("near-miss telemetry: below-threshold cosine inside the 0.1 band logs one evidence line", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      const stored = cfg({ messages: [{ role: "user", content: "base" }] });
+      const query = cfg({ messages: [{ role: "user", content: "far" }] });
+      // angle 30deg -> cosine ~0.866: a miss, but inside [threshold-0.1, threshold)
+      const { deps, close } = makeDeps("nearmiss", {
+        "user:base": vecAtAngle(0),
+        "user:far": vecAtAngle(30),
+      }, ENABLED);
+      const d = await deps;
+      await storeCache(d, stored, result("N"));
+      expect(await lookupCache(d, query)).toBeNull();
+      const line = infoSpy.mock.calls.map((c) => String(c[0])).find((s) => s.includes("semantic_cache.near_miss"));
+      expect(line).toBeTruthy();
+      const evt = JSON.parse(line!);
+      expect(evt.cosine).toBeCloseTo(0.866, 2);
+      expect(evt.threshold).toBe(0.95);
+      close();
+    } finally { infoSpy.mockRestore(); }
   });
 
   test("param-mismatch: same model+prompt-family, different params hash -> miss", async () => {
