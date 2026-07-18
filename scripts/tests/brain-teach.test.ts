@@ -142,3 +142,18 @@ describe("brain-teach v10 — code-based sets", () => {
     expect(buildCodePatternRecords().find((r) => r.id === "teach:desen:guarded-alter")?.content).toContain("ALTER");
   });
 });
+
+import { buildToolCatalogRecords, buildTestMapRecords, buildFrontendMapRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v11 — tool/test/frontend maps", () => {
+  it("parses registry tools, test describes and frontend heads", () => {
+    const reg = 'brain_recall: {\n    tier: "safe",\n    schema: fn(\n      "brain_recall",\n      "Semantic recall from the agent brain.",';
+    const t = buildToolCatalogRecords(reg);
+    expect(t[0].id).toBe("teach:tool:brain_recall");
+    expect(t[0].fact?.object).toBe("brain_recall (safe)");
+    const tm = buildTestMapRecords([["tests/brain.test.ts", 'describe("Brain — belief revision (Tur-5)", () => {});']]);
+    expect(tm[0].content).toContain("belief revision");
+    const fe = buildFrontendMapRecords([["src/App.tsx", "// Ana uygulama kabuğu.\nexport default function App() {}"]]);
+    expect(fe[0].fact?.predicate).toBe("has_frontend_module");
+  });
+});

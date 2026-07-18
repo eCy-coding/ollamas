@@ -696,6 +696,41 @@ export function buildCodePatternRecords(): TeachRecord[] {
   return CODE_PATTERNS.map(([k, d]) => ({ id: `teach:desen:${k}`, actor: "code-patterns", content: `ollamas kod-deseni '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-11: tool-katalog + test-harita + frontend-harita (hepsi canlı parse) ———
+export function buildToolCatalogRecords(registrySrc: string): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const m of registrySrc.matchAll(/([\w]+):\s*\{\s*tier:\s*"(\w+)",\s*schema:\s*fn\(\s*"([\w]+)",\s*"([^"]{10,300}?)"/g)) {
+    out.push({ id: `teach:tool:${m[3]}`, actor: "tool-registry",
+      content: `ollamas tool '${m[3]}' (${m[2]}): ${m[4].slice(0, 220)}`,
+      fact: { subject: "ollamas", predicate: "has_tool", object: `${m[3]} (${m[2]})` } });
+  }
+  return out.slice(0, 60);
+}
+export function buildTestMapRecords(files: [string, string][]): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const [path, src] of files) {
+    const names = [...src.matchAll(/describe\(\s*"([^"]{5,90})"/g)].map((m) => m[1]).slice(0, 8);
+    if (!names.length) continue;
+    const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 48);
+    out.push({ id: `teach:testmap:${slug}`, actor: "tests",
+      content: `Test dosyası ${path} şu davranışları sözleşmeler: ${names.join(" · ").slice(0, 400)}` });
+  }
+  return out.slice(0, 50);
+}
+export function buildFrontendMapRecords(files: [string, string][]): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const [path, src] of files) {
+    const head = headComment(src) || (src.split("\n").find((l) => l.trim() && !l.startsWith("import")) || "").trim().slice(0, 120);
+    if (!head) continue;
+    const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 48);
+    out.push({ id: `teach:fe:${slug}`, actor: "frontend",
+      content: `Frontend modülü ${path}: ${head.slice(0, 250)}`,
+      fact: { subject: "ollamas", predicate: "has_frontend_module", object: path.slice(0, 60) } });
+  }
+  return out.slice(0, 40);
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -756,7 +791,31 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
       codeFiles.push([`scripts/${f}`, fsMod.readFileSync(`scripts/${f}`, "utf8")]);
   } catch { /* partial fine */ }
   const brainFiles = codeFiles.filter(([p2]) => /brain|gpu|embed|rerank/.test(p2));
+  let registrySrc = "";
+  try { registrySrc = fsMod.readFileSync("server/tool-registry.ts", "utf8"); } catch { /* absent */ }
+  const testFiles: [string, string][] = [];
+  try {
+    for (const f of fsMod.readdirSync("tests").filter((x: string) => x.endsWith(".test.ts")).slice(0, 60))
+      testFiles.push([`tests/${f}`, fsMod.readFileSync(`tests/${f}`, "utf8")]);
+  } catch { /* fine */ }
+  const feFiles: [string, string][] = [];
+  const walkFe = (dir: string, depth: number) => {
+    if (depth > 2 || feFiles.length >= 40) return;
+    try {
+      for (const e of fsMod.readdirSync(dir, { withFileTypes: true })) {
+        if (feFiles.length >= 40) break;
+        const full = `${dir}/${e.name}`;
+        if (e.isDirectory()) walkFe(full, depth + 1);
+        else if (/\.(tsx|ts)$/.test(e.name) && !e.name.includes(".test."))
+          feFiles.push([full, fsMod.readFileSync(full, "utf8")]);
+      }
+    } catch { /* fine */ }
+  };
+  walkFe("src", 0);
   const sets: [string, TeachRecord[]][] = [
+    ["tool-katalog", buildToolCatalogRecords(registrySrc)],
+    ["test-harita", buildTestMapRecords(testFiles)],
+    ["frontend-harita", buildFrontendMapRecords(feFiles)],
     ["kod-harita", buildCodeMapRecords(codeFiles)],
     ["kod-export", buildExportRecords(brainFiles)],
     ["kod-desen", buildCodePatternRecords()],
