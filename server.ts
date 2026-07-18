@@ -88,7 +88,7 @@ import { coreUtilization, activitySummary } from "./server/cockpit-metrics";
 import { rankMacModels } from "./server/cockpit-models";
 import { checkAnswer, scoreCouncil } from "./server/council";
 import { registerCookbookRoutes } from "./server/cookbook";
-import { registerResearchRoutes } from "./server/research";
+import { registerResearchRoutes, isSafeUrl } from "./server/research";
 import { registerEcymRoutes } from "./server/ecym";
 import { registerPanelAssistRoutes } from "./server/panel-assist";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
@@ -631,7 +631,23 @@ app.post("/api/github/actions/dispatch", async (req, res) => {
 // eCySearcher Flask stack so the threat-intel tab has live data even when the
 // docker stack is down. Lazy 15-min TTL cache; ?refresh=1 forces a refetch.
 app.get("/api/threatfeed", async (req, res) => {
-  res.json(await getFeedItems({ refresh: req.query.refresh === "1" }));
+  // Merge operator-added custom feeds (v12 gap #9) with the curated sources.
+  const extra = (db.data.threatFeeds ?? [])
+    .filter((f) => isSafeUrl(f.url))
+    .map((f) => ({ id: `custom-${f.source}`, title: f.source, url: f.url, kind: "rss" as const }));
+  res.json(await getFeedItems({ refresh: req.query.refresh === "1", extra }));
+});
+
+// Add a custom threat feed (v12 gap #9) — SSRF-guarded (no loopback/private hosts).
+app.post("/api/threatfeed/sources", async (req, res) => {
+  const b = req.body as { source?: unknown; url?: unknown };
+  const source = String(b?.source ?? "").trim().slice(0, 60);
+  const url = String(b?.url ?? "").trim();
+  if (!source || !isSafeUrl(url)) { res.status(400).json({ error: "source + a public https feed url required" }); return; }
+  db.data.threatFeeds = (db.data.threatFeeds ?? []).filter((f) => f.source !== source);
+  db.data.threatFeeds.push({ source, url });
+  db.save();
+  res.json({ ok: true, count: db.data.threatFeeds.length });
 });
 
 // eCySearcher threat-intel subsystem (docker-compose stack). SUPERVISOR control routes — single
