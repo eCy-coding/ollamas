@@ -321,6 +321,114 @@ export function buildGlossaryRecords(): TeachRecord[] {
   return GLOSSARY.map(([k, d]) => ({ id: `teach:term:${k}`, actor: "glossary", content: `Teknik terim '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-4 (teach v4): temel başlangıç katmanı — her şeyin tabanı ———
+
+const PROG_BASICS: [string, string][] = [
+  ["degisken", "değer tutan isimli kutu; let/const (JS), = (Python)"],
+  ["dongu", "for/while — tekrar eden iş; her turda durum ilerler, çıkış koşulu şart"],
+  ["kosul", "if/else — akışı duruma göre dallandırır"],
+  ["fonksiyon", "girdi alıp çıktı dönen yeniden kullanılabilir blok; tek iş yapsın"],
+  ["dizi-array", "sıralı eleman listesi; index 0'dan başlar"],
+  ["map-dict", "anahtar→değer eşlemesi; O(1) erişim"],
+  ["set-kume", "tekrarsız eleman topluluğu; üyelik kontrolü hızlı"],
+  ["stack", "LIFO — son giren ilk çıkar (çağrı yığını böyle)"],
+  ["queue", "FIFO — ilk giren ilk çıkar (iş kuyrukları böyle)"],
+  ["recursion", "fonksiyonun kendini çağırması; TABAN KOŞUL şart yoksa sonsuz döngü/stack overflow"],
+  ["big-o", "algoritma maliyet büyümesi: O(1) sabit, O(n) doğrusal, O(n²) kare — iç içe döngü kokusu"],
+  ["hata-yonetimi", "try/catch — hata yakala, anlamlı mesaj ver, sessizce yutma"],
+  ["null-undefined", "değer yokluğu; kontrolsüz erişim çöker — önce kontrol et"],
+  ["immutability", "veriyi değiştirmek yerine yenisini üret; yan etki azalır"],
+  ["scope", "değişkenin görünür olduğu alan; blok içi dışarıdan görünmez"],
+  ["string-islem", "birleştirme, kesme (slice), arama (includes), bölme (split)"],
+  ["tip", "sayı/metin/boolean/nesne — tip karışıklığı hataların anasıdır"],
+  ["yorum", "kod NE yapıyor değil NEDEN yapıyor açıklanır"],
+];
+export function buildProgBasicsRecords(): TeachRecord[] {
+  return PROG_BASICS.map(([k, d]) => ({ id: `teach:prog:${k}`, actor: "programming", content: `Programlama temeli '${k}': ${d}.` }));
+}
+
+const COMPUTER_BASICS: [string, string][] = [
+  ["cpu", "komutları yürüten işlemci; çekirdek sayısı paralel iş kapasitesi"],
+  ["ram", "hızlı geçici bellek; kapanınca silinir; yetmezse swap→yavaşlama"],
+  ["disk", "kalıcı depolama (SSD hızlı); dosya sistemi burada yaşar"],
+  ["gpu", "paralel matris işlemci; grafik + LLM inference (Apple Silicon'da RAM'le paylaşımlı)"],
+  ["process", "çalışan program örneği; kendi bellek alanı var"],
+  ["thread", "process içi hafif iş kolu; belleği paylaşır — process'ten farkı bu"],
+  ["dosya-sistemi", "dizin ağacı; yol = /kök/klasör/dosya; ~ ev dizini"],
+  ["binary-hex", "bilgisayar 0/1 konuşur; hex (0xFF) binary'nin okunur kısaltması"],
+  ["utf8", "evrensel metin kodlaması; Türkçe karakterler çok-bayt — encoding karışırsa � çıkar"],
+  ["onbellek-cache", "sık kullanılanı yakında tutma; hız kazandırır, bayatlama riski getirir"],
+  ["environment", "process'e dışarıdan verilen ayarlar (env değişkenleri)"],
+  ["kernel", "donanımla programlar arasındaki çekirdek yönetici (macOS: Darwin)"],
+];
+export function buildComputerBasicsRecords(): TeachRecord[] {
+  return COMPUTER_BASICS.map(([k, d]) => ({ id: `teach:comp:${k}`, actor: "computer", content: `Bilgisayar temeli '${k}': ${d}.` }));
+}
+
+const INTERNET_BASICS: [string, string][] = [
+  ["ip-adres", "makinenin ağdaki numarası; 127.0.0.1 = localhost (kendi makinen)"],
+  ["dns", "alan adını IP'ye çevirir (google.com → 142.x) — internetin telefon rehberi"],
+  ["tcp", "güvenilir sıralı bağlantı; HTTP bunun üstünde"],
+  ["udp", "hızlı, garanti yok; canlı yayın/oyun"],
+  ["port", "aynı makinede servis kapısı; ollamas 3000, ollama 11434"],
+  ["istemci-sunucu", "istemci ister, sunucu cevaplar; tarayıcın istemci, ollamas sunucu"],
+  ["http-yasam", "istek: metot+yol+başlık+gövde → cevap: status+başlık+gövde"],
+  ["api", "programların birbiriyle konuşma sözleşmesi; REST = HTTP üstünde kaynak-odaklı"],
+  ["url", "protokol://host:port/yol?sorgu — adresin anatomisi"],
+  ["ssl-sertifika", "https kilidi; sunucunun kimlik kanıtı"],
+  ["bant-genisligi", "birim zamanda veri; gecikme (latency) ayrı şey — ikisi karıştırılır"],
+];
+export function buildInternetBasicsRecords(): TeachRecord[] {
+  return INTERNET_BASICS.map(([k, d]) => ({ id: `teach:net:${k}`, actor: "internet", content: `İnternet temeli '${k}': ${d}.` }));
+}
+
+const DATA_FORMATS: [string, string][] = [
+  ["json", "{\"anahtar\": \"değer\"} — API'lerin ortak dili; son elemanda virgül YOK"],
+  ["yaml", "girintiyle yapı; config dosyaları; TAB değil boşluk"],
+  ["csv", "virgülle ayrık tablo; ilk satır başlık"],
+  ["markdown", "# başlık, **kalın**, - liste, ``` kod — README'lerin dili"],
+  ["base64", "ikili veriyi metne çevirme; şifreleme DEĞİL kodlama"],
+  ["regex-temel", ". herhangi, * tekrar, + en-az-bir, ^ başlangıç, $ son, [abc] küme, \\d rakam"],
+  ["escape", "özel karakteri düz kullanmak: \\n satır, \\t tab, \\\\ ters-eğik"],
+  ["timestamp", "epoch ms = 1970'ten beri milisaniye; ISO 8601 = 2026-07-18T15:00Z"],
+];
+export function buildDataFormatRecords(): TeachRecord[] {
+  return DATA_FORMATS.map(([k, d]) => ({ id: `teach:fmt:${k}`, actor: "data-format", content: `Veri formatı '${k}': ${d}.` }));
+}
+
+const SOFTWARE_PRACTICE: [string, string][] = [
+  ["unit-test", "tek fonksiyonu izole test eder; hızlı, çok sayıda"],
+  ["e2e-test", "sistemi uçtan uca kullanıcı gibi test eder; az ama değerli"],
+  ["tdd", "önce KIRMIZI test yaz, sonra geçir (yeşil), sonra temizle"],
+  ["debugging", "belirtiyi değil KÖKÜ bul: yeniden üret → daralt → hipotez → doğrula"],
+  ["refactoring", "davranışı değiştirmeden kodu iyileştirme; testler güvence"],
+  ["dry", "kendini tekrarlama — ortak kodu tek yere topla"],
+  ["kiss", "basit tut — akıllıca karmaşık yerine sıkıcı ama net"],
+  ["yagni", "ihtiyacın yoksa yazma — belki-lazım-olur kodu yük"],
+  ["code-review", "başkasının gözü; küçük diff'ler incelenir, dev diff'ler onaylanır (kötü)"],
+  ["semver", "MAJOR.MINOR.PATCH — kırıcı.özellik.düzeltme"],
+  ["log", "ne olduğunu iz bırak; hata mesajına bağlam koy"],
+  ["rubber-duck", "sorunu yüksek sesle anlat — çoğu zaman anlatırken çözülür"],
+];
+export function buildSoftwarePracticeRecords(): TeachRecord[] {
+  return SOFTWARE_PRACTICE.map(([k, d]) => ({ id: `teach:pratik:${k}`, actor: "practice", content: `Yazılım pratiği '${k}': ${d}.` }));
+}
+
+const LOGIC_MATH: [string, string][] = [
+  ["boolean", "AND (ikisi de), OR (en az biri), NOT (tersi); kısa devre: false && x hiç bakmaz"],
+  ["mod", "kalan: 10 % 3 = 1; döngüsel işlerde (saat, ring buffer)"],
+  ["ortalama-medyan", "ortalama uç değere duyarlı; medyan ortadaki — çarpık veride medyan"],
+  ["olasilik", "0-1 arası; bağımsız olaylar çarpılır; nadir olay çok denemede olağanlaşır"],
+  ["ustel", "2^n patlar: 2^10≈bin, 2^20≈milyon, 2^30≈milyar"],
+  ["kb-mb-gb", "1 KB=1024 B, MB=1024 KB, GB=1024 MB; disk üreticileri 1000 kullanır (fark bundan)"],
+  ["yuvarlama", "float hassasiyeti: 0.1+0.2≠0.3 — para işinde tam sayı kuruş kullan"],
+  ["binary-search", "sıralı veride ortadan böl: milyonda 20 adım"],
+];
+export function buildLogicMathRecords(): TeachRecord[] {
+  return LOGIC_MATH.map(([k, d]) => ({ id: `teach:mantik:${k}`, actor: "logic", content: `Mantık/matematik temeli '${k}': ${d}.` }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -364,6 +472,12 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
   try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["prog-temel", buildProgBasicsRecords()],
+    ["bilgisayar-temel", buildComputerBasicsRecords()],
+    ["internet-temel", buildInternetBasicsRecords()],
+    ["veri-format", buildDataFormatRecords()],
+    ["yazilim-pratik", buildSoftwarePracticeRecords()],
+    ["mantik-matematik", buildLogicMathRecords()],
     ["ollamas-internal", buildOllamasRecords(mkText, intMd)],
     ["llm-ops", buildLlmOpsRecords()],
     ["react", buildReactRecords()],

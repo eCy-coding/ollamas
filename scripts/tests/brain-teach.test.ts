@@ -69,3 +69,16 @@ describe("brain-teach v3 — dalga-3 sets", () => {
     expect(buildGlossaryRecords().find((r) => r.id === "teach:term:idempotent")).toBeTruthy();
   });
 });
+
+import { buildProgBasicsRecords, buildComputerBasicsRecords, buildInternetBasicsRecords, buildDataFormatRecords, buildSoftwarePracticeRecords, buildLogicMathRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v4 — temel başlangıç sets", () => {
+  it("foundational sets: stable ids, Turkish content, lived pitfalls included", () => {
+    expect(buildProgBasicsRecords().find((r) => r.id === "teach:prog:recursion")?.content).toContain("TABAN KOŞUL");
+    expect(buildComputerBasicsRecords().find((r) => r.id === "teach:comp:thread")?.content).toContain("belleği paylaşır");
+    expect(buildInternetBasicsRecords().find((r) => r.id === "teach:net:port")?.content).toContain("11434");
+    expect(buildDataFormatRecords().find((r) => r.id === "teach:fmt:base64")?.content).toContain("şifreleme DEĞİL");
+    expect(buildSoftwarePracticeRecords().find((r) => r.id === "teach:pratik:tdd")?.content).toContain("KIRMIZI");
+    expect(buildLogicMathRecords().find((r) => r.id === "teach:mantik:yuvarlama")?.content).toContain("0.1+0.2");
+  });
+});
