@@ -634,3 +634,44 @@ describe("Brain — ftsQuery stopword filter (dalga-7 root-fix)", () => {
     expect(ftsQuery("nedir bu")).toBe('"nedir" OR "bu"'); // all-filler → legacy, never empty MATCH
   });
 });
+
+describe("Brain — fact write-behind (ileri-düzey: facts never lost to a busy embedder)", () => {
+  test("assertFact survives a hanging embedder; supersede works; backfill indexes for semantic search", async () => {
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    const b = createBrainStore({ dbPath: tmpDb(), embed, llmActive: () => false });
+    await b.remember({ id: "m-base", tier: "learned", content: "deploy uses make ship" }); // dim set
+    hang = true;
+    process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS = "120";
+    try {
+      const r1 = await b.assertFact({ subject: "emre", predicate: "lives_in", object: "adana" });
+      expect(r1.changed).toBe(true); // row landed despite dead embedder
+      const r2 = await b.assertFact({ subject: "emre", predicate: "lives_in", object: "istanbul" });
+      expect(r2.invalidated).toBe(1); // SQL-only supersede intact
+      expect(b.factsAbout("emre").map((f) => f.object)).toEqual(["istanbul"]);
+      hang = false;
+      await b.backfillEmbeddings();
+      const found = await b.searchFacts("emre lives_in istanbul", { k: 3 });
+      expect(found.map((f) => f.object)).toContain("istanbul"); // vector arrived
+    } finally {
+      delete process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS;
+      b.close();
+    }
+  });
+});
+
+describe("Brain — ask iterative deepening (gap #2 closed)", () => {
+  test("thin evidence triggers a second wave from uncovered question terms", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const hit = (id: string, content: string, score = 0.3) => ({ id, tier: "learned", content, distance: 0, score, createdAt: 1 }) as any;
+    const queries: string[] = [];
+    const r = await askBrain("odysseus pulse paneli hangi portta", {
+      recall: async (q) => { queries.push(q); return q.includes("hangi") || q.includes("odysseus pulse") ? [hit("h-1", "odysseus temel bilgi", 0.3)] : q === "pulse" ? [hit("h-2", "ODY-PULSE panel 4777", 0.9)] : []; },
+      searchFacts: async () => [],
+      generate: async () => "Panel 4777 [mem:h-2].",
+    });
+    expect(r.hops).toBe(2); // deepening fired (thin evidence)
+    expect(r.sources.map((s) => s.id)).toContain("h-2"); // uncovered term 'pulse' found it
+    expect(queries).toContain("pulse");
+  });
+});

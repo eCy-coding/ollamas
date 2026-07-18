@@ -307,6 +307,8 @@ export function createBrainStore(
     invalidated_at INTEGER
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS brain_facts_sp ON brain_facts(ns, subject, predicate)`);
+  // Fact write-behind (ileri-düzey tur): a contended embedder must not lose FACTS either.
+  try { db.exec("ALTER TABLE brain_facts ADD COLUMN pending_embed INTEGER NOT NULL DEFAULT 0"); } catch { /* already there */ }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_meta (k TEXT PRIMARY KEY, v TEXT)`);
   // B3 audit ledger (2026 gap-audit): append-only record of every mutation the
   // store performs — remember/merge/revise/forget. Read via auditTail(); never
@@ -646,12 +648,19 @@ export function createBrainStore(
       ensureProvider();
       // v2: facts are embedded ("subject predicate object") for semantic search. The
       // vector stays after invalidation so point-in-time search still works.
-      const vec = await embed(`${f.subject} ${f.predicate} ${f.object}`);
-      ensureVec(vec.length);
+      // Write-behind: past the embed budget the fact ROW still lands (supersede above
+      // is SQL-only and already done) — the vector arrives via backfillEmbeddings.
+      let vec: number[] | null = null;
+      try {
+        vec = await embedWithBudget(`${f.subject} ${f.predicate} ${f.object}`);
+      } catch {
+        if (process.env.BRAIN_DEFER_EMBED === "0") throw new Error("fact embed failed (BRAIN_DEFER_EMBED=0)");
+      }
+      if (vec) ensureVec(vec.length);
       const ins = db.prepare(
-        "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from) VALUES(?,?,?,?,?,?)",
-      ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, validFrom);
-      db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(ins.lastInsertRowid), f32(vec));
+        "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from, pending_embed) VALUES(?,?,?,?,?,?,?)",
+      ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, validFrom, vec ? 0 : 1);
+      if (vec) db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(ins.lastInsertRowid), f32(vec));
       return { changed: true, invalidated };
     },
 
@@ -704,16 +713,32 @@ export function createBrainStore(
       // one small batch is forced through so deferred rows can never starve.
       const gpuBusy = opts.llmActive ?? llmActive;
       const boundary = Number(process.env.BRAIN_BACKFILL_BOUNDARY) || 50;
-      const pendingTotal = Number(
-        (db.prepare("SELECT COUNT(*) AS n FROM brain_memories WHERE pending_embed=1").get() as { n: number }).n,
-      );
+      const pendingTotal =
+        Number((db.prepare("SELECT COUNT(*) AS n FROM brain_memories WHERE pending_embed=1").get() as { n: number }).n) +
+        Number((db.prepare("SELECT COUNT(*) AS n FROM brain_facts WHERE pending_embed=1").get() as { n: number }).n);
       if (pendingTotal === 0) return 0;
       const forced = pendingTotal > boundary;
       if (gpuBusy() && !forced) return 0;
       const pending = db
         .prepare("SELECT rowid, content FROM brain_memories WHERE pending_embed=1 ORDER BY rowid LIMIT ?")
         .all(limit) as { rowid: number; content: string }[];
+      const pendingFacts = db
+        .prepare("SELECT rowid, subject, predicate, object FROM brain_facts WHERE pending_embed=1 ORDER BY rowid LIMIT ?")
+        .all(limit) as { rowid: number; subject: string; predicate: string; object: string }[];
       let indexed = 0;
+      for (const pf of pendingFacts) {
+        if (!forced && indexed > 0 && gpuBusy()) break;
+        try {
+          const v = await embedWithBudget(`${pf.subject} ${pf.predicate} ${pf.object}`);
+          ensureVec(v.length);
+          db.prepare("DELETE FROM brain_fact_vec WHERE rowid=?").run(BigInt(pf.rowid));
+          db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(pf.rowid), f32(v));
+          db.prepare("UPDATE brain_facts SET pending_embed=0 WHERE rowid=?").run(BigInt(pf.rowid));
+          indexed++;
+        } catch {
+          break;
+        }
+      }
       for (const p of pending) {
         // Re-check between items (unless forced): a generation that started mid-drain
         // reclaims the GPU immediately — the rest waits for the next pass.
