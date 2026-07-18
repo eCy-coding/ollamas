@@ -80,3 +80,52 @@ describe("HTML5 structure check (validated, honest scope)", () => {
     expect(checkHtml("<div><span></div></span>").definitive).toBe(false);
   });
 });
+
+// ── research-until-verified core (answer-research.ts) ──────────────────────────
+import { extractKeyFact, corroborate, renderImpasse } from "../bin/lib/answer-research";
+
+describe("research corroboration (it is either right or wrong)", () => {
+  it("extractKeyFact: number wins; normalization makes phrasings agree", () => {
+    expect(extractKeyFact("2012 – Microsoft released TypeScript.")).toBe("2012");
+    expect(extractKeyFact("In 2012, it shipped.")).toBe("2012");
+    expect(extractKeyFact("")).toBeNull();
+  });
+  it("one channel = candidate, never an answer", () => {
+    const c = corroborate([{ channel: "a", text: "2012", ok: true }]);
+    expect(c.agreed).toBeNull();
+    expect(c.votes[0]).toMatchObject({ fact: "2012" });
+  });
+  it("two INDEPENDENT channels agreeing → DEFINITIVE fact", () => {
+    const c = corroborate([
+      { channel: "odysseus-research", text: "2012 — official site", ok: true },
+      { channel: "cloud:groq", text: "It was 2012 (Wikipedia).", ok: true },
+    ]);
+    expect(c.agreed).toBe("2012");
+    expect(c.votes[0].channels).toEqual(["cloud:groq", "odysseus-research"]);
+  });
+  it("same channel twice does NOT corroborate (independence required)", () => {
+    const c = corroborate([
+      { channel: "cloud:groq", text: "2012", ok: true },
+      { channel: "cloud:groq", text: "2012", ok: true },
+    ]);
+    expect(c.agreed).toBeNull();
+  });
+  it("conflict → no agreement; impasse names every candidate honestly", () => {
+    const c = corroborate([
+      { channel: "a", text: "2012", ok: true },
+      { channel: "b", text: "2010", ok: true },
+    ]);
+    expect(c.agreed).toBeNull();
+    const msg = renderImpasse(c.votes, 2);
+    expect(msg).toContain('"2012" (a)');
+    expect(msg).toContain('"2010" (b)');
+  });
+  it("failed channels are ignored, not counted as votes", () => {
+    const c = corroborate([
+      { channel: "a", text: "timeout", ok: false },
+      { channel: "b", text: "2012", ok: true },
+      { channel: "c", text: "2012!", ok: true },
+    ]);
+    expect(c.agreed).toBe("2012");
+  });
+});

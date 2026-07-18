@@ -18,6 +18,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { classifyQuestion, evalArithmetic, checkHtml, renderVerdict, definitive, unverified, type Verdict, type QuestionKind } from "./lib/answer";
+import { corroborate, extractKeyFact, renderImpasse, type ResearchAttempt } from "./lib/answer-research";
 import { remember } from "./lib/brain-ledger";
 
 const argv = process.argv.slice(2);
@@ -43,25 +44,74 @@ function runCode(kind: "python" | "javascript", code: string): Verdict {
   }
 }
 
-/** Facts: only a sourced answer counts. Research bridge (odysseus via :3000) supplies the source;
- *  unreachable/empty → UNVERIFIED (law #4: no source, no answer). */
-async function answerFact(q: string): Promise<Verdict> {
+// ── Facts: RESEARCH-UNTIL-VERIFIED (it is either right or wrong — GROUNDED-ANSWER.md §research) ──
+// One channel's claim is a CANDIDATE, never an answer. The loop keeps researching across
+// independent channels until ≥2 agree on the same key fact (corroboration = DEFINITIVE). Only when
+// every channel is exhausted does it report the impasse honestly — candidates + sources on the
+// record, gap remembered in the brain for the next attempt.
+
+const CITE = "Answer with the single key fact FIRST (one line), then the source (name + where to check). If you truly cannot ground it, reply exactly: UNVERIFIABLE.";
+
+async function channelOdysseus(q: string): Promise<ResearchAttempt> {
   try {
     const res = await fetch("http://127.0.0.1:3000/api/odysseus/run", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "research", query: `${q}\n\nAnswer definitively and CITE the source (name + where it can be checked). If you cannot ground the answer in a source, reply exactly: UNVERIFIABLE.` }),
-      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({ type: "research", query: `${q}\n\n${CITE}` }),
+      signal: AbortSignal.timeout(90_000),
     });
     const body = await res.json() as { ok?: boolean; result?: string };
     const text = (body.result ?? "").trim();
     // ORG-FAULT-ODY-001: ok:true can embed an error in the text — scan payload, never trust ok alone.
-    if (!body.ok || !text || /UNVERIFIABLE|error|exception/i.test(text.slice(0, 80))) {
-      return unverified("fact", `no sourced answer available (bridge said: ${text.slice(0, 120) || "empty"})`);
-    }
-    return definitive("fact", text.split("\n")[0].slice(0, 200), "sourced(odysseus research)", text.slice(0, 500));
+    const usable = Boolean(body.ok) && text.length > 0 && !/UNVERIFIABLE|error|exception/i.test(text.slice(0, 80));
+    return { channel: "odysseus-research", text, ok: usable };
   } catch (e) {
-    return unverified("fact", `research bridge unreachable — refusing to answer from model memory (${(e as Error).message.slice(0, 80)})`);
+    return { channel: "odysseus-research", text: (e as Error).message, ok: false };
   }
+}
+
+function channelCloud(provider: string): (q: string) => Promise<ResearchAttempt> {
+  return async (q: string) => {
+    const channel = `cloud:${provider}`;
+    try {
+      const res = await fetch("http://127.0.0.1:3000/api/generate", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider, messages: [{ role: "user", content: `${q}\n\n${CITE}` }] }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      const body = await res.json() as { text?: string };
+      const text = (body.text ?? "").trim();
+      return { channel, text, ok: text.length > 0 && !/UNVERIFIABLE/i.test(text.slice(0, 40)) };
+    } catch (e) {
+      return { channel, text: (e as Error).message, ok: false };
+    }
+  };
+}
+
+/** Independent channels, cheapest-diverse first. Distinct providers = distinct backing corpora. */
+const FACT_CHANNELS: Array<(q: string) => Promise<ResearchAttempt>> = [
+  channelOdysseus,
+  channelCloud("groq"),
+  channelCloud("gemini"),
+  channelCloud("github-models"),
+  channelCloud("cerebras"),
+];
+
+async function answerFact(q: string, maxChannels = FACT_CHANNELS.length): Promise<Verdict> {
+  const attempts: ResearchAttempt[] = [];
+  for (let i = 0; i < Math.min(maxChannels, FACT_CHANNELS.length); i++) {
+    const attempt = await FACT_CHANNELS[i](q);
+    attempts.push(attempt);
+    if (!JSON_OUT) process.stderr.write(`  🔎 ${attempt.channel}: ${attempt.ok ? `"${(extractKeyFact(attempt.text) ?? "?")}"` : "kanal sessiz"}\n`);
+    const c = corroborate(attempts);
+    if (c.agreed) {
+      const backers = c.votes[0].channels;
+      const sourceTexts = attempts.filter((a) => a.ok && backers.includes(a.channel)).map((a) => `[${a.channel}] ${a.text.slice(0, 220)}`);
+      return definitive("fact", c.agreed, `corroborated(${backers.join("+")})`,
+        `${backers.length} independent channels agree on "${c.agreed}":\n   ${sourceTexts.join("\n   ")}`);
+    }
+  }
+  const c = corroborate(attempts);
+  return unverified("fact", renderImpasse(c.votes, attempts.length) + " — gap recorded; research continues on the next ask.");
 }
 
 async function main(): Promise<void> {

@@ -15,7 +15,7 @@
 
 ## The doctrine (how "no assumptions" becomes executable)
 
-An answer is allowed exactly TWO shapes. Nothing in between exists:
+An answer is allowed exactly these shapes. Nothing in between exists:
 
 1. **DEFINITIVE** — the answer was obtained from its authoritative source, and the evidence ships
    with it:
@@ -28,7 +28,14 @@ An answer is allowed exactly TWO shapes. Nothing in between exists:
      verdict reports exactly what was checked.
    - **General knowledge** → the answer must arrive WITH its source (research bridge / registry /
      documented reference). A fact without a source is not an answer; it is a guess wearing a suit.
-2. **UNVERIFIED (honest refusal to guess)** — when no verification path exists (the expression is
+2. **RESEARCH-UNTIL-VERIFIED (facts never stop at "I don't know")** — a fact question that no
+   single channel can settle triggers the research loop: INDEPENDENT channels are consulted one
+   after another (odysseus deep research, then diverse cloud corpora), every claim is only a
+   CANDIDATE, and the answer becomes DEFINITIVE the moment **two independent channels agree on the
+   same key fact** (corroboration). A wrong claim from one channel cannot survive — it is outvoted,
+   as it must be: *the answer is either right or wrong.* Engine: `bin/lib/answer-research.ts`
+   (extractKeyFact + corroborate, deterministic), loop in `bin/answer.ts`.
+3. **UNVERIFIED (honest impasse, never a guess)** — when no verification path exists (the expression is
    malformed, the runtime is unavailable, no source can be reached), the system says exactly that:
    *"cannot verify — here is what failed"*. It never fills the gap with a plausible number, never
    hedges with "probably", never offers three candidate answers. **"I don't know, and here is why"
