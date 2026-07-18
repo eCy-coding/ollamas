@@ -608,3 +608,20 @@ describe("Brain — K3b: live truth beats synthesizer refusal", () => {
     expect(r.confidence).toBeGreaterThan(0.5);
   });
 });
+
+describe("Brain — ask multi-ns fan-out (dalga-6 root-fix)", () => {
+  test("nsless ask sweeps live namespaces and merges sources by score", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const hit = (id: string, score: number) => ({ id, tier: "learned", content: id, distance: 0, score, createdAt: 1 }) as any;
+    const seen: string[] = [];
+    const r = await askBrain("odysseus nedir", {
+      namespaces: () => ["default", "knowledge"],
+      recall: async (_q, o: any) => { seen.push(o.ns); return o.ns === "knowledge" ? [hit("k-1", 0.9)] : [hit("d-1", 0.5)]; },
+      searchFacts: async () => [],
+      generate: async () => "Cevap [mem:k-1] [mem:d-1].",
+    });
+    expect(seen).toEqual(expect.arrayContaining(["default", "knowledge"]));
+    expect(r.sources.map((s) => s.id)).toEqual(expect.arrayContaining(["k-1", "d-1"]));
+    expect(r.sources[0].id).toBe("k-1"); // score-merged ordering
+  });
+});

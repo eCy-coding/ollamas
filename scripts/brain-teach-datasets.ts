@@ -453,6 +453,72 @@ export function buildEcosystemRecords(): TeachRecord[] {
     ...(k.startsWith("prensip") ? {} : { fact: { subject: "ecosystem", predicate: "has_component", object: k } }) }));
 }
 
+
+// ——— Dalga-6: aktif lane setleri ———
+const CSS_SET: [string, string][] = [
+  ["flexbox", "tek boyutlu dizilim (satır VEYA sütun): display:flex; justify-content yatay, align-items dikey"],
+  ["grid", "iki boyutlu yerleşim: display:grid; grid-template-columns: 1fr 1fr — kart ızgaraları için"],
+  ["flex-vs-grid", "tek eksen → flex, iki eksen/şablon → grid"],
+  ["responsive", "@media (max-width:860px) — mobil kırılımlar; mobile-first yaklaş"],
+  ["specificity", "id > class > etiket; inline en güçlü; !important son çare — kaçın"],
+  ["box-model", "margin dış, border, padding iç; box-sizing:border-box hesabı sadeleştirir"],
+  ["position", "relative (akışta kayar), absolute (en yakın positioned ataya göre), fixed (viewport), sticky"],
+  ["z-index", "yalnız positioned elemanlarda; stacking context tuzağı"],
+  ["css-var", "--renk: #fff; kullanım var(--renk) — tema değişimi tek noktadan (brain paneli böyle)"],
+  ["tailwind-mantik", "utility-first: class='flex gap-2 p-4' — CSS yazmadan kompozisyon; tekrar edeni @apply/bileşene çıkar"],
+  ["tailwind-responsive", "md:flex lg:hidden — breakpoint önekleri"],
+  ["transition", "transition: all .15s — hover/durum geçişleri; layout-tetikleyen özelliklerden kaçın"],
+];
+export function buildCssRecords(): TeachRecord[] {
+  return CSS_SET.map(([k, d]) => ({ id: `teach:css:${k}`, actor: "css", content: `CSS/Tailwind '${k}': ${d}.` }));
+}
+const NET_DEEP: [string, string][] = [
+  ["dns-a", "A kaydı: alan adı → IPv4; AAAA → IPv6"],
+  ["dns-cname", "CNAME: takma ad → başka alan adı; kök domain'de kullanılamaz"],
+  ["dns-mx", "MX: e-posta sunucusu; öncelik numaralı"],
+  ["dns-txt", "TXT: doğrulama/SPF/DKIM metinleri"],
+  ["dns-ttl", "TTL: kaydın önbellek ömrü; taşınmadan önce düşür"],
+  ["tcp-handshake", "SYN → SYN-ACK → ACK üçlü el-sıkışma; sonra veri akar"],
+  ["tls-akis", "ClientHello → sertifika → anahtar anlaşması → şifreli kanal"],
+  ["nat", "özel IP'ler tek genel IP arkasında; içeriden dışarı doğal, dışarıdan içeri port-forward ister"],
+  ["dhcp", "IP'yi otomatik dağıtır; kira süreli"],
+  ["localhost-vs-lan", "127.0.0.1 yalnız kendi makinen; LAN erişimi için 0.0.0.0 dinle + makine IP'si"],
+  ["traceroute", "paketin yol aldığı düğümler; nerede koptuğunu gösterir"],
+  ["arp", "IP ↔ MAC eşlemesi; yerel ağ keşfi (eCyNetWatch bunu izler)"],
+];
+export function buildNetDeepRecords(): TeachRecord[] {
+  return NET_DEEP.map(([k, d]) => ({ id: `teach:agderin:${k}`, actor: "network", content: `Ağ-derin '${k}': ${d}.` }));
+}
+const EDITOR_SET: [string, string][] = [
+  ["cmd-p", "VS Code: Cmd+P dosyaya atla; Cmd+Shift+P komut paleti"],
+  ["multi-cursor", "Cmd+D aynı kelimeyi sıradaki seçime ekler; Alt+tık serbest imleç"],
+  ["find-regex", "arama kutusunda .* ikonu regex açar; $1 ile yakalama-grubu değiştirme"],
+  ["goto-def", "F12 tanıma git; Shift+F12 referanslar"],
+  ["rename-symbol", "F2 — sembolü her yerde güvenle yeniden adlandır"],
+  ["terminal-toggle", "Ctrl+` entegre terminal"],
+  ["quick-fix", "Cmd+. hata üstünde hızlı düzeltme önerileri"],
+  ["fold", "Cmd+Alt+[ katla — büyük dosyada gezinme"],
+  ["zen", "Cmd+K Z dikkat modu"],
+];
+export function buildEditorRecords(): TeachRecord[] {
+  return EDITOR_SET.map(([k, d]) => ({ id: `teach:editor:${k}`, actor: "editor", content: `Editör verimi '${k}': ${d}.` }));
+}
+const EN_WRITING: [string, string][] = [
+  ["pr-baslik", "PR başlığı: emir kipi + kapsam — 'fix(auth): handle expired tokens'"],
+  ["pr-aciklama", "PR gövdesi: What/Why/How-tested üç blok; ekran görüntüsü varsa ekle"],
+  ["issue-rapor", "Issue: Expected vs Actual + Steps to reproduce + ortam bilgisi"],
+  ["rica", "kibar rica: 'Could you please...' / 'Would you mind...' — 'You must' değil"],
+  ["tesekkur", "'Thanks for the quick review!' / 'Much appreciated' — kısa ve içten"],
+  ["ozur-duzeltme", "'Good catch — fixed in <commit>' — savunma değil düzeltme"],
+  ["kararsizlik", "'I might be missing something, but...' — nazik itiraz açılışı"],
+  ["takip", "'Just following up on this' — nazik hatırlatma; 'any update?' tek başına sert"],
+  ["kapanis", "'Let me know if anything else is needed' — profesyonel kapanış"],
+  ["review-istegi", "'PTAL (please take a look) when you get a chance'"],
+];
+export function buildEnWritingRecords(): TeachRecord[] {
+  return EN_WRITING.map(([k, d]) => ({ id: `teach:en:${k}`, actor: "english", content: `İngilizce yazışma '${k}': ${d}.` }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -496,6 +562,10 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
   try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["css-tailwind", buildCssRecords()],
+    ["ag-derin", buildNetDeepRecords()],
+    ["editor-verim", buildEditorRecords()],
+    ["en-yazisma", buildEnWritingRecords()],
     ["ecy-ekosistem", buildEcosystemRecords()],
     ["prog-temel", buildProgBasicsRecords()],
     ["bilgisayar-temel", buildComputerBasicsRecords()],

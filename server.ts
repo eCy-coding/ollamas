@@ -4013,6 +4013,7 @@ app.post("/api/brain/ask", async (req, res) => {
     const { liveSystemContext } = await import("./server/brain-system");
     const r = await askBrain(question, {
       ns,
+      namespaces: brain.brainListNamespaces,
       liveContext: liveSystemContext,
       recall: (q, o) => brain.brainRecall(q, { ...o, ns }),
       searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ns }),

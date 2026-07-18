@@ -29,6 +29,10 @@ export interface AskDeps {
   /** K3: instant machine-state probe — "şu an disk kaç GB?" answers from the LIVE
    *  system, not stale memories. Returns null when the question isn't about state. */
   liveContext?: (q: string) => Promise<string | null>;
+  /** Multi-ns fan-out: when the caller pins no ns, recall sweeps the store's live
+   *  namespaces (cap 6) and merges by score — knowledge/universe/research answers
+   *  no longer hide behind an ns parameter nobody remembers to pass. */
+  namespaces?: () => string[];
 }
 
 const SYNTH_PROMPT = `Sen bir kişisel hafıza asistanısın. SADECE sana verilen KAYNAK kayıtlardan yararlanarak soruyu Türkçe, kısa ve net yanıtla.
@@ -64,7 +68,11 @@ async function widen(question: string, first: BrainRecallHit[], deps: AskDeps): 
 export async function askBrain(question: string, deps: AskDeps): Promise<AskResult> {
   const q = (question || "").trim();
   if (!q) return { answer: "", sources: [], confidence: 0, mode: "hybrid", abstained: true };
-  const first = await deps.recall(q, { k: 8, graphExpand: true, ns: deps.ns });
+  const nsList = deps.ns ? [deps.ns] : (deps.namespaces?.() ?? ["default"]).slice(0, 6);
+  const perNs = await Promise.all(
+    nsList.map((n) => deps.recall(q, { k: nsList.length > 1 ? 4 : 8, graphExpand: true, ns: n }).catch(() => [] as BrainRecallHit[])),
+  );
+  const first = perNs.flat().sort((a, b) => b.score - a.score).slice(0, 8);
   const hits = (await widen(q, first, deps)).slice(0, 10);
   const mode: AskResult["mode"] = hits.some((h) => h.lexical) ? "lexical" : "hybrid";
   let live: string | null = null;
