@@ -6,6 +6,7 @@ export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Cockpit Dashboard',
   'app.tab.revenue': 'Revenue / Personal Ops',
   'app.tab.cookbook': 'Recipe Library',
+  'app.tab.research': 'Deep Research',
   'app.tab.swarm': 'P2P Computing Swarm',
   'app.tab.saas': 'SaaS Gateway',
   'app.tab.pipeline': 'Pipeline Agent',
