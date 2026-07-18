@@ -4000,6 +4000,35 @@ app.post("/api/brain/recall", async (req, res) => {
   }
 });
 
+// E2 ASK — synthesized, source-cited, confidence-scored answer drawn ONLY from the
+// store. Synthesis rides the $0 keyless provider (distill pattern), NOT ollama, so
+// answers flow even while the local embedder is starved (recall degrades lexical, E1).
+app.post("/api/brain/ask", async (req, res) => {
+  try {
+    const { question, ns } = req.body || {};
+    if (typeof question !== "string" || !question.trim()) return res.status(400).json({ error: "question (string) required" });
+    const brain = await import("./server/brain");
+    const { askBrain } = await import("./server/brain-ask");
+    const { resolveDistillProvider } = await import("./server/brain-active");
+    const r = await askBrain(question, {
+      ns,
+      recall: (q, o) => brain.brainRecall(q, { ...o, ns }),
+      searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ns }),
+      generate: async (messages) => {
+        const out = await ProviderRouter.generate({
+          provider: resolveDistillProvider(process.env),
+          model: process.env.BRAIN_DISTILL_MODEL || "openai",
+          messages, stream: false,
+        } as any);
+        return out.text || "";
+      },
+    });
+    res.json(r);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain ask failed" });
+  }
+});
+
 // B4 right-to-be-forgotten: deterministic ns-scoped purge. Loopback-only — erasure
 // is an operator action, never a network-exposed one (S49 double-lock convention).
 app.post("/api/brain/forget", async (req, res) => {
@@ -4102,8 +4131,9 @@ footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center;padd
 <header><div class="logo">B</div><div><h1>BRAIN — ollamas kalıcı hafıza</h1><div class="sub">5-tier · bi-temporal graf · hybrid RRF + rerank · belief revision · audit ledger</div></div>
 <div class="badges" id="badges">yükleniyor…</div></header>
 
-<div class="card"><label>Canlı Arama — hybrid recall (skor · tier · actor · abstention)</label>
-<input type="text" id="q" placeholder="brain'e sor… (ör. 'deploy nasıl', 'geçen hafta alınan kararlar')" autocomplete="off">
+<div class="card"><label>Brain'e Sor — Enter = sentezli cevap · yazarken = anlık kayıt araması</label>
+<input type="text" id="q" placeholder="brain'e sor… (ör. 'deploy nasıl yapılıyor?') — Enter'a bas, kaynak-atıflı cevap al" autocomplete="off">
+<div id="ans"></div>
 <div class="mems" id="qres"></div></div>
 
 <div class="card"><label>Tier Dağılımı — karta tıkla, kayıtları gör</label><div class="tiers" id="tiers"></div><div class="mems" id="tierres" style="display:none"></div></div>
@@ -4132,6 +4162,19 @@ function memRow(m,extra){return '<div class="rec '+esc(m.tier)+'"><div class="t"
 // — canlı arama (B1/B2/B5 görünür) —
 let qt=null;
 $('q').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(runQuery,450)});
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();clearTimeout(qt);runAsk()}});
+async function runAsk(){const q=$('q').value.trim();if(!q)return;
+$('ans').innerHTML='<div class="rec" style="border-left:3px solid var(--cyan)">🧠 düşünüyorum… (kayıtlar taranıyor + sentez)</div>';
+try{const r=await fetch('/api/brain/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q})});
+const j=await r.json();
+if(j.error){$('ans').innerHTML='<div class="rec">HATA: '+esc(j.error)+'</div>';return}
+const conf=Math.round((j.confidence||0)*100);
+const modeTag=j.mode==='lexical'?'<span class="pill" style="color:var(--warn)">kelime-eşleşme modu</span>':'<span class="pill score">semantik</span>';
+if(j.abstained){$('ans').innerHTML='<div class="rec" style="border-left:3px solid var(--warn)"><div class="t">'+modeTag+'</div>'+esc(j.answer||'Kayıtlarda bu konuda bilgi yok.')+'</div>'}
+else{$('ans').innerHTML='<div class="rec" style="border-left:3px solid var(--ok);font-size:13px;line-height:1.6"><div class="t">'+modeTag+'<span class="pill score">güven %'+conf+'</span><span class="pill">'+j.sources.length+' kaynak</span></div>'
++esc(j.answer).replace(/\\[mem:([^\\]]+)\\]/g,'<span class="pill actor">$1</span>')+'</div>'
++(j.sources||[]).slice(0,5).map(s2=>'<div class="rec '+esc(s2.tier)+'" style="opacity:.75;margin-top:4px"><div class="t"><span class="pill">'+esc(s2.tier)+'</span><span class="pill score">skor '+s2.score+'</span><span>'+esc(s2.id)+'</span></div>'+esc(s2.excerpt)+'</div>').join('')}
+}catch(e){$('ans').innerHTML='<div class="rec">HATA: '+esc(e)+'</div>'}}
 async function runQuery(){const q=$('q').value.trim();if(!q){$('qres').innerHTML='';return}
 $('qres').innerHTML='<div class="rec">aranıyor…</div>';
 try{const r=await fetch('/api/brain/recall',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,k:6})});

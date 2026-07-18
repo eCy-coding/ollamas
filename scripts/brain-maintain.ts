@@ -80,6 +80,38 @@ async function main() {
     }
     const consolidate = b.consolidate(); // promote hot episodic BEFORE prune can see it
     const sweep = b.sweep();
+    // E4 epoch distill: the day's episodic pile (conductor mirror, git captures…)
+    // becomes durable knowledge — 3-5 learned summaries + facts on the $0 keyless
+    // floor. The A-MAC gate inside distill filters junk. BRAIN_EPOCH_DISTILL=0 opts out.
+    if (process.env.BRAIN_EPOCH_DISTILL !== "0") {
+      try {
+        const ov = await b.overview({ recent: 100 });
+        const dayAgo = Date.now() - 86_400_000;
+        const epi = ov.memories.filter((m) => m.tier === "episodic" && m.createdAt >= dayAgo).slice(0, 40);
+        if (epi.length >= 5) {
+          const { distillSession } = await import("../server/brain-distill");
+          const { resolveDistillProvider } = await import("../server/brain-active");
+          const { ProviderRouter } = await import("../server/providers");
+          const day = new Date().toISOString().slice(0, 10);
+          const out = await distillSession(
+            { id: `epoch:${day}`, messages: epi.map((m) => ({ role: "user" as const, content: m.content })) },
+            {
+              generate: async (messages) =>
+                (
+                  await ProviderRouter.generate({
+                    provider: resolveDistillProvider(process.env),
+                    model: process.env.BRAIN_DISTILL_MODEL || "openai",
+                    messages, stream: false,
+                  } as any)
+                ).text || "",
+            },
+          );
+          console.log(JSON.stringify({ event: "brain.epoch.distill", day, fed: epi.length, ...out }));
+        }
+      } catch (e: any) {
+        console.warn(`[brain] epoch distill skipped (${e?.message ?? e})`);
+      }
+    }
     // Write-behind drain: rows written while the embedder was contended get their
     // vectors now (sleep-time = the embedder is idle). Best-effort, never fatal.
     try {

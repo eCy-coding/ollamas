@@ -113,8 +113,9 @@ describe("BRAIN routes (in-process app)", () => {
     expect(html).toContain("/api/brain/recall");
     expect(html).toContain("/api/brain/audit");
     expect(html).toContain("Audit Ledger");
-    expect(html).toContain("Canlı Arama");
+    expect(html).toContain("Brain'e Sor");
     expect(html).toContain("abstention");
+    expect(html).toContain("/api/brain/ask");
   });
 
   test("GET /api/brain/audit → 200 with append-only entries (B3 surface)", async () => {

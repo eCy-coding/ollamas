@@ -482,3 +482,65 @@ describe("Brain — 2026 gaps B5+B2: actor attribution + relative-time recall", 
     b.close();
   });
 });
+
+describe("Brain — E1: recall never goes silent (lexical fallback)", () => {
+  test("embedder hang → FTS-only results with lexical flag; healthy embedder → hybrid", async () => {
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    const b = createBrainStore({ dbPath: tmpDb(), embed });
+    await b.remember({ id: "m-esp", tier: "learned", content: "likes espresso" });
+    await b.remember({ id: "m-dep", tier: "learned", content: "deploy uses make ship" });
+    hang = true;
+    process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS = "150";
+    try {
+      const hits = await b.recall("espresso", { k: 5 });
+      expect(hits.length).toBeGreaterThan(0); // answers even with a dead embedder
+      expect(hits[0].id).toBe("m-esp"); // BM25 keyword arm found it
+      expect(hits[0].lexical).toBe(true);
+      hang = false;
+      const hybrid = await b.recall("query_coffee", { k: 5 });
+      expect(hybrid[0].lexical).toBeUndefined(); // healthy path unchanged
+    } finally {
+      delete process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS;
+      b.close();
+    }
+  });
+});
+
+describe("Brain — E2: askBrain synthesis (cited, confident, honest)", () => {
+  const hit = (id: string, content: string, score = 1, lexical = false) =>
+    ({ id, tier: "learned", content, distance: 0, score, createdAt: 1, ...(lexical ? { lexical: true } : {}) }) as any;
+
+  test("synthesizes a cited answer from recall + multi-hop widening", async () => {
+    const calls: string[] = [];
+    const r = await (await import("./brain-ask")).askBrain("deploy nasıl yapılır", {
+      recall: async (q) => { calls.push(q); return q === "deploy nasıl yapılır" ? [hit("m-1", "deploy uses make ship")] : [hit("m-2", "make ship runs the gate first")]; },
+      searchFacts: async () => [{ subject: "make ship", predicate: "runs", object: "gate", validFrom: 1, invalidatedAt: null, distance: 0.1 } as any],
+      generate: async (msgs) => {
+        expect(msgs[1].content).toContain("[mem:m-1]");
+        return "Deploy make ship ile yapılır [mem:m-1]; önce gate koşar [mem:m-2].";
+      },
+    });
+    expect(r.abstained).toBeUndefined();
+    expect(r.answer).toContain("[mem:m-1]");
+    expect(r.sources.map((s) => s.id)).toEqual(expect.arrayContaining(["m-1", "m-2"])); // multi-hop widened
+    expect(r.confidence).toBeGreaterThan(0);
+    expect(calls.length).toBeGreaterThan(1); // second-hop recalls happened
+  });
+
+  test("abstains honestly: no sources OR model says BİLGİ_YOK", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const empty = await askBrain("uzaylılar nerede", { recall: async () => [], searchFacts: async () => [], generate: async () => "irrelevant" });
+    expect(empty.abstained).toBe(true);
+    const refused = await askBrain("x", { recall: async () => [hit("m-1", "unrelated")], searchFacts: async () => [], generate: async () => "BİLGİ_YOK" });
+    expect(refused.abstained).toBe(true);
+    expect(refused.confidence).toBe(0);
+  });
+
+  test("lexical-mode recall surfaces as mode=lexical (degraded but answering)", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const r = await askBrain("espresso", { recall: async () => [hit("m-1", "likes espresso", 0.8, true)], searchFacts: async () => [], generate: async () => "Espresso seviyor [mem:m-1]." });
+    expect(r.mode).toBe("lexical");
+    expect(r.abstained).toBeUndefined();
+  });
+});

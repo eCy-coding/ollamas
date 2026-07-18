@@ -56,6 +56,9 @@ export interface BrainRecallHit {
   score: number;
   createdAt: number;
   actor?: string | null;
+  /** E1: set when the embedder was unavailable and this ranking came from the
+   *  FTS/BM25 arm alone — still an answer, just keyword-grounded. */
+  lexical?: boolean;
 }
 
 export interface BrainFactInput {
@@ -498,12 +501,21 @@ export function createBrainStore(
       const scoreFloor = minScore ?? (Number(process.env.BRAIN_RECALL_MIN_SCORE) || 0);
       ensureProvider();
       if (refreshDim() === null) return []; // nothing remembered yet (re-reads for concurrent writers)
-      const vec = await (fresh ? rawEmbed : embed)(query);
-      ensureVec(vec.length);
+      // E1 — recall never goes silent: a contended embedder degrades the VECTOR arm,
+      // not the whole answer. The FTS/BM25 arm needs no embedding. fresh (drift probe)
+      // keeps fail-fast semantics — a lexical probe would fake self-hit health.
+      let vec: number[] | null = null;
+      if (fresh) vec = await rawEmbed(query);
+      else {
+        try {
+          vec = await embedWithBudget(query);
+        } catch { /* lexical-only fallback below */ }
+      }
+      if (vec) ensureVec(vec.length);
       const over = k * 4 + 16;
       // W1 hybrid: vector KNN candidates ∪ FTS5 BM25 candidates, fused by RRF. FTS surfaces
       // keyword/id matches the embedder misses; the vector arm keeps semantic recall.
-      const vecRows = db
+      const vecRows = !vec ? [] as (BrainRecallHit & { ns: string; rowid: number; hits: number })[] : db
         .prepare(
           `SELECT m.rowid AS rowid, m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
                   v.distance AS distance, m.ns AS ns, m.access_count AS hits, m.actor AS actor
@@ -528,7 +540,7 @@ export function createBrainStore(
       // name entities; memories MENTIONING those entities become a third RRF arm. Widens
       // the candidate set beyond what the query's own vector/keywords can reach.
       let graphIds: string[] = [];
-      if (graphExpand && hasFts) {
+      if (graphExpand && hasFts && vec) {
         const seeds: (BrainFact & { distance: number })[] = await this.searchFacts(query, { k: 4, ns });
         const entities = [...new Set(seeds.flatMap((f) => [f.subject, f.object]).map((e) => e.toLowerCase().trim()))].slice(0, 6);
         graphIds = entities.flatMap((e) => memFts(e, 3));
@@ -548,7 +560,7 @@ export function createBrainStore(
         for (const r of extra) byId.set(r.id, { ...r, distance: 1 } as any); // no vector distance → neutral
       }
       const lists = [vecRows.map((r) => r.id), ftsIds, graphIds].filter((l) => l.length > 0);
-      const fusedIds = lists.length > 1 ? rrfFuseMany(lists, over) : vecRows.map((r) => r.id);
+      const fusedIds = lists.length > 1 ? rrfFuseMany(lists, over) : (lists[0] ?? []);
       const rows = fusedIds.map((id) => byId.get(id)).filter(Boolean) as (BrainRecallHit & { ns: string; hits: number })[];
       const t = now();
       const scored = rows
@@ -562,6 +574,7 @@ export function createBrainStore(
           distance: r.distance,
           createdAt: r.createdAt,
           actor: (r as any).actor ?? null,
+          ...(vec ? {} : { lexical: true as const }),
           score:
             (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
         }))
