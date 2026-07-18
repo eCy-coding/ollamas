@@ -128,7 +128,7 @@ export interface BrainOverview {
   memories: { id: string; tier: MemoryTier; content: string; hits: number; createdAt: number }[];
   facts: { subject: string; predicate: string; object: string; episodeId: string | null }[];
   history: { subject: string; predicate: string; object: string; invalidatedAt: number }[];
-  health: { selfHitRate: number; drift: boolean; probes: number };
+  health: { selfHitRate: number; drift: boolean; probes: number; degraded?: boolean };
 }
 
 const f32 = (v: number[]) => new Uint8Array(new Float32Array(v).buffer);
@@ -735,7 +735,25 @@ export function createBrainStore(
           "SELECT subject, predicate, object, invalidated_at AS invalidatedAt FROM brain_facts WHERE invalidated_at IS NOT NULL ORDER BY invalidated_at DESC LIMIT ?",
         )
         .all(Math.min(recent, 10)) as BrainOverview["history"];
-      return { stats: this.stats(), memories, facts, history, health: await this.health() };
+      // health() embeds fresh (the drift probe bypasses the cache by design) — under
+      // embedder load one probe can outlast any HTTP client and would take this whole
+      // SQL-only bundle down with it. Degrade-alive: health is best-effort within
+      // BRAIN_HEALTH_TIMEOUT_MS (default 10s); a timed-out probe is flagged degraded,
+      // never reported as drift.
+      const healthBudget = Number(process.env.BRAIN_HEALTH_TIMEOUT_MS || 10_000);
+      let health: BrainOverview["health"] = { selfHitRate: 0, drift: false, probes: 0, degraded: true };
+      try {
+        health = await Promise.race([
+          this.health(),
+          new Promise<never>((_, reject) => {
+            const t = setTimeout(() => reject(new Error("health probe timed out")), healthBudget);
+            (t as { unref?: () => void }).unref?.();
+          }),
+        ]);
+      } catch {
+        /* degraded default stands */
+      }
+      return { stats: this.stats(), memories, facts, history, health };
     },
 
     async graph({ ns, at, limit = 200 } = {}) {

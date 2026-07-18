@@ -182,3 +182,38 @@ describe("Brain — tier weights", () => {
     expect(TIER_WEIGHT.episodic).toBeGreaterThan(TIER_WEIGHT.working);
   });
 });
+
+describe("Brain — overview resilience (degrade-alive health)", () => {
+  test("overview ships SQL-only bundle with degraded health when the embedder hangs", async () => {
+    // Health's drift probe embeds fresh (cache bypass by design) — a busy embedder
+    // must degrade the health field, never take stats/memories/facts down with it.
+    let hang = false;
+    const embed = async (t: string) => (hang ? new Promise<number[]>(() => {}) : VECTORS[t] ?? [0, 0, 1]);
+    const b = createBrainStore({ dbPath: tmpDb(), embed });
+    await b.remember({ id: "m-l", tier: "learned", content: "likes espresso" });
+    hang = true;
+    process.env.BRAIN_HEALTH_TIMEOUT_MS = "200";
+    try {
+      const started = performance.now();
+      const o = await b.overview({ recent: 5 });
+      expect(performance.now() - started).toBeLessThan(3000);
+      expect(o.stats.memories.learned).toBe(1);
+      expect(o.memories.map((m) => m.id)).toEqual(["m-l"]);
+      expect(o.health.degraded).toBe(true);
+      expect(o.health.drift).toBe(false); // a timed-out probe is not evidence of drift
+    } finally {
+      delete process.env.BRAIN_HEALTH_TIMEOUT_MS;
+      b.close();
+    }
+  });
+
+  test("overview keeps real health when the embedder answers in time", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-l", tier: "learned", content: "likes espresso" });
+    const o = await b.overview({ recent: 5 });
+    expect(o.health.degraded).toBeUndefined();
+    expect(o.health.probes).toBe(1);
+    expect(o.health.selfHitRate).toBe(1);
+    b.close();
+  });
+});

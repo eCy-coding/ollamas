@@ -4030,7 +4030,7 @@ h1{font-size:20px;margin:0}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
 .card{background:var(--surf);border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:11px}
 label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
 .badges{display:flex;gap:8px;flex-wrap:wrap}.badge{font:700 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 12px;border:1px solid var(--line);background:var(--raised)}
-.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}.badge.warn{color:var(--warn);border-color:var(--warn)}
 .tiers{display:flex;gap:8px;flex-wrap:wrap}.tier{flex:1;min-width:100px;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
 .tier b{font-size:20px;display:block}.tier span{font-size:10.5px;color:var(--fg2);text-transform:uppercase}
 .mems{max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
@@ -4061,15 +4061,17 @@ for(const n of ns){const p=pos[n.id],r=5+2.2*Math.sqrt(n.degree);
 s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+(n.live?'#00D4FF':'#536882')+'" opacity=".9"><title>'+esc(n.label)+' (degree '+n.degree+')</title></circle>';
 s+='<text x="'+p[0]+'" y="'+(p[1]-r-4)+'" text-anchor="middle" fill="#F0F4FF" font-size="10.5" font-family="ui-monospace,monospace">'+esc(String(n.label).slice(0,20))+'</text>';}
 $('graph').innerHTML=s+'</svg>';}
-async function load(){try{const[o,g]=await Promise.all([fetch('/api/brain/overview?recent=30').then(r=>r.json()),fetch('/api/brain/graph?limit=60').then(r=>r.json())]);
+async function load(){try{const[or,gr]=await Promise.allSettled([fetch('/api/brain/overview?recent=30').then(r=>r.json()),fetch('/api/brain/graph?limit=60').then(r=>r.json())]);
+if(gr.status==='fulfilled'&&Array.isArray(gr.value.nodes))drawGraph(gr.value);
+const o=or.status==='fulfilled'?or.value:null;
+if(!o||o.error||!o.stats){$('badges').innerHTML='<span class="badge bad">HATA: '+esc((o&&o.error)||(or.status==='rejected'?or.reason:'overview alınamadı'))+'</span>';return}
 const h=o.health||{},b=[];
-b.push('<span class="badge '+(h.drift?'bad':'ok')+'">self-hit: '+Math.round((h.selfHitRate??0)*100)+'% · '+(h.drift?'DRIFT':'sağlıklı')+' ('+h.probes+' probe)</span>');
+b.push(h.degraded?'<span class="badge warn">sağlık: ertelendi (embedder meşgul)</span>':'<span class="badge '+(h.drift?'bad':'ok')+'">self-hit: '+Math.round((h.selfHitRate??0)*100)+'% · '+(h.drift?'DRIFT':'sağlıklı')+' ('+h.probes+' probe)</span>');
 const tot=Object.values(o.stats.memories||{}).reduce((a,c)=>a+c,0);
 b.push('<span class="badge dim">'+tot+' hafıza · '+o.stats.facts+' canlı fact · '+o.stats.namespaces+' ns</span>');
 b.push('<span class="badge dim">db: '+(o.stats.dbBytes/1048576).toFixed(1)+' MB</span>');
 $('badges').innerHTML=b.join('');
 $('tiers').innerHTML=['core','learned','procedural','episodic','working'].map(t=>'<div class="tier"><b>'+(o.stats.memories[t]||0)+'</b><span>'+t+'</span></div>').join('');
-drawGraph(g);
 $('facts').innerHTML=(o.facts||[]).map(f=>'<tr><td><b>'+esc(f.subject)+'</b></td><td class="p">'+esc(f.predicate)+'</td><td>'+esc(f.object)+'</td></tr>').join('')||'<tr><td>fact yok</td></tr>';
 $('mems').innerHTML=(o.memories||[]).map(m=>'<div class="rec '+esc(m.tier)+'"><div class="t">'+esc(m.tier)+' · hit '+m.hits+' · '+new Date(m.createdAt).toLocaleString('tr-TR')+'</div>'+esc(String(m.content).slice(0,300))+'</div>').join('')||'<div class="rec">hafıza yok</div>';
 }catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>';}}
