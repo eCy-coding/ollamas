@@ -3951,7 +3951,7 @@ void (async () => {
 // invariant; every cross-ns use is itself recorded as an ops fact.
 app.post("/api/brain/recall", async (req, res) => {
   try {
-    const { query, k, ns, graphExpand } = req.body || {};
+    const { query, k, ns, graphExpand, minScore } = req.body || {};
     if (typeof query !== "string" || !query.trim()) return res.status(400).json({ error: "query (string) required" });
     const brain = await import("./server/brain");
     if (ns === "*") {
@@ -3969,7 +3969,7 @@ app.post("/api/brain/recall", async (req, res) => {
     // Bounded like the auto-recall path: under conductor load the local embedder
     // can queue for 30s+ — an external API must degrade fast, not hang.
     const bounded = await Promise.race([
-      brain.brainRecall(query, { k: k || 5, ns, graphExpand }),
+      brain.brainRecall(query, { k: k || 5, ns, graphExpand, minScore }),
       new Promise<null>((r) => {
         const t = setTimeout(() => r(null), Number(process.env.BRAIN_RECALL_API_TIMEOUT_MS) || 10_000);
         t.unref?.();
@@ -3984,9 +3984,35 @@ app.post("/api/brain/recall", async (req, res) => {
         maybeShadowEval(query, bounded, (q, o) => brain.brainRecall(q, { ...o, ns })),
       ).catch(() => {});
     }
-    res.json({ hits: bounded });
+    res.json({ hits: bounded, ...(bounded.length === 0 ? { abstained: true } : {}) });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "brain recall failed" });
+  }
+});
+
+// B4 right-to-be-forgotten: deterministic ns-scoped purge. Loopback-only — erasure
+// is an operator action, never a network-exposed one (S49 double-lock convention).
+app.post("/api/brain/forget", async (req, res) => {
+  try {
+    const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).json({ error: "forget is a loopback-only operator action" });
+    const { contains, ns } = req.body || {};
+    if (typeof contains !== "string" || !contains.trim()) return res.status(400).json({ error: "contains (string) required" });
+    const { brainForget } = await import("./server/brain");
+    res.json(brainForget({ contains, ns }));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain forget failed" });
+  }
+});
+
+// B3 audit ledger tail — append-only mutation history for transparency/compliance.
+app.get("/api/brain/audit", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 500);
+    const { brainAuditTail } = await import("./server/brain");
+    res.json({ entries: brainAuditTail(limit) });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain audit failed" });
   }
 });
 

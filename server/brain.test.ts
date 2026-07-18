@@ -398,3 +398,50 @@ describe("Brain — shadow evaluation (Tur-6: counterfactual recall telemetry)",
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("Brain — 2026 gap B1: abstention (grounding threshold)", () => {
+  test("recall drops hits below minScore; env gate; abstains to [] instead of guessing", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-close", tier: "learned", content: "likes espresso" });
+    await b.remember({ id: "m-far", tier: "learned", content: "deploy uses make ship" });
+    const all = await b.recall("query_coffee", { k: 5 });
+    expect(all.map((h) => h.id)).toContain("m-far"); // no threshold → distant noise included
+    const близко = all.find((h) => h.id === "m-close")!.score;
+    const uzak = all.find((h) => h.id === "m-far")!.score;
+    const gated = await b.recall("query_coffee", { k: 5, minScore: (близко + uzak) / 2 });
+    expect(gated.map((h) => h.id)).toEqual(["m-close"]); // distant hit abstained away
+    process.env.BRAIN_RECALL_MIN_SCORE = String(близко + 1);
+    try {
+      expect(await b.recall("query_coffee", { k: 5 })).toEqual([]); // nothing grounded → say nothing
+    } finally {
+      delete process.env.BRAIN_RECALL_MIN_SCORE;
+      b.close();
+    }
+  });
+});
+
+describe("Brain — 2026 gaps B3+B4: audit ledger + right-to-be-forgotten", () => {
+  test("every write/merge/revise/forget lands in the append-only audit ledger", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-1", tier: "learned", content: "likes espresso" });
+    const gone = await b.forget({ contains: "espresso" });
+    expect(gone.forgotten).toBe(1);
+    const tail = b.auditTail(10);
+    expect(tail.map((a) => a.action)).toEqual(expect.arrayContaining(["remember", "forget"]));
+    expect(tail.find((a) => a.action === "forget")?.detail).toContain("espresso");
+    b.close();
+  });
+
+  test("forget removes row+vector+fts (subject purge), ns-scoped, and recall no longer finds it", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-a", tier: "learned", content: "likes espresso" });
+    await b.remember({ id: "m-b", tier: "learned", content: "prefers tea" });
+    await b.remember({ id: "m-c", tier: "learned", content: "likes espresso", ns: "tenant-b" });
+    const r = await b.forget({ contains: "espresso" }); // default ns only
+    expect(r.forgotten).toBe(1);
+    expect((await b.recall("query_coffee", { k: 5 })).map((h) => h.id)).not.toContain("m-a");
+    expect((await b.recall("query_coffee", { k: 5, ns: "tenant-b" })).map((h) => h.id)).toContain("m-c");
+    expect(b.stats().memories.learned).toBe(2); // m-b + tenant-b's m-c
+    b.close();
+  });
+});

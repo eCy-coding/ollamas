@@ -86,10 +86,15 @@ export interface BrainStore {
    *  defers entirely while a local generation is active, unless the pending queue
    *  exceeds BRAIN_BACKFILL_BOUNDARY (starvation guard). Returns rows indexed. */
   backfillEmbeddings(opts?: { limit?: number }): Promise<number>;
+  /** B4 right-to-be-forgotten: deterministic ns-scoped substring purge (row+vector+fts),
+   *  recorded in the audit ledger. */
+  forget(opts: { contains: string; ns?: string }): { forgotten: number };
+  /** B3 audit ledger tail — append-only mutation history (remember/merge/revise/forget). */
+  auditTail(limit?: number): { ts: number; action: string; memId: string | null; detail: string }[];
   /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
    *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
    *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
-  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean }): Promise<BrainRecallHit[]>;
+  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number }): Promise<BrainRecallHit[]>;
   assertFact(f: BrainFactInput): Promise<{ changed: boolean; invalidated: number }>;
   /** S42: episodes ↔ sessions reverse link — every memory a distill/ingest wrote
    *  for a session carries source=episodeId(=sessionId). */
@@ -284,6 +289,16 @@ export function createBrainStore(
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS brain_facts_sp ON brain_facts(ns, subject, predicate)`);
   db.exec(`CREATE TABLE IF NOT EXISTS brain_meta (k TEXT PRIMARY KEY, v TEXT)`);
+  // B3 audit ledger (2026 gap-audit): append-only record of every mutation the
+  // store performs — remember/merge/revise/forget. Read via auditTail(); never
+  // updated or deleted in place.
+  db.exec(`CREATE TABLE IF NOT EXISTS brain_audit (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    mem_id TEXT,
+    detail TEXT
+  )`);
 
   // W1 hybrid retrieval: an FTS5 keyword index over content, keyed by the memory rowid
   // (unindexed, so it is stored but not tokenized). Feature-detected — if this SQLite
@@ -347,6 +362,12 @@ export function createBrainStore(
     db.prepare("DELETE FROM brain_memories WHERE rowid=?").run(BigInt(rowid));
   };
 
+  const audit = (action: string, memId: string | null, detail: string) => {
+    try {
+      db.prepare("INSERT INTO brain_audit(ts, action, mem_id, detail) VALUES(?,?,?,?)").run(now(), action, memId, detail);
+    } catch { /* the ledger must never break the operation it records */ }
+  };
+
   const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean; revised?: string[] }> => {
     if (!TIERS.includes(m.tier)) throw new Error(`invalid tier '${m.tier}' (${TIERS.join("/")})`);
     if (!m.content?.trim()) throw new Error("empty memory content");
@@ -406,6 +427,7 @@ export function createBrainStore(
           db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(keepContent, BigInt(dup.rowid));
         }
         const keepId = (db.prepare("SELECT mem_id FROM brain_memories WHERE rowid=?").get(BigInt(dup.rowid)) as { mem_id: string }).mem_id;
+        audit("merge", keepId, `near-dup absorbed (${m.tier}/${ns})`);
         return { id: keepId, dim: vec.length, merged: true };
       }
     }
@@ -432,6 +454,7 @@ export function createBrainStore(
       for (const r of near) {
         if (r.distance <= maxDist && entityOverlap(content, r.content) >= 1) {
           db.prepare("UPDATE brain_memories SET superseded_at=? WHERE rowid=?").run(now(), BigInt(r.rowid));
+          audit("revise", r.id, `superseded by ${id}`);
           revised.push(r.id);
         }
       }
@@ -455,6 +478,7 @@ export function createBrainStore(
         .all(ns, workingCap) as { rowid: number }[];
       for (const r of over) deleteMemRow(r.rowid);
     }
+    audit("remember", id, `${m.tier}/${ns}${vec ? "" : " deferred"}`);
     return vec
       ? { id, dim: vec.length, ...(revised.length ? { revised } : {}) }
       : { id, dim: 0, deferred: true };
@@ -463,7 +487,11 @@ export function createBrainStore(
   return {
     remember: rememberOne,
 
-    async recall(query, { k = 5, tier, ns, fresh, graphExpand } = {}) {
+    async recall(query, { k = 5, tier, ns, fresh, graphExpand, minScore } = {}) {
+      // B1 abstention (2026 gap-audit): an ungrounded answer is worse than none.
+      // Hits scoring below the threshold are dropped — an empty result tells the
+      // caller to say "I don't know" instead of hallucinating from distant noise.
+      const scoreFloor = minScore ?? (Number(process.env.BRAIN_RECALL_MIN_SCORE) || 0);
       ensureProvider();
       if (refreshDim() === null) return []; // nothing remembered yet (re-reads for concurrent writers)
       const vec = await (fresh ? rawEmbed : embed)(query);
@@ -530,7 +558,8 @@ export function createBrainStore(
           score:
             (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
         }))
-        .sort((a, b) => b.score - a.score);
+        .sort((a, b) => b.score - a.score)
+        .filter((r) => r.score >= scoreFloor);
       let hits = scored.slice(0, k);
       // B5 rerank (opt-in, BRAIN_RERANK=1): the local $0 cross-encoder (server/rerank.ts)
       // re-orders a wider pool than k before the cut. Fixture eval measured +0.66 MRR@5;
@@ -613,6 +642,24 @@ export function createBrainStore(
         )
         .all(f32(vec), k * 4 + 16, ns || DEFAULT_NS, t, t, k) as unknown as (BrainFact & { distance: number })[];
       return rows;
+    },
+
+    forget({ contains, ns } = { contains: "" }) {
+      // B4 right-to-be-forgotten: deterministic substring purge (LIKE, not semantic —
+      // erasure demands certainty, not similarity). ns-scoped; removes row+vector+fts.
+      if (!contains || !contains.trim()) return { forgotten: 0 };
+      const rows = db
+        .prepare("SELECT rowid FROM brain_memories WHERE ns=? AND content LIKE ?")
+        .all(ns || DEFAULT_NS, `%${contains}%`) as { rowid: number }[];
+      for (const r of rows) deleteMemRow(r.rowid);
+      audit("forget", null, `contains='${contains}' ns=${ns || DEFAULT_NS} (${rows.length} rows)`);
+      return { forgotten: rows.length };
+    },
+
+    auditTail(limit = 50) {
+      return db
+        .prepare("SELECT ts, action, mem_id AS memId, detail FROM brain_audit ORDER BY rowid DESC LIMIT ?")
+        .all(limit) as { ts: number; action: string; memId: string | null; detail: string }[];
     },
 
     async backfillEmbeddings({ limit = 16 } = {}) {
@@ -992,7 +1039,7 @@ function store(): BrainStore {
 export const brainRemember = (m: BrainMemoryInput) => store().remember(m);
 export const brainRecall = async (
   q: string,
-  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean },
+  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number },
 ) => {
   // S21: latency observed HERE (external choke-point) and not inside recall(),
   // so the drift probe's internal this.recall() calls never skew the histogram.
@@ -1016,6 +1063,8 @@ export const brainSearchFacts = (q: string, o?: { k?: number; ns?: string; at?: 
 export const brainSweep = (o?: { workingTtlMs?: number }) => store().sweep(o);
 export const brainConsolidate = (o?: { minAccess?: number }) => store().consolidate(o);
 export const brainHealth = (o?: { probes?: number; threshold?: number }) => store().health(o);
+export const brainForget = (o: { contains: string; ns?: string }) => store().forget(o);
+export const brainAuditTail = (limit?: number) => store().auditTail(limit);
 export const brainStats = () => store().stats();
 export const brainOverview = (o?: { recent?: number }) => store().overview(o);
 export const brainGraph = (o?: { ns?: string; at?: number; limit?: number }) => store().graph(o);
