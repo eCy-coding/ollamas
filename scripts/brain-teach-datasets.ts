@@ -639,6 +639,63 @@ export function buildServiceRecords(servicesSrc: string): TeachRecord[] {
   return out.slice(0, 60);
 }
 
+
+// ——— Dalga-10: kod-temelli setler — brain kendi kaynak tabanını öğrenir ———
+export function headComment(src: string): string {
+  const lines: string[] = [];
+  for (const l of src.split("\n")) {
+    const t = l.trim();
+    if (t.startsWith("//")) { lines.push(t.replace(/^\/\/\s?/, "")); if (lines.length >= 4) break; }
+    else if (t === "" && lines.length === 0) continue;
+    else break;
+  }
+  return lines.join(" ").slice(0, 300);
+}
+export function buildCodeMapRecords(files: [string, string][]): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const [path, src] of files) {
+    const head = headComment(src);
+    if (!head) continue;
+    const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+    out.push({ id: `teach:kod:${slug}`, actor: "codebase",
+      content: `ollamas modülü ${path}: ${head}`,
+      fact: { subject: "ollamas", predicate: "has_module", object: path.slice(0, 60) } });
+  }
+  return out.slice(0, 90);
+}
+export function buildExportRecords(files: [string, string][]): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const [path, src] of files) {
+    const sigs: string[] = [];
+    for (const m of src.matchAll(/^export (?:async )?(?:function|const) ([\w$]+)\s*(?:=\s*)?\(([^)\n]{0,80})/gm)) {
+      sigs.push(`${m[1]}(${(m[2] || "").split(",").map((a) => a.split(":")[0].trim()).filter(Boolean).join(", ")})`);
+      if (sigs.length >= 10) break;
+    }
+    if (!sigs.length) continue;
+    const slug = path.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+    out.push({ id: `teach:export:${slug}`, actor: "codebase",
+      content: `${path} dışa açtığı fonksiyonlar: ${sigs.join(" · ")}` });
+  }
+  return out.slice(0, 50);
+}
+const CODE_PATTERNS: [string, string][] = [
+  ["choke-point", "tüm tool'lar TEK registry'den, tüm brain-yazımları rememberOne'dan geçer — ikinci dispatch-yolu icat etme"],
+  ["guarded-alter", "şema evrimi: try { ALTER TABLE ... ADD COLUMN } catch {} — mevcut db yerinde migrate olur, sıfırdan kurulum da aynı koddan"],
+  ["injectable-deps", "IO'yu parametre yap (embed, generate, now, llmActive) — test deterministik, prod default gerçek implementasyon"],
+  ["degrade-alive", "alt-bileşen çökünce BÜTÜN cevabı öldürme: bounded dene, degraded-işaretli kısmi sonuç dön (overview health, recall lexical, 503-busy)"],
+  ["write-behind", "pahalı yan-işlem (embed) yazımı bloklamaz: satır hemen, vektör pending_embed=1 ile sonra (backfill)"],
+  ["best-effort-bracket", "kritik-olmayan iş try/catch'le sarılır ve ASLA ana işlemi bozmaz (audit-ledger, bus-emit, capture-hook)"],
+  ["module-top-level-route", "in-process test edilecek route'lar initializeServer İÇİNE değil modül seviyesine yazılır (org/brain paneli dersi)"],
+  ["pure-thin-io", "parse/karar/format saf fonksiyon (fixture-testli); dosya/ağ/exec ince kabukta"],
+  ["stable-id-idempotent", "programatik yazımlar stable-id upsert (teach:*, universe:*) — tekrar koşmak çoğaltmaz, tazeler"],
+  ["evidence-commit", "'çalışıyor' iddiası commit-mesajına kanıtla girer: canlı çıktı, sayı, önce/sonra"],
+  ["ns-jail", "tenant/kaynak izolasyonu namespace ile; cross-ns yalnız çift-kilitli admin yüzeyinde"],
+  ["bounded-race", "dış-bağımlı await'ler Promise.race + timeout + unref — hiçbir istek sonsuza asılamaz"],
+];
+export function buildCodePatternRecords(): TeachRecord[] {
+  return CODE_PATTERNS.map(([k, d]) => ({ id: `teach:desen:${k}`, actor: "code-patterns", content: `ollamas kod-deseni '${k}': ${d}.` }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -691,7 +748,18 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   } catch { /* partial is fine */ }
   let servicesSrc = "";
   try { servicesSrc = fsMod.readFileSync("server/brain-services.ts", "utf8"); } catch { /* absent */ }
+  const codeFiles: [string, string][] = [];
+  try {
+    for (const f of fsMod.readdirSync("server").filter((x: string) => x.endsWith(".ts") && !x.includes(".test.")).slice(0, 80))
+      codeFiles.push([`server/${f}`, fsMod.readFileSync(`server/${f}`, "utf8")]);
+    for (const f of fsMod.readdirSync("scripts").filter((x: string) => x.startsWith("brain-") && x.endsWith(".ts")).slice(0, 20))
+      codeFiles.push([`scripts/${f}`, fsMod.readFileSync(`scripts/${f}`, "utf8")]);
+  } catch { /* partial fine */ }
+  const brainFiles = codeFiles.filter(([p2]) => /brain|gpu|embed|rerank/.test(p2));
   const sets: [string, TeachRecord[]][] = [
+    ["kod-harita", buildCodeMapRecords(codeFiles)],
+    ["kod-export", buildExportRecords(brainFiles)],
+    ["kod-desen", buildCodePatternRecords()],
     ["servis-katalog", buildServiceRecords(servicesSrc)],
     ["ollamas-hata", buildOllamasErrorRecords()],
     ["ollamas-api", buildApiSurfaceRecords(serverSrc)],

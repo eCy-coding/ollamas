@@ -128,3 +128,17 @@ describe("brain-teach v9 — live service catalog", () => {
     expect(recs[0].content).toContain("RRF");
   });
 });
+
+import { headComment, buildCodeMapRecords, buildExportRecords, buildCodePatternRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v10 — code-based sets", () => {
+  it("head comment + code map + export signatures parse; patterns curated", () => {
+    const src = "// Brain ASK — synthesized answers.\n// Injectable LLM.\nimport x from 'y';\nexport async function askBrain(question: string, deps: AskDeps) {}\nexport function rbo(a: string[], b: string[]) {}\n";
+    expect(headComment(src)).toContain("synthesized answers");
+    const map = buildCodeMapRecords([["server/brain-ask.ts", src]]);
+    expect(map[0].fact?.object).toBe("server/brain-ask.ts");
+    const ex = buildExportRecords([["server/brain-ask.ts", src]]);
+    expect(ex[0].content).toContain("askBrain(question, deps)");
+    expect(buildCodePatternRecords().find((r) => r.id === "teach:desen:guarded-alter")?.content).toContain("ALTER");
+  });
+});
