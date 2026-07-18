@@ -35,7 +35,12 @@ export function AssistDrawer({
     let acc = "";
     let buf = "";
     try {
-      await api.streamPost(`/api/ecym/panel/${panelId}`, { context: context() }, {
+      // Honest hard ceiling: on a saturated single GPU the specialist may never get a
+      // slot — fail with a clear message instead of hanging the drawer forever.
+      const timeout = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("model 90sn'de yanıt vermedi (GPU meşgul) — sonra tekrar dene")), 90_000),
+      );
+      await Promise.race([timeout, api.streamPost(`/api/ecym/panel/${panelId}`, { context: context() }, {
         onChunk: (t: string) => {
           buf += t;
           const parts = buf.split("\n\n");
@@ -50,7 +55,7 @@ export function AssistDrawer({
             } catch { /* partial frame */ }
           }
         },
-      });
+      })]);
     } catch (e) {
       setErr(String((e as Error)?.message || e));
     } finally {
