@@ -83,6 +83,11 @@ export interface BrainStore {
    *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
   recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean }): Promise<BrainRecallHit[]>;
   assertFact(f: BrainFactInput): Promise<{ changed: boolean; invalidated: number }>;
+  /** S42: episodes ↔ sessions reverse link — every memory a distill/ingest wrote
+   *  for a session carries source=episodeId(=sessionId). */
+  memoriesBySource(source: string, opts?: { limit?: number }): { id: string; tier: MemoryTier; content: string; ns: string; createdAt: number }[];
+  /** S49: namespaces present in the store (admin cross-ns recall fans over these). */
+  listNamespaces(): string[];
   factsAbout(subject: string, opts?: { ns?: string; at?: number }): BrainFact[];
   /** Semantic fact search (v2): KNN over embedded "subject predicate object" strings,
    *  filtered to facts VALID at `at` (default now) — history stays searchable. */
@@ -647,6 +652,18 @@ export function createBrainStore(
       return { selfHitRate, drift, probes: rows.length };
     },
 
+    memoriesBySource(source, { limit = 50 } = {}) {
+      return db
+        .prepare(
+          "SELECT mem_id AS id, tier, content, ns, created_at AS createdAt FROM brain_memories WHERE source=? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        )
+        .all(source, limit) as { id: string; tier: MemoryTier; content: string; ns: string; createdAt: number }[];
+    },
+
+    listNamespaces() {
+      return (db.prepare("SELECT DISTINCT ns FROM brain_memories ORDER BY ns").all() as { ns: string }[]).map((r) => r.ns);
+    },
+
     factsAbout(subject, { ns, at } = {}) {
       const t = at ?? now();
       const rows = db
@@ -825,6 +842,8 @@ export const brainRecall = async (
 };
 export const brainAssertFact = (f: BrainFactInput) => store().assertFact(f);
 export const brainFactsAbout = (s: string, o?: { ns?: string; at?: number }) => store().factsAbout(s, o);
+export const brainMemoriesBySource = (s: string, o?: { limit?: number }) => store().memoriesBySource(s, o);
+export const brainListNamespaces = () => store().listNamespaces();
 export const brainIngest = (b: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }) =>
   store().ingest(b);
 export const brainSearchFacts = (q: string, o?: { k?: number; ns?: string; at?: number }) => store().searchFacts(q, o);

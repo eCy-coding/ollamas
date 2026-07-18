@@ -23,12 +23,15 @@ import { createHash } from "node:crypto";
 
 export type BrainEventType =
   | "tool.outcome"        // S30 — tool-registry onUsage
-  | "provider.verdict"    // S32 — key-health verdict transition
+  | "provider.verdict"    // S32 — key-health verdict transition (poll-captured at flush)
   | "council.score"       // S33 — scoreCouncil result
-  | "mcp.upstream"        // S35 — MCP supervisor health transition
-  | "champion.change"     // S37 — model champion change
+  | "mcp.upstream"        // S35 — MCP supervisor health transition (poll-captured at flush)
+  | "champion.change"     // S37 — model champion change (poll-captured at flush)
   | "session.distilled"   // S42 — distill completed for a session
   | "tenant.created"      // S43 — tenant provisioned
+  | "error.recorded"      // S31 — central error tracker (in-process ring is ephemeral)
+  | "job.outcome"         // S34 — durable-job / recurring-loop completion
+  | "align.verdict"       // S44 — verifier verdict on an agent answer
   | "selftest.ping";      // S50 — e2e proof probe
 
 export interface BrainEvent {

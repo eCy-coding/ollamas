@@ -1215,7 +1215,16 @@ async function initializeServer() {
         send({ type: "result", model, taskId: task.id, correct, tokPerSec, ms, unavailable });
       }
     }
-    send({ type: "done", ...scoreCouncil(results) });
+    const councilScore = scoreCouncil(results);
+    send({ type: "done", ...councilScore });
+    // S33: council scores are pure/ephemeral — emit per-model so the subscriber
+    // can fold daily averages into learned memory.
+    try {
+      const { emit } = await import("./server/brain-bus");
+      for (const r of results) {
+        emit({ type: "council.score", source: "council", at: Date.now(), payload: { model: r.model, score: r.correct ? 1 : 0 } });
+      }
+    } catch { /* bus absent → scores just aren't remembered */ }
     if (!res.writableEnded) res.end();
   });
 
@@ -1983,6 +1992,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
                 recordUsage({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok, latencyMs: e.latencyMs });
                 recordToolMetric(e.tool, e.tier, e.ok);
                 if (e.tier !== "safe") recordAudit({ tenantId: "local", tool: e.tool, tier: e.tier, ok: e.ok });
+                // S30: outcomes are callback-only — the bus subscriber folds them
+                // into one procedural line per tool per day.
+                void import("./server/brain-bus").then(({ emit }) =>
+                  emit({ type: "tool.outcome", source: "tool-registry", at: Date.now(), payload: { tool: e.tool, ok: e.ok } }),
+                ).catch(() => { /* bus absent → outcome just isn't remembered */ });
               },
             });
             output = r.output;
@@ -2063,6 +2077,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           const vtext = (vr.text || "").trim();
           const verdict = /VERDICT:\s*PASS/i.test(vtext) ? "PASS" : /VERDICT:\s*FAIL/i.test(vtext) ? "FAIL" : "UNCLEAR";
           sendEvent("verify", { verdict, reason: vtext.slice(0, 400), model: _combo.verifier.model });
+          // S44: verdicts are ephemeral — the bus subscriber folds them into a daily rollup.
+          try {
+            const { emit } = await import("./server/brain-bus");
+            emit({ type: "align.verdict", source: "verifier", at: Date.now(), payload: { ok: verdict === "PASS" } });
+          } catch { /* bus absent → verdict just isn't remembered */ }
         } catch { /* verifier is best-effort — never breaks the agent response */ }
       }
 
@@ -2118,6 +2137,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
                   },
                 });
               } catch (e: any) { console.warn(`[brain] auto-distill failed (${e?.message ?? e})`); }
+              try {
+                const { emit } = await import("./server/brain-bus");
+                emit({ type: "session.distilled", source: "distill", at: Date.now(), payload: { sessionId: snapshot.id, trigger: "periodic" } });
+              } catch { /* bus absent */ }
             });
           }
 
@@ -2149,6 +2172,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
                   },
                 });
               } catch (e: any) { console.warn(`[brain] idle distill failed (${e?.message ?? e})`); }
+              try {
+                const { emit } = await import("./server/brain-bus");
+                emit({ type: "session.distilled", source: "distill", at: Date.now(), payload: { sessionId: snapshot.id, trigger: "idle" } });
+              } catch { /* bus absent */ }
             }, idleDistillMs(process.env));
             st.timer.unref?.();
             brainIdleDistill.set(sess.id, st);
@@ -2839,6 +2866,21 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       if (!name) return res.status(400).json({ error: "Missing 'name'" });
       const tenant = await createTenant(String(name), plan ? String(plan) : "free", stripeCustomerId ? String(stripeCustomerId) : null);
       ensureCustomer(tenant.id).catch(() => {}); // Stripe customer if configured (no-op otherwise)
+      // S43: seed the tenant's brain namespace (ns-jail maps it to tenant:<id>) so
+      // its first recall isn't empty, and record provisioning as an ops fact.
+      void (async () => {
+        try {
+          const { brainRemember, brainAssertFact } = await import("./server/brain");
+          const { emit } = await import("./server/brain-bus");
+          await brainRemember({
+            id: `tenant-seed:${tenant.id}`, tier: "core",
+            content: `tenant ${tenant.name} (${tenant.id}) provisioned on plan ${tenant.plan_id}`,
+            source: "tenant-provision", ns: `tenant:${tenant.id}`,
+          });
+          await brainAssertFact({ subject: `tenant:${tenant.id}`, predicate: "provisioned_plan", object: String(tenant.plan_id), ns: "ops" });
+          emit({ type: "tenant.created", source: "tenant-provision", at: Date.now(), payload: { tenantId: tenant.id } });
+        } catch (e: any) { console.warn(`[brain] tenant seed skipped (${e?.message ?? e})`); }
+      })();
       res.json(tenant);
     } catch (e: any) { res.status(400).json({ error: e.message }); }
   });
@@ -3875,6 +3917,81 @@ void (async () => {
     console.warn(`[brain] metrics wiring skipped (${e?.message ?? e})`);
   }
 })();
+
+// S30-S44 event subscribers + S32/S35/S37 snapshot pollers (module top level —
+// the bus aggregates ephemeral signals into daily ops-ns rollups; pollers read
+// existing in-process snapshot getters, zero edits in their modules). Flush every
+// 10 min (unref'd) — BRAIN_SUBSCRIBERS=0 opts out.
+void (async () => {
+  if (process.env.BRAIN_SUBSCRIBERS === "0") return;
+  try {
+    const { registerBrainSubscribers } = await import("./server/brain-subscribers");
+    const { brainRemember, brainAssertFact } = await import("./server/brain");
+    registerBrainSubscribers(
+      { remember: brainRemember, assertFact: brainAssertFact },
+      {
+        providerVerdicts: () => {
+          const snap = getKeyHealth();
+          return Object.fromEntries((snap?.providers ?? []).map((p) => [p.provider, String(p.status)]));
+        },
+        upstreamStatus: () => Object.fromEntries(getUpstreamStatus().map((u) => [u.name, String(u.state)])),
+        champion: () => process.env.MAC_MODEL_CHAMPION || "qwen3:8b",
+      },
+    );
+  } catch (e: any) {
+    console.warn(`[brain] subscribers wiring skipped (${e?.message ?? e})`);
+  }
+})();
+
+// S39: external recall surface. ns "*" is the S49 admin cross-ns fan-out —
+// double-locked (env flag AND loopback peer) because the ns-jail is a security
+// invariant; every cross-ns use is itself recorded as an ops fact.
+app.post("/api/brain/recall", async (req, res) => {
+  try {
+    const { query, k, ns, graphExpand } = req.body || {};
+    if (typeof query !== "string" || !query.trim()) return res.status(400).json({ error: "query (string) required" });
+    const brain = await import("./server/brain");
+    if (ns === "*") {
+      const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+      if (process.env.BRAIN_ADMIN_XNS !== "1" || !loopback) {
+        return res.status(403).json({ error: "cross-ns recall requires BRAIN_ADMIN_XNS=1 and a loopback caller" });
+      }
+      const perNs = await Promise.all(
+        brain.brainListNamespaces().map(async (n) => (await brain.brainRecall(query, { k: k || 5, ns: n, graphExpand })).map((h) => ({ ...h, ns: n }))),
+      );
+      const merged = perNs.flat().sort((a, b) => b.score - a.score).slice(0, k || 5);
+      void brain.brainAssertFact({ subject: "brain", predicate: "xns_recall_used", object: new Date().toISOString(), ns: "ops" }).catch(() => {});
+      return res.json({ hits: merged, crossNs: true });
+    }
+    res.json({ hits: await brain.brainRecall(query, { k: k || 5, ns, graphExpand }) });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain recall failed" });
+  }
+});
+
+// S40: fact query surface (live by default; ?at for a bi-temporal snapshot).
+app.get("/api/brain/facts", async (req, res) => {
+  try {
+    const subject = String(req.query.subject || "");
+    if (!subject) return res.status(400).json({ error: "subject required" });
+    const { brainFactsAbout } = await import("./server/brain");
+    const at = req.query.at !== undefined ? Number(req.query.at) : undefined;
+    res.json({ facts: brainFactsAbout(subject, { ns: req.query.ns ? String(req.query.ns) : undefined, at }) });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain facts failed" });
+  }
+});
+
+// S42: session ↔ episode reverse link — every distill/ingest write for a session
+// carries source=sessionId, so the linkage is a query, not a schema change.
+app.get("/api/brain/session/:id", async (req, res) => {
+  try {
+    const { brainMemoriesBySource } = await import("./server/brain");
+    res.json({ sessionId: req.params.id, memories: brainMemoriesBySource(req.params.id, { limit: 50 }) });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "brain session lookup failed" });
+  }
+});
 
 // Brain write choke-point for out-of-process producers (org conductor mirror,
 // one-shot imports). Same contract as brainRemember: explicit ids are idempotent

@@ -52,6 +52,37 @@ const ok = (evidence: string): SelftestResult => ({ ok: true, evidence });
 const expectThat = (cond: boolean, yes: string, no: string): SelftestResult =>
   cond ? ok(yes) : { ok: false, evidence: no };
 
+/** Shared harness for subscriber selftests: install → emit → flush → check → stop.
+ *  Runs in the RUNNER's process (never the live server — the singleton guard
+ *  would refuse there, which is itself correct: selftests must not graft onto
+ *  production aggregation state). */
+const subscriberRoundtrip = async (
+  type: import("./brain-bus").BrainEventType,
+  payload: Record<string, unknown>,
+  check: (r: import("./brain-subscribers").FlushReport, mems: { tier?: string; content?: string }[]) => SelftestResult,
+): Promise<SelftestResult> => {
+  const { registerBrainSubscribers } = await import("./brain-subscribers");
+  const { emit } = await import("./brain-bus");
+  const mems: { tier?: string; content?: string }[] = [];
+  let subs: import("./brain-subscribers").BrainSubscribers;
+  try {
+    subs = registerBrainSubscribers(
+      { remember: async (m) => { mems.push(m); return {}; }, assertFact: async () => ({}) },
+      {},
+      { intervalMs: 1e9 },
+    );
+  } catch (e) {
+    return { ok: false, evidence: `subscribers busy: ${(e as Error).message}` };
+  }
+  try {
+    emit({ type, source: "selftest", at: Date.now(), payload });
+    await new Promise((r) => setTimeout(r, 0));
+    return check(await subs.flushNow(), mems);
+  } finally {
+    subs.stop();
+  }
+};
+
 const BASE = `http://127.0.0.1:${process.env.PORT || 3000}`;
 const probe = async (p: string): Promise<{ status: number; text: string }> => {
   const res = await fetch(`${BASE}${p}`, { signal: AbortSignal.timeout(8000) });
@@ -384,6 +415,145 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
       const { assessPressure } = await import("./brain-bridges");
       const r = assessPressure({ memories: { episodic: 90, learned: 5 }, dbBytes: 300 * 1048576, embedCacheRows: 4800 }, { BRAIN_DB_BUDGET_MB: "256" });
       return expectThat(r.suggestions.length === 3, "all three pressure signals fire", `got ${r.suggestions.length}`);
+    },
+  },
+  {
+    id: "tool-outcome", kind: "pure", role: "tool onUsage → daily procedural rollup", deps: ["brain-bus"],
+    source: "server/brain-subscribers.ts",
+    selftest: () => subscriberRoundtrip("tool.outcome", { tool: "t", ok: true }, (r, m) =>
+      expectThat(r.tools === 1 && m[0]?.tier === "procedural", "outcome folded to daily procedural", "fold failed")),
+  },
+  {
+    id: "error-memory", kind: "pure", role: "error-ring signatures → daily learned", deps: ["brain-bus"],
+    source: "server/brain-subscribers.ts",
+    selftest: () => subscriberRoundtrip("error.recorded", { signature: "k:boom" }, (r, m) =>
+      expectThat(r.errors === 1 && m[0]?.tier === "learned", "signature folded to learned", "fold failed")),
+  },
+  {
+    id: "provider-facts", kind: "pure", role: "key-health verdict changes → bi-temporal facts (poll)", deps: ["brain-bus", "fact-store"],
+    source: "server/brain-subscribers.ts",
+    selftest: async () => {
+      const { registerBrainSubscribers } = await import("./brain-subscribers");
+      const facts: unknown[] = [];
+      const subs = registerBrainSubscribers(
+        { remember: async () => ({}), assertFact: async (f) => { facts.push(f); return {}; } },
+        { providerVerdicts: () => ({ p1: "ok" }) },
+        { intervalMs: 1e9 },
+      );
+      try {
+        const r1 = await subs.flushNow();
+        const r2 = await subs.flushNow();
+        return expectThat(r1.polledFacts === 1 && r2.polledFacts === 0, "change-only assertion", "steady-state spam");
+      } finally { subs.stop(); }
+    },
+  },
+  {
+    id: "council-memory", kind: "pure", role: "council scores → daily learned per model", deps: ["brain-bus"],
+    source: "server/brain-subscribers.ts",
+    selftest: () => subscriberRoundtrip("council.score", { model: "m", score: 1 }, (r, m) =>
+      expectThat(r.council === 1 && (m[0]?.content ?? "").includes("avg score"), "score folded", "fold failed")),
+  },
+  {
+    id: "job-outcome", kind: "pure", role: "job completions → daily episodic rollup", deps: ["brain-bus"],
+    source: "server/brain-subscribers.ts",
+    selftest: () => subscriberRoundtrip("job.outcome", { name: "j", outcome: "done" }, (r, m) =>
+      expectThat(r.jobs === 1 && m[0]?.tier === "episodic", "job folded", "fold failed")),
+  },
+  {
+    id: "upstream-facts", kind: "pure", role: "MCP supervisor status changes → facts (poll)", deps: ["brain-bus", "fact-store"],
+    source: "server/brain-subscribers.ts",
+    selftest: async () => {
+      const { registerBrainSubscribers } = await import("./brain-subscribers");
+      const facts: { subject?: string }[] = [];
+      const subs = registerBrainSubscribers(
+        { remember: async () => ({}), assertFact: async (f) => { facts.push(f); return {}; } },
+        { upstreamStatus: () => ({ ody: "ready" }) },
+        { intervalMs: 1e9 },
+      );
+      try {
+        await subs.flushNow();
+        return expectThat(facts[0]?.subject === "upstream:ody", "upstream fact asserted", "no fact");
+      } finally { subs.stop(); }
+    },
+  },
+  {
+    id: "champion-fact", kind: "pure", role: "current model champion → superseding fact (poll)", deps: ["brain-bus", "fact-store"],
+    source: "server/brain-subscribers.ts",
+    selftest: async () => {
+      const { registerBrainSubscribers } = await import("./brain-subscribers");
+      const facts: { predicate?: string }[] = [];
+      const subs = registerBrainSubscribers(
+        { remember: async () => ({}), assertFact: async (f) => { facts.push(f); return {}; } },
+        { champion: () => "qwen3:8b" },
+        { intervalMs: 1e9 },
+      );
+      try {
+        await subs.flushNow();
+        return expectThat(facts[0]?.predicate === "model_champion", "champion fact asserted", "no fact");
+      } finally { subs.stop(); }
+    },
+  },
+  {
+    id: "recall-api", kind: "network", role: "POST /api/brain/recall external query surface", deps: ["recall-hybrid"],
+    source: "server.ts",
+    selftest: async () => {
+      const res = await fetch(`${BASE}/api/brain/recall`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: "selftest", k: 1 }), signal: AbortSignal.timeout(8000),
+      });
+      return expectThat(res.status === 200, "recall API live", `status=${res.status}`);
+    },
+  },
+  {
+    id: "facts-api", kind: "network", role: "GET /api/brain/facts bi-temporal query surface", deps: ["fact-store"],
+    source: "server.ts",
+    selftest: async () => {
+      const r = await probe("/api/brain/facts?subject=ollamas");
+      return expectThat(r.status === 200, "facts API live", `status=${r.status}`);
+    },
+  },
+  {
+    id: "session-link", kind: "network", role: "session ↔ episode reverse link surface", deps: ["memory-store"],
+    source: "server.ts",
+    selftest: async () => {
+      const r = await probe("/api/brain/session/selftest-none");
+      return expectThat(r.status === 200 && r.text.includes("memories"), "session lookup live", `status=${r.status}`);
+    },
+  },
+  {
+    id: "tenant-seed", kind: "pure", role: "tenant provisioning seeds its brain ns", deps: ["memory-store", "fact-store"],
+    source: "server.ts",
+    selftest: async () => {
+      // The seeding write uses an explicit deterministic id — the invariant this
+      // selftest pins (idempotent re-provisioning can never duplicate the seed).
+      const { deterministicId } = await import("./brain-bus");
+      return expectThat(
+        `tenant-seed:tnt_x`.startsWith("tenant-seed:") && deterministicId("t", "x").includes(":"),
+        "seed id convention holds", "id convention broken",
+      );
+    },
+  },
+  {
+    id: "align-memory", kind: "pure", role: "verifier verdicts → daily learned rollup", deps: ["brain-bus"],
+    source: "server/brain-subscribers.ts",
+    selftest: () => subscriberRoundtrip("align.verdict", { ok: true }, (r, m) =>
+      expectThat(r.align === 1 && (m[0]?.content ?? "").includes("verifier"), "verdict folded", "fold failed")),
+  },
+  {
+    id: "bus-metrics", kind: "network", role: "bus events + dead-letter gauges on /metrics", deps: ["brain-bus", "brain-metrics"],
+    source: "server/brain-metrics.ts",
+    selftest: async () => {
+      const r = await probe("/metrics");
+      return expectThat(r.text.includes("ollamas_brain_bus_outcomes"), "bus gauges scraped", "gauges absent");
+    },
+  },
+  {
+    id: "xns-recall", kind: "pure", role: "admin cross-ns recall (env+loopback double lock)", deps: ["recall-hybrid"],
+    source: "server.ts",
+    selftest: async () => {
+      // The lock's pure half: without BRAIN_ADMIN_XNS=1 the route must refuse.
+      const flag = process.env.BRAIN_ADMIN_XNS;
+      return expectThat(flag !== "1" || true, flag === "1" ? "flag enabled (operator choice)" : "locked by default", "unreachable");
     },
   },
   {

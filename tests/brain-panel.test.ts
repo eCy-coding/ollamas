@@ -57,6 +57,50 @@ describe("BRAIN routes (in-process app)", () => {
     expect(Array.isArray(g.edges)).toBe(true);
   });
 
+  test("POST /api/brain/recall (S39) → ranked hits; missing query → 400", async () => {
+    const res = await fetch(`${base}/api/brain/recall`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: "panel test memory", k: 2, ns: "org" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.hits[0]?.id).toBe("t-1");
+    const bad = await fetch(`${base}/api/brain/recall`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  test("cross-ns recall (S49) is double-locked: env flag off → 403; on+loopback → merged hits", async () => {
+    const xns = (body: object) => fetch(`${base}/api/brain/recall`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    const denied = await xns({ query: "panel test memory", ns: "*" });
+    expect(denied.status).toBe(403);
+    process.env.BRAIN_ADMIN_XNS = "1";
+    try {
+      const res = await xns({ query: "panel test memory", ns: "*", k: 3 });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.crossNs).toBe(true);
+      expect(body.hits.some((h: { ns: string }) => h.ns === "org")).toBe(true);
+    } finally {
+      delete process.env.BRAIN_ADMIN_XNS;
+    }
+  });
+
+  test("GET /api/brain/facts (S40) + /api/brain/session/:id (S42)", async () => {
+    const fr = await fetch(`${base}/api/brain/facts?subject=nothing-here`);
+    expect(fr.status).toBe(200);
+    expect((await fr.json()).facts).toEqual([]);
+    const noSubject = await fetch(`${base}/api/brain/facts`);
+    expect(noSubject.status).toBe(400);
+    const sr = await fetch(`${base}/api/brain/session/some-session`);
+    expect(sr.status).toBe(200);
+    expect((await sr.json()).memories).toEqual([]);
+  });
+
   test("GET /brain → 200 html panel wired to the brain APIs", async () => {
     const res = await fetch(`${base}/brain`);
     expect(res.status).toBe(200);

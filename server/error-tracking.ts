@@ -65,6 +65,14 @@ export function recordError(kind: ErrorKind, err: unknown, route?: string): Erro
     `[ErrorTracker] ${kind}: ${rec.message}`,
   );
   maybeAlert(rec.ts);
+  // S31: the ring is in-process and ephemeral — emit so the brain subscriber can
+  // fold recurring signatures into learned memory. Best-effort by definition.
+  void import("./brain-bus").then(({ emit }) =>
+    emit({
+      type: "error.recorded", source: "error-tracking", at: rec.ts,
+      payload: { signature: `${kind}:${rec.message.slice(0, 100)}` },
+    }),
+  ).catch(() => { /* bus absent */ });
   return rec;
 }
 

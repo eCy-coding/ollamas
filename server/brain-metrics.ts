@@ -119,6 +119,35 @@ export function registerBrainMetrics(
       } catch { /* no log yet */ }
     },
   });
+  // S45: bus dead-letter visibility — a best-effort bus is only trustworthy if
+  // its drops are observable. Counters snapshot at scrape from getBusStats().
+  new client.Gauge({
+    name: "ollamas_brain_bus_events",
+    help: "Brain bus events by type (emitted since boot)",
+    labelNames: ["type"],
+    registers: [register],
+    async collect() {
+      try {
+        const { getBusStats } = await import("./brain-bus");
+        for (const [type, n] of Object.entries(getBusStats().emitted)) this.labels(type).set(n);
+      } catch { /* tolerant */ }
+    },
+  });
+  new client.Gauge({
+    name: "ollamas_brain_bus_outcomes",
+    help: "Brain bus handler outcomes + budget denials (handled|failed|denied)",
+    labelNames: ["outcome"],
+    registers: [register],
+    async collect() {
+      try {
+        const { getBusStats } = await import("./brain-bus");
+        const s = getBusStats();
+        this.labels("handled").set(s.handled);
+        this.labels("failed").set(s.failed);
+        this.labels("denied").set(Object.values(s.denied).reduce((a, b) => a + b, 0));
+      } catch { /* tolerant */ }
+    },
+  });
   new client.Gauge({
     name: "ollamas_brain_last_maintain_exit",
     help: "Exit code of the last maintenance pass (0 healthy, 3 drift/MRR alarm; absent until first pass)",

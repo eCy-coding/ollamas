@@ -218,6 +218,11 @@ export async function runClaimedJob(
   const record = (outcome: "done" | "failed") => {
     jobsRunsTotal.labels(job.name, outcome).inc();
     jobsDurationMs.labels(job.name, outcome).observe(Date.now() - t0);
+    // S34: outcomes only live in in-memory counters — emit so the brain
+    // subscriber can fold a daily per-job rollup. Best-effort by definition.
+    void import("./brain-bus").then(({ emit }) =>
+      emit({ type: "job.outcome", source: "jobs", at: Date.now(), payload: { name: job.name, outcome } }),
+    ).catch(() => { /* bus absent */ });
   };
   const handler = handlers.get(job.name);
   if (!handler) {
