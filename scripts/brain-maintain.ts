@@ -15,37 +15,45 @@ import { resolveEmbedder } from "../server/rag";
 import { backupBrain } from "./brain-backup";
 
 export interface MaintainInputs {
-  sweep: { swept: number; pruned?: number; embedEvicted?: number };
+  sweep: { swept: number; pruned?: number; factsPruned?: number; embedEvicted?: number };
   consolidate: { promoted: number; merged: number };
   health: { selfHitRate: number; drift: boolean; probes: number };
+  /** S25: consistency sentinel violation total (report-only — never alarms). */
+  consistency?: { total: number; error?: string };
 }
 
 export interface MaintainReport {
   swept: number;
   pruned: number;
+  factsPruned: number;
   embedEvicted: number;
   promoted: number;
   merged: number;
   drift: boolean;
   selfHitRate: number;
+  consistencyViolations: number;
   action: "noop" | "consolidated" | "re-embed-suggested";
   exitCode: 0 | 3;
 }
 
-/** Pure: fold the three lever outcomes into one report. Drift dominates the action
- *  and the exit code (cron alarm) regardless of how much housekeeping happened. */
+/** Pure: fold the lever outcomes into one report. Drift dominates the action
+ *  and the exit code (cron alarm) regardless of how much housekeeping happened;
+ *  consistency violations are surfaced but stay report-only (SSGM). */
 export function buildMaintainReport(i: MaintainInputs): MaintainReport {
   const worked =
-    i.sweep.swept + (i.sweep.pruned ?? 0) + i.consolidate.promoted + i.consolidate.merged > 0;
+    i.sweep.swept + (i.sweep.pruned ?? 0) + (i.sweep.factsPruned ?? 0) +
+    i.consolidate.promoted + i.consolidate.merged > 0;
   const action = i.health.drift ? "re-embed-suggested" : worked ? "consolidated" : "noop";
   return {
     swept: i.sweep.swept,
     pruned: i.sweep.pruned ?? 0,
+    factsPruned: i.sweep.factsPruned ?? 0,
     embedEvicted: i.sweep.embedEvicted ?? 0,
     promoted: i.consolidate.promoted,
     merged: i.consolidate.merged,
     drift: i.health.drift,
     selfHitRate: i.health.selfHitRate,
+    consistencyViolations: i.consistency?.total ?? 0,
     action,
     exitCode: i.health.drift ? 3 : 0,
   };
@@ -84,7 +92,23 @@ async function main() {
         console.warn(`[brain] nightly mrr eval skipped (${e?.message ?? e})`);
       }
     }
-    const report = buildMaintainReport({ sweep, consolidate, health });
+    // S25 consistency sentinel — report-only cross-table invariants (fact
+    // uniqueness, vec/fts sync). BRAIN_CONSISTENCY=0 opts out; its own failure
+    // lands in `error` and never breaks the pass.
+    let consistency: { total: number; error?: string } | undefined;
+    if (process.env.BRAIN_CONSISTENCY !== "0") {
+      try {
+        const { checkConsistencyAt } = await import("../server/brain-consistency");
+        const dbPath =
+          process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
+        const c = checkConsistencyAt(dbPath);
+        consistency = { total: c.total, error: c.error };
+        if (c.total > 0 || c.error) console.log(JSON.stringify({ event: "brain.consistency", ...c }));
+      } catch (e: any) {
+        console.warn(`[brain] consistency check skipped (${e?.message ?? e})`);
+      }
+    }
+    const report = buildMaintainReport({ sweep, consolidate, health, consistency });
     console.log(JSON.stringify({
       event: "brain.maintain",
       "gen_ai.operation.name": "memory_maintenance",

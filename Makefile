@@ -37,7 +37,7 @@ eval-providers:
 eval-rerank:
 	@npx tsx scripts/eval-rerank.mjs
 # ---------------- Brain (ported from integrate-wt, B-pattern 2026-07-18) ----------------
-.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap brain-export brain-import
+.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap brain-export brain-import brain-check brain-reembed
 
 ## brain-show: live viewer — stats + memories + facts (+ Q="soru" semantic query)
 brain-show:
@@ -82,3 +82,11 @@ brain-export:
 ## brain-import: idempotent restore of a dump into BRAIN_DB_PATH (S22) — FILE=dump.json [DRY=1]
 brain-import:
 	@npx tsx scripts/brain-import.ts $(FILE) $(if $(DRY),--dry,)
+
+## brain-check: consistency sentinel (S25) — report-only cross-table invariants (exit 0 always)
+brain-check:
+	@npx tsx scripts/brain-check.ts
+
+## brain-reembed: drift remediation (S23) — verified backup, full vector rebuild, meta flip LAST [DRY=1]
+brain-reembed:
+	@npx tsx scripts/brain-reembed.ts $(if $(DRY),--dry,)
