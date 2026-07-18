@@ -93,15 +93,18 @@ export function buildEcymModelfile(opts: {
   config: OptConfig;
   sys: SysInfo;
   temperature?: number;
+  /** Existing persona core — PRESERVED verbatim when present (never overwrite Emre's voice). */
+  identity?: string;
 }): string {
   const temperature = Math.min(1, Math.max(0, opts.temperature ?? 0.4));
+  const identity = (opts.identity ?? "").trim() || ECY_IDENTITY;
   return [
     `# eCy — distilled by ollamas eCy Studio (${new Date().toISOString()})`,
     `# Hardware: ${opts.sys.chip} · ${opts.sys.ramGb}GB · ${opts.sys.cores} cores`,
     `FROM ${opts.base}`,
     ``,
     `SYSTEM """`,
-    ECY_IDENTITY,
+    identity,
     ``,
     `Working principles: ${ECY_PRINCIPLES}`,
     `"""`,
@@ -111,6 +114,24 @@ export function buildEcymModelfile(opts: {
     `PARAMETER temperature ${temperature}`,
     ``,
   ].join("\n");
+}
+
+/** Fetch the CURRENT full SYSTEM prompt of a model from ollama (persona preservation). */
+export async function getCurrentSystem(model: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+  try {
+    const r = await fetchImpl("http://localhost:11434/api/show", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: model }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!r.ok) return "";
+    const j = (await r.json()) as { system?: string; modelfile?: string };
+    if (j.system?.trim()) return j.system.trim();
+    return (/SYSTEM\s+"""([\s\S]*?)"""/.exec(j.modelfile || "")?.[1] || "").trim();
+  } catch {
+    return "";
+  }
 }
 
 // ============ BENCH-DRIVEN BASE SELECTION ============
@@ -232,7 +253,9 @@ export async function* distillEcym(db: DBLike, target: string, deps: DistillDeps
   yield { stage: "plan", status: "done", text: `base=${base} (${reason}) · num_ctx=${config.num_ctx} thread=${config.num_thread}` };
 
   yield { stage: "modelfile", status: "running" };
-  const modelfile = buildEcymModelfile({ base, config, sys });
+  // Preserve Emre's existing eCy persona verbatim; only the principles+params refresh.
+  const identity = await getCurrentSystem("ecy:latest");
+  const modelfile = buildEcymModelfile({ base, config, sys, identity });
   const dir = path.join(db.data.workspacePath, ".ecym");
   const mfPath = path.join(dir, "Modelfile");
   // The write stays inside the workspace — same containment rule as FilesystemManager.

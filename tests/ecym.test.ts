@@ -41,6 +41,14 @@ describe("ecym — modelfile distillation (pure)", () => {
     expect(mf).toContain("PARAMETER temperature 0.4");
   });
 
+  it("preserves an existing persona verbatim as the identity core", () => {
+    const persona = "Sen eCy'sin — Emre'nin kişisel MacBook asistanı. Gevezelik YOK.";
+    const mf = buildEcymModelfile({ base: "b", config: CFG, sys: SYS, identity: persona });
+    expect(mf).toContain(persona);           // Emre's voice kept
+    expect(mf).not.toContain("You are eCy"); // default identity NOT injected over it
+    expect(mf).toContain("Working principles:"); // principles still appended
+  });
+
   it("clamps temperature into [0,1]", () => {
     expect(buildEcymModelfile({ base: "b", config: CFG, sys: SYS, temperature: 9 })).toContain("PARAMETER temperature 1");
     expect(buildEcymModelfile({ base: "b", config: CFG, sys: SYS, temperature: -3 })).toContain("PARAMETER temperature 0");
