@@ -25,6 +25,7 @@ export const messages: Record<string, string> = {
   'app.tab.revenue': 'Gelir / Kişisel Ops',
   'app.tab.cookbook': 'Reçete Kütüphanesi',
   'app.tab.research': 'Derin Araştırma',
+  'app.tab.documents': 'Belgeler',
   'app.sidebar.explorer': 'Proje Gezgini',
   'app.status.activeHost': 'Aktif Ana Makine:',
   'app.status.workspace': 'Çalışma Alanı:',
