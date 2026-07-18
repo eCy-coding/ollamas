@@ -15,7 +15,7 @@
  * "bake" path (server/ecym.ts distillSpecialist), not required at runtime.
  */
 import type { Request, Response } from "express";
-import { generateTextStream, generateText, type AiOptions } from "./ai";
+import { generateTextStream, generateText, loadedModelNames, type AiOptions } from "./ai";
 import { searchWeb, type Source } from "./research";
 import { distillEcym } from "./ecym";
 
@@ -116,6 +116,24 @@ export function panelModel(db: DBLike, panelId: PanelId): string {
   return db.data.ecymSpecialists?.[panelId]?.model || ECY_BASE;
 }
 
+// eCy-family models that are behaviorally EQUIVALENT for assist: the specialist persona
+// rides AiOptions.system, which overrides each tag's baked SYSTEM — so any of these gives
+// the same specialist output. Ordered by preference. qwen3:8b is what the conductor keeps
+// warm, so preferring a warm member here means ZERO model-swap on the single GPU.
+export const ECY_FAMILY = ["ecy:latest", "ecy:candidate", "qwen3:8b-16k", "qwen3:8b"];
+
+/**
+ * Pick the assist model to avoid a cold model-swap (v13). Prefer a resident model:
+ * a warm baked specialist → a warm eCy-family member → else fall back (baked tag if
+ * registered, else ecy:latest). Pure — `warm` = names from /api/ps.
+ */
+export function pickAssistModel(warm: string[], baked?: string): string {
+  const w = new Set(warm);
+  if (baked && w.has(baked)) return baked;            // baked specialist already resident
+  for (const m of ECY_FAMILY) if (w.has(m)) return m; // any warm eCy-family member → no swap
+  return baked || ECY_BASE;                            // nothing warm: honor baked, else base
+}
+
 /** Read the distilled brief for a panel, or the hardcoded fallback (never empty). */
 export function resolveBrief(db: DBLike, panelId: PanelId): string {
   return db.data.panelBriefs?.[panelId]?.brief || PANEL_BRIEFS[panelId].fallback;
@@ -133,15 +151,19 @@ export interface AssistDeps {
   stream?: (prompt: string, opts?: AiOptions) => AsyncGenerator<string>;
   compress?: (prompt: string, opts?: AiOptions) => Promise<string>;
   search?: (query: string) => Promise<Source[]>;
+  loadedModels?: () => Promise<string[]>;
 }
 
 /** Stream the panel specialist's answer (GPU-serialized). */
 export async function* assistStream(db: DBLike, panelId: PanelId, contextText: string, deps: AssistDeps = {}): AsyncGenerator<string> {
   const stream = deps.stream ?? generateTextStream;
+  const loaded = deps.loadedModels ?? loadedModelNames;
   const brief = resolveBrief(db, panelId);
   const { system, prompt } = buildAssistPrompt(panelId, contextText, brief);
-  // Baked specialist tag once registered (hybrid), else the shared warm base.
-  const model = panelModel(db, panelId);
+  // v13: pick a RESIDENT eCy-family model to avoid a cold 5GB swap on the single GPU.
+  // The persona rides `system`, so any warm family member is an equivalent specialist.
+  const baked = db.data.ecymSpecialists?.[panelId]?.model;
+  const model = pickAssistModel(await loaded().catch(() => []), baked);
   // Serialize the whole stream behind the mutex so panels queue rather than thrash.
   const gen = await withGpu(async () => stream(prompt, { model, system, temperature: 0.3 }));
   for await (const chunk of gen) yield chunk;

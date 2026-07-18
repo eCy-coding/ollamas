@@ -67,6 +67,24 @@ export async function listModels(): Promise<string[]> {
   return [];
 }
 
+/**
+ * Names of the models ollama currently has RESIDENT (warm) — from /api/ps.
+ * Used to pick an already-loaded model and avoid a cold model-swap on the single GPU.
+ * Same host-probe strategy as listModels(); [] if ollama is unreachable.
+ */
+export async function loadedModelNames(): Promise<string[]> {
+  const bases = [...new Set([ollamaHost(), "http://127.0.0.1:11434", "http://localhost:11434"])];
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/api/ps`);
+      if (!res.ok) continue;
+      const data: any = await res.json();
+      return (data.models || []).map((m: any) => m.name);
+    } catch { /* unreachable base — try next */ }
+  }
+  return [];
+}
+
 /** Prefer a coder-tuned local model (qwen3-coder per orchestration vO6 M4 benchmark). */
 export async function resolveLocalCoder(): Promise<string> {
   const models = await listModels();

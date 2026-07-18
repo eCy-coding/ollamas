@@ -11,6 +11,8 @@ import {
   SPECIALIST_TAG,
   buildSpecialistIdentity,
   panelModel,
+  pickAssistModel,
+  ECY_FAMILY,
 } from "../server/panel-assist";
 
 function mockDb(briefs?: Record<string, { brief: string; ts: string; sources: string[] }>) {
@@ -72,7 +74,8 @@ describe("panel-assist — assistStream", () => {
       yield "diag";
       yield "nosis";
     };
-    const out = await drain(assistStream(mockDb(), "github-actions", "logs…", { stream }));
+    // No warm model → falls back to the ecy:latest base; system carries the specialist brief.
+    const out = await drain(assistStream(mockDb(), "github-actions", "logs…", { stream, loadedModels: async () => [] }));
     expect(out.join("")).toBe("diagnosis");
     expect(calls[0].opts.model).toBe("ecy:latest");
     expect(calls[0].opts.system).toContain(PANEL_BRIEFS["github-actions"].role);
@@ -117,6 +120,33 @@ describe("panel-assist — hybrid bake binding", () => {
     expect(panelModel(db, "search")).toBe("ecy:latest");
     (db.data as { ecymSpecialists?: Record<string, { model?: string }> }).ecymSpecialists = { search: { model: "ecy-github:latest" } };
     expect(panelModel(db, "search")).toBe("ecy-github:latest");
+  });
+});
+
+describe("panel-assist — adaptive warm-model (v13, no-swap)", () => {
+  it("prefers a warm baked specialist tag", () => {
+    expect(pickAssistModel(["qwen3:8b", "ecy-actions:latest"], "ecy-actions:latest")).toBe("ecy-actions:latest");
+  });
+  it("uses a warm eCy-family member (qwen3:8b) instead of forcing a cold ecy:latest", () => {
+    // conductor keeps qwen3:8b warm; ecy:latest is NOT resident → pick the warm one, no swap
+    expect(pickAssistModel(["qwen3:8b"])).toBe("qwen3:8b");
+  });
+  it("prefers ecy:latest when it is the warm one", () => {
+    expect(pickAssistModel(["ecy:latest", "phi4:latest"])).toBe("ecy:latest");
+  });
+  it("does NOT pick an unrelated warm model", () => {
+    expect(ECY_FAMILY).not.toContain("phi4:latest");
+    expect(pickAssistModel(["phi4:latest"])).toBe("ecy:latest"); // nothing eCy-family warm → base
+  });
+  it("falls back to a registered baked tag when nothing is warm", () => {
+    expect(pickAssistModel([], "ecy-vault:latest")).toBe("ecy-vault:latest");
+    expect(pickAssistModel([])).toBe("ecy:latest");
+  });
+  it("assistStream runs on the warm model (injected loadedModels)", async () => {
+    const calls: Array<{ model?: string }> = [];
+    const stream = async function* (_p: string, opts: { model?: string }) { calls.push(opts); yield "ok"; };
+    await drain(assistStream(mockDb(), "keys", "ctx", { stream, loadedModels: async () => ["qwen3:8b"] }));
+    expect(calls[0].model).toBe("qwen3:8b"); // no ecy:latest swap
   });
 });
 
