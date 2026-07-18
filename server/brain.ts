@@ -420,7 +420,7 @@ export function createBrainStore(
       const fusedIds = lists.length > 1 ? rrfFuseMany(lists, over) : vecRows.map((r) => r.id);
       const rows = fusedIds.map((id) => byId.get(id)).filter(Boolean) as (BrainRecallHit & { ns: string; hits: number })[];
       const t = now();
-      const hits = rows
+      const scored = rows
         .filter((r) => (!tier || r.tier === tier) && r.ns === (ns || DEFAULT_NS))
         .map((r) => ({
           id: r.id,
@@ -431,8 +431,20 @@ export function createBrainStore(
           score:
             (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
         }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, k);
+        .sort((a, b) => b.score - a.score);
+      let hits = scored.slice(0, k);
+      // B5 rerank (opt-in, BRAIN_RERANK=1): the local $0 cross-encoder (server/rerank.ts)
+      // re-orders a wider pool than k before the cut. Fixture eval measured +0.66 MRR@5;
+      // brain adoption stays evidence-gated on eval-brain-mrr. rerankCandidates degrades
+      // gracefully, and the model download makes this unsuitable for the default gate —
+      // hence opt-in, never on in tests.
+      if (process.env.BRAIN_RERANK === "1" && scored.length > 1) {
+        try {
+          const { rerankCandidates } = await import("./rerank");
+          const pool = scored.slice(0, Math.max(k * 3, 12)).map((h) => ({ ...h, text: h.content }));
+          hits = (await rerankCandidates(query, pool, { topN: k })).map(({ text: _t, ...h }) => h);
+        } catch { /* rerank is a quality bonus, never a blocker */ }
+      }
       // v2: access accounting feeds consolidate() — recalled memories get hotter.
       const bump = db.prepare("UPDATE brain_memories SET access_count=access_count+1, last_access=? WHERE mem_id=?");
       for (const h of hits) bump.run(t, h.id);
