@@ -19,7 +19,9 @@ import os from "os";
 import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
-import { db, ChatSession } from "./server/db";
+import type { ViteDevServer } from "vite";
+import type { Server as HttpServer } from "node:http";
+import { db, ChatSession, flushPendingSave } from "./server/db";
 import { sessionEventsSince, sessionStepCount, isSessionDone, formatSseEvent, formatSseDone } from "./server/agent-events";
 import { ProviderRouter, repairJson, getToolArgError } from "./server/providers";
 import { keyedCloudProviders, catalogEntry, catalogBaseUrl, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
@@ -922,6 +924,21 @@ export function createAdminGuard(): express.RequestHandler {
 // aggregation surfaces through the existing GET /metrics output and getErrorStats().
 app.use(errorTrackingMiddleware);
 
+// FIX B5: extracted + exported so it's independently unit-testable (no full server boot
+// needed). `server.close(cb)`'s callback only fires once every open connection is gone —
+// an attached SSE client (/api/cockpit/stream, /api/telemetry/stream) never closes on its
+// own, so that callback previously never fired and the SHUTDOWN_GRACE_MS force-exit timer
+// fired on every restart. closeIdleConnections() drops keep-alives immediately;
+// closeAllConnections() after `graceMs` is the hard cut for anything still attached
+// (SSE included), which finally lets `closed` resolve.
+export function drainHttp(server: HttpServer, graceMs = 2000): Promise<void> {
+  const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+  server.closeIdleConnections?.();
+  const forceTimer = setTimeout(() => server.closeAllConnections?.(), graceMs);
+  forceTimer.unref?.();
+  return closed;
+}
+
 // Dynamic start wrapper
 async function initializeServer() {
   CURRENT_MODE = await detectMode();
@@ -958,29 +975,55 @@ async function initializeServer() {
   // Upstreams declared in tools.json `mcpServers`; each server's tools are merged
   // into ToolRegistry as `mcp__<server>__<tool>`. Best-effort — a dead upstream
   // never blocks boot.
+  //
+  // FIX B3: boot must never AWAIT this block — a single dead/slow upstream (e.g. a
+  // stdio command that isn't installed, or an http URL with nothing listening) used to
+  // add its full connect timeout to boot latency, and the 6-row tenant loop below was
+  // sequential on top of that (measured 12.7s; worst case far higher). During all of it
+  // there was no port and no /api/health — total outage. The whole body is now fire-
+  // and-forget (`void (async () => { … })()`): app.listen (below) and /api/health (module
+  // top-level) are reachable immediately, independent of how long any upstream takes.
+  // Upstreams that finish later self-register into ToolRegistry via superviseUpstream();
+  // tools/list needs NO change for this (see the comment on ListToolsRequestSchema in
+  // server/mcp/server.ts) — it is simply eventually-correct a few seconds after boot. A
+  // tools/call that lands mid-connect for a specific upstream tool is bridged by
+  // ensureUpstream() (server/mcp/server.ts), which holds that one call (bounded) instead
+  // of 404ing on a tool that is seconds away from existing.
   try {
     const reg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tools.json"), "utf-8"));
     const upstreams: UpstreamConfig[] = reg.mcpServers || [];
-    // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
-    // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
-    // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
-    // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
-    await Promise.all(upstreams.map(async (cfg) => {
-      const r = await superviseUpstream(cfg);
-      console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
-    }));
-    // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
-    // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
-    const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
-    for (const u of eagerTenants ? await allUpstreamServers() : []) {
-      // Defense-in-depth: re-validate persisted tenant rows in case a row was
-      // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
-      const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
-      if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); continue; }
-      const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
-      console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
-    }
-    if (!eagerTenants) console.log(`[MCP-Consume] eager tenant connect deferred (MCP_CONSUME_EAGER=0)`);
+    void (async () => {
+      // Faz 27: connect UNDER SUPERVISION (health-check + backoff + circuit-breaker
+      // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
+      // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
+      // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
+      await Promise.all(upstreams.map(async (cfg) => {
+        const r = await superviseUpstream(cfg);
+        console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
+      }));
+      // MCP_CONSUME_EAGER=0 → boot'ta per-tenant upstream subprocess fan-out'unu ATLA (hızlı boot);
+      // startSupervisor()'ın periyodik reconnect'i ve on-demand yollar bozulmadan kalır. Unset/"1" = eski davranış.
+      const eagerTenants = (process.env.MCP_CONSUME_EAGER ?? "1") !== "0";
+      const tenantRows = eagerTenants ? await allUpstreamServers() : [];
+      // Bounded-parallel (concurrency 3, was fully sequential): a 6-row tenant table no
+      // longer sums 6 connect-timeouts, but a plain chunker still caps how many `npx`/
+      // stdio subprocesses spawn at once (avoids a 6-way simultaneous spawn storm).
+      const TENANT_CONNECT_CONCURRENCY = 3;
+      for (let i = 0; i < tenantRows.length; i += TENANT_CONNECT_CONCURRENCY) {
+        await Promise.allSettled(tenantRows.slice(i, i + TENANT_CONNECT_CONCURRENCY).map(async (u) => {
+          // Defense-in-depth: re-validate persisted tenant rows in case a row was
+          // written before the guard existed or the DB was tampered with. Skip (loudly) rather than spawn.
+          const v = await validateUpstreamConfig({ transport: u.transport, command: u.command || undefined, args: u.args, url: u.url || undefined });
+          if (!v.ok) { console.warn(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: SKIPPED unsafe config — ${v.error}`); return; }
+          const r = await superviseUpstream({ name: `${u.tenant_id}_${u.name}`, transport: u.transport, url: u.url || undefined, command: u.command || undefined, args: u.args, allowedTools: u.allowed_tools }, u.tenant_id);
+          console.log(`[MCP-Consume][tenant ${u.tenant_id}] ${u.name}: ${r.ok ? r.tools + " tools" : "FAILED — " + r.error}`);
+        }));
+      }
+      if (!eagerTenants) console.log(`[MCP-Consume] eager tenant connect deferred (MCP_CONSUME_EAGER=0)`);
+    })().catch((e: any) => console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`));
+    // Synchronous, OUTSIDE the void-wrapped block above: the periodic health/reconnect
+    // loop must start immediately, not wait on the (possibly minutes-long, against a
+    // hung upstream) connect fan-out above.
     startSupervisor(); // periodic health/reconnect (opt-in via MCP_HEALTH_INTERVAL_MS)
   } catch (e: any) {
     console.warn(`[MCP-Consume] upstream init skipped: ${e?.message}`);
@@ -3245,8 +3288,13 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   // VITE & STATIC FILES SERVING
   // ----------------------------------------------------
 
+  // FIX B5: hoisted to function scope (was a `const vite` local to this `if` block) so
+  // `shutdown` below can close it. Left unclosed, its HMR websocket/watchers/dep-optimizer
+  // survive the hard `process.exit` — the documented "Port 24678 already in use" +
+  // blank-page-after-restart symptom.
+  let viteServer: ViteDevServer | null = null;
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    viteServer = await createViteServer({
       // HMR off by default: the fleet serves this for USE, and the derived-port HMR
       // WebSocket (PORT+20000) flaps in middleware mode → the Vite client reload-loops
       // the page every few seconds while idle. `VITE_HMR=true` re-enables it (per-instance
@@ -3257,7 +3305,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       },
       appType: "spa",
     });
-    app.use(vite.middlewares);
+    app.use(viteServer.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -3321,7 +3369,17 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       stopKeyHealth();
       stopSupervisor();
       ecysearcherSupervisor.haltSupervision(); // halt the health loop; leave eCySearcher containers running
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      // FIX B5: close vite BEFORE the HTTP drain — its HMR ws/watchers/dep-optimizer must
+      // not survive the process (best-effort; a vite close failure must not abort shutdown).
+      await viteServer?.close().catch(() => {});
+      // FIX B5: drainHttp() actually resolves even with an SSE client attached
+      // (/api/cockpit/stream, /api/telemetry/stream never call res.end() on their own) —
+      // previously `server.close(cb)`'s callback waited on that connection forever, so the
+      // grace timer above fired `process.exit(1)` on every restart instead of this clean path.
+      await drainHttp(server, 2000);
+      // FIX B5: flush the debounced chat-turn writer (server/db.ts) so a save still
+      // in-flight when SIGTERM lands isn't lost.
+      await flushPendingSave();
       await closeStore();
       clearTimeout(force);
       console.log("[Shutdown] clean exit");

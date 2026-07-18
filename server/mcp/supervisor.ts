@@ -108,7 +108,15 @@ export async function superviseUpstream(cfg: UpstreamConfig, owner?: string): Pr
   }
   s.cfg = cfg;
   s.owner = owner;
-  const r = await connectUpstream(cfg, owner);
+  // Faz B3: publish this initial connect on the SAME `.connecting` single-flight marker
+  // doReconnect() uses, so ensureUpstream() (server/mcp/server.ts tools/call bridge) can
+  // await THIS first connect too — not just later circuit-breaker reconnects. Boot now
+  // fires this connect fire-and-forget (server.ts), so a request can legitimately land
+  // while it is still in flight.
+  const sRef = s;
+  const connectPromise = connectUpstream(cfg, owner);
+  sRef.connecting = connectPromise.then(() => undefined, () => undefined).finally(() => { sRef.connecting = undefined; });
+  const r = await connectPromise;
   applyResult(s, r);
   return r;
 }
@@ -180,6 +188,22 @@ export function getCollisions(): { tool: string; upstreams: string[] }[] {
   const out: { tool: string; upstreams: string[] }[] = [];
   for (const [tool, owners] of toolOwners) if (owners.size > 1) out.push({ tool, upstreams: [...owners] });
   return out;
+}
+
+/** Faz B3 bridge: boot connects upstreams in the background (server.ts's void-wrapped
+ *  MCP-Consume block) instead of blocking `app.listen`, so a `/mcp` tools/call can
+ *  legitimately land for a supervised-but-still-connecting upstream before its tools
+ *  exist. Await that upstream's single-flight `.connecting` promise (set above by
+ *  superviseUpstream's initial connect AND by reconnect()'s retries), raced against
+ *  `deadlineMs`. NEVER throws — resolves either way so the caller can retry its tool
+ *  lookup once and fall through to its own "not found" path if still down at the deadline. */
+export async function ensureUpstream(name: string, deadlineMs = 15000): Promise<void> {
+  const s = supervised.get(name);
+  if (!s || s.state === "connected" || !s.connecting) return;
+  await Promise.race([
+    s.connecting,
+    new Promise<void>((resolve) => { const t = setTimeout(resolve, deadlineMs); t.unref?.(); }),
+  ]);
 }
 
 /** Stop supervising + forget an upstream (e.g. tenant deletes it). */
