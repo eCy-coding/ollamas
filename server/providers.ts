@@ -416,6 +416,9 @@ export class ProviderRouter {
             const live = this.liveKeyCount(prov);
             // Token NAMES/positions ok to log; VALUES never.
             console.warn(`[KeyPool] ${prov} key#${attempt + 1} ${isQuota ? "quota" : "auth"}-exhausted → ${live} live key(s) remain`);
+            // v15 buddy-system: the provider just went dark (last live key cooled) → ask the
+            // health loop to immediately harvest any machine key so a buddy can be restored fast.
+            if (live === 0) { try { ProviderRouter.onPoolExhausted?.(prov); } catch { /* best-effort self-heal */ } }
             if (live > 0 && attempt + 1 < attempts) { rotated = true; continue; } // retry same provider, next key
           } else if (cloudKeyed) {
             // Passive capability learning: a 400/422 on a TOOLS request marks this
@@ -570,6 +573,28 @@ export class ProviderRouter {
     if (pool.length === 0) return 0;
     if (this.keyPoolStatus(provider).live === 0) return 2;
     return this.poolSaturation(provider).allApproaching ? 1 : 0;
+  }
+
+  // v15 buddy-system status for the UI: who's live/saturated/cooled/absent, which buddy is
+  // actually serving, and whether every cloud provider is down (→ riding $0-local). No values.
+  public static buddyStatus(): {
+    providers: Array<{ id: string; state: "live" | "saturated" | "cooled" | "absent"; worstPct: number; live: number; total: number }>;
+    activeBuddy: string;
+    allCloudCooled: boolean;
+  } {
+    const LEGACY = ["gemini", "openai", "openrouter", "anthropic", "ollama-cloud"];
+    const catalogKeyed = Object.keys(PROVIDER_CATALOG).filter((id) => !catalogEntry(id)?.keyless);
+    const ids = [...new Set([...LEGACY, ...catalogKeyed])];
+    const providers = ids.map((id) => {
+      const { total, live } = this.keyPoolStatus(id);
+      if (total === 0) return { id, state: "absent" as const, worstPct: 0, live: 0, total: 0 };
+      const sat = this.poolSaturation(id);
+      const state = live === 0 ? "cooled" as const : sat.allApproaching ? "saturated" as const : "live" as const;
+      return { id, state, worstPct: Math.round(sat.worstPct * 100) / 100, live, total };
+    });
+    const liveCloud = providers.filter((p) => p.state === "live" || p.state === "saturated").map((p) => p.id);
+    const activeBuddy = this.getFallbackChain("ollama-local").find((p) => liveCloud.includes(p)) ?? "ollama-local ($0)";
+    return { providers, activeBuddy, allCloudCooled: liveCloud.length === 0 };
   }
 
   // vNext T2.2: order the fallback TAIL by measured latency WITHOUT breaking invariants —
@@ -747,6 +772,11 @@ export class ProviderRouter {
   // validated as the EXACT key that serves the ping — without mutating the vault or being
   // overshadowed by the least-loaded pool selection. Set+cleared around a single test call.
   public static testKeyOverride: { provider: string; key: string } | null = null;
+
+  // v15 buddy-system hook: set by key-health.startKeyHealth. Fired (best-effort) when a keyed
+  // provider's last live key cools (live→0) so the health loop can rescan machine keys NOW.
+  // A callback (not a direct import) avoids a providers↔key-health cycle.
+  public static onPoolExhausted: ((provider: string) => void) | null = null;
 
   public static getDecryptedKey(provider: string): string {
     const o = this.testKeyOverride;

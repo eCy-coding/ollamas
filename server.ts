@@ -1324,6 +1324,12 @@ async function initializeServer() {
     res.json(getKeyHealth() ?? liveCheapSnapshot());
   });
 
+  // v15 buddy-system: who's covering for whom. Per-provider live/saturated/cooled/absent +
+  // the active buddy + whether every cloud provider is down (→ riding $0-local ollama). No values.
+  app.get("/api/keys/buddy-status", (_req, res) => {
+    res.json(ProviderRouter.buddyStatus());
+  });
+
   /**
    * key-doctor (T3-F3): discover candidate keys already on this machine (env / macOS
    * keychain / gh CLI) -> validate against the real provider -> connect to the vault ->

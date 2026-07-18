@@ -180,6 +180,26 @@ export function parseSources(raw: string | undefined): CandidateSource[] {
 let snapshot: KeyHealthSnapshot | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let consecutiveFailures = 0;
+// v15 buddy-system: drop-triggered rescan (debounced). scheduleNow re-fires the loop ASAP.
+let lastRescanMs = 0;
+let scheduleNow: (() => void) | null = null;
+const RESCAN_DEBOUNCE_MS = Number(process.env.KEY_RESCAN_DEBOUNCE_MS || 60_000);
+
+/**
+ * v15: run the discovery scan NOW instead of waiting for the ~15min steady tick — e.g. a
+ * provider just went dark (last live key cooled), so harvest any machine key (env/keychain/gh)
+ * immediately so a buddy can be restored fast. Debounced to ≤1 per RESCAN_DEBOUNCE_MS so a
+ * burst of failures triggers a single scan. Returns true if it actually kicked a rescan.
+ */
+export function triggerKeyRescan(reason: string, now: () => number = Date.now): boolean {
+  if (!timer || !scheduleNow) return false;          // loop not started → nothing to reschedule
+  const t = now();
+  if (t - lastRescanMs < RESCAN_DEBOUNCE_MS) return false; // debounce the failure burst
+  lastRescanMs = t;
+  console.warn(`[KeyHealth] rescan triggered: ${reason}`);
+  scheduleNow();
+  return true;
+}
 
 /** Cached snapshot for GET /api/keys/health (null until the first tick populates it). */
 export function getKeyHealth(): KeyHealthSnapshot | null {
@@ -230,6 +250,10 @@ export function startKeyHealth(): void {
     }
   };
   schedule(bootDelay); // first scan shortly after boot — never blocks app.listen
+  // v15 buddy-system: let a drop-trigger re-fire the loop immediately (clear the pending
+  // steady-state timer, run now), and route provider-went-dark events into a debounced rescan.
+  scheduleNow = () => { if (timer) { clearTimeout(timer); timer = null; } schedule(0); };
+  ProviderRouter.onPoolExhausted = (prov) => { triggerKeyRescan(`pool-exhausted:${prov}`); };
 }
 
 /** Stop the loop (graceful shutdown). Idempotent. */
