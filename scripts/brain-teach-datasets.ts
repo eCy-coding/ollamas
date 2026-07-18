@@ -584,6 +584,49 @@ export function buildBasvuruTrRecords(): TeachRecord[] {
   return BASVURU_TR.map(([k, d]) => ({ id: `teach:basvuru:${k}`, actor: "basvuru-tr", content: `Resmi TR yazışma '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-8: ollamas-E2E kritik setler ———
+const OLLAMAS_ERRORS: [string, string][] = [
+  ["embedder-busy-503", "recall/ask 503 'embedder busy' → ollama embed kuyruğu dolu; write-behind satırı yine yazar, backfill gece tamamlar — VERİ KAYBI YOK, bekle-tekrar-dene"],
+  ["database-is-locked", "sqlite 'database is locked' → WAL + busy_timeout=5000 kök çözüm (brain.db böyle); eşzamanlı yazar varsa normal, retry"],
+  ["index-lock", "git 'index.lock exists' → paylaşımlı checkout'ta eşzamanlı git; bekle-retry, lock dosyasını KÖRLEMESİNE SİLME"],
+  ["gate-transient-red", "pre-commit gate RED ama tam suite yeşil → paralel-yük flaky'si; kırmızı testi İZOLE koş, geçiyorsa commit'i retry (GATE_SKIP asla)"],
+  ["eaddrinuse", "EADDRINUSE port dolu → lsof -i :PORT ile sahibi bul; ollamas 3000, ollama 11434"],
+  ["vec0-load-sart", "düz DatabaseSync vec0 tablolarını OKUYAMAZ — sqlite-vec load ŞART yoksa sessiz 0 satır (S25 kökü)"],
+  ["max-pending-requests", "ollama 'maximum pending requests exceeded' → kuyruk tavan; istek azalt/bekle, brain degrade-yolları devrede"],
+  ["spread-undefined-ezer", "TS spread'de sonradan yazılan explicit-undefined property önceki değeri EZER → opsiyonel-pin: ...(x?{x}:{}) (ns-clobber kökü)"],
+  ["vite-hot-reload-garantisiz", "dinamik-import her zaman hot-reload olmaz → 'yansıdı' varsayma, canlı kanıtla; kesinlik restart"],
+  ["tcc-log-yolu", "launchd servisi Desktop/Documents'a log yazamaz (TCC) → log'u ~/Library/Logs ya da /tmp'ye yaz"],
+  ["fts-match-sanitize", "FTS5 MATCH ham sorguyu parse eder → ftsQuery alnum-token'lar + stopword-filtre; ham kullanıcı-girdisi MATCH'e verilmez"],
+  ["makefile-literal-n", "Makefile'a programatik satır eklerken literal-\\n tuzağı → printf/heredoc kullan, cat -A ile doğrula"],
+  ["whatis-yavas", "macOS whatis terim-başı ~0.6s man-db taraması → çok-terim tek çağrı timeout patlatır; 8'li paralel batch"],
+  ["execsync-stdout-kayip", "execFileSync nonzero-exit'te stdout'u throw'a gömer → catch'te e.stdout kurtar"],
+  ["tr-apostrof-string", "TS'te apostroflu TR metin tek-tırnak string'i kırar (API'lerin) → çift-tırnak + escape"],
+  ["node-sqlite-bigint", "node:sqlite prepared-statement rowid parametresi BigInt ister → BigInt(rowid)"],
+];
+export function buildOllamasErrorRecords(): TeachRecord[] {
+  return OLLAMAS_ERRORS.map(([k, d]) => ({ id: `teach:hata:${k}`, actor: "ollamas-errors", content: `ollamas hata-sözlüğü '${k}': ${d}.` }));
+}
+export function buildApiSurfaceRecords(serverTs: string): TeachRecord[] {
+  const out: TeachRecord[] = []; const seen = new Set<string>();
+  for (const m of serverTs.matchAll(/app\.(get|post|put|delete)\(\s*"(\/(?:api|v1|brain|org|mcp)[^"]*)"/g)) {
+    const route = `${m[1].toUpperCase()} ${m[2]}`;
+    if (seen.has(route)) continue; seen.add(route);
+    out.push({ id: `teach:route:${m[1]}-${m[2].replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 40)}`,
+      actor: "ollamas-api", content: `ollamas API route: ${route}`,
+      fact: { subject: "ollamas", predicate: "has_route", object: route.slice(0, 60) } });
+  }
+  return out.slice(0, 60);
+}
+export function buildEnvRecords(sources: string[]): TeachRecord[] {
+  const names = new Set<string>();
+  for (const src of sources) for (const m of src.matchAll(/process\.env\.([A-Z][A-Z0-9_]{2,})/g)) names.add(m[1]);
+  return [...names].filter((n) => /^(BRAIN|OLLAMAS|GPU|ECY|SEMANTIC|HIERARCHY)_/.test(n)).sort().slice(0, 60)
+    .map((n) => ({ id: `teach:env:${n}`, actor: "ollamas-env",
+      content: `ollamas env değişkeni ${n} — server kodunda okunan yapılandırma bayrağı (detay docs/BRAIN-INTEGRATION.md).`,
+      fact: { subject: "ollamas", predicate: "has_env", object: n } }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -626,7 +669,18 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   let mkText = "", intMd = "";
   try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
   try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
+  let serverSrc = "";
+  const fsMod = await import("node:fs");
+  try { serverSrc = fsMod.readFileSync("server.ts", "utf8"); } catch { /* cwd drift */ }
+  let envSources: string[] = [serverSrc];
+  try {
+    for (const f of fsMod.readdirSync("server").filter((x: string) => x.endsWith(".ts")).slice(0, 60))
+      envSources.push(fsMod.readFileSync(`server/${f}`, "utf8"));
+  } catch { /* partial is fine */ }
   const sets: [string, TeachRecord[]][] = [
+    ["ollamas-hata", buildOllamasErrorRecords()],
+    ["ollamas-api", buildApiSurfaceRecords(serverSrc)],
+    ["ollamas-env", buildEnvRecords(envSources)],
     ["prompt-eng", buildPromptEngRecords()],
     ["vitest-test", buildVitestRecords()],
     ["regex-derin", buildRegexRecords()],
