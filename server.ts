@@ -4015,8 +4015,10 @@ app.post("/api/brain/ask", async (req, res) => {
       ns,
       namespaces: brain.brainListNamespaces,
       liveContext: liveSystemContext,
-      recall: (q, o) => brain.brainRecall(q, { ...o, ns }),
-      searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ns }),
+      // Spread order bug: an undefined body-ns must not clobber the fan-out's per-ns
+      // choice — only pin ns when the caller actually sent one.
+      recall: (q, o) => brain.brainRecall(q, { ...o, ...(ns ? { ns } : {}) }),
+      searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ...(ns ? { ns } : {}) }),
       generate: async (messages) => {
         const out = await ProviderRouter.generate({
           provider: resolveDistillProvider(process.env),
