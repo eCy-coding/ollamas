@@ -24,3 +24,28 @@ describe("brain-teach datasets", () => {
     expect(recs[1].fact?.object).toBe("df");
   });
 });
+
+import { buildNodeRecords, buildGitRecords, buildSqliteRecords, buildShellRecords, buildHttpRecords, buildLaunchdRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v2 — critical-priority sets", () => {
+  it("node/ts: builtin modules described + TS concepts, fact-tagged", () => {
+    const recs = buildNodeRecords(["fs", "http", "_private"]);
+    expect(recs.find((r) => r.id === "teach:node:mod-fs")?.content).toContain("dosya sistemi");
+    expect(recs.find((r) => r.id === "teach:node:mod-_private")).toBeUndefined();
+    expect(recs.find((r) => r.id === "teach:ts:generics")).toBeTruthy();
+    expect(recs.find((r) => r.id === "teach:node:mod-http")?.fact?.object).toBe("http");
+  });
+  it("git: help -a commands intersected with curated descriptions", () => {
+    const recs = buildGitRecords("  add       Add file contents\n  frobnicate  unknown\n");
+    expect(recs.find((r) => r.id === "teach:git:add")?.content).toContain("stage");
+    expect(recs.find((r) => r.id === "teach:git:frobnicate")).toBeUndefined();
+    expect(recs.find((r) => r.id === "teach:git:rebase")).toBeTruthy(); // curated floor
+  });
+  it("static sets: sqlite/shell/http/launchd stable ids; http status facts", () => {
+    expect(buildSqliteRecords().find((r) => r.id === "teach:sql:wal")?.content).toContain("WAL");
+    expect(buildShellRecords().find((r) => r.id === "teach:shell:pipe")).toBeTruthy();
+    const h429 = buildHttpRecords().find((r) => r.id === "teach:http:429")!;
+    expect(h429.fact?.object).toContain("429");
+    expect(buildLaunchdRecords().find((r) => r.id === "teach:launchd:kickstart")?.content).toContain("kickstart");
+  });
+});
