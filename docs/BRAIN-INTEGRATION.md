@@ -1,4 +1,4 @@
-# BRAIN-INTEGRATION — aktivasyon durumu (dürüst, 2026-07-16)
+# BRAIN-INTEGRATION — aktivasyon durumu (dürüst, 2026-07-16 · son: 2026-07-18)
 
 Bu doküman brain'in ollamas'a NE KADAR entegre olduğunu YALANSIZ anlatır — neyin canlı-aktif, neyin merge'e bağlı olduğu.
 
@@ -34,10 +34,26 @@ Bu worktree'den `PORT=3009 npx tsx server.ts` ile server boot edildi (keyless pr
   MCP gate + openapi spec'leri + Makefile hedefleri.
 - launchd `com.ollamas.brain-maintain` artık MAIN yolundan koşar; `com.ollamas.server`
   restart'ı brain'i + `SEMANTIC_CACHE=1`'i birlikte aktifleştirir.
-- Git-capture hook'ları main'e KURULMADI (main'in paylaşımlı pre-commit gate'i korunur);
-  istenirse `make brain-hooks` opt-in.
+- ~~Git-capture hook'ları main'e KURULMADI~~ → **2026-07-18 KURULDU** (`make brain-hooks`;
+  hook paylaşımlı gate'e ZİNCİRLİ — gate korunur, capture best-effort öne eklenir).
 - Worktree lane'i brain'in geliştirme sahibi olmaya devam eder; yeni brain işi wt'de yapılır,
   aynı B-pattern ile porta taşınır.
+
+## TAMAMLAMA TURU + PRODUCTION RESTART (2026-07-18, TAM CANLI — YALANSIZ)
+
+9/9 denetim gap'i main'de shipped (`c123d98..e2488b4`) ve `com.ollamas.server` restart'ı
+SONRASI :3000'de HEPSİ canlı-kanıtlı:
+
+| Özellik | Canlı kanıt |
+|---|---|
+| `POST /api/brain/remember` choke-point | 200 `{id,dim:768}` gerçek-nomic; explicit-id re-POST idempotent |
+| Org conductor dual-write mirror | server.log'da UA=node remember POST'ları; brain.db `ns='org'` 124→125+ (gerçek REPAIR kayıtları akıyor) |
+| `/brain` paneli | Chrome görsel: self-hit %100 yeşil, tier dağılımı, entity-graf render |
+| Drift-probe ns-fix (`ba55077`) | health selfHitRate 1.0 / drift false (org-ns kayıtlarıyla birlikte) |
+| Session-end distill (S1) | idle-timer 10dk `BRAIN_DISTILL_IDLE_MS`; retain rejresyonsuz (working +1/chat-turu) |
+| `BRAIN_RERANK=1` (.env) | recall canlı, degrade yok; kanıt golden-set MRR 0.8562→0.9531 |
+| Fact hijyeni + gece MRR | maintain: fact-prune 30g retention + `brain.eval.mrr` satırı launchd logunda, exit 0 |
+| Semantic-cache | `/api/cache` enabled:true (sayaçlar in-memory, restart'ta sıfırlanır — normal) |
 
 ## Nasıl doğrularsın (herkes)
 
