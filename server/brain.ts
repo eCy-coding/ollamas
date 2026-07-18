@@ -184,10 +184,22 @@ export function buildGraph(facts: BrainFact[]): BrainGraph {
 
 /** Sanitize a natural-language query into a safe FTS5 MATCH expression: keep alnum
  *  tokens, OR them, drop punctuation/operators that would be parsed as FTS5 syntax. */
+// Dalga-7 root-fix: question filler ("nedir", "hangi", "what", "how") matches
+// EVERYTHING in a Turkish/English store and drowns the real keyword's BM25 rank —
+// the cold-embedder lexical arm kept returning noise for exactly this reason.
+const FTS_STOPWORDS = new Set([
+  "nedir", "nasıl", "nasil", "hangi", "neden", "niye", "için", "icin", "gibi", "daha",
+  "çok", "cok", "şu", "su", "bu", "ne", "ile", "ve", "veya", "ama", "mi", "mı", "mu",
+  "zaman", "kullanılır", "kullanilir", "yapılır", "yapilir", "olur", "var", "yok",
+  "what", "how", "which", "why", "when", "the", "is", "are", "does", "do", "a", "an",
+  "of", "to", "in", "and", "or", "it", "for",
+]);
 export function ftsQuery(q: string): string {
   const tokens = (q.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).slice(0, 16);
   if (tokens.length === 0) throw new Error("no searchable tokens");
-  return tokens.map((t) => `"${t}"`).join(" OR ");
+  const meaty = tokens.filter((t) => !FTS_STOPWORDS.has(t));
+  // An all-filler query ("nedir bu?") keeps legacy behavior — an empty MATCH would throw.
+  return (meaty.length ? meaty : tokens).map((t) => `"${t}"`).join(" OR ");
 }
 
 /** Reciprocal Rank Fusion (W1, 2026 hybrid retrieval) — fuse N ranked id lists by

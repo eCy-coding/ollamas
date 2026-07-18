@@ -625,3 +625,12 @@ describe("Brain — ask multi-ns fan-out (dalga-6 root-fix)", () => {
     expect(r.sources[0].id).toBe("k-1"); // score-merged ordering
   });
 });
+
+describe("Brain — ftsQuery stopword filter (dalga-7 root-fix)", () => {
+  test("filler drops, keywords stay; all-filler falls back to legacy", async () => {
+    const { ftsQuery } = await import("./brain");
+    expect(ftsQuery("odysseus nedir hangi portta")).toBe('"odysseus" OR "portta"');
+    expect(ftsQuery("what is the flexbox")).toBe('"flexbox"');
+    expect(ftsQuery("nedir bu")).toBe('"nedir" OR "bu"'); // all-filler → legacy, never empty MATCH
+  });
+});
