@@ -90,6 +90,7 @@ import { checkAnswer, scoreCouncil } from "./server/council";
 import { registerCookbookRoutes } from "./server/cookbook";
 import { registerResearchRoutes } from "./server/research";
 import { registerEcymRoutes } from "./server/ecym";
+import { registerPanelAssistRoutes } from "./server/panel-assist";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -791,6 +792,9 @@ registerResearchRoutes(app, localOwnerGuard);
 
 // eCy Studio — distills bench evidence + working principles into ecy:latest (SSE). localOwnerGuard'd.
 registerEcymRoutes(app, db, localOwnerGuard);
+
+// eCym control plane — 5 panel specialists (assist + per-panel distill), SSE. localOwnerGuard'd.
+registerPanelAssistRoutes(app, db, localOwnerGuard);
 
 /**
  * Every way ollama might be reachable — try each until one answers. `host.docker.internal` only resolves

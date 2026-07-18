@@ -85,6 +85,27 @@ export interface DBConfig {
   notify?: { slackWebhookUrl?: string; discordWebhookUrl?: string };
   /** Per-model tuning overrides (M-038): model tag → num_ctx/temperature/keep_alive/system. */
   modelOverrides?: Record<string, ModelOverride>;
+  /** eCym distillation ledger (v10) — capped history of ecy:latest/candidate rebuilds. */
+  ecymVersions?: EcymVersionRecord[];
+  /** eCym panel-specialist registry (v12) — panelId → binding + params + provenance. */
+  ecymSpecialists?: Record<string, EcymSpecialistRecord>;
+  /** Distilled panel knowledge briefs (v12) — panelId → { brief, ts, sources[] }. Public knowledge, unencrypted. */
+  panelBriefs?: Record<string, { brief: string; ts: string; sources: string[] }>;
+  /** Operator-added threat-intel feed URLs (v12, gap #9) — merged into threatfeed.ts FEEDS. */
+  threatFeeds?: { source: string; url: string }[];
+}
+
+/** eCym distillation ledger record (was written off-schema pre-v12). */
+export interface EcymVersionRecord {
+  id: string; createdAt: string; base: string; numCtx: number; temperature: number;
+  probeOk: boolean; note: string; specialistId?: string;
+}
+
+/** eCym panel-specialist binding (v12). model defaults to "ecy:latest" until baked. */
+export interface EcymSpecialistRecord {
+  panelId: string; model: string; identity: string;
+  params: { temperature: number; numCtx: number };
+  knowledgeSources: string[]; lastDistilled: string | null; lastVersionId: string | null;
 }
 
 const DEFAULT_CONFIG: DBConfig = {

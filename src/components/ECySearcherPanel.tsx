@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { ShieldAlert, Loader2, AlertTriangle, Search, Rss, RefreshCw, ExternalLink } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { AssistDrawer } from "./AssistDrawer";
 
 // "Threat Intel" tab — queries the eCySearcher threat-intel platform (a separate Flask stack run
 // under ollamas, see scripts/ecysearcher-lane.mjs) through the ollamas reverse-proxy
@@ -46,6 +47,20 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
     finally { setFeedBusy(false); }
   };
   useEffect(() => { loadFeed(); }, []);
+
+  // Compact, redacted metadata for the eCym threat-analyst (severity-scoring + KEV/CVSS
+  // correlation). Top ~20 feed items only, summaries trimmed, hard-capped well under the
+  // panel's 3800-char budget.
+  const buildContext = () =>
+    JSON.stringify(
+      (feed?.items ?? []).slice(0, 20).map((it) => ({
+        source: it.source,
+        title: it.title,
+        severity: it.severity ?? "",
+        date: it.dateIso ? it.dateIso.slice(0, 10) : "",
+        summary: (it.summary || "").slice(0, 140),
+      })),
+    ).slice(0, 3800);
 
   const refreshStatus = async () => {
     try { setSup(await api.get<SupStatus>("/api/ecysearcher/status")); } catch { /* supervisor route absent */ }
@@ -199,6 +214,12 @@ export default function ECySearcherPanel({ onNotify }: { onNotify?: (msg: string
             {feedBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Yenile
           </button>
         </div>
+        <AssistDrawer
+          panelId="threatintel"
+          context={buildContext}
+          label="eCy ile önceliklendir"
+          disabled={(feed?.items?.length ?? 0) === 0}
+        />
         {feedErr && <div className="text-rose-400 text-xs font-mono">akış alınamadı: {feedErr}</div>}
         {!feed && !feedErr && <div className="text-slate-500 text-xs">yükleniyor…</div>}
         {feed && (feed.items?.length ?? 0) === 0 && !feedErr && <div className="text-slate-500 text-xs">öğe yok</div>}

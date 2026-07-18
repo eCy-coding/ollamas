@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Key, CheckCircle, XCircle, Loader2, Info, AlertTriangle, ExternalLink, Radar } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { AssistDrawer } from "./AssistDrawer";
 
 interface KeyVaultProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -308,6 +309,37 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     { id: "custom-openai", label: "Custom OpenAI compatible", placeholder: "Bearer token", desc: "Connect local wrappers, LM Studio, or vLLM hosts" },
   ];
 
+  // eCy key-hygiene context: MASKED METADATA ONLY. Never reads inputs[] (the raw key the
+  // operator typed) — only the already-masked mask string (…last4), pool burn counts, the
+  // key-doctor source (env/keychain/gh/vault/manual), rate-limit flags, and ping state. If a
+  // field could carry a raw secret it is EXCLUDED. Kept compact (<3000 chars) for the SSE call.
+  const buildContext = (): string => {
+    const rows = providers
+      .filter((p) => p.id !== "custom-openai-endpoint")
+      .map((p) => {
+        const id = p.id;
+        const masked = masks[id]; // already redacted server-side (…last4) — safe to surface
+        const configured = !!masked;
+        const ph = pool[id];
+        if (!configured && !ph) return null; // nothing to advise on — skip to stay compact
+        const source = doctorReport?.providers?.[id]?.source ?? (configured ? "manual" : "unknown");
+        const approaching = !!ph?.allApproaching || alerts.some((a) => a.provider === id);
+        const ping = pingStatus[id];
+        const parts = [id, configured ? "active" : "inactive", `src=${source}`];
+        if (masked) parts.push(`mask=${masked}`);
+        if (ph && ph.total > 0) parts.push(`pool=${ph.live}/${ph.total}`);
+        if (ph) parts.push(`burn=${Math.round((ph.worstPct ?? 0) * 100)}%`);
+        if (approaching) parts.push("rate-limit-approaching");
+        if (ph?.trainsOnData) parts.push("trains-on-data");
+        if (ping) parts.push(ping.ok ? `ping=ok${ping.latency ? `(${ping.latency}ms)` : ""}` : "ping=fail");
+        return parts.join(" ");
+      })
+      .filter((line): line is string => line !== null);
+    const header = `KeyVault key-hygiene snapshot — ${rows.length} provider(s), masked metadata only (no raw keys).`;
+    return [header, ...rows].join("\n").slice(0, 3000);
+  };
+  const noProvidersLoaded = Object.keys(masks).length === 0 && Object.keys(pool).length === 0;
+
   return (
     <div className="bg-immersive-sidebar border border-immersive-border rounded p-5 shadow-lg">
       <div className="flex items-center gap-2.5 mb-4">
@@ -335,6 +367,11 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
             Deep
           </button>
         </div>
+      </div>
+
+      {/* eCy key-hygiene / rotation advice — driven from MASKED per-provider metadata only. */}
+      <div className="mb-4">
+        <AssistDrawer panelId="keys" context={buildContext} label="eCy hijyen tavsiyesi" disabled={noProvidersLoaded} />
       </div>
 
       <div className="flex gap-2.5 bg-immersive-inset border border-immersive-border p-3.5 rounded mb-6 text-[10px] text-immersive-text-muted font-mono leading-relaxed">
