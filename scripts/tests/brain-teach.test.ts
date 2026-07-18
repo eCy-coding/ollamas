@@ -117,3 +117,14 @@ describe("brain-teach v8 — ollamas-e2e critical sets", () => {
     expect(env.map((r) => r.id)).toEqual(["teach:env:BRAIN_RERANK", "teach:env:OLLAMAS_NO_AUTOBOOT"]); // PATH filtered
   });
 });
+
+import { buildServiceRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v9 — live service catalog", () => {
+  it("parses registry id+role pairs into fact-tagged records", () => {
+    const recs = buildServiceRecords('{ id: "recall-hybrid", kind: "core", role: "vector+BM25 RRF fusion", x }');
+    expect(recs[0].id).toBe("teach:servis:recall-hybrid");
+    expect(recs[0].fact?.object).toBe("recall-hybrid");
+    expect(recs[0].content).toContain("RRF");
+  });
+});

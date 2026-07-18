@@ -693,3 +693,19 @@ describe("Brain — provenance confidence (#10/#12)", () => {
     b.close();
   });
 });
+
+describe("Brain — episodic dup-collapse (org-mirror spam cleanup)", () => {
+  test("identical episodic rows collapse to oldest with summed hits and ×N marker", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    for (let i = 0; i < 3; i++)
+      await b.remember({ id: `org:${i}`, tier: "episodic", content: "council verdict HOLD (no consensus)", ns: "org", hits: 1 });
+    await b.remember({ id: "org:x", tier: "episodic", content: "different event", ns: "org" });
+    const r = b.consolidate();
+    expect(r.episodicMerged).toBe(2);
+    const left = await b.recall("council verdict HOLD consensus", { k: 5, ns: "org" });
+    const kept = left.find((h) => h.content.includes("council"));
+    expect(kept?.content).toContain("[×3 tekrar]");
+    expect(b.stats().memories.episodic).toBe(2); // 3→1 + different
+    b.close();
+  });
+});

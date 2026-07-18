@@ -627,6 +627,18 @@ export function buildEnvRecords(sources: string[]): TeachRecord[] {
       fact: { subject: "ollamas", predicate: "has_env", object: n } }));
 }
 
+
+// ——— Dalga-9: canlı 50-servis kataloğu ———
+export function buildServiceRecords(servicesSrc: string): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const m of servicesSrc.matchAll(/id:\s*"([\w-]+)",\s*kind:\s*"\w+",\s*role:\s*"([^"]+)"/g)) {
+    out.push({ id: `teach:servis:${m[1]}`, actor: "brain-services",
+      content: `Brain servisi '${m[1]}': ${m[2].slice(0, 180)}.`,
+      fact: { subject: "brain", predicate: "has_service", object: m[1] } });
+  }
+  return out.slice(0, 60);
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -677,7 +689,10 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
     for (const f of fsMod.readdirSync("server").filter((x: string) => x.endsWith(".ts")).slice(0, 60))
       envSources.push(fsMod.readFileSync(`server/${f}`, "utf8"));
   } catch { /* partial is fine */ }
+  let servicesSrc = "";
+  try { servicesSrc = fsMod.readFileSync("server/brain-services.ts", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["servis-katalog", buildServiceRecords(servicesSrc)],
     ["ollamas-hata", buildOllamasErrorRecords()],
     ["ollamas-api", buildApiSurfaceRecords(serverSrc)],
     ["ollamas-env", buildEnvRecords(envSources)],

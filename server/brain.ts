@@ -124,7 +124,7 @@ export interface BrainStore {
   sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; factsPruned?: number; embedEvicted?: number; supersededPruned?: number };
   /** Consolidation (v2+v3): promote hot episodic memories to learned, then merge
    *  duplicate learned contents (normalized) into the oldest row, summing hits. */
-  consolidate(opts?: { minAccess?: number }): { promoted: number; merged: number };
+  consolidate(opts?: { minAccess?: number }): { promoted: number; merged: number; episodicMerged?: number };
   /** Drift probe (v3): recall each recent learned/core memory by its own content —
    *  top-1 must be itself. selfHitRate below the threshold ⇒ the embedding space
    *  no longer matches the stored vectors (model swap/decay). Report-only. */
@@ -854,7 +854,40 @@ export function createBrainStore(
         deleteMemRow(row.rowid);
         merged++;
       }
-      return { promoted: Number(r.changes), merged };
+      // Episodic dup-collapse (dalga-9 kök-temizlik): the org mirror writes the SAME
+      // content under distinct explicit ids (ledger-sha1) on purpose, so AUDN never
+      // fires — identical episodic rows per ns collapse into the OLDEST with summed
+      // hits and an [×N] marker. Decay-tier only; core/learned/procedural untouched
+      // beyond the existing learned pass above.
+      const episodic = db
+        .prepare("SELECT rowid, ns, content, access_count FROM brain_memories WHERE tier='episodic' AND superseded_at IS NULL ORDER BY created_at ASC, rowid ASC")
+        .all() as { rowid: number; ns: string; content: string; access_count: number }[];
+      const epiKeep = new Map<string, { rowid: number; hits: number; content: string; dupes: number }>();
+      let episodicMerged = 0;
+      for (const row of episodic) {
+        const norm = row.content.toLowerCase().replace(/\s+/g, " ").replace(/ \[×\d+ tekrar\]$/, "").trim();
+        const key = `${row.ns}\u0000${norm}`;
+        const first = epiKeep.get(key);
+        if (!first) {
+          epiKeep.set(key, { rowid: row.rowid, hits: row.access_count, content: row.content, dupes: 1 });
+          continue;
+        }
+        first.hits += row.access_count;
+        first.dupes++;
+        deleteMemRow(row.rowid);
+        episodicMerged++;
+      }
+      for (const k of epiKeep.values()) {
+        if (k.dupes < 2) continue;
+        const newContent = `${k.content.replace(/ \[×\d+ tekrar\]$/, "")} [×${k.dupes} tekrar]`;
+        db.prepare("UPDATE brain_memories SET access_count=?, content=? WHERE rowid=?").run(k.hits, newContent, BigInt(k.rowid));
+        if (hasFts) {
+          db.prepare("DELETE FROM brain_fts WHERE mem_rowid=?").run(BigInt(k.rowid));
+          db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(newContent, BigInt(k.rowid));
+        }
+        audit("merge", null, `episodic dup-collapse ×${k.dupes}`);
+      }
+      return { promoted: Number(r.changes), merged, episodicMerged };
     },
 
     async health({ probes = 8, threshold = 0.8 } = {}) {
