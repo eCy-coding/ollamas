@@ -122,6 +122,21 @@ async function main() {
         console.warn(`[brain] consistency check skipped (${e?.message ?? e})`);
       }
     }
+    // S47 restore drill rides the pass WEEKLY (Monday) — a backup you never
+    // restored is a hope. BRAIN_RESTORE_DRILL=1 forces, =0 disables; a failed
+    // drill warns loudly but never blocks the alarm path (backup already ran).
+    const drillEnv = process.env.BRAIN_RESTORE_DRILL;
+    if (drillEnv !== "0" && (drillEnv === "1" || new Date().getDay() === 1)) {
+      try {
+        const { runRestoreDrill } = await import("./brain-restore-drill");
+        const dbPath = process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
+        const drill = await runRestoreDrill(dbPath);
+        console.log(JSON.stringify({ event: "brain.restore.drill", ...drill }));
+        if (!drill.ok) console.warn("[brain] restore drill FAILED — the DR chain needs attention");
+      } catch (e: any) {
+        console.warn(`[brain] restore drill skipped (${e?.message ?? e})`);
+      }
+    }
     const report = buildMaintainReport({ sweep, consolidate, health, consistency });
     console.log(JSON.stringify({
       event: "brain.maintain",

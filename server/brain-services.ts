@@ -557,6 +557,19 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     },
   },
   {
+    id: "restore-drill", kind: "io", role: "DR proof: dump → throwaway restore → recall smoke", deps: ["portable"],
+    source: "scripts/brain-restore-drill.ts",
+    selftest: async () => {
+      const { runRestoreDrill } = await import("../scripts/brain-restore-drill");
+      const src = tmpDb();
+      const b = createBrainStore({ dbPath: src, embed: fakeEmbed });
+      await b.remember({ id: "drill-1", tier: "learned", content: "drill target row" });
+      b.close();
+      const r = await runRestoreDrill(src);
+      return expectThat(r.ok && r.recallHit, `restored ${r.imported}, recall hit`, `ok=${r.ok} hit=${r.recallHit}`);
+    },
+  },
+  {
     id: "service-registry", kind: "pure", role: "this registry + validation (unique/deps)", deps: [],
     source: "server/brain-services.ts",
     selftest: () => {
