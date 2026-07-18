@@ -105,3 +105,15 @@ describe("brain-teach v7 — dalga-7 sets", () => {
     expect(buildBasvuruTrRecords().find((r) => r.id === "teach:basvuru:arz-rica")?.content).toContain("arz ederim");
   });
 });
+
+import { buildOllamasErrorRecords, buildApiSurfaceRecords, buildEnvRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v8 — ollamas-e2e critical sets", () => {
+  it("error dictionary carries lived roots; api/env parse live sources", () => {
+    expect(buildOllamasErrorRecords().find((r) => r.id === "teach:hata:vec0-load-sart")?.content).toContain("sqlite-vec load");
+    const api = buildApiSurfaceRecords('app.get("/api/brain/overview", x); app.post("/api/brain/ask", y); app.get("/api/brain/overview", dup);');
+    expect(api.map((r) => r.fact?.object)).toEqual(["GET /api/brain/overview", "POST /api/brain/ask"]);
+    const env = buildEnvRecords(["process.env.BRAIN_RERANK process.env.PATH process.env.OLLAMAS_NO_AUTOBOOT"]);
+    expect(env.map((r) => r.id)).toEqual(["teach:env:BRAIN_RERANK", "teach:env:OLLAMAS_NO_AUTOBOOT"]); // PATH filtered
+  });
+});
