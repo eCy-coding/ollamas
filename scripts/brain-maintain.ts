@@ -125,6 +125,30 @@ async function main() {
         console.warn(`[brain] epoch distill skipped (${e?.message ?? e})`);
       }
     }
+    // #11 weekly rollup: Sunday (or BRAIN_WEEK_ROLLUP=force) folds the week's daily
+    // epoch summaries into ONE learned record — the day→week compression hierarchy.
+    const isSunday = new Date().getDay() === 0;
+    if (process.env.BRAIN_WEEK_ROLLUP === "force" || (isSunday && process.env.BRAIN_WEEK_ROLLUP !== "0")) {
+      try {
+        const ov = await b.overview({ recent: 100 });
+        const weekAgo = Date.now() - 7 * 86_400_000;
+        const dailies = ov.memories.filter((m) => m.tier === "learned" && m.createdAt >= weekAgo && /epoch:/.test(String((m as any).id)));
+        if (dailies.length >= 2) {
+          const { distillSession } = await import("../server/brain-distill");
+          const { resolveDistillProvider } = await import("../server/brain-active");
+          const { ProviderRouter } = await import("../server/providers");
+          const now2 = new Date();
+          const week = `${now2.getFullYear()}-W${String(Math.ceil(((+now2 - +new Date(now2.getFullYear(), 0, 1)) / 86_400_000 + 1) / 7)).padStart(2, "0")}`;
+          const out = await distillSession(
+            { id: `epoch-week:${week}`, messages: dailies.map((m) => ({ role: "user" as const, content: m.content })) },
+            { generate: async (messages) => (await ProviderRouter.generate({ provider: resolveDistillProvider(process.env), model: process.env.BRAIN_DISTILL_MODEL || "openai", messages, stream: false } as any)).text || "" },
+          );
+          console.log(JSON.stringify({ event: "brain.week.rollup", week, fed: dailies.length, ...out }));
+        }
+      } catch (e: any) {
+        console.warn(`[brain] week rollup skipped (${e?.message ?? e})`);
+      }
+    }
     // Write-behind drain: rows written while the embedder was contended get their
     // vectors now (sleep-time = the embedder is idle). Best-effort, never fatal.
     try {
