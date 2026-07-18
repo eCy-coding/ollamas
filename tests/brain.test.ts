@@ -45,6 +45,36 @@ describe("Brain — tiered memories (sqlite-vec)", () => {
     b.close();
   });
 
+  test("fact hygiene: sweep prunes long-invalidated facts, never live ones", async () => {
+    let clock = Date.parse("2026-01-01T00:00:00Z");
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed, now: () => clock });
+    await b.assertFact({ subject: "ollamas", predicate: "branch", object: "v1" });
+    clock += 86_400_000; // next day the branch changes → v1 superseded
+    await b.assertFact({ subject: "ollamas", predicate: "branch", object: "v2" });
+    clock += 29 * 86_400_000; // 29d after invalidation: inside retention, history kept
+    expect(b.sweep().factsPruned).toBe(0);
+    clock += 2 * 86_400_000; // 31d after invalidation: audit window over
+    expect(b.sweep().factsPruned).toBe(1);
+    const live = b.factsAbout("ollamas");
+    expect(live.map((f) => f.object)).toEqual(["v2"]); // live fact untouched
+    b.close();
+  });
+
+  test("BRAIN_FACT_PRUNE=0 keeps superseded facts forever", async () => {
+    let clock = Date.parse("2026-01-01T00:00:00Z");
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed, now: () => clock });
+    await b.assertFact({ subject: "ollamas", predicate: "port", object: "3009" });
+    await b.assertFact({ subject: "ollamas", predicate: "port", object: "3000" });
+    clock += 400 * 86_400_000;
+    process.env.BRAIN_FACT_PRUNE = "0";
+    try {
+      expect(b.sweep().factsPruned).toBe(0);
+    } finally {
+      delete process.env.BRAIN_FACT_PRUNE;
+    }
+    b.close();
+  });
+
   test("createdAt override keeps original event time for imports", async () => {
     const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
     const then = Date.parse("2026-01-01T00:00:00Z");

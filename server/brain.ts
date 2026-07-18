@@ -84,7 +84,7 @@ export interface BrainStore {
    *  importance-prunes cold episodic/working rows (P4): importance =
    *  tier_weight × tierRecency × usageBoost; below the threshold the row falls off.
    *  core/learned/procedural are NEVER auto-pruned. BRAIN_PRUNE=0 opts out. */
-  sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; embedEvicted?: number };
+  sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; factsPruned?: number; embedEvicted?: number };
   /** Consolidation (v2+v3): promote hot episodic memories to learned, then merge
    *  duplicate learned contents (normalized) into the oldest row, summing hits. */
   consolidate(opts?: { minAccess?: number }): { promoted: number; merged: number };
@@ -517,11 +517,29 @@ export function createBrainStore(
           }
         }
       }
+      // Fact hygiene (P0-3): superseded facts keep point-in-time queries honest for a
+      // while, but their audit value decays and the scan cost doesn't — without this
+      // they are the last unbounded leak. LIVE facts are never touched; only rows
+      // invalidated longer than the retention window ago die (vector row too).
+      let factsPruned = 0;
+      if (process.env.BRAIN_FACT_PRUNE !== "0") {
+        const retentionMs = (Number(process.env.BRAIN_FACT_PRUNE_DAYS) || 30) * 86_400_000;
+        const dead = db
+          .prepare("SELECT rowid FROM brain_facts WHERE invalidated_at IS NOT NULL AND invalidated_at<?")
+          .all(now() - retentionMs) as { rowid: number }[];
+        for (const f of dead) {
+          try {
+            db.prepare("DELETE FROM brain_fact_vec WHERE rowid=?").run(BigInt(f.rowid));
+          } catch { /* v1 store without fact vectors */ }
+          db.prepare("DELETE FROM brain_facts WHERE rowid=?").run(BigInt(f.rowid));
+          factsPruned++;
+        }
+      }
       // P1: same maintenance pass also caps the persistent embed cache.
       const embedEvicted = embedCache
         ? embedCache.sweep({ cap: Number(process.env.BRAIN_EMBED_CACHE_CAP) || undefined }).evicted
         : 0;
-      return { swept: expired.length, pruned, embedEvicted };
+      return { swept: expired.length, pruned, factsPruned, embedEvicted };
     },
 
     consolidate({ minAccess = 3 } = {}) {
