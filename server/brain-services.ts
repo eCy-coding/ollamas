@@ -341,6 +341,52 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     },
   },
   {
+    id: "seyir-ingest", kind: "pure", role: "ship's-log jsonl tail → episodic (cursored)", deps: ["brain-bus", "memory-store"],
+    source: "server/brain-bridges.ts",
+    selftest: async () => {
+      const { foldSeyirLines } = await import("./brain-bridges");
+      const line = JSON.stringify({ ts: "2026-07-18T09:00:00.000Z", kind: "op", entry: { a: 1 } }) + "\n";
+      const noise = JSON.stringify({ ts: "2026-07-18T09:00:01.000Z", kind: "note", entry: { note: "web-vital", metric: "TTFB" } }) + "\n";
+      const { items } = foldSeyirLines(line + noise, 0);
+      return expectThat(items.length === 1, "op kept, telemetry dropped", `items=${items.length}`);
+    },
+  },
+  {
+    id: "kev-facts", kind: "pure", role: "KEV catalog deltas → bi-temporal facts", deps: ["brain-bus", "fact-store"],
+    source: "server/brain-bridges.ts",
+    selftest: async () => {
+      const { newKevItems } = await import("./brain-bridges");
+      const d = newKevItems([{ id: "a", title: "A" }, { id: "b", title: "B" }], new Set(["a"]));
+      return expectThat(d.length === 1 && d[0].id === "b", "delta-only ingest", "delta logic broken");
+    },
+  },
+  {
+    id: "rag-bridge", kind: "io", role: "rag document ingest → topic facts", deps: ["fact-store"],
+    source: "server/brain-bridges.ts",
+    selftest: async () => {
+      const { runMaintainBridges } = await import("./brain-bridges");
+      return expectThat(typeof runMaintainBridges === "function", "bridge orchestrator importable", "bridge module broken");
+    },
+  },
+  {
+    id: "hierarchy-snapshot", kind: "pure", role: "on-disk tier policy → procedural memory", deps: ["memory-store"],
+    source: "server/brain-bridges.ts",
+    selftest: async () => {
+      const { deterministicId } = await import("./brain-bus");
+      const a = deterministicId("hierarchy", "{}");
+      return expectThat(a === deterministicId("hierarchy", "{}"), "policy hash stable", "hash unstable");
+    },
+  },
+  {
+    id: "pressure-governor", kind: "pure", role: "db/row budget watch → report-only tuning", deps: ["memory-store"],
+    source: "server/brain-bridges.ts",
+    selftest: async () => {
+      const { assessPressure } = await import("./brain-bridges");
+      const r = assessPressure({ memories: { episodic: 90, learned: 5 }, dbBytes: 300 * 1048576, embedCacheRows: 4800 }, { BRAIN_DB_BUDGET_MB: "256" });
+      return expectThat(r.suggestions.length === 3, "all three pressure signals fire", `got ${r.suggestions.length}`);
+    },
+  },
+  {
     id: "service-registry", kind: "pure", role: "this registry + validation (unique/deps)", deps: [],
     source: "server/brain-services.ts",
     selftest: () => {

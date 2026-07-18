@@ -64,6 +64,20 @@ async function main() {
   const r = resolveEmbedder();
   const b = createBrainStore({ embed: r.embed, embedProvider: r.providerId });
   try {
+    // S29/S36/S41/S38 durable-source bridges + S48 governor ride the same pass,
+    // BEFORE consolidate so fresh ops-ns episodics can promote in later nights.
+    // BRAIN_BRIDGES=0 opts out; bridge failures are per-source, never fatal.
+    if (process.env.BRAIN_BRIDGES !== "0") {
+      try {
+        const { runMaintainBridges, assessPressure } = await import("../server/brain-bridges");
+        const bridges = await runMaintainBridges(b);
+        const pressure = assessPressure(b.stats());
+        console.log(JSON.stringify({ event: "brain.bridges", ...bridges }));
+        if (pressure.suggestions.length > 0) console.log(JSON.stringify({ event: "brain.pressure", ...pressure }));
+      } catch (e: any) {
+        console.warn(`[brain] bridges skipped (${e?.message ?? e})`);
+      }
+    }
     const consolidate = b.consolidate(); // promote hot episodic BEFORE prune can see it
     const sweep = b.sweep();
     const health = await b.health();
