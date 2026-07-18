@@ -80,7 +80,7 @@ export interface Extraction {
 export interface BrainStore {
   /** `deferred` = the embedder was contended: the row is durable (FTS-indexed) but its
    *  vector arrives via backfillEmbeddings(). dim is 0 for a deferred write. */
-  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean }>;
+  remember(m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean; revised?: string[] }>;
   /** Write-behind drain: embed pending rows in small batches; aborts on the first
    *  failure (embedder still busy) and retries next maintain pass. GPU-gated (Tur-4):
    *  defers entirely while a local generation is active, unless the pending queue
@@ -105,7 +105,7 @@ export interface BrainStore {
    *  importance-prunes cold episodic/working rows (P4): importance =
    *  tier_weight × tierRecency × usageBoost; below the threshold the row falls off.
    *  core/learned/procedural are NEVER auto-pruned. BRAIN_PRUNE=0 opts out. */
-  sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; factsPruned?: number; embedEvicted?: number };
+  sweep(opts?: { workingTtlMs?: number; pruneThreshold?: number }): { swept: number; pruned?: number; factsPruned?: number; embedEvicted?: number; supersededPruned?: number };
   /** Consolidation (v2+v3): promote hot episodic memories to learned, then merge
    *  duplicate learned contents (normalized) into the oldest row, summing hits. */
   consolidate(opts?: { minAccess?: number }): { promoted: number; merged: number };
@@ -267,7 +267,9 @@ export function createBrainStore(
   // v1 → v2 migration: columns may be missing on an existing brain.db.
   // pending_embed (write-behind): 1 = durable row awaiting its vector (embedder was
   // contended at write time); backfillEmbeddings() indexes it when the embedder frees up.
-  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0"]) {
+  // superseded_at (belief revision, Tur-5): a memory contradicted by a later write is
+  // invalidated bi-temporally — recall filters it, history keeps it, sweep prunes it.
+  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0", "superseded_at INTEGER"]) {
     try { db.exec(`ALTER TABLE brain_memories ADD COLUMN ${col}`); } catch { /* already there */ }
   }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_facts (
@@ -345,7 +347,7 @@ export function createBrainStore(
     db.prepare("DELETE FROM brain_memories WHERE rowid=?").run(BigInt(rowid));
   };
 
-  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean }> => {
+  const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean; deferred?: boolean; revised?: string[] }> => {
     if (!TIERS.includes(m.tier)) throw new Error(`invalid tier '${m.tier}' (${TIERS.join("/")})`);
     if (!m.content?.trim()) throw new Error("empty memory content");
     // S24 redaction gate — the ONE enforcement point every write path funnels
@@ -390,7 +392,7 @@ export function createBrainStore(
           `SELECT m.rowid AS rowid, m.content AS content, m.access_count AS hits, v.distance AS distance
            FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT 8) v
            JOIN brain_memories m ON m.rowid = v.rowid
-           WHERE m.ns=? AND m.tier=?`,
+           WHERE m.ns=? AND m.tier=? AND m.superseded_at IS NULL`,
         )
         .all(f32(vec), ns, m.tier) as { rowid: number; content: string; hits: number; distance: number }[];
       const dup = near.find((r) => r.distance <= maxDist);
@@ -405,6 +407,33 @@ export function createBrainStore(
         }
         const keepId = (db.prepare("SELECT mem_id FROM brain_memories WHERE rowid=?").get(BigInt(dup.rowid)) as { mem_id: string }).mem_id;
         return { id: keepId, dim: vec.length, merged: true };
+      }
+    }
+
+    // Tur-5 belief revision: an auto-id write carrying a negation/change signal
+    // supersedes near, entity-anchored memories (bi-temporal — recall filters them,
+    // history keeps them, sweep prunes them after a TTL). Core is untouchable,
+    // explicit-id operator writes don't revise, deferred writes have no vector to
+    // measure nearness with. BRAIN_REVISION=0 opts out.
+    const revised: string[] = [];
+    if (
+      process.env.BRAIN_REVISION !== "0" && !explicitId && vec && dim !== null &&
+      m.tier !== "core" && contradictionSignal(content)
+    ) {
+      const maxDist = Number(process.env.BRAIN_REVISION_DISTANCE) || 0.4;
+      const near = db
+        .prepare(
+          `SELECT m.rowid AS rowid, m.mem_id AS id, m.content AS content, v.distance AS distance
+           FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT 8) v
+           JOIN brain_memories m ON m.rowid = v.rowid
+           WHERE m.ns=? AND m.tier!='core' AND m.superseded_at IS NULL`,
+        )
+        .all(f32(vec), ns) as { rowid: number; id: string; content: string; distance: number }[];
+      for (const r of near) {
+        if (r.distance <= maxDist && entityOverlap(content, r.content) >= 1) {
+          db.prepare("UPDATE brain_memories SET superseded_at=? WHERE rowid=?").run(now(), BigInt(r.rowid));
+          revised.push(r.id);
+        }
       }
     }
 
@@ -426,7 +455,9 @@ export function createBrainStore(
         .all(ns, workingCap) as { rowid: number }[];
       for (const r of over) deleteMemRow(r.rowid);
     }
-    return vec ? { id, dim: vec.length } : { id, dim: 0, deferred: true };
+    return vec
+      ? { id, dim: vec.length, ...(revised.length ? { revised } : {}) }
+      : { id, dim: 0, deferred: true };
   };
 
   return {
@@ -445,7 +476,8 @@ export function createBrainStore(
           `SELECT m.rowid AS rowid, m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
                   v.distance AS distance, m.ns AS ns, m.access_count AS hits
            FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
-           JOIN brain_memories m ON m.rowid = v.rowid`,
+           JOIN brain_memories m ON m.rowid = v.rowid
+           WHERE m.superseded_at IS NULL`,
         )
         .all(f32(vec), over) as unknown as (BrainRecallHit & { ns: string; rowid: number; hits: number })[];
       const memFts = (q: string, limit: number): string[] => {
@@ -453,7 +485,7 @@ export function createBrainStore(
           const rows = db
             .prepare(
               `SELECT m.mem_id AS id FROM brain_fts f JOIN brain_memories m ON m.rowid = f.mem_rowid
-               WHERE brain_fts MATCH ? ORDER BY f.rank LIMIT ?`,
+               WHERE brain_fts MATCH ? AND m.superseded_at IS NULL ORDER BY f.rank LIMIT ?`,
             )
             .all(ftsQuery(q), limit) as { id: string }[];
           return rows.map((r) => r.id);
@@ -478,7 +510,7 @@ export function createBrainStore(
           .prepare(
             `SELECT m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt, m.ns AS ns,
                     m.access_count AS hits
-             FROM brain_memories m WHERE m.mem_id IN (${ph})`,
+             FROM brain_memories m WHERE m.mem_id IN (${ph}) AND m.superseded_at IS NULL`,
           )
           .all(...missing) as unknown as (BrainRecallHit & { ns: string; hits: number })[];
         for (const r of extra) byId.set(r.id, { ...r, distance: 1 } as any); // no vector distance → neutral
@@ -648,6 +680,19 @@ export function createBrainStore(
           }
         }
       }
+      // Tur-5 belief-revision hygiene: superseded MEMORIES mirror superseded facts —
+      // history for a retention window, then gone (recall already filters them).
+      let supersededPruned = 0;
+      {
+        const retentionMs = (Number(process.env.BRAIN_SUPERSEDED_PRUNE_DAYS) || 30) * 86_400_000;
+        const dead = db
+          .prepare("SELECT rowid FROM brain_memories WHERE superseded_at IS NOT NULL AND superseded_at<?")
+          .all(now() - retentionMs) as { rowid: number }[];
+        for (const r of dead) {
+          deleteMemRow(r.rowid);
+          supersededPruned++;
+        }
+      }
       // Fact hygiene (P0-3): superseded facts keep point-in-time queries honest for a
       // while, but their audit value decays and the scan cost doesn't — without this
       // they are the last unbounded leak. LIVE facts are never touched; only rows
@@ -670,7 +715,7 @@ export function createBrainStore(
       const embedEvicted = embedCache
         ? embedCache.sweep({ cap: Number(process.env.BRAIN_EMBED_CACHE_CAP) || undefined }).evicted
         : 0;
-      return { swept: expired.length, pruned, factsPruned, embedEvicted };
+      return { swept: expired.length, pruned, factsPruned, embedEvicted, supersededPruned };
     },
 
     consolidate({ minAccess = 3 } = {}) {
@@ -706,7 +751,7 @@ export function createBrainStore(
       // first time a non-default ns gained recent learned rows (ledger migration).
       const rows = db
         .prepare(
-          "SELECT mem_id AS id, content, ns FROM brain_memories WHERE tier IN ('learned','core') ORDER BY created_at DESC, rowid DESC LIMIT ?",
+          "SELECT mem_id AS id, content, ns FROM brain_memories WHERE tier IN ('learned','core') AND superseded_at IS NULL ORDER BY created_at DESC, rowid DESC LIMIT ?",
         )
         .all(probes) as { id: string; content: string; ns: string }[];
       if (rows.length === 0) return { selfHitRate: 1, drift: false, probes: 0 };
@@ -854,6 +899,36 @@ export function createBrainStore(
       db.close();
     },
   };
+}
+
+// Belief revision primitives (Tur-5 research: Mem0-style negation routing, zero-LLM).
+// A write that NEGATES near, entity-overlapping content supersedes it at write time —
+// "I am strictly vegan now" must stop "loves pepperoni pizza" from ever being recalled.
+const CONTRADICTION_RE =
+  /\b(not|no longer|no more|stop(ped)?|don'?t|never|anymore|cancel(led)?|quit|moved|changed|instead|değil|art[ıi]k|vazgeç\w*|b[ıi]rak\w*|iptal|yerine|taş[ıi]nd[ıi]m|değişti|içmiyorum|yemiyorum|kullanm[ıi]yorum)\b/iu;
+const OVERLAP_STOPWORDS = new Set([
+  "the", "and", "that", "this", "with", "have", "from", "user", "için", "gibi", "daha", "olan", "artık", "anymore",
+]);
+
+/** Does this text carry an explicit negation/change-of-state signal? Pure, TR+EN. */
+export function contradictionSignal(text: string): boolean {
+  return CONTRADICTION_RE.test(text || "");
+}
+
+/** Count of meaningful (len>3, non-stopword) tokens two texts share — the entity
+ *  anchor that keeps semantic nearness from superseding unrelated memories. */
+export function entityOverlap(a: string, b: string): number {
+  const toks = (s: string) =>
+    new Set(
+      (s || "")
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((w) => w.length > 3 && !OVERLAP_STOPWORDS.has(w)),
+    );
+  const ta = toks(a);
+  let n = 0;
+  for (const w of toks(b)) if (ta.has(w)) n++;
+  return n;
 }
 
 /** Parse an agent/LLM extraction reply into a validated Extraction. Reasoning-leakage

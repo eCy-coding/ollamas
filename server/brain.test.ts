@@ -305,3 +305,61 @@ describe("Brain — GPU-aware backfill gate (Tur-4: LLM-active defers embedding)
     }
   });
 });
+
+describe("Brain — belief revision (Tur-5: negation supersedes contradicted memories)", () => {
+  test("contradictionSignal + entityOverlap primitives", async () => {
+    const { contradictionSignal, entityOverlap } = await import("./brain");
+    expect(contradictionSignal("I am strictly vegan now, no pizza anymore")).toBe(true);
+    expect(contradictionSignal("artık kahve içmiyorum, bıraktım")).toBe(true);
+    expect(contradictionSignal("user loves eating pepperoni pizza")).toBe(false);
+    expect(entityOverlap("loves pepperoni pizza", "no pizza anymore")).toBeGreaterThanOrEqual(1);
+    expect(entityOverlap("deploy make ship", "no pizza anymore")).toBe(0);
+  });
+
+  test("a negation write supersedes the near contradicted memory; recall stops returning it", async () => {
+    const V: Record<string, number[]> = {
+      "user loves eating pepperoni pizza": [1, 0, 0],
+      "user is strictly vegan now, no pizza anymore": [0.9, 0.1, 0],
+    };
+    const b = createBrainStore({ dbPath: tmpDb(), embed: async (t) => V[t] ?? [0, 0, 1] });
+    const old = await b.remember({ tier: "learned", content: "user loves eating pepperoni pizza" });
+    process.env.BRAIN_REVISION_DISTANCE = "2"; // fake-embed space → wide gate; entity overlap does the narrowing
+    try {
+      const neu = await b.remember({ tier: "learned", content: "user is strictly vegan now, no pizza anymore" });
+      expect((neu as any).revised).toContain(old.id);
+      const hits = await b.recall("user loves eating pepperoni pizza", { k: 5 });
+      expect(hits.map((h) => h.id)).not.toContain(old.id); // superseded → gone from recall
+      expect(hits.map((h) => h.id)).toContain(neu.id);
+    } finally {
+      delete process.env.BRAIN_REVISION_DISTANCE;
+      b.close();
+    }
+  });
+
+  test("core is never revised; BRAIN_REVISION=0 disables; no-negation writes revise nothing", async () => {
+    const V: Record<string, number[]> = {
+      "core identity: Emre speaks Turkish": [1, 0, 0],
+      "not Turkish anymore whatever": [0.9, 0.1, 0],
+      "user likes green tea": [0, 1, 0],
+      "user likes black tea too": [0.1, 0.9, 0],
+    };
+    const b = createBrainStore({ dbPath: tmpDb(), embed: async (t) => V[t] ?? [0, 0, 1] });
+    process.env.BRAIN_REVISION_DISTANCE = "2";
+    try {
+      const core = await b.remember({ id: "c-1", tier: "core", content: "core identity: Emre speaks Turkish" });
+      const attack = await b.remember({ tier: "working", content: "not Turkish anymore whatever" });
+      expect((attack as any).revised ?? []).not.toContain(core.id); // core untouchable
+      const t1 = await b.remember({ tier: "learned", content: "user likes green tea" });
+      const t2 = await b.remember({ tier: "learned", content: "user likes black tea too" });
+      expect((t2 as any).revised ?? []).toHaveLength(0); // no negation signal → no revision
+      process.env.BRAIN_REVISION = "0";
+      const off = await b.remember({ tier: "learned", content: "no green tea anymore" });
+      expect((off as any).revised ?? []).toHaveLength(0); // disabled
+      expect((await b.recall("user likes green tea", { k: 5 })).map((h) => h.id)).toContain(t1.id);
+    } finally {
+      delete process.env.BRAIN_REVISION;
+      delete process.env.BRAIN_REVISION_DISTANCE;
+      b.close();
+    }
+  });
+});
