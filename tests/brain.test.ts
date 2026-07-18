@@ -45,6 +45,17 @@ describe("Brain — tiered memories (sqlite-vec)", () => {
     b.close();
   });
 
+  test("drift probe recalls each memory in its OWN namespace (no false drift)", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "l-def", tier: "learned", content: "likes espresso" });
+    await b.remember({ id: "l-org", tier: "learned", content: "deploy uses make ship", ns: "org" });
+    const h = await b.health({ probes: 8 });
+    expect(h.probes).toBe(2);
+    expect(h.selfHitRate).toBe(1); // ns-blind probing scored the org row 0 here
+    expect(h.drift).toBe(false);
+    b.close();
+  });
+
   test("fact hygiene: sweep prunes long-invalidated facts, never live ones", async () => {
     let clock = Date.parse("2026-01-01T00:00:00Z");
     const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed, now: () => clock });

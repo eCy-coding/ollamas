@@ -570,15 +570,18 @@ export function createBrainStore(
     },
 
     async health({ probes = 8, threshold = 0.8 } = {}) {
+      // Probe rows carry their ns: recall() is namespace-scoped, so probing an org/tenant
+      // memory through the default ns can NEVER self-hit — that false DRIFT fired the
+      // first time a non-default ns gained recent learned rows (ledger migration).
       const rows = db
         .prepare(
-          "SELECT mem_id AS id, content FROM brain_memories WHERE tier IN ('learned','core') ORDER BY created_at DESC, rowid DESC LIMIT ?",
+          "SELECT mem_id AS id, content, ns FROM brain_memories WHERE tier IN ('learned','core') ORDER BY created_at DESC, rowid DESC LIMIT ?",
         )
-        .all(probes) as { id: string; content: string }[];
+        .all(probes) as { id: string; content: string; ns: string }[];
       if (rows.length === 0) return { selfHitRate: 1, drift: false, probes: 0 };
       let hits = 0;
       for (const p of rows) {
-        const top = await this.recall(p.content, { k: 1, fresh: true });
+        const top = await this.recall(p.content, { k: 1, fresh: true, ns: p.ns });
         if (top[0]?.id === p.id) hits++;
       }
       const selfHitRate = hits / rows.length;
