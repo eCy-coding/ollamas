@@ -544,3 +544,53 @@ describe("Brain — E2: askBrain synthesis (cited, confident, honest)", () => {
     expect(r.abstained).toBeUndefined();
   });
 });
+
+describe("Brain — K1/K3: system omniscience (facts, summary, live arm)", () => {
+  const snap = {
+    osVersion: "15.5", cpu: "Apple M2", ramGb: 16, diskFree: "41Gi", diskUsedPct: "82%",
+    hostname: "emre-mbp", ollamasServices: ["com.ollamas.server", "com.ollamas.brain-maintain"],
+    ollamaModels: ["qwen3:8b", "nomic-embed-text:latest"], desktopProjects: ["ollamas", "karargah1", "gelir-makinesi"], at: 1,
+  };
+
+  test("snapshotToFacts: stable bi-temporal S-P-O; summary carries everything", async () => {
+    const { snapshotToFacts, snapshotSummary, wantsLiveSystem } = await import("./brain-system");
+    const facts = snapshotToFacts(snap as any);
+    expect(facts).toContainEqual({ subject: "macbook", predicate: "ram", object: "16 GB" });
+    expect(facts).toContainEqual({ subject: "macbook", predicate: "disk_free", object: "41Gi" });
+    expect(facts.find((f) => f.predicate === "launchd_services")?.object).toContain("com.ollamas.server");
+    const sum = snapshotSummary(snap as any);
+    expect(sum).toContain("41Gi");
+    expect(sum).toContain("karargah1");
+    expect(wantsLiveSystem("şu an disk kaç GB boş?")).toBe(true);
+    expect(wantsLiveSystem("deploy nasıl yapılır")).toBe(false);
+  });
+
+  test("syncSystemToBrain: superseding facts + stable learned row", async () => {
+    const { syncSystemToBrain } = await import("./brain-system");
+    const asserted: any[] = []; const rows: any[] = [];
+    const r = await syncSystemToBrain({
+      assertFact: async (f) => { asserted.push(f); return { changed: true, invalidated: 0 }; },
+      remember: async (m) => { rows.push(m); return {}; },
+      collect: async () => snap as any,
+    });
+    expect(r.facts).toBeGreaterThanOrEqual(8);
+    expect(rows[0].id).toBe("system-inventory"); // stable id → upsert, not pile-up
+    expect(rows[0].actor).toBe("macbook");
+  });
+
+  test("askBrain live arm: state question answers from LIVE probe even with zero memories", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const r = await askBrain("şu an disk kaç GB boş?", {
+      recall: async () => [],
+      searchFacts: async () => [],
+      liveContext: async () => "MacBook envanteri: disk boş 41Gi (kullanım 82%)",
+      generate: async (msgs) => {
+        expect(msgs[1].content).toContain("CANLI sistem durumu");
+        return "Şu an 41Gi boş alan var [mem:live:system].";
+      },
+    });
+    expect(r.abstained).toBeUndefined();
+    expect(r.sources[0].id).toBe("live:system");
+    expect(r.answer).toContain("41Gi");
+  });
+});

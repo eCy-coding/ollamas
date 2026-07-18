@@ -26,6 +26,9 @@ export interface AskDeps {
   searchFacts: (q: string, o?: { k?: number; ns?: string }) => Promise<(BrainFact & { distance: number })[]>;
   generate: (messages: { role: string; content: string }[]) => Promise<string>;
   ns?: string;
+  /** K3: instant machine-state probe — "şu an disk kaç GB?" answers from the LIVE
+   *  system, not stale memories. Returns null when the question isn't about state. */
+  liveContext?: (q: string) => Promise<string | null>;
 }
 
 const SYNTH_PROMPT = `Sen bir kişisel hafıza asistanısın. SADECE sana verilen KAYNAK kayıtlardan yararlanarak soruyu Türkçe, kısa ve net yanıtla.
@@ -63,7 +66,11 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
   const first = await deps.recall(q, { k: 8, graphExpand: true, ns: deps.ns });
   const hits = (await widen(q, first, deps)).slice(0, 10);
   const mode: AskResult["mode"] = hits.some((h) => h.lexical) ? "lexical" : "hybrid";
-  if (hits.length === 0) {
+  let live: string | null = null;
+  if (deps.liveContext) {
+    try { live = await deps.liveContext(q); } catch { /* live arm is best-effort */ }
+  }
+  if (hits.length === 0 && !live) {
     return { answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.", sources: [], confidence: 0, mode, abstained: true };
   }
   const sources: AskSource[] = hits.map((h) => ({
@@ -72,7 +79,10 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
     score: Number(h.score.toFixed(3)),
     excerpt: String(h.content).slice(0, 240),
   }));
-  const context = sources.map((s) => `[mem:${s.id}] (${s.tier}) ${s.excerpt}`).join("\n");
+  if (live) sources.unshift({ id: "live:system", tier: "live", score: 1, excerpt: live.slice(0, 400) });
+  const context =
+    (live ? `[mem:live:system] (CANLI sistem durumu, ŞU AN) ${live}\n` : "") +
+    sources.filter((s) => s.id !== "live:system").map((s) => `[mem:${s.id}] (${s.tier}) ${s.excerpt}`).join("\n");
   const raw = await deps.generate([
     { role: "system", content: SYNTH_PROMPT },
     { role: "user", content: `SORU: ${q}\n\nKAYNAKLAR:\n${context}` },

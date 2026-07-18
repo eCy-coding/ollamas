@@ -4010,8 +4010,10 @@ app.post("/api/brain/ask", async (req, res) => {
     const brain = await import("./server/brain");
     const { askBrain } = await import("./server/brain-ask");
     const { resolveDistillProvider } = await import("./server/brain-active");
+    const { liveSystemContext } = await import("./server/brain-system");
     const r = await askBrain(question, {
       ns,
+      liveContext: liveSystemContext,
       recall: (q, o) => brain.brainRecall(q, { ...o, ns }),
       searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ns }),
       generate: async (messages) => {
@@ -4026,6 +4028,20 @@ app.post("/api/brain/ask", async (req, res) => {
     res.json(r);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "brain ask failed" });
+  }
+});
+
+// K1 system sync: MacBook + ollamas runtime inventory → superseding facts +
+// a stable learned summary. Loopback-only (operator/maintain surface).
+app.post("/api/brain/sync-system", async (req, res) => {
+  try {
+    const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).json({ error: "sync-system is loopback-only" });
+    const { syncSystemToBrain } = await import("./server/brain-system");
+    const brain = await import("./server/brain");
+    res.json(await syncSystemToBrain({ assertFact: brain.brainAssertFact, remember: brain.brainRemember as any }));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "sync-system failed" });
   }
 });
 

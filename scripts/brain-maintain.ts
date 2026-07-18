@@ -80,6 +80,19 @@ async function main() {
     }
     const consolidate = b.consolidate(); // promote hot episodic BEFORE prune can see it
     const sweep = b.sweep();
+    // K1 daily system sync: the machine's reality lands as superseding facts.
+    if (process.env.BRAIN_SYSTEM_SYNC !== "0") {
+      try {
+        const { syncSystemToBrain } = await import("../server/brain-system");
+        const sys = await syncSystemToBrain({
+          assertFact: (f) => b.assertFact(f),
+          remember: (m) => b.remember(m as any),
+        });
+        console.log(JSON.stringify({ event: "brain.system.sync", ...sys }));
+      } catch (e: any) {
+        console.warn(`[brain] system sync skipped (${e?.message ?? e})`);
+      }
+    }
     // E4 epoch distill: the day's episodic pile (conductor mirror, git captures…)
     // becomes durable knowledge — 3-5 learned summaries + facts on the $0 keyless
     // floor. The A-MAC gate inside distill filters junk. BRAIN_EPOCH_DISTILL=0 opts out.

@@ -98,3 +98,6 @@ brain-services:
 ## brain-drill: DR proof (S47) — dump the live brain, restore into a throwaway store, recall smoke
 brain-drill:
 	@npx tsx scripts/brain-restore-drill.ts
+
+brain-sync-universe: ## Emre'nin proje evreni + repo yüzeyi -> brain (idempotent)
+	@npx tsx scripts/brain-ingest-universe.ts
