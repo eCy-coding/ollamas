@@ -594,3 +594,17 @@ describe("Brain — K1/K3: system omniscience (facts, summary, live arm)", () =>
     expect(r.answer).toContain("41Gi");
   });
 });
+
+describe("Brain — K3b: live truth beats synthesizer refusal", () => {
+  test("BİLGİ_YOK + live probe → raw live answer, never an empty-handed abstain", async () => {
+    const { askBrain } = await import("./brain-ask");
+    const r = await askBrain("şu an ram?", {
+      recall: async () => [], searchFacts: async () => [],
+      liveContext: async () => "48 GB RAM, disk 26Gi boş",
+      generate: async () => "BİLGİ_YOK",
+    });
+    expect(r.abstained).toBeUndefined();
+    expect(r.answer).toContain("48 GB RAM");
+    expect(r.confidence).toBeGreaterThan(0.5);
+  });
+});

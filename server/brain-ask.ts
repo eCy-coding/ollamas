@@ -34,6 +34,7 @@ export interface AskDeps {
 const SYNTH_PROMPT = `Sen bir kişisel hafıza asistanısın. SADECE sana verilen KAYNAK kayıtlardan yararlanarak soruyu Türkçe, kısa ve net yanıtla.
 Kurallar:
 - Her iddiadan sonra dayandığı kaynağı [mem:ID] biçiminde belirt.
+- [mem:live:system] etiketli kaynak CANLI sistem durumudur — "şu an" soruları için birincil ve güvenilir kaynaktır, kullan.
 - Kaynaklarda cevap yoksa SADECE şunu yaz: BİLGİ_YOK
 - Kaynak dışına çıkma, tahmin etme, süsleme yapma.`;
 
@@ -91,6 +92,9 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
   // confidence = evidence quality (mean source score, capped), not LLM bravado.
   const confidence = Math.min(1, sources.reduce((a, s) => a + s.score, 0) / sources.length);
   if (!answer || /BİLGİ_YOK|BILGI_YOK/.test(answer)) {
+    // The live probe is deterministic truth — if the synthesizer balks, serve it raw
+    // rather than abstaining while holding the answer in hand.
+    if (live) return { answer: `Canlı sistem durumu [mem:live:system]: ${live}`, sources, confidence: 0.9, mode };
     return { answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.", sources, confidence: 0, mode, abstained: true };
   }
   return { answer, sources, confidence: Number(confidence.toFixed(3)), mode };

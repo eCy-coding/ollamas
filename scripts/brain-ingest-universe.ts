@@ -34,8 +34,10 @@ async function main() {
         actor: "emre",
       });
       mem++;
-      const r = await brainAssertFact({ subject: "emre", predicate: "has_project", object: title.slice(0, 80), ns: "default" });
-      if (r.changed) facts++;
+      try {
+        const r = await brainAssertFact({ subject: "emre", predicate: "has_project", object: title.slice(0, 80), ns: "default" });
+        if (r.changed) facts++;
+      } catch { /* fact arm needs the embedder — memories (write-behind) already landed */ }
     }
   }
   // ollamas repo surface: scripts + docs headlines (titles only — bodies stay in git).
