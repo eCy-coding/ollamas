@@ -17,6 +17,8 @@ Bu doküman brain'in ollamas'a NE KADAR entegre olduğunu YALANSIZ anlatır — 
 | Abstention (B1) | **opt-in** | `minScore` param / `BRAIN_RECALL_MIN_SCORE` | Eşik altı hit'ler recall'dan düşer; boş sonuç = "bilmiyorum" sinyali (S39 `abstained:true`) |
 | Audit ledger (B3) | **ON** | — | `brain_audit` append-only: remember/merge/revise/forget; `GET /api/brain/audit` |
 | RTBF forget (B4) | **ON** | — | `POST /api/brain/forget {contains,ns}` loopback-only deterministik purge (satır+vektör+FTS) + audit kaydı |
+| Actor attribution (B5) | **ON** | — | `BrainMemoryInput.actor` kolonu; recall `{actor}` filtresi — çok-taraflı kimlik sızıntısı önlenir |
+| Relative-time recall (B2) | **ON** | — | `parseTemporalFilter` TR+EN ("dün/geçen hafta/son N gün/last week") → S39'da otomatik `createdAt` penceresi; store `recall({since,until})` |
 | Belief revision | **ON** | `BRAIN_REVISION=0` | Auto-id yazım negation/change sinyali taşıyorsa (`contradictionSignal` TR+EN) yakın (`BRAIN_REVISION_DISTANCE` 0.4) + entity-örtüşen (`entityOverlap`≥1) hafızaları `superseded_at` ile geçersizler ("strictly vegan" → "loves pizza" recall'dan düşer); core ASLA, explicit-id ASLA, deferred yazım tetiklemez; recall/dedup/probe superseded filtreler; sweep `BRAIN_SUPERSEDED_PRUNE_DAYS` (30g) sonra siler |
 | Periyodik distill | **ON** | `BRAIN_AUTO_DISTILL=0` | Her 10 mesajda durable extraction; provider default keyless pollinations ($0) |
 | Otonom bakım | **ON** (launchd) | — | Günlük 04:00 sweep+consolidate+drift |

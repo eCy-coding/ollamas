@@ -3951,7 +3951,7 @@ void (async () => {
 // invariant; every cross-ns use is itself recorded as an ops fact.
 app.post("/api/brain/recall", async (req, res) => {
   try {
-    const { query, k, ns, graphExpand, minScore } = req.body || {};
+    const { query, k, ns, graphExpand, minScore, actor } = req.body || {};
     if (typeof query !== "string" || !query.trim()) return res.status(400).json({ error: "query (string) required" });
     const brain = await import("./server/brain");
     if (ns === "*") {
@@ -3969,7 +3969,13 @@ app.post("/api/brain/recall", async (req, res) => {
     // Bounded like the auto-recall path: under conductor load the local embedder
     // can queue for 30s+ — an external API must degrade fast, not hang.
     const bounded = await Promise.race([
-      brain.brainRecall(query, { k: k || 5, ns, graphExpand, minScore }),
+      (async () => {
+        // B2: a TR/EN relative-time cue in the query becomes an absolute createdAt
+        // window ("gecen haftaki karar" only surfaces last week's rows).
+        const { parseTemporalFilter } = await import("./server/brain-active");
+        const tw = parseTemporalFilter(query, Date.now());
+        return brain.brainRecall(query, { k: k || 5, ns, graphExpand, minScore, actor, ...(tw ?? {}) });
+      })(),
       new Promise<null>((r) => {
         const t = setTimeout(() => r(null), Number(process.env.BRAIN_RECALL_API_TIMEOUT_MS) || 10_000);
         t.unref?.();

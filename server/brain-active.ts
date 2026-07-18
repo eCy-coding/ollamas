@@ -98,3 +98,18 @@ export const idleDistillMs = (env: { BRAIN_DISTILL_IDLE_MS?: string }): number =
   const n = Number(env.BRAIN_DISTILL_IDLE_MS);
   return Number.isFinite(n) && n > 0 ? n : 600_000;
 };
+
+/** B2 relative-time recall (2026 gap-audit): resolve TR/EN relative expressions in a
+ *  query to an absolute [since, until] window over createdAt. Pure — `now` injectable.
+ *  Returns null when the query carries no time cue (recall stays semantic-only). */
+export function parseTemporalFilter(query: string, now: number): { since: number; until: number } | null {
+  const q = (query || "").toLowerCase();
+  const d = 86_400_000;
+  const lastN = q.match(/\b(?:son|last|past)\s+(\d{1,3})\s*(?:gün|gun|days?)\b/);
+  if (lastN) return { since: now - Number(lastN[1]) * d, until: now };
+  if (/\b(dün|dun|yesterday)\b/.test(q)) return { since: now - 2 * d, until: now };
+  if (/\b(geçen hafta|gecen hafta|last week)\b/.test(q)) return { since: now - 14 * d, until: now - 7 * d + d };
+  if (/\b(bugün|bugun|today)\b/.test(q)) return { since: now - d, until: now };
+  if (/\b(geçen ay|gecen ay|last month)\b/.test(q)) return { since: now - 60 * d, until: now - 30 * d + d };
+  return null;
+}

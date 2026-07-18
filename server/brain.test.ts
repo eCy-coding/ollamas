@@ -445,3 +445,40 @@ describe("Brain — 2026 gaps B3+B4: audit ledger + right-to-be-forgotten", () =
     b.close();
   });
 });
+
+describe("Brain — 2026 gaps B5+B2: actor attribution + relative-time recall", () => {
+  test("actor is stored, recalled, and filterable (multi-party attribution)", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-e", tier: "learned", content: "likes espresso", actor: "emre" });
+    await b.remember({ id: "m-g", tier: "learned", content: "prefers tea", actor: "guest" });
+    const all = await b.recall("query_coffee", { k: 5 });
+    expect(all.find((h) => h.id === "m-e")?.actor).toBe("emre");
+    const onlyGuest = await b.recall("query_coffee", { k: 5, actor: "guest" });
+    expect(onlyGuest.map((h) => h.id)).toEqual(["m-g"]);
+    b.close();
+  });
+
+  test("parseTemporalFilter resolves TR/EN relative expressions to [since,until]", async () => {
+    const { parseTemporalFilter } = await import("./brain-active");
+    const now = Date.UTC(2026, 6, 18, 12, 0, 0); // 2026-07-18T12:00Z
+    const d = 86_400_000;
+    expect(parseTemporalFilter("what did we decide yesterday", now)).toEqual({ since: now - 2 * d, until: now });
+    expect(parseTemporalFilter("geçen hafta alınan karar", now)).toEqual({ since: now - 14 * d, until: now - 7 * d + d });
+    expect(parseTemporalFilter("son 3 gün özet", now)).toEqual({ since: now - 3 * d, until: now });
+    expect(parseTemporalFilter("last week decisions", now)).toEqual({ since: now - 14 * d, until: now - 7 * d + d });
+    expect(parseTemporalFilter("no time cue here", now)).toBeNull();
+  });
+
+  test("recall applies since/until window on createdAt", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    const now = Date.now();
+    const d = 86_400_000;
+    await b.remember({ id: "m-old", tier: "learned", content: "likes espresso", createdAt: now - 10 * d });
+    await b.remember({ id: "m-new", tier: "learned", content: "likes espresso", createdAt: now - 1 * d });
+    const recent = await b.recall("query_coffee", { k: 5, since: now - 3 * d });
+    expect(recent.map((h) => h.id)).toEqual(["m-new"]);
+    const older = await b.recall("query_coffee", { k: 5, until: now - 5 * d });
+    expect(older.map((h) => h.id)).toEqual(["m-old"]);
+    b.close();
+  });
+});

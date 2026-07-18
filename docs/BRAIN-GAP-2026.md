@@ -8,18 +8,18 @@ Durum işaretleri: ✓ shipped (kanıt=dosya) · ◐ kısmi · ✗ eksik. "Std" 
 |---|---------|-----|-------|---------------|
 | 1 | Single-hop recall (IE) | Yes | ✓ | hybrid RRF + rerank, `server/brain.ts` recall |
 | 2 | Multi-hop / multi-session synthesis | Yes | ◐ | `graphExpand` 1-hop var; iteratif multi-hop yok (BACKLOG) |
-| 3 | Temporal reasoning / event ordering | Yes | ◐→✓ | facts bi-temporal + point-in-time ✓; **relative-time sorgu çözümleme (B2)** bu turda |
+| 3 | Temporal reasoning / event ordering | Yes | ◐→✓ | facts bi-temporal + point-in-time ✓; **relative-time sorgu çözümleme (B2) SHIPPED** |
 | 4 | Knowledge update / staleness | Yes | ✓ | fact süperseed + belief-revision (`superseded_at`, 50fcd21) |
-| 5 | Abstention / grounding threshold | Yes | ✗→✓ | recall eşiksiz k döndürüyordu — **B1 bu turda** |
+| 5 | Abstention / grounding threshold | Yes | ✗→✓ | recall eşiksiz k döndürüyordu — **B1 SHIPPED** |
 | 6 | Contradiction / belief consistency | Yes | ✓ | belief-revision 50fcd21 |
 | 7 | Instruction vs preference ayrımı | Yes | ✓ | 5-tier (core/procedural sabit, learned/episodic akışkan) |
-| 8 | Actor attribution (multi-party) | Yes | ✗→✓ | satırda konuşan-kimliği yoktu — **B5 bu turda** |
+| 8 | Actor attribution (multi-party) | Yes | ✗→✓ | satırda konuşan-kimliği yoktu — **B5 SHIPPED** |
 | 9 | Memory awareness / proactive recall | Yes | ✓ | auto-recall default-ON (`brain-active.ts`) |
 | 10 | Provenance & confidence | Yes | ◐ | `source` alanı var; recall'da score zaten dönüyor; citation + confidence ayrı alan BACKLOG |
 | 11 | Session summarization hierarchy | Yes | ◐ | distill (10-mesaj + idle) var; rolling-compression hiyerarşisi BACKLOG |
 | 12 | Memory poisoning defense | Yes | ◐ | redaction-gate + A-MAC admission var; untrusted-source işaretleme BACKLOG |
-| 13 | Right-to-be-forgotten (delete-by-subject) | Mixed | ✗→✓ | silme API'si yoktu — **B4 bu turda** |
-| 14 | Audit trail (append-only ledger) | Yes | ✗→✓ | OTel log vardı ama DB-ledger yoktu — **B3 bu turda** |
+| 13 | Right-to-be-forgotten (delete-by-subject) | Mixed | ✗→✓ | silme API'si yoktu — **B4 SHIPPED** |
+| 14 | Audit trail (append-only ledger) | Yes | ✗→✓ | OTel log vardı ama DB-ledger yoktu — **B3 SHIPPED** |
 | 15 | Failure-driven procedural learning | No (edge) | ◐ | PROBLEM_REGISTRY→learned köprüsü var (`make brain-sync-registry`); otomatik failure-hook BACKLOG |
 | 16 | GPU/embedder contention yönetimi | — | ✓ | write-behind + GPU-gate (58233cb, c2c0524) |
 | 17 | Counterfactual/shadow eval | — | ✓ | brain-shadow.ts f18464a |

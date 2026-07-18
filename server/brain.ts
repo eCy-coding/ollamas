@@ -43,6 +43,9 @@ export interface BrainMemoryInput {
   /** Access-count override for imports (S22) — heat feeds consolidate()/usageBoost,
    *  so a restore must not reset every memory to cold. Omit for live writes. */
   hits?: number;
+  /** B5 multi-party attribution: who this memory is about/from (user id, agent name).
+   *  Filterable at recall — prevents identity leakage across speakers. */
+  actor?: string;
 }
 
 export interface BrainRecallHit {
@@ -52,6 +55,7 @@ export interface BrainRecallHit {
   distance: number;
   score: number;
   createdAt: number;
+  actor?: string | null;
 }
 
 export interface BrainFactInput {
@@ -94,7 +98,7 @@ export interface BrainStore {
   /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
    *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
    *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
-  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number }): Promise<BrainRecallHit[]>;
+  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number }): Promise<BrainRecallHit[]>;
   assertFact(f: BrainFactInput): Promise<{ changed: boolean; invalidated: number }>;
   /** S42: episodes ↔ sessions reverse link — every memory a distill/ingest wrote
    *  for a session carries source=episodeId(=sessionId). */
@@ -274,7 +278,7 @@ export function createBrainStore(
   // contended at write time); backfillEmbeddings() indexes it when the embedder frees up.
   // superseded_at (belief revision, Tur-5): a memory contradicted by a later write is
   // invalidated bi-temporally — recall filters it, history keeps it, sweep prunes it.
-  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0", "superseded_at INTEGER"]) {
+  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0", "superseded_at INTEGER", "actor TEXT"]) {
     try { db.exec(`ALTER TABLE brain_memories ADD COLUMN ${col}`); } catch { /* already there */ }
   }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_facts (
@@ -463,8 +467,8 @@ export function createBrainStore(
     const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
-      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count, pending_embed) VALUES(?,?,?,?,?,?,?,?)")
-      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0, vec ? 0 : 1);
+      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count, pending_embed, actor) VALUES(?,?,?,?,?,?,?,?,?)")
+      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0, vec ? 0 : 1, m.actor ?? null);
     const rowid = BigInt(ins.lastInsertRowid);
     if (vec) db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
     if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(content, rowid);
@@ -487,7 +491,7 @@ export function createBrainStore(
   return {
     remember: rememberOne,
 
-    async recall(query, { k = 5, tier, ns, fresh, graphExpand, minScore } = {}) {
+    async recall(query, { k = 5, tier, ns, fresh, graphExpand, minScore, actor, since, until } = {}) {
       // B1 abstention (2026 gap-audit): an ungrounded answer is worse than none.
       // Hits scoring below the threshold are dropped — an empty result tells the
       // caller to say "I don't know" instead of hallucinating from distant noise.
@@ -502,7 +506,7 @@ export function createBrainStore(
       const vecRows = db
         .prepare(
           `SELECT m.rowid AS rowid, m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
-                  v.distance AS distance, m.ns AS ns, m.access_count AS hits
+                  v.distance AS distance, m.ns AS ns, m.access_count AS hits, m.actor AS actor
            FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
            JOIN brain_memories m ON m.rowid = v.rowid
            WHERE m.superseded_at IS NULL`,
@@ -537,7 +541,7 @@ export function createBrainStore(
         const extra = db
           .prepare(
             `SELECT m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt, m.ns AS ns,
-                    m.access_count AS hits
+                    m.access_count AS hits, m.actor AS actor
              FROM brain_memories m WHERE m.mem_id IN (${ph}) AND m.superseded_at IS NULL`,
           )
           .all(...missing) as unknown as (BrainRecallHit & { ns: string; hits: number })[];
@@ -549,12 +553,15 @@ export function createBrainStore(
       const t = now();
       const scored = rows
         .filter((r) => (!tier || r.tier === tier) && r.ns === (ns || DEFAULT_NS))
+        .filter((r) => !actor || (r as any).actor === actor)
+        .filter((r) => (since === undefined || r.createdAt >= since) && (until === undefined || r.createdAt <= until))
         .map((r) => ({
           id: r.id,
           tier: r.tier,
           content: r.content,
           distance: r.distance,
           createdAt: r.createdAt,
+          actor: (r as any).actor ?? null,
           score:
             (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
         }))
@@ -1039,7 +1046,7 @@ function store(): BrainStore {
 export const brainRemember = (m: BrainMemoryInput) => store().remember(m);
 export const brainRecall = async (
   q: string,
-  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number },
+  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number },
 ) => {
   // S21: latency observed HERE (external choke-point) and not inside recall(),
   // so the drift probe's internal this.recall() calls never skew the histogram.
