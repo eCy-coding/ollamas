@@ -42,6 +42,8 @@ import { assignRole, consultErrors, faultsAsRules, recordOutcome, type TaskSpec 
 import { loadOrgChart, loadPreventionRules, nextErrorSeq, proposeErrorEntry } from "./lib/org-io";
 import { remember, recall } from "./lib/brain-ledger";
 import { statsFromPolicy, type OrgPolicy } from "./lib/org-learn";
+import { emitEvent, resetRun } from "./lib/tracker-io";
+import type { ItemStatus } from "./lib/task-tracker";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ORCH_DIR = join(HERE, "..");
@@ -200,6 +202,42 @@ function orgBrief(state: OrchestraState, slot: string, goalText: string, target:
   } catch { return ""; }
 }
 
+// ── Live task tracker (Claude-Code-style progress UX — lib/task-tracker + `ollamas follow`) ──────
+// Every helper is fully tolerant: a tracker failure must never touch the FSM loop.
+const FSM_ITEMS = [
+  { id: "COUNCIL_DEBATE", label: "Konsey değerlendirmesi" },
+  { id: "BENCHMARK_VALIDATION", label: "Benchmark doğrulaması" },
+  { id: "REPAIR", label: "REPAIR — grounded proposal üretimi" },
+  { id: "GATE", label: "Gate (tsc+test) + kayıt" },
+];
+
+function trkStart(task: string): void {
+  try {
+    resetRun();
+    emitEvent({
+      type: "start", ts: new Date().toISOString(), runId: `ollamas-${Date.now()}`,
+      title: `"${task}" işleniyor`, source: "ollamas",
+      items: [{ id: `task:${task}`, label: `Görev: ${task}` }, ...FSM_ITEMS],
+    });
+  } catch { /* best-effort */ }
+}
+
+function trkPhase(phase: string, note: string): void {
+  try {
+    const ts = new Date().toISOString();
+    const idx = FSM_ITEMS.findIndex((f) => f.id === phase);
+    if (idx >= 0) {
+      for (let i = 0; i < idx; i++) emitEvent({ type: "item", ts, id: FSM_ITEMS[i].id, status: "done" as ItemStatus });
+      emitEvent({ type: "item", ts, id: phase, status: "active" as ItemStatus });
+    }
+    emitEvent({ type: "note", ts, note, phase });
+  } catch { /* best-effort */ }
+}
+
+function trkEvent(ev: { type: "item"; id: string; status: ItemStatus } | { type: "tokens"; n: number } | { type: "note"; note: string } | { type: "finish" }): void {
+  try { emitEvent({ ...ev, ts: new Date().toISOString() } as Parameters<typeof emitEvent>[0]); } catch { /* best-effort */ }
+}
+
 async function repairPropose(state: OrchestraState): Promise<void> {
   // Resolve the target: (1) the 100-task catalog (task's OWN real target + goal), else (2) a FOCUS stream.
   let slot = "", target = "", content = "", goalText = "", catalogId = "";
@@ -216,9 +254,11 @@ async function repairPropose(state: OrchestraState): Promise<void> {
   if (!slot) { log("  ↳ REPAIR: no grounded target (catalog/FOCUS) — skip"); return; }
   if (DRY) { log(`  ↳ REPAIR (dry): would ground ${state.conductor_model} on ${slot} (${target})`); return; }
 
+  trkPhase("REPAIR", `${slot} için ${state.conductor_model} grounded proposal üretiyor`);
   try {
     const prompt = groundedPrompt(goalText + orgBrief(state, slot, goalText, target), target, content);
     const r = await chatOnce(state.conductor_model, "", prompt, { host: OLLAMA_HOST, timeoutMs: REPAIR_MS, num_ctx: 8192 });
+    trkEvent({ type: "tokens", n: Math.round((r.tokS * r.ms) / 1000) || Math.round(r.text.length / 4) });
     if (!hasSearchReplace(r.text)) {
       log(`  ↳ REPAIR: ${state.conductor_model} → no actionable SEARCH/REPLACE (retry next tick)`);
       try { remember("episodic", `outcome ${slot}: no actionable SEARCH/REPLACE (transient, retry)`, { ok: false }); } catch { /* best-effort */ }
@@ -230,15 +270,19 @@ async function repairPropose(state: OrchestraState): Promise<void> {
     if (catalogId) saveProgress(mark(loadProgress(), catalogId, "proposed"));
     log(`  ↳ REPAIR: ${state.conductor_model} → ${slot}.${ORCHESTRA_SLOT} PROPOSAL (${r.tokS.toFixed(0)} tok/s)`);
     orgRecordOutcome(slot, true, `PROPOSAL written by ${state.conductor_model}`);
+    trkEvent({ type: "item", id: "REPAIR", status: "done" });
+    trkEvent({ type: "note", note: `${slot} PROPOSAL hazır${APPLY ? " — gate koşuyor" : " (apply kapalı)"}` });
     if (APPLY) {
       try {
         const out = execFileSync(TSX, [join(HERE, "fleet-apply.ts"), "--apply", applyToken(slot)], { encoding: "utf8", timeout: CHILD_MS * 4, cwd: REPO, stdio: ["ignore", "pipe", "pipe"] });
         if (catalogId) saveProgress(mark(loadProgress(), catalogId, "done")); // gated apply landed green → done
         log(`  ↳ fleet-apply: ${(out.trim().split("\n").pop() || "applied").slice(0, 100)}`);
         orgRecordOutcome(slot, true, "gated apply landed green");
+        trkEvent({ type: "item", id: "GATE", status: "done" });
       } catch (e) {
         log(`  ↳ fleet-apply: gate red → reverted (${(e as Error).message.slice(0, 60)})`);
         orgRecordOutcome(slot, false, "gate red → reverted", (e as Error).message.slice(0, 160));
+        trkEvent({ type: "item", id: "GATE", status: "failed" });
       }
     }
   } catch (e) {
@@ -318,7 +362,12 @@ async function tick(): Promise<OrchestraState> {
   const input: PhaseInput = { phase: state.phase, actionTier, hasTask, converged, retryExceeded };
   let next = nextPhase(input);
   // Clear a completed current_task (proposed/done) so the loop advances (drain picks the next pending below).
-  if (curDone) { log(`  ↳ görev tamam: ${curTask!.id} (${statusOf(loadProgress(), curTask!.id)}) → sıradaki`); state = { ...state, current_task: null }; }
+  if (curDone) {
+    log(`  ↳ görev tamam: ${curTask!.id} (${statusOf(loadProgress(), curTask!.id)}) → sıradaki`);
+    trkEvent({ type: "item", id: `task:${state.current_task}`, status: "done" });
+    trkEvent({ type: "finish" });
+    state = { ...state, current_task: null };
+  }
   // G2 (STEP 2 wiring): leaving COUNCIL_DEBATE with an explicit council HOLD and nothing forcing work
   // (no queued task, no blocking signal) → hold at MONITORING instead of burning a repair on no-consensus.
   if (state.phase === "COUNCIL_DEBATE" && !hasTask && !isBlocking(actionTier) && councilDecision() === "HOLD") {
@@ -331,9 +380,12 @@ async function tick(): Promise<OrchestraState> {
   if (next === "MONITORING" && !hasTask && AUTODRAIN) {
     const cat = loadCatalog();
     const t = nextPending(cat, loadProgress());
-    if (t) { state = enqueueTask(state, t.id); next = "COUNCIL_DEBATE"; const s = summary(cat, loadProgress()); log(`↻ auto-drain: ${t.id} (done ${s.done}/${s.total})`); }
+    if (t) { state = enqueueTask(state, t.id); next = "COUNCIL_DEBATE"; const s = summary(cat, loadProgress()); trkStart(t.id); log(`↻ auto-drain: ${t.id} (done ${s.done}/${s.total})`); }
   }
   if (shouldResetRetry(next)) state.retry_count = 0;
+  if (next === "COUNCIL_DEBATE" || next === "BENCHMARK_VALIDATION") {
+    trkPhase(next, next === "COUNCIL_DEBATE" ? "Konsey görevi değerlendiriyor" : "Benchmark sinyalleri doğrulanıyor");
+  }
   if (next === "COUNCIL_DEBATE" && state.pending_actions.length) state = dequeueTask(state);
   state.history = pruneHistory(state.history, { ts, phase: next, note: `action=${actionTier ?? "clean"}${isBlocking(actionTier) ? "!" : ""} conv=${converged ? 1 : 0}` });
   state = { ...state, phase: next };
@@ -348,6 +400,7 @@ async function tick(): Promise<OrchestraState> {
 function enqueueCli(task: string): void {
   const state = enqueueTask(loadState(conductorModel()), task);
   saveState(state);
+  trkStart(task); // live progress UX: `ollamas follow` picks this run up immediately
   log(`＋ enqueued: "${task}" (queue=${state.pending_actions.length})`);
 }
 
