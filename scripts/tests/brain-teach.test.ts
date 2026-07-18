@@ -94,3 +94,14 @@ describe("brain-teach v5 — ecosystem set", () => {
     expect(recs.find((r) => r.id === "teach:eco:prensip-kanit")?.content).toContain("evidence");
   });
 });
+
+import { buildPromptEngRecords, buildVitestRecords, buildRegexRecords, buildBasvuruTrRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v7 — dalga-7 sets", () => {
+  it("daily-work sets carry own-system patterns and lived gotchas", () => {
+    expect(buildPromptEngRecords().find((r) => r.id === "teach:prompt:anti-halusinasyon")?.content).toContain("BİLGİ_YOK");
+    expect(buildVitestRecords().find((r) => r.id === "teach:vitest:test-timeout")?.content).toContain("5s");
+    expect(buildRegexRecords().find((r) => r.id === "teach:regex:greedy-lazy")?.content).toContain("tembel");
+    expect(buildBasvuruTrRecords().find((r) => r.id === "teach:basvuru:arz-rica")?.content).toContain("arz ederim");
+  });
+});

@@ -519,6 +519,71 @@ export function buildEnWritingRecords(): TeachRecord[] {
   return EN_WRITING.map(([k, d]) => ({ id: `teach:en:${k}`, actor: "english", content: `İngilizce yazışma '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-7: günlük iş setleri ———
+const PROMPT_ENG: [string, string][] = [
+  ["system-prompt", "modelin rolü+kuralları en başta; kısa, emir kipi, çelişkisiz"],
+  ["few-shot", "2-3 örnek girdi→çıktı göster; format örneklerden öğrenilir"],
+  ["cot", "adım-adım düşündür ('think step by step') — mantık işlerinde isabet artar"],
+  ["json-extraction", "SADECE-JSON iste + şemayı ver; sondan-geriye parse et (reasoning sızıntısına dayanıklı — parseExtraction böyle)"],
+  ["anti-halusinasyon", "kaynak-dışına çıkma yasağı + 'yoksa BİLGİ_YOK yaz' kaçışı (brain-ask deseni)"],
+  ["kisit-liste", "yapma-listesi ver: 'süsleme yok, tahmin yok, en fazla N madde'"],
+  ["sicaklik", "extraction/kod işinde temperature düşük; yaratıcı işte yüksek"],
+  ["delimiter", "kullanıcı-metnini ``` ya da <text> ile ayır — talimat-karışması (injection) azalır"],
+  ["rol-atama", "'Sen bir X uzmanısın' — cevap dilini/derinliğini kalibre eder"],
+  ["iteratif-daraltma", "geniş cevap → 'şimdi sadece Y kısmını derinleştir' zinciri"],
+  ["citation-zorunlu", "her iddiaya [kaynak-id] şartı — doğrulanabilirlik (ask'ın [mem:id] deseni)"],
+  ["ornek-negatif", "yanlış-örnek de göster: 'ŞÖYLE YAPMA: ...' — sınır netleşir"],
+];
+export function buildPromptEngRecords(): TeachRecord[] {
+  return PROMPT_ENG.map(([k, d]) => ({ id: `teach:prompt:${k}`, actor: "prompt-eng", content: `Prompt mühendisliği '${k}': ${d}.` }));
+}
+const VITEST_SET: [string, string][] = [
+  ["describe-it", "describe blok gruplar, it/test tek durum; isim davranışı anlatsın"],
+  ["expect", "expect(x).toBe (özdeş) / toEqual (derin) / toContain / toThrow"],
+  ["red-green", "önce KIRMIZI (davranış yok), sonra minimal kodla YEŞİL, sonra temizle"],
+  ["vi-fn", "vi.fn() sahte fonksiyon; çağrı sayısı/argüman assert edilir"],
+  ["fixture", "sabit örnek veri — gerçek-format kopyası kullan (whatis/Makefile fixture'larımız gibi)"],
+  ["injectable-deps", "IO'yu parametre yap (embed, generate, now) — test deterministik olur (brain deseni)"],
+  ["test-timeout", "yavaş test: it('...', fn, 30000) — paralel yüklü kutuda 5s default yetmez (yaşanmış)"],
+  ["in-process-http", "app'i import + http.createServer — route'ları portsuz gerçek test (brain-panel deseni)"],
+  ["run-one", "npx vitest run dosya -t 'isim' — tek testi koş, hızlı döngü"],
+  ["flaky", "paralel-suite'te düşen testi İZOLE koş — geçiyorsa flaky, kod değil ortam (demo.test yaşandı)"],
+];
+export function buildVitestRecords(): TeachRecord[] {
+  return VITEST_SET.map(([k, d]) => ({ id: `teach:vitest:${k}`, actor: "vitest", content: `Vitest/test '${k}': ${d}.` }));
+}
+const REGEX_DEEP: [string, string][] = [
+  ["named-group", "(?<ad>...) — eşleşmeye isimle eriş: m.groups.ad"],
+  ["lookahead", "x(?=y) y GELECEKSE x; x(?!y) gelmeyecekse — tüketmeden bakar"],
+  ["greedy-lazy", ".* açgözlü (en uzun), .*? tembel (en kısa) — HTML/quote parse'ta kritik"],
+  ["flags", "g tümü, i harf-duyarsız, m çok-satır (^$ satır-başı), s nokta=newline, u unicode (TR şart)"],
+  ["char-class", "[a-z0-9_-] küme; ^ içeride NEGATİF: [^\\s] boşluk-olmayan"],
+  ["anchor", "^ başlangıç $ son \\b kelime-sınırı — kısmi-eşleşme kazalarını keser"],
+  ["escape-ozel", ". * + ? ( ) [ ] { } | \\ ^ $ — düz kullanmak için \\ ile kaçır"],
+  ["replace-group", "replace(/(\\d+)-(\\d+)/, '$2-$1') — yakalanan grupla değiştirme"],
+  ["yaygin-desen", "email ^[^@\\s]+@[^@\\s]+$ · semver ^\\d+\\.\\d+\\.\\d+ · hex-hash ^[a-f0-9]{7,40}$"],
+  ["test-once", "regex101 benzeri yerine node -e ile hızlı doğrula; ÜRETİME test'siz regex sokma"],
+];
+export function buildRegexRecords(): TeachRecord[] {
+  return REGEX_DEEP.map(([k, d]) => ({ id: `teach:regex:${k}`, actor: "regex", content: `Regex-derin '${k}': ${d}.` }));
+}
+const BASVURU_TR: [string, string][] = [
+  ["hitap", "kuruma: 'Sayın Yetkili' / birime: '... Başkanlığına' — büyük harf, virgülsüz satır"],
+  ["arz-rica", "üst makama 'arz ederim', ast/eş düzeye 'rica ederim'; ikisi birden: 'arz ve rica ederim'"],
+  ["konu-satiri", "Konu: tek satır özet — dilekçenin ilk bloğu"],
+  ["ek-listesi", "EKLER: 1- ... 2- ... — metinde '(Ek-1)' atıfla"],
+  ["tarih-format", "resmi yazıda GG.AA.YYYY; uluslararası başvuruda ISO YYYY-AA-GG"],
+  ["kimlik-blok", "ad-soyad, TC/başvuru-no, iletişim — sağ üst ya da imza altı"],
+  ["proje-ozeti", "TÜBİTAK tarzı: amaç→yöntem→beklenen-etki 3 cümle; jargonsuz ilk cümle"],
+  ["butce-gerekce", "her kalem: ne + neden-gerekli + nasıl-hesaplandı"],
+  ["taahhut", "'... beyan ederim' kalıbı; yanlış-beyan sonuçları bilinerek"],
+  ["takip-yazisi", "'... tarihli başvurumun durumu hakkında bilgi rica ederim' — kısa, referans-numaralı"],
+];
+export function buildBasvuruTrRecords(): TeachRecord[] {
+  return BASVURU_TR.map(([k, d]) => ({ id: `teach:basvuru:${k}`, actor: "basvuru-tr", content: `Resmi TR yazışma '${k}': ${d}.` }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -562,6 +627,10 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
   try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["prompt-eng", buildPromptEngRecords()],
+    ["vitest-test", buildVitestRecords()],
+    ["regex-derin", buildRegexRecords()],
+    ["basvuru-tr", buildBasvuruTrRecords()],
     ["css-tailwind", buildCssRecords()],
     ["ag-derin", buildNetDeepRecords()],
     ["editor-verim", buildEditorRecords()],
