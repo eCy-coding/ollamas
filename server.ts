@@ -33,7 +33,7 @@ import { costSummary } from "./server/key-usage";
 import { geminiCliAvailable, generateViaGeminiCli } from "./server/gemini-cli";
 import { listModels as aiListModels, generate as aiGenerate, generateTextStream as aiGenerateTextStream } from "./server/ai";
 import { runTestgen, runAudit, generateStorefront, getRevenueConfig, setRevenueConfig, publishAuditToGitHub, publishAuditPR } from "./server/revenue";
-import { parseRepoSlug, rerunFailedJobs, cancelRun } from "./server/github";
+import { parseRepoSlug, rerunFailedJobs, cancelRun, validateGitHubToken } from "./server/github";
 import { getRuns, getJobs, getWorkflows, getLog, dispatch, detectRepoSlug } from "./server/github-actions";
 import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignature } from "./server/github-app";
 import { notify } from "./server/notify";
@@ -1370,6 +1370,12 @@ async function initializeServer() {
       db.logSecurity("permission_change", `Key vault configured: ${provider}`, "Decrypted credentials saved securely at rest", "info");
     }
     db.save();
+    // GitHub (repo): live-validate on save so the UI can show the real login / a clear
+    // error instead of a blind "success". Never blocks the save; never logs the token.
+    if (provider === "github" && key) {
+      const gh = await validateGitHubToken(key);
+      return res.json({ success: true, github: { ok: gh.ok, tokenType: gh.tokenType, ...(gh.login ? { login: gh.login } : {}), ...(gh.scopes.length ? { scopes: gh.scopes } : {}), ...(gh.ok ? {} : { error: gh.error }) } });
+    }
     res.json({ success: true });
   });
 
@@ -1392,6 +1398,23 @@ async function initializeServer() {
     // the literal "undefined" key → corrupted store on disk. Reject early.
     if (!provider || typeof provider !== "string") {
       return res.status(400).json({ error: "provider required" });
+    }
+    // GitHub (repo) is NOT an LLM provider — validate the token against the real GitHub
+    // API (GET /user) instead of the chat path (which false-positives via the demo lane).
+    if (provider === "github") {
+      let tok = typeof key === "string" && key ? key : "";
+      if (!tok) { try { tok = db.decrypt(db.data.keys["github"] || ""); } catch { /* absent */ } }
+      const r = await validateGitHubToken(tok);
+      return res.json({
+        success: r.ok,
+        tokenType: r.tokenType,
+        ...(r.login ? { login: r.login } : {}),
+        ...(r.scopes.length ? { scopes: r.scopes } : {}),
+        ...(r.ok ? {} : { error: r.error }),
+        ...(r.ok && r.tokenType === "fine-grained"
+          ? { warning: "Fine-grained token — Actions/Arama için repo seçimi + Actions(R/W)+Contents+Metadata izinleri gerekir." }
+          : {}),
+      });
     }
     const testConfig = {
       provider,

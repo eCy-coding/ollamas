@@ -15,6 +15,10 @@ const KEY_PAGE: Record<string, string> = {
   anthropic: "https://console.anthropic.com/settings/keys",
   openrouter: "https://openrouter.ai/keys",
   "ollama-cloud": "https://ollama.com/settings/keys",
+  // GitHub repo (Actions/Search/audit): classic token pre-scoped for repo + workflow.
+  github: "https://github.com/settings/tokens/new?scopes=repo,workflow&description=ollamas",
+  // GitHub Models (LLM inference) needs a token with the "Models" permission, NOT repo.
+  "github-models": "https://github.com/settings/personal-access-tokens",
 };
 
 // Rich display names; providers absent here (future catalog entries) fall back to their id.
@@ -29,7 +33,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   zai: "Zhipu GLM (z.ai)",
   sambanova: "SambaNova",
   "nvidia-nim": "NVIDIA NIM",
-  "github-models": "GitHub Models",
+  github: "GitHub (repo)",
+  "github-models": "GitHub Models (LLM)",
   cloudflare: "Cloudflare Workers AI",
   mistral: "Mistral",
 };
@@ -71,7 +76,7 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [masks, setMasks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
-  const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string }>>({});
+  const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string; detail?: string }>>({});
   const [pool, setPool] = useState<Record<string, PoolEntry>>({});
   const [alerts, setAlerts] = useState<Array<{ provider: string; worstPct: number; live: number }>>([]);
   // "Scan & Connect" (T6): one click harvests machine keys via /api/keys/doctor.
@@ -231,22 +236,26 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     const endpoint = provider === "custom-openai" ? inputs["custom-openai-endpoint"] : undefined;
 
     try {
-      const data = await api.post<{ success: boolean; latencyMs?: number; error?: string }>(
+      const data = await api.post<{ success: boolean; latencyMs?: number; error?: string; login?: string; tokenType?: string; warning?: string }>(
         "/api/keys/test",
         { provider, key: keyVal, customEndpoint: endpoint },
       );
       if (data.success) {
+        // GitHub (repo) returns the authenticated login (+ a fine-grained permission hint)
+        // instead of an LLM latency — surface it so "connected" is real, not blind.
+        const detail = data.login ? `bağlandı: ${data.login}${data.warning ? ` · ${data.warning}` : ""}` : undefined;
         setPingStatus((prev) => ({
           ...prev,
-          [provider]: { ok: true, latency: data.latencyMs },
+          [provider]: { ok: true, latency: data.latencyMs, detail },
         }));
-        onNotify(`${provider} connection verified!`, "success");
+        onNotify(data.login ? `GitHub bağlandı: ${data.login}` : `${provider} connection verified!`, "success");
+        if (data.warning) onNotify(data.warning, "info");
       } else {
         setPingStatus((prev) => ({
           ...prev,
           [provider]: { ok: false, err: data.error },
         }));
-        onNotify(`${provider} reachability failed. Check keys.`, "error");
+        onNotify(`${provider}: ${data.error ?? "reachability failed. Check keys."}`, "error");
       }
     } catch (e: any) {
       setPingStatus((prev) => ({ ...prev, [provider]: { ok: false, err: e.message } }));
@@ -293,6 +302,10 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     // even before/independent of the /api/keys/pool fetch — account_id is pinned server-side, so
     // pasting the Workers-AI token here is the only step. Kept in baseIds → no catalog-row dup.
     { id: "cloudflare", label: "Cloudflare Workers AI", placeholder: "Key: CLOUDFLARE_API_TOKEN", desc: "Workers AI — free ~10K neurons/day · paste the Workers-AI token (account_id auto-resolved)" },
+    // GitHub REPO integration (Actions/Search/audit) — writes keys["github"], live-validated
+    // on Test/Save. Key↗ opens a classic token pre-scoped for repo+workflow. Fine-grained
+    // github_pat_… also works (needs Actions R/W + Contents + Metadata on the target repo).
+    { id: "github", label: "GitHub (repo)", placeholder: "ghp_… veya github_pat_… (repo+workflow)", desc: "Actions/Arama/audit için repo erişimi · Key↗ classic token (repo+workflow) açar; fine-grained için Actions+Contents+Metadata izni ver. Test canlı doğrular." },
   ];
   const baseIds = new Set(BASE_ROWS.map((r) => r.id));
   const catalogRows = (Object.entries(pool) as Array<[string, PoolEntry]>)
@@ -499,16 +512,16 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
 
                 {/* Ping Result Indicators */}
                 {testReport && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-mono">
+                  <div className="mt-2 flex items-start gap-1.5 text-[10px] font-mono">
                     {testReport.ok ? (
-                      <span className="text-status-ok flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Online ({testReport.latency}ms)
+                      <span className="text-status-ok flex items-start gap-1">
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                        {testReport.detail ?? `Online (${testReport.latency}ms)`}
                       </span>
                     ) : (
-                      <span className="text-status-err flex items-center gap-1 group relative">
-                        <XCircle className="w-3.5 h-3.5" />
-                        Ping Failed
+                      <span className="text-status-err flex items-start gap-1 group relative">
+                        <XCircle className="w-3.5 h-3.5 shrink-0" />
+                        {testReport.err ?? "Ping Failed"}
                       </span>
                     )}
                   </div>
