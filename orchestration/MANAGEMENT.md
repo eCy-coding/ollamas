@@ -103,6 +103,19 @@ RESEARCH-ORG.md §v3). The loop is: **train → gate → dispatch → record →
 - **Retrain cadence.** Online: `npx tsx orchestration/bin/org-train.ts` after any episode (the
   sandbox retrains every round automatically). The conductor loads `ORG_POLICY.json` advisorily.
 
+## The Definitive Answer Doctrine (assumption-free answering)
+
+Every answering surface obeys GROUNDED-ANSWER.md: an answer is either DEFINITIVE (arithmetic
+COMPUTED by the deterministic evaluator, code EXECUTED for real with captured output, HTML
+mechanically VALIDATED, facts answered only WITH a source) or an honest UNVERIFIED refusal with the
+exact failure — never a hedge, never a guess. `2+2=?` → **4**, because the evaluator computed it.
+
+```bash
+tsx orchestration/bin/answer.ts "2+2=?"            # → 4 — DEFINITIVE (computed)
+tsx orchestration/bin/answer.ts --python 'print(2+2)' # executed for real
+tsx orchestration/bin/answer.ts --fact "..."         # sourced or refused
+```
+
 ## The 50 critical µ-services
 
 The whole working principle decomposes into 50 single-responsibility services under one contract
