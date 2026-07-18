@@ -55,6 +55,9 @@ export async function distillSession(
     return { memories: 0, facts: 0, skipped: false };
   }
   const sink = deps.ingest ?? brainIngest;
+  // LLM-generated rows carry the untrusted-class confidence (0.5) — synthesis treats
+  // them with caution and curated/user knowledge outranks them on conflict.
+  extraction.memories = extraction.memories.map((m) => ({ ...m, confidence: 0.5 })) as any;
   const out = await sink({ episodeId: sess.id, ...extraction, ns: deps.ns });
   // Single-line observation record — OTel gen-ai semantic field NAMES only (no SDK dep).
   console.log(JSON.stringify({

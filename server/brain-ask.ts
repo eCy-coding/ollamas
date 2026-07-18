@@ -11,6 +11,8 @@ export interface AskSource {
   tier: string;
   score: number;
   excerpt: string;
+  /** Provenance confidence (#10/#12) when the row carries one. */
+  conf?: number;
 }
 
 export interface AskResult {
@@ -42,6 +44,7 @@ Kurallar:
 - Her iddiadan sonra dayandığı kaynağı [mem:ID] biçiminde belirt.
 - [mem:live:system] etiketli kaynak CANLI sistem durumudur — "şu an" soruları için birincil ve güvenilir kaynaktır, kullan.
 - Kaynaklarda cevap yoksa SADECE şunu yaz: BİLGİ_YOK
+- Düşük-güven işaretli (conf≤0.5, LLM-üretimi) kaynakları ihtiyatla kullan; çelişkide yüksek-güvenli kaynağı seç.
 - Kaynak dışına çıkma, tahmin etme, süsleme yapma.`;
 
 /** Multi-hop widen (backlog #2): entities named by the first-pass facts seed a
@@ -118,6 +121,7 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
     tier: h.tier,
     score: Number(h.score.toFixed(3)),
     excerpt: String(h.content).slice(0, 240),
+    ...((h as { confidence?: number | null }).confidence != null ? { conf: (h as any).confidence } : {}),
   }));
   if (live) sources.unshift({ id: "live:system", tier: "live", score: 1, excerpt: live.slice(0, 400) });
   const context =

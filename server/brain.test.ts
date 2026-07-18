@@ -675,3 +675,21 @@ describe("Brain — ask iterative deepening (gap #2 closed)", () => {
     expect(queries).toContain("pulse");
   });
 });
+
+describe("Brain — provenance confidence (#10/#12)", () => {
+  test("low-confidence (LLM-distilled) yields to curated at equal distance; tier order survives", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-cur", tier: "learned", content: "likes espresso", confidence: 0.95 });
+    await b.remember({ id: "m-llm", tier: "learned", content: "likes espresso", confidence: 0.5 });
+    const hits = await b.recall("query_coffee", { k: 3 });
+    expect(hits[0].id).toBe("m-cur"); // same distance+tier → confidence decides
+    expect(hits[0].confidence).toBe(0.95);
+    expect(hits[1].confidence).toBe(0.5);
+    // tier contract intact: low-conf core still beats high-conf working
+    await b.remember({ id: "m-core", tier: "core", content: "likes espresso", confidence: 0.5 });
+    await b.remember({ id: "m-work", tier: "working", content: "likes espresso", confidence: 0.95 });
+    const h2 = await b.recall("query_coffee", { k: 5 });
+    expect(h2.findIndex((h) => h.id === "m-core")).toBeLessThan(h2.findIndex((h) => h.id === "m-work"));
+    b.close();
+  });
+});

@@ -659,7 +659,7 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   for (const [name, recs] of sets) console.log(JSON.stringify({ event: "brain.teach.set", set: name, records: recs.length }));
   const all = [...py, ...mac, ...sets.flatMap(([, r]) => r)];
   for (const r of all) {
-    await brainRemember({ id: r.id, tier: "procedural", content: r.content, source: "teach-datasets", ns: "knowledge", actor: r.actor });
+    await brainRemember({ id: r.id, tier: "procedural", content: r.content, source: "teach-datasets", ns: "knowledge", actor: r.actor, confidence: 0.95 });
     mem++;
     if (r.fact) {
       try { const f = await brainAssertFact({ ...r.fact, ns: "default" }); if (f.changed) facts++; } catch { /* embedder queued — nightly */ }

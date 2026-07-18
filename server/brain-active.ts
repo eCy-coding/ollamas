@@ -24,6 +24,7 @@ export function buildTurnMemory(
     tier: "working",
     content: parts.join("\n").slice(0, 2000),
     source: sessionId ? `turn:${sessionId}` : "turn",
+    confidence: 0.6,
   };
 }
 

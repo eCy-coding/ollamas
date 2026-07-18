@@ -122,7 +122,7 @@ export async function syncSystemToBrain(deps: {
     const r = await deps.assertFact(f);
     if (r.changed) changed++;
   }
-  await deps.remember({ id: "system-inventory", tier: "learned", content: snapshotSummary(s), source: "system-sync", actor: "macbook" });
+  await deps.remember({ id: "system-inventory", tier: "learned", content: snapshotSummary(s), source: "system-sync", actor: "macbook", confidence: 0.9 } as any);
   return { facts: facts.length, changed };
 }
 

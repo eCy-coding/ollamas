@@ -46,6 +46,9 @@ export interface BrainMemoryInput {
   /** B5 multi-party attribution: who this memory is about/from (user id, agent name).
    *  Filterable at recall — prevents identity leakage across speakers. */
   actor?: string;
+  /** #10/#12 provenance confidence 0..1: curated 0.95, user 0.85, mirror 0.7,
+   *  retain 0.6, LLM-distilled 0.5 (untrusted class). NULL legacy rows read as 0.6. */
+  confidence?: number;
 }
 
 export interface BrainRecallHit {
@@ -56,6 +59,7 @@ export interface BrainRecallHit {
   score: number;
   createdAt: number;
   actor?: string | null;
+  confidence?: number | null;
   /** E1: set when the embedder was unavailable and this ranking came from the
    *  FTS/BM25 arm alone — still an answer, just keyword-grounded. */
   lexical?: boolean;
@@ -293,7 +297,7 @@ export function createBrainStore(
   // contended at write time); backfillEmbeddings() indexes it when the embedder frees up.
   // superseded_at (belief revision, Tur-5): a memory contradicted by a later write is
   // invalidated bi-temporally — recall filters it, history keeps it, sweep prunes it.
-  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0", "superseded_at INTEGER", "actor TEXT"]) {
+  for (const col of ["last_access INTEGER", "access_count INTEGER NOT NULL DEFAULT 0", "pending_embed INTEGER NOT NULL DEFAULT 0", "superseded_at INTEGER", "actor TEXT", "confidence REAL"]) {
     try { db.exec(`ALTER TABLE brain_memories ADD COLUMN ${col}`); } catch { /* already there */ }
   }
   db.exec(`CREATE TABLE IF NOT EXISTS brain_facts (
@@ -484,8 +488,8 @@ export function createBrainStore(
     const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
-      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count, pending_embed, actor) VALUES(?,?,?,?,?,?,?,?,?)")
-      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0, vec ? 0 : 1, m.actor ?? null);
+      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count, pending_embed, actor, confidence) VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0, vec ? 0 : 1, m.actor ?? null, m.confidence ?? null);
     const rowid = BigInt(ins.lastInsertRowid);
     if (vec) db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
     if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(content, rowid);
@@ -532,7 +536,7 @@ export function createBrainStore(
       const vecRows = !vec ? [] as (BrainRecallHit & { ns: string; rowid: number; hits: number })[] : db
         .prepare(
           `SELECT m.rowid AS rowid, m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt,
-                  v.distance AS distance, m.ns AS ns, m.access_count AS hits, m.actor AS actor
+                  v.distance AS distance, m.ns AS ns, m.access_count AS hits, m.actor AS actor, m.confidence AS confidence
            FROM (SELECT rowid, distance FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?) v
            JOIN brain_memories m ON m.rowid = v.rowid
            WHERE m.superseded_at IS NULL`,
@@ -567,7 +571,7 @@ export function createBrainStore(
         const extra = db
           .prepare(
             `SELECT m.mem_id AS id, m.tier AS tier, m.content AS content, m.created_at AS createdAt, m.ns AS ns,
-                    m.access_count AS hits, m.actor AS actor
+                    m.access_count AS hits, m.actor AS actor, m.confidence AS confidence
              FROM brain_memories m WHERE m.mem_id IN (${ph}) AND m.superseded_at IS NULL`,
           )
           .all(...missing) as unknown as (BrainRecallHit & { ns: string; hits: number })[];
@@ -588,9 +592,13 @@ export function createBrainStore(
           distance: r.distance,
           createdAt: r.createdAt,
           actor: (r as any).actor ?? null,
+          confidence: (r as any).confidence ?? null,
           ...(vec ? {} : { lexical: true as const }),
           score:
-            (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0),
+            (1 / (1 + r.distance)) * TIER_WEIGHT[r.tier] * tierRecency(r.createdAt, t, r.tier) * usageBoost(r.hits ?? 0) *
+            // #10/#12: provenance weighting — LLM-distilled (0.5) yields to curated (0.95)
+            // without ever overturning the tier-order contract (bounded 0.55..1.0).
+            (0.55 + 0.45 * (((r as any).confidence ?? 0.6) as number)),
         }))
         .sort((a, b) => b.score - a.score)
         .filter((r) => r.score >= scoreFloor);
@@ -904,7 +912,7 @@ export function createBrainStore(
       if (!episodeId?.trim()) throw new Error("ingest needs an episodeId");
       let m = 0;
       for (const [i, mem] of memories.entries()) {
-        await rememberOne({ id: `${episodeId}:m${i}`, tier: mem.tier, content: mem.content, source: episodeId, ns });
+        await rememberOne({ id: `${episodeId}:m${i}`, tier: mem.tier, content: mem.content, source: episodeId, ns, confidence: (mem as { confidence?: number }).confidence });
         m++;
       }
       let fCount = 0;
