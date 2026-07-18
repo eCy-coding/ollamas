@@ -1375,6 +1375,19 @@ async function initializeServer() {
     }
   });
 
+  // Brain write choke-point for out-of-process producers (org conductor mirror,
+  // one-shot imports). Same contract as brainRemember: explicit ids are idempotent
+  // upserts, auto-ids go through AUDN dedup; createdAt lets imports keep event time.
+  app.post("/api/brain/remember", async (req, res) => {
+    try {
+      const { id, tier, content, source, ns, createdAt } = req.body || {};
+      const { brainRemember } = await import("./server/brain");
+      res.json(await brainRemember({ id, tier, content, source, ns, createdAt }));
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || "brain remember failed" });
+    }
+  });
+
   // Hierarchy tier-router bridge snapshot (B7): current mode (off/advisory/enforce),
   // whether the on-disk HIERARCHY_POLICY is structurally + statistically usable, and the
   // last 100 recommendations. Advisory-only by default — see server/hierarchy-bridge.ts.

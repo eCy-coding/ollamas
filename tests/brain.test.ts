@@ -45,6 +45,18 @@ describe("Brain — tiered memories (sqlite-vec)", () => {
     b.close();
   });
 
+  test("createdAt override keeps original event time for imports", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    const then = Date.parse("2026-01-01T00:00:00Z");
+    await b.remember({ id: "m-old", tier: "episodic", content: "likes espresso", createdAt: then });
+    await b.remember({ id: "m-new", tier: "episodic", content: "prefers tea" });
+    const rows = (await b.overview({ recent: 5 })).memories;
+    expect(rows.find((m) => m.id === "m-old")?.createdAt).toBe(then);
+    // a migrated 6-month-old episodic memory must NOT score as fresh
+    expect(rows.find((m) => m.id === "m-new")!.createdAt).toBeGreaterThan(then);
+    b.close();
+  });
+
   test("re-remember same id upserts (no duplicates)", async () => {
     const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
     await b.remember({ id: "m1", tier: "working", content: "likes espresso" });

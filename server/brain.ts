@@ -36,6 +36,9 @@ export interface BrainMemoryInput {
   content: string;
   source?: string;
   ns?: string;
+  /** Epoch ms override for imports/migrations — recency decay must see the ORIGINAL
+   *  event time, not the import time. Omit for live writes. */
+  createdAt?: number;
 }
 
 export interface BrainRecallHit {
@@ -342,7 +345,7 @@ export function createBrainStore(
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
       .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at) VALUES(?,?,?,?,?,?)")
-      .run(id, m.tier, m.content, m.source ?? null, ns, now());
+      .run(id, m.tier, m.content, m.source ?? null, ns, m.createdAt ?? now());
     const rowid = BigInt(ins.lastInsertRowid);
     db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
     if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(m.content, rowid);
