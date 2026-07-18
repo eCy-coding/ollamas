@@ -176,8 +176,11 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     id: "retain-turn", kind: "pure", role: "per-turn working-tier exchange fold", deps: ["memory-store"],
     source: "server/brain-active.ts",
     selftest: async () => {
-      const { buildTurnMemory } = await import("./brain-active");
+      const { buildTurnMemory, admitsTurn } = await import("./brain-active");
       const m = buildTurnMemory([{ role: "user", content: "hi" }, { role: "assistant", content: "yo" }], "sess");
+      // A-MAC probe: the fold above is exactly the noise the admission gate exists to drop.
+      if (admitsTurn("S: hi\nY: yo", {}) || !admitsTurn("S: deploy server.ts at 15:00\nY: make ship works", {}))
+        return expectThat(false, "", "A-MAC admission gate misrouting noise/substance");
       return expectThat(m?.tier === "working" && m.content.includes("S: hi"), "turn folded to working", "turn fold broken");
     },
   },

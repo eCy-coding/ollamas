@@ -10,6 +10,7 @@ Bu doküman brain'in ollamas'a NE KADAR entegre olduğunu YALANSIZ anlatır — 
 |---|---|---|---|
 | Auto-recall | **ON** | `BRAIN_AUTO_RECALL=0` | Her ReAct turn'ünde ilgili hafıza system-prompt'a enjekte (best-effort 4s, $0 local embed) |
 | Per-turn retain | **ON** | `BRAIN_AUTO_RETAIN=0` | Her turn sonrası user+assistant exchange'i working-tier'a async yaz (embed-only, $0, LLM YOK) |
+| A-MAC admission gate | **ON** | `BRAIN_ADMIT=0` | Retain öncesi salience/utility skoru (`admissionScore`, pure/embed-free): gürültü turn'lar ("tamam", "hi") satır+vektör+embedder maliyeti ödemez; eşik `BRAIN_ADMIT_MIN` (default 0.1) |
 | Periyodik distill | **ON** | `BRAIN_AUTO_DISTILL=0` | Her 10 mesajda durable extraction; provider default keyless pollinations ($0) |
 | Otonom bakım | **ON** (launchd) | — | Günlük 04:00 sweep+consolidate+drift |
 | MCP expose | **OFF** | `BRAIN_MCP_EXPOSE=1` | brain_* dış MCP istemcilerine kapalı (operatör hafızası güvenliği) |

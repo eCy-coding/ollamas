@@ -787,6 +787,29 @@ describe("Brain v6 — always-on helpers (Y1, pure)", () => {
   });
 });
 
+describe("Brain — A-MAC admission control (Tur-2 research, pure)", () => {
+  test("admissionScore: noise turns score ~0, substantive turns score high", async () => {
+    const { admissionScore } = await import("../server/brain-active");
+    // Greetings / acknowledgements carry zero high-value tokens and no markers.
+    expect(admissionScore("S: Selam!")).toBe(0);
+    expect(admissionScore("Tamam, teşekkürler sağol")).toBe(0);
+    expect(admissionScore("S: hi\nY: yo")).toBe(0);
+    // Numbers, code ids, proper nouns and intent markers push the score up.
+    expect(admissionScore("S: deploy server.ts at 15:00\nY: make ship her Pazartesi 09:30 koşuyor")).toBeGreaterThan(0.3);
+    expect(admissionScore("Emre prefers Türkçe responses, kod İngilizce")).toBeGreaterThan(0.2);
+    expect(admissionScore("remind me to check the backup")).toBeGreaterThanOrEqual(0.25);
+    expect(admissionScore("")).toBe(0);
+  });
+
+  test("admitsTurn: gate at BRAIN_ADMIT_MIN, BRAIN_ADMIT=0 restores write-every-turn", async () => {
+    const { admitsTurn } = await import("../server/brain-active");
+    expect(admitsTurn("S: hi\nY: yo", {})).toBe(false);
+    expect(admitsTurn("S: deploy server.ts at 15:00\nY: make ship works", {})).toBe(true);
+    expect(admitsTurn("S: hi\nY: yo", { BRAIN_ADMIT: "0" })).toBe(true); // filter off → legacy behavior
+    expect(admitsTurn("S: deploy server.ts at 15:00\nY: ok", { BRAIN_ADMIT_MIN: "0.99" })).toBe(false); // custom gate wins
+  });
+});
+
 describe("Brain — tier weights", () => {
   test("core > learned > procedural > episodic > working", () => {
     expect(TIER_WEIGHT.core).toBeGreaterThan(TIER_WEIGHT.learned);

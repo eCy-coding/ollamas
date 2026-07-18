@@ -2105,9 +2105,12 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
 
           // Brain per-turn retain (default ON, BRAIN_AUTO_RETAIN=0 opts out): the last
           // user+assistant exchange lands in the working tier async — embed-only, no LLM.
+          // A-MAC admission gate (BRAIN_ADMIT=0 off): noise turns ("tamam", "hi") never
+          // cost a row, a vector, or an embedder slot.
           if (brainActiveOn(process.env.BRAIN_AUTO_RETAIN)) {
+            const { admitsTurn } = await import("./server/brain-active");
             const turnMem = brainBuildTurnMemory(sess.messages, sess.id);
-            if (turnMem) {
+            if (turnMem && admitsTurn(turnMem.content)) {
               setImmediate(async () => {
                 try {
                   const { brainRemember } = await import("./server/brain");

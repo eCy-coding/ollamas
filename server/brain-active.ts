@@ -27,6 +27,55 @@ export function buildTurnMemory(
   };
 }
 
+// A-MAC admission markers (Tur-2 AI-Mode research): deterministic keyword buckets that
+// signal future actionability — temporal commitments, preferences, tasks. TR+EN.
+const ADMIT_TEMPORAL =
+  /\b(yar[ıi]n|bug[üu]n|pazartesi|sal[ıi]|çarşamba|perşembe|cuma|cumartesi|pazar|hafta|saat|deadline|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|until|every)\b/iu;
+const ADMIT_PREFERENCE =
+  /\b(sever|sevmez|tercih|istemiyor|nefret|alerji|prefers?|hates?|loves?|likes?|dislikes?|always|never|asla|daima|allergic)\b/iu;
+const ADMIT_TASK =
+  /\b(remind|need to|must|plan|todo|fix|deploy|kur|oluştur|yap[ıi]lacak|gerek|laz[ıi]m|hat[ıi]rlat|unutma)\b/iu;
+
+/** A-MAC admission score (0..1): high-value token density (numbers, code ids/paths,
+ *  interior-uppercase names, mid-sentence proper nouns) plus actionability-marker
+ *  bonuses. Pure, zero-dep, embed-free — it runs BEFORE any write or embedding, so
+ *  dropping a noise turn also spares the embedder. Sentence-start capitals (incl.
+ *  after `.:!?` or a newline, e.g. the "S:"/"Y:" fold prefixes) do not count. */
+export function admissionScore(text: string): number {
+  const t = (text || "").trim();
+  if (!t) return 0;
+  const rawTokens = t.split(/\s+/);
+  let highValue = 0;
+  let sentenceStart = true;
+  for (const raw of rawTokens) {
+    const w = raw.replace(/^[^\p{L}\p{N}`~/._:\\-]+|[^\p{L}\p{N}`~/._:\\-]+$/gu, "");
+    const startsSentence = sentenceStart;
+    sentenceStart = /[.:!?\n]$/.test(raw);
+    if (!w) continue;
+    if (/\d/.test(w)) highValue++;
+    else if (w.length > 2 && /[/_.:`\\-]/.test(w)) highValue++; // paths, urls, code ids
+    else if (/\p{Lu}/u.test(w.slice(1))) highValue++; // camelCase / ALLCAPS interior
+    else if (!startsSentence && w.length > 2 && /^\p{Lu}\p{Ll}/u.test(w)) highValue++; // mid-sentence proper noun (real Aa shape — not fold prefixes like "Y:")
+  }
+  let bonus = 0;
+  if (ADMIT_TEMPORAL.test(t)) bonus += 0.25;
+  if (ADMIT_PREFERENCE.test(t)) bonus += 0.25;
+  if (ADMIT_TASK.test(t)) bonus += 0.25;
+  return Math.min(1, highValue / rawTokens.length + bonus);
+}
+
+/** Admission gate for the per-turn retain: below BRAIN_ADMIT_MIN (default 0.1) the
+ *  exchange is noise ("tamam", "hi") — not worth a row, a vector, or maintenance
+ *  work. BRAIN_ADMIT=0 turns the filter off (legacy write-every-turn). */
+export function admitsTurn(
+  content: string,
+  env: { BRAIN_ADMIT?: string; BRAIN_ADMIT_MIN?: string } = process.env,
+): boolean {
+  if (env.BRAIN_ADMIT === "0") return true;
+  const min = Number(env.BRAIN_ADMIT_MIN);
+  return admissionScore(content) >= (Number.isFinite(min) && min > 0 ? min : 0.1);
+}
+
 /** Distill provider resolution: the periodic durable extraction defaults to the KEYLESS
  *  $0 provider (pollinations) unless BRAIN_DISTILL_PROVIDER is pinned — so auto-distill
  *  being on-by-default never spends the session's (possibly paid) provider budget. */
