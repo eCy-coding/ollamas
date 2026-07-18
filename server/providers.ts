@@ -558,7 +558,18 @@ export class ProviderRouter {
       : initial === "gemini-cli" ? ["gemini-cli", "gemini"]
       : [initial];
     const rest = defaults.filter((p) => !front.includes(p));
-    return [...front, ...this.orderRestByLatency(rest, (p) => this.getLatency(p))];
+    return [...front, ...this.orderRestByLatency(rest, (p) => this.getLatency(p), (p) => this.healthPenalty(p))];
+  }
+
+  // v15 buddy-system: how "unavailable" a KEYED cloud provider is right now, for proactive
+  // reordering. 0 = healthy, 1 = every live key ≥80% (about to 429), 2 = all keys cooled.
+  // Providers with no keyed pool (keyless like pollinations, local, unconfigured) return 0 —
+  // they're never demoted; keyless/local are the always-available buddies + $0 safety net.
+  public static healthPenalty(provider: string): number {
+    const pool = this.keyPool(provider);
+    if (pool.length === 0) return 0;
+    if (this.keyPoolStatus(provider).live === 0) return 2;
+    return this.poolSaturation(provider).allApproaching ? 1 : 0;
   }
 
   // vNext T2.2: order the fallback TAIL by measured latency WITHOUT breaking invariants —
@@ -566,13 +577,22 @@ export class ProviderRouter {
   // adjacent. Only the cloud tier reorders, fastest-first; providers with no fresh latency
   // (getLatency = -1) sort last via Infinity, so a cold cache preserves the original order
   // (zero behavior change until real measurements exist). Pure (getLatency injected) → tested.
-  public static orderRestByLatency(rest: string[], getLatency: (p: string) => number): string[] {
+  public static orderRestByLatency(
+    rest: string[],
+    getLatency: (p: string) => number,
+    // v15 buddy-system: proactively demote a saturated/cooled provider BELOW its healthy
+    // buddies BEFORE it 429s. 0 = healthy, 1 = ≥80% saturated, 2 = all keys cooled. Keyless/
+    // local/demo return 0 (never demoted — they're the always-available buddies). Default
+    // () => 0 keeps the pure latency behavior for existing callers/tests.
+    getHealthPenalty: (p: string) => number = () => 0,
+  ): string[] {
     const EARLY = ["fleet", "ollama-local"];
     const early = rest.filter((p) => EARLY.includes(p));
     const hasDemo = rest.includes("demo");
     const cloud = rest.filter((p) => !EARLY.includes(p) && p !== "demo");
     const lat = (p: string) => { const v = getLatency(p); return v < 0 ? Infinity : v; };
-    const sorted = [...cloud].sort((a, b) => lat(a) - lat(b)); // stable: equal/unmeasured keep order
+    // Health penalty dominates latency: a healthy slow buddy beats a fast saturated one.
+    const sorted = [...cloud].sort((a, b) => (getHealthPenalty(a) - getHealthPenalty(b)) || (lat(a) - lat(b)));
     // Keep the gemini family adjacent: pin gemini-cli immediately after gemini if both present.
     const gi = sorted.indexOf("gemini"), ci = sorted.indexOf("gemini-cli");
     if (gi >= 0 && ci >= 0 && ci !== gi + 1) {

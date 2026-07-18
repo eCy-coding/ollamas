@@ -30,3 +30,27 @@ describe("orderRestByLatency (vNext T2.2 — constraint-safe cloud-tier ordering
     expect(out.indexOf("gemini-cli")).toBe(out.indexOf("gemini") + 1);
   });
 });
+
+describe("orderRestByLatency — v15 buddy health penalty (proactive demotion)", () => {
+  const R = ["fleet", "ollama-local", "openrouter", "gemini", "openai", "demo"];
+  it("a saturated buddy sinks BELOW a healthy one even if faster", () => {
+    // openai fast(10) but saturated(1); openrouter slow(500) but healthy(0) → healthy wins
+    const lat = (p: string) => ({ openai: 10, openrouter: 500, gemini: 100 }[p] ?? -1);
+    const pen = (p: string) => (p === "openai" ? 1 : 0);
+    const out = order(R, lat, pen).filter((p: string) => !["fleet", "ollama-local", "demo"].includes(p));
+    expect(out.indexOf("openrouter")).toBeLessThan(out.indexOf("openai"));
+  });
+  it("a fully-cooled buddy (penalty 2) sinks to the bottom of the cloud tier", () => {
+    const lat = () => 50;
+    const pen = (p: string) => (p === "gemini" ? 2 : p === "openai" ? 1 : 0);
+    const cloud = order(R, lat, pen).filter((p: string) => !["fleet", "ollama-local", "demo"].includes(p));
+    expect(cloud[cloud.length - 1]).toBe("gemini");   // cooled last
+    expect(cloud.indexOf("openai")).toBeGreaterThan(cloud.indexOf("openrouter")); // saturated below healthy
+  });
+  it("invariants hold under penalties: $0 local first, demo last", () => {
+    const out = order(R, () => 50, (p: string) => (p === "openai" ? 2 : 0));
+    expect(out[0]).toBe("fleet");
+    expect(out[1]).toBe("ollama-local");
+    expect(out[out.length - 1]).toBe("demo");
+  });
+});
