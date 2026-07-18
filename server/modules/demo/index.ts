@@ -10,7 +10,7 @@ import { echo } from "./service";
 export const demoModule = defineModule({
   id: "demo",
   envFlag: "MODULE_DEMO",
-  tab: { labelKey: "tabs.demo", icon: "Box" },
+  tab: { labelKey: "app.tab.demo", icon: "Box" },
   mountRoutes: mountDemoRoutes,
   tools: [
     {

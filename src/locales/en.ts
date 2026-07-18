@@ -26,8 +26,10 @@ export const messages: Record<string, string> = {
   'app.tab.backup': 'AES Cloud Backup',
   'app.tab.automation': 'Virtual Controller',
   'app.tab.selftest': 'Verify Gates',
+  'app.tab.demo': 'Demo',
   'app.sidebar.explorer': 'Project Explorer',
   // ODYSSEY shell skin — nav-rail section headers (visual grouping only, same tabs/order).
+  'app.sidebar.group.ecy': 'eCy',
   'app.sidebar.group.workspace': 'Workspace',
   'app.sidebar.group.integrations': 'Data & Integrations',
   'app.sidebar.group.ops': 'Ops & Security',

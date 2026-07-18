@@ -25,8 +25,10 @@ export const messages: Record<string, string> = {
   'app.tab.revenue': 'Gelir / Kişisel Ops',
   'app.tab.chat': 'Sohbet (eCy)',
   'app.tab.ecym': 'eCy Stüdyo',
+  'app.tab.demo': 'Demo',
   'app.sidebar.explorer': 'Proje Gezgini',
   // ODYSSEY kabuk kaplaması — nav-rail bölüm başlıkları (yalnız görsel gruplama, sekmeler/sıra aynı).
+  'app.sidebar.group.ecy': 'eCy',
   'app.sidebar.group.workspace': 'Çalışma Alanı',
   'app.sidebar.group.integrations': 'Veri ve Entegrasyonlar',
   'app.sidebar.group.ops': 'Operasyon ve Güvenlik',

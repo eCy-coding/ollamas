@@ -46,4 +46,21 @@ describe('App shell', () => {
     expect(within(nav).getByText(/Data & Integrations/i)).toBeInTheDocument();
     expect(within(nav).getByText(/Ops & Security/i)).toBeInTheDocument();
   });
+
+  // K2 (v18) — chat/ecym previously rendered with no section header (dead
+  // idx===0 branch). NAV_GROUP_START now maps chat -> "app.sidebar.group.ecy"
+  // so the "eCy" header sits above the first tab, and the group appears before
+  // "Workspace" since chat is the first tab in the flat list.
+  it('groups chat + ecym under an "eCy" section header at the top of the nav', async () => {
+    renderUI(<App />);
+    const chatButton = await screen.findByRole('button', { name: /Chat \(eCy\)/i });
+    const nav = screen.getByRole('navigation', { name: /Primary/i });
+    expect(within(nav).getByText(/^eCy$/)).toBeInTheDocument();
+
+    // The header must precede the chat tab in DOM order (proves it labels the
+    // chat/ecym group, not some unrelated "eCy" substring elsewhere in the nav).
+    const position = chatButton.compareDocumentPosition(within(nav).getByText(/^eCy$/));
+    // eslint-disable-next-line no-bitwise -- DOM Node.compareDocumentPosition bitmask check
+    expect(position & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
 });

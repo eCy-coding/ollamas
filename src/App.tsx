@@ -153,6 +153,7 @@ export default function App() {
   // Section boundaries line up with the existing contiguous tab order, so no
   // reordering is needed — only a header inserted above the first tab of a run.
   const NAV_GROUP_START: Record<string, string> = {
+    chat: "app.sidebar.group.ecy",
     telemetry: "app.sidebar.group.workspace",
     files: "app.sidebar.group.integrations",
     threatintel: "app.sidebar.group.ops",
