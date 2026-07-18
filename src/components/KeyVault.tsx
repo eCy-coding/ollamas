@@ -77,6 +77,8 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState<Record<string, boolean>>({});
   const [pingStatus, setPingStatus] = useState<Record<string, { ok: boolean; latency?: number; err?: string; detail?: string }>>({});
+  // v15 buddy-system: which providers cover for each other + the active buddy.
+  const [buddy, setBuddy] = useState<{ activeBuddy: string; allCloudCooled: boolean; providers: Array<{ id: string; state: string }> } | null>(null);
   const [pool, setPool] = useState<Record<string, PoolEntry>>({});
   const [alerts, setAlerts] = useState<Array<{ provider: string; worstPct: number; live: number }>>([]);
   // "Scan & Connect" (T6): one click harvests machine keys via /api/keys/doctor.
@@ -113,9 +115,14 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
     } catch { /* gateway down — leave prior state */ }
   };
 
+  const loadBuddy = async () => {
+    try { setBuddy(await api.get("/api/keys/buddy-status")); } catch { /* leave prior */ }
+  };
+
   useEffect(() => {
     loadMasks();
     loadPool(); // authoritative initial paint
+    loadBuddy(); // v15: buddy-system status (who covers for whom)
     // vNEXT-D3: ride the live cockpit SSE (≤2s) — it now carries per-provider worstPct/allApproaching
     // + keyAlerts. The 15s poll is SLOWED to 60s as a graceful fallback (non-breaking: if any SSE
     // field is missing or the stream errors, the poll authoritatively backfills the full shape).
@@ -381,6 +388,22 @@ export const KeyVault: React.FC<KeyVaultProps> = ({ onNotify }) => {
           </button>
         </div>
       </div>
+
+      {/* v15 buddy-system: models cover for each other — who's live + the active buddy. */}
+      {buddy && Array.isArray(buddy.providers) && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 bg-immersive-inset border border-immersive-border rounded text-[11px] font-mono">
+          <span className="text-immersive-text-dim">🤝 Çalışma arkadaşları:</span>
+          <b className="text-status-ok">{buddy.providers.filter((p) => p.state === "live").length} canlı</b>
+          {buddy.providers.filter((p) => p.state === "saturated").length > 0 && (
+            <span className="text-status-warn">· {buddy.providers.filter((p) => p.state === "saturated").length} dolu</span>
+          )}
+          <span className="text-immersive-text-muted">· aktif buddy:</span>
+          <b className="text-status-accent">{buddy.activeBuddy}</b>
+          {buddy.allCloudCooled
+            ? <span className="ml-auto text-status-warn">tüm cloud düştü → $0-local ollama devrede</span>
+            : <span className="ml-auto text-immersive-text-muted">$0-local her zaman hazır</span>}
+        </div>
+      )}
 
       {/* eCy key-hygiene / rotation advice — driven from MASKED per-provider metadata only. */}
       <div className="mb-4">
