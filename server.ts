@@ -3992,7 +3992,11 @@ app.post("/api/brain/recall", async (req, res) => {
     }
     res.json({ hits: bounded, ...(bounded.length === 0 ? { abstained: true } : {}) });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message || "brain recall failed" });
+    // A fast-failing embedder (ollama 503 during model swap) is the SAME degraded
+    // state as a slow one — honor the S39 degrade contract instead of surfacing 500.
+    const msg = String(err?.message || "");
+    if (/embed|503/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
+    res.status(500).json({ error: msg || "brain recall failed" });
   }
 });
 
