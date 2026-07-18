@@ -37,7 +37,7 @@ eval-providers:
 eval-rerank:
 	@npx tsx scripts/eval-rerank.mjs
 # ---------------- Brain (ported from integrate-wt, B-pattern 2026-07-18) ----------------
-.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap brain-export brain-import brain-check brain-reembed
+.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap brain-export brain-import brain-check brain-reembed brain-services
 
 ## brain-show: live viewer — stats + memories + facts (+ Q="soru" semantic query)
 brain-show:
@@ -90,3 +90,7 @@ brain-check:
 ## brain-reembed: drift remediation (S23) — verified backup, full vector rebuild, meta flip LAST [DRY=1]
 brain-reembed:
 	@npx tsx scripts/brain-reembed.ts $(if $(DRY),--dry,)
+
+## brain-services: run every brain service selftest (S28 proof machine) [OFFLINE=1 skips :3000 probes]
+brain-services:
+	@npx tsx scripts/brain-services.ts $(if $(OFFLINE),--offline,)
