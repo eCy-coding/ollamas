@@ -19,6 +19,8 @@ export interface AskResult {
   confidence: number;
   mode: "hybrid" | "lexical";
   abstained?: boolean;
+  /** Retrieval rounds actually run (1 = single pass, 2 = deepen fired). */
+  hops?: number;
 }
 
 export interface AskDeps {
@@ -82,7 +84,27 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
     if (!prev || h.score > prev.score) byId.set(h.id, h);
   }
   const first = [...byId.values()].sort((a, b) => b.score - a.score).slice(0, 8);
-  const hits = (await widen(q, first, deps)).slice(0, 10);
+  let hops = 1;
+  let widened = await widen(q, first, deps);
+  // İleri-düzey: true iterative deepening (gap #2). When evidence is thin (few
+  // sources or weak top score), question tokens NOT yet covered by any source
+  // become a second retrieval wave — deterministic, zero-LLM, one extra hop max.
+  if (widened.length < 4 || (widened[0]?.score ?? 0) < 0.5) {
+    const covered = widened.map((h) => String(h.content).toLowerCase()).join(" ");
+    const missing = [...new Set((q.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []))]
+      .filter((t) => !covered.includes(t))
+      .slice(0, 3);
+    if (missing.length) {
+      hops = 2;
+      const seen = new Set(widened.map((h) => h.id));
+      for (const term of missing) {
+        const extra = await deps.recall(term, { k: 3, ns: deps.ns }).catch(() => [] as BrainRecallHit[]);
+        for (const h of extra) if (!seen.has(h.id)) { seen.add(h.id); widened.push(h); }
+      }
+      widened.sort((a, b) => b.score - a.score);
+    }
+  }
+  const hits = widened.slice(0, 10);
   const mode: AskResult["mode"] = hits.some((h) => h.lexical) ? "lexical" : "hybrid";
   let live: string | null = null;
   if (deps.liveContext) {
@@ -114,5 +136,5 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
     if (live) return { answer: `Canlı sistem durumu [mem:live:system]: ${live}`, sources, confidence: 0.9, mode };
     return { answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.", sources, confidence: 0, mode, abstained: true };
   }
-  return { answer, sources, confidence: Number(confidence.toFixed(3)), mode };
+  return { answer, sources, confidence: Number(confidence.toFixed(3)), mode, hops };
 }

@@ -7,7 +7,7 @@ Durum işaretleri: ✓ shipped (kanıt=dosya) · ◐ kısmi · ✗ eksik. "Std" 
 | # | Yetenek | Std | Durum | Kanıt / Eksik |
 |---|---------|-----|-------|---------------|
 | 1 | Single-hop recall (IE) | Yes | ✓ | hybrid RRF + rerank, `server/brain.ts` recall |
-| 2 | Multi-hop / multi-session synthesis | Yes | ◐ | `graphExpand` 1-hop var; iteratif multi-hop yok (BACKLOG) |
+| 2 | Multi-hop / multi-session synthesis | Yes | ✓ | `graphExpand` + widen + **iteratif deepen (hops=2, kanıt-zayıfsa kapsanmamış-terim dalgası)** — brain-ask.ts |
 | 3 | Temporal reasoning / event ordering | Yes | ◐→✓ | facts bi-temporal + point-in-time ✓; **relative-time sorgu çözümleme (B2) SHIPPED** |
 | 4 | Knowledge update / staleness | Yes | ✓ | fact süperseed + belief-revision (`superseded_at`, 50fcd21) |
 | 5 | Abstention / grounding threshold | Yes | ✗→✓ | recall eşiksiz k döndürüyordu — **B1 SHIPPED** |
