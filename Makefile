@@ -102,5 +102,9 @@ brain-drill:
 brain-sync-universe: ## Emre'nin proje evreni + repo yüzeyi -> brain (idempotent)
 	@npx tsx scripts/brain-ingest-universe.ts
 
-brain-teach: ## Python + macOS bilgi verisetlerini brain'e ogret (idempotent)
+brain-teach: ## tum datasetleri brain'e ogret + ekosistem senkronu (idempotent)
 	@npx tsx scripts/brain-teach-datasets.ts
+	@npx tsx scripts/ecosystem-sync.ts
+
+ecosystem-sync: ## brain+eCym+odysseus senkronu (yedekli, idempotent)
+	@npx tsx scripts/ecosystem-sync.ts

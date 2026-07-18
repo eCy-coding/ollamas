@@ -429,6 +429,30 @@ export function buildLogicMathRecords(): TeachRecord[] {
   return LOGIC_MATH.map(([k, d]) => ({ id: `teach:mantik:${k}`, actor: "logic", content: `Mantık/matematik temeli '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-5: eCy-ekosistem — üç sistemin (ollamas/eCym/odysseus) ortak bilinci ———
+const ECOSYSTEM: [string, string][] = [
+  ["ollamas", "LLM Mission Control (:3000) — provider router, tool registry, brain; ~/Desktop/ollamas, launchd com.ollamas.server"],
+  ["ecym", "Emre'nin $0 kişisel modeli (qwen3:8b+persona); ~/ecy-model/terminal-dataset.json (110+ komut) + brain.vec.json; ecy-brain auto-rebuild dataset değişince"],
+  ["odysseus", "zincirin uzak-yürütme halkası (:7860 API, ODY-PULSE panel :4777); ecy-io 'odysseus <task> chat|agent|research|health' ile erişilir"],
+  ["ecy-io", "doğrulanmış eCym↔ollamas↔odysseus köprüsü: input/output/read/write/agent/odysseus op'ları; OLLAMAS=:3000, OLLAMA=:11434, ODY=:7860"],
+  ["brain-ask", "curl -s -X POST :3000/api/brain/ask -d '{\"question\":\"...\"}' — sentezli atıflı cevap; abstention dürüst"],
+  ["conductor-mirror", "orchestration kayıtları ns=org olarak brain'e otomatik akar (dual-write ledger)"],
+  ["port-haritasi", "3000 ollamas · 11434 ollama · 7860 odysseus · 4777 ODY-PULSE · 8770 karargah-komutan"],
+  ["prensip-sifir-maliyet", "çalışma prensibi: $0-yerel öncelik — keyless provider'lar, lokal modeller; para harcayan yol Emre-onaylı"],
+  ["prensip-kanit", "çalışma prensibi: evidence-before-claims — 'çalışıyor' demek = komutu koşup çıktıyı göstermek"],
+  ["prensip-choke-point", "çalışma prensibi: tek denetim noktası — tüm tool'lar registry'den, tüm brain-yazımları rememberOne'dan geçer"],
+  ["prensip-daemon-gate", "çalışma prensibi: daemon start/stop/restart Emre-onaylı (kickstart dahil)"],
+  ["prensip-worktree", "çalışma prensibi: lane'ler izole worktree'de; paylaşılan tarih yeniden yazılmaz"],
+  ["prensip-yedek", "çalışma prensibi: karşı-sistem dosyasına yazmadan önce yedek al (.bak-<ts>); idempotent id'li ekleme"],
+  ["prensip-senkron", "çalışma prensibi: her teach/brain işlemi sonunda ecosystem-sync koşar — brain fact'leri tazelenir, eCym yeni yetenekleri komut olarak öğrenir, odysseus durumu fact'lenir"],
+];
+export function buildEcosystemRecords(): TeachRecord[] {
+  return ECOSYSTEM.map(([k, d]) => ({ id: `teach:eco:${k}`, actor: "ecosystem",
+    content: `eCy ekosistemi '${k}': ${d}.`,
+    ...(k.startsWith("prensip") ? {} : { fact: { subject: "ecosystem", predicate: "has_component", object: k } }) }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -472,6 +496,7 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
   try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["ecy-ekosistem", buildEcosystemRecords()],
     ["prog-temel", buildProgBasicsRecords()],
     ["bilgisayar-temel", buildComputerBasicsRecords()],
     ["internet-temel", buildInternetBasicsRecords()],

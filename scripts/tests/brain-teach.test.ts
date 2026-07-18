@@ -82,3 +82,15 @@ describe("brain-teach v4 — temel başlangıç sets", () => {
     expect(buildLogicMathRecords().find((r) => r.id === "teach:mantik:yuvarlama")?.content).toContain("0.1+0.2");
   });
 });
+
+import { buildEcosystemRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v5 — ecosystem set", () => {
+  it("components fact-tagged, principles taught, ports mapped", () => {
+    const recs = buildEcosystemRecords();
+    expect(recs.find((r) => r.id === "teach:eco:odysseus")?.fact?.object).toBe("odysseus");
+    expect(recs.find((r) => r.id === "teach:eco:prensip-senkron")?.fact).toBeUndefined(); // principles are memories, not graph components
+    expect(recs.find((r) => r.id === "teach:eco:port-haritasi")?.content).toContain("7860");
+    expect(recs.find((r) => r.id === "teach:eco:prensip-kanit")?.content).toContain("evidence");
+  });
+});
