@@ -319,11 +319,23 @@ export function createBrainStore(
   const rememberOne = async (m: BrainMemoryInput): Promise<{ id: string; dim: number; merged?: boolean }> => {
     if (!TIERS.includes(m.tier)) throw new Error(`invalid tier '${m.tier}' (${TIERS.join("/")})`);
     if (!m.content?.trim()) throw new Error("empty memory content");
+    // S24 redaction gate — the ONE enforcement point every write path funnels
+    // through (retain, distill, git-capture, org-mirror, ingest, import, HTTP).
+    // Enforce mode persists AND embeds the masked text: the vector of a secret is
+    // itself a leak surface. Detection reuses the repo-wide interceptor rules.
+    const { redactForBrain } = await import("./brain-redact");
+    const red = redactForBrain(m.content);
+    if (red.hits > 0) {
+      console.warn(JSON.stringify({
+        event: "brain.redact", mode: red.mode, hits: red.hits, tier: m.tier, source: m.source ?? null,
+      }));
+    }
+    const content = red.text;
     ensureProvider();
     const explicitId = !!m.id;
     const id = m.id || `mem-${crypto.randomUUID()}`;
     const ns = m.ns || DEFAULT_NS;
-    const vec = await embed(m.content);
+    const vec = await embed(content);
     ensureVec(vec.length);
 
     // W2 semantic write-dedup (AUDN-lite): for an AUTO-id write (no explicit id), if a
@@ -344,7 +356,7 @@ export function createBrainStore(
       const dup = near.find((r) => r.distance <= maxDist);
       if (dup) {
         // Keep the richer (longer) content; bump heat. No new row → recall stays clean.
-        const keepContent = m.content.length > dup.content.length ? m.content : dup.content;
+        const keepContent = content.length > dup.content.length ? content : dup.content;
         db.prepare("UPDATE brain_memories SET content=?, access_count=access_count+1, last_access=? WHERE rowid=?")
           .run(keepContent, now(), BigInt(dup.rowid));
         if (hasFts) {
@@ -360,10 +372,10 @@ export function createBrainStore(
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
       .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count) VALUES(?,?,?,?,?,?,?)")
-      .run(id, m.tier, m.content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0);
+      .run(id, m.tier, content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0);
     const rowid = BigInt(ins.lastInsertRowid);
     db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
-    if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(m.content, rowid);
+    if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(content, rowid);
     // v3 ring buffer: working is a bounded scratchpad — beyond the cap, the oldest
     // working rows in this namespace fall off (their vectors + fts too).
     if (m.tier === "working") {
