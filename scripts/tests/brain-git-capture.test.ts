@@ -32,10 +32,13 @@ describe("buildCapture", () => {
     expect(out.memory.content).toContain("feat(brain): v2");
   });
 
-  it("asserts bi-temporal facts: active branch + last op per repo", () => {
+  it("asserts bi-temporal facts: active branch + compact commit head (graph hygiene)", () => {
     const out = buildCapture(ctx);
     expect(out.facts).toContainEqual({ subject: "ollamas", predicate: "active_branch", object: "feat/complementary-integrations" });
-    expect(out.facts).toContainEqual({ subject: "ollamas", predicate: "last_commit_subject", object: "feat(brain): v2 — semantic fact search" });
+    // The fact carries only the "type(scope)" head — a full commit title as a graph
+    // node is unreadable noise; the episodic memory keeps the full subject.
+    expect(out.facts).toContainEqual({ subject: "ollamas", predicate: "last_commit_subject", object: "feat(brain)" });
+    expect(out.memory.content).toContain("feat(brain): v2 — semantic fact search");
   });
 
   it("push/merge ops keep distinct ids and content labels", () => {

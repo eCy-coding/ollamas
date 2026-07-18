@@ -109,5 +109,34 @@ describe("BRAIN routes (in-process app)", () => {
     expect(html).toContain("BRAIN");
     expect(html).toContain("/api/brain/overview");
     expect(html).toContain("/api/brain/graph");
+    // Panel v2: live search (recall), audit ledger and last-known-health surfaces.
+    expect(html).toContain("/api/brain/recall");
+    expect(html).toContain("/api/brain/audit");
+    expect(html).toContain("Audit Ledger");
+    expect(html).toContain("Canlı Arama");
+    expect(html).toContain("abstention");
+  });
+
+  test("GET /api/brain/audit → 200 with append-only entries (B3 surface)", async () => {
+    await fetch(`${base}/api/brain/remember`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "audit-probe", tier: "working", content: "audit probe row" }),
+    });
+    const res = await fetch(`${base}/api/brain/audit?limit=10`);
+    expect(res.status).toBe(200);
+    const j = await res.json();
+    expect(Array.isArray(j.entries)).toBe(true);
+    expect(j.entries.some((e: any) => e.action === "remember")).toBe(true);
+  });
+
+  test("POST /api/brain/forget → loopback purge with count (B4 surface)", async () => {
+    const res = await fetch(`${base}/api/brain/forget`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contains: "audit probe row" }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).forgotten).toBeGreaterThanOrEqual(1);
   });
 });

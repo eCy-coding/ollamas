@@ -43,6 +43,14 @@ export async function distillSession(
     { role: "user", content: transcript },
   ]);
   const extraction = parseExtraction(raw || "");
+  // A-MAC quality gate (panel-hygiene root-fix): a small local model happily "extracts"
+  // greetings and stray numbers ("Selam!", "42") — the SAME admission score that guards
+  // the per-turn retain guards distilled output. Facts need a real subject+object.
+  const { admissionScore } = await import("./brain-active");
+  extraction.memories = extraction.memories.filter((m) => admissionScore(m.content) >= 0.1 || m.content.trim().length > 40);
+  extraction.facts = extraction.facts.filter(
+    (f) => f.subject.trim().length >= 3 && f.object.trim().length >= 3 && /\p{L}/u.test(f.subject) && /\p{L}/u.test(f.object),
+  );
   if (extraction.memories.length === 0 && extraction.facts.length === 0) {
     return { memories: 0, facts: 0, skipped: false };
   }

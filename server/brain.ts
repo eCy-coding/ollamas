@@ -943,9 +943,11 @@ export function createBrainStore(
       const superseded = db
         .prepare(
           `SELECT subject, predicate, object, episode_id AS episodeId, ns, valid_from AS validFrom, invalidated_at AS invalidatedAt
-           FROM brain_facts WHERE ns=? AND invalidated_at IS NOT NULL ORDER BY invalidated_at DESC LIMIT ?`,
+           FROM brain_facts WHERE ns=? AND invalidated_at IS NOT NULL
+             AND predicate NOT IN ('last_commit_subject')
+           ORDER BY invalidated_at DESC LIMIT ?`,
         )
-        .all(ns || DEFAULT_NS, Math.min(limit, 30)) as unknown as BrainFact[];
+        .all(ns || DEFAULT_NS, Math.min(limit, 8)) as unknown as BrainFact[];
       return buildGraph([...rows, ...superseded]);
     },
 

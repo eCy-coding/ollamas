@@ -4068,61 +4068,132 @@ app.post("/api/brain/remember", async (req, res) => {
 // OLLAMAS_NO_AUTOBOOT=1 in-process tests, no vite/frontend build involved).
 app.get("/brain", (_req, res) => {
   res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>BRAIN · 5-Tier Hafıza · ollamas</title><style>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>BRAIN · ollamas</title><style>
 :root{--bg:#050A14;--surf:#0D1B2E;--raised:#132338;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--violet:#7B5EA7;--ok:#00C896;--warn:#F5A623;--bad:#FF5470}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:30px 18px}
-main{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-header{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#00C896,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;color:#050A14}
-h1{font-size:20px;margin:0}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
-.card{background:var(--surf);border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:11px}
-label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
-.badges{display:flex;gap:8px;flex-wrap:wrap}.badge{font:700 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 12px;border:1px solid var(--line);background:var(--raised)}
-.badge.ok{color:var(--ok);border-color:var(--ok)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}.badge.warn{color:var(--warn);border-color:var(--warn)}
-.tiers{display:flex;gap:8px;flex-wrap:wrap}.tier{flex:1;min-width:100px;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
-.tier b{font-size:20px;display:block}.tier span{font-size:10.5px;color:var(--fg2);text-transform:uppercase}
-.mems{max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
-.rec{background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:11.5px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
-.rec .t{color:var(--fg2);font-size:10px}.rec.learned{border-color:var(--violet)}.rec.core{border-color:var(--cyan)}
-svg{width:100%;height:auto;background:var(--raised);border-radius:8px}
-table{width:100%;border-collapse:collapse;font:12.5px/1.5 ui-monospace,monospace}
-td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05)}td.p{color:var(--fg2)}
-footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:26px 18px}
+main{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#00C896,#7B5EA7);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#050A14}
+h1{font-size:20px;margin:0;letter-spacing:.01em}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.badge{font:600 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 11px;border:1px solid var(--line);background:var(--raised)}
+.badge.ok{color:var(--ok);border-color:rgba(0,200,150,.5)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}.badge.warn{color:var(--warn);border-color:rgba(245,166,35,.5)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px}
+label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.tiers{display:flex;gap:8px;flex-wrap:wrap}
+.tier{flex:1;min-width:96px;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:11px;text-align:center;cursor:pointer;transition:border-color .15s}
+.tier:hover,.tier.sel{border-color:var(--cyan)}.tier b{font-size:21px;display:block}.tier span{font-size:10.5px;color:var(--fg2);text-transform:uppercase}
+.mems{max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.rec{background:var(--raised);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font:11.5px/1.55 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
+.rec .t{color:var(--fg2);font-size:10px;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:3px}
+.rec.learned{border-left:3px solid var(--violet)}.rec.core{border-left:3px solid var(--cyan)}.rec.working{border-left:3px solid var(--fg2)}.rec.episodic{border-left:3px solid rgba(255,255,255,.25)}.rec.procedural{border-left:3px solid var(--ok)}
+.pill{border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:9.5px;color:var(--fg2)}
+.pill.score{color:var(--ok);border-color:rgba(0,200,150,.4)}.pill.actor{color:var(--cyan)}
+input[type=text]{width:100%;background:var(--raised);border:1px solid var(--line);border-radius:10px;color:var(--fg);font:14px/1.4 system-ui;padding:11px 14px;outline:none}
+input[type=text]:focus{border-color:var(--cyan)}
+svg{width:100%;height:auto;background:var(--raised);border-radius:10px;cursor:grab;user-select:none}
+table{width:100%;border-collapse:collapse;font:12px/1.5 ui-monospace,monospace}
+td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}td.p{color:var(--fg2);white-space:nowrap}
+.audit .a-remember{color:var(--ok)}.audit .a-merge{color:var(--cyan)}.audit .a-revise{color:var(--warn)}.audit .a-forget{color:var(--bad)}
+.toggle{font:11px ui-monospace,monospace;color:var(--fg2);cursor:pointer;user-select:none}.toggle input{vertical-align:-2px}
+footer{color:#536882;font:11px/1.4 ui-monospace,monospace;text-align:center;padding-top:4px}
 </style></head><body><main>
-<header><div class="logo">B</div><div><h1>BRAIN — 5-Tier Hafıza + Bi-temporal Graf</h1><div class="sub">core → learned → procedural → episodic → working · hybrid RRF recall · auto retain/distill</div></div></header>
-<div class="card"><label>Sağlık / Boyut</label><div class="badges" id="badges">yükleniyor…</div></div>
-<div class="card"><label>Tier Dağılımı</label><div class="tiers" id="tiers"></div></div>
-<div class="card"><label>Entity Graf (canlı fact'ler · degree ∝ boyut)</label><div id="graph"></div></div>
-<div class="card"><label>Canlı Fact'ler</label><div style="overflow-x:auto"><table><tbody id="facts"></tbody></table></div></div>
+<header><div class="logo">B</div><div><h1>BRAIN — ollamas kalıcı hafıza</h1><div class="sub">5-tier · bi-temporal graf · hybrid RRF + rerank · belief revision · audit ledger</div></div>
+<div class="badges" id="badges">yükleniyor…</div></header>
+
+<div class="card"><label>Canlı Arama — hybrid recall (skor · tier · actor · abstention)</label>
+<input type="text" id="q" placeholder="brain'e sor… (ör. 'deploy nasıl', 'geçen hafta alınan kararlar')" autocomplete="off">
+<div class="mems" id="qres"></div></div>
+
+<div class="card"><label>Tier Dağılımı — karta tıkla, kayıtları gör</label><div class="tiers" id="tiers"></div><div class="mems" id="tierres" style="display:none"></div></div>
+
+<div class="card"><label style="display:flex;justify-content:space-between;align-items:center">Entity Graf (canlı fact'ler · degree ∝ boyut · sürükle=pan · tekerlek=zoom)
+<span class="toggle"><input type="checkbox" id="hist"> geçmişi göster</span></label><div id="graph"></div></div>
+
+<div class="grid2">
+<div class="card"><label>Canlı Fact'ler</label><div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table><tbody id="facts"></tbody></table></div></div>
+<div class="card audit"><label>Audit Ledger — son mutasyonlar</label><div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table><tbody id="audit"></tbody></table></div></div>
+</div>
+
 <div class="card"><label>Son Hafızalar</label><div class="mems" id="mems"></div></div>
-<footer>/api/brain/overview · /api/brain/graph · bakım: launchd brain-maintain 04:00 (sweep→consolidate→health→backup)</footer>
+<footer>/api/brain/{overview·graph·recall·audit} · bakım: launchd 04:00 (consolidate→sweep→backfill→health→backup→MRR)</footer>
 </main><script>
-const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/</g,"&lt;");
-function drawGraph(g){const ns=(g.nodes||[]).slice(0,40),es=(g.edges||[]).filter(e=>ns.find(n=>n.id===e.source)&&ns.find(n=>n.id===e.target));
+const $=id=>document.getElementById(id);const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const fmtT=ms=>new Date(ms).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+let O=null,G=null;
+
+function memRow(m,extra){return '<div class="rec '+esc(m.tier)+'"><div class="t"><span class="pill">'+esc(m.tier)+'</span>'
+ +(m.actor?'<span class="pill actor">'+esc(m.actor)+'</span>':'')
+ +(extra||'')
+ +'<span>'+fmtT(m.createdAt)+'</span>'+(m.hits!==undefined?'<span>hit '+m.hits+'</span>':'')+'</div>'
+ +esc(String(m.content).slice(0,320))+'</div>'}
+
+// — canlı arama (B1/B2/B5 görünür) —
+let qt=null;
+$('q').addEventListener('input',()=>{clearTimeout(qt);qt=setTimeout(runQuery,450)});
+async function runQuery(){const q=$('q').value.trim();if(!q){$('qres').innerHTML='';return}
+$('qres').innerHTML='<div class="rec">aranıyor…</div>';
+try{const r=await fetch('/api/brain/recall',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:q,k:6})});
+const j=await r.json();
+if(r.status===503){$('qres').innerHTML='<div class="rec">embedder meşgul — birazdan tekrar dene</div>';return}
+if(j.abstained||!j.hits||!j.hits.length){$('qres').innerHTML='<div class="rec">— bu konuda güvenilir kayıt yok (abstention) —</div>';return}
+$('qres').innerHTML=j.hits.map(h=>memRow(h,'<span class="pill score">skor '+h.score.toFixed(2)+'</span>')).join('');
+}catch(e){$('qres').innerHTML='<div class="rec">HATA: '+esc(e)+'</div>'}}
+
+// — tier kartları —
+function renderTiers(){const tiers=['core','learned','procedural','episodic','working'];
+$('tiers').innerHTML=tiers.map(t=>'<div class="tier" data-t="'+t+'"><b>'+(O.stats.memories[t]||0)+'</b><span>'+t+'</span></div>').join('');
+document.querySelectorAll('.tier').forEach(el=>el.onclick=()=>{document.querySelectorAll('.tier').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');
+const t=el.dataset.t;const rows=(O.memories||[]).filter(m=>m.tier===t).slice(0,10);
+$('tierres').style.display='flex';$('tierres').innerHTML=rows.map(m=>memRow(m)).join('')||'<div class="rec">bu tier'+"'"+'da güncel kayıt yok</div>'})}
+
+// — graf v2: pan/zoom + degree-etiket —
+function drawGraph(){if(!G)return;const showHist=$('hist').checked;
+const ns=(G.nodes||[]).filter(n=>showHist||n.live).slice(0,40);
+const es=(G.edges||[]).filter(e=>(showHist||e.live)&&ns.find(n=>n.id===e.source)&&ns.find(n=>n.id===e.target));
 if(!ns.length){$('graph').innerHTML='<div class="rec">graf boş</div>';return}
-const W=900,H=480,cx=W/2,cy=H/2;ns.sort((a,b)=>b.degree-a.degree);const hub=ns[0],rest=ns.slice(1);
-const pos={};pos[hub.id]=[cx,cy];rest.forEach((n,i)=>{const a=2*Math.PI*i/rest.length;const r=150+((i%3)*45);pos[n.id]=[cx+r*Math.cos(a),cy+r*0.72*Math.sin(a)];});
-let s='<svg viewBox="0 0 '+W+' '+H+'">';
+const W=980,H=460,cx=W/2,cy=H/2;ns.sort((a,b)=>b.degree-a.degree);const hub=ns[0],rest=ns.slice(1);
+const pos={};pos[hub.id]=[cx,cy];rest.forEach((n,i)=>{const a=2*Math.PI*i/Math.max(rest.length,1);const r=140+((i%3)*52);pos[n.id]=[cx+r*Math.cos(a),cy+r*0.68*Math.sin(a)]});
+let b='';
 for(const e of es){const p1=pos[e.source],p2=pos[e.target];if(!p1||!p2)continue;
-s+='<line x1="'+p1[0]+'" y1="'+p1[1]+'" x2="'+p2[0]+'" y2="'+p2[1]+'" stroke="'+(e.live?'#00C896':'#536882')+'" stroke-width="1" '+(e.live?'':'stroke-dasharray="4 3" ')+'opacity=".55"><title>'+esc(e.predicate)+'</title></line>';}
-for(const n of ns){const p=pos[n.id],r=5+2.2*Math.sqrt(n.degree);
-s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+(n.live?'#00D4FF':'#536882')+'" opacity=".9"><title>'+esc(n.label)+' (degree '+n.degree+')</title></circle>';
-s+='<text x="'+p[0]+'" y="'+(p[1]-r-4)+'" text-anchor="middle" fill="#F0F4FF" font-size="10.5" font-family="ui-monospace,monospace">'+esc(String(n.label).slice(0,20))+'</text>';}
-$('graph').innerHTML=s+'</svg>';}
-async function load(){try{const[or,gr]=await Promise.allSettled([fetch('/api/brain/overview?recent=30').then(r=>r.json()),fetch('/api/brain/graph?limit=60').then(r=>r.json())]);
-if(gr.status==='fulfilled'&&Array.isArray(gr.value.nodes))drawGraph(gr.value);
+b+='<line x1="'+p1[0]+'" y1="'+p1[1]+'" x2="'+p2[0]+'" y2="'+p2[1]+'" stroke="'+(e.live?'#00C896':'#536882')+'" stroke-width="1.1" '+(e.live?'':'stroke-dasharray="4 3" ')+'opacity=".5"><title>'+esc(e.predicate)+'</title></line>'}
+for(const n of ns){const p=pos[n.id],r=6+2.4*Math.sqrt(n.degree);
+b+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+(n.live?'#00D4FF':'#536882')+'" opacity=".92"><title>'+esc(n.label)+' (degree '+n.degree+')</title></circle>';
+if(n.degree>=2||n.id===hub.id)b+='<text x="'+p[0]+'" y="'+(p[1]-r-5)+'" text-anchor="middle" fill="#F0F4FF" font-size="11" font-family="ui-monospace,monospace">'+esc(String(n.label).slice(0,22))+'</text>'}
+$('graph').innerHTML='<svg id="gsvg" viewBox="0 0 '+W+' '+H+'">'+b+'</svg>';
+const svg=$('gsvg');let vb=[0,0,W,H],drag=null;
+svg.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];svg.setPointerCapture(e.pointerId)});
+svg.addEventListener('pointermove',e=>{if(!drag)return;const sc=vb[2]/svg.clientWidth;vb[0]-=(e.clientX-drag[0])*sc;vb[1]-=(e.clientY-drag[1])*sc;drag=[e.clientX,e.clientY];svg.setAttribute('viewBox',vb.join(' '))});
+svg.addEventListener('pointerup',()=>drag=null);
+svg.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY>0?1.12:0.89;const nw=vb[2]*f,nh=vb[3]*f;vb[0]+=(vb[2]-nw)/2;vb[1]+=(vb[3]-nh)/2;vb[2]=nw;vb[3]=nh;svg.setAttribute('viewBox',vb.join(' '))},{passive:false})}
+$('hist').addEventListener('change',drawGraph);
+
+// — health: son başarılı ölçüm localStorage'ta (panel asla bilgisiz görünmez) —
+function healthBadge(h){if(h&&!h.degraded){try{localStorage.setItem('brain.health',JSON.stringify({r:h.selfHitRate,p:h.probes,ts:Date.now()}))}catch(e){}
+return '<span class="badge '+(h.drift?'bad':'ok')+'">self-hit '+Math.round(h.selfHitRate*100)+'% · '+(h.drift?'DRIFT':'sağlıklı')+' ('+h.probes+' probe)</span>'}
+let last=null;try{last=JSON.parse(localStorage.getItem('brain.health'))}catch(e){}
+return last?'<span class="badge ok">son ölçüm self-hit '+Math.round(last.r*100)+'% ('+fmtT(last.ts)+')</span><span class="badge warn">şu an: embedder meşgul</span>'
+:'<span class="badge warn">sağlık: embedder meşgul — ölçüm bekleniyor</span>'}
+
+async function load(){try{const[or,gr,ar]=await Promise.allSettled([
+fetch('/api/brain/overview?recent=40').then(r=>r.json()),
+fetch('/api/brain/graph?limit=60').then(r=>r.json()),
+fetch('/api/brain/audit?limit=15').then(r=>r.json())]);
+if(gr.status==='fulfilled'&&Array.isArray(gr.value.nodes)){G=gr.value;drawGraph()}
+if(ar.status==='fulfilled'&&Array.isArray(ar.value.entries)){
+$('audit').innerHTML=ar.value.entries.map(a=>'<tr><td class="p">'+fmtT(a.ts)+'</td><td class="a-'+esc(a.action)+'">'+esc(a.action)+'</td><td>'+esc((a.detail||'')+(a.memId?' · '+a.memId.slice(0,18):''))+'</td></tr>').join('')||'<tr><td>kayıt yok</td></tr>'}
 const o=or.status==='fulfilled'?or.value:null;
-if(!o||o.error||!o.stats){$('badges').innerHTML='<span class="badge bad">HATA: '+esc((o&&o.error)||(or.status==='rejected'?or.reason:'overview alınamadı'))+'</span>';return}
-const h=o.health||{},b=[];
-b.push(h.degraded?'<span class="badge warn">sağlık: ertelendi (embedder meşgul)</span>':'<span class="badge '+(h.drift?'bad':'ok')+'">self-hit: '+Math.round((h.selfHitRate??0)*100)+'% · '+(h.drift?'DRIFT':'sağlıklı')+' ('+h.probes+' probe)</span>');
-const tot=Object.values(o.stats.memories||{}).reduce((a,c)=>a+c,0);
-b.push('<span class="badge dim">'+tot+' hafıza · '+o.stats.facts+' canlı fact · '+o.stats.namespaces+' ns</span>');
-b.push('<span class="badge dim">db: '+(o.stats.dbBytes/1048576).toFixed(1)+' MB</span>');
-$('badges').innerHTML=b.join('');
-$('tiers').innerHTML=['core','learned','procedural','episodic','working'].map(t=>'<div class="tier"><b>'+(o.stats.memories[t]||0)+'</b><span>'+t+'</span></div>').join('');
+if(!o||o.error||!o.stats){$('badges').innerHTML='<span class="badge bad">overview: '+esc((o&&o.error)||'ulaşılamadı')+'</span>';return}
+O=o;const tot=Object.values(o.stats.memories||{}).reduce((a,c)=>a+c,0);
+$('badges').innerHTML=healthBadge(o.health)
++'<span class="badge dim">'+tot+' hafıza · '+o.stats.facts+' fact · '+o.stats.namespaces+' ns</span>'
++'<span class="badge dim">'+(o.stats.dbBytes/1048576).toFixed(1)+' MB</span>';
+renderTiers();
 $('facts').innerHTML=(o.facts||[]).map(f=>'<tr><td><b>'+esc(f.subject)+'</b></td><td class="p">'+esc(f.predicate)+'</td><td>'+esc(f.object)+'</td></tr>').join('')||'<tr><td>fact yok</td></tr>';
-$('mems').innerHTML=(o.memories||[]).map(m=>'<div class="rec '+esc(m.tier)+'"><div class="t">'+esc(m.tier)+' · hit '+m.hits+' · '+new Date(m.createdAt).toLocaleString('tr-TR')+'</div>'+esc(String(m.content).slice(0,300))+'</div>').join('')||'<div class="rec">hafıza yok</div>';
-}catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>';}}
-load();setInterval(load,15000);
+$('mems').innerHTML=(o.memories||[]).slice(0,20).map(m=>memRow(m)).join('')||'<div class="rec">hafıza yok</div>';
+}catch(e){$('badges').innerHTML='<span class="badge bad">HATA: '+esc(e)+'</span>'}}
+load();setInterval(load,20000);
 </script></body></html>`);
 });
 

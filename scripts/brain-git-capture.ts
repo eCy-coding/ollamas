@@ -31,7 +31,9 @@ export function buildCapture(ctx: CaptureCtx) {
     },
     facts: [
       { subject: "ollamas", predicate: "active_branch", object: ctx.branch },
-      { subject: "ollamas", predicate: "last_commit_subject", object: ctx.lastSubject },
+      // Graph hygiene: the fact carries only the compact "type(scope)" head — a full
+      // commit title as a graph node is unreadable noise (the memory above keeps it).
+      { subject: "ollamas", predicate: "last_commit_subject", object: ctx.lastSubject.split(/[—:]/)[0].trim().slice(0, 32) },
     ],
   };
 }
