@@ -497,10 +497,18 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     id: "recall-api", kind: "network", role: "POST /api/brain/recall external query surface", deps: ["recall-hybrid"],
     source: "server.ts",
     selftest: async () => {
-      const res = await fetch(`${BASE}/api/brain/recall`, {
+      // One retry: the route embeds the query through LIVE ollama, and right
+      // after a server/model restart the first embed pays the cold model load
+      // (>8s). The retry hits the warmed model — persistent failure still reds.
+      const attempt = () => fetch(`${BASE}/api/brain/recall`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query: "selftest", k: 1 }), signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({ query: "selftest", k: 1 }), signal: AbortSignal.timeout(15_000),
       });
+      let res: Response;
+      try { res = await attempt(); } catch { res = await attempt(); }
+      // 503 = the surface is alive and degrading CORRECTLY (embedder queued under
+      // conductor load — S1's health signal, not this route's). Anything else reds.
+      if (res.status === 503) return ok("alive, embedder busy (degraded correctly)");
       return expectThat(res.status === 200, "recall API live", `status=${res.status}`);
     },
   },

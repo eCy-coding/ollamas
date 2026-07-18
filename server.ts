@@ -3963,7 +3963,17 @@ app.post("/api/brain/recall", async (req, res) => {
       void brain.brainAssertFact({ subject: "brain", predicate: "xns_recall_used", object: new Date().toISOString(), ns: "ops" }).catch(() => {});
       return res.json({ hits: merged, crossNs: true });
     }
-    res.json({ hits: await brain.brainRecall(query, { k: k || 5, ns, graphExpand }) });
+    // Bounded like the auto-recall path: under conductor load the local embedder
+    // can queue for 30s+ — an external API must degrade fast, not hang.
+    const bounded = await Promise.race([
+      brain.brainRecall(query, { k: k || 5, ns, graphExpand }),
+      new Promise<null>((r) => {
+        const t = setTimeout(() => r(null), Number(process.env.BRAIN_RECALL_API_TIMEOUT_MS) || 10_000);
+        t.unref?.();
+      }),
+    ]);
+    if (bounded === null) return res.status(503).json({ error: "embedder busy — retry shortly" });
+    res.json({ hits: bounded });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "brain recall failed" });
   }
