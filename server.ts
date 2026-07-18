@@ -89,6 +89,7 @@ import { rankMacModels } from "./server/cockpit-models";
 import { checkAnswer, scoreCouncil } from "./server/council";
 import { registerCookbookRoutes } from "./server/cookbook";
 import { registerResearchRoutes } from "./server/research";
+import { registerEcymRoutes } from "./server/ecym";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -787,6 +788,9 @@ registerCookbookRoutes(app, db, localOwnerGuard);
 
 // Deep research — question → plan → web-search → summarize → cited report (SSE). localOwnerGuard'd.
 registerResearchRoutes(app, localOwnerGuard);
+
+// eCy Studio — distills bench evidence + working principles into ecy:latest (SSE). localOwnerGuard'd.
+registerEcymRoutes(app, db, localOwnerGuard);
 
 /**
  * Every way ollama might be reachable — try each until one answers. `host.docker.internal` only resolves
@@ -2177,6 +2181,24 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       res.json({ success: true, deleted: (db.data.sessions || []).length < initialCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to delete session" });
+    }
+  });
+
+  // Chat panel (v10): persist a session's messages/title after each exchange.
+  app.put("/api/agent/sessions/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const session = (db.data.sessions || []).find(s => s.id === id);
+      if (!session) return res.status(404).json({ error: "session not found" });
+      const { messages, title, modelId } = req.body || {};
+      if (Array.isArray(messages)) session.messages = messages;
+      if (typeof title === "string" && title.trim()) session.title = title.trim().slice(0, 120);
+      if (typeof modelId === "string" && modelId.trim()) session.modelId = modelId.trim();
+      session.updatedAt = new Date().toISOString();
+      db.save();
+      res.json({ success: true, session });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to update session" });
     }
   });
 

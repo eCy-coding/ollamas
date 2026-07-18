@@ -8,6 +8,8 @@ export const messages: Record<string, string> = {
   'app.tab.cookbook': 'Recipe Library',
   'app.tab.research': 'Deep Research',
   'app.tab.documents': 'Documents',
+  'app.tab.chat': 'Chat (eCy)',
+  'app.tab.ecym': 'eCy Studio',
   'app.tab.swarm': 'P2P Computing Swarm',
   'app.tab.saas': 'SaaS Gateway',
   'app.tab.pipeline': 'Pipeline Agent',

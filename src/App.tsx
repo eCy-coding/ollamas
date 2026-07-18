@@ -16,6 +16,8 @@ import { GmailBrowser } from "./components/GmailBrowser";
 import { CookbookPanel } from "./components/CookbookPanel";
 import { ResearchPanel } from "./components/ResearchPanel";
 import { DocumentsPanel } from "./components/DocumentsPanel";
+import { ChatPanel } from "./components/ChatPanel";
+import { EcymPanel } from "./components/EcymPanel";
 import GitHubActionsPanel from "./components/GitHubActionsPanel";
 import { CommandLineTerminal } from "./components/CommandLineTerminal";
 import { BackupControl } from "./components/BackupControl";
@@ -39,7 +41,7 @@ import { HealthTelemetry } from "./types";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
-  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch, Plug, BookOpen, Telescope, FileText,
+  MousePointer2, Building2, Lock, DollarSign, Sheet, Search, Calendar, Mail, GitBranch, Plug, BookOpen, Telescope, FileText, MessageSquare, FlaskConical,
 } from "lucide-react";
 
 // vF11 — shown in a gated tab's body when the backend has not granted the
@@ -110,6 +112,8 @@ export default function App() {
 
   // Tab labels resolve via i18n at render: `_(`app.tab.${id}`)` (vF9).
   const tabs = [
+    { id: "chat", icon: <MessageSquare className="w-4 h-4 text-indigo-400" /> },
+    { id: "ecym", icon: <FlaskConical className="w-4 h-4 text-emerald-400" /> },
     { id: "telemetry", icon: <Cpu className="w-4 h-4" /> },
     { id: "swarm", icon: <Network className="w-4 h-4 text-cyan-400" /> },
     { id: "saas", icon: <Building2 className="w-4 h-4 text-cyan-300" /> },
@@ -360,6 +364,18 @@ export default function App() {
           {activeTab === "documents" && (
             <div className="animate-fade-in">
               <DocumentsPanel onNotify={notify} />
+            </div>
+          )}
+
+          {activeTab === "chat" && (
+            <div className="animate-fade-in">
+              <ChatPanel onNotify={notify} />
+            </div>
+          )}
+
+          {activeTab === "ecym" && (
+            <div className="animate-fade-in">
+              <EcymPanel onNotify={notify} />
             </div>
           )}
 

@@ -26,6 +26,8 @@ export const messages: Record<string, string> = {
   'app.tab.cookbook': 'Reçete Kütüphanesi',
   'app.tab.research': 'Derin Araştırma',
   'app.tab.documents': 'Belgeler',
+  'app.tab.chat': 'Sohbet (eCy)',
+  'app.tab.ecym': 'eCy Stüdyo',
   'app.sidebar.explorer': 'Proje Gezgini',
   'app.status.activeHost': 'Aktif Ana Makine:',
   'app.status.workspace': 'Çalışma Alanı:',
