@@ -66,3 +66,23 @@ tsx orchestration/bin/answer.ts --js 'console.log([1,2,3].map(x=>x*2))'
 tsx orchestration/bin/answer.ts --html '<div><p>hi</p></div>'      # structure verdict
 tsx orchestration/bin/answer.ts "1/0"                        # → UNVERIFIED: division by zero (honest)
 ```
+
+## §learning — the loop that gets better with every question
+
+Accuracy is not a hope; it is a trained, measured property (`bin/lib/answer-learn.ts`):
+
+- **Every settled round trains the router.** Channels that backed the corroborated fact record a
+  hit; channels whose claim was OUTVOTED record a miss (a wrong "2014" is a permanent, evidence-
+  lowering event). Rounds WITHOUT agreement record nothing — scoring without ground truth would
+  itself be guessing.
+- **The research order is learned.** `orderChannels` re-ranks channels by Wilson accuracy (n≥3;
+  thin evidence keeps the hand-tuned baseline) — the loop consults its historically-best sources
+  first. Observed live: after three settled rounds, cloud:groq (3/3) overtook odysseus-research,
+  whose long-report number extraction had been outvoted twice.
+- **Accuracy is benchmarked.** `bin/answer-bench.ts` runs the golden set (offline computables MUST
+  score 100% — they are either right or wrong) plus optional live facts, and prints the learned
+  channel scoreboard → `ANSWER-BENCH.md`. Interactive live view: every research round streams its
+  channel probes to `ollamas follow`.
+- **Known limit on the record:** long research reports can yield a wrong FIRST number to
+  `extractKeyFact` (observed: odysseus "21.4"/"6.2") — safely outvoted today; answer-line-priority
+  extraction is the next accuracy upgrade.
