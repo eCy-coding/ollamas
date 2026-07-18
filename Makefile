@@ -108,3 +108,5 @@ brain-teach: ## tum datasetleri brain'e ogret + ekosistem senkronu (idempotent)
 
 ecosystem-sync: ## brain+eCym+odysseus senkronu (yedekli, idempotent)
 	@npx tsx scripts/ecosystem-sync.ts
+brain-coherence: ## semantik-bag denetimi + guvenli karantina (apply)
+	@npx tsx scripts/brain-coherence-audit.ts --apply
