@@ -90,7 +90,7 @@ import { checkAnswer, scoreCouncil } from "./server/council";
 import { registerCookbookRoutes } from "./server/cookbook";
 import { registerResearchRoutes, isSafeUrl } from "./server/research";
 import { registerEcymRoutes } from "./server/ecym";
-import { registerPanelAssistRoutes } from "./server/panel-assist";
+import { registerPanelAssistRoutes, distillPanel, PANEL_IDS, type PanelId } from "./server/panel-assist";
 // Benchmarked Mac-efficient champion (real ollama tok/s on this MacBook, 2026-06-29):
 // qwen3:8b ≈ 82 tok/s, resident, instant load. Bigger local models contend on the
 // single-GPU Mac (MAX_LOADED_MODELS=1) → not efficient for concurrent use.
@@ -3257,6 +3257,21 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         console.log(`[KeyDoctor] boot scan: +${connected.length} connected${connected.length ? ` (${connected.join(",")})` : ""} · ${s("already").length} already · ${invalid.length} invalid${invalid.length ? ` (${invalid.join(",")})` : ""} · ${s("absent").length} absent`);
       })
       .catch((e) => console.warn(`[KeyDoctor] boot scan skipped: ${String(e?.message ?? e).slice(0, 80)}`));
+
+    // eCym panel-brief auto-distill (v13-D) — OPT-IN (ECYM_AUTODISTILL=1) so boot never
+    // adds surprise GPU load. Fills only panels that have no distilled brief yet; fail-soft
+    // (DDG rate-limit keeps the fallback). Sequential via distillPanel's own GPU mutex.
+    if (process.env.ECYM_AUTODISTILL === "1") {
+      void (async () => {
+        const missing = (PANEL_IDS as readonly PanelId[]).filter((id) => !db.data.panelBriefs?.[id]);
+        if (!missing.length) return;
+        console.log(`[eCym] auto-distill: ${missing.length} panel brief(s) → ${missing.join(",")}`);
+        for (const id of missing) {
+          try { for await (const _ of distillPanel(db, id)) { /* drain — persistence is inside */ } }
+          catch (e) { console.warn(`[eCym] distill ${id} skipped: ${String((e as Error)?.message ?? e).slice(0, 80)}`); }
+        }
+      })();
+    }
   });
 
   // Graceful shutdown (Faz 13A): on SIGTERM/SIGINT (K8s rolling deploy) stop
