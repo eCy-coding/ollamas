@@ -190,4 +190,78 @@ describe("SecureDB — session/message cap + debounced writer (B6)", () => {
     const db2 = new SecureDB();
     expect(db2.data.workspacePath).toBe("/immediate");
   });
+
+  // (d) ---------------------------------------------------------------------------------------
+  // Focused unit test around the converted server.ts call sites (PUT /api/agent/sessions/:id —
+  // the per-chat-turn message-append route). A full in-process HTTP route test was not viable:
+  // routes-openapi.test.ts / routes-hardening.test.ts's `OLLAMAS_NO_AUTOBOOT=1` harness only
+  // exercises routes registered at module top level (before `initializeServer()`); the agent
+  // session routes are registered INSIDE `initializeServer()`, which only runs when the full
+  // stack boots (vite + a real port bind) — too heavy for a unit suite. So this mirrors the
+  // route handler's exact mutation pattern (find session → replace messages → bump updatedAt →
+  // saveDebounced()) directly against a real SecureDB instance, matching how the trim tests
+  // above already validate saveDebounced()/flushPendingSave() against workspacePath.
+  it("repeated PUT-style session-update saves coalesce into ONE physical write, then flush persists the final state", () => {
+    const db1 = freshDb();
+    const session: ChatSession = {
+      id: "sess-1",
+      title: "New ReAct Session",
+      modelId: "gemini-3.5-flash",
+      providerId: "gemini",
+      messages: [],
+      updatedAt: new Date(0).toISOString(),
+    };
+    db1.data.sessions = [session];
+    db1.save(); // baseline persisted (constructor + this save are both outside the spy window)
+
+    vi.useFakeTimers();
+    const writeSpy = vi.spyOn(fs, "writeFileSync");
+
+    // Simulate 10 back-to-back chat turns each hitting PUT /api/agent/sessions/:id, which
+    // looks up the session, replaces its messages[], bumps updatedAt, then calls saveDebounced()
+    // — exactly the converted call site at server.ts's session-update route.
+    for (let i = 0; i < 10; i++) {
+      const sess = db1.data.sessions.find((s) => s.id === "sess-1")!;
+      sess.messages = [{ id: `m${i}`, role: "user", content: `turn ${i}`, timestamp: new Date().toISOString() }];
+      sess.updatedAt = new Date().toISOString();
+      db1.saveDebounced();
+      vi.advanceTimersByTime(10); // 10 turns spread across 100ms — well under the 500ms trailing window
+    }
+    expect(writeSpy).not.toHaveBeenCalled(); // still debouncing — no per-call physical write
+
+    vi.advanceTimersByTime(500); // trailing window elapses
+    expect(writeSpy).toHaveBeenCalledTimes(1); // ONE physical write for 10 route hits, not 10
+
+    vi.useRealTimers();
+    // Shutdown/flush drains any still-pending save (no-op here, already flushed above) and the
+    // reload — a fresh SecureDB pointed at the same dir, exactly like the trim tests' restart
+    // simulation — proves the LAST turn's data actually reached disk.
+    const db2 = new SecureDB();
+    expect(db2.data.sessions[0].messages).toEqual([
+      { id: "m9", role: "user", content: "turn 9", timestamp: expect.any(String) },
+    ]);
+  });
+
+  it("a still-pending session-update save is drained by flushPendingSave() on shutdown", async () => {
+    const db1 = freshDb();
+    db1.data.sessions = [{
+      id: "sess-2", title: "t", modelId: "m", providerId: "p", messages: [], updatedAt: new Date(0).toISOString(),
+    }];
+    db1.save();
+
+    vi.useFakeTimers();
+    const writeSpy = vi.spyOn(fs, "writeFileSync");
+
+    const sess = db1.data.sessions.find((s) => s.id === "sess-2")!;
+    sess.messages = [{ id: "m0", role: "assistant", content: "final turn before exit", timestamp: new Date().toISOString() }];
+    db1.saveDebounced();
+    expect(writeSpy).not.toHaveBeenCalled(); // still within the 500ms trailing window — nothing on disk yet
+
+    vi.useRealTimers();
+    await db1.flushPendingSave(); // shutdown hook (server.ts's flushPendingSave export) forces it now
+    expect(writeSpy).toHaveBeenCalledTimes(1);
+
+    const db2 = new SecureDB();
+    expect(db2.data.sessions[0].messages[0].content).toBe("final turn before exit");
+  });
 });

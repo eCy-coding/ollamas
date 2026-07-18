@@ -2093,7 +2093,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
           if (firstUserMsg && typeof firstUserMsg.content === "string" && sess.title === "New ReAct Session") {
             sess.title = firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : "");
           }
-          db.save();
+          // B6-debounce: fires on EVERY ReAct step/turn — chat history is replayable/non-
+          // credential data, so a bounded (500ms trailing / 2s maxWait) coalesced write is
+          // safe here, unlike vault/key/security writes which must stay immediate. Drained
+          // by flushPendingSave() on shutdown so the last turn is never lost on exit.
+          db.saveDebounced();
         }
       }
 
@@ -2257,7 +2261,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
         db.data.sessions = [];
       }
       db.data.sessions.unshift(newSession);
-      db.save();
+      // B6-debounce: a new empty session is replayable/non-credential chat data (unlike
+      // vault/key/security/cluster writes, which stay immediate). Coalesced write is safe;
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
       res.json(newSession);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to create agent session" });
@@ -2269,7 +2276,10 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       const { id } = req.params;
       const initialCount = (db.data.sessions || []).length;
       db.data.sessions = (db.data.sessions || []).filter(s => s.id !== id);
-      db.save();
+      // B6-debounce: session deletion is replayable/non-credential chat data — worst case
+      // on a crash before flush, the deleted session reappears (no security/vault impact).
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
       res.json({ success: true, deleted: (db.data.sessions || []).length < initialCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to delete session" });
@@ -2287,7 +2297,11 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
       if (typeof title === "string" && title.trim()) session.title = title.trim().slice(0, 120);
       if (typeof modelId === "string" && modelId.trim()) session.modelId = modelId.trim();
       session.updatedAt = new Date().toISOString();
-      db.save();
+      // B6-debounce: fires on every chat-panel message append — chat history is replayable/
+      // non-credential data, so a bounded coalesced write (500ms trailing / 2s maxWait) is
+      // safe here, unlike vault/key/security/cluster writes which stay immediate.
+      // flushPendingSave() on shutdown drains any still-pending save before exit.
+      db.saveDebounced();
       res.json({ success: true, session });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to update session" });
