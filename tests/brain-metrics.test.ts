@@ -82,10 +82,13 @@ describe("brain gauges on /metrics (in-process app)", () => {
     expect(body).toMatch(/ollamas_brain_last_maintain_exit 0/);
   });
 
+  // 30s budget: under the fully-parallel gate this file shares the machine with
+  // ~330 suites — recall+scrape exceeded the 5s default on a loaded box (observed
+  // 5.3s), which is load, not a hang.
   test("recall latency histogram fills through the brainRecall choke-point", async () => {
     const { brainRecall } = await import("../server/brain");
     await brainRecall("metrics seed", { k: 2 });
     const body = await (await fetch(`${base}/metrics`)).text();
     expect(body).toMatch(/ollamas_brain_recall_ms_count [1-9]/);
-  });
+  }, 30_000);
 });

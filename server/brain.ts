@@ -39,6 +39,9 @@ export interface BrainMemoryInput {
   /** Epoch ms override for imports/migrations — recency decay must see the ORIGINAL
    *  event time, not the import time. Omit for live writes. */
   createdAt?: number;
+  /** Access-count override for imports (S22) — heat feeds consolidate()/usageBoost,
+   *  so a restore must not reset every memory to cold. Omit for live writes. */
+  hits?: number;
 }
 
 export interface BrainRecallHit {
@@ -56,6 +59,11 @@ export interface BrainFactInput {
   object: string;
   episodeId?: string;
   ns?: string;
+  /** Epoch ms overrides for imports/migrations (S22) — bi-temporal history must
+   *  survive a dump/restore verbatim. A fact arriving with `invalidatedAt` is a
+   *  history row: inserted as-is, never superseding live facts. Omit for live use. */
+  validFrom?: number;
+  invalidatedAt?: number;
 }
 
 export interface BrainFact extends BrainFactInput {
@@ -351,8 +359,8 @@ export function createBrainStore(
     const prior = db.prepare("SELECT rowid FROM brain_memories WHERE mem_id=?").get(id) as { rowid?: number } | undefined;
     if (prior?.rowid !== undefined) deleteMemRow(prior.rowid);
     const ins = db
-      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at) VALUES(?,?,?,?,?,?)")
-      .run(id, m.tier, m.content, m.source ?? null, ns, m.createdAt ?? now());
+      .prepare("INSERT INTO brain_memories(mem_id, tier, content, source, ns, created_at, access_count) VALUES(?,?,?,?,?,?,?)")
+      .run(id, m.tier, m.content, m.source ?? null, ns, m.createdAt ?? now(), m.hits ?? 0);
     const rowid = BigInt(ins.lastInsertRowid);
     db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(rowid, f32(vec));
     if (hasFts) db.prepare("INSERT INTO brain_fts(content, mem_rowid) VALUES(?,?)").run(m.content, rowid);
@@ -464,6 +472,20 @@ export function createBrainStore(
       }
       const ns = f.ns || DEFAULT_NS;
       const t = now();
+      const validFrom = f.validFrom ?? t;
+      // Historical import path (S22): a fact that arrives ALREADY invalidated is a
+      // bi-temporal history row — insert verbatim, never supersede anything (the live
+      // supersede chain belongs to live assertions only).
+      if (f.invalidatedAt !== undefined) {
+        ensureProvider();
+        const histVec = await embed(`${f.subject} ${f.predicate} ${f.object}`);
+        ensureVec(histVec.length);
+        const histIns = db.prepare(
+          "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from, invalidated_at) VALUES(?,?,?,?,?,?,?)",
+        ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, validFrom, f.invalidatedAt);
+        db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(histIns.lastInsertRowid), f32(histVec));
+        return { changed: true, invalidated: 0 };
+      }
       const current = db
         .prepare(
           "SELECT rowid, object FROM brain_facts WHERE ns=? AND subject=? AND predicate=? AND invalidated_at IS NULL",
@@ -483,7 +505,7 @@ export function createBrainStore(
       ensureVec(vec.length);
       const ins = db.prepare(
         "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from) VALUES(?,?,?,?,?,?)",
-      ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, t);
+      ).run(f.subject, f.predicate, f.object, f.episodeId ?? null, ns, validFrom);
       db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(ins.lastInsertRowid), f32(vec));
       return { changed: true, invalidated };
     },

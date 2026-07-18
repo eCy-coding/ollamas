@@ -37,7 +37,7 @@ eval-providers:
 eval-rerank:
 	@npx tsx scripts/eval-rerank.mjs
 # ---------------- Brain (ported from integrate-wt, B-pattern 2026-07-18) ----------------
-.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap
+.PHONY: brain-show brain-hooks eval-brain brain-e2e brain-sync-registry brain-maintain brain-backup eval-brain-mrr brain-bootstrap brain-export brain-import
 
 ## brain-show: live viewer — stats + memories + facts (+ Q="soru" semantic query)
 brain-show:
@@ -74,3 +74,11 @@ eval-brain-mrr:
 ## brain-bootstrap: 0-manual — install git-capture hooks + load the daily maintenance agent (idempotent)
 brain-bootstrap:
 	@bash scripts/brain-bootstrap.sh
+
+## brain-export: portable vector-free JSON dump (S22) — stdout, or OUT=dump.json
+brain-export:
+	@npx tsx scripts/brain-export.ts
+
+## brain-import: idempotent restore of a dump into BRAIN_DB_PATH (S22) — FILE=dump.json [DRY=1]
+brain-import:
+	@npx tsx scripts/brain-import.ts $(FILE) $(if $(DRY),--dry,)
