@@ -214,6 +214,113 @@ export function buildLaunchdRecords(): TeachRecord[] {
   return LAUNCHD_SET.map(([k, d]) => ({ id: `teach:launchd:${k}`, actor: "launchd", content: `launchd '${k}': ${d}.` }));
 }
 
+
+// ——— Dalga-3 (teach v3): 1 ollamas-internal, 2 llm-ops, 3 react, 4 security, 5 docker, 6 sözlük ———
+
+export function buildOllamasRecords(makefileText: string, integrationMd: string): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const line of makefileText.split("\n")) {
+    const m = line.match(/^([a-z][\w-]+):\s*##\s*(.+)$/);
+    if (!m) continue;
+    out.push({ id: `teach:ollamas:make-${m[1]}`, actor: "ollamas",
+      content: `ollamas make hedefi 'make ${m[1]}': ${m[2].slice(0, 200)}`,
+      fact: { subject: "ollamas", predicate: "has_make_target", object: m[1] } });
+  }
+  for (const line of integrationMd.split("\n")) {
+    const m = line.match(/^\|\s*([^|]+?)\s*\|\s*\*?\*?(ON|OFF|opt-in)[^|]*\|\s*`?([A-Z_0-9=]+)?`?[^|]*\|\s*([^|]+)\|/);
+    if (!m || !m[3]) continue;
+    const flag = m[3].split("=")[0];
+    out.push({ id: `teach:ollamas:flag-${flag}`, actor: "brain",
+      content: `Brain davranışı '${m[1].trim()}' (default ${m[2]}): ${m[4].trim().slice(0, 250)} — flag: ${m[3]}`,
+      fact: { subject: "brain", predicate: "has_flag", object: flag } });
+  }
+  return out;
+}
+
+const LLM_OPS: [string, string][] = [
+  ["context-window", "modelin tek seferde görebildiği token penceresi; num_ctx ile ayarlanır — büyük pencere = çok RAM/VRAM"],
+  ["num-ctx", "ollama'da bağlam boyu; 256K default bazı modellerde 44GB spill yapar — 8192 gibi sınırla (yaşanmış gotcha)"],
+  ["quantization", "Q4_K_M gibi — ağırlıkları küçültür, VRAM düşer, kalite az düşer"],
+  ["embedding", "metni vektöre çevirme; nomic-embed-text 768-dim — brain'in semantik araması bununla"],
+  ["kv-cache", "üretim sırasında dikkat anahtar/değerleri; uzun sohbette VRAM'i şişirir"],
+  ["vram-contention", "chat modeli + embedder aynı GPU'da yarışır — brain write-behind/GPU-gate bunun için var"],
+  ["keep-alive", "ollama modelin bellekte kalma süresi; sık swap = yavaşlık"],
+  ["temperature", "0=deterministik, yüksek=çeşitli; extraction işlerinde düşük tut"],
+  ["system-prompt", "modelin rol/kural tanımı; ollamas'ta withSystemOverride ile"],
+  ["keyless-provider", "pollinations gibi $0 API — brain distill/ask sentezi bununla, ollama'ya bağımlı değil"],
+  ["rag", "retrieval-augmented generation: önce ara, bulguları bağlama koy, sonra üret — brain ask böyle çalışır"],
+  ["rerank", "ilk arama sonuçlarını cross-encoder ile yeniden sıralama; brain MRR 0.95'i böyle aldı"],
+];
+export function buildLlmOpsRecords(): TeachRecord[] {
+  return LLM_OPS.map(([k, d]) => ({ id: `teach:llm:${k}`, actor: "llm-ops", content: `LLM-ops '${k}': ${d}.` }));
+}
+
+const REACT_SET: [string, string][] = [
+  ["component", "UI parçası — props alır, JSX döner; büyük harfle başlar"],
+  ["props", "üstten gelen salt-okunur veriler; değişirse yeniden render"],
+  ["state", "useState — bileşenin kendi verisi; setState yeni referansla"],
+  ["useeffect", "yan etki (fetch, abonelik); bağımlılık dizisi ŞART, temizlik fonksiyonu döndür"],
+  ["key", "liste elemanlarında benzersiz key — index kullanma, kimlik kullan"],
+  ["memo", "React.memo/useMemo/useCallback — gereksiz render'ı keser; inline obje/fonksiyon yeni referans üretir"],
+  ["controlled-input", "value+onChange ile form; state tek gerçek kaynak"],
+  ["lifting-state", "ortak state'i en yakın ortak ataya taşı"],
+  ["conditional-render", "koşullu JSX: {cond && <X/>} veya üçlü operatör"],
+  ["hooks-rules", "hook'lar en üst düzeyde, koşulsuz, her render aynı sırada çağrılır"],
+];
+export function buildReactRecords(): TeachRecord[] {
+  return REACT_SET.map(([k, d]) => ({ id: `teach:react:${k}`, actor: "react", content: `React '${k}': ${d}.` }));
+}
+
+const SEC_SET: [string, string][] = [
+  ["tls", "HTTPS'in şifreleme katmanı; sertifika doğrulaması atlanmaz"],
+  ["ssh-key", "parola yerine anahtar çifti; özel anahtar ASLA paylaşılmaz, ~/.ssh/id_ed25519"],
+  ["secret-hygiene", "API key/token koda ve log'a yazılmaz — env/keychain; brain redaction-gate bunu zorlar"],
+  ["least-privilege", "her servis yalnız gereken izinle koşar; loopback-only route'lar bu ilke"],
+  ["injection", "kullanıcı girdisi sorguya/komuta ham katılmaz — parametreli sorgu, allowlist"],
+  ["xss", "kullanıcı içeriği HTML'e escape'siz basılmaz (brain paneli esc() kullanır)"],
+  ["csrf", "durum değiştiren istekler token/SameSite ile korunur"],
+  ["port-scan", "açık portlar yüzeydir; lsof -i / networksetup ile denetle"],
+  ["firewall", "macOS: Sistem Ayarları > Ağ > Güvenlik Duvarı; pf ile gelişmiş"],
+  ["rate-limit", "429 + Retry-After; brute-force ve maliyet koruması"],
+  ["backup-3-2-1", "3 kopya, 2 ortam, 1 offsite; brain gece backup+restore-drill yapar"],
+];
+export function buildSecurityRecords(): TeachRecord[] {
+  return SEC_SET.map(([k, d]) => ({ id: `teach:sec:${k}`, actor: "security", content: `Güvenlik '${k}': ${d}.` }));
+}
+
+const DOCKER_SET: [string, string][] = [
+  ["image", "değişmez şablon; Dockerfile'dan build edilir"],
+  ["container", "image'ın çalışan örneği; docker run ile"],
+  ["dockerfile", "FROM/RUN/COPY/CMD — katmanlı build tarifi"],
+  ["volume", "kalıcı veri: -v host:container; container silinse de kalır"],
+  ["port-map", "-p 8080:80 — host:container port eşleme"],
+  ["compose", "docker-compose.yml — çok servisli stack tek komutla"],
+  ["exec", "docker exec -it ad bash — çalışan container'a gir"],
+  ["logs", "docker logs -f ad — canlı log"],
+  ["prune", "docker system prune — kullanılmayanları temizle (disk kurtarır)"],
+  ["arm64", "Apple Silicon'da platform farkı: --platform linux/amd64 bazen gerekir (yaşanmış gotcha)"],
+];
+export function buildDockerRecords(): TeachRecord[] {
+  return DOCKER_SET.map(([k, d]) => ({ id: `teach:docker:${k}`, actor: "docker", content: `Docker '${k}': ${d}.` }));
+}
+
+const GLOSSARY: [string, string][] = [
+  ["deprecated", "kullanımdan kaldırılıyor — yenisine geç"], ["breaking-change", "geriye uyumsuz değişiklik"],
+  ["backward-compatible", "eski kullanımlar çalışmaya devam eder"], ["idempotent", "tekrar koşmak sonucu değiştirmez"],
+  ["race-condition", "zamanlamaya bağlı hata — eşzamanlı erişim çakışması"], ["deadlock", "karşılıklı kilit bekleme kilitlenmesi"],
+  ["throttle", "hız sınırlama"], ["debounce", "ardışık tetiklemeleri bekletip tekle indirme"],
+  ["fallback", "birincil yol başarısızsa yedek yol"], ["graceful-degradation", "kısmi arızada azaltılmış ama çalışır hizmet"],
+  ["single-source-of-truth", "verinin tek yetkili kaynağı"], ["choke-point", "tüm akışın geçtiği tek denetim noktası"],
+  ["boilerplate", "tekrarlayan kalıp kod"], ["scaffold", "iskelet/başlangıç yapısı"],
+  ["lint", "stil/hata denetleyici"], ["ci-cd", "sürekli entegrasyon/teslimat boru hattı"],
+  ["regression", "önceden çalışanın bozulması"], ["edge-case", "uç durum"],
+  ["stale", "bayat/güncelliğini yitirmiş"], ["upstream-downstream", "kaynak yön / tüketen yön"],
+  ["observability", "sistemi log/metric/trace ile gözlemleyebilme"], ["telemetry", "otomatik ölçüm verisi"],
+];
+export function buildGlossaryRecords(): TeachRecord[] {
+  return GLOSSARY.map(([k, d]) => ({ id: `teach:term:${k}`, actor: "glossary", content: `Teknik terim '${k}': ${d}.` }));
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -253,7 +360,16 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
   try { nodeMods = JSON.parse(execFileSync("node", ["-p", "JSON.stringify(require('module').builtinModules)"], { timeout: 10000 }).toString()); } catch { /* node absent? impossible here */ }
   let gitHelp = "";
   try { gitHelp = execFileSync("git", ["help", "-a"], { timeout: 10000 }).toString(); } catch { /* git missing → curated only */ }
+  let mkText = "", intMd = "";
+  try { mkText = (await import("node:fs")).readFileSync("Makefile", "utf8"); } catch { /* cwd drift */ }
+  try { intMd = (await import("node:fs")).readFileSync("docs/BRAIN-INTEGRATION.md", "utf8"); } catch { /* absent */ }
   const sets: [string, TeachRecord[]][] = [
+    ["ollamas-internal", buildOllamasRecords(mkText, intMd)],
+    ["llm-ops", buildLlmOpsRecords()],
+    ["react", buildReactRecords()],
+    ["security", buildSecurityRecords()],
+    ["docker", buildDockerRecords()],
+    ["glossary", buildGlossaryRecords()],
     ["node-ts", buildNodeRecords(nodeMods)],
     ["git", buildGitRecords(gitHelp)],
     ["sqlite", buildSqliteRecords()],

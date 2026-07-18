@@ -49,3 +49,23 @@ describe("brain-teach v2 — critical-priority sets", () => {
     expect(buildLaunchdRecords().find((r) => r.id === "teach:launchd:kickstart")?.content).toContain("kickstart");
   });
 });
+
+import { buildOllamasRecords, buildLlmOpsRecords, buildDockerRecords, buildGlossaryRecords } from "../brain-teach-datasets";
+
+describe("brain-teach v3 — dalga-3 sets", () => {
+  it("ollamas-internal: Makefile '##' targets + BRAIN-INTEGRATION flag rows parse", () => {
+    const mk = "brain-teach: ## Python + macOS ogret\n\t@npx tsx x.ts\nplain:\n\techo no-desc\n";
+    const md = "| Belief revision | **ON** | `BRAIN_REVISION=0` | Negation yazımı süperseed eder |\n| junk | x |\n";
+    const recs = buildOllamasRecords(mk, md);
+    expect(recs.find((r) => r.id === "teach:ollamas:make-brain-teach")?.fact?.object).toBe("brain-teach");
+    expect(recs.find((r) => r.id === "teach:ollamas:make-plain")).toBeUndefined(); // only ## documented
+    const flag = recs.find((r) => r.id === "teach:ollamas:flag-BRAIN_REVISION");
+    expect(flag?.content).toContain("süperseed");
+    expect(flag?.fact).toEqual({ subject: "brain", predicate: "has_flag", object: "BRAIN_REVISION" });
+  });
+  it("curated dalga-3 sets carry lived gotchas", () => {
+    expect(buildLlmOpsRecords().find((r) => r.id === "teach:llm:num-ctx")?.content).toContain("44GB");
+    expect(buildDockerRecords().find((r) => r.id === "teach:docker:arm64")?.content).toContain("platform");
+    expect(buildGlossaryRecords().find((r) => r.id === "teach:term:idempotent")).toBeTruthy();
+  });
+});
