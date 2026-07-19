@@ -172,6 +172,10 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
     return { job: withLog.find((j) => j.conclusion === "failure") ?? withLog[0]! };
   })();
 
+  // Header'daki assist butonu dürüst şekilde disabled: run genişletilmemiş/seçili
+  // değilse veya job log'u henüz yüklenmemişse teşhis edecek bir şey yok.
+  const canDiagnose = Boolean(selectedRun && loadedLog);
+
   const buildContext = (): string => {
     const r = selectedRun;
     if (!r) return "Seçili çalışma yok — teşhis için bir workflow çalışmasını genişletin.";
@@ -200,6 +204,20 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
       <div className="flex items-center gap-2 text-sm text-slate-300">
         <GitBranch className="w-4 h-4 text-purple-400" />
         <span>GitHub Actions — workflow çalışmaları</span>
+      </div>
+
+      {/* eCy teşhis draweri artık diğer 4 panelle (Search/Integrations/ThreatIntel/Vault)
+          tutarlı biçimde başlıkta — her zaman görünür, ama teşhis edilecek bir şey olana
+          kadar dürüstçe disabled. AssistDrawer'ın kendi title'ı disabled butonda
+          görünmediği için (Chrome/Safari) sarmalayıcı div'e neden-tooltip'i koyuyoruz;
+          AssistDrawer.tsx'e dokunmuyoruz (başka bir agent orada çalışıyor). */}
+      <div title={canDiagnose ? undefined : "Teşhis için bir workflow çalışmasını genişletin ve logunu yükleyin"}>
+        <AssistDrawer
+          panelId="github-actions"
+          context={buildContext}
+          label="eCy ile teşhis"
+          disabled={!canDiagnose}
+        />
       </div>
 
       <div className="flex gap-2">
@@ -335,12 +353,6 @@ export default function GitHubActionsPanel({ onNotify }: { onNotify?: (msg: stri
                         )}
                       </div>
                     ))}
-                    <AssistDrawer
-                      panelId="github-actions"
-                      context={buildContext}
-                      label="eCy ile teşhis"
-                      disabled={!selectedRun || !loadedLog}
-                    />
                   </div>
                 )}
               </li>
