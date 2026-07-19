@@ -110,3 +110,5 @@ ecosystem-sync: ## brain+eCym+odysseus senkronu (yedekli, idempotent)
 	@npx tsx scripts/ecosystem-sync.ts
 brain-coherence: ## semantik-bag denetimi + guvenli karantina (apply)
 	@npx tsx scripts/brain-coherence-audit.ts --apply
+brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
+	@npx tsx scripts/brain-code-audit.ts

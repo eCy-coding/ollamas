@@ -731,6 +731,96 @@ export function buildFrontendMapRecords(files: [string, string][]): TeachRecord[
   return out.slice(0, 40);
 }
 
+
+// ——— Dalga-12: import-graph (etki analizi) + tip/bağımlılık katalogları ———
+
+/** Pure: [path, src][] → who-imports-whom. Relative specifiers only (own code);
+ *  node_modules and node: builtins are out of scope for impact analysis. */
+export function buildImportGraph(files: [string, string][]): { importers: Map<string, Set<string>>; imports: Map<string, Set<string>> } {
+  const importers = new Map<string, Set<string>>();
+  const imports = new Map<string, Set<string>>();
+  const norm = (fromFile: string, spec: string): string => {
+    const dir = fromFile.includes("/") ? fromFile.slice(0, fromFile.lastIndexOf("/")) : ".";
+    const parts = `${dir}/${spec}`.split("/");
+    const stack: string[] = [];
+    for (const seg of parts) {
+      if (seg === "." || seg === "") continue;
+      if (seg === "..") stack.pop();
+      else stack.push(seg);
+    }
+    const path = stack.join("/");
+    return path.endsWith(".ts") || path.endsWith(".tsx") ? path : `${path}.ts`;
+  };
+  for (const [path, src] of files) {
+    for (const m of src.matchAll(/(?:from|import)\s*\(?\s*["'](\.[^"']+)["']/g)) {
+      const target = norm(path, m[1]);
+      if (!importers.has(target)) importers.set(target, new Set());
+      importers.get(target)!.add(path);
+      if (!imports.has(path)) imports.set(path, new Set());
+      imports.get(path)!.add(target);
+    }
+  }
+  return { importers, imports };
+}
+
+export function buildImpactRecords(files: [string, string][]): TeachRecord[] {
+  const { importers } = buildImportGraph(files);
+  const out: TeachRecord[] = [];
+  for (const [target, who] of [...importers.entries()].sort((a, b) => b[1].size - a[1].size)) {
+    const list = [...who].sort();
+    const slug = target.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 48);
+    out.push({ id: `teach:etki:${slug}`, actor: "impact",
+      content: `Etki analizi — ${target} modülünü ${list.length} modül import eder: ${list.slice(0, 12).join(", ")}${list.length > 12 ? " …" : ""}. Bu dosyayı değiştirirsen bunlar etkilenir; testlerini birlikte koş.`,
+      fact: { subject: target.slice(0, 60), predicate: "imported_by_count", object: String(list.length) } });
+  }
+  return out.slice(0, 70);
+}
+
+export function buildTypeCatalogRecords(files: [string, string][]): TeachRecord[] {
+  const out: TeachRecord[] = [];
+  for (const [path, src] of files) {
+    for (const m of src.matchAll(/export (interface|type) (\w+)[^{]*\{([^}]{0,600})/g)) {
+      const fields = [...m[3].matchAll(/^\s*(\w+)\??:/gm)].map((f) => f[1]).slice(0, 10);
+      if (!fields.length) continue;
+      out.push({ id: `teach:tip:${m[2]}`, actor: "types",
+        content: `Tip sözleşmesi ${m[2]} (${path}): alanlar ${fields.join(", ")}.`,
+        fact: { subject: "ollamas", predicate: "has_type", object: m[2] } });
+    }
+  }
+  return out.slice(0, 45);
+}
+
+const DEP_DESC: Record<string, string> = {
+  "sqlite-vec": "SQLite vektör KNN eklentisi — brain'in semantik arama motoru (vec0 tabloları)",
+  express: "HTTP sunucu çatısı — tüm /api route'ları",
+  vite: "frontend build + dev-server (module-runner hot-reload)",
+  vitest: "test koşucusu — 3000+ testin motoru",
+  typescript: "tip sistemi + tsc --noEmit kalite kapısı",
+  react: "frontend bileşen kütüphanesi",
+  zod: "runtime şema doğrulama",
+  "@modelcontextprotocol/sdk": "MCP gateway/broker protokolü",
+  "@opentelemetry/api": "trace/metric telemetri sözleşmesi",
+  playwright: "e2e tarayıcı testleri",
+  pino: "yapılandırılmış log",
+  helmet: "HTTP güvenlik başlıkları",
+  "@google/genai": "Gemini provider SDK",
+  "@huggingface/transformers": "yerel model/embedding çalıştırma",
+};
+export function buildDependencyRecords(pkgJson: string): TeachRecord[] {
+  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = {};
+  try { pkg = JSON.parse(pkgJson); } catch { return []; }
+  const out: TeachRecord[] = [];
+  const add = (name: string, version: string, kind: string) => {
+    const desc = DEP_DESC[name] || "ollamas bağımlılığı";
+    out.push({ id: `teach:dep:${name.replace(/[^a-z0-9]+/gi, "-")}`, actor: "dependencies",
+      content: `ollamas ${kind} bağımlılığı '${name}' (${version}): ${desc}.`,
+      fact: { subject: "ollamas", predicate: "depends_on", object: `${name} (${kind})` } });
+  };
+  for (const [n, v] of Object.entries(pkg.dependencies || {})) if (DEP_DESC[n] || out.length < 40) add(n, v, "runtime");
+  for (const [n, v] of Object.entries(pkg.devDependencies || {})) if (DEP_DESC[n]) add(n, v, "dev");
+  return out.slice(0, 45);
+}
+
 async function main() {
   const pyJson = execFileSync("python3", ["-c", `
 import json, keyword, builtins, importlib
@@ -812,7 +902,14 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
     } catch { /* fine */ }
   };
   walkFe("src", 0);
+  let pkgJson = "";
+  try { pkgJson = fsMod.readFileSync("package.json", "utf8"); } catch { /* absent */ }
+  const graphFiles: [string, string][] = [...codeFiles];
+  if (serverSrc) graphFiles.push(["server.ts", serverSrc]);
   const sets: [string, TeachRecord[]][] = [
+    ["etki-analizi", buildImpactRecords(graphFiles)],
+    ["tip-katalog", buildTypeCatalogRecords(codeFiles)],
+    ["bagimlilik", buildDependencyRecords(pkgJson)],
     ["tool-katalog", buildToolCatalogRecords(registrySrc)],
     ["test-harita", buildTestMapRecords(testFiles)],
     ["frontend-harita", buildFrontendMapRecords(feFiles)],
