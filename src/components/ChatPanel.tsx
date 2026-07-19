@@ -2,13 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { MessageSquare, Send, Loader2, Plus, Trash2, AlertCircle, Calculator, Brain } from "lucide-react";
 import { api } from "../lib/apiClient";
 import { AgentMessage } from "./AgentMessage";
-import { evalArithmetic, stripThink, formatCertain, type ArithResult } from "../lib/certainty";
+import { evalArithmetic, stripThink, formatCertain } from "../lib/certainty";
+import {
+  chatStreamStore,
+  startChatStream,
+  useChatStream,
+  getActiveChatSessionId,
+  setActiveChatSessionId,
+  type ChatMsg,
+} from "../lib/streamStore";
 
 // Chat (v10) — the odysseus-core service: talk to the $0-local models (eCy first).
 // Streams over the existing POST /api/generate SSE contract; sessions persist via
 // the existing /api/agent/sessions store (+ the v10 PUT for message updates).
+//
+// v19: conversation + stream state (messages/streaming/error/tokS) moved OUT of
+// this component into src/lib/streamStore.ts — a module-level store keyed by
+// `chat:<sessionId ?? "new">` — so an in-flight stream survives this panel being
+// unmounted (App.tsx mounts panels conditionally on the active tab).
 
-interface ChatMsg { id: string; role: "user" | "assistant" | string; content: string; timestamp: string; certain?: ArithResult; slow?: boolean }
 interface Session { id: string; title: string; modelId: string; providerId: string; messages: ChatMsg[]; updatedAt: string }
 
 const PROVIDER = "ollama-local";
@@ -19,14 +31,20 @@ export function ChatPanel({ onNotify }: { onNotify?: (msg: string, type?: "succe
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState<string>(PREFERRED_MODEL);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  // Lazy-init from the module-level pointer so a REMOUNT (tab switch back) picks
+  // up whichever session was active before this component was torn down.
+  const [sessionId, setSessionIdRaw] = useState<string | null>(() => getActiveChatSessionId());
   const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [error, setError] = useState("");
-  const [tokS, setTokS] = useState<number | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const setSessionId = (id: string | null) => {
+    setSessionIdRaw(id);
+    setActiveChatSessionId(id);
+  };
+
+  const key = `chat:${sessionId ?? "new"}`;
+  const { messages, streaming, error, tokS } = useChatStream(key);
 
   useEffect(() => {
     let alive = true;
@@ -61,6 +79,9 @@ export function ChatPanel({ onNotify }: { onNotify?: (msg: string, type?: "succe
       modelId: model,
     });
     const id = created.id!;
+    // The optimistic paint below wrote to "chat:new" before the real id was
+    // known — move that entry (message + draft already in it) to its real key.
+    chatStreamStore.rename(`chat:new`, `chat:${id}`);
     setSessionId(id);
     setSessions((s) => [{ ...(created as Session) }, ...s]);
     return id;
@@ -70,69 +91,35 @@ export function ChatPanel({ onNotify }: { onNotify?: (msg: string, type?: "succe
     const text = input.trim();
     if (!text || streaming) return;
     setInput("");
-    setError("");
-    setTokS(null);
     // Source-of-truth pre-compute: if the message is pure arithmetic, the answer
     // comes from a deterministic parser (not the 8B model) — definitive, no hedge.
     const certain = evalArithmetic(text) ?? undefined;
     const userMsg: ChatMsg = { id: newId(), role: "user", content: text, timestamp: new Date().toISOString(), certain };
     const draft: ChatMsg = { id: newId(), role: "assistant", content: "", timestamp: new Date().toISOString() };
     const base = [...messages, userMsg];
-    setMessages([...base, draft]);
-    setStreaming(true);
-    const started = Date.now();
-    // GPU-busy watchdog: if no first chunk in 8s, flag the draft as slow (queued).
-    let firstChunk = false;
-    const slowTimer = setTimeout(() => {
-      if (!firstChunk) setMessages((cur) => cur.map((m) => (m.id === draft.id ? { ...m, slow: true } : m)));
-    }, 8000);
-    let acc = "";
-    let buf = "";
+    // Optimistic paint — shows the user's message + a spinner draft immediately,
+    // even before the session-creation round trip resolves (preserves original UX).
+    chatStreamStore.set(key, { messages: [...base, draft], streaming: true, error: "", tokS: null });
     try {
       const id = await ensureSession(text);
-      // Hard ceiling so a saturated GPU can't hang the UI forever.
-      const timeout = new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error("model timed out after 120s (GPU busy) — try again")), 120_000),
-      );
-      await Promise.race([timeout, api.streamPost("/api/generate", {
+      // The actual SSE stream + its 8s/120s watchdogs now live in the store, so
+      // they keep running (and keep updating chat:<id>) even if this component
+      // unmounts before they finish.
+      startChatStream({
+        key: `chat:${id}`,
+        base,
+        draftId: draft.id,
         provider: PROVIDER,
         model,
-        stream: true,
-        messages: base.map((m) => ({ role: m.role, content: m.content })),
-      }, {
-        onChunk: (t: string) => {
-          buf += t;
-          const parts = buf.split("\n\n");
-          buf = parts.pop() ?? "";
-          for (const part of parts) {
-            const line = part.trim();
-            if (!line.startsWith("data:")) continue;
-            try {
-              const f = JSON.parse(line.slice(5).trim());
-              if (f.chunk) {
-                firstChunk = true;
-                acc += f.chunk;
-                setMessages((cur) => cur.map((m) => (m.id === draft.id ? { ...m, content: acc, slow: false } : m)));
-              } else if (f.error) {
-                setError(String(f.error));
-              }
-            } catch { /* partial frame */ }
-          }
-        },
-      })]);
-      const secs = (Date.now() - started) / 1000;
-      if (acc && secs > 0) setTokS(Math.round(acc.length / 4 / secs)); // ~4 chars/token estimate
-      const finalMsgs = [...base, { ...draft, content: acc }];
-      setMessages(finalMsgs);
-      void persist(id, finalMsgs, base.length === 1 ? text : undefined);
+        onDone: (finalMsgs) => { void persist(id, finalMsgs, base.length === 1 ? text : undefined); },
+        onError: (msg) => onNotify?.(`Chat failed: ${msg}`, "error"),
+      });
     } catch (e) {
+      // Session creation itself failed (rare) — same honest-failure shape as a
+      // stream failure: drop the empty draft, surface the error.
       const msg = String((e as Error)?.message || e);
-      setError(msg);
+      chatStreamStore.patch(key, { messages: base, error: msg, streaming: false });
       onNotify?.(`Chat failed: ${msg}`, "error");
-      setMessages(base); // drop the empty draft on hard failure — honest state
-    } finally {
-      clearTimeout(slowTimer);
-      setStreaming(false);
     }
   };
 
@@ -140,19 +127,23 @@ export function ChatPanel({ onNotify }: { onNotify?: (msg: string, type?: "succe
     try {
       const full = await api.get<Session>(`/api/agent/sessions/${s.id}`);
       setSessionId(full.id);
-      setMessages(full.messages ?? []);
+      chatStreamStore.set(`chat:${full.id}`, { messages: full.messages ?? [], streaming: false, error: "", tokS: null });
       if (full.modelId && models.includes(full.modelId)) setModel(full.modelId);
     } catch {
       onNotify?.("Failed to load session", "error");
     }
   };
 
-  const newChat = () => { setSessionId(null); setMessages([]); setError(""); setTokS(null); };
+  const newChat = () => {
+    setSessionId(null);
+    chatStreamStore.clear(`chat:new`); // don't let a stale failed-attempt error leak into the fresh view
+  };
 
   const deleteSession = async (id: string) => {
     try {
       await api.del(`/api/agent/sessions/${id}`);
       setSessions((s) => s.filter((x) => x.id !== id));
+      chatStreamStore.clear(`chat:${id}`); // stop/forget any stream still writing to a now-deleted session
       if (sessionId === id) newChat();
     } catch { onNotify?.("Delete failed", "error"); }
   };
