@@ -175,7 +175,13 @@ async function main() {
     }));
   } catch (e: any) {
     const msg = String(e?.message ?? e);
-    const kind = /provider mismatch/i.test(msg) ? "embed-provider-mismatch" : /timed out|exceeded/i.test(msg) ? "budget" : "error";
+    // 503/meşgul geçici bir DURUM, hata değil: tur sessizce atlanır, 15 dk sonra
+    // tekrar denenir (canlı ilk otomatik turda yakalandı).
+    const kind = /HTTP 503|embedder busy/i.test(msg) ? "embedder-busy"
+      : /provider mismatch/i.test(msg) ? "embed-provider-mismatch"
+      : /timed out|exceeded/i.test(msg) ? "budget"
+      : /HTTP 5\d\d|fetch failed|ECONNREFUSED/i.test(msg) ? "server-unavailable"
+      : "error";
     console.warn(JSON.stringify({ event: "brain.loop", [kind === "error" ? "error" : "skipped"]: kind, detail: msg.slice(0, 160) }));
   } finally {
     try { unlinkSync(LOCK_FILE); } catch { /* zaten yok */ }
