@@ -233,12 +233,16 @@ async function exerciseSandbox(
   ]);
 
   try {
+    // Durum-farkında mod: candidate ise CANLI-GÖLGE (mode:"live") — canlı-pencereyi
+    // biriktir ki candidate→autonomous tıkanmasın; sandbox ise ölçüm (mode:"sandbox").
+    // Her iki modda da çıktı ATILIR (withCapability); yalnız otonomlaşınca kullanılır.
+    const exerciseMode = cap.status === "candidate" ? "live" : "sandbox";
     await withCapability(id, bounded, async () => ({}), {
-      ledger, turn, mode: "sandbox", metricOf: prepared.metricOf,
+      ledger, turn, mode: exerciseMode, metricOf: prepared.metricOf,
     });
     const after = loadLedger().caps[id];
     console.log(JSON.stringify({
-      event: "brain.sandbox", id, status: after?.status,
+      event: "brain.sandbox", id, mode: exerciseMode, status: after?.status,
       runs: after?.runs.length, metric: after?.runs.at(-1)?.metric,
     }));
   } catch { /* withCapability zaten yutar; buraya düşmez */ }
@@ -372,12 +376,12 @@ async function main() {
       saveState(state); return;
     }
     const qHash = hash(question);
-    if (!shouldAsk(state, maxWrites)) {
-      saveState(state);
-      console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "budget", writesToday: state.writesToday }));
-      await record({ turn: state.turn, ms: Date.now() - t0, wrote: false, skipped: "budget" });
-      return;
-    }
+    // Günlük yazma bütçesi YALNIZ brain'e fact-yazmayı kısar — turun yetenek ÖLÇÜMÜNÜ
+    // değil. Egzersizci (canlı-gölge) brain'e YAZMAZ; onu yazma kotasına bağlamak
+    // candidate→autonomous'u sonsuza dek tıkıyordu (aç kalan ölçüm yolu: kota dolunca
+    // tüm tur — egzersiz dahil — atlanıyordu). GPU-kibarlığını yukarıdaki gpu-busy gate
+    // korur; burada yalnız fact-yazma durur, tur geri kalanı (askShared + egzersiz) koşar.
+    const writeAllowed = shouldAsk(state, maxWrites);
 
     // 2) Ortak-brain: tek retrieval → üç uzman → gate.
     // Gate artık ATOMİK okunur/yazılır ve bozuksa son-iyi yedeğe düşer.
@@ -467,7 +471,7 @@ async function main() {
 
     // 3) Kalite kapısı → öğrenilen bilgi brain'e (ns=loop, conf 0.7).
     let wrote = false;
-    if (!r.abstained && r.sources.length >= 2 && r.answer.length > 40) {
+    if (writeAllowed && !r.abstained && r.sources.length >= 2 && r.answer.length > 40) {
       await api("/api/brain/remember", {
         id: `loop:${qHash}`, tier: "learned", ns: "loop", actor: r.expert || "loop",
         confidence: 0.7, source: "brain-loop",

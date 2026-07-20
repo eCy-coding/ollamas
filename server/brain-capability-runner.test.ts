@@ -68,6 +68,59 @@ describe("withCapability", () => {
   });
 });
 
+/** Yeteneği aday duruma taşı (yalnız 10 temiz sandbox → candidate, canlı henüz yok). */
+const makeCandidate = (l: Ledger, id: string) => {
+  let c = emptyCap(id);
+  for (let i = 0; i < 10; i++) {
+    c = recordRun(c, { turn: i, at: 1_000 + i, mode: "sandbox", ok: true, ms: 10 }, 1_000 + i);
+  }
+  l.caps[id] = c;
+  return c;
+};
+
+describe("withCapability — canlı-gölge (candidate→autonomous köprüsü)", () => {
+  test("candidate + mode:live → next KOŞAR, canlı koşu kaydolur, ÇIKTI ATILIR (gölge)", async () => {
+    const l = emptyLedger();
+    expect(makeCandidate(l, "x").status).toBe("candidate");
+    let ran = false;
+    const out = await withCapability("x", async () => { ran = true; return "yeni"; }, async () => "eski",
+      { ledger: l, turn: 20, mode: "live" });
+    expect(ran).toBe(true);                                            // canlı-gölge KOŞTU
+    expect(out).toBe("eski");                                          // ama çıktı güvenilmez → atıldı
+    const liveRuns = l.caps.x.runs.filter((r) => r.mode === "live");
+    expect(liveRuns.length).toBe(1);                                   // canlı koşu KAYDEDİLDİ (evaluate besler)
+  });
+
+  test("candidate + 10 temiz canlı-gölge → autonomous'a terfi", async () => {
+    const l = emptyLedger();
+    makeCandidate(l, "x");
+    for (let i = 0; i < 10; i++) {
+      await withCapability("x", async () => "yeni", async () => "eski", { ledger: l, turn: 20 + i, mode: "live" });
+    }
+    expect(l.caps.x.status).toBe("autonomous");                       // canlı-gölge penceresi geçti
+  });
+
+  test("canlı-gölge PATLARSA anında karantina (canlı hata = güvenlik sınırı)", async () => {
+    const l = emptyLedger();
+    makeCandidate(l, "x");
+    const out = await withCapability("x", async () => { throw new Error("gölge-boom"); }, async () => "eski",
+      { ledger: l, turn: 20, mode: "live" });
+    expect(out).toBe("eski");
+    expect(l.caps.x.status).toBe("quarantined");
+    expect(l.caps.x.quarantine?.reason).toContain("gölge-boom");
+  });
+
+  test("SANDBOX yetenek mode:live ile KOŞMAZ — sandbox asla canlıya sızmaz", async () => {
+    const l = emptyLedger();
+    ensureCap(l, "x");                                                // status=sandbox
+    let ran = false;
+    const out = await withCapability("x", async () => { ran = true; return "yeni"; }, async () => "eski",
+      { ledger: l, turn: 1, mode: "live" });
+    expect(ran).toBe(false);                                          // sandbox yetenek canlı-gölge bile koşamaz
+    expect(out).toBe("eski");
+  });
+});
+
 describe("defter kalıcılığı", () => {
   test("yaz-oku turu", () => {
     const l = emptyLedger();

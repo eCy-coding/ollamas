@@ -51,9 +51,16 @@ export interface WithCapOpts {
 /**
  * Yeteneği kapıdan geçirerek çalıştır.
  *
- * SÖZLEŞME: `next` yalnız yetenek `autonomous` ise (ya da açıkça sandbox modunda)
- * koşar. NE OLURSA OLSUN hata durumunda `fallback`'in değeri döner — kapı loop'u
- * asla düşürmez. Her koşu deftere yazılır; canlı hata anında karantinaya alır.
+ * KOŞMA/ÇIKTI KARARI yeteneğin DURUMUNA göre (mode yalnız KAYIT etiketidir):
+ *   • autonomous → koşar, ÇIKTI KULLANILIR (güvenilir).
+ *   • sandbox + mode:sandbox → koşar, ÇIKTI ATILIR (yalnız ölçülür).
+ *   • candidate + mode:live → CANLI-GÖLGE: koşar, canlı ölçülür, ÇIKTI ATILIR
+ *     (henüz güvenilmez ama canlı-pencere biriktirmeli — yoksa candidate sonsuza
+ *     dek candidate kalır; bu boşluk candidate→autonomous'u tıkıyordu).
+ *   • aksi (sandbox+live, quarantined, …) → KOŞMAZ, fallback.
+ *
+ * Canlı-gölge de GERÇEK bir canlı koşudur: hata → evaluate anında karantina eder.
+ * NE OLURSA OLSUN hata durumunda `fallback` döner — kapı loop'u asla düşürmez.
  */
 export async function withCapability<T>(
   id: string,
@@ -63,7 +70,10 @@ export async function withCapability<T>(
 ): Promise<T> {
   const { ledger, turn, mode = "live" } = opts;
   const cap = ensureCap(ledger, id);
-  const allowed = mode === "sandbox" || autonomousIds(ledger).includes(id);
+  const isAutonomous = autonomousIds(ledger).includes(id);
+  const isSandboxRun = mode === "sandbox" && (cap.status === "sandbox" || cap.status === "candidate");
+  const isLiveShadow = mode === "live" && cap.status === "candidate";
+  const allowed = isAutonomous || isSandboxRun || isLiveShadow;
   if (!allowed) return fallback();
 
   const t0 = Date.now();
@@ -72,8 +82,9 @@ export async function withCapability<T>(
     const run: Run = { turn, at: Date.now(), mode, ok: true, ms: Date.now() - t0, metric: opts.metricOf?.(out) };
     ledger.caps[id] = recordRun(cap, run, run.at);
     saveLedger(ledger);
-    // Sandbox koşusunun SONUCU KULLANILMAZ — yalnız ölçülür. Canlı davranış değişmez.
-    return mode === "sandbox" ? fallback() : out;
+    // Yalnız OTONOM yetenek çıktısı kullanılır. Sandbox ölçümü ve canlı-gölge
+    // GÜVENİLMEZ → çıktı atılır (canlı davranış değişmez), yalnız deftere ölçü düşer.
+    return isAutonomous ? out : fallback();
   } catch (e: any) {
     const run: Run = {
       turn, at: Date.now(), mode, ok: false, ms: Date.now() - t0,
