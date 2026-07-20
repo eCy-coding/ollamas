@@ -11,6 +11,7 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Embedder } from "./rag";
+import type { EmbedRole } from "./embed-contract";
 
 export interface EmbedCacheStats {
   memHits: number;
@@ -53,8 +54,11 @@ export function createEmbedCache(opts: {
   let dbHits = 0;
   let misses = 0;
 
-  const keyOf = (text: string) =>
-    createHash("sha256").update(provider).update("\x00").update(text).digest("hex");
+  // F0: role is part of the key. nomic's task prefixes make the document and query
+  // embeddings of the SAME string different vectors; keying on text alone would serve
+  // whichever was computed first to both callers — a silent, unrecoverable mix-up.
+  const keyOf = (text: string, role: EmbedRole) =>
+    createHash("sha256").update(provider).update("\x00").update(role).update("\x00").update(text).digest("hex");
 
   const lruSet = (key: string, vec: number[]) => {
     if (mem.has(key)) mem.delete(key);
@@ -75,8 +79,10 @@ export function createEmbedCache(opts: {
 
   return {
     wrap(embed) {
-      return async (text: string) => {
-        const key = keyOf(text);
+      // Default MUST match contractEmbedder's default ("query") or a caller that omits
+      // the role would cache under one key and embed under another prefix.
+      return async (text: string, role: EmbedRole = "query") => {
+        const key = keyOf(text, role);
         const hot = mem.get(key);
         if (hot) {
           memHits++;
@@ -94,7 +100,7 @@ export function createEmbedCache(opts: {
           return vec;
         }
         misses++;
-        const vec = await embed(text);
+        const vec = await embed(text, role);
         const t = now();
         db.prepare(
           "INSERT OR REPLACE INTO embed_cache(key, dim, vec, created_at, last_access) VALUES(?,?,?,?,?)",

@@ -21,6 +21,45 @@ const countingEmbed = () => {
   return { embed, count: () => calls };
 };
 
+// F0 — the cache sits between brain.ts and the contract embedder. If it drops the
+// `role` argument, every document write silently gets the QUERY prefix; if it keys
+// only on text, a document and a query vector for the same string collide. Both are
+// silent corruptions that no downstream assertion would catch.
+describe("embed-cache — F0 role passthrough", () => {
+  test("forwards the role to the underlying embedder", async () => {
+    const db = new DatabaseSync(":memory:");
+    const c = createEmbedCache({ db, provider: "p1" });
+    const seen: (string | undefined)[] = [];
+    const wrapped = c.wrap(async (t, role) => { seen.push(role); return [t.length, 0, 0]; });
+    await wrapped("hello", "document");
+    await wrapped("hello", "query");
+    expect(seen).toEqual(["document", "query"]);
+  });
+
+  test("cache key includes role — document and query of same text do NOT collide", async () => {
+    const db = new DatabaseSync(":memory:");
+    const c = createEmbedCache({ db, provider: "p1" });
+    let calls = 0;
+    const wrapped = c.wrap(async (_t, role) => { calls++; return role === "document" ? [1, 0, 0] : [0, 1, 0]; });
+    const d = await wrapped("same text", "document");
+    const q = await wrapped("same text", "query");
+    expect(calls).toBe(2);
+    expect(d).toEqual([1, 0, 0]);
+    expect(q).toEqual([0, 1, 0]);
+  });
+
+  test("same role still memoizes (the cache must not become a no-op)", async () => {
+    const db = new DatabaseSync(":memory:");
+    const c = createEmbedCache({ db, provider: "p1" });
+    let calls = 0;
+    const wrapped = c.wrap(async () => { calls++; return [1, 0, 0]; });
+    await wrapped("x", "document");
+    await wrapped("x", "document");
+    expect(calls).toBe(1);
+    expect(c.stats().memHits).toBe(1);
+  });
+});
+
 describe("embed-cache — memoization", () => {
   test("second embed of same text is a memory hit (underlying embedder called once)", async () => {
     const db = new DatabaseSync(":memory:");
@@ -92,12 +131,30 @@ describe("embed-cache — memoization", () => {
 });
 
 describe("embed-cache — brain integration", () => {
-  test("remember then recall of same content embeds ONCE (default-on cache)", async () => {
+  // F0 changed this contract, deliberately. remember() embeds with the "document" role
+  // and recall() with "query"; under nomic's asymmetric task prefixes those are genuinely
+  // DIFFERENT vectors, so they cannot share a cache entry. The pre-F0 single-embed result
+  // was only reachable because both sides embedded the identical raw string.
+  //
+  // Real cost: a remember-then-recall of the same text now costs 2 embeds, not 1. The
+  // cache still earns its keep on repeated recalls of the same query (asserted below).
+  test("remember then recall of same content embeds TWICE — document ≠ query vector", async () => {
     const { embed, count } = countingEmbed();
     const b = createBrainStore({ dbPath: tmpDb(), embed, embedProvider: "count" });
     await b.remember({ id: "m1", tier: "learned", content: "espresso ritual" });
     await b.recall("espresso ritual", { k: 1 });
-    expect(count()).toBe(1); // recall query == remembered content → cache hit
+    expect(count()).toBe(2);
+    b.close();
+  });
+
+  test("repeated recall of the same query still embeds ONCE (cache earns its keep)", async () => {
+    const { embed, count } = countingEmbed();
+    const b = createBrainStore({ dbPath: tmpDb(), embed, embedProvider: "count" });
+    await b.remember({ id: "m1", tier: "learned", content: "espresso ritual" });
+    await b.recall("espresso ritual", { k: 1 });
+    const afterFirst = count();
+    await b.recall("espresso ritual", { k: 1 });
+    expect(count()).toBe(afterFirst); // same text + same role → cache hit
     b.close();
   });
 

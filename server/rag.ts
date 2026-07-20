@@ -8,17 +8,28 @@
 // without ollama; production uses embedText() against the local ollama daemon.
 import { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
-import { pickEmbedProvider, buildEmbedRequest, parseEmbedResponse } from "./embed-catalog";
+import { pickEmbedProvider, buildEmbedRequest, parseEmbedResponse, embedBaseUrl } from "./embed-catalog";
+import { contractEmbedder, embedFingerprint, type EmbedRole } from "./embed-contract";
 import { rerankCandidates, type Scorer } from "./rerank";
 import { withLlmSpan } from "./tracing";
 
-export type Embedder = (text: string) => Promise<number[]>;
+/** F0: `role` selects the nomic task prefix (see embed-contract.ts). Optional, so every
+ *  pre-F0 `(text) => ...` embedder — including the test fakes — stays assignable. */
+export type Embedder = (text: string, role?: EmbedRole) => Promise<number[]>;
+
+export const localEmbedHost = () => process.env.OLLAMA_HOST || "http://localhost:11434";
+export const localEmbedModel = () => process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
 
 /** Embed text via the local ollama daemon (`POST /api/embeddings`). Model +
- *  host are env-configurable; mirrors the ollama-local pattern in providers.ts. */
+ *  host are env-configurable; mirrors the ollama-local pattern in providers.ts.
+ *
+ *  RAW on purpose: no task prefix, no normalization. The `brain-encoder/v1` contract is
+ *  applied one level up in resolveEmbedder(), so semantic-cache.ts — which wires
+ *  embedText through its own normalizingEmbedder into a separate collection — keeps its
+ *  existing vector space and its 0.95 hit threshold stays meaningful. */
 export async function embedText(text: string): Promise<number[]> {
-  const host = process.env.OLLAMA_HOST || "http://localhost:11434";
-  const model = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+  const host = localEmbedHost();
+  const model = localEmbedModel();
   const res = await fetch(`${host}/api/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -43,9 +54,20 @@ export function resolveEmbedder(
 ): { embed: Embedder; providerId: string } {
   const local = deps.localEmbed ?? embedText;
   const entry = pickEmbedProvider(env);
-  if (!entry) return { embed: local, providerId: "ollama-local" };
+  const host = env.OLLAMA_HOST || "http://localhost:11434";
+  const localModel = env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+  if (!entry) {
+    return {
+      embed: contractEmbedder(local, localModel),
+      providerId: embedFingerprint({ provider: "ollama-local", model: localModel, host }),
+    };
+  }
   const fetchFn = deps.fetchFn ?? fetch;
-  const embed: Embedder = async (text) => {
+  // The cloud arm's model decides its own prefix policy; the local fallback keeps the
+  // local model's. Both are wrapped so the caller always gets unit-norm vectors.
+  const cloudModel = entry.defaultModel || entry.id;
+  const localArm = contractEmbedder(local, localModel);
+  const raw: Embedder = async (text, role) => {
     try {
       const req = buildEmbedRequest(entry, [text], (env[entry.envKey] || "").trim(), env);
       const res = await fetchFn(req.url, {
@@ -57,10 +79,15 @@ export function resolveEmbedder(
       // Terminal fallback. Safe on an empty index; on a cloud-built index the store's
       // dim/provider guards below stop a mixed-dim write before it can corrupt anything.
       console.warn(`[RAG] ${entry.id} embed failed (${e?.message ?? e}) → local ollama fallback`);
-      return local(text);
+      // Already contract-wrapped, and normalize is idempotent, so the outer wrap below
+      // cannot double-prefix (applyEmbedPrefix is a no-op on prefixed text).
+      return localArm(text, role);
     }
   };
-  return { embed, providerId: entry.id };
+  return {
+    embed: contractEmbedder(raw, cloudModel),
+    providerId: embedFingerprint({ provider: entry.id, model: cloudModel, host: embedBaseUrl(entry.id, env) }),
+  };
 }
 
 // ── Chunking seam (RAG_SEMANTIC_CHUNK) ──────────────────────────────────────
