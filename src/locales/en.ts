@@ -5,6 +5,7 @@ export const dir: 'ltr' | 'rtl' = 'ltr';
 export const messages: Record<string, string> = {
   'app.tab.telemetry': 'Cockpit Dashboard',
   'app.tab.revenue': 'Revenue / Personal Ops',
+  'app.tab.agent-policy': 'Agent Permissions',
   'app.tab.chat': 'Chat (eCy)',
   'app.tab.ecym': 'eCy Studio',
   'app.tab.swarm': 'P2P Computing Swarm',

@@ -23,6 +23,7 @@ export const messages: Record<string, string> = {
   'app.tab.automation': 'Sanal Denetleyici',
   'app.tab.selftest': 'Doğrulama Kapıları',
   'app.tab.revenue': 'Gelir / Kişisel Ops',
+  'app.tab.agent-policy': 'Ajan İzinleri',
   'app.tab.chat': 'Sohbet (eCy)',
   'app.tab.ecym': 'eCy Stüdyo',
   'app.tab.demo': 'Demo',
