@@ -136,6 +136,7 @@ export default function App() {
     { id: "automation", icon: <MousePointer2 className="w-4 h-4 text-orange-400" /> },
     { id: "selftest", icon: <BadgeInfo className="w-4 h-4 text-rose-400" /> },
     { id: "revenue", icon: <DollarSign className="w-4 h-4 text-green-400" /> },
+    { id: "agent-policy", icon: <ShieldCheck className="w-4 h-4 text-emerald-400" /> },
     // O0: single append point — every backend-enabled module becomes a tab here.
     // No per-module `activeTab === "..."` block: one generic <ModulePanel> slot
     // renders them (kills the scattered-registration anti-pattern O0 targets).

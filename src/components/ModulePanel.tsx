@@ -11,6 +11,7 @@ import DocumentsPanel from "./DocumentsPanel";
 import CalendarPanel from "./CalendarPanel";
 import EmailPanel from "./EmailPanel";
 import SettingsPanel from "./SettingsPanel";
+import AgentPolicyPanel from "./AgentPolicyPanel";
 
 interface ModulePanelProps {
   id: string;
@@ -28,6 +29,7 @@ export default function ModulePanel({ id, labelKey }: ModulePanelProps) {
   if (id === "calendar") return <CalendarPanel />;
   if (id === "email") return <EmailPanel />;
   if (id === "settings") return <SettingsPanel />;
+  if (id === "agent-policy") return <AgentPolicyPanel />;
 
   return (
     <section

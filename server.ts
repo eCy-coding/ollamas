@@ -4168,6 +4168,55 @@ app.post("/api/brain/recall", async (req, res) => {
   }
 });
 
+// AJAN İZİN POLİTİKASI — ollamas·eCym·odysseus'un macOS uygulamaları üzerindeki yetkisi.
+//
+// Bu route'un varlık sebebi: izinlerin KOD DEĞİL VERİ olması. Hangi eylem sınıfının
+// otonom çalışacağına operatör panelden karar verir; sunucu yalnız mekanizmayı ve
+// güvenli varsayılanı tutar. Yukarıdaki /api/security/permissions deseninin aynısı,
+// iki farkla: (1) kısmi güncelleme (panel tek anahtar gönderebilir), (2) geçersiz
+// veri mevcut politikayı BOZAMAZ — mergePolicy geçersiz değeri yok sayar.
+app.get("/api/agent/policy", async (_req, res) => {
+  try {
+    const { loadPolicy } = await import("./server/agent-policy-store");
+    const { RISK_CLASSES, AUTONOMY_LEVELS } = await import("./server/agent-policy");
+    // Şemayı da döndür: panel seçenekleri sunucudan gelsin, iki yerde
+    // elle senkron tutulan bir liste olmasın.
+    res.json({ policy: loadPolicy(), riskClasses: RISK_CLASSES, autonomyLevels: AUTONOMY_LEVELS });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "policy read failed" });
+  }
+});
+
+app.post("/api/agent/policy", async (req, res) => {
+  try {
+    const { loadPolicy, savePolicy } = await import("./server/agent-policy-store");
+    const { mergePolicy } = await import("./server/agent-policy");
+    const before = loadPolicy();
+    const next = mergePolicy(before, req.body || {});
+    const saved = savePolicy(next);
+    if (!saved.ok) return res.status(400).json({ error: "geçersiz politika", errors: saved.errors });
+
+    // Yetki değişikliği DENETLENEBİLİR olmalı: neyin neye döndüğü kayda geçer.
+    const changed = Object.entries(next.classes)
+      .filter(([k, v]) => before.classes[k as keyof typeof before.classes] !== v)
+      .map(([k, v]) => `${k}: ${before.classes[k as keyof typeof before.classes]}→${v}`);
+    const { db } = await import("./server/db");
+    // Kategori `permission_change`: db.ts sabit bir birleşim tutuyor ve bu GERÇEKTEN
+    // bir izin değişikliği — başka bir modülün tipini genişletmektense doğru olan
+    // mevcut kategoriyi kullanmak.
+    db.logSecurity(
+      "permission_change",
+      "Update agent policy",
+      changed.length ? changed.join(", ") : "sınıf değişmedi (istisna/ilke güncellemesi)",
+      changed.some((c) => c.endsWith("→auto")) ? "warning" : "info",
+    );
+    db.save();
+    res.json({ success: true, policy: next });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "policy write failed" });
+  }
+});
+
 // F3c EMBED — sorgu gömme yüzeyi. brain-loop gibi HTTP istemcileri q* = q + λ·p_u
 // kurabilsin diye var (loop brain.db'yi doğrudan AÇMAZ — bu bilinçli bir sözleşme).
 // Yalnız loopback: gömme yüzeyi açığa çıkarsa embedder dışarıdan tüketilebilir.
