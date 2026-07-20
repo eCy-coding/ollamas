@@ -37,6 +37,7 @@ import ModulePanel from "./components/ModulePanel";
 import { useLingui } from "@lingui/react";
 import { api } from "./lib/apiClient";
 import { HealthTelemetry } from "./types";
+import { AgentPolicyPanel } from "./components/AgentPolicyPanel";
 import {
   Cpu, Key, Sparkles, FolderOpen, Terminal,
   ShieldCheck, ShieldAlert, CloudLightning, BadgeInfo, Bell, X, Info, Network,
@@ -490,6 +491,12 @@ export default function App() {
           {activeTab === "revenue" && (
             <div className="animate-fade-in">
               <RevenueOps onNotify={notify} />
+            </div>
+          )}
+
+          {activeTab === "agent-policy" && (
+            <div className="animate-fade-in">
+              <AgentPolicyPanel onNotify={notify} />
             </div>
           )}
 
