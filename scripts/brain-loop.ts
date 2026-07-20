@@ -67,6 +67,8 @@ export function subjectsFrom(hits: { content: string }[]): string[] {
 /** Profil vektörü (p_u) bu kadar turda bir tazelenir. Her tur yeniden hesaplamak
  *  3 ekstra embed = 3 ekstra GPU çağrısı demekti; profil yavaş değişen bir şeydir. */
 const PROFILE_REFRESH_TURNS = 20;
+/** Gate eğitimi bu kadar turda bir koşar — her tur eğitmek gereksiz, veri yavaş birikir. */
+const GATE_TRAIN_EVERY = Number(process.env.BRAIN_GATE_TRAIN_EVERY) || 10;
 
 export interface LoopState {
   turn: number;
@@ -240,6 +242,8 @@ async function main() {
     // 2) Ortak-brain: tek retrieval → üç uzman → gate.
     // Gate artık ATOMİK okunur/yazılır ve bozuksa son-iyi yedeğe düşer.
     const { loadGate, saveGate: persistGate } = await import("../server/brain-gate-store");
+    const { mulberry32, fnv1a } = await import("../server/brain-explore");
+    const { appendOutcome, readOutcomes } = await import("../server/brain-outcome-ledger");
     const gate = loadGate() ?? emptyGate(768);
 
     // F3c bağımlılıkları — HTTP üzerinden (loop brain.db'yi AÇMAZ, sözleşme).
@@ -276,11 +280,20 @@ async function main() {
       liveContext: liveSystemContext,
       generate: gen(resolveDistillProvider(process.env)),
       gate,
+      // askShared artık gate'e YAZMAZ (öz-doğrulama kaldırıldı — kusur G). Eğitim
+      // aşağıda, toplu ve terfi kapısının arkasında yapılır. Sözleşme gereği duruyor.
       saveGate: (g: any) => { persistGate(g); },
       // F3c: gate'i besleyen gömme + q*'ı retrieval'a taşıyan vektör-recall.
       embed,
       recallVec,
       profileVectors: async () => profileVecs,
+      // (F3b keşif) YALNIZ loop keşfeder; canlı kullanıcı sorgusu (HTTP yolu) ε=0
+      // kalır. Tohum sorudan türetilir → aynı soru aynı kararı verir, tekrarlanabilir.
+      epsilon: Number(process.env.BRAIN_EXPLORE_EPSILON ?? 0.15),
+      rng: mulberry32(fnv1a(question)),
+      // Turun DIŞSAL sonucu deftere — gate eğitiminin ham verisi (kendi argmax'ı DEĞİL).
+      onOutcome: (o: { q: number[]; scores: number[] }) =>
+        appendOutcome({ at: Date.now(), turn: state.turn, q: o.q, scores: o.scores }),
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // eCym yerel modeldir: GPU'yu chat LLM ile paylaşır → yalnız boştayken katılır.
@@ -325,6 +338,38 @@ async function main() {
     }
     state.lastAt = Date.now();
     saveState(state);
+
+    // 3.5) GATE EĞİTİMİ — kusur G'nin yerine geçen mekanizma.
+    // Öz-doğrulayan tur-içi dürtme yerine: biriken DIŞSAL puanlar üzerinde toplu
+    // cross-entropy. Terfi kapısının ARKASINDA (withCapability'nin ilk üretim
+    // kullanımı): `gate-ce-train` otonom değilken sandbox'ta ölçülür, gate'e
+    // DOKUNMAZ; baraj geçilince canlıya alınır.
+    if (state.turn % GATE_TRAIN_EVERY === 0) {
+      try {
+        const { loadLedger } = await import("../server/brain-capability-runner");
+        const { withCapability } = await import("../server/brain-capability-runner");
+        const { autonomousIds } = await import("../server/brain-capabilities");
+        const { trainGate } = await import("../server/brain-gate-train");
+        const ledger = loadLedger();
+        const mode = autonomousIds(ledger).includes("gate-ce-train") ? "live" : "sandbox";
+        const rows = readOutcomes(500);
+        const res = await withCapability(
+          "gate-ce-train",
+          async () => {
+            const { gate: trained, losses } = trainGate(gate, rows);
+            // İNCELİK: withCapability sandbox SONUCUNU ATAR → kalıcılaştırma
+            // sarmalayıcıyla değil, BURADA mode'a bakılarak yapılmalı.
+            if (mode === "live" && losses.length) persistGate(trained);
+            return { rows: rows.length, drop: losses.length ? losses[0] - losses[losses.length - 1] : 0 };
+          },
+          async () => ({ rows: rows.length, drop: 0 }),
+          { ledger, turn: state.turn, mode, metricOf: (r: any) => r?.drop },
+        );
+        console.log(JSON.stringify({ event: "brain.gate.train", mode, ...res }));
+      } catch (e: any) {
+        console.warn(JSON.stringify({ event: "brain.gate.train", error: String(e?.message ?? e).slice(0, 120) }));
+      }
+    }
 
     // 4) Bakım: her 4 turda backfill + ekosistem senkronu (üç sistem güncel kalır).
     if (state.turn % 4 === 0 && Date.now() - t0 < budgetMs) {

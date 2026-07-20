@@ -6,8 +6,27 @@
 import { gatherContext, type AskDeps, type AskSource } from "./brain-ask";
 import {
   EXPERTS, emptyGate, gateLogits, gateWeights, heuristicBias, mixtureSelect,
-  personalizeQuery, profileVector, updateGate, type Expert,
+  personalizeQuery, profileVector, l2normalize, type Candidate, type Expert, type MixtureResult,
 } from "./brain-formulas";
+import { scoreAll } from "./brain-answer-score";
+import { exploreSelect } from "./brain-explore";
+
+/** Boyut koruması: `gateLogits` eksik boyutu `?? 0` ile doldurur, yani 8-boyutlu bayat
+ *  bir gate 768-boyutlu q ile SESSİZCE yalnız ilk 8 boyutu kullanırdı. Uyuşmazlıkta
+ *  öğrenilmiş gate'i kullanmaktansa sıfırdan başlarız — sessiz bozulmaktansa görünür
+ *  soğuk başlangıç. Saf ve dışa açık: davranış doğrudan test edilebilsin. */
+export function usableGate(supplied: Gate | undefined, dim: number): Gate {
+  return supplied && supplied.W[0]?.length === dim ? supplied : emptyGate(dim);
+}
+
+/** Keşif seçimi: ağırlıklar yine renormalize edilir ama KAZANAN zorlanır.
+ *  mixtureSelect argmax'ı seçer; keşifte bilinçli olarak argmax DIŞINI istiyoruz. */
+function forcePick(candidates: Candidate[], w: number[], index: number): MixtureResult {
+  const base = mixtureSelect(candidates, w);
+  const c = candidates[index];
+  if (!c || !c.available || !c.answer?.trim()) return base;
+  return { ...base, expert: String(c.expert), answer: c.answer };
+}
 
 export interface SharedAskResult {
   answer: string;
@@ -20,6 +39,10 @@ export interface SharedAskResult {
   degraded: string[];
   personalized: boolean;
   abstained?: boolean;
+  /** Uzman başına DIŞSAL kalite puanı (EXPERTS sırasında) — gate'in öğrenme etiketi. */
+  scores?: Record<string, number>;
+  /** Bu tur keşif amaçlı argmax DIŞI bir uzman mı seçildi. */
+  explored?: boolean;
 }
 
 export interface Gate { W: number[][]; b: number[] }
@@ -34,8 +57,16 @@ export interface SharedDeps extends AskDeps {
   embed?: (text: string) => Promise<number[]>;
   /** Öğrenilen gate; yoksa boş (uniform + heuristik bias). */
   gate?: Gate;
-  /** Gate güncellemesini kalıcılaştırma (loop kullanır). */
+  /** Gate güncellemesini kalıcılaştırma. askShared BUNU ARTIK ÇAĞIRMAZ (öz-doğrulama
+   *  kaldırıldı); eğitim toplu ve ayrıdır (brain-gate-train.ts). Arayüzde kalıyor
+   *  çünkü eğitim adımını koşturan çağıran (loop) hâlâ gate'i yazar. */
   saveGate?: (g: Gate) => void;
+  /** ε-greedy keşif oranı. 0 (varsayılan) ⇒ daima argmax, bit-aynı davranış. */
+  epsilon?: number;
+  /** Keşif için enjekte edilen rastgelelik (Math.random YOK — tekrarlanabilirlik). */
+  rng?: () => number;
+  /** Her turun DIŞSAL sonucu — gate eğitiminin ham verisi. */
+  onOutcome?: (o: { q: number[]; scores: number[]; picked: number; explored: boolean }) => void;
   // `recallVec` artık AskDeps'ten miras alınır. Buradaki yinelenen bildirim
   // `Promise<unknown>` dönüyordu; hiç çağrılmadığı için uyuşmazlık yıllarca
   // görünmedi. Tek tanım = tek doğruluk kaynağı.
@@ -127,12 +158,32 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   // bir gate 768-boyutlu q ile SESSİZCE ilk 8 boyutu kullanırdı. Uyuşmazlıkta öğrenilmiş
   // gate'i kullanmak yerine sıfırdan başlarız — sessiz bozulmaktansa görünür soğuk başlangıç.
   const dim = qVec?.length ?? 8;
-  const supplied = deps.gate;
-  const gate = supplied && supplied.W[0]?.length === dim ? supplied : emptyGate(dim);
+  const gate = usableGate(deps.gate, dim);
   const bias = heuristicBias(q);
-  const logits = gateLogits(qVec ?? [], gate.W, gate.b).map((l, j) => l + (bias[j] ?? 0));
+  // Gate YÖNE bakar, büyüklüğe değil: ham nomic vektörü |q|≈20 ve logitleri o oranda
+  // şişirip heuristik biası ezerdi; ayrıca eğitim tarafı da normalize ediyor
+  // (brain-gate-train.ts) — eğitim ve çıkarım AYNI temsilde olmalı.
+  // Retrieval ham vektörü kullanmaya devam eder (normalize etmek recall'ı bozuyordu).
+  const gateVec = qVec ? l2normalize(qVec) : [];
+  const logits = gateLogits(gateVec, gate.W, gate.b).map((l, j) => l + (bias[j] ?? 0));
   const w = gateWeights(logits);
-  const picked = mixtureSelect(answers, w);
+
+  // DIŞSAL etiket: üç uzmanın cevabı ZATEN hesaplandı → üçünü de puanlamak bedava.
+  // Gate'in öğrenmesi gereken sinyal budur, kendi argmax'ı değil.
+  const scores = scoreAll(answers, ctx.sources);
+  const scoreMap = Object.fromEntries(EXPERTS.map((x, j) => [x, scores[j] ?? 0]));
+
+  // (F3b keşif) ε olasılıkla argmax DIŞI bir uzman seçilir. Gerekçe: gate hep
+  // argmax'ı seçerse kaybeden uzmanların cevabı hiç değerlendirilmez ve eğitim
+  // verisi tek uzmandan gelir — doğru etiketle bile öz-doğrulama sürerdi.
+  // ε=0 (varsayılan, canlı HTTP yolu) ⇒ davranış bit-aynı, sıfır gerileme.
+  const epsilon = deps.epsilon ?? 0;
+  const explore = epsilon > 0 && deps.rng
+    ? exploreSelect(w, EXPERTS.map((e) => answers.find((a) => a.expert === e)?.available ?? false), { epsilon, rng: deps.rng })
+    : { index: -1, explored: false };
+  const picked = explore.explored && explore.index >= 0
+    ? forcePick(answers, w, explore.index)
+    : mixtureSelect(answers, w);
 
   const confidence = ctx.sources.length
     ? Number((ctx.sources.reduce((a, s) => a + (s.conf ?? s.score ?? 0), 0) / ctx.sources.length).toFixed(3))
@@ -143,14 +194,23 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
       answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.",
       expert: "", weights: picked.weights, sources: ctx.sources, confidence: 0,
       mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, personalized, abstained: true,
+      scores: scoreMap, explored: explore.explored,
     };
   }
 
-  // Online gate kalibrasyonu: kazanan uzman bu sorgu yönünde güçlenir.
-  if (deps.saveGate && qVec) {
+  // (F3b öğrenme) KALDIRILDI: burada eskiden `updateGate(..., indexOf(picked.expert))`
+  // vardı — yani gate KENDİ argmax'ıyla eğitiliyordu. Etiketi kendi tahmini olan bir
+  // öğrenici yetkinlik öğrenemez, yalnız başlangıç eğilimini büyütür. Ölçülen sonuç:
+  // W satır L2 [0.358, 0.304, 0.660] ve son 11 yazımın 11'i tek uzman (üstelik 11 turun
+  // 9'unda üç uzman da MEVCUTTU → erişilebilirlik artefaktı değil, öz-doğrulama).
+  //
+  // Yerine: üç uzmanın da cevabı DIŞSAL olarak puanlanır (brain-answer-score.ts) ve
+  // ham sonuç deftere yazılır; eğitim ayrı ve toplu yapılır (brain-gate-train.ts,
+  // cross-entropy + L2 tavanı). Bu fonksiyon artık gate'e YAZMAZ.
+  if (deps.onOutcome && qVec) {
     try {
-      deps.saveGate(updateGate(gate.W, gate.b, qVec, EXPERTS.indexOf(picked.expert as Expert), 0.05));
-    } catch { /* kalibrasyon best-effort */ }
+      deps.onOutcome({ q: qVec, scores, picked: EXPERTS.indexOf(picked.expert as Expert), explored: explore.explored });
+    } catch { /* defter best-effort — turu bloklamaz */ }
   }
 
   return {
@@ -163,5 +223,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     hops: ctx.hops,
     degraded: picked.degraded,
     personalized,
+    scores: scoreMap,
+    explored: explore.explored,
   };
 }

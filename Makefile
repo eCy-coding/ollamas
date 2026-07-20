@@ -116,6 +116,9 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+brain-gate-reset: ## cokmus MoE gate'i arsivle + sifirla [DRY=1]
+	@npx tsx scripts/brain-gate-reset.ts $(if $(DRY),--dry,)
+
 brain-capabilities: ## yetenek terfi defteri (sandbox->candidate->autonomous)
 	@npx tsx scripts/brain-capabilities.ts $(ARGS)
 
