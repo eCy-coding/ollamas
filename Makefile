@@ -116,6 +116,9 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+disk-survey: ## SALT-OKUNUR disk raporu + kopya tespiti (hicbir sey silmez)
+	@npx tsx scripts/disk-survey.ts
+
 brain-gate-reset: ## cokmus MoE gate'i arsivle + sifirla [DRY=1]
 	@npx tsx scripts/brain-gate-reset.ts $(if $(DRY),--dry,)
 
