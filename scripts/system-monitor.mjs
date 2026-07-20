@@ -7,7 +7,7 @@
 // agent's spoken report can be cross-checked against this. Exit 1 if any invariant FAILs
 // (CRITICAL ordered first). `--json` emits machine-readable output for agents/cron.
 //
-// Usage:  node scripts/system-monitor.mjs [--json] [--app-url http://127.0.0.1:8090]
+// Usage:  node scripts/system-monitor.mjs [--json] [--app-url http://127.0.0.1:3000]
 //         [--bridge-url http://127.0.0.1:7345] [--ollama http://127.0.0.1:11434]
 
 import { execSync } from "node:child_process";
@@ -21,7 +21,7 @@ const JSON_OUT = process.argv.includes("--json");
 // and follows "Silence = Success" — prints nothing when nothing changed (cron-cheap).
 const HEARTBEAT = process.argv.includes("--heartbeat");
 const LEDGER = opt("--ledger", `${process.env.HOME}/.llm-mission-control/monitor-history.jsonl`);
-const APP = opt("--app-url", "http://127.0.0.1:8090");
+const APP = opt("--app-url", "http://127.0.0.1:3000");
 const BRIDGE = opt("--bridge-url", "http://127.0.0.1:7345");
 const OLLAMA = opt("--ollama", "http://127.0.0.1:11434");
 const REPO = "/Users/emrecnyngmail.com/Desktop/ollamas";
@@ -32,11 +32,12 @@ const sh = (cmd) => { try { return { ok: true, out: execSync(cmd, { encoding: "u
 // Each check: { name, sev: CRITICAL|HIGH|MED, run: async () => ({status, detail}) }
 const CHECKS = [
   { name: "app.health", sev: "CRITICAL", run: async () => {
-    try { const r = await j(`${APP}/health`); return { status: r.status === 200 ? "PASS" : "FAIL", detail: `GET /health -> ${r.status}` }; }
+    try { const r = await j(`${APP}/api/health`); return { status: r.status === 200 ? "PASS" : "FAIL", detail: `GET /api/health -> ${r.status}` }; }
     catch (e) { return { status: "FAIL", detail: `unreachable: ${e.message}` }; } } },
 
   { name: "app.metrics", sev: "MED", run: async () => {
-    try { const r = await j(`${APP}/metrics`); const has = typeof r.body === "string" && /(^|\n)\w+/.test(r.body); return { status: r.status === 200 && has ? "PASS" : "FAIL", detail: `GET /metrics -> ${r.status}, ${typeof r.body === "string" ? r.body.length : 0} bytes` }; }
+    // No Prometheus /metrics endpoint exists; /api/org/overview is the real app-telemetry JSON.
+    try { const r = await j(`${APP}/api/org/overview`); const has = r.body && typeof r.body === "object" && Object.keys(r.body).length > 0; const size = JSON.stringify(r.body || {}).length; return { status: r.status === 200 && has ? "PASS" : "FAIL", detail: `GET /api/org/overview -> ${r.status}, ${size} bytes` }; }
     catch (e) { return { status: "FAIL", detail: e.message }; } } },
 
   { name: "provider.real_coding", sev: "CRITICAL", run: async () => {
