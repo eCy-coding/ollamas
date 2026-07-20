@@ -25,6 +25,14 @@ export const REQUIRED_TOKENS = [
   "empty trash",    // kalıcı silme, rm desenine uğramaz
 ] as const;
 
+/** KOMUT olarak çağrıldığında tehlikeli olanlar — tırnak içinde geçmeleri
+ *  (uygulama adı olarak) tehlike DEĞİLDİR. `open -a "Automator"` uygulamayı açar,
+ *  `automator /tmp/x.workflow` iş akışı çalıştırır: ikisi aynı şey değil. */
+const COMMAND_TOKENS = ["osascript", "shortcuts run", "automator", "tccutil", "screencapture"] as const;
+
+/** AppleScript İFADELERİ — doğal olarak tırnak içinde geçerler, ham metinde aranır. */
+const PHRASE_TOKENS = ["tell app", "System Events", "empty trash"] as const;
+
 export interface GuardReport {
   /** ecym dosyası bulundu ve regex çıkarılabildi mi. */
   found: boolean;
@@ -79,7 +87,13 @@ export function auditGuard(source: string | null): GuardReport {
  */
 export function isGuiRisky(cmd: string): boolean {
   const c = String(cmd ?? "");
-  return REQUIRED_TOKENS.some((t) => c.toLowerCase().includes(t.toLowerCase()))
+  // Tırnak İÇİ metin uygulama ADI olabilir: `open -a "Automator"` bir iş akışı
+  // çalıştırmaz, uygulamayı açar. Komut-adı token'ları bu yüzden tırnaklar
+  // ÇIKARILDIKTAN sonra aranır; AppleScript ifadeleri (tell app, System Events,
+  // empty trash) ise doğal olarak tırnak içinde geçer, ham metinde aranır.
+  const unquoted = c.replace(/"[^"]*"|'[^']*'/g, " ");
+  return COMMAND_TOKENS.some((t) => new RegExp(`(^|[\\s;|&(])${t}\\b`, "i").test(unquoted))
+    || PHRASE_TOKENS.some((t) => c.toLowerCase().includes(t.toLowerCase()))
     // `open -a "App" <belge/URL>` — argümanlı açış, uygulamaya veri enjekte eder.
     // Çıplak alternatif tırnak İÇERMEZ: aksi halde `\S+` tırnaklı adın ilk parçasını
     // (`"DaVinci`) yakalayıp kalanını (`Resolve"`) argüman sanıyordu.

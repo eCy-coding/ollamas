@@ -116,6 +116,9 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+app-literacy-verify: ## 100 uygulama kartini dogrula (calistirmadan)
+	@npx tsx scripts/app-literacy-verify.ts
+
 ecym-guard: ## eCym risky() GUI-otomasyon token denetimi (salt-okunur)
 	@npx tsx scripts/ecym-guard-check.ts $(ARGS)
 

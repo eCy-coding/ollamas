@@ -4,6 +4,8 @@
 // (ns=knowledge, stable teach:* ids → idempotent re-runs refresh, never pile up).
 // Write-behind keeps this immune to embedder queues. Usage: make brain-teach
 import { execFileSync } from "node:child_process";
+import { loadAppCards } from "./app-literacy-load";
+import { buildAppLiteracyRecords } from "../server/app-literacy";
 import { brainRemember, brainAssertFact } from "../server/brain";
 
 export interface TeachRecord { id: string; content: string; actor: string; fact?: { subject: string; predicate: string; object: string } }
@@ -915,6 +917,7 @@ print(json.dumps({'keywords': keyword.kwlist, 'builtins': b, 'modules': mods}))
     ["frontend-harita", buildFrontendMapRecords(feFiles)],
     ["kod-harita", buildCodeMapRecords(codeFiles)],
     ["kod-export", buildExportRecords(brainFiles)],
+    ["app-literacy", buildAppLiteracyRecords(loadAppCards())],
     ["kod-desen", buildCodePatternRecords()],
     ["servis-katalog", buildServiceRecords(servicesSrc)],
     ["ollamas-hata", buildOllamasErrorRecords()],

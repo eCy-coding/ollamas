@@ -1,3 +1,11 @@
+import { loadAppCards } from "./app-literacy-load";
+import { buildAppEcymCommands } from "../server/app-literacy";
+import { loadPolicy } from "../server/agent-policy-store";
+
+/** 100 uygulama kartından eCym komutları. `safe` alanı operatörün politikası ile
+ *  GUI-risk kontrolünün KESİŞİMİNDEN türetilir — burada elle yazılmaz. */
+const appLiteracyCommands = () => buildAppEcymCommands(loadAppCards(), loadPolicy());
+
 // ecosystem-sync — ÇALIŞMA PRENSİBİ: her teach/brain işlemi üç sistemi günceller.
 // (1) brain: odysseus CANLI durumu superseding fact olur; (2) eCym: brain-erişim
 // komutları terminal-dataset.json'a idempotent iner (yedekli, safe:true, kaynak
@@ -11,6 +19,7 @@ import { brainAssertFact } from "../server/brain";
 const DS = join(homedir(), "ecy-model", "terminal-dataset.json");
 
 const ECYM_CMDS = [
+  ...appLiteracyCommands(),
   { id: "brain-sor", level: "orta", triggers: ["brain'e sor", "hafizaya sor", "beyne sor", "brain soru"],
     cmd: "curl -s -X POST http://127.0.0.1:3000/api/brain/ask -H 'content-type: application/json' -d '{\"question\":\"SORU\"}'",
     arg: "SORU yerine sorunuz", desc: "ollamas brain'e soru sorar, atifli sentezli cevap alir", safe: "True", source: "ollamas-sync" },

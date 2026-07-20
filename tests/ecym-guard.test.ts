@@ -104,6 +104,15 @@ describe("isGuiRisky — ecym'den BAĞIMSIZ ikinci kontrol", () => {
     expect(isGuiRisky("open mailto:biri@ornek.com")).toBe(true);
   });
 
+  test("UYGULAMA ADI tırnak içinde token içerse bile riskli DEĞİL", () => {
+    // `open -a "Automator"` uygulamayı AÇAR; `automator x.workflow` iş akışı ÇALIŞTIRIR.
+    // Alt-dizi eşleştirmesi ikisini karıştırıyordu — doğrulama harness'i yakaladı.
+    expect(isGuiRisky('open -a "Automator"')).toBe(false);
+    expect(isGuiRisky('open -a "Script Editor"')).toBe(false);
+    expect(isGuiRisky("automator /tmp/x.workflow")).toBe(true);   // komut olarak: riskli
+    expect(isGuiRisky("screencapture -x /tmp/a.png")).toBe(true);
+  });
+
   test("zararsız kabuk komutları riskli değil", () => {
     for (const c of ["lsappinfo info -only name", "mdfind -name rapor", "system_profiler SPHardwareDataType"]) {
       expect(isGuiRisky(c), c).toBe(false);
