@@ -6,7 +6,8 @@
 import { gatherContext, type AskDeps, type AskSource } from "./brain-ask";
 import {
   EXPERTS, emptyGate, gateLogits, gateWeights, heuristicBias, mixtureSelect,
-  personalizeQuery, profileVector, l2normalize, type Candidate, type Expert, type MixtureResult,
+  personalizeQuery, profileVector, l2normalize, sequenceWeights, weightedContext,
+  type Candidate, type Expert, type MixtureResult,
 } from "./brain-formulas";
 import { scoreAll } from "./brain-answer-score";
 import { exploreSelect } from "./brain-explore";
@@ -43,6 +44,8 @@ export interface SharedAskResult {
   scores?: Record<string, number>;
   /** Bu tur keşif amaçlı argmax DIŞI bir uzman mı seçildi. */
   explored?: boolean;
+  /** Formül 3a: kaynak başına p_ret(z|x) — bağlam payının dayanağı. */
+  pRet?: number[];
 }
 
 export interface Gate { W: number[][]; b: number[] }
@@ -67,6 +70,9 @@ export interface SharedDeps extends AskDeps {
   rng?: () => number;
   /** Her turun DIŞSAL sonucu — gate eğitiminin ham verisi. */
   onOutcome?: (o: { q: number[]; scores: number[]; picked: number; explored: boolean }) => void;
+  /** Formül 3a: bağlamı p_ret'e göre yeniden paylaştır. Varsayılan kapalı —
+   *  `ragseq-weighting` yeteneği terfi edene dek canlıya inmez. */
+  ragSeq?: boolean;
   // `recallVec` artık AskDeps'ten miras alınır. Buradaki yinelenen bildirim
   // `Promise<unknown>` dönüyordu; hiç çağrılmadığı için uyuşmazlık yıllarca
   // görünmedi. Tek tanım = tek doğruluk kaynağı.
@@ -75,6 +81,9 @@ export interface SharedDeps extends AskDeps {
 /** Uzman başına sert zaman sınırı (bounded-race deseni): yerel model / uzak halka
  *  asılırsa TÜM tur takılmasın — süresi dolan uzman "erişilemez" sayılır. */
 const expertTimeoutMs = (): number => Number(process.env.BRAIN_EXPERT_TIMEOUT_MS) || 25_000;
+
+/** RAG-Seq bağlam bütçesi (karakter). Prompt'un kaynak bloğunun üst sınırı. */
+const ragSeqBudget = (): number => Number(process.env.BRAIN_RAGSEQ_BUDGET) || 4000;
 
 function bounded<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -132,7 +141,16 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
 
   // (2) TEK retrieval: R_k(x) tüm uzmanlara AYNI gider. q* varsa vektörle sürülür.
   const ctx = await gatherContext(q, deps, qVec);
-  const userMsg = `SORU: ${q}\n\nKAYNAKLAR:\n${ctx.context}`;
+
+  // (3a RAG-Sequence) p_ret dağılımı HER ZAMAN hesaplanır (bedava, raporlanır).
+  // Bağlamın p_ret'e göre yeniden paylaştırılması ise yetenek bayrağına bağlı:
+  // canlıya ancak terfi kapısından geçerek iner.
+  const pRet = sequenceWeights(ctx.sources.map((s) => s.score ?? 0));
+  const contextText = deps.ragSeq && ctx.sources.length
+    ? weightedContext(ctx.sources, pRet, ragSeqBudget())
+    : ctx.context;
+
+  const userMsg = `SORU: ${q}\n\nKAYNAKLAR:\n${contextText}`;
   const messages = [
     { role: "system", content: SHARED_PROMPT },
     { role: "user", content: userMsg },
@@ -194,7 +212,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
       answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.",
       expert: "", weights: picked.weights, sources: ctx.sources, confidence: 0,
       mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, personalized, abstained: true,
-      scores: scoreMap, explored: explore.explored,
+      scores: scoreMap, explored: explore.explored, pRet,
     };
   }
 
@@ -225,5 +243,6 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     personalized,
     scores: scoreMap,
     explored: explore.explored,
+    pRet,
   };
 }

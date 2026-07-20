@@ -244,6 +244,14 @@ async function main() {
     const { loadGate, saveGate: persistGate } = await import("../server/brain-gate-store");
     const { mulberry32, fnv1a } = await import("../server/brain-explore");
     const { appendOutcome, readOutcomes } = await import("../server/brain-outcome-ledger");
+    // Hangi yetenekler CANLI koşabilir — terfi kapısı karar verir, kod değil.
+    const capsAutonomous: string[] = await (async () => {
+      try {
+        const { loadLedger } = await import("../server/brain-capability-runner");
+        const { autonomousIds } = await import("../server/brain-capabilities");
+        return autonomousIds(loadLedger());
+      } catch { return []; } // defter okunamazsa HİÇBİRİ canlı değil (güvenli yön)
+    })();
     const gate = loadGate() ?? emptyGate(768);
 
     // F3c bağımlılıkları — HTTP üzerinden (loop brain.db'yi AÇMAZ, sözleşme).
@@ -289,6 +297,8 @@ async function main() {
       profileVectors: async () => profileVecs,
       // (F3b keşif) YALNIZ loop keşfeder; canlı kullanıcı sorgusu (HTTP yolu) ε=0
       // kalır. Tohum sorudan türetilir → aynı soru aynı kararı verir, tekrarlanabilir.
+      // (F3a) Bağlamı p_ret'e göre paylaştırma — YALNIZ yetenek terfi ettiyse.
+      ragSeq: capsAutonomous.includes("ragseq-weighting"),
       epsilon: Number(process.env.BRAIN_EXPLORE_EPSILON ?? 0.15),
       rng: mulberry32(fnv1a(question)),
       // Turun DIŞSAL sonucu deftere — gate eğitiminin ham verisi (kendi argmax'ı DEĞİL).

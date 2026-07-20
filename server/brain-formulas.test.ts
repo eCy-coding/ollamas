@@ -3,6 +3,7 @@ import { describe, test, expect } from "vitest";
 import {
   softmax, retrievalProbabilities, l2normalize, profileVector, personalizeQuery,
   gateLogits, gateWeights, heuristicBias, mixtureSelect, expectedMixture, updateGate, EXPERTS,
+  sequenceWeights, weightedContext,
 } from "./brain-formulas";
 
 describe("Formül 2 — p_ret(z|x) = softmax(qᵀd)", () => {
@@ -59,5 +60,56 @@ describe("Formül 3b/son — p_final = Σ_j w_j p_j", () => {
     expect(chosen.weights.ecym).toBe(0);
     expect(chosen.weights.ollamas + chosen.weights.odysseus).toBeCloseTo(1, 6);
     expect(chosen.degraded).toContain("ecym");
+  });
+});
+
+// Formül 3a (RAG-Sequence): p_RAG-Seq(y|x) = Σ_z p_ret(z|x)·p_gen(y|x,z)
+// Çalışan biçim: p_ret kaynak SIRALAMASINI ve bağlam BÜTÇE PAYINI belirler —
+// yüksek olasılıklı belge daha çok yer alır. Logprob gerektirmez.
+describe("Formül 3a — RAG-Sequence bağlam ağırlıklandırma", () => {
+  const src = (id: string, excerpt: string, score: number) =>
+    ({ id, tier: "learned", score, excerpt }) as any;
+
+  test("sequenceWeights = p_ret: toplam 1, skor sırasını korur", () => {
+    const p = sequenceWeights([3, 1, 0]);
+    expect(p.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
+    expect(p[0]).toBeGreaterThan(p[1]);
+    expect(p[1]).toBeGreaterThan(p[2]);
+  });
+
+  test("tüm skorlar eşitse dağılım UNIFORM (kayırma yok)", () => {
+    const p = sequenceWeights([2, 2, 2]);
+    expect(p[0]).toBeCloseTo(1 / 3, 6);
+    expect(p[1]).toBeCloseTo(1 / 3, 6);
+  });
+
+  test("weightedContext: yüksek p_ret'li kaynak ÖNCE ve daha UZUN yer alır", () => {
+    const sources = [
+      src("m-low", "d".repeat(400), 0.1),
+      src("m-high", "y".repeat(400), 3.0),
+    ];
+    const p = sequenceWeights(sources.map((s) => s.score));
+    const ctx = weightedContext(sources, p, 300);
+    expect(ctx.indexOf("m-high")).toBeLessThan(ctx.indexOf("m-low")); // sıralama
+    const yCount = (ctx.match(/y/g) || []).length;
+    const dCount = (ctx.match(/d/g) || []).length;
+    expect(yCount).toBeGreaterThan(dCount); // bütçe payı p_z ile orantılı
+  });
+
+  test("weightedContext bütçeyi AŞMAZ", () => {
+    const sources = Array.from({ length: 5 }, (_, i) => src(`m-${i}`, "x".repeat(500), 1));
+    const ctx = weightedContext(sources, sequenceWeights(sources.map(() => 1)), 400);
+    expect(ctx.length).toBeLessThanOrEqual(400 * 1.35); // id/etiket payı için tolerans
+  });
+
+  test("boş kaynak listesi çökmez", () => {
+    expect(weightedContext([], [], 100)).toBe("");
+    expect(sequenceWeights([])).toEqual([]);
+  });
+
+  test("her kaynak en az bir parça alır (tamamen susturulmaz)", () => {
+    const sources = [src("m-a", "a".repeat(300), 10), src("m-b", "b".repeat(300), 0.001)];
+    const ctx = weightedContext(sources, sequenceWeights(sources.map((s) => s.score)), 200);
+    expect(ctx).toContain("m-b"); // düşük olasılıklı kaynak da görünür kalır
   });
 });

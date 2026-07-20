@@ -140,3 +140,50 @@ export function updateGate(
 export function emptyGate(d: number): { W: number[][]; b: number[] } {
   return { W: EXPERTS.map(() => Array(d).fill(0)), b: EXPERTS.map(() => 0) };
 }
+
+// ---------------------------------------------------------------------------
+// Formül 3a — RAG-Sequence:  p_RAG-Seq(y|x) = Σ_z p_ret(z|x) · p_gen(y|x,z)
+//
+// DÜRÜSTLÜK NOTU: tam biçim her belge için AYRI bir üretim koşup olasılıkları
+// toplamayı ister — üç uzman × k belge = kat kat LLM çağrısı, MacBook'ta ne ısı
+// ne süre bütçesi kaldırır. Çalışan biçim, p_ret'i belgenin BAĞLAMDAKİ PAYINA
+// çevirir: yüksek olasılıklı belge daha önce ve daha uzun yer alır, düşük olan
+// susturulmaz ama kısalır. Yani Σ_z ağırlıklandırması üretimden ÖNCE, bağlam
+// katmanında uygulanır. Formül kılık değiştirmiyor; yaklaşım işaretli.
+// ---------------------------------------------------------------------------
+
+/** Formül 3a: retrieval skorlarından p_ret dağılımı (F2 ile aynı softmax). */
+export function sequenceWeights(scores: number[], temperature = 1): number[] {
+  return retrievalProbabilities(scores, temperature);
+}
+
+/** Bir kaynağın bağlamda görünecek asgari karakteri — p_ret düşük olsa bile
+ *  kaynak TAMAMEN susturulmaz (aksi halde tek belge bağlamı ele geçirir). */
+const MIN_SHARE = 80;
+
+export interface WeightedSource {
+  id: string;
+  excerpt: string;
+}
+
+/** Formül 3a çalışan biçimi: kaynakları p_ret'e göre sırala, bütçeyi p_z oranında
+ *  paylaştır. Çıktı doğrudan prompt'a giren KAYNAKLAR bloğudur. */
+export function weightedContext(sources: WeightedSource[], p: number[], budget: number): string {
+  if (!sources.length) return "";
+  const order = sources
+    .map((s, i) => ({ s, p: p[i] ?? 0 }))
+    .sort((a, b) => b.p - a.p);
+
+  const parts: string[] = [];
+  let spent = 0;
+  for (const { s, p: pz } of order) {
+    const share = Math.max(MIN_SHARE, Math.floor(budget * pz));
+    const room = Math.max(0, budget - spent);
+    if (room <= 0) break;
+    const take = Math.min(share, room, s.excerpt.length);
+    if (take <= 0) continue;
+    parts.push(`[mem:${s.id}] ${s.excerpt.slice(0, take)}`);
+    spent += take;
+  }
+  return parts.join("\n");
+}
