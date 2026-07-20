@@ -4430,6 +4430,32 @@ app.post("/api/brain/remember", async (req, res) => {
   }
 });
 
+// Obsidian mirror — the human-facing, graph-navigable vault view of the brain. sync
+// mutates the vault on disk AND upserts hand-edited notes back into the store, so it is
+// a loopback-only operator action (same S49 double-lock as forget/sync-system). status
+// is read-only introspection (counts + drift), safe to expose to the local dashboard.
+app.post("/api/brain/obsidian/sync", async (req, res) => {
+  try {
+    const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).json({ error: "obsidian sync is a loopback-only operator action" });
+    const dir = ((req.body || {}).direction ?? "both") as "both" | "push" | "pull";
+    if (!["both", "push", "pull"].includes(dir)) return res.status(400).json({ error: "direction must be both|push|pull" });
+    const { syncObsidian } = await import("./server/brain-obsidian");
+    res.json(await syncObsidian(dir));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "obsidian sync failed" });
+  }
+});
+
+app.get("/api/brain/obsidian/status", async (_req, res) => {
+  try {
+    const { obsidianStatus } = await import("./server/brain-obsidian");
+    res.json(obsidianStatus());
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "obsidian status failed" });
+  }
+});
+
 // BRAIN panel (G3) — read-only introspection over /api/brain/overview + /api/brain/graph,
 // same self-contained inline-HTML shape as /org (module top level: reachable under
 // OLLAMAS_NO_AUTOBOOT=1 in-process tests, no vite/frontend build involved).

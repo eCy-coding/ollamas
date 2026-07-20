@@ -43,9 +43,12 @@
     "postbuild:cli": "chmod +x dist/cli/index.cjs",
     "size": "size-limit",
     "smoke": "vitest run tests/smoke-live.e2e.test.ts",
+    "doctor": "tsx scripts/stack-health.ts",
+    "obsidian:sync": "tsx scripts/brain-obsidian-sync.ts",
     "start": "node dist/server.cjs",
     "test": "vitest run",
     "test:perf": "PERF=1 vitest run",
+    "test:e2e:odysseus": "PERF=1 vitest run tests/odysseus-bridge.e2e.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:web": "playwright test -c playwright.web.config.ts",
     "tokens": "style-dictionary build --config style-dictionary.config.js && style-dictionary build --config style-dictionary.light.config.js"

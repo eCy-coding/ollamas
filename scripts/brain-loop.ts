@@ -329,8 +329,16 @@ async function main() {
   try {
     mkdirSync(STATE_DIR, { recursive: true });
     if (existsSync(LOCK_FILE)) {
-      const age = Date.now() - Number(readFileSync(LOCK_FILE, "utf8").split("|")[1] || 0);
-      if (age < 600_000) { console.log(JSON.stringify({ event: "brain.loop", skipped: "locked" })); await record({ turn: 0, ms: 0, wrote: false, skipped: "locked" }); return; }
+      const [lpid, lts] = readFileSync(LOCK_FILE, "utf8").split("|");
+      const age = Date.now() - Number(lts || 0);
+      // Holder liveness: reclaim instantly if the pid is dead (e.g. killed mid-run),
+      // so a leaked lock never stalls the loop for the full 10-min window. Keep the
+      // 10-min cap only for a genuinely-hung-but-alive holder.
+      let holderAlive = false;
+      try { process.kill(Number(lpid), 0); holderAlive = true; } catch (e: any) { holderAlive = e?.code === "EPERM"; }
+      if (holderAlive && Number(lpid) !== process.pid && age < 600_000) {
+        console.log(JSON.stringify({ event: "brain.loop", skipped: "locked" })); await record({ turn: 0, ms: 0, wrote: false, skipped: "locked" }); return;
+      }
     }
     writeFileSync(LOCK_FILE, `${process.pid}|${Date.now()}`);
   } catch { /* kilit yazılamadıysa yine de devam */ }
@@ -517,26 +525,30 @@ async function main() {
     // DOKUNMAZ; baraj geçilince canlıya alınır.
     if (state.turn % GATE_TRAIN_EVERY === 0) {
       try {
-        const { loadLedger } = await import("../server/brain-capability-runner");
+        const { loadLedger, ensureCap } = await import("../server/brain-capability-runner");
         const { withCapability } = await import("../server/brain-capability-runner");
-        const { autonomousIds } = await import("../server/brain-capabilities");
-        const { trainGate } = await import("../server/brain-gate-train");
+        const { trainGate, gateTrainPolicy } = await import("../server/brain-gate-train");
+        const { isInfraFailure } = await import("../server/brain-sandbox");
         const ledger = loadLedger();
-        const mode = autonomousIds(ledger).includes("gate-ce-train") ? "live" : "sandbox";
+        // DURUM-FARKINDA: candidate → canlı-gölge (live ölç, gate'e DOKUNMA); autonomous
+        // → gerçek (persist). Eski ikili mantık candidate'i sandbox'ta tutup gate'i
+        // sonsuza [0,0,0]'da bırakıyordu (egzersizci fix'inden ayrı, aynı ölü-yol).
+        const { mode, persist } = gateTrainPolicy(ensureCap(ledger, "gate-ce-train").status);
         const rows = readOutcomes(500);
         const res = await withCapability(
           "gate-ce-train",
           async () => {
             const { gate: trained, losses } = trainGate(gate, rows);
-            // İNCELİK: withCapability sandbox SONUCUNU ATAR → kalıcılaştırma
-            // sarmalayıcıyla değil, BURADA mode'a bakılarak yapılmalı.
-            if (mode === "live" && losses.length) persistGate(trained);
+            // İNCELİK: withCapability sandbox/gölge SONUCUNU ATAR → kalıcılaştırma
+            // sarmalayıcıyla değil, BURADA persist bayrağına bakılarak yapılır. YALNIZ
+            // autonomous (persist=true) gate'e yazar; candidate-gölge ölçer ama dokunmaz.
+            if (persist && losses.length) persistGate(trained);
             return { rows: rows.length, drop: losses.length ? losses[0] - losses[losses.length - 1] : 0 };
           },
           async () => ({ rows: rows.length, drop: 0 }),
-          { ledger, turn: state.turn, mode, metricOf: (r: any) => r?.drop },
+          { ledger, turn: state.turn, mode, metricOf: (r: any) => r?.drop, isInfraError: isInfraFailure },
         );
-        console.log(JSON.stringify({ event: "brain.gate.train", mode, ...res }));
+        console.log(JSON.stringify({ event: "brain.gate.train", mode, persist, ...res }));
       } catch (e: any) {
         console.warn(JSON.stringify({ event: "brain.gate.train", error: String(e?.message ?? e).slice(0, 120) }));
       }

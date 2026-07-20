@@ -10,8 +10,28 @@
 //   • clipRows — hiçbir uzmanın satır normu tavanı geçemez, yani "kaçış" imkânsız.
 //   • decay    — kanıtsız kalan ağırlık zamanla sönümlenir.
 import { softmax, l2normalize } from "./brain-formulas";
+import type { Status, Mode } from "./brain-capabilities";
 
 export interface Gate { W: number[][]; b: number[] }
+
+/**
+ * gate-ce-train'in DURUM-FARKINDA eğitim politikası — candidate→autonomous köprüsü.
+ *
+ * gate-ce-train'in kendi eğitim yolu vardır (loop turn%10) ve egzersizci canlı-gölge
+ * fix'inden AYRIDIR. Eski hâli ikili idi: `autonomous ? "live" : "sandbox"` → bir
+ * CANDIDATE gate-ce-train hâlâ sandbox koşuyor, canlı koşu HİÇ birikmiyor, dolayısıyla
+ * candidate→autonomous İMKÂNSIZ → gate sonsuza dek `[0,0,0]` (öğrenemiyor). Bu saf fn
+ * ayrımı düzeltir:
+ *   • candidate → CANLI-GÖLGE: mode "live" (canlı pencereyi biriktir) ama persist=false
+ *     (gate'e DOKUNMA — henüz güvenilmez). withCapability çıktıyı zaten atar.
+ *   • autonomous → GERÇEK: mode "live", persist=true (gate'i kalıcılaştır).
+ *   • sandbox/quarantined → ölçüm, persist=false.
+ */
+export function gateTrainPolicy(status: Status): { mode: Mode; persist: boolean } {
+  if (status === "autonomous") return { mode: "live", persist: true };
+  if (status === "candidate") return { mode: "live", persist: false };
+  return { mode: "sandbox", persist: false };
+}
 
 export interface OutcomeRow {
   at: number;

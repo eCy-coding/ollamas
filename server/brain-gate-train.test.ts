@@ -1,7 +1,7 @@
 // Gate CE eğitimi — kayıp gerçekten düşmeli, ağırlık gerçekten sınırlı kalmalı.
 import { describe, test, expect } from "vitest";
 import {
-  targetDistribution, crossEntropyLoss, clipRows, trainGate, DEFAULT_TRAIN,
+  targetDistribution, crossEntropyLoss, clipRows, trainGate, DEFAULT_TRAIN, gateTrainPolicy,
   type Gate, type OutcomeRow,
 } from "./brain-gate-train";
 
@@ -16,6 +16,25 @@ const row = (q: number[], scores: number[], turn = 0): OutcomeRow => ({ at: 1_00
 const separable = (n = 20): OutcomeRow[] =>
   Array.from({ length: n }, (_, i) =>
     i % 2 === 0 ? row([1, 0], [0.9, 0.1, 0.1], i) : row([0, 1], [0.1, 0.9, 0.1], i));
+
+describe("gateTrainPolicy — candidate→autonomous köprüsü (aynı ölü-yol, gate kendi yolunda)", () => {
+  // gate-ce-train'in KENDİ eğitim yolu vardı (turn%10) ve egzersizci fix'inden
+  // AYRI olarak eski ikili mantığı taşıyordu: mode = autonomous?"live":"sandbox".
+  // Yani CANDIDATE gate-ce-train hâlâ sandbox koşuyor → live birikmez → asla otonomlaşamaz
+  // → gate [0,0,0]'da kalır. Bu saf fn candidate'i canlı-gölge yapar (gate'e DOKUNMADAN).
+  test("sandbox → ölçüm (sandbox mod, gate'e yazma YOK)", () => {
+    expect(gateTrainPolicy("sandbox")).toEqual({ mode: "sandbox", persist: false });
+  });
+  test("candidate → CANLI-GÖLGE (live ölç, gate'e yazma YOK — güvenilmez)", () => {
+    expect(gateTrainPolicy("candidate")).toEqual({ mode: "live", persist: false });
+  });
+  test("autonomous → GERÇEK (live, gate'e YAZAR)", () => {
+    expect(gateTrainPolicy("autonomous")).toEqual({ mode: "live", persist: true });
+  });
+  test("quarantined → ölçüm, asla persist etmez", () => {
+    expect(gateTrainPolicy("quarantined")).toEqual({ mode: "sandbox", persist: false });
+  });
+});
 
 describe("targetDistribution", () => {
   test("puanlar hedef dağılıma dönüşür, toplam 1", () => {
