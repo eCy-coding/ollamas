@@ -188,6 +188,21 @@ export const PROVIDER_CATALOG: Record<string, CatalogEntry> = {
     toolCalling: "probe",
     resetBoundary: "rolling",
   },
+  perplexity: {
+    id: "perplexity",
+    // Sonar family — live web-search-grounded chat completions (its distinguishing feature
+    // over every other catalog entry, none of which browse). No published free-tier
+    // RPM/RPD numbers → limits 0 (unknown), the reactive 429 cooldown is the backstop.
+    baseUrl: "https://api.perplexity.ai",
+    envKey: "PERPLEXITY_API_KEY",
+    signupUrl: "https://www.perplexity.ai/settings/api",
+    defaultModel: "sonar",
+    limits: { perMin: 0, perDay: 0 },
+    trainsOnData: false,
+    maxContext: 127_072,
+    toolCalling: "none", // sonar API has no function-calling surface today
+    resetBoundary: "rolling",
+  },
 };
 
 export function catalogEntry(provider: string): CatalogEntry | undefined {
@@ -283,6 +298,7 @@ const CATALOG_CAPABILITIES: Record<string, readonly string[]> = {
   pollinations: ["code", "fast"],   // keyless per-IP fallback tier
   cohere: ["code", "long-ctx"],     // command-r7b 128K ctx; 1K req/mo shared quota
   huggingface: ["code"],            // thin credit tier, last-resort key'd fallback
+  perplexity: ["code", "long-ctx"], // sonar — closest existing tags; live web-search grounding has no dedicated capability tag yet
 };
 
 const LEGACY_CAPABILITIES: Record<string, readonly string[]> = {

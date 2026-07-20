@@ -40,3 +40,25 @@ describe("catalog: new free providers (T9-F4)", () => {
     expect(chain).toContain("ollama-local");
   });
 });
+
+describe("catalog: perplexity — live web-search-grounded chat, no bespoke code needed", () => {
+  it("is a keyed OpenAI-compat entry pointed at the real Perplexity API root", () => {
+    const e = catalogEntry("perplexity")!;
+    expect(e.baseUrl).toBe("https://api.perplexity.ai");
+    expect(e.envKey).toBe("PERPLEXITY_API_KEY");
+    expect(e.defaultModel).toBe("sonar");
+    expect(e.trainsOnData).toBe(false);
+    expect(e.keyless).toBeFalsy();
+  });
+
+  it("carries orchestra capabilities and a unique envKey", () => {
+    expect(capabilitiesFor("perplexity").length).toBeGreaterThan(0);
+    const envKeys = Object.values(PROVIDER_CATALOG).map((e) => e.envKey);
+    expect(envKeys.filter((k) => k === "PERPLEXITY_API_KEY").length).toBe(1);
+  });
+
+  it("joins the generic catalog fallback chain (main ollamas chat path)", () => {
+    expect(keyedCloudProviders()).toContain("perplexity");
+    expect(ProviderRouter.getFallbackChain("groq")).toContain("perplexity");
+  });
+});

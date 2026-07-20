@@ -37,6 +37,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   "github-models": "GitHub Models (LLM)",
   cloudflare: "Cloudflare Workers AI",
   mistral: "Mistral",
+  perplexity: "Perplexity AI",
 };
 
 // One-click endpoint presets for the custom-OpenAI row — the common local OpenAI-compatible

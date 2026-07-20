@@ -12,7 +12,7 @@ import {
 } from "../server/provider-catalog";
 import { limitFor } from "../server/key-limits";
 
-const IDS = ["groq", "cerebras", "zai", "sambanova", "nvidia-nim", "github-models", "cloudflare", "mistral", "scaleway", "pollinations", "cohere", "huggingface"];
+const IDS = ["groq", "cerebras", "zai", "sambanova", "nvidia-nim", "github-models", "cloudflare", "mistral", "scaleway", "pollinations", "cohere", "huggingface", "perplexity"];
 
 describe("PROVIDER_CATALOG — free-tier cloud providers (zero-dep, OpenAI-compat)", () => {
   it("contains exactly the planned providers, each internally consistent", () => {

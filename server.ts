@@ -3811,56 +3811,6 @@ ledger();setInterval(ledger,15000);
   });
 
   // ----------------------------------------------------
-  // OpenAI-compat shim (/v1) — lets odysseus (or any OpenAI client) use ollamas' reliable
-  // vault-keyed multi-cloud routing as its model backend. Tries several reliable cloud
-  // providers until one returns non-empty (no local ollama). Fixes odysseus flakiness from
-  // a single degraded/rate-limited free provider.
-  // ----------------------------------------------------
-  const V1_PROVIDERS = ["groq", "gemini", "cerebras", "github-models", "sambanova"];
-  const v1Gen = async (p: string, messages: any[]): Promise<string> => {
-    const g: any = await ProviderRouter.generate({ provider: p, messages, stream: false, singleAttempt: true } as any);
-    const t = (g?.text ?? "").trim();
-    if (!t) throw new Error("empty");
-    return t;
-  };
-  // Perf: RACE the two fastest providers in parallel (first non-empty wins) instead of
-  // sequential-await. A slow/empty groq no longer blocks — cerebras answers concurrently.
-  // Falls back to the remaining providers (raced) only if both leaders fail.
-  const reliableGenerate = async (messages: any[]): Promise<string> => {
-    // Leaders = cerebras+gemini (fast, and NOT groq): keeps groq's burst budget free for the
-    // council seat + 3 concurrent judges that already use groq. groq stays in the fallback tier.
-    try {
-      return await Promise.any(["cerebras", "gemini"].map((p) => v1Gen(p, messages)));
-    } catch { /* both leaders failed → race the rest incl. groq */ }
-    try {
-      return await Promise.any(["groq", "github-models", "sambanova"].map((p) => v1Gen(p, messages)));
-    } catch { return ""; }
-  };
-  app.get("/v1/models", (_req, res) => {
-    res.json({ object: "list", data: [{ id: "ollamas-auto", object: "model", owned_by: "ollamas" }, ...V1_PROVIDERS.map((p) => ({ id: p, object: "model", owned_by: "ollamas" }))] });
-  });
-  app.post("/v1/chat/completions", async (req, res) => {
-    const b = req.body || {};
-    const messages = Array.isArray(b.messages) ? b.messages : [];
-    const id = "chatcmpl-" + Date.now().toString(36);
-    try {
-      const content = await reliableGenerate(messages);
-      if (b.stream) {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.setHeader("Cache-Control", "no-cache");
-        res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] })}\n\n`);
-        res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
-        res.write("data: [DONE]\n\n");
-        res.end();
-      } else {
-        res.json({ id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: "ollamas-auto", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
-      }
-    } catch (e: any) {
-      res.status(500).json({ error: { message: String(e?.message ?? e), type: "server_error" } });
-    }
-  });
-
-  // ----------------------------------------------------
   // VITE & STATIC FILES SERVING
   // ----------------------------------------------------
 
@@ -3980,6 +3930,62 @@ ledger();setInterval(ledger,15000);
     onRejectionSurvived: () => unhandledRejectionTotal.inc(),
   });
 }
+
+// ----------------------------------------------------
+// OpenAI-compat shim (/v1) — lets odysseus (or any OpenAI client) use ollamas' reliable
+// vault-keyed multi-cloud routing as its model backend. Tries several reliable cloud
+// providers until one returns non-empty (no local ollama). Fixes odysseus flakiness from
+// a single degraded/rate-limited free provider. Also the ONLY path eCym's (~/.local/bin/ecym)
+// `cloud()` factual/güncel escalation reaches — moved to module top level (the /org lesson,
+// same as below) so in-process tests can exercise it under OLLAMAS_NO_AUTOBOOT=1; it was
+// untestable before this move.
+// ----------------------------------------------------
+const V1_PROVIDERS = ["groq", "gemini", "cerebras", "github-models", "sambanova", "perplexity"];
+const v1Gen = async (p: string, messages: any[]): Promise<string> => {
+  const g: any = await ProviderRouter.generate({ provider: p, messages, stream: false, singleAttempt: true } as any);
+  const t = (g?.text ?? "").trim();
+  if (!t) throw new Error("empty");
+  return t;
+};
+// Perf: RACE the two fastest providers in parallel (first non-empty wins) instead of
+// sequential-await. A slow/empty groq no longer blocks — cerebras answers concurrently.
+// Falls back to the remaining providers (raced) only if both leaders fail.
+const reliableGenerate = async (messages: any[]): Promise<string> => {
+  // Leaders = cerebras+gemini (fast, and NOT groq): keeps groq's burst budget free for the
+  // council seat + 3 concurrent judges that already use groq. groq stays in the fallback tier.
+  // perplexity (sonar, live web-search grounding) joins the fallback tier too, not the
+  // leaders — its search+synthesis round trip is slower than a plain chat completion, so it
+  // shouldn't race for speed against the two fast leaders; it's reachable the moment they miss.
+  try {
+    return await Promise.any(["cerebras", "gemini"].map((p) => v1Gen(p, messages)));
+  } catch { /* both leaders failed → race the rest incl. groq */ }
+  try {
+    return await Promise.any(["groq", "github-models", "sambanova", "perplexity"].map((p) => v1Gen(p, messages)));
+  } catch { return ""; }
+};
+app.get("/v1/models", (_req, res) => {
+  res.json({ object: "list", data: [{ id: "ollamas-auto", object: "model", owned_by: "ollamas" }, ...V1_PROVIDERS.map((p) => ({ id: p, object: "model", owned_by: "ollamas" }))] });
+});
+app.post("/v1/chat/completions", async (req, res) => {
+  const b = req.body || {};
+  const messages = Array.isArray(b.messages) ? b.messages : [];
+  const id = "chatcmpl-" + Date.now().toString(36);
+  try {
+    const content = await reliableGenerate(messages);
+    if (b.stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] })}\n\n`);
+      res.write(`data: ${JSON.stringify({ id, object: "chat.completion.chunk", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    } else {
+      res.json({ id, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: "ollamas-auto", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+    }
+  } catch (e: any) {
+    res.status(500).json({ error: { message: String(e?.message ?? e), type: "server_error" } });
+  }
+});
 
 // ----------------------------------------------------
 // ORG management layer (orchestration/ORGANIZATION.md) — read-only status surface, registered at
