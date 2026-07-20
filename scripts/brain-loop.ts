@@ -19,7 +19,18 @@ export { questionFromRecord };
 const STATE_DIR = process.env.BRAIN_LOOP_DIR || join(homedir(), ".llm-mission-control");
 const STATE_FILE = join(STATE_DIR, "loop-state.json");
 const LOCK_FILE = join(STATE_DIR, "loop.lock");
+const METRICS_FILE = join(STATE_DIR, "loop-metrics.jsonl");
 // gate.json artık server/brain-gate-store.ts'in sorumluluğunda (atomik + yedekli).
+
+/** Her turun sonucu ölçülür — ATLANAN tur da bir sonuçtur. Sessiz başarısızlık
+ *  ancak ölçülürse görünür (tur 42-53 boşa uyanışı elle log okunana dek fark
+ *  edilmemişti). Ölçüm best-effort: asla turu düşürmez. */
+async function record(m: Record<string, unknown>): Promise<void> {
+  try {
+    const { appendMetric } = await import("../server/brain-loop-health");
+    appendMetric(METRICS_FILE, { at: Date.now(), ...m } as any);
+  } catch { /* ölçüm turu bloklamaz */ }
+}
 
 /** Sorulan soru bu süre sonra yeniden hedef olabilir (bilgi bayatlar, yeniden sorulur). */
 const ASK_TTL_MS = Number(process.env.BRAIN_LOOP_TTL_MS) || DEFAULT_TTL_MS;
@@ -148,14 +159,14 @@ async function main() {
     mkdirSync(STATE_DIR, { recursive: true });
     if (existsSync(LOCK_FILE)) {
       const age = Date.now() - Number(readFileSync(LOCK_FILE, "utf8").split("|")[1] || 0);
-      if (age < 600_000) { console.log(JSON.stringify({ event: "brain.loop", skipped: "locked" })); return; }
+      if (age < 600_000) { console.log(JSON.stringify({ event: "brain.loop", skipped: "locked" })); await record({ turn: 0, ms: 0, wrote: false, skipped: "locked" }); return; }
     }
     writeFileSync(LOCK_FILE, `${process.pid}|${Date.now()}`);
   } catch { /* kilit yazılamadıysa yine de devam */ }
 
   try {
     const { llmActive } = await import("../server/gpu-coordinator");
-    if (llmActive()) { console.log(JSON.stringify({ event: "brain.loop", skipped: "gpu-busy" })); return; }
+    if (llmActive()) { console.log(JSON.stringify({ event: "brain.loop", skipped: "gpu-busy" })); await record({ turn: 0, ms: Date.now() - t0, wrote: false, skipped: "gpu-busy" }); return; }
 
     const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
     const api = async (path: string, body?: unknown, ms = 30_000): Promise<any> => {
@@ -206,11 +217,16 @@ async function main() {
     const picked = selectTarget(state, input, Date.now());
     state.backlog = picked.backlog;
     const question = picked.question;
-    if (!question) { console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "no-fresh-target", seed, ns })); saveState(state); return; }
+    if (!question) {
+      console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "no-fresh-target", seed, ns }));
+      await record({ turn: state.turn, ms: Date.now() - t0, wrote: false, skipped: "no-fresh-target", ns });
+      saveState(state); return;
+    }
     const qHash = hash(question);
     if (!shouldAsk(state, maxWrites)) {
       saveState(state);
       console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "budget", writesToday: state.writesToday }));
+      await record({ turn: state.turn, ms: Date.now() - t0, wrote: false, skipped: "budget" });
       return;
     }
 
@@ -315,6 +331,10 @@ async function main() {
       weights: r.weights, sources: r.sources.length, confidence: r.confidence, degraded: r.degraded,
       wrote, writesToday: state.writesToday, backlog: state.backlog.length, ms: Date.now() - t0,
     }));
+    await record({
+      turn: state.turn, ms: Date.now() - t0, strategy: picked.strategy, ns, expert: r.expert,
+      wrote, sources: r.sources.length, confidence: r.confidence, degraded: r.degraded,
+    });
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     // 503/meşgul geçici bir DURUM, hata değil: tur sessizce atlanır, 15 dk sonra
@@ -325,6 +345,7 @@ async function main() {
       : /HTTP 5\d\d|fetch failed|ECONNREFUSED/i.test(msg) ? "server-unavailable"
       : "error";
     console.warn(JSON.stringify({ event: "brain.loop", [kind === "error" ? "error" : "skipped"]: kind, detail: msg.slice(0, 160) }));
+    await record({ turn: 0, ms: Date.now() - t0, wrote: false, skipped: kind });
   } finally {
     try { unlinkSync(LOCK_FILE); } catch { /* zaten yok */ }
     // Kusursuz loop şartı: iş bitince SÜREÇ de biter. Yarıda kalan sağlayıcı

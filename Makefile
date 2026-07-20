@@ -116,5 +116,8 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+brain-loop-health: ## loop olculen durum (yazim orani, kuru tur, atlama siniflari)
+	@npx tsx scripts/brain-loop-health.ts $(ARGS)
+
 brain-loop-install: ## sonsuz loop launchd agent yukle (Emre onayli)
 	@cp scripts/com.ollamas.brain-loop.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$$(id -u) ~/Library/LaunchAgents/com.ollamas.brain-loop.plist && echo 'brain-loop agent yuklendi (15dk periyot)'
