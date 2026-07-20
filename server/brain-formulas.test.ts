@@ -3,7 +3,7 @@ import { describe, test, expect } from "vitest";
 import {
   softmax, retrievalProbabilities, l2normalize, profileVector, personalizeQuery,
   gateLogits, gateWeights, heuristicBias, mixtureSelect, expectedMixture, updateGate, EXPERTS,
-  sequenceWeights, weightedContext,
+  sequenceWeights, weightedContext, avgMaxScore, sequenceLogprob, perTokenMixture,
 } from "./brain-formulas";
 
 describe("Formül 2 — p_ret(z|x) = softmax(qᵀd)", () => {
@@ -111,5 +111,80 @@ describe("Formül 3a — RAG-Sequence bağlam ağırlıklandırma", () => {
     const sources = [src("m-a", "a".repeat(300), 10), src("m-b", "b".repeat(300), 0.001)];
     const ctx = weightedContext(sources, sequenceWeights(sources.map((s) => s.score)), 200);
     expect(ctx).toContain("m-b"); // düşük olasılıklı kaynak da görünür kalır
+  });
+});
+
+// Formül 4 (ReAtt): r_h(q,d) = avg_{t∈q}( max_{s∈d} A^{q,d}[t,s] )
+describe("Formül 4 — ReAtt avg-max skoru", () => {
+  const e1 = [1, 0, 0], e2 = [0, 1, 0], e3 = [0, 0, 1];
+
+  test("aynı parçalar tam eşleşir (skor 1)", () => {
+    expect(avgMaxScore([e1, e2], [e1, e2])).toBeCloseTo(1, 6);
+  });
+
+  test("dik parçalar eşleşmez (skor 0)", () => {
+    expect(avgMaxScore([e1], [e2, e3])).toBeCloseTo(0, 6);
+  });
+
+  test("MAX alınır: bir tek iyi eşleşme yeterli, kötüler cezalandırmaz", () => {
+    // q parçası e1; d'de bir tane e1 var, gerisi alakasız → max = 1
+    expect(avgMaxScore([e1], [e3, e2, e1])).toBeCloseTo(1, 6);
+  });
+
+  test("AVG alınır: sorgu parçalarının ortalaması", () => {
+    // e1 tam eşleşir (1), e2 hiç eşleşmez (0) → ortalama 0.5
+    expect(avgMaxScore([e1, e2], [e1, e3])).toBeCloseTo(0.5, 6);
+  });
+
+  test("büyüklükten bağımsız (kosinüs — ölçek değil YÖN)", () => {
+    expect(avgMaxScore([[5, 0, 0]], [[0.2, 0, 0]])).toBeCloseTo(1, 6);
+  });
+
+  test("boş girdi 0 döner, çökmez", () => {
+    expect(avgMaxScore([], [e1])).toBe(0);
+    expect(avgMaxScore([e1], [])).toBe(0);
+    expect(avgMaxScore([[0, 0, 0]], [[0, 0, 0]])).toBe(0); // sıfır vektör güvenli
+  });
+
+  test("daha ilgili doküman daha yüksek skor alır (sıralama amacı)", () => {
+    const q = [e1, e2];
+    const ilgili = [e1, e2, e3];
+    const alakasiz = [e3, e3];
+    expect(avgMaxScore(q, ilgili)).toBeGreaterThan(avgMaxScore(q, alakasiz));
+  });
+});
+
+// Formül 3a/3b (RAG-Token): p_final(y|x) = Σ_j w_j(x) · p_j(y|x)
+// Faz-0 ÖLÇÜMÜ: ollama 0.32.1 /v1/chat/completions per-token logprob VERİYOR,
+// /api/chat vermiyor. Yani gerçek p_final artık hesaplanabilir — ama YALNIZ
+// logprob dönen uzmanlar için (odysseus MCP üzerinden geldiği için veremez).
+describe("Formül 3a/3b — gerçek p_final (logprob)", () => {
+  test("dizi logprob'u ortalama token logprob'una çevrilir (uzunluk yanlılığı yok)", () => {
+    // Uzun cevap doğal olarak daha düşük TOPLAM logprob alır; ortalama almazsak
+    // mixture kısa cevabı sistematik olarak kayırırdı.
+    expect(sequenceLogprob([-0.1, -0.1, -0.1])).toBeCloseTo(-0.1, 6);
+    expect(sequenceLogprob([-0.1, -0.1, -0.1, -0.1, -0.1])).toBeCloseTo(-0.1, 6);
+    expect(sequenceLogprob([])).toBeNull(); // veri yok → iddia yok
+  });
+
+  test("perTokenMixture: logprob veren uzmanlar w_j ile karıştırılır", () => {
+    // p_j = exp(ort. logprob); p_final = Σ_j w_j p_j
+    const r = perTokenMixture([-0.1, null, -2.0], [0.5, 0.3, 0.2]);
+    expect(r.pFinal).toBeCloseTo(0.5 * Math.exp(-0.1) + 0.2 * Math.exp(-2.0), 6);
+    // Logprob VERMEYEN uzman (null) toplamdan DIŞLANIR ve dürüstçe raporlanır.
+    expect(r.covered).toEqual([true, false, true]);
+    expect(r.coverage).toBeCloseTo(0.7, 6); // w kapsaması: 0.5+0.2
+  });
+
+  test("hiç logprob yoksa null — uydurma p_final üretilmez", () => {
+    const r = perTokenMixture([null, null, null], [0.5, 0.3, 0.2]);
+    expect(r.pFinal).toBeNull();
+    expect(r.coverage).toBe(0);
+  });
+
+  test("daha olası cevap daha yüksek p_final verir", () => {
+    const iyi = perTokenMixture([-0.05, null, null], [1, 0, 0]).pFinal!;
+    const kotu = perTokenMixture([-3.0, null, null], [1, 0, 0]).pFinal!;
+    expect(iyi).toBeGreaterThan(kotu);
   });
 });

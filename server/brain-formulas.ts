@@ -187,3 +187,95 @@ export function weightedContext(sources: WeightedSource[], p: number[], budget: 
   }
   return parts.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Formül 4 — Retrieval-as-Attention (ReAtt):
+//   A^{q,d}[t,s] = Q_t · K_s      (sorgu-belge dikkat matrisi)
+//   r_h(q,d)     = avg_{t∈q}( max_{s∈d} A[t,s] )
+//   r(q,d)       = Σ_h P^head_h · r_h(q,d)
+//
+// DÜRÜSTLÜK NOTU: gerçek ReAtt bunu Transformer'ın İÇİNDE, TOKEN düzeyinde ve
+// birden çok başlıkla (head) yapar; öğrenilebilir P^head ile tek bir
+// "retrieval-head" seçilir. Bizde ne token-düzeyi dikkat matrisine ne de
+// başlıklara erişim var — elimizde yalnız cümle/parça gömmeleri var. Bu yüzden
+// burada uygulanan biçim CÜMLE düzeyinde ve TEK başlıklıdır (P^head = 1):
+// avg-max yapısı korunur, çözünürlük düşer. `expectedMixture` gibi bu da
+// işaretli bir yaklaşımdır — formül kılık değiştirmiyor, sınırı yazılıyor.
+// ---------------------------------------------------------------------------
+
+/** İki vektörün kosinüs benzerliği; sıfır vektör güvenli (0 döner). */
+function cosine(a: number[], b: number[]): number {
+  let dot = 0, na = 0, nb = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return na > 0 && nb > 0 ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
+
+/** Formül 4 (cümle düzeyi): her sorgu parçası için belgedeki EN İYİ eşleşme
+ *  bulunur, sonra bunların ORTALAMASI alınır. Max sayesinde uzun belgeler
+ *  alakasız parçalarıyla cezalandırılmaz; avg sayesinde sorgunun her yönü sayılır. */
+export function avgMaxScore(qChunks: number[][], dChunks: number[][]): number {
+  if (!qChunks.length || !dChunks.length) return 0;
+  let sum = 0;
+  for (const qc of qChunks) {
+    let best = 0;
+    for (const dc of dChunks) {
+      const s = cosine(qc, dc);
+      if (s > best) best = s;
+    }
+    sum += best;
+  }
+  return sum / qChunks.length;
+}
+
+// ---------------------------------------------------------------------------
+// Formül 3a/3b — GERÇEK p_final:  p_final(y|x) = Σ_j w_j(x) · p_j(y|x)
+//
+// Dosya başındaki dürüstlük notu "logprob eriştiğimiz gün doğrudan kullanılır"
+// diyordu. FAZ-0 ÖLÇÜMÜ (scripts/probe-logprobs.ts, 2026-07-20): ollama 0.32.1
+// `/v1/chat/completions` per-token logprob VERİYOR; `/api/chat` VERMİYOR.
+// Yani o gün geldi — ama KISMEN: odysseus MCP köprüsünden geldiği için logprob
+// üretemez. Bu yüzden p_final yalnız logprob DÖNEN uzmanlar üzerinde hesaplanır
+// ve kapsama (coverage) açıkça raporlanır. Kapsama düşükse sayı "tam p_final"
+// değildir ve öyle sunulmamalıdır.
+// ---------------------------------------------------------------------------
+
+/** Dizi olasılığının uzunluktan bağımsız ölçüsü: ORTALAMA token logprob'u.
+ *  Toplam kullanılsaydı uzun cevap sistematik olarak cezalanırdı. */
+export function sequenceLogprob(tokenLogprobs: number[]): number | null {
+  if (!tokenLogprobs.length) return null;
+  const sum = tokenLogprobs.reduce((a, b) => a + b, 0);
+  return sum / tokenLogprobs.length;
+}
+
+export interface PFinalResult {
+  /** Σ_j w_j p_j — yalnız logprob veren uzmanlar üzerinden. Hiçbiri yoksa null. */
+  pFinal: number | null;
+  /** Hangi uzmanlar hesaba katılabildi. */
+  covered: boolean[];
+  /** Katılan uzmanların toplam w ağırlığı — sonucun ne kadar "tam" olduğu. */
+  coverage: number;
+}
+
+/** Formül: p_final = Σ_j w_j·p_j, p_j = exp(ortalama logprob).
+ *  Logprob vermeyen uzman (null) toplamdan DIŞLANIR — sıfır saymak onu
+ *  "kesinlikle yanlış" ilan etmek olurdu, oysa yalnızca ÖLÇÜLEMEDİ. */
+export function perTokenMixture(avgLogprobs: (number | null)[], w: number[]): PFinalResult {
+  const covered = avgLogprobs.map((lp) => lp !== null && Number.isFinite(lp));
+  let pFinal = 0;
+  let coverage = 0;
+  for (let j = 0; j < avgLogprobs.length; j++) {
+    if (!covered[j]) continue;
+    pFinal += (w[j] ?? 0) * Math.exp(avgLogprobs[j] as number);
+    coverage += w[j] ?? 0;
+  }
+  return {
+    pFinal: coverage > 0 ? pFinal : null,
+    covered,
+    coverage: Number(coverage.toFixed(6)),
+  };
+}
