@@ -4240,6 +4240,15 @@ app.post("/api/brain/sync-system", async (req, res) => {
   }
 });
 
+// brain-loop.ts is an HTTP client of this server (never opens brain.db directly, see
+// scripts/brain-loop.ts's contract note) — including for GPU state. It cannot see this
+// process's in-process llmActive() any other way (it runs as a separate `tsx` process
+// each launchd tick, so a direct import always reads a fresh, always-idle module copy).
+app.get("/api/brain/gpu-status", async (req, res) => {
+  const { llmActive } = await import("./server/gpu-coordinator");
+  res.json({ active: llmActive() });
+});
+
 // Ortak-brain (formüller.md §3b): tek retrieval → üç uzman (ollamas/eCym/odysseus)
 // → MoE gate w_j → p_final seçimi. Erişilemeyen uzman degrade edilir.
 app.post("/api/brain/ask-shared", async (req, res) => {

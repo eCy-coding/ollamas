@@ -165,9 +165,6 @@ async function main() {
   } catch { /* kilit yazılamadıysa yine de devam */ }
 
   try {
-    const { llmActive } = await import("../server/gpu-coordinator");
-    if (llmActive()) { console.log(JSON.stringify({ event: "brain.loop", skipped: "gpu-busy" })); await record({ turn: 0, ms: Date.now() - t0, wrote: false, skipped: "gpu-busy" }); return; }
-
     const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
     const api = async (path: string, body?: unknown, ms = 30_000): Promise<any> => {
       const r = await fetch(`${API}${path}`, {
@@ -179,6 +176,16 @@ async function main() {
       if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
       return r.json();
     };
+    // G7: llmActive() is in-process module state (server/gpu-coordinator.ts). This loop
+    // runs as a fresh `tsx` process every launchd tick, so importing it directly always
+    // reads a blank, always-idle copy — it can never see the live :3000 server's real
+    // GPU state. The loop is already an HTTP client of :3000 for everything else (see
+    // contract note above); ask it over HTTP instead. Best-effort: if the check itself
+    // fails (server down, network), treat as not-busy — the loop already tolerates
+    // :3000 being unreachable elsewhere and shouldn't newly stall on this one.
+    const checkGpuActive = () => api("/api/brain/gpu-status").then((r) => !!r?.active).catch(() => false);
+    if (await checkGpuActive()) { console.log(JSON.stringify({ event: "brain.loop", skipped: "gpu-busy" })); await record({ turn: 0, ms: Date.now() - t0, wrote: false, skipped: "gpu-busy" }); return; }
+
     const httpRecall = async (q: string, o: { k?: number; ns?: string } = {}) =>
       (await api("/api/brain/recall", { query: q, k: o.k ?? 5, ns: o.ns })).hits ?? [];
     const { askShared } = await import("../server/brain-shared");
@@ -258,6 +265,10 @@ async function main() {
     const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
       (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
 
+    // Recheck right before dispatch (fresher than the top-of-turn gate above — recall/
+    // embed/profile-refresh took real time, GPU state may have moved on since).
+    const ecymGpuBusy = await checkGpuActive();
+
     const askPromise = askShared(question, {
       recall: (q: string, o: any) => httpRecall(q, o),
       searchFacts: async () => [], // semantik fact araması HTTP yüzeyinde yok → widen atlanır
@@ -265,7 +276,7 @@ async function main() {
       liveContext: liveSystemContext,
       generate: gen(resolveDistillProvider(process.env)),
       gate,
-      saveGate: (g) => { persistGate(g); },
+      saveGate: (g: any) => { persistGate(g); },
       // F3c: gate'i besleyen gömme + q*'ı retrieval'a taşıyan vektör-recall.
       embed,
       recallVec,
@@ -273,8 +284,8 @@ async function main() {
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // eCym yerel modeldir: GPU'yu chat LLM ile paylaşır → yalnız boştayken katılır.
-        ecym: llmActive() ? undefined : gen("ollama-local", process.env.ECY_MODEL || "ecy"),
-        odysseus: async (messages) => {
+        ecym: ecymGpuBusy ? undefined : gen("ollama-local", process.env.ECY_MODEL || "ecy"),
+        odysseus: async (messages: { role: string; content: string }[]) => {
           const { ToolRegistry } = await import("../server/tool-registry");
           const out = await ToolRegistry.execute("mcp__odysseus__odysseus_chat",
             { prompt: messages[1].content, model: "ollamas-auto" }, { source: "brain-loop" } as any);
