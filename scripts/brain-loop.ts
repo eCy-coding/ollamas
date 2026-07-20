@@ -63,6 +63,10 @@ export interface LoopState {
   writesToday: number;
   /** F3c: önbelleklenmiş p_u kaynağı — geçmiş soruların gömme vektörleri. */
   profile?: { vectors: number[][]; at: number; turn: number };
+  /** Son sorulan soruların METNİ (hash değil) — p_u'nun kaynağı budur.
+   *  Yalnız hash tutulunca profil mevcut soruya düşüyor ve p_u ≈ q oluyordu:
+   *  matematiksel olarak geçerli ama ANLAMSIZ bir profil (kendini işaret eder). */
+  recentQuestions?: string[];
   /** hash → sorulma zamanı. TTL dolunca soru yeniden taze olur (kusur-3 panzehiri). */
   asked: Record<string, number>;
   /** Üretilip o tur kullanılmayan hedefler — hiçbir strateji üretmezse buradan drene edilir. */
@@ -82,6 +86,7 @@ export function loadState(): LoopState {
       asked: migrateAsked(raw.asked ?? raw.askedHashes),
       backlog: Array.isArray(raw.backlog) ? raw.backlog : [],
       profile: raw.profile,
+      recentQuestions: Array.isArray(raw.recentQuestions) ? raw.recentQuestions : [],
       lastAt: raw.lastAt ?? 0,
     };
     return s.day === today ? s : { ...s, day: today, writesToday: 0 };
@@ -223,12 +228,14 @@ async function main() {
     // Profil (p_u): PROFILE_REFRESH_TURNS turda bir tazelenir — her tur 3 embed
     // yakmak yerine. Profil yavaş değişir, sıcaklık bütçesi değişmez.
     let profileVecs = state.profile?.vectors ?? [];
+    const prior = (state.recentQuestions ?? []).filter((s) => s && s !== question);
     const profileStale = !state.profile || state.turn - state.profile.turn >= PROFILE_REFRESH_TURNS;
-    if (profileStale) {
+    // p_u YALNIZ geçmiş sorulardan kurulur. Geçmiş yoksa profil KURULMAZ — mevcut
+    // soruyu tohum yapmak p_u ≈ q verirdi, yani q* = q(1+λ): yönü değişmeyen, hiçbir
+    // şey öğretmeyen sahte bir kişiselleştirme. Yoksa yok demek daha dürüst.
+    if (profileStale && prior.length) {
       try {
-        const recent = Object.keys(state.asked).length ? state.backlog.slice(-3) : [];
-        const seeds = recent.length ? recent : [question];
-        profileVecs = await Promise.all(seeds.slice(0, 3).map((s) => embed(s)));
+        profileVecs = await Promise.all(prior.slice(-3).map((s) => embed(s)));
         state.profile = { vectors: profileVecs, at: Date.now(), turn: state.turn };
       } catch { /* profil best-effort — yoksa kişiselleştirme kapalı, tur düşmez */ }
     }
@@ -281,6 +288,8 @@ async function main() {
     }
     // Soru sorulmuş olarak damgalanır — TTL dolunca yeniden hedef olabilir.
     state.asked[qHash] = Date.now();
+    // Metni de sakla: bir sonraki turun p_u'su GEÇMİŞ sorulardan kurulur.
+    state.recentQuestions = [...(state.recentQuestions ?? []), question].slice(-10);
     const askedKeys = Object.keys(state.asked);
     if (askedKeys.length > ASKED_CAP) {
       // En eski damgalar düşer (dosya sınırsız büyümesin).
