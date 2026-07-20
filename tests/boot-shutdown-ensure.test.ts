@@ -54,7 +54,11 @@ describe("drainHttp (FIX B5)", () => {
     expect(elapsed).toBeGreaterThanOrEqual(250);
 
     clientReq.destroy();
-  });
+    // Davranış bütçesi yukarıdaki iki assert'tir (drainHttp ~300ms). Buradaki sarmalayıcı
+    // süre `await import("../server")` içindir: server.ts ağır bir modül ve tam suite
+    // paralel koşarken tek başına 5sn'lik VARSAYILAN testTimeout'u aşıp flake üretiyordu
+    // (izole koşuda 3.4sn, yük altında >5sn). Süre iddiaları değişmedi, yalnız import payı.
+  }, 30_000);
 });
 
 // ---------------------------------------------------------------------------
