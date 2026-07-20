@@ -51,7 +51,7 @@ describe("embedFingerprint", () => {
       provider: "ollama-local",
       model: "nomic-embed-text",
       host: "http://127.0.0.1:11434",
-    })).toBe("ollama-local:nomic-embed-text@127.0.0.1:11434/prefix=nomic-v1/norm=l2");
+    }, {} as NodeJS.ProcessEnv)).toBe("ollama-local:nomic-embed-text@127.0.0.1:11434/prefix=nomic-v1/norm=none");
   });
 
   it("CHANGES when prefix policy changes — this is the whole point", () => {
@@ -83,13 +83,33 @@ describe("contractEmbedder", () => {
     return [scale, scale * 2, scale * 2];
   };
 
-  it("L2-normalizes every vector it returns", async () => {
-    const embed = contractEmbedder(raw, "nomic-embed-text");
+  it("does NOT normalize by default — measured, not assumed", async () => {
+    // eval-brain-mrr over the golden fixture: norm=l2 → MRR 0.3823, norm=none → 0.8771.
+    // brain.ts ranks by 1/(1+L2) and sqlite-vec orders by L2, so vector magnitude
+    // carries signal that unit-normalizing throws away. See normPolicy()'s table.
+    const embed = contractEmbedder(raw, "nomic-embed-text", {} as NodeJS.ProcessEnv);
+    const v = await embed("x", "query");
+    expect(Math.hypot(...v)).toBeGreaterThan(1.5); // raw magnitude preserved
+  });
+
+  it("normalizes when explicitly opted in (BRAIN_EMBED_NORM=1)", async () => {
+    const env = { BRAIN_EMBED_NORM: "1" } as unknown as NodeJS.ProcessEnv;
+    const embed = contractEmbedder(raw, "nomic-embed-text", env);
     for (const role of ["document", "query"] as EmbedRole[]) {
-      const v = await embed("x", role);
-      const norm = Math.hypot(...v);
-      expect(norm).toBeCloseTo(1, 12);
+      expect(Math.hypot(...(await embed("x", role)))).toBeCloseTo(1, 12);
     }
+  });
+
+  it("raw storage still yields exact cosine — the formulas do not need unit vectors", async () => {
+    // cos(q,d) = q·d/(‖q‖‖d‖) is scale-invariant in d, so p_ret = softmax(cos/τ) is
+    // computable from unnormalized stored vectors. This is why norm=none costs nothing
+    // downstream: storage normalization and cosine computability are separable.
+    const embed = contractEmbedder(raw, "nomic-embed-text", {} as NodeJS.ProcessEnv);
+    const d = await embed("x", "document");
+    const q = await embed("x", "query");
+    const cos = d.reduce((s, x, i) => s + x * q[i], 0) / (Math.hypot(...d) * Math.hypot(...q));
+    expect(cos).toBeLessThanOrEqual(1 + 1e-12);
+    expect(cos).toBeCloseTo(1, 12); // same direction, different magnitudes
   });
 
   it("routes the role through to the prefix", async () => {
@@ -107,16 +127,6 @@ describe("contractEmbedder", () => {
     const spy = async (t: string) => { seen.push(t); return [1, 0, 0]; };
     await contractEmbedder(spy, "nomic-embed-text")("hello");
     expect(seen).toEqual(["search_query: hello"]);
-  });
-
-  it("makes document and query vectors directly comparable by cosine", async () => {
-    // Both unit-norm ⇒ dot product IS cosine ⇒ softmax(cos/τ) is well-defined.
-    const embed = contractEmbedder(raw, "nomic-embed-text");
-    const d = await embed("x", "document");
-    const q = await embed("x", "query");
-    const cos = d.reduce((s, x, i) => s + x * q[i], 0);
-    expect(cos).toBeLessThanOrEqual(1 + 1e-12);
-    expect(cos).toBeGreaterThanOrEqual(-1 - 1e-12);
   });
 
   it("forwards the role to the raw embedder so wrappers can nest", async () => {

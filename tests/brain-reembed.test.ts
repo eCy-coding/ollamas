@@ -75,6 +75,23 @@ describe("brain-reembed (S23)", () => {
     db.close();
   });
 
+  test("re-embeds stored rows with the DOCUMENT role, not the query default", async () => {
+    // F0: memories and fact triples are documents. Letting the role default to "query"
+    // would rebuild the entire brain into the query subspace — recall would compare
+    // query-prefixed content against query-prefixed queries and quietly throw away the
+    // asymmetry nomic's task prefixes exist to provide. Nothing else would fail loudly.
+    const dbPath = tmpDb();
+    await seed(dbPath);
+    const db = openBrainDb(dbPath);
+    const roles: (string | undefined)[] = [];
+    const spy = async (t: string, role?: string) => { roles.push(role); return embedB(t); };
+    await reembedAll(db, spy, { provider: "prov-B" });
+    // roles[0] is the dimension probe; every stored row after it must be a document.
+    expect(roles.slice(1).every((r) => r === "document")).toBe(true);
+    expect(roles.slice(1).length).toBeGreaterThan(0);
+    db.close();
+  });
+
   test("mid-run failure leaves meta UNFLIPPED (drift stays flagged)", async () => {
     const dbPath = tmpDb();
     await seed(dbPath);

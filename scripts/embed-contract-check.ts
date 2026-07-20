@@ -14,8 +14,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { resolveEmbedder } from "../server/rag";
-import { EMBED_CONTRACT, applyEmbedPrefix, embedFingerprint, type EmbedRole } from "../server/embed-contract";
+import { resolveEmbedder, localEmbedModel } from "../server/rag";
+import { EMBED_CONTRACT, applyEmbedPrefix, embedSpaceId, type EmbedRole } from "../server/embed-contract";
 
 const PROBE = "brain encoder contract probe: espresso ritual";
 const TOL = 0.999; // cosine below this = different space
@@ -30,7 +30,7 @@ async function probeOllamas(role: EmbedRole): Promise<Probe> {
   try {
     const r = resolveEmbedder();
     const vec = await r.embed(PROBE, role);
-    return { name: "ollamas", ok: true, note: r.providerId, vec };
+    return { name: "ollamas", ok: true, note: `space=${embedSpaceId(localEmbedModel())} store=${r.providerId.split("/").pop()}`, vec };
   } catch (e: any) {
     return { name: "ollamas", ok: false, note: `embed failed: ${e?.message ?? e}` };
   }
@@ -54,7 +54,7 @@ async function probeEcym(role: EmbedRole): Promise<Probe> {
     return {
       name: "eCym",
       ok: true,
-      note: embedFingerprint({ provider: "ollama-local", model, host }),
+      note: `space=${embedSpaceId(model)} store=norm=l2`,
       vec: raw.map((x) => x / n),
     };
   } catch (e: any) {
@@ -101,11 +101,8 @@ async function main() {
     console.log(`── role=${role} ─────────────────────────────`);
     for (const p of probes) {
       if (!p.ok || !p.vec) { console.log(`  ${p.name.padEnd(9)} UNREACHABLE  ${p.note}`); continue; }
-      console.log(`  ${p.name.padEnd(9)} dim=${p.vec.length} ‖v‖=${norm(p.vec).toFixed(6)}  ${p.note}`);
-      if (Math.abs(norm(p.vec) - 1) > 1e-6) {
-        console.log(`  ${" ".repeat(9)} FAIL: not unit-norm — cosine identities break`);
-        failed = true;
-      }
+      console.log(`  ${p.name.padEnd(9)} dim=${p.vec.length} ‖v‖=${norm(p.vec).toFixed(4)}  ${p.note}`);
+      // No unit-norm requirement: cosine is computed explicitly, so magnitude is free.
     }
 
     const live = probes.filter((p) => p.ok && p.vec);
@@ -117,7 +114,9 @@ async function main() {
           failed = true;
           continue;
         }
-        const cos = dot(a.vec!, b.vec!);
+        // Cosine, not raw dot: ollamas stores raw and eCym stores unit vectors, which is
+        // fine — cosine is scale-invariant, so they remain exactly comparable.
+        const cos = dot(a.vec!, b.vec!) / ((norm(a.vec!) || 1) * (norm(b.vec!) || 1));
         const verdict = cos >= TOL ? "OK" : "FAIL";
         if (cos < TOL) failed = true;
         console.log(`  ${a.name}↔${b.name}: cos=${cos.toFixed(6)} ${verdict} (floor ${TOL})`);
@@ -131,7 +130,7 @@ async function main() {
   // Asymmetry check: nomic's prefixes must actually change the vector.
   const [d, q] = [await probeOllamas("document"), await probeOllamas("query")];
   if (d.ok && q.ok && d.vec && q.vec) {
-    const cos = dot(d.vec, q.vec);
+    const cos = dot(d.vec, q.vec) / ((norm(d.vec) || 1) * (norm(q.vec) || 1));
     console.log(`── prefix is live ──────────────────────────`);
     console.log(`  ollamas document↔query cos=${cos.toFixed(6)} ${cos < 0.9999 ? "OK (prefix applied)" : "FAIL (prefix inert)"}`);
     if (cos >= 0.9999) failed = true;

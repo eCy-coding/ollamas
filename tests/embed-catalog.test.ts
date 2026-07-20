@@ -80,16 +80,15 @@ describe("buildEmbedRequest / parseEmbedResponse — OpenAI-compat /embeddings",
 
 describe("resolveEmbedder — pinned cloud with local terminal fallback", () => {
   // F0 (brain-encoder/v1): resolveEmbedder now returns a CONTRACT embedder — nomic task
-  // prefix by role + L2 normalization — and a providerId that fingerprints the whole
-  // geometry rather than the bare provider name. Both assertions below changed on purpose.
+  // prefix by role — and a providerId that fingerprints the whole geometry rather than the
+  // bare provider name. Storage normalization is OFF by default (measured: MRR 0.8771 raw
+  // vs 0.3823 unit-normalized); cosine is computed explicitly downstream instead.
   it("no pin → local embedder used directly, contract-wrapped", async () => {
     const local = async () => [0.5, 0.5];
     const r = resolveEmbedder({} as any, { localEmbed: local });
-    expect(r.providerId).toBe("ollama-local:nomic-embed-text@localhost:11434/prefix=nomic-v1/norm=l2");
-    // unit-norm, direction preserved
-    const v = await r.embed("x");
-    expect(v[0]).toBeCloseTo(Math.SQRT1_2, 12);
-    expect(Math.hypot(...v)).toBeCloseTo(1, 12);
+    expect(r.providerId).toBe("ollama-local:nomic-embed-text@localhost:11434/prefix=nomic-v1/norm=none");
+    // norm=none by default: eval-brain-mrr measured 0.8771 raw vs 0.3823 unit-normalized
+    expect(await r.embed("x")).toEqual([0.5, 0.5]);
   });
 
   it("providerId changes when the embedding geometry changes", async () => {
@@ -114,16 +113,14 @@ describe("resolveEmbedder — pinned cloud with local terminal fallback", () => 
     const fetchFn = (async () => new Response(JSON.stringify({ data: [{ index: 0, embedding: [0, 3, 4] }] }), { status: 200 })) as typeof fetch;
     const r = resolveEmbedder({ EMBED_PROVIDER: "jina", JINA_API_KEY: "jk" } as any, { fetchFn, localEmbed: async () => [9] });
     expect(r.providerId).toContain("jina:");
-    expect(r.providerId).toContain("/norm=l2");
-    expect(await r.embed("hello")).toEqual([0, 0.6, 0.8]);
+    expect(r.providerId).toContain("/norm=none");
+    expect(await r.embed("hello")).toEqual([0, 3, 4]);
   });
 
   it("pinned cloud failure → falls to local (terminal fallback never removed)", async () => {
     const fetchFn = (async () => new Response("quota", { status: 429 })) as typeof fetch;
     const r = resolveEmbedder({ EMBED_PROVIDER: "jina", JINA_API_KEY: "jk" } as any, { fetchFn, localEmbed: async () => [7, 7] });
-    const v = await r.embed("hello");
-    expect(v[0]).toBeCloseTo(Math.SQRT1_2, 12);
-    expect(Math.hypot(...v)).toBeCloseTo(1, 12);
+    expect(await r.embed("hello")).toEqual([7, 7]);
   });
 
   it("fallback does not double-prefix (cloud model non-nomic, local model nomic)", async () => {

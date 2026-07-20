@@ -14,8 +14,11 @@
 //     and the new provider's entries repopulate organically.
 import { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
+import type { EmbedRole } from "./embed-contract";
 
-export type EmbedFn = (text: string) => Promise<number[]>;
+/** F0: `role` selects the nomic task prefix. Optional so pre-F0 fakes stay assignable;
+ *  reembedAll always passes "document" because it rebuilds stored content, not queries. */
+export type EmbedFn = (text: string, role?: EmbedRole) => Promise<number[]>;
 
 export interface ReembedPlan {
   memories: number;
@@ -82,7 +85,11 @@ export async function reembedAll(
   const insMem = db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)");
   for (let i = 0; i < memRows.length; i += batchSize) {
     for (const r of memRows.slice(i, i + batchSize)) {
-      const v = await embed(r.content);
+      // F0: stored memories are DOCUMENTS. Omitting the role defaults to "query" and
+      // would re-embed the whole brain into the query subspace — recall would then
+      // compare query-prefixed content against query-prefixed queries, silently
+      // discarding the asymmetry nomic's prefixes exist to provide.
+      const v = await embed(r.content, "document");
       if (v.length !== toDim) throw new Error(`memory rowid ${r.rowid}: dim ${v.length} != ${toDim}`);
       insMem.run(BigInt(r.rowid), f32(v));
       done++;
@@ -98,7 +105,7 @@ export async function reembedAll(
   const insFact = db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)");
   for (let i = 0; i < factRows.length; i += batchSize) {
     for (const r of factRows.slice(i, i + batchSize)) {
-      const v = await embed(`${r.subject} ${r.predicate} ${r.object}`);
+      const v = await embed(`${r.subject} ${r.predicate} ${r.object}`, "document");
       if (v.length !== toDim) throw new Error(`fact rowid ${r.rowid}: dim ${v.length} != ${toDim}`);
       insFact.run(BigInt(r.rowid), f32(v));
       done++;
