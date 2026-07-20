@@ -1,5 +1,5 @@
 import { loadAppCards } from "./app-literacy-load";
-import { buildAppEcymCommands } from "../server/app-literacy";
+import { buildAppEcymCommands, reconcileAppSafety } from "../server/app-literacy";
 import { loadPolicy } from "../server/agent-policy-store";
 
 /** 100 uygulama kartından eCym komutları. `safe` alanı operatörün politikası ile
@@ -11,7 +11,7 @@ const appLiteracyCommands = () => buildAppEcymCommands(loadAppCards(), loadPolic
 // komutları terminal-dataset.json'a idempotent iner (yedekli, safe:true, kaynak
 // işaretli — ecy-brain dataset-mtime ile otomatik rebuild eder); (3) prensipler:
 // docs/BRAIN-ECOSYSTEM.md sözleşmesi. Usage: make ecosystem-sync
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync, statSync, utimesSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { brainAssertFact } from "../server/brain";
@@ -48,11 +48,17 @@ async function main() {
     await brainAssertFact({ subject: "odysseus", predicate: "status", object: `${odyState} @ ${new Date().toISOString().slice(0, 16)}` });
   } catch { /* embedder queued — nightly */ }
 
-  // (2) eCym dataset: backup → idempotent insert → report (approval principle: marked source).
+  // (2) eCym dataset: append yeni komut + mevcut app komutlarının safe'ini RECONCILE.
+  //
+  // KUSUR (2026-07-21): eskiden yalnız yeni id EKLENİYORDU; mevcut app komutlarının
+  // `safe` alanı GÜNCELLENMİYORDU. Operatör politikayı değiştirince (ya da bir yedek
+  // geri yüklenince) safe bayat kalıyor ve OTOMATİK düzelmiyordu — 98 True bir gecede
+  // 0'a döndü ve hiçbir şey onarmadı. Artık ecosystem-sync (loop her 4 turda çağırır)
+  // TEK YAZAR olarak safe'i güncel politikadan reconcile eder → herhangi bir regresyon
+  // en geç 4 turda kendiliğinden düzelir.
   let added: string[] = [];
+  let safeChanged: string[] = [];
   if (existsSync(DS)) {
-    const backup = `${DS}.bak-${Date.now()}`;
-    copyFileSync(DS, backup);
     const ds = JSON.parse(readFileSync(DS, "utf8"));
     const ids = new Set(ds.commands.map((c: { id: string }) => c.id));
     for (const c of ECYM_CMDS) {
@@ -60,8 +66,26 @@ async function main() {
       ds.commands.push(c);
       added.push(c.id);
     }
-    if (added.length) writeFileSync(DS, JSON.stringify(ds, null, 1));
-    console.log(JSON.stringify({ event: "ecosystem.sync", odysseus: odyState, ecymAdded: added, backup: added.length ? backup : "unchanged" }));
+    // Mevcut app komutlarının safe'ini güncel politikadan tazele (YALNIZ .safe).
+    const rec = reconcileAppSafety(ds.commands, loadAppCards(), loadPolicy());
+    ds.commands = rec.commands;
+    safeChanged = rec.changed;
+
+    if (added.length || safeChanged.length) {
+      // Yalnız yazılacaksa yedekle (her çağrıda değil — yedek şişmesini önle).
+      const backup = `${DS}.bak-${Date.now()}`;
+      copyFileSync(DS, backup);
+      const mtimeBefore = statSync(DS).mtime;
+      writeFileSync(DS, JSON.stringify(ds, null, 1));
+      // Yeni komut EKLENDİYSE triggers değişti → ecy-brain rebuild etmeli (mtime bırak).
+      // YALNIZ safe değiştiyse vektör aynı → gereksiz 882-embed rebuild'i önle (mtime koru).
+      if (!added.length && process.env.ECY_REBUILD_VECTORS !== "1") {
+        try { utimesSync(DS, mtimeBefore, mtimeBefore); } catch { /* best-effort */ }
+      }
+      console.log(JSON.stringify({ event: "ecosystem.sync", odysseus: odyState, ecymAdded: added, safeReconciled: safeChanged.length, backup }));
+    } else {
+      console.log(JSON.stringify({ event: "ecosystem.sync", odysseus: odyState, ecymAdded: [], safeReconciled: 0, backup: "unchanged" }));
+    }
   } else {
     console.log(JSON.stringify({ event: "ecosystem.sync", odysseus: odyState, ecym: "dataset-missing" }));
   }
