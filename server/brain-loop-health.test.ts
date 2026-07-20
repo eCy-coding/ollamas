@@ -28,6 +28,25 @@ describe("summarize", () => {
     expect(h.consecutiveDry).toBe(0);
   });
 
+  test("kuru sayaç BUDGET kaynaklıysa 'hedef' uyarısı ÇIKMAZ (yanıltıcı sinyal)", () => {
+    // Günlük yazım tavanı dolunca turlar budget ile atlar ve wrote:false olur.
+    // Bunu 'hedef üretimini incele' diye göstermek yanlış yeri işaret eder:
+    // hedef üretiliyor, yalnız yazım tavanına takılmış (tasarlanmış koruma).
+    const budget = Array.from({ length: 7 }, (_, i) => m({ turn: 20 + i, wrote: false, skipped: "budget" }));
+    const h = summarize([m({ turn: 19, wrote: true }), ...budget]);
+    expect(h.consecutiveDry).toBe(7);
+    expect(h.dryReason).toBe("budget");
+    expect(renderHealth(h)).not.toContain("HEDEF ÜRETİMİ İNCELE");
+    expect(renderHealth(h)).toContain("günlük tavan");
+  });
+
+  test("kuru sayaç no-fresh-target kaynaklıysa 'hedef' uyarısı ÇIKAR", () => {
+    const dead = Array.from({ length: 6 }, (_, i) => m({ turn: 10 + i, wrote: false, skipped: "no-fresh-target" }));
+    const h = summarize([m({ turn: 9, wrote: true }), ...dead]);
+    expect(h.dryReason).toBe("no-fresh-target");
+    expect(renderHealth(h)).toContain("HEDEF ÜRETİMİ İNCELE");
+  });
+
   test("strateji/uzman/atlama dağılımı sayılır", () => {
     const h = summarize([
       m({ turn: 1, strategy: "cold", expert: "ollamas" }),

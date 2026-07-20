@@ -40,6 +40,9 @@ export interface HealthSummary {
   lastAt: number | null;
   /** Art arda kaç turdur hiçbir şey yazılmadı — 12 olması kusur-3'ün imzasıydı. */
   consecutiveDry: number;
+  /** Kuru diziyi besleyen baskın skip sınıfı — 'budget'/'gpu-busy' korumadır,
+   *  'no-fresh-target' gerçek hedef sorunudur. */
+  dryReason: string | null;
 }
 
 const tally = (xs: (string | undefined)[]): Record<string, number> => {
@@ -58,11 +61,19 @@ export function summarize(metrics: TurnMetric[]): HealthSummary {
   const durations = metrics.map((m) => m.ms ?? 0).filter((n) => n > 0).sort((a, b) => a - b);
 
   // Sondan geriye: kaç turdur kuru. Yazan ilk turda durur.
+  // Kuru sayacı BESLEYEN skip sınıfını da izle: "budget"/"gpu-busy" kaynaklı kuruluk
+  // tasarlanmış korumadır (yazım tavanı, GPU paylaşımı), "no-fresh-target" ise gerçek
+  // hedef üretimi sorunudur. İkisini karıştırmak sinyali yanıltıcı yapar.
   let consecutiveDry = 0;
+  const dryKinds: Record<string, number> = {};
   for (let i = metrics.length - 1; i >= 0; i--) {
     if (metrics[i].wrote) break;
     consecutiveDry++;
+    const k = metrics[i].skipped ?? "?";
+    dryKinds[k] = (dryKinds[k] ?? 0) + 1;
   }
+  // Baskın sebep: kuru dizideki en çok görülen skip sınıfı.
+  const dryReason = Object.entries(dryKinds).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   const last = metrics[metrics.length - 1];
   return {
@@ -78,6 +89,7 @@ export function summarize(metrics: TurnMetric[]): HealthSummary {
     lastTurn: last?.turn ?? null,
     lastAt: last?.at ?? null,
     consecutiveDry,
+    dryReason,
   };
 }
 
@@ -129,6 +141,16 @@ export function readMetrics(path: string, limit = 200): TurnMetric[] {
   } catch { return []; }
 }
 
+/** Kuru dizi uyarısı — SEBEBE göre. budget/gpu-busy koruma, no-fresh-target sorun. */
+function dryNote(h: HealthSummary): string {
+  if (h.consecutiveDry < 5) return "";
+  if (h.dryReason === "no-fresh-target") return "  ← HEDEF ÜRETİMİ İNCELE";
+  if (h.dryReason === "budget") return "  (günlük tavan dolu — yarın sıfırlanır)";
+  if (h.dryReason === "gpu-busy") return "  (GPU meşgul — geçici)";
+  if (h.dryReason === "server-unavailable") return "  (server erişilemez — geçici)";
+  return `  (${h.dryReason ?? "?"})`;
+}
+
 /** İnsan-okur özet — sıfat yok, sayı var. */
 export function renderHealth(h: HealthSummary): string {
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -138,7 +160,7 @@ export function renderHealth(h: HealthSummary): string {
   return [
     `tur           ${h.turns}  (son: #${h.lastTurn ?? "-"}, ${age})`,
     `yazım         ${h.wrote}/${h.turns} = ${pct(h.writeRate)}`,
-    `ardışık kuru  ${h.consecutiveDry}${h.consecutiveDry >= 5 ? "  ← HEDEF ÜRETİMİ İNCELE" : ""}`,
+    `ardışık kuru  ${h.consecutiveDry}${dryNote(h)}`,
     `atlama        ${h.skipped}  [${kv(h.kinds)}]`,
     `strateji      ${kv(h.strategies)}`,
     `uzman         ${kv(h.experts)}`,
