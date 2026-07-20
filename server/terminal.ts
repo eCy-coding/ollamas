@@ -1,5 +1,9 @@
 import { execFile } from "child_process";
 import { db } from "./db";
+import { GatewayClient, buildDoctorReport } from "../cli/lib/client";
+import { loadConfig } from "../cli/lib/config";
+import { resolveOutputCtx, formatDoctor } from "../cli/lib/output";
+import { buildSnapshot, renderDashboard } from "../cli/commands/top";
 
 // Allowed structural commands
 const ALLOWED_BINARIES = [
@@ -14,6 +18,15 @@ const ALLOWED_BINARIES = [
 // Structural dangerous tokens or shell bindings
 const BLOCKED_METACHARACTERS = [";", "&", "|", "`", "$", ">", "<"];
 const BLOCKED_TOKENS = ["rm", "sudo", "mv", "dd", "kill", "chmod", "chown", "curl", "wget"];
+
+// `ollamas <sub>` is a pseudo-binary: on the host it's a shell ALIAS (not a PATH executable),
+// so execFile can never resolve it directly regardless of allowlist membership — it must be
+// special-cased before the raw-binary allowlist check. Only these read-mostly introspection
+// subcommands are wired; `ollamas do/up/conductor/...` (autonomous task dispatch, fleet boot)
+// stay out of the sandbox on purpose — those are not "run a diagnostic", they're "start work".
+const OLLAMAS_SUBCOMMANDS = ["doctor", "top", "ecysearcher"] as const;
+const ECYSEARCHER_ACTIONS = ["up", "down", "status", "health"];
+const ECYSEARCHER_FLAGS = ["--json", "--dry"];
 
 export interface ExecResult {
   stdout: string;
@@ -92,6 +105,12 @@ export class TerminalManager {
       }
     }
 
+    // 3.5. `ollamas <sub>` pseudo-binary — dispatched before the raw allowlist check below,
+    // since "ollamas" is a shell alias on the host and would otherwise 126 as an unknown binary.
+    if (firstWord === "ollamas") {
+      return this.executeOllamas(words.slice(1));
+    }
+
     // 4. Validate first binary token against strict allowlist
     if (!ALLOWED_BINARIES.includes(firstWord)) {
       db.logSecurity(
@@ -142,6 +161,125 @@ export class TerminalManager {
             stderr: stderr || "",
             exitCode,
           });
+        }
+      );
+    });
+  }
+
+  /**
+   * `ollamas <sub>` pseudo-binary dispatch. Same audit/permission posture as execute() (caller
+   * already checked db.data.permissions.commandExec before reaching here) but each subcommand is
+   * its own hand-picked allowlist rather than a raw-binary check, because "ollamas" resolves to a
+   * host shell alias — there is no PATH executable to execFile in the first place.
+   *
+   * doctor/top run the SAME pure report builders the real `ollamas doctor`/`ollamas top --json`
+   * CLI commands use (cli/lib/client.ts, cli/commands/top.ts) — in-process, not spawned — so
+   * there's no second cold `tsx` start per click and no risk of `top --watch`'s alt-screen loop
+   * ever touching this (server) process's real stdout/TTY.
+   */
+  private static async executeOllamas(args: string[]): Promise<ExecResult> {
+    const [sub, ...rest] = args;
+    const display = `ollamas ${args.join(" ")}`.trim();
+
+    if (!sub || !(OLLAMAS_SUBCOMMANDS as readonly string[]).includes(sub)) {
+      const msg = `'ollamas ${sub ?? ""}' is not an allowed subcommand.`;
+      db.logSecurity("command_exec", display, `Command refused: ${msg}`, "deny");
+      return {
+        stdout: "",
+        stderr: `Security block: ${msg}\nAllowed: ollamas doctor [--json], ollamas top [--json], ollamas ecysearcher <${ECYSEARCHER_ACTIONS.join("|")}> [--dry] [--json]`,
+        exitCode: 126,
+      };
+    }
+
+    if (sub === "doctor" || sub === "top") {
+      const json = rest.includes("--json");
+      const unknown = rest.filter((a) => a !== "--json");
+      if (unknown.length) {
+        const msg = `'ollamas ${sub}' does not accept '${unknown.join(" ")}' here (snapshot-only; --watch/--interval are not supported through the sandbox).`;
+        db.logSecurity("command_exec", display, `Command refused: ${msg}`, "deny");
+        return { stdout: "", stderr: `Security block: ${msg}`, exitCode: 126 };
+      }
+
+      db.logSecurity("command_exec", display, "Executing ollamas subcommand in-process (no subprocess)", "allow");
+      try {
+        const cfg = loadConfig();
+        if (sub === "doctor") {
+          const client = new GatewayClient(cfg.gateway, cfg.apiKey, cfg.saasAdminToken);
+          const ollamaHost = process.env.OLLAMA_HOST || "http://localhost:11434";
+          const report = await buildDoctorReport(client, ollamaHost, new Date().toISOString());
+          const ctx = resolveOutputCtx(process.env, false, json);
+          const stdout = json ? JSON.stringify(report, null, 2) : formatDoctor(report, ctx);
+          return { stdout, stderr: "", exitCode: report.healthy ? 0 : 1 };
+        }
+
+        // sub === "top" — snapshot only, no --watch: a single /metrics read + render.
+        const client = new GatewayClient(cfg.gateway, cfg.apiKey);
+        const metricsText = await client.getMetrics();
+        let usageSeries: { day: string; calls: number; tokens: number }[] | undefined;
+        let usageError: string | undefined;
+        try {
+          usageSeries = (await client.getUsageTimeseries()).series;
+        } catch (e: any) {
+          usageError = String(e?.message || e);
+        }
+        let sessions;
+        try {
+          sessions = await client.listSessions();
+        } catch {
+          /* omit the sessions pane — best-effort like the real CLI */
+        }
+        const snap = buildSnapshot(metricsText, {
+          gateway: cfg.gateway,
+          ts: new Date().toISOString(),
+          usageSeries,
+          usageError,
+          sessions,
+        });
+        const ctx = resolveOutputCtx(process.env, false, json);
+        const stdout = json ? JSON.stringify(snap, null, 2) : renderDashboard(snap, ctx, 100);
+        return { stdout, stderr: "", exitCode: 0 };
+      } catch (e: any) {
+        return { stdout: "", stderr: `ollamas ${sub} failed: ${e?.message || e}`, exitCode: 1 };
+      }
+    }
+
+    // sub === "ecysearcher" — the one pseudo-subcommand that is a real subprocess: it drives
+    // `docker compose` for the eCySearcher subsystem, scoped to its own compose project and
+    // never touching the main :3000 stack (scripts/ecysearcher-lane.mjs). `up`/`down` mutate
+    // container state, but the action itself is a fixed word, not user-composed shell text.
+    const action = rest[0];
+    if (!ECYSEARCHER_ACTIONS.includes(action)) {
+      const msg = `'ollamas ecysearcher ${action ?? ""}' unknown. Allowed actions: ${ECYSEARCHER_ACTIONS.join(", ")}.`;
+      db.logSecurity("command_exec", display, `Command refused: ${msg}`, "deny");
+      return { stdout: "", stderr: `Security block: ${msg}`, exitCode: 126 };
+    }
+    const flags = rest.slice(1);
+    const badFlag = flags.find((f) => !ECYSEARCHER_FLAGS.includes(f));
+    if (badFlag) {
+      const msg = `unsupported flag '${badFlag}' for 'ollamas ecysearcher'. Allowed: ${ECYSEARCHER_FLAGS.join(", ")}.`;
+      db.logSecurity("command_exec", display, `Command refused: ${msg}`, "deny");
+      return { stdout: "", stderr: `Security block: ${msg}`, exitCode: 126 };
+    }
+
+    db.logSecurity("command_exec", display, "Executing ecysearcher-lane.mjs (docker compose lane, scoped subsystem)", "allow");
+    return new Promise((resolve) => {
+      // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
+      // Justified: execFile (no shell), action is a fixed allowlisted word (not interpolated
+      // user text), flags are allowlisted individually; same posture as execute() above.
+      execFile(
+        process.execPath,
+        ["scripts/ecysearcher-lane.mjs", action, ...flags],
+        {
+          cwd: process.cwd(), // the ollamas repo root — scripts/ is relative to it, not the sandbox workspaceRoot
+          timeout: 120000, // `up --build` can exceed the 45s used for the plain sandbox — this is a known-slow, known-safe lane
+          shell: false,
+        },
+        (error, stdout, stderr) => {
+          // execFile's error.code can be a numeric exit code OR an errno string (e.g. "ENOENT")
+          // depending on failure kind — Number(...) collapses both cases correctly instead of a
+          // compile-time-only `as number` cast that would leave a string masquerading as number.
+          const exitCode = error ? Number((error as NodeJS.ErrnoException).code) || 1 : 0;
+          resolve({ stdout: stdout || "", stderr: stderr || "", exitCode });
         }
       );
     });

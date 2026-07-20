@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Terminal, Play, ShieldAlert, AlertOctagon, HelpCircle } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Terminal, Play, ShieldAlert, AlertOctagon, HelpCircle, History } from "lucide-react";
 import { api } from "../lib/apiClient";
+import { SecurityEvent } from "../types";
 
 interface TerminalProps {
   onNotify: (msg: string, type: "success" | "error" | "info") => void;
@@ -11,6 +12,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
   const [command, setCommand] = useState("");
   const [logs, setLogs] = useState<string[]>(["Session initialized. Ready for telemetry..."]);
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<SecurityEvent[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,6 +20,22 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // Same audit trail SecurityPolicies.tsx reads (GET /api/security/log) — every command this
+  // panel runs is already persisted there (db.logSecurity in server/terminal.ts), so a page
+  // refresh doesn't lose "what did I run and was it allowed", without a second storage path.
+  const loadHistory = useCallback(async () => {
+    try {
+      const events = (await api.get("/api/security/log")) as SecurityEvent[];
+      setHistory((events || []).filter((e) => e.category === "command_exec").slice(0, 8));
+    } catch {
+      /* history is a convenience panel — a failed fetch shouldn't block the terminal itself */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const runCommand = async (cmdStr: string) => {
     if (!cmdStr.trim()) return;
@@ -39,6 +57,7 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
       setLogs((prev) => [...prev, `[CONNECTION FAIL]: ${e.message}`]);
     } finally {
       setLoading(false);
+      loadHistory();
     }
   };
 
@@ -55,6 +74,13 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
     { label: "Verify pytest", cmd: "pytest" },
     { label: "Inspect files", cmd: "ls -la" },
     { label: "System Uname", cmd: "uname -a" },
+    // Read-only ollamas subcommands (P0/P1) — the real `ollamas doctor`/`ollamas top` report
+    // builders run in-process, and `ecysearcher status` only probes the subsystem's health
+    // endpoint. `up`/`down` are deliberately NOT a quick-action button (they mutate docker
+    // container state) — still reachable by typing the command, but not one click away.
+    { label: "Stack health", cmd: "ollamas doctor" },
+    { label: "Live metrics", cmd: "ollamas top" },
+    { label: "eCySearcher status", cmd: "ollamas ecysearcher status" },
   ];
 
   return (
@@ -132,6 +158,31 @@ export const CommandLineTerminal: React.FC<TerminalProps> = ({ onNotify, isLive 
           <ShieldAlert className="w-3.5 h-3.5 text-immersive-text-dim" />
           <span>Allowlist locks sandbox commands parameters. Blocking redirects, sudo, curl or file removals (rm).</span>
         </div>
+
+        {/* Recent commands (persisted audit trail — survives a page refresh, unlike `logs` above) */}
+        {history.length > 0 && (
+          <div className="mt-3 border-t border-immersive-border pt-3">
+            <div className="flex items-center gap-1.5 mb-1.5 text-[10px] text-immersive-text-dim font-mono uppercase tracking-wider">
+              <History className="w-3.5 h-3.5" />
+              <span>Recent (audit log)</span>
+            </div>
+            <div className="space-y-1 max-h-[110px] overflow-y-auto">
+              {history.map((ev) => (
+                <div key={ev.id} className="flex items-start gap-2 text-[10px] font-mono">
+                  <span className={ev.status === "deny" ? "text-status-err" : "text-immersive-text-muted"}>
+                    {ev.status === "deny" ? "✕" : "✓"}
+                  </span>
+                  <span className="text-immersive-text-muted truncate" title={`${ev.action} — ${ev.details}`}>
+                    {ev.action}
+                  </span>
+                  <span className="text-immersive-text-dim ml-auto shrink-0">
+                    {new Date(ev.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
