@@ -70,8 +70,29 @@ async function widen(question: string, first: BrainRecallHit[], deps: AskDeps): 
   return out;
 }
 
-export async function askBrain(question: string, deps: AskDeps): Promise<AskResult> {
+/** Retrieval katmanı — askBrain ve askShared (ortak-brain, çok-uzman) AYNI bağlamı
+ *  kullansın diye ayrıldı: tek retrieval, R_k(x) tüm uzmanlara aynı gider (formüller.md
+ *  3b: her model aynı p_ret üzerinden aynı k belgeyi çeker). */
+export async function gatherContext(question: string, deps: AskDeps): Promise<{
+  sources: AskSource[]; context: string; mode: AskResult["mode"]; hops: number; live: string | null;
+}> {
   const q = (question || "").trim();
+  const r = await askInternal(q, deps, true);
+  return { sources: r.sources, context: r.context!, mode: r.mode, hops: r.hops ?? 1, live: r.live ?? null };
+}
+
+export async function askBrain(question: string, deps: AskDeps): Promise<AskResult> {
+  const r = await askInternal((question || "").trim(), deps, false);
+  delete (r as { context?: string }).context;
+  delete (r as { live?: string | null }).live;
+  return r;
+}
+
+async function askInternal(
+  q: string,
+  deps: AskDeps,
+  contextOnly: boolean,
+): Promise<AskResult & { context?: string; live?: string | null }> {
   if (!q) return { answer: "", sources: [], confidence: 0, mode: "hybrid", abstained: true };
   // Knowledge-bearing namespaces lead the sweep: fresh episodic noise (git captures)
   // must not shadow taught/curated answers in the lexical arm.
@@ -127,6 +148,9 @@ export async function askBrain(question: string, deps: AskDeps): Promise<AskResu
   const context =
     (live ? `[mem:live:system] (CANLI sistem durumu, ŞU AN) ${live}\n` : "") +
     sources.filter((s) => s.id !== "live:system").map((s) => `[mem:${s.id}] (${s.tier}) ${s.excerpt}`).join("\n");
+  if (contextOnly) {
+    return { answer: "", sources, confidence: 0, mode, hops, context, live };
+  }
   const raw = await deps.generate([
     { role: "system", content: SYNTH_PROMPT },
     { role: "user", content: `SORU: ${q}\n\nKAYNAKLAR:\n${context}` },

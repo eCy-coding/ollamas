@@ -16,6 +16,7 @@ import { statSync } from "node:fs";
 import * as sqliteVec from "sqlite-vec";
 import { type Embedder, embedText, resolveEmbedder } from "./rag";
 import { createEmbedCache, type EmbedCache } from "./embed-cache";
+import type { EmbedRole } from "./embed-contract";
 import { llmActive } from "./gpu-coordinator";
 
 export type MemoryTier = "core" | "procedural" | "learned" | "episodic" | "working";
@@ -270,12 +271,14 @@ export function createBrainStore(
   // Per-write embed budget: the write path never waits on the embedder longer than
   // BRAIN_EMBED_WRITE_TIMEOUT_MS (default 4s). A timed-out embed keeps running in the
   // background and lands in the embed cache — the later backfill then hits it for free.
-  const embedWithBudget = (text: string): Promise<number[]> => {
+  // F0: `role` picks the nomic task prefix. Writes are "document", searches are "query";
+  // getting this backwards costs recall quality silently, so every call site is explicit.
+  const embedWithBudget = (text: string, role: EmbedRole): Promise<number[]> => {
     const ms = Number(process.env.BRAIN_EMBED_WRITE_TIMEOUT_MS) || 4000;
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error(`embed timed out after ${ms}ms`)), ms);
       (t as { unref?: () => void }).unref?.();
-      embed(text).then(
+      embed(text, role).then(
         (v) => { clearTimeout(t); resolve(v); },
         (e) => { clearTimeout(t); reject(e); },
       );
@@ -420,7 +423,7 @@ export function createBrainStore(
     const deferOn = process.env.BRAIN_DEFER_EMBED !== "0";
     let vec: number[] | null = null;
     try {
-      vec = await embedWithBudget(content);
+      vec = await embedWithBudget(content, "document");
     } catch (e) {
       if (!deferOn) throw e;
     }
@@ -523,10 +526,10 @@ export function createBrainStore(
       // not the whole answer. The FTS/BM25 arm needs no embedding. fresh (drift probe)
       // keeps fail-fast semantics — a lexical probe would fake self-hit health.
       let vec: number[] | null = null;
-      if (fresh) vec = await rawEmbed(query);
+      if (fresh) vec = await rawEmbed(query, "query");
       else {
         try {
-          vec = await embedWithBudget(query);
+          vec = await embedWithBudget(query, "query");
         } catch { /* lexical-only fallback below */ }
       }
       if (vec) ensureVec(vec.length);
@@ -633,7 +636,7 @@ export function createBrainStore(
       // supersede chain belongs to live assertions only).
       if (f.invalidatedAt !== undefined) {
         ensureProvider();
-        const histVec = await embed(`${f.subject} ${f.predicate} ${f.object}`);
+        const histVec = await embed(`${f.subject} ${f.predicate} ${f.object}`, "document");
         ensureVec(histVec.length);
         const histIns = db.prepare(
           "INSERT INTO brain_facts(subject, predicate, object, episode_id, ns, valid_from, invalidated_at) VALUES(?,?,?,?,?,?,?)",
@@ -660,7 +663,7 @@ export function createBrainStore(
       // is SQL-only and already done) — the vector arrives via backfillEmbeddings.
       let vec: number[] | null = null;
       try {
-        vec = await embedWithBudget(`${f.subject} ${f.predicate} ${f.object}`);
+        vec = await embedWithBudget(`${f.subject} ${f.predicate} ${f.object}`, "document");
       } catch {
         if (process.env.BRAIN_DEFER_EMBED === "0") throw new Error("fact embed failed (BRAIN_DEFER_EMBED=0)");
       }
@@ -675,7 +678,7 @@ export function createBrainStore(
     async searchFacts(query, { k = 5, ns, at } = {}) {
       ensureProvider();
       if (refreshDim() === null) return []; // nothing embedded yet (re-reads for concurrent writers)
-      const vec = await embed(query);
+      const vec = await embed(query, "query");
       ensureVec(vec.length);
       const t = at ?? now();
       const rows = db
@@ -737,7 +740,7 @@ export function createBrainStore(
       for (const pf of pendingFacts) {
         if (!forced && indexed > 0 && gpuBusy()) break;
         try {
-          const v = await embedWithBudget(`${pf.subject} ${pf.predicate} ${pf.object}`);
+          const v = await embedWithBudget(`${pf.subject} ${pf.predicate} ${pf.object}`, "document");
           ensureVec(v.length);
           db.prepare("DELETE FROM brain_fact_vec WHERE rowid=?").run(BigInt(pf.rowid));
           db.prepare("INSERT INTO brain_fact_vec(rowid, embedding) VALUES(?,?)").run(BigInt(pf.rowid), f32(v));
@@ -752,7 +755,7 @@ export function createBrainStore(
         // reclaims the GPU immediately — the rest waits for the next pass.
         if (!forced && indexed > 0 && gpuBusy()) break;
         try {
-          const v = await embedWithBudget(p.content);
+          const v = await embedWithBudget(p.content, "document");
           ensureVec(v.length);
           db.prepare("DELETE FROM brain_vec WHERE rowid=?").run(BigInt(p.rowid));
           db.prepare("INSERT INTO brain_vec(rowid, embedding) VALUES(?,?)").run(BigInt(p.rowid), f32(v));
@@ -1163,6 +1166,7 @@ export const brainSearchFacts = (q: string, o?: { k?: number; ns?: string; at?: 
 export const brainSweep = (o?: { workingTtlMs?: number }) => store().sweep(o);
 export const brainConsolidate = (o?: { minAccess?: number }) => store().consolidate(o);
 export const brainHealth = (o?: { probes?: number; threshold?: number }) => store().health(o);
+export const brainBackfill = (o?: { limit?: number }) => store().backfillEmbeddings(o);
 export const brainForget = (o: { contains: string; ns?: string }) => store().forget(o);
 export const brainAuditTail = (limit?: number) => store().auditTail(limit);
 export const brainStats = () => store().stats();

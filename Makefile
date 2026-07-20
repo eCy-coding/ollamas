@@ -112,3 +112,9 @@ brain-coherence: ## semantik-bag denetimi + guvenli karantina (apply)
 	@npx tsx scripts/brain-coherence-audit.ts --apply
 brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 	@npx tsx scripts/brain-code-audit.ts
+
+brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
+	@npx tsx scripts/brain-loop.ts
+
+brain-loop-install: ## sonsuz loop launchd agent yukle (Emre onayli)
+	@cp scripts/com.ollamas.brain-loop.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$$(id -u) ~/Library/LaunchAgents/com.ollamas.brain-loop.plist && echo 'brain-loop agent yuklendi (15dk periyot)'

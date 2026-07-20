@@ -4211,6 +4211,45 @@ app.post("/api/brain/sync-system", async (req, res) => {
   }
 });
 
+// Ortak-brain (formüller.md §3b): tek retrieval → üç uzman (ollamas/eCym/odysseus)
+// → MoE gate w_j → p_final seçimi. Erişilemeyen uzman degrade edilir.
+app.post("/api/brain/ask-shared", async (req, res) => {
+  try {
+    const { question, ns } = req.body || {};
+    if (typeof question !== "string" || !question.trim()) return res.status(400).json({ error: "question (string) required" });
+    const brain = await import("./server/brain");
+    const { askShared } = await import("./server/brain-shared");
+    const { resolveDistillProvider } = await import("./server/brain-active");
+    const { liveSystemContext } = await import("./server/brain-system");
+    const { llmActive } = await import("./server/gpu-coordinator");
+    const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
+      (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
+    const r = await askShared(question, {
+      ns,
+      namespaces: brain.brainListNamespaces,
+      liveContext: liveSystemContext,
+      recall: (q, o) => brain.brainRecall(q, { ...o, ...(ns ? { ns } : {}) }),
+      searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ...(ns ? { ns } : {}) }),
+      generate: gen(resolveDistillProvider(process.env)),
+      experts: {
+        ollamas: gen(resolveDistillProvider(process.env)),
+        // Yerel model GPU'yu paylaşır — canlı generation varken uzman devre dışı.
+        ecym: llmActive() ? undefined : gen("ollama-local", process.env.ECY_MODEL || "ecy"),
+        odysseus: async (messages: { role: string; content: string }[]) => {
+          const out = await ToolRegistry.execute("mcp__odysseus__odysseus_chat",
+            { prompt: messages[1].content, model: "ollamas-auto" }, { source: "ask-shared" } as any);
+          return typeof out === "string" ? out : JSON.stringify(out).slice(0, 4000);
+        },
+      },
+    } as any);
+    res.json(r);
+  } catch (err: any) {
+    const msg = String(err?.message || "");
+    if (/embed|503/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
+    res.status(500).json({ error: msg || "ask-shared failed" });
+  }
+});
+
 // B4 right-to-be-forgotten: deterministic ns-scoped purge. Loopback-only — erasure
 // is an operator action, never a network-exposed one (S49 double-lock convention).
 app.post("/api/brain/forget", async (req, res) => {
