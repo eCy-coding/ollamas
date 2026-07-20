@@ -6,28 +6,80 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
+import {
+  STRATEGIES, pickStrategy, targetsFor, freshTargets, migrateAsked, pushBacklog,
+  hashQuestion, questionFromRecord, DEFAULT_TTL_MS,
+  type Strategy, type TargetInput, type TargetHit, type TargetFact,
+} from "../server/brain-targets";
+
+// Hedef üretimi brain-targets.ts'e taşındı (tükenmezlik sözleşmesi orada testli).
+// Geriye dönük uyum: eski çağıranlar bu adı hâlâ buradan alabilsin.
+export { questionFromRecord };
 
 const STATE_DIR = process.env.BRAIN_LOOP_DIR || join(homedir(), ".llm-mission-control");
 const STATE_FILE = join(STATE_DIR, "loop-state.json");
 const LOCK_FILE = join(STATE_DIR, "loop.lock");
 const GATE_FILE = join(STATE_DIR, "gate.json");
 
+/** Sorulan soru bu süre sonra yeniden hedef olabilir (bilgi bayatlar, yeniden sorulur). */
+const ASK_TTL_MS = Number(process.env.BRAIN_LOOP_TTL_MS) || DEFAULT_TTL_MS;
+/** Birikmiş hedef kuyruğu tavanı. */
+const BACKLOG_CAP = 200;
+/** `asked` sözlüğü bu boyutu aşarsa en eski kayıtlar budanır (dosya şişmesin). */
+const ASKED_CAP = 2000;
+
+// Tohum ve namespace HER TUR DÖNER — tek sabit sorgu kusur-3'ün köküydü.
+// Tur başına yalnız bir recall yapılır (recall = embed = GPU); rotasyon çeşitliliği
+// zamana yayar, ısıya değil.
+const SEEDS = [
+  "ollamas brain kod sistem",
+  "loop formül gate retrieval vektör",
+  "server route api endpoint istek",
+  "test vitest kalite kapısı hata",
+  "launchd servis daemon port süreç",
+  "embedding sqlite store şema",
+  "odysseus ecym uzman model",
+  "gotcha kök neden düzeltme",
+];
+const NS_POOL = ["knowledge", "universe", "loop", "default", "research", "org", "code"];
+
+/** Kayıt içeriklerinden olgu-araması için özne adayları (tırnaklı terimler). */
+export function subjectsFrom(hits: { content: string }[]): string[] {
+  const out: string[] = [];
+  for (const h of hits) {
+    const m = String(h.content ?? "").match(/'([^']{2,60})'/);
+    if (m) out.push(m[1]);
+  }
+  return [...new Set(out)];
+}
+
 export interface LoopState {
   turn: number;
   day: string;
   writesToday: number;
-  askedHashes: string[];
+  /** hash → sorulma zamanı. TTL dolunca soru yeniden taze olur (kusur-3 panzehiri). */
+  asked: Record<string, number>;
+  /** Üretilip o tur kullanılmayan hedefler — hiçbir strateji üretmezse buradan drene edilir. */
+  backlog: string[];
   lastAt: number;
 }
 
 export function loadState(): LoopState {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const s = JSON.parse(readFileSync(STATE_FILE, "utf8")) as LoopState;
+    const raw = JSON.parse(readFileSync(STATE_FILE, "utf8")) as Partial<LoopState> & { askedHashes?: string[] };
+    // Göç: eski `askedHashes: string[]` → `asked: Record<hash, ts>` (ts=0 → derhal taze).
+    const s: LoopState = {
+      turn: raw.turn ?? 0,
+      day: raw.day ?? today,
+      writesToday: raw.writesToday ?? 0,
+      asked: migrateAsked(raw.asked ?? raw.askedHashes),
+      backlog: Array.isArray(raw.backlog) ? raw.backlog : [],
+      lastAt: raw.lastAt ?? 0,
+    };
     return s.day === today ? s : { ...s, day: today, writesToday: 0 };
   } catch {
-    return { turn: 0, day: today, writesToday: 0, askedHashes: [], lastAt: 0 };
+    return { turn: 0, day: today, writesToday: 0, asked: {}, backlog: [], lastAt: 0 };
   }
 }
 
@@ -35,19 +87,40 @@ export function saveState(s: LoopState): void {
   try { mkdirSync(STATE_DIR, { recursive: true }); writeFileSync(STATE_FILE, JSON.stringify(s, null, 1)); } catch { /* best-effort */ }
 }
 
-/** Pure: bir kaydın içeriğinden öğrenme sorusu türet (LLM'siz, deterministik). */
-export function questionFromRecord(content: string): string {
-  const first = String(content).split(/[.\n]/)[0].trim();
-  const subject = first.replace(/^[^']*'([^']+)'.*$/, "$1").slice(0, 80);
-  return subject && subject !== first ? `${subject} nedir, ollamas'ta nasıl kullanılır?` : `${first.slice(0, 90)} — bu konuyu özetle`;
+/** Pure: günlük yazım bütçesi. Tekrar-koruması artık freshTargets'ın TTL'inde. */
+export function shouldAsk(state: LoopState, maxWrites: number): boolean {
+  return state.writesToday < maxWrites;
 }
 
-/** Pure: günlük yazım bütçesi ve tekrar-soru koruması. */
-export function shouldAsk(state: LoopState, qHash: string, maxWrites: number): boolean {
-  return state.writesToday < maxWrites && !state.askedHashes.includes(qHash);
+/** Pure: stratejileri turdan başlayarak gez, ilk TAZE hedefi seç, kalanı backlog'a it.
+ *  Hiçbir strateji üretmezse backlog drene edilir — bu yüzden loop tükenmez. */
+export function selectTarget(
+  state: LoopState,
+  input: TargetInput,
+  now: number,
+  ttlMs: number = ASK_TTL_MS,
+): { question: string; strategy: Strategy | ""; backlog: string[] } {
+  let backlog = state.backlog;
+  for (let i = 0; i < STRATEGIES.length; i++) {
+    const s = pickStrategy(state.turn + i);
+    const cands = targetsFor(s, input);
+    if (!cands.length) continue;
+    const fresh = freshTargets(cands, state.asked, now, ttlMs);
+    if (fresh.length) {
+      backlog = pushBacklog(backlog, fresh.slice(1), BACKLOG_CAP);
+      return { question: fresh[0], strategy: s, backlog };
+    }
+    backlog = pushBacklog(backlog, cands, BACKLOG_CAP);
+  }
+  // Son çare: birikmiş kuyruk.
+  const drained = freshTargets(backlog, state.asked, now, ttlMs);
+  if (drained.length) {
+    return { question: drained[0], strategy: "backlog", backlog: backlog.filter((b) => b !== drained[0]) };
+  }
+  return { question: "", strategy: "", backlog };
 }
 
-const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 12);
+const hash = hashQuestion;
 
 async function main() {
   if (process.env.BRAIN_LOOP === "0") return;
@@ -94,17 +167,38 @@ async function main() {
     const state = loadState();
     state.turn++;
 
-    // 1) Zayıf nokta: hiç recall edilmemiş (hits=0) en eski knowledge kaydı.
-    const cold = await httpRecall("ollamas brain kod sistem", { k: 12, ns: "knowledge" });
-    // Hedef seçimi ile bütçe kontrolü AYNI hash uzayında olmalı — aksi halde her tur
-    // aynı kaydı seçip "tekrar" diye atlar (ilk canlı koşuda yakalandı).
-    const candidates = cold.map((h: { content: string }) => questionFromRecord(h.content));
-    const question = candidates.find((qq: string) => !state.askedHashes.includes(hash(qq))) || "";
-    if (!question) { console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "no-fresh-target" })); saveState(state); return; }
+    // 1) HEDEF SEÇİMİ — sabit sorgu YOK (kusur-3). Tohum ve namespace her tur döner;
+    //    tur başına YALNIZ BİR recall yapılır çünkü recall = embed = GPU (ısı bütçesi).
+    const seed = SEEDS[state.turn % SEEDS.length];
+    const ns = NS_POOL[state.turn % NS_POOL.length];
+    const rawHits = await httpRecall(seed, { k: 12, ns });
+    const hits: TargetHit[] = rawHits.map((h: any) => ({
+      id: h.id, content: String(h.content ?? ""), conf: h.conf ?? h.confidence,
+      usage: h.hits ?? 0, ns,
+    }));
+
+    // Olgular ucuz (embed YOK, doğrudan arama) → çelişki avı için ilk birkaç özne.
+    const facts: TargetFact[] = [];
+    for (const subj of subjectsFrom(hits).slice(0, 3)) {
+      try {
+        const r = await api(`/api/brain/facts?subject=${encodeURIComponent(subj)}`, undefined, 8_000);
+        for (const f of (r.facts ?? []).slice(0, 8)) {
+          facts.push({ subject: f.subject, predicate: f.predicate, object: String(f.object), conf: f.conf ?? f.confidence });
+        }
+      } catch { /* olgu araması best-effort */ }
+    }
+
+    // Kapsama: dönen ns bu tur kaç kayıt verdi — ns rotasyonu sayesinde 7 turda hepsi taranır.
+    const input: TargetInput = { hits, facts, namespaces: [{ ns, count: hits.length }], backlog: state.backlog };
+
+    const picked = selectTarget(state, input, Date.now());
+    state.backlog = picked.backlog;
+    const question = picked.question;
+    if (!question) { console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "no-fresh-target", seed, ns })); saveState(state); return; }
     const qHash = hash(question);
-    if (!shouldAsk(state, qHash, maxWrites)) {
+    if (!shouldAsk(state, maxWrites)) {
       saveState(state);
-      console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "budget-or-repeat", writesToday: state.writesToday }));
+      console.log(JSON.stringify({ event: "brain.loop", turn: state.turn, skipped: "budget", writesToday: state.writesToday }));
       return;
     }
 
@@ -154,7 +248,14 @@ async function main() {
       wrote = true;
       state.writesToday++;
     }
-    state.askedHashes = [...state.askedHashes, qHash].slice(-500);
+    // Soru sorulmuş olarak damgalanır — TTL dolunca yeniden hedef olabilir.
+    state.asked[qHash] = Date.now();
+    const askedKeys = Object.keys(state.asked);
+    if (askedKeys.length > ASKED_CAP) {
+      // En eski damgalar düşer (dosya sınırsız büyümesin).
+      const keep = askedKeys.sort((a, b) => (state.asked[b] ?? 0) - (state.asked[a] ?? 0)).slice(0, ASKED_CAP);
+      state.asked = Object.fromEntries(keep.map((k) => [k, state.asked[k]]));
+    }
     state.lastAt = Date.now();
     saveState(state);
 
@@ -169,9 +270,10 @@ async function main() {
     }
 
     console.log(JSON.stringify({
-      event: "brain.loop", turn: state.turn, question: question.slice(0, 70), expert: r.expert,
+      event: "brain.loop", turn: state.turn, strategy: picked.strategy, seed, ns,
+      question: question.slice(0, 70), expert: r.expert,
       weights: r.weights, sources: r.sources.length, confidence: r.confidence, degraded: r.degraded,
-      wrote, writesToday: state.writesToday, ms: Date.now() - t0,
+      wrote, writesToday: state.writesToday, backlog: state.backlog.length, ms: Date.now() - t0,
     }));
   } catch (e: any) {
     const msg = String(e?.message ?? e);
