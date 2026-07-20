@@ -239,6 +239,9 @@ async function exerciseSandbox(
     const exerciseMode = cap.status === "candidate" ? "live" : "sandbox";
     await withCapability(id, bounded, async () => ({}), {
       ledger, turn, mode: exerciseMode, metricOf: prepared.metricOf,
+      // Altyapı hatası (fetch failed/timeout/503) yeteneği karantinaya almasın —
+      // canlı-gölge HTTP :3000'e bağlı; geçici hıçkırık reatt/ragseq'i haksızca gömüyordu.
+      isInfraError: isInfraFailure,
     });
     const after = loadLedger().caps[id];
     console.log(JSON.stringify({

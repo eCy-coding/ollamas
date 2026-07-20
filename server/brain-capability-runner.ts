@@ -46,6 +46,10 @@ export interface WithCapOpts {
   mode?: Mode;
   /** Yeteneğe özgü kalite ölçüsü — sonuçtan türetilir. */
   metricOf?: (result: unknown) => number | undefined;
+  /** Hata mesajı ALTYAPI kaynaklı mı (fetch failed, timeout, 503…). True dönerse
+   *  koşu KAYDEDİLMEZ ve yetenek karantinaya ALINMAZ — geçici bir server/ağ hıçkırığı
+   *  yeteneğin kusuru değildir (aç turdaki skip gibi). Yoksa her hata yeteneğe yazılır. */
+  isInfraError?: (message: string) => boolean;
 }
 
 /**
@@ -86,9 +90,14 @@ export async function withCapability<T>(
     // GÜVENİLMEZ → çıktı atılır (canlı davranış değişmez), yalnız deftere ölçü düşer.
     return isAutonomous ? out : fallback();
   } catch (e: any) {
+    const msg = String(e?.message ?? e);
+    // ALTYAPI hatası (geçici server/ağ) yeteneğin kusuru DEĞİL → koşu kaydedilmez,
+    // karantina yok. Yoksa bir HTTP hıçkırığı sağlam bir yeteneği haksızca gömerdi
+    // (gözlendi: reatt-rerank canlı-gölgede "fetch failed" ile yanlış karantina).
+    if (opts.isInfraError?.(msg)) return fallback();
     const run: Run = {
       turn, at: Date.now(), mode, ok: false, ms: Date.now() - t0,
-      err: String(e?.message ?? e).slice(0, 120),
+      err: msg.slice(0, 120),
     };
     ledger.caps[id] = recordRun(cap, run, run.at);
     saveLedger(ledger);

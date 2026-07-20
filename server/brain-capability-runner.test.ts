@@ -110,6 +110,27 @@ describe("withCapability — canlı-gölge (candidate→autonomous köprüsü)",
     expect(l.caps.x.quarantine?.reason).toContain("gölge-boom");
   });
 
+  test("canlı-gölge ALTYAPI hatası (fetch failed) → karantina YOK, koşu KAYDEDİLMEZ", async () => {
+    const l = emptyLedger();
+    makeCandidate(l, "x");
+    const isInfra = (m: string) => /fetch failed|timeout|503/i.test(m);
+    const out = await withCapability("x", async () => { throw new Error("fetch failed"); }, async () => "eski",
+      { ledger: l, turn: 20, mode: "live", isInfraError: isInfra });
+    expect(out).toBe("eski");
+    expect(l.caps.x.status).toBe("candidate");                       // altyapı ≠ yetenek kusuru → karantina YOK
+    expect(l.caps.x.runs.filter((r) => r.mode === "live").length).toBe(0); // koşu kaydedilmedi (aç turdaki skip gibi)
+  });
+
+  test("GERÇEK yetenek hatası (altyapı değil) → hâlâ karantina (güvenlik korundu)", async () => {
+    const l = emptyLedger();
+    makeCandidate(l, "x");
+    const isInfra = (m: string) => /fetch failed|timeout|503/i.test(m);
+    const out = await withCapability("x", async () => { throw new Error("NaN skoru üretti"); }, async () => "eski",
+      { ledger: l, turn: 20, mode: "live", isInfraError: isInfra });
+    expect(out).toBe("eski");
+    expect(l.caps.x.status).toBe("quarantined");                     // gerçek kusur → karantina (davranış değişmedi)
+  });
+
   test("SANDBOX yetenek mode:live ile KOŞMAZ — sandbox asla canlıya sızmaz", async () => {
     const l = emptyLedger();
     ensureCap(l, "x");                                                // status=sandbox
