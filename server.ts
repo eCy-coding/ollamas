@@ -4251,6 +4251,9 @@ app.post("/api/brain/ask-shared", async (req, res) => {
     const { resolveDistillProvider } = await import("./server/brain-active");
     const { liveSystemContext } = await import("./server/brain-system");
     const { llmActive } = await import("./server/gpu-coordinator");
+    // Gate kalıcılığı loop ile AYNI dosyayı paylaşır: canlı sorular ve otonom loop
+    // turları tek bir öğrenilmiş W_g biriktirir, iki ayrı yarım-öğrenmiş gate değil.
+    const { loadGate: loadLearnedGate, saveGate: persistLearnedGate } = await import("./server/brain-gate-store");
     const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
       (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
     const r = await askShared(question, {
@@ -4260,6 +4263,15 @@ app.post("/api/brain/ask-shared", async (req, res) => {
       recall: (q, o) => brain.brainRecall(q, { ...o, ...(ns ? { ns } : {}) }),
       searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ...(ns ? { ns } : {}) }),
       generate: gen(resolveDistillProvider(process.env)),
+      // F3b/F3c — canlı yol da ÖĞRENİR. Bunlar verilmediği için qVec daima null
+      // kalıyor, W_g hiç çarpılmıyor ve gate kalıcı olarak yalnız regex biasıydı.
+      // embed → gate gerçek vektör alır; recallVec → q* retrieval'ı gerçekten sürer;
+      // gate/saveGate → öğrenilen ağırlık turlar arası KALICI olur.
+      embed: brain.brainEmbedQuery,
+      recallVec: (vec: number[], o?: { k?: number; graphExpand?: boolean; ns?: string }) =>
+        brain.brainRecall(question, { ...o, vector: vec, ...(ns ? { ns } : {}) }),
+      gate: loadLearnedGate() ?? undefined,
+      saveGate: persistLearnedGate,
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // Yerel model GPU'yu paylaşır — canlı generation varken uzman devre dışı.

@@ -62,7 +62,13 @@ describe("askShared — ortak brain, çok uzman", () => {
       saveGate: () => {},
     } as any);
     expect(r.personalized).toBe(true);
-    expect(usedVec).toBeNull(); // recallVec şu an bağlam katmanında kullanılmıyor — q* gate'e gider
+    // 2026-07-20 DÜZELTME: bu satır eskiden `toBeNull()` idi ve bir KUSURU doğru
+    // davranış diye belgeliyordu — q* hesaplanıyor ama retrieval metinle sürülüyordu,
+    // yani formül 3c dekoratifti. Artık q* GERÇEKTEN recallVec'e gider:
+    //   p_u = mean([0,1,0],[0,1,0]) = [0,1,0];  λ=0.2  →  q* = [1, 0.2, 0]
+    expect(usedVec).not.toBeNull();
+    expect(usedVec![0]).toBeCloseTo(1, 6);
+    expect(usedVec![1]).toBeCloseTo(0.2, 6);
     expect(r.expert).toBe("ollamas");
   });
 });
@@ -87,5 +93,61 @@ describe("askShared — bounded experts (kusursuz loop şartı)", () => {
     } finally {
       delete process.env.BRAIN_EXPERT_TIMEOUT_MS;
     }
+  });
+});
+
+// F3b/F3c CANLANDIRMA (2026-07-20). Bu üç yol canlı kodda ÖLÜYDÜ: hiçbir çağıran
+// embed+profileVectors+recallVec üçlüsünü birden vermediği için qVec daima null
+// kalıyor, W_g hiç çarpılmıyor, updateGate hiç ateşlenmiyordu (gate.json yoktu).
+// Bu blok üçünün de gerçekten çalıştığını kilitler.
+describe("askShared — q* ve gate canlı (F3b/F3c)", () => {
+  const embed = async (t: string) => (t.includes("kod") ? [1, 0, 0] : [0, 1, 0]);
+
+  test("yalnız embed verilse bile gate GERÇEK vektör alır ve saveGate ateşler", async () => {
+    let saved: any = null;
+    const r = await askShared("brain kodu hangi modülde", {
+      ...baseDeps,
+      embed,
+      gate: { W: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], b: [0, 0, 0] },
+      saveGate: (g: any) => { saved = g; },
+      experts: { ollamas: async () => "cevap [mem:m-1]" },
+    } as any);
+    expect(r.expert).toBe("ollamas");
+    // Kanıt: gate güncellendi (eskiden qVec null olduğu için BU HİÇ OLMUYORDU).
+    expect(saved).not.toBeNull();
+    expect(saved.W[0].some((x: number) => x !== 0)).toBe(true);
+    // profil/recallVec yok → kişiselleştirme dürüstçe false raporlanır.
+    expect(r.personalized).toBe(false);
+  });
+
+  test("recallVec yoksa kişiselleştirme false raporlanır (rapor kendini kandırmaz)", async () => {
+    const r = await askShared("brain kodu hangi modülde", {
+      ...baseDeps,
+      embed,
+      profileVectors: async () => [[0, 0, 1]],
+      experts: { ollamas: async () => "cevap [mem:m-1]" },
+    } as any);
+    expect(r.personalized).toBe(false); // q* hesaplandı ama retrieval'ı sürmedi
+  });
+
+  test("boyutu uyuşmayan bayat gate sessizce kullanılmaz, sıfırdan başlanır", async () => {
+    let saved: any = null;
+    await askShared("brain kodu hangi modülde", {
+      ...baseDeps,
+      embed,                                        // 3 boyutlu q
+      gate: { W: [[0, 0], [0, 0], [0, 0]], b: [0, 0, 0] },  // 2 boyutlu BAYAT gate
+      saveGate: (g: any) => { saved = g; },
+      experts: { ollamas: async () => "cevap [mem:m-1]" },
+    } as any);
+    expect(saved.W[0].length).toBe(3); // bayat 2-boyutlu gate reddedildi
+  });
+
+  test("embed patlarsa tur düşmez — düz metin yoluyla devam", async () => {
+    const r = await askShared("brain kodu hangi modülde", {
+      ...baseDeps,
+      embed: async () => { throw new Error("embedder busy"); },
+      experts: { ollamas: async () => "cevap [mem:m-1]" },
+    } as any);
+    expect(r.expert).toBe("ollamas"); // degrade-alive
   });
 });

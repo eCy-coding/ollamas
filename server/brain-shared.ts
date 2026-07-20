@@ -36,8 +36,9 @@ export interface SharedDeps extends AskDeps {
   gate?: Gate;
   /** Gate güncellemesini kalıcılaştırma (loop kullanır). */
   saveGate?: (g: Gate) => void;
-  /** Kişiselleştirilmiş vektörle recall (q* desteği). Yoksa normal recall kullanılır. */
-  recallVec?: (vec: number[], opts: { k?: number; ns?: string }) => Promise<unknown>;
+  // `recallVec` artık AskDeps'ten miras alınır. Buradaki yinelenen bildirim
+  // `Promise<unknown>` dönüyordu; hiç çağrılmadığı için uyuşmazlık yıllarca
+  // görünmedi. Tek tanım = tek doğruluk kaynağı.
 }
 
 /** Uzman başına sert zaman sınırı (bounded-race deseni): yerel model / uzak halka
@@ -69,23 +70,37 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   const q = (question || "").trim();
   if (!q) return { answer: "", expert: "", weights: {}, sources: [], confidence: 0, mode: "hybrid", hops: 0, degraded: [], personalized: false, abstained: true };
 
-  // (3c) Kişiselleştirme: q* = q + λ·p_u — profil vektörü varsa retrieval o vektörle.
+  // (3c) Kişiselleştirme: q* = q + λ·p_u.
+  //
+  // ÖNEMLİ (2026-07-20 kök-düzeltme): burası eskiden `embed && profileVectors &&
+  // recallVec` ÜÇÜNÜ birden şart koşuyordu. Hiçbir çağıran üçünü de vermediği için
+  // qVec DAİMA null kalıyordu → gateLogits boş vektör alıyor → W_g hiç çarpılmıyor →
+  // gate kalıcı olarak yalnız heuristicBias regex'iydi ve updateGate hiç çalışmadı
+  // (gate.json dosyası hiç oluşmamıştı). Artık koşullar AYRIŞTI:
+  //   • embed varsa           → qVec üretilir, gate GERÇEKTEN öğrenir.
+  //   • profil de varsa       → q* = q + λ·p_u (kişiselleştirme).
+  //   • recallVec de varsa    → q* retrieval'ı GERÇEKTEN sürer (yoksa yalnız gate'i besler).
+  // Böylece eksik bağımlılık tüm zinciri öldürmez, sadece kendi katkısını düşürür.
   let personalized = false;
   let qVec: number[] | null = null;
   const lambda = personalizeLambda();
-  if (lambda > 0 && deps.embed && deps.profileVectors && deps.recallVec) {
+  if (deps.embed) {
     try {
-      const history = await deps.profileVectors();
-      if (history.length) {
-        const pu = profileVector(history);
-        qVec = personalizeQuery(await deps.embed(q), pu, lambda);
-        personalized = true;
+      qVec = await deps.embed(q);
+      if (lambda > 0 && deps.profileVectors) {
+        const history = await deps.profileVectors();
+        if (history.length) {
+          qVec = personalizeQuery(qVec, profileVector(history), lambda);
+          // "personalized" YALNIZ q* gerçekten retrieval'ı sürdüyse doğrudur —
+          // aksi halde rapor kendini kandırır.
+          personalized = !!deps.recallVec;
+        }
       }
-    } catch { /* profil best-effort — kişiselleştirme yoksa düz q ile devam */ }
+    } catch { /* gömme best-effort — qVec null kalır, düz metin yoluyla devam */ }
   }
 
-  // (2) TEK retrieval: R_k(x) tüm uzmanlara AYNI gider.
-  const ctx = await gatherContext(q, deps);
+  // (2) TEK retrieval: R_k(x) tüm uzmanlara AYNI gider. q* varsa vektörle sürülür.
+  const ctx = await gatherContext(q, deps, qVec);
   const userMsg = `SORU: ${q}\n\nKAYNAKLAR:\n${ctx.context}`;
   const messages = [
     { role: "system", content: SHARED_PROMPT },
@@ -108,8 +123,14 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   );
 
   // (3b) w_j(x) = softmax(W_g q + b_g) + soğuk-başlangıç heuristik biası.
-  const gate = deps.gate ?? emptyGate(qVec?.length ?? 8);
-  const logits = gateLogits(qVec ?? [], gate.W, gate.b).map((l, j) => l + heuristicBias(q)[j]);
+  // Boyut koruması: gateLogits eksik boyutu `?? 0` ile doldurur, yani 8-boyutlu bayat
+  // bir gate 768-boyutlu q ile SESSİZCE ilk 8 boyutu kullanırdı. Uyuşmazlıkta öğrenilmiş
+  // gate'i kullanmak yerine sıfırdan başlarız — sessiz bozulmaktansa görünür soğuk başlangıç.
+  const dim = qVec?.length ?? 8;
+  const supplied = deps.gate;
+  const gate = supplied && supplied.W[0]?.length === dim ? supplied : emptyGate(dim);
+  const bias = heuristicBias(q);
+  const logits = gateLogits(qVec ?? [], gate.W, gate.b).map((l, j) => l + (bias[j] ?? 0));
   const w = gateWeights(logits);
   const picked = mixtureSelect(answers, w);
 

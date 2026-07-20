@@ -19,7 +19,7 @@ export { questionFromRecord };
 const STATE_DIR = process.env.BRAIN_LOOP_DIR || join(homedir(), ".llm-mission-control");
 const STATE_FILE = join(STATE_DIR, "loop-state.json");
 const LOCK_FILE = join(STATE_DIR, "loop.lock");
-const GATE_FILE = join(STATE_DIR, "gate.json");
+// gate.json artık server/brain-gate-store.ts'in sorumluluğunda (atomik + yedekli).
 
 /** Sorulan soru bu süre sonra yeniden hedef olabilir (bilgi bayatlar, yeniden sorulur). */
 const ASK_TTL_MS = Number(process.env.BRAIN_LOOP_TTL_MS) || DEFAULT_TTL_MS;
@@ -53,10 +53,16 @@ export function subjectsFrom(hits: { content: string }[]): string[] {
   return [...new Set(out)];
 }
 
+/** Profil vektörü (p_u) bu kadar turda bir tazelenir. Her tur yeniden hesaplamak
+ *  3 ekstra embed = 3 ekstra GPU çağrısı demekti; profil yavaş değişen bir şeydir. */
+const PROFILE_REFRESH_TURNS = 20;
+
 export interface LoopState {
   turn: number;
   day: string;
   writesToday: number;
+  /** F3c: önbelleklenmiş p_u kaynağı — geçmiş soruların gömme vektörleri. */
+  profile?: { vectors: number[][]; at: number; turn: number };
   /** hash → sorulma zamanı. TTL dolunca soru yeniden taze olur (kusur-3 panzehiri). */
   asked: Record<string, number>;
   /** Üretilip o tur kullanılmayan hedefler — hiçbir strateji üretmezse buradan drene edilir. */
@@ -75,6 +81,7 @@ export function loadState(): LoopState {
       writesToday: raw.writesToday ?? 0,
       asked: migrateAsked(raw.asked ?? raw.askedHashes),
       backlog: Array.isArray(raw.backlog) ? raw.backlog : [],
+      profile: raw.profile,
       lastAt: raw.lastAt ?? 0,
     };
     return s.day === today ? s : { ...s, day: today, writesToday: 0 };
@@ -203,8 +210,28 @@ async function main() {
     }
 
     // 2) Ortak-brain: tek retrieval → üç uzman → gate.
-    let gate = emptyGate(768);
-    try { gate = JSON.parse(readFileSync(GATE_FILE, "utf8")); } catch { /* öğrenilmemiş */ }
+    // Gate artık ATOMİK okunur/yazılır ve bozuksa son-iyi yedeğe düşer.
+    const { loadGate, saveGate: persistGate } = await import("../server/brain-gate-store");
+    const gate = loadGate() ?? emptyGate(768);
+
+    // F3c bağımlılıkları — HTTP üzerinden (loop brain.db'yi AÇMAZ, sözleşme).
+    const embed = async (text: string): Promise<number[]> =>
+      (await api("/api/brain/embed", { text }, 20_000)).vector;
+    const recallVec = async (vec: number[], o: { k?: number; ns?: string; graphExpand?: boolean } = {}) =>
+      (await api("/api/brain/recall", { query: question, vector: vec, k: o.k ?? 5, ns: o.ns })).hits ?? [];
+
+    // Profil (p_u): PROFILE_REFRESH_TURNS turda bir tazelenir — her tur 3 embed
+    // yakmak yerine. Profil yavaş değişir, sıcaklık bütçesi değişmez.
+    let profileVecs = state.profile?.vectors ?? [];
+    const profileStale = !state.profile || state.turn - state.profile.turn >= PROFILE_REFRESH_TURNS;
+    if (profileStale) {
+      try {
+        const recent = Object.keys(state.asked).length ? state.backlog.slice(-3) : [];
+        const seeds = recent.length ? recent : [question];
+        profileVecs = await Promise.all(seeds.slice(0, 3).map((s) => embed(s)));
+        state.profile = { vectors: profileVecs, at: Date.now(), turn: state.turn };
+      } catch { /* profil best-effort — yoksa kişiselleştirme kapalı, tur düşmez */ }
+    }
     const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
       (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
 
@@ -215,7 +242,11 @@ async function main() {
       liveContext: liveSystemContext,
       generate: gen(resolveDistillProvider(process.env)),
       gate,
-      saveGate: (g) => { try { writeFileSync(GATE_FILE, JSON.stringify(g)); } catch { /* best-effort */ } },
+      saveGate: (g) => { persistGate(g); },
+      // F3c: gate'i besleyen gömme + q*'ı retrieval'a taşıyan vektör-recall.
+      embed,
+      recallVec,
+      profileVectors: async () => profileVecs,
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // eCym yerel modeldir: GPU'yu chat LLM ile paylaşır → yalnız boştayken katılır.

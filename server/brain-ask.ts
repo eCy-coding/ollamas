@@ -27,6 +27,11 @@ export interface AskResult {
 
 export interface AskDeps {
   recall: (q: string, o?: { k?: number; graphExpand?: boolean; ns?: string }) => Promise<BrainRecallHit[]>;
+  /** F3c: hazır sorgu vektörüyle recall. Verilirse BİRİNCİ geçiş bu vektörle sürülür —
+   *  kişiselleştirilmiş q* = q + λ·p_u ancak böyle retrieval'a ETKİ eder. Genişletme
+   *  (widen/deepen) turları metin tabanlı kalır: onlar q'yu değil, BAŞKA terimleri arar,
+   *  dolayısıyla q* onlara uygulanamaz. */
+  recallVec?: (vec: number[], o?: { k?: number; graphExpand?: boolean; ns?: string }) => Promise<BrainRecallHit[]>;
   searchFacts: (q: string, o?: { k?: number; ns?: string }) => Promise<(BrainFact & { distance: number })[]>;
   generate: (messages: { role: string; content: string }[]) => Promise<string>;
   ns?: string;
@@ -73,11 +78,11 @@ async function widen(question: string, first: BrainRecallHit[], deps: AskDeps): 
 /** Retrieval katmanı — askBrain ve askShared (ortak-brain, çok-uzman) AYNI bağlamı
  *  kullansın diye ayrıldı: tek retrieval, R_k(x) tüm uzmanlara aynı gider (formüller.md
  *  3b: her model aynı p_ret üzerinden aynı k belgeyi çeker). */
-export async function gatherContext(question: string, deps: AskDeps): Promise<{
+export async function gatherContext(question: string, deps: AskDeps, qVec?: number[] | null): Promise<{
   sources: AskSource[]; context: string; mode: AskResult["mode"]; hops: number; live: string | null;
 }> {
   const q = (question || "").trim();
-  const r = await askInternal(q, deps, true);
+  const r = await askInternal(q, deps, true, qVec ?? null);
   return { sources: r.sources, context: r.context!, mode: r.mode, hops: r.hops ?? 1, live: r.live ?? null };
 }
 
@@ -92,6 +97,7 @@ async function askInternal(
   q: string,
   deps: AskDeps,
   contextOnly: boolean,
+  qVec: number[] | null = null,
 ): Promise<AskResult & { context?: string; live?: string | null }> {
   if (!q) return { answer: "", sources: [], confidence: 0, mode: "hybrid", abstained: true };
   // Knowledge-bearing namespaces lead the sweep: fresh episodic noise (git captures)
@@ -99,8 +105,15 @@ async function askInternal(
   const NS_PRIORITY = ["knowledge", "universe", "research"];
   const rawNs = deps.ns ? [deps.ns] : (deps.namespaces?.() ?? ["default"]);
   const nsList = [...new Set([...NS_PRIORITY.filter((n) => rawNs.includes(n)), ...rawNs])].slice(0, 6);
+  // F3c: birinci geçiş — kişiselleştirilmiş q* varsa retrieval ONUNLA sürülür.
+  // Vektör kolu düşerse metin koluna sessizce dönülür (degrade-alive sözleşmesi).
+  const usePersonalized = !!(qVec && qVec.length && deps.recallVec);
+  const firstPass = (n: string, k: number) =>
+    usePersonalized
+      ? deps.recallVec!(qVec!, { k, graphExpand: true, ns: n }).catch(() => deps.recall(q, { k, graphExpand: true, ns: n }).catch(() => [] as BrainRecallHit[]))
+      : deps.recall(q, { k, graphExpand: true, ns: n }).catch(() => [] as BrainRecallHit[]);
   const perNs = await Promise.all(
-    nsList.map((n) => deps.recall(q, { k: nsList.length > 1 ? 4 : 8, graphExpand: true, ns: n }).catch(() => [] as BrainRecallHit[])),
+    nsList.map((n) => firstPass(n, nsList.length > 1 ? 4 : 8)),
   );
   const byId = new Map<string, BrainRecallHit>();
   for (const h of perNs.flat()) {
