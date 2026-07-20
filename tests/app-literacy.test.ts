@@ -1,7 +1,7 @@
 // Uygulama okuryazarlığı kartları — kimlik kararlılığı, çakışma, güvenlik tutarlılığı.
 import { describe, test, expect } from "vitest";
 import {
-  buildAppLiteracyRecords, buildAppEcymCommands, validateCards, triggerCollision,
+  buildAppLiteracyRecords, buildAppEcymCommands, validateCards, triggerCollision, reconcileAppSafety,
   type AppCard,
 } from "../server/app-literacy";
 import { defaultPolicy } from "../server/agent-policy";
@@ -141,5 +141,59 @@ describe("triggerCollision — eCym 0.70 kosinüs, 115 mevcut komut", () => {
 
   test("çakışma yoksa temiz", () => {
     expect(triggerCollision([card()], existing)).toEqual([]);
+  });
+});
+
+// Politika → eCym senkronu: Emre panelden izin verince app komutlarının safe alanı
+// tazelenmeli. KUSUR: safe teach ANINDA hesaplanıyor, politika sonradan değişince
+// dataset bayat kalıyor (Emre auto verdi, eCym hâlâ onay kapısında).
+describe("reconcileAppSafety — politika değişikliği eCym'e yansısın", () => {
+  const appCmd = (id: string, safe: string) =>
+    ({ id, level: "baslangic", triggers: [id], cmd: `open -a "X"`, arg: "yok", desc: "d", safe, source: "app-literacy" });
+  const otherCmd = (id: string) =>
+    ({ id, level: "orta", triggers: [id], cmd: "df -h", arg: "yok", desc: "d", safe: "True", source: "native" });
+
+  const cards = [card({ ops: [{
+    opId: "resolve.open", riskClass: "launch", triggers: ["resolve ac"],
+    cmd: `open -a "DaVinci Resolve"`, arg: "yok", desc: "açar", level: "baslangic",
+  }] })];
+
+  test("politika genişleyince BAYAT safe:False → True olur", () => {
+    const wide = { ...defaultPolicy(), classes: { ...defaultPolicy().classes, launch: "auto" as const } };
+    // dataset'te app komutu bayat "False" (teach anında kısıtlıydı)
+    const ds = [appCmd("app-resolve-open", "False"), otherCmd("df")];
+    const { commands, changed } = reconcileAppSafety(ds as any, cards, wide);
+    expect(changed).toEqual(["app-resolve-open"]);
+    expect(commands.find((c: any) => c.id === "app-resolve-open").safe).toBe("True");
+  });
+
+  test("app-DIŞI komutlara ASLA dokunulmaz", () => {
+    const ds = [appCmd("app-resolve-open", "False"), otherCmd("df")];
+    const { commands } = reconcileAppSafety(ds as any, cards, { ...defaultPolicy(), classes: { ...defaultPolicy().classes, launch: "auto" } });
+    const df = commands.find((c: any) => c.id === "df");
+    expect(df.safe).toBe("True"); // native komut değişmedi
+    expect(df.source).toBe("native");
+  });
+
+  test("değişiklik yoksa changed BOŞ (idempotent, yazma tetiklenmez)", () => {
+    // varsayılan politikada launch=gated → safe zaten False, değişmez
+    const ds = [appCmd("app-resolve-open", "False")];
+    const { changed } = reconcileAppSafety(ds as any, cards, defaultPolicy());
+    expect(changed).toEqual([]);
+  });
+
+  test("triggers/cmd/desc KORUNUR (vektör indeksi geçerli kalır)", () => {
+    const ds = [{ ...appCmd("app-resolve-open", "False"), triggers: ["resolve ac", "davinci"], desc: "orijinal" }];
+    const { commands } = reconcileAppSafety(ds as any, cards, { ...defaultPolicy(), classes: { ...defaultPolicy().classes, launch: "auto" } });
+    const c = commands.find((x: any) => x.id === "app-resolve-open");
+    expect(c.triggers).toEqual(["resolve ac", "davinci"]); // dokunulmadı
+    expect(c.desc).toBe("orijinal");
+  });
+
+  test("haritada olmayan app komutu (silinmiş kart) dokunulmadan geçer", () => {
+    const ds = [appCmd("app-silinmis-op", "False")];
+    const { commands, changed } = reconcileAppSafety(ds as any, cards, defaultPolicy());
+    expect(changed).toEqual([]);
+    expect(commands[0].safe).toBe("False"); // olduğu gibi
   });
 });

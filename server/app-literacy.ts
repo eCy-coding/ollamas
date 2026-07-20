@@ -121,6 +121,36 @@ export function buildAppEcymCommands(cards: AppCard[], policy: AgentPolicy): Ecy
   return out;
 }
 
+/**
+ * Politika → eCym senkronu: mevcut dataset komutlarının `safe` alanını GÜNCEL
+ * politikadan yeniden hesaplar.
+ *
+ * KUSUR (2026-07-20): `buildAppEcymCommands` `safe`'i TEACH ANINDA hesaplıyor.
+ * Operatör politikayı sonra değiştirince dataset bayat kalıyordu — Emre 4 sınıfı
+ * `auto` yaptı ama 105 app komutu hâlâ `safe:"False"` diye onay kapısındaydı.
+ * `ecosystem-sync` id-dedup ile atladığı için saf yeniden-çalıştırma da düzeltmezdi.
+ *
+ * YALNIZ `.safe` güncellenir: triggers/cmd/desc/level'e dokunulmaz, çünkü `ecy-brain`
+ * yalnız triggers+desc'i gömer — safe değişikliği vektör indeksini geçersiz KILMAZ.
+ * App-dışı komutlar referans-aynı geçer.
+ */
+export function reconcileAppSafety(
+  dsCommands: EcymCmd[],
+  cards: AppCard[],
+  policy: AgentPolicy,
+): { commands: EcymCmd[]; changed: string[] } {
+  const fresh = new Map(buildAppEcymCommands(cards, policy).map((c) => [c.id, c.safe]));
+  const changed: string[] = [];
+  const commands = dsCommands.map((c) => {
+    if (c.source !== "app-literacy") return c;      // app-dışı: dokunma
+    const want = fresh.get(c.id);
+    if (want === undefined || want === c.safe) return c; // haritada yok ya da zaten doğru
+    changed.push(c.id);
+    return { ...c, safe: want };                     // YALNIZ safe
+  });
+  return { commands, changed };
+}
+
 export interface CardValidation {
   ok: boolean;
   errors: string[];

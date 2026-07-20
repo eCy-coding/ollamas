@@ -4211,7 +4211,19 @@ app.post("/api/agent/policy", async (req, res) => {
       changed.some((c) => c.endsWith("→auto")) ? "warning" : "info",
     );
     db.save();
-    res.json({ success: true, policy: next });
+
+    // Politika değişikliğini eCym'e YANSIT: app komutlarının safe alanını tazele.
+    // Kopukluğun kökü buydu — izin veriliyor ama dataset teach anındaki bayat safe'i
+    // taşımaya devam ediyordu. KENDİ try/catch'i: dataset yoksa politika yazımı DÜŞMEZ.
+    let synced = 0;
+    try {
+      const { syncAppCommandSafety } = await import("./scripts/app-literacy-safety-sync");
+      const s = syncAppCommandSafety();
+      synced = s.changed.length;
+      if (synced) db.logSecurity("permission_change", "eCym safety re-synced", `${synced} app komutu güncellendi`, "info");
+    } catch { /* eCym senkronu best-effort — politika yazımını bloklamaz */ }
+
+    res.json({ success: true, policy: next, ecymSynced: synced });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "policy write failed" });
   }
