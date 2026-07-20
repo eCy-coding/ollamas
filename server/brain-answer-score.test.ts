@@ -5,7 +5,7 @@
 // tek uzmana gitti). Bu modül dışsal, deterministik, LLM'siz bir etiket üretir:
 // uzmanın cevabı GERÇEKTEN getirilen kaynaklara dayanıyor mu?
 import { describe, test, expect } from "vitest";
-import { citationIds, scoreAnswer, scoreAll } from "./brain-answer-score";
+import { citationIds, scoreAnswer, scoreAll, citedRetentionInSet } from "./brain-answer-score";
 import type { AskSource } from "./brain-ask";
 
 const src = (id: string, excerpt: string): AskSource => ({ id, tier: "learned", score: 0.9, excerpt });
@@ -22,6 +22,37 @@ describe("citationIds", () => {
   test("atıf yoksa boş", () => {
     expect(citationIds("hiç atıf yok")).toEqual([]);
     expect(citationIds("")).toEqual([]);
+  });
+});
+
+describe("citedRetentionInSet — YALNIZ ağırlıklandırmanın kontrol ettiğini ölçer", () => {
+  // Kök hata (canlı ragseq-weighting'de ölçüldü): eski metrik `kept/cited.length`
+  // cevabın KÜME-DIŞI bir id atıf yapmasını (kept=0) ağırlıklandırmanın kusuru sayıp
+  // sahte retention=0 üretiyordu → sahte-mükemmel baseline'a takılıp terfiyi tıkadı.
+  // Doğru metrik: retention YALNIZ küme-İÇİ atıflar üzerinden; küme-dışı atıf ragseq'in
+  // kontrolünde değil. Küme-içi atıf yoksa metrik BELİRSİZ (undefined) — ortalamayı kirletmez.
+  const ctxWith = (ids: string[]) => ids.map((i) => `[mem:${i}] içerik`).join("\n");
+
+  test("küme-içi tüm atıflar bağlamda → 1.0", () => {
+    expect(citedRetentionInSet(["m-1", "m-2"], ["m-1", "m-2", "m-3"], ctxWith(["m-1", "m-2", "m-3"]))).toBe(1);
+  });
+
+  test("KÜME-DIŞI atıf (kaynak setinde yok) → sahte 0 ÜRETMEZ, undefined döner", () => {
+    // cevap m-9'u atıf yapmış ama retrieval setinde yok → ragseq suçlanamaz
+    expect(citedRetentionInSet(["m-9"], ["m-1", "m-2"], ctxWith(["m-1", "m-2"]))).toBeUndefined();
+  });
+
+  test("küme-içi atıfın yarısı bağlamdan düşmüş → 0.5 (GERÇEK ağırlıklandırma sinyali)", () => {
+    expect(citedRetentionInSet(["m-1", "m-2"], ["m-1", "m-2"], ctxWith(["m-1"]))).toBe(0.5);
+  });
+
+  test("hiç atıf yok → undefined (bilgi taşımaz)", () => {
+    expect(citedRetentionInSet([], ["m-1"], ctxWith(["m-1"]))).toBeUndefined();
+  });
+
+  test("küme-dışı + küme-içi karışık → yalnız küme-içi sayılır", () => {
+    // m-1 küme-içi ve bağlamda (kept), m-9 küme-dışı (yok sayılır) → 1/1 = 1.0
+    expect(citedRetentionInSet(["m-1", "m-9"], ["m-1", "m-2"], ctxWith(["m-1", "m-2"]))).toBe(1);
   });
 });
 

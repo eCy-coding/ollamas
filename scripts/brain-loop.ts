@@ -293,8 +293,9 @@ async function prepareSandboxRun(
     // hâlâ duruyor mu. Bir ağırlıklandırma cevabın kullandığı kaynağı atıyorsa
     // temellendirmeyi bozar — bunun gerçek dişi var, ama "daha iyi cevap" demez.
     const { sequenceWeights, weightedContext } = await import("../server/brain-formulas");
-    const { citationIds } = await import("../server/brain-answer-score");
+    const { citationIds, citedRetentionInSet } = await import("../server/brain-answer-score");
     const cited = citationIds(String(r?.answer ?? ""));
+    const sourceIds = sources.map((s) => s.id);
     const budget = Number(process.env.BRAIN_RAGSEQ_BUDGET) || 4000;
     return {
       run: async () => {
@@ -303,8 +304,10 @@ async function prepareSandboxRun(
         if (ctx.length > budget * 1.5) throw new Error(`bağlam bütçeyi aştı: ${ctx.length}>${budget}`);
         const missing = sources.filter((s) => !ctx.includes(`[mem:${s.id}]`));
         if (missing.length) throw new Error(`MIN_SHARE ihlali: ${missing.length} kaynak düştü`);
-        const kept = cited.filter((c) => ctx.includes(`[mem:${c}]`)).length;
-        return { citedRetention: cited.length ? kept / cited.length : 1, len: ctx.length };
+        // Metrik YALNIZ küme-içi atıfları ölçer: küme-dışı atıf (cevabın getirilmemiş
+        // id göstermesi) ragseq'in suçu değil → undefined (metriği kirletmez). Küme-içi
+        // atıf yoksa da undefined. Böylece sahte retention=0 terfiyi tıkamaz.
+        return { citedRetention: citedRetentionInSet(cited, sourceIds, ctx), len: ctx.length };
       },
       metricOf: (x) => x?.citedRetention,
     };

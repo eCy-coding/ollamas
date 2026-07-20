@@ -41,6 +41,29 @@ export function citationIds(answer: string): string[] {
   return out;
 }
 
+/**
+ * RAG-Seq ağırlıklandırmasının atıf-koruma metriği ∈ [0,1] | undefined.
+ *
+ * YALNIZ ağırlıklandırmanın FİİLEN kontrol ettiğini ölçer: retrieval setinde OLAN
+ * (yani weightedContext'in tutabileceği/düşürebileceği) atıflanmış kaynakların ne
+ * kadarı ağırlıklı bağlamda kaldı. Küme-DIŞI atıf (cevabın getirilmemiş bir id'yi
+ * göstermesi) ragseq-weighting'in suçu DEĞİL → yok sayılır.
+ *
+ * KÖK HATA (canlı ölçüldü): eski satır-içi metrik `kept/cited.length` küme-dışı atıfı
+ * sahte retention=0 sayıp candidate→autonomous'u sahte-mükemmel (vacuous 1.0) baseline'a
+ * takıyordu. Küme-içi atıf yoksa metrik BELİRSİZ (undefined) döner → summarize onu eler,
+ * ortalamayı ve baseline'ı kirletmez (dürüst, like-for-like karşılaştırma).
+ */
+export function citedRetentionInSet(
+  citedIds: string[], sourceIds: string[], ctxText: string,
+): number | undefined {
+  const inSet = new Set(sourceIds);
+  const relevant = citedIds.filter((id) => inSet.has(id));
+  if (!relevant.length) return undefined; // ağırlıklandırma hakkında bilgi taşımaz
+  const kept = relevant.filter((id) => ctxText.includes(`[mem:${id}]`)).length;
+  return kept / relevant.length;
+}
+
 /** İçerik belirteçleri — noktalama atılır, 3+ harfli olanlar kalır. */
 const tokens = (s: string): string[] =>
   String(s ?? "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 3);
