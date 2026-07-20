@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, Send, Loader2, Plus, Trash2, AlertCircle, Calculator, Brain } from "lucide-react";
+import { MessageSquare, Send, Loader2, Plus, Trash2, AlertCircle, AlertTriangle, Calculator, Brain } from "lucide-react";
 import { api } from "../lib/apiClient";
 import { AgentMessage } from "./AgentMessage";
 import { evalArithmetic, stripThink, formatCertain } from "../lib/certainty";
@@ -214,6 +214,12 @@ export function ChatPanel({ onNotify }: { onNotify?: (msg: string, type?: "succe
                   {m.role === "assistant" ? (
                     m.content ? (
                       <>
+                        {m.substituted && (
+                          <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 bg-status-warn/10 border border-status-warn/30 rounded text-status-warn text-xs">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <span>⚠︎ {m.requestedModel ?? model} yanıt veremedi — {m.servedBy} cevapladı</span>
+                          </div>
+                        )}
                         {contradicts && (
                           <div className="mb-1.5 flex items-center gap-1.5 px-2 py-1 bg-status-err/10 border border-status-err/30 rounded text-status-err text-xs">
                             <Calculator className="w-3 h-3 shrink-0" />

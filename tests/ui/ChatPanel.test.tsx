@@ -124,3 +124,48 @@ describe("ChatPanel — certainty engine", () => {
     });
   });
 });
+
+// v20 — silent model substitution (honesty defect): the router can fall through its
+// provider chain and answer with something other than the model the user picked, with
+// no indication in the UI. These lock in the provenance warning that now surfaces it.
+describe("ChatPanel — substitution provenance warning", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    __resetStreamStoresForTests();
+  });
+
+  it("shows the substitution warning when the served source differs from the requested provider", async () => {
+    stubMount();
+    stubStream([
+      JSON.stringify({ chunk: "1914-1918 yılları arasında..." }),
+      JSON.stringify({ done: true, source: "cloud:gemini", latencyMs: 500 }),
+    ]);
+    renderUI(<ChatPanel />);
+    await typeAndSend("Fransa'nın başkenti nedir?");
+    await waitFor(() => {
+      expect(screen.getByText("1914-1918 yılları arasında...")).toBeInTheDocument();
+      expect(screen.getByText(/cloud:gemini cevapladı/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows NO warning when the served source matches the requested provider", async () => {
+    stubMount();
+    stubStream([
+      JSON.stringify({ chunk: "Ankara." }),
+      JSON.stringify({ done: true, source: "ollama_local", latencyMs: 300 }),
+    ]);
+    renderUI(<ChatPanel />);
+    await typeAndSend("Türkiye'nin başkenti?");
+    await waitFor(() => expect(screen.getByText("Ankara.")).toBeInTheDocument());
+    expect(screen.queryByText(/cevapladı/)).not.toBeInTheDocument();
+  });
+
+  it("shows NO warning when the done frame carries no source at all (unknown, not substituted)", async () => {
+    stubMount();
+    stubStream([JSON.stringify({ chunk: "Ankara." }), JSON.stringify({ done: true })]);
+    renderUI(<ChatPanel />);
+    await typeAndSend("Türkiye'nin başkenti?");
+    await waitFor(() => expect(screen.getByText("Ankara.")).toBeInTheDocument());
+    expect(screen.queryByText(/cevapladı/)).not.toBeInTheDocument();
+  });
+});

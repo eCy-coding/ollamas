@@ -200,6 +200,89 @@ describe("streamStore — chat stream", () => {
 
     expect(chatStreamStore.getSnapshot(key).messages.find((m) => m.id === draftId)?.content).toBe("before");
   });
+
+  // v20 — silent model substitution (honesty defect): the router can fall through
+  // its provider chain and serve an answer from something other than what was
+  // requested, with zero indication in the UI. The `done` frame already carries
+  // the real `source` on the wire (server.ts); these tests lock in that the store
+  // captures it (and the honest substituted/servedBy/latencyMs bookkeeping).
+  it("a `done` frame carrying `source` populates servedBy + latencyMs on the finalized message", async () => {
+    const key = "chat:test";
+    const { base, draftId } = paintChatDraft(key);
+    const d = deferredStreamPost();
+    startChatStream({ key, base, draftId, provider: "ollama-local", model: "ecy:latest" });
+    d.push({ chunk: "Ankara." });
+    d.push({ done: true, source: "ollama_local", latencyMs: 850 });
+    d.resolve();
+    await flush();
+
+    const msg = chatStreamStore.getSnapshot(key).messages.find((m) => m.id === draftId);
+    expect(msg?.servedBy).toBe("ollama_local");
+    expect(msg?.latencyMs).toBe(850);
+  });
+
+  it("a `done` frame WITHOUT `source` leaves servedBy undefined (no crash)", async () => {
+    const key = "chat:test";
+    const { base, draftId } = paintChatDraft(key);
+    const d = deferredStreamPost();
+    startChatStream({ key, base, draftId, provider: "ollama-local", model: "ecy:latest" });
+    d.push({ chunk: "hi" });
+    d.push({ done: true }); // no source/latencyMs at all
+    d.resolve();
+    await flush();
+
+    const snap = chatStreamStore.getSnapshot(key);
+    const msg = snap.messages.find((m) => m.id === draftId);
+    expect(msg?.content).toBe("hi"); // unaffected — the store tolerates the missing field
+    expect(msg?.servedBy).toBeUndefined();
+    expect(msg?.latencyMs).toBeUndefined();
+    expect(snap.streaming).toBe(false);
+  });
+
+  it("flags `substituted: true` when the served source differs from the requested provider (the measured bug)", async () => {
+    const key = "chat:test";
+    const { base, draftId } = paintChatDraft(key);
+    const d = deferredStreamPost();
+    // User picked ecy:latest on ollama-local; the router silently fell through to gemini.
+    startChatStream({ key, base, draftId, provider: "ollama-local", model: "ecy:latest" });
+    d.push({ chunk: "nonsense about 1914-1918..." });
+    d.push({ done: true, source: "cloud:gemini", latencyMs: 500 });
+    d.resolve();
+    await flush();
+
+    const msg = chatStreamStore.getSnapshot(key).messages.find((m) => m.id === draftId);
+    expect(msg?.servedBy).toBe("cloud:gemini");
+    expect(msg?.substituted).toBe(true);
+  });
+
+  it("leaves `substituted` falsy when the served source matches the requested provider (hyphen/underscore normalized)", async () => {
+    const key = "chat:test";
+    const { base, draftId } = paintChatDraft(key);
+    const d = deferredStreamPost();
+    startChatStream({ key, base, draftId, provider: "ollama-local", model: "ecy:latest" });
+    d.push({ chunk: "Paris." });
+    // Real server source for the local case is underscored ("ollama_local"), while the
+    // requested provider id is hyphenated ("ollama-local") — this must NOT read as a mismatch.
+    d.push({ done: true, source: "ollama_local", latencyMs: 300 });
+    d.resolve();
+    await flush();
+
+    const msg = chatStreamStore.getSnapshot(key).messages.find((m) => m.id === draftId);
+    expect(msg?.substituted).toBeFalsy();
+  });
+
+  it("leaves `substituted` falsy when no done frame ever carried a source (no false alarm on unknown provenance)", async () => {
+    const key = "chat:test";
+    const { base, draftId } = paintChatDraft(key);
+    const d = deferredStreamPost();
+    startChatStream({ key, base, draftId, provider: "ollama-local", model: "ecy:latest" });
+    d.push({ chunk: "hi" });
+    d.resolve(); // stream ends with no `done` frame at all — mirrors older/odd server responses
+    await flush();
+
+    const msg = chatStreamStore.getSnapshot(key).messages.find((m) => m.id === draftId);
+    expect(msg?.substituted).toBeFalsy();
+  });
 });
 
 describe("streamStore — assist stream", () => {
