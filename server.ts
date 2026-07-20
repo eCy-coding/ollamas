@@ -4114,8 +4114,13 @@ void (async () => {
 // invariant; every cross-ns use is itself recorded as an ops fact.
 app.post("/api/brain/recall", async (req, res) => {
   try {
-    const { query, k, ns, graphExpand, minScore, actor } = req.body || {};
+    const { query, k, ns, graphExpand, minScore, actor, vector } = req.body || {};
     if (typeof query !== "string" || !query.trim()) return res.status(400).json({ error: "query (string) required" });
+    // F3c: çağıran kişiselleştirilmiş q* = q + λ·p_u verdiyse KNN kolu onunla sürülür.
+    // Boyut/biçim burada reddedilir — bozuk vektör 500 değil 400 olmalı.
+    if (vector !== undefined && (!Array.isArray(vector) || !vector.length || !vector.every((n: unknown) => typeof n === "number" && Number.isFinite(n)))) {
+      return res.status(400).json({ error: "vector must be a non-empty number[]" });
+    }
     const brain = await import("./server/brain");
     if (ns === "*") {
       const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
@@ -4137,7 +4142,7 @@ app.post("/api/brain/recall", async (req, res) => {
         // window ("gecen haftaki karar" only surfaces last week's rows).
         const { parseTemporalFilter } = await import("./server/brain-active");
         const tw = parseTemporalFilter(query, Date.now());
-        return brain.brainRecall(query, { k: k || 5, ns, graphExpand, minScore, actor, ...(tw ?? {}) });
+        return brain.brainRecall(query, { k: k || 5, ns, graphExpand, minScore, actor, ...(tw ?? {}), ...(vector ? { vector } : {}) });
       })(),
       new Promise<null>((r) => {
         const t = setTimeout(() => r(null), Number(process.env.BRAIN_RECALL_API_TIMEOUT_MS) || 10_000);
@@ -4160,6 +4165,30 @@ app.post("/api/brain/recall", async (req, res) => {
     const msg = String(err?.message || "");
     if (/embed|503/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
     res.status(500).json({ error: msg || "brain recall failed" });
+  }
+});
+
+// F3c EMBED — sorgu gömme yüzeyi. brain-loop gibi HTTP istemcileri q* = q + λ·p_u
+// kurabilsin diye var (loop brain.db'yi doğrudan AÇMAZ — bu bilinçli bir sözleşme).
+// Yalnız loopback: gömme yüzeyi açığa çıkarsa embedder dışarıdan tüketilebilir.
+app.post("/api/brain/embed", async (req, res) => {
+  try {
+    const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).json({ error: "embed is loopback-only" });
+    const { text } = req.body || {};
+    if (typeof text !== "string" || !text.trim()) return res.status(400).json({ error: "text (string) required" });
+    const { brainEmbedQuery } = await import("./server/brain");
+    const { embedSpaceId } = await import("./server/embed-contract");
+    const { localEmbedModel } = await import("./server/rag");
+    const vector = await brainEmbedQuery(text);
+    // spaceId üç sistemin (ollamas · eCym · odysseus) aynı vektör uzayında olup
+    // olmadığını çağıranın doğrulayabilmesi için döner — sessiz uzay kayması olmasın.
+    res.json({ vector, dim: vector.length, spaceId: embedSpaceId(localEmbedModel()) });
+  } catch (err: any) {
+    // Meşgul embedder recall ile AYNI degrade sözleşmesine tabi (S39): 503, 500 değil.
+    const msg = String(err?.message || "");
+    if (/embed|503|busy/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
+    res.status(500).json({ error: msg || "brain embed failed" });
   }
 });
 

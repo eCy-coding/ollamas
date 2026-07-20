@@ -106,7 +106,12 @@ export interface BrainStore {
   /** `fresh` bypasses the embed cache (P1) — the drift probe needs the LIVE embedding
    *  space; a cached vector would mask a silent model swap. `graphExpand` (P3) adds a
    *  third RRF arm: memories mentioning entities from semantically-near facts (1-hop). */
-  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number }): Promise<BrainRecallHit[]>;
+  /** `vector` (F3c): önceden hesaplanmış sorgu vektörü — verilirse embed adımı ATLANIR
+   *  ve KNN kolu bu vektörle sürülür. Kişiselleştirilmiş q* = q + λ·p_u böyle uygulanır.
+   *  FTS/BM25 kolu yine ham `query` metniyle sürülür — leksik sıralama değişmez. */
+  recall(query: string, opts?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number; vector?: number[] }): Promise<BrainRecallHit[]>;
+  /** Sorgu gömme yüzeyi — q* hesaplamak isteyen çağıranlar (ask-shared, loop) için. */
+  embedQuery(text: string): Promise<number[]>;
   assertFact(f: BrainFactInput): Promise<{ changed: boolean; invalidated: number }>;
   /** S42: episodes ↔ sessions reverse link — every memory a distill/ingest wrote
    *  for a session carries source=episodeId(=sessionId). */
@@ -515,7 +520,12 @@ export function createBrainStore(
   return {
     remember: rememberOne,
 
-    async recall(query, { k = 5, tier, ns, fresh, graphExpand, minScore, actor, since, until } = {}) {
+    async embedQuery(text) {
+      ensureProvider();
+      return rawEmbed(text, "query");
+    },
+
+    async recall(query, { k = 5, tier, ns, fresh, graphExpand, minScore, actor, since, until, vector } = {}) {
       // B1 abstention (2026 gap-audit): an ungrounded answer is worse than none.
       // Hits scoring below the threshold are dropped — an empty result tells the
       // caller to say "I don't know" instead of hallucinating from distant noise.
@@ -525,12 +535,16 @@ export function createBrainStore(
       // E1 — recall never goes silent: a contended embedder degrades the VECTOR arm,
       // not the whole answer. The FTS/BM25 arm needs no embedding. fresh (drift probe)
       // keeps fail-fast semantics — a lexical probe would fake self-hit health.
-      let vec: number[] | null = null;
-      if (fresh) vec = await rawEmbed(query, "query");
-      else {
-        try {
-          vec = await embedWithBudget(query, "query");
-        } catch { /* lexical-only fallback below */ }
+      // F3c: çağıran q* gibi hazır bir vektör verdiyse EMBED ETME — onu kullan.
+      // (Kişiselleştirilmiş retrieval bu yoldan geçer; boyut aşağıda denetlenir.)
+      let vec: number[] | null = vector ?? null;
+      if (!vec) {
+        if (fresh) vec = await rawEmbed(query, "query");
+        else {
+          try {
+            vec = await embedWithBudget(query, "query");
+          } catch { /* lexical-only fallback below */ }
+        }
       }
       if (vec) ensureVec(vec.length);
       const over = k * 4 + 16;
@@ -1142,7 +1156,7 @@ function store(): BrainStore {
 export const brainRemember = (m: BrainMemoryInput) => store().remember(m);
 export const brainRecall = async (
   q: string,
-  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number },
+  o?: { k?: number; tier?: MemoryTier; ns?: string; fresh?: boolean; graphExpand?: boolean; minScore?: number; actor?: string; since?: number; until?: number; vector?: number[] },
 ) => {
   // S21: latency observed HERE (external choke-point) and not inside recall(),
   // so the drift probe's internal this.recall() calls never skew the histogram.
@@ -1163,6 +1177,14 @@ export const brainListNamespaces = () => store().listNamespaces();
 export const brainIngest = (b: { episodeId: string; memories?: Extraction["memories"]; facts?: BrainFactInput[]; ns?: string }) =>
   store().ingest(b);
 export const brainSearchFacts = (q: string, o?: { k?: number; ns?: string; at?: number }) => store().searchFacts(q, o);
+/** F3c: hazır vektörle recall — KNN kolu `vec`, leksik kol `query` metniyle sürülür. */
+export const brainRecallVec = (
+  vec: number[],
+  query: string,
+  o?: { k?: number; ns?: string; graphExpand?: boolean; minScore?: number },
+) => store().recall(query, { ...o, vector: vec });
+/** F3c: sorgu gömme (q* kurmak için). */
+export const brainEmbedQuery = (text: string) => store().embedQuery(text);
 export const brainSweep = (o?: { workingTtlMs?: number }) => store().sweep(o);
 export const brainConsolidate = (o?: { minAccess?: number }) => store().consolidate(o);
 export const brainHealth = (o?: { probes?: number; threshold?: number }) => store().health(o);

@@ -709,3 +709,40 @@ describe("Brain — episodic dup-collapse (org-mirror spam cleanup)", () => {
     b.close();
   });
 });
+
+// F3c — hazır sorgu vektörüyle recall. Kişiselleştirme (q* = q + λ·p_u) ancak
+// retrieval'ın METİN yerine VEKTÖR ile sürülebilmesiyle gerçek olur; bu blok o
+// yüzeyin sözleşmesini kilitler.
+describe("Brain — recall(vector) / embedQuery (F3c)", () => {
+  test("verilen vektör embed'i ATLAR ve KNN kolunu o vektör sürer", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-coffee", tier: "core", content: "likes espresso" });
+    await b.remember({ id: "m-deploy", tier: "core", content: "deploy uses make ship" });
+
+    // "bilinmeyen metin" sahte embedder'da [0,0,1]'e düşer — yani METİN yolu
+    // kahveyi BULAMAZ. Vektörü elle verince kahve birinci gelmeli: bu, vektörün
+    // gerçekten kullanıldığının (ve embed'in atlandığının) kanıtı.
+    const byText = await b.recall("bilinmeyen metin", { k: 2 });
+    const byVec = await b.recall("bilinmeyen metin", { k: 2, vector: [1, 0, 0] });
+    expect(byVec[0].id).toBe("m-coffee");
+    expect(byText[0].id).not.toBe("m-coffee");
+    b.close();
+  });
+
+  test("aynı metnin gömmesiyle çağrı, metin yoluyla AYNI top-1'i verir", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m-coffee", tier: "core", content: "likes espresso" });
+    await b.remember({ id: "m-deploy", tier: "core", content: "deploy uses make ship" });
+    const viaText = await b.recall("query_coffee", { k: 2 });
+    const viaVec = await b.recall("query_coffee", { k: 2, vector: await b.embedQuery("query_coffee") });
+    expect(viaVec[0].id).toBe(viaText[0].id); // eşdeğerlik: vektör yolu sapma getirmez
+    b.close();
+  });
+
+  test("yanlış boyutlu vektör reddedilir (sessiz bozulma yok)", async () => {
+    const b = createBrainStore({ dbPath: tmpDb(), embed: fakeEmbed });
+    await b.remember({ id: "m1", tier: "core", content: "likes espresso" });
+    await expect(b.recall("query_coffee", { k: 1, vector: [1, 0] })).rejects.toThrow();
+    b.close();
+  });
+});
