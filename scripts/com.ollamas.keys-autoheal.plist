@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Autonomous key-pool healer. Runs every 4h, GETs /api/keys/pool, and for any DRY provider:
+     gemini gets a REAL fix (npm run gemini:provision -- --all-accounts, using the operator's
+     already-authenticated gcloud to mint keys in their EXISTING GCP projects — no account
+     creation, no credential entry by this job). Every other dry provider gets an ALERT ONLY
+     (Slack/Discord via /api/notify) — no CLI-based key issuance exists for them.
+     Supersedes com.ollamas.gemini-pool-check.plist (same check, plus the real fix) — install
+     only one of the two, not both, to avoid duplicate 4h checks/alerts.
+     Activate once:  launchctl load ~/Library/LaunchAgents/com.ollamas.keys-autoheal.plist  -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ollamas.keys-autoheal</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Desktop/ollamas" &amp;&amp; exec node scripts/gemini-pool-autoheal.mjs</string>
+  </array>
+  <key>StartInterval</key><integer>14400</integer>
+  <key>RunAtLoad</key><false/>
+  <key>WorkingDirectory</key><string>/Users/emrecnyngmail.com/Desktop/ollamas</string>
+  <key>StandardOutPath</key><string>/tmp/ollamas-keys-autoheal.log</string>
+  <key>StandardErrorPath</key><string>/tmp/ollamas-keys-autoheal.log</string>
+  <key>ProcessType</key><string>Background</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+</dict>
+</plist>
