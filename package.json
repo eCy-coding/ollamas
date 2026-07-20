@@ -33,6 +33,7 @@
     "gemini:provision": "node scripts/gemini-provision.mjs",
     "gemini:check": "node scripts/gemini-pool-check.mjs",
     "keys:autoheal": "node scripts/gemini-pool-autoheal.mjs",
+    "keys:doctor": "node scripts/key-doctor.mjs",
     "provider:bench": "node scripts/provider-bench.mjs",
     "harden": "make harden",
     "lint": "tsc --noEmit",

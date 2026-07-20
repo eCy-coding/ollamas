@@ -8,9 +8,11 @@
 // (live === 0): gemini is the only provider with a proven, safe, non-account-creating
 // auto-issuance path (npm run gemini:provision — uses the operator's ALREADY-authenticated
 // gcloud to mint a key in each of their EXISTING GCP projects; see scripts/gemini-provision.mjs).
-// So gemini gets a real auto-heal attempt. Every other dry provider gets an ALERT ONLY — this
-// script never signs up for anything, never opens a browser, never enters credentials. Getting a
-// new OpenAI/Anthropic/Cohere/etc. key requires a human on that provider's dashboard.
+// So gemini gets a real auto-heal attempt. Every other dry provider gets an ALERT ONLY, with a
+// per-provider remedy (see remedyHint below): github-models has a semi-automatic fix that just
+// needs a human's browser-approval click (scripts/key-doctor.mjs --fix), everyone else is
+// genuinely dashboard-issued (OpenAI/Anthropic/Cohere/etc.) — this script never signs up for
+// anything, never opens a browser, never enters credentials.
 //
 //   npm run keys:autoheal
 //   GATEWAY=http://127.0.0.1:3000 node scripts/gemini-pool-autoheal.mjs
@@ -35,6 +37,23 @@ export function classifyDryProviders(pool) {
     (AUTO_HEAL_CAPABLE.has(name) ? healable : alertOnly).push(name);
   }
   return { healable, alertOnly };
+}
+
+/** Pure: the actual next step for a dry, alert-only provider. Unit-tested.
+ * github-models has a real semi-automatic fix (scripts/key-doctor.mjs --fix runs
+ * `gh auth refresh` for it) — it just needs a human to click "approve" in a browser, so it
+ * can't be the auto-heal branch above, but it's still wrong to tell the operator "check the
+ * dashboard" when the actual fix is one CLI command. Everyone else really is dashboard-issued
+ * (no CLI exists in this repo for them — see scripts/*.mjs), so their real signupUrl (already
+ * returned by GET /api/keys/pool, see server.ts keySignupUrl) is the accurate remedy. */
+export function remedyHint(name, entry) {
+  if (name === "github-models") {
+    return "run `node scripts/key-doctor.mjs --fix` (gh auth refresh — needs a browser approval click, so it can't run unattended)";
+  }
+  if (entry?.signupUrl) {
+    return `get a new key from ${entry.signupUrl} and add it via Donanım Kasası / Key Vault`;
+  }
+  return "no auto-issuance CLI for this provider — get a new key from its dashboard and add it via the Donanım Kasası / Key Vault";
 }
 
 async function alert(gateway, text) {
@@ -70,7 +89,7 @@ async function main() {
   let worstCode = 0;
 
   for (const name of alertOnly) {
-    const { code, alert: msg } = assess(pool[name], name, "no auto-issuance CLI for this provider — get a new key from its dashboard and add it via the Donanım Kasası / Key Vault");
+    const { code, alert: msg } = assess(pool[name], name, remedyHint(name, pool[name]));
     if (code > worstCode) worstCode = code;
     if (msg) await alert(gateway, msg);
   }
