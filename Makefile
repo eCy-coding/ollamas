@@ -116,6 +116,9 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+permission-test: ## verilen izinlerle FIILEN yapilabilecekleri test et [ARGS='--run-mutations --launch-all']
+	@npx tsx scripts/permission-probe.ts $(ARGS)
+
 app-safety-sync: ## politika degisikligini eCym safe alanlarina yansit (yedekli)
 	@npx tsx scripts/app-literacy-safety-sync.ts
 
