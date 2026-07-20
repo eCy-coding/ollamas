@@ -147,6 +147,165 @@ export function selectTarget(
 
 const hash = hashQuestion;
 
+const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
+
+/** Loop'un TEK dış yüzeyi. Modül düzeyinde: hem tur akışı hem sandbox egzersizcisi
+ *  aynı istemciyi kullanır (iki ayrı tanım = iki ayrı timeout/hata davranışı riski). */
+const api = async (path: string, body?: unknown, ms = 30_000): Promise<any> => {
+  const r = await fetch(`${API}${path}`, {
+    method: body ? "POST" : "GET",
+    headers: body ? { "content-type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(ms),
+  });
+  if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
+  return r.json();
+};
+
+// G7: llmActive() is in-process module state (server/gpu-coordinator.ts). This loop
+// runs as a fresh `tsx` process every launchd tick, so importing it directly always
+// reads a blank, always-idle copy — it can never see the live :3000 server's real
+// GPU state. The loop is already an HTTP client of :3000 for everything else; ask it
+// over HTTP instead. Best-effort: if the check itself fails (server down, network),
+// treat as not-busy — the loop already tolerates :3000 being unreachable elsewhere.
+const checkGpuActive = () => api("/api/brain/gpu-status").then((r) => !!r?.active).catch(() => false);
+
+/** Sandbox koşusuna ayrılan azami süre. p95 tavanı (30s) ALTINDA tutulur ki
+ *  aşım sessizce geçmesin, terfi kapısında hata olarak görünsün. */
+const SANDBOX_MS = Number(process.env.BRAIN_SANDBOX_MS) || 20_000;
+
+/**
+ * Bir yeteneği sandbox'ta koştur — canlı davranış DEĞİŞMEZ, yalnız ölçülür.
+ *
+ * Altyapı arızaları (embedder 503, bağlantı) `withCapability`'ye GİRİLMEDEN elenir:
+ * `maxErrors: 0` olduğu için tek bir 503 yeteneği 20 tur terfi edemez hâle getirirdi,
+ * yani sunucunun geçici meşguliyeti yeteneğin kalitesi hakkında kalıcı yargıya
+ * dönüşürdü. Bu en kolay yapılan hata — ölçüm altyapıyı yeteneğe yazmamalı.
+ */
+async function exerciseSandbox(
+  turn: number, t0: number, budgetMs: number, r: any,
+): Promise<void> {
+  const { loadLedger, withCapability, ensureCap } = await import("../server/brain-capability-runner");
+  const { sandboxIdFor } = await import("../server/brain-capabilities");
+  const { shouldExercise, alreadyRanThisTurn, isInfraFailure } = await import("../server/brain-sandbox");
+
+  const ledger = loadLedger();
+  // gate-ce-train'in KENDİ dalı var (adım 3.5, turn%10). Egzersizci rotasyonuna da
+  // girerse sandbox slotlarının 1/3'ü "tanımsız koşu" diye boşa gider — canlı ilk
+  // turda görüldü. Egzersizci yalnız kendi koşusu OLMAYAN yetenekleri döndürür.
+  const OWN_PATH = new Set(["gate-ce-train"]);
+  const eligible = { ...ledger, caps: Object.fromEntries(Object.entries(ledger.caps).filter(([k]) => !OWN_PATH.has(k))) };
+  const id = sandboxIdFor(eligible, turn);
+  if (!id) return; // terfi bekleyen yetenek yok
+
+  const cap = ensureCap(ledger, id);
+  if (alreadyRanThisTurn(cap, turn)) return; // gate-ce-train kendi dalından koşmuş olabilir
+
+  const gate = shouldExercise({ gpuBusy: await checkGpuActive(), elapsedMs: Date.now() - t0, budgetMs });
+  if (!gate.ok) {
+    console.log(JSON.stringify({ event: "brain.sandbox", id, skipped: gate.why }));
+    return;
+  }
+
+  const sources = (r?.sources ?? []) as { id: string; excerpt: string; score: number }[];
+  if (!sources.length) return;
+
+  // --- Altyapıya dokunan hazırlık: BURADA patlarsa yetenek suçlanmaz. ---
+  let prepared: { run: () => Promise<any>; metricOf: (x: any) => number | undefined };
+  try {
+    prepared = await prepareSandboxRun(id, r, sources);
+  } catch (e: any) {
+    const msg = String(e?.message ?? e);
+    console.log(JSON.stringify({
+      event: "brain.sandbox", id,
+      skipped: isInfraFailure(msg) ? "altyapı" : "hazırlık",
+      detail: msg.slice(0, 100),
+    }));
+    return; // koşu KAYDEDİLMEZ — hata sayılmaz
+  }
+
+  const bounded = () => Promise.race([
+    prepared.run(),
+    new Promise<never>((_, rej) => {
+      const t = setTimeout(() => rej(new Error(`sandbox exceeded ${SANDBOX_MS}ms`)), SANDBOX_MS);
+      (t as { unref?: () => void }).unref?.();
+    }),
+  ]);
+
+  try {
+    await withCapability(id, bounded, async () => ({}), {
+      ledger, turn, mode: "sandbox", metricOf: prepared.metricOf,
+    });
+    const after = loadLedger().caps[id];
+    console.log(JSON.stringify({
+      event: "brain.sandbox", id, status: after?.status,
+      runs: after?.runs.length, metric: after?.runs.at(-1)?.metric,
+    }));
+  } catch { /* withCapability zaten yutar; buraya düşmez */ }
+}
+
+/** Yetenek başına sandbox koşusu + METRİĞİ. Metriklerin dürüstlük sınıfı için
+ *  her dalın kendi yorumuna bakın — hepsi "kalite" ölçmez. */
+async function prepareSandboxRun(
+  id: string, r: any, sources: { id: string; excerpt: string; score: number }[],
+): Promise<{ run: () => Promise<any>; metricOf: (x: any) => number | undefined }> {
+  if (id === "reatt-rerank") {
+    // METRİK SINIFI: GERÇEK ama ZAYIF-DENETİMLİ kalite.
+    // citedRankGain = cevabın atıf yaptığı kaynakların yeniden sıralamadaki MRR'ı
+    // eksi orijinal sıralamadaki MRR'ı. DÜRÜSTLÜK SINIRI: atıflar ORİJİNAL sırayla
+    // üretilmiş bir cevaptan geliyor → etiket temele doğru YANLI. Pozitif delta
+    // güvenilir, negatif delta belirsizdir.
+    const { reattRerank, mrr } = await import("../server/brain-reatt");
+    const { openEmbedCache } = await import("../server/brain-embed-cache");
+    const { citationIds } = await import("../server/brain-answer-score");
+    const qVec: number[] = r?.qVec ?? [];
+    if (!qVec.length) throw new Error("qVec yok — ReAtt sorgu parçası kuramaz");
+    const cache = openEmbedCache();
+    const embed = async (text: string) => {
+      const hit = cache.get("pending", text);
+      if (hit) return { vector: hit, spaceId: "pending" };
+      const res = await api("/api/brain/embed", { text }, 15_000); // 503 burada patlar → altyapı
+      cache.set(res.spaceId, text, res.vector);
+      return { vector: res.vector, spaceId: res.spaceId };
+    };
+    const cited = citationIds(String(r?.answer ?? ""));
+    return {
+      run: async () => {
+        const out = await reattRerank(qVec, sources as any, { embed, cache });
+        cache.flush();
+        return { ...out, citedRankGain: mrr(out.reranked, cited) - mrr(out.original, cited) };
+      },
+      metricOf: (x) => x?.citedRankGain,
+    };
+  }
+
+  if (id === "ragseq-weighting") {
+    // METRİK SINIFI: YALNIZ GÜVENLİK/YAPI — cevap kalitesi DEĞİL.
+    // Gerçek kalite ikinci bir generation isterdi (tur başına iki kat LLM).
+    // citedRetention: cevabın atıf yaptığı kaynaklar ağırlıklandırılmış bağlamda
+    // hâlâ duruyor mu. Bir ağırlıklandırma cevabın kullandığı kaynağı atıyorsa
+    // temellendirmeyi bozar — bunun gerçek dişi var, ama "daha iyi cevap" demez.
+    const { sequenceWeights, weightedContext } = await import("../server/brain-formulas");
+    const { citationIds } = await import("../server/brain-answer-score");
+    const cited = citationIds(String(r?.answer ?? ""));
+    const budget = Number(process.env.BRAIN_RAGSEQ_BUDGET) || 4000;
+    return {
+      run: async () => {
+        const p = sequenceWeights(sources.map((s) => s.score ?? 0));
+        const ctx = weightedContext(sources as any, p, budget);
+        if (ctx.length > budget * 1.5) throw new Error(`bağlam bütçeyi aştı: ${ctx.length}>${budget}`);
+        const missing = sources.filter((s) => !ctx.includes(`[mem:${s.id}]`));
+        if (missing.length) throw new Error(`MIN_SHARE ihlali: ${missing.length} kaynak düştü`);
+        const kept = cited.filter((c) => ctx.includes(`[mem:${c}]`)).length;
+        return { citedRetention: cited.length ? kept / cited.length : 1, len: ctx.length };
+      },
+      metricOf: (x) => x?.citedRetention,
+    };
+  }
+
+  throw new Error(`sandbox koşusu tanımsız: ${id}`);
+}
+
 async function main() {
   if (process.env.BRAIN_LOOP === "0") return;
   // Loop bir İSTEMCİdir: brain.db'yi doğrudan AÇMAZ, canlı :3000 API'sini kullanır.
@@ -167,25 +326,6 @@ async function main() {
   } catch { /* kilit yazılamadıysa yine de devam */ }
 
   try {
-    const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
-    const api = async (path: string, body?: unknown, ms = 30_000): Promise<any> => {
-      const r = await fetch(`${API}${path}`, {
-        method: body ? "POST" : "GET",
-        headers: body ? { "content-type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(ms),
-      });
-      if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
-      return r.json();
-    };
-    // G7: llmActive() is in-process module state (server/gpu-coordinator.ts). This loop
-    // runs as a fresh `tsx` process every launchd tick, so importing it directly always
-    // reads a blank, always-idle copy — it can never see the live :3000 server's real
-    // GPU state. The loop is already an HTTP client of :3000 for everything else (see
-    // contract note above); ask it over HTTP instead. Best-effort: if the check itself
-    // fails (server down, network), treat as not-busy — the loop already tolerates
-    // :3000 being unreachable elsewhere and shouldn't newly stall on this one.
-    const checkGpuActive = () => api("/api/brain/gpu-status").then((r) => !!r?.active).catch(() => false);
     if (await checkGpuActive()) { console.log(JSON.stringify({ event: "brain.loop", skipped: "gpu-busy" })); await record({ turn: 0, ms: Date.now() - t0, wrote: false, skipped: "gpu-busy" }); return; }
 
     const httpRecall = async (q: string, o: { k?: number; ns?: string } = {}) =>
@@ -348,6 +488,17 @@ async function main() {
     }
     state.lastAt = Date.now();
     saveState(state);
+
+    // 3.6) SANDBOX EGZERSİZCİSİ — kusur S'nin panzehiri.
+    // Terfi 10 sandbox koşusu ister; hiçbir şey yetenekleri koşturmadığı için üçü
+    // sonsuza dek sandbox'ta kalıyordu (kısır döngü). Burada her tur BİR yetenek,
+    // turun GERÇEK verisiyle, canlı davranışı değiştirmeden ölçülür.
+    // Yazımdan SONRA çalışır: sandbox çökerse turun asıl işi zaten kaydedilmiştir.
+    try {
+      await exerciseSandbox(state.turn, t0, budgetMs, r);
+    } catch (e: any) {
+      console.warn(JSON.stringify({ event: "brain.sandbox", error: String(e?.message ?? e).slice(0, 120) }));
+    }
 
     // 3.5) GATE EĞİTİMİ — kusur G'nin yerine geçen mekanizma.
     // Öz-doğrulayan tur-içi dürtme yerine: biriken DIŞSAL puanlar üzerinde toplu

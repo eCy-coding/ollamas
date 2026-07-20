@@ -46,6 +46,11 @@ export interface SharedAskResult {
   explored?: boolean;
   /** Formül 3a: kaynak başına p_ret(z|x) — bağlam payının dayanağı. */
   pRet?: number[];
+  /** Sandbox egzersizcisinin ReAtt kolu için sorgu vektörü — yeniden gömme YOK.
+   *  ASLA loglanmaz/metriğe yazılmaz: 768 float, log'u da metriği de şişirir. */
+  qVec?: number[];
+  /** Ağırlıklandırılmamış KAYNAKLAR bloğu — ragseq sandbox'ının karşılaştırma tabanı. */
+  context?: string;
 }
 
 export interface Gate { W: number[][]; b: number[] }
@@ -213,6 +218,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
       expert: "", weights: picked.weights, sources: ctx.sources, confidence: 0,
       mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, personalized, abstained: true,
       scores: scoreMap, explored: explore.explored, pRet,
+      qVec: qVec ?? undefined, context: ctx.context,
     };
   }
 
@@ -244,5 +250,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     scores: scoreMap,
     explored: explore.explored,
     pRet,
+    qVec: qVec ?? undefined,
+    context: ctx.context,
   };
 }
