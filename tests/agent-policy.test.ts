@@ -212,3 +212,42 @@ describe("agent-policy-store — bozulma YETKİ GENİŞLETMEZ", () => {
     expect(loadPolicy().classes["communicate-outward"]).toBe("deny");
   });
 });
+
+// loadPolicyStrict — safe regresyonunun KÖK FİX'i.
+// KUSUR: loadPolicy fail-closed → okunamazsa defaultPolicy (hepsi gated/deny) →
+// reconcile 98 True'yu 105 False yapıyordu. "okunamadı" ≠ "kısıtlı". strict null döner.
+describe("loadPolicyStrict — okunamadı ≠ kısıtlı", () => {
+  let dir = "";
+  const prev = process.env.BRAIN_LOOP_DIR;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "polstrict-")); process.env.BRAIN_LOOP_DIR = dir; });
+  afterEach(() => {
+    if (prev === undefined) delete process.env.BRAIN_LOOP_DIR; else process.env.BRAIN_LOOP_DIR = prev;
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* geçici */ }
+  });
+
+  test("dosya YOK → null (default DÖNDÜRMEZ — safe'i sıfırlamaz)", async () => {
+    const { loadPolicyStrict } = await import("../server/agent-policy-store");
+    expect(loadPolicyStrict()).toBeNull();
+  });
+
+  test("geçerli dosya → policy", async () => {
+    const { loadPolicyStrict, savePolicy } = await import("../server/agent-policy-store");
+    const p = { ...defaultPolicy(), classes: { ...defaultPolicy().classes, launch: "auto" as const } };
+    savePolicy(p);
+    expect(loadPolicyStrict()?.classes.launch).toBe("auto");
+  });
+
+  test("BOZUK dosya → null (geçerli yedek yoksa)", async () => {
+    const { loadPolicyStrict, policyPath } = await import("../server/agent-policy-store");
+    writeFileSync(policyPath(), "{ bozuk");
+    expect(loadPolicyStrict()).toBeNull();
+  });
+
+  test("bozuk ana + geçerli yedek → yedek (default değil)", async () => {
+    const { loadPolicyStrict, savePolicy, policyPath } = await import("../server/agent-policy-store");
+    savePolicy(defaultPolicy());                                   // yedek oluşsun
+    savePolicy({ ...defaultPolicy(), principles: ["x"] });          // ana → ikinci, yedek → ilk
+    writeFileSync(policyPath(), "çöp");                             // ana boz
+    expect(loadPolicyStrict()).not.toBeNull();                     // yedekten kurtar
+  });
+});

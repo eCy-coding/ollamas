@@ -1,6 +1,6 @@
 import { loadAppCards } from "./app-literacy-load";
 import { buildAppEcymCommands, reconcileAppSafety } from "../server/app-literacy";
-import { loadPolicy } from "../server/agent-policy-store";
+import { loadPolicy, loadPolicyStrict } from "../server/agent-policy-store";
 
 /** 100 uygulama kartından eCym komutları. `safe` alanı operatörün politikası ile
  *  GUI-risk kontrolünün KESİŞİMİNDEN türetilir — burada elle yazılmaz. */
@@ -67,9 +67,17 @@ async function main() {
       added.push(c.id);
     }
     // Mevcut app komutlarının safe'ini güncel politikadan tazele (YALNIZ .safe).
-    const rec = reconcileAppSafety(ds.commands, loadAppCards(), loadPolicy());
-    ds.commands = rec.commands;
-    safeChanged = rec.changed;
+    // KRİTİK: politika GÜVENİLİR okunamıyorsa reconcile ATLA — aksi halde
+    // loadPolicy'nin fail-closed default'u (hepsi kısıtlı) 98 True'yu False yapardı
+    // (safe regresyonunun kök nedeni). "Okunamadı → dokunma", "kısıtlı varsayma".
+    const strictPolicy = loadPolicyStrict();
+    if (strictPolicy) {
+      const rec = reconcileAppSafety(ds.commands, loadAppCards(), strictPolicy);
+      ds.commands = rec.commands;
+      safeChanged = rec.changed;
+    } else {
+      console.warn(JSON.stringify({ event: "ecosystem.sync", warn: "agent-policy okunamadı → safe KORUNDU (reconcile atlandı)" }));
+    }
 
     if (added.length || safeChanged.length) {
       // Yalnız yazılacaksa yedekle (her çağrıda değil — yedek şişmesini önle).

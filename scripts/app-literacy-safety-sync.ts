@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { reconcileAppSafety } from "../server/app-literacy";
 import { loadAppCards } from "./app-literacy-load";
-import { loadPolicy } from "../server/agent-policy-store";
+import { loadPolicyStrict } from "../server/agent-policy-store";
 
 const DS = process.env.ECYM_DATASET || join(homedir(), "ecy-model", "terminal-dataset.json");
 
@@ -24,7 +24,13 @@ export function syncAppCommandSafety(): SyncResult {
 
   const ds = JSON.parse(readFileSync(DS, "utf8"));
   const commands = ds.commands ?? [];
-  const { commands: next, changed } = reconcileAppSafety(commands, loadAppCards(), loadPolicy());
+
+  // KRİTİK: politika GÜVENİLİR okunamıyorsa reconcile ATLA — loadPolicy fail-closed
+  // default'u (hepsi kısıtlı) safe'i sıfırlardı (regresyonun kök nedeni). "Okunamadı → dokunma".
+  const strictPolicy = loadPolicyStrict();
+  if (!strictPolicy) return { changed: [], unchanged: commands.length, total: commands.length, backup: null };
+
+  const { commands: next, changed } = reconcileAppSafety(commands, loadAppCards(), strictPolicy);
 
   // Değişiklik yoksa YAZMA — mtime bile bozulmasın (tam idempotent).
   if (!changed.length) return { changed: [], unchanged: commands.length, total: commands.length, backup: null };

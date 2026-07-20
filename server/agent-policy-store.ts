@@ -29,6 +29,27 @@ export function loadPolicy(): AgentPolicy {
   return defaultPolicy(Date.now());
 }
 
+/**
+ * KATI okuma — "okunamadı" ile "kısıtlı"yı AYIRIR.
+ *
+ * `loadPolicy` fail-closed: okunamazsa `defaultPolicy()` (hepsi gated/deny) döner.
+ * Bu, bir KARAR sunucusu için doğru (şüphede kısıtla), ama bir RECONCILE için
+ * YIKICI: reconcile bunu app komutlarına uygulayınca 98 True'yu 105 False yapıyordu
+ * (safe regresyonunun kök nedeni). "Politika dosyası okunamadı" bir HATA durumudur,
+ * "operatör her şeyi kısıtladı" DEĞİL. Bu fonksiyon ayrımı yapar: dosya YOK/BOZUK
+ * ise `null` döner (default DÖNDÜRMEZ), böylece çağıran "veri yok → dokunma" diyebilir.
+ */
+export function loadPolicyStrict(): AgentPolicy | null {
+  for (const f of [policyPath(), backupPath()]) {
+    try {
+      if (!existsSync(f)) continue;
+      const p = JSON.parse(readFileSync(f, "utf8"));
+      if (validatePolicy(p).ok) return p as AgentPolicy;
+    } catch { /* bir sonraki adaya düş */ }
+  }
+  return null; // okunamadı — çağıran KARAR versin, biz kısıtlı VARSAYMAYIZ
+}
+
 /** Politikayı ATOMİK yaz. Geçersiz politika ASLA diske inmez. */
 export function savePolicy(p: AgentPolicy): { ok: boolean; errors: string[] } {
   const v = validatePolicy(p);
