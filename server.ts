@@ -4456,6 +4456,73 @@ app.get("/api/brain/obsidian/status", async (_req, res) => {
   }
 });
 
+// OBSIDIAN panel — human-facing view over /api/brain/obsidian/status + a loopback
+// sync trigger. Same self-contained inline-HTML shape as /brain and /org (module top
+// level: reachable in in-process tests, no vite/frontend build involved).
+app.get("/obsidian", (_req, res) => {
+  res.type("html").send(`<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>OBSIDIAN ⇄ brain · ollamas</title><style>
+:root{--bg:#050A14;--surf:#0D1B2E;--raised:#132338;--line:rgba(255,255,255,.1);--fg:#F0F4FF;--fg2:#8A9BB0;--cyan:#00D4FF;--violet:#7B5EA7;--ok:#00C896;--warn:#F5A623;--bad:#FF5470}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,sans-serif;padding:26px 18px}
+main{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#7B5EA7,#00D4FF);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#050A14}
+h1{font-size:20px;margin:0;letter-spacing:.01em}.sub{color:var(--fg2);font-size:12px;margin-top:2px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.badge{font:600 11.5px/1 ui-monospace,monospace;border-radius:8px;padding:8px 11px;border:1px solid var(--line);background:var(--raised)}
+.badge.ok{color:var(--ok);border-color:rgba(0,200,150,.5)}.badge.bad{color:var(--bad);border-color:var(--bad)}.badge.dim{color:var(--fg2)}.badge.warn{color:var(--warn);border-color:rgba(245,166,35,.5)}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:11px}
+label{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.tier{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:12px}
+.tier .n{font:800 22px/1 ui-monospace,monospace;color:var(--cyan)}.tier .k{font-size:11px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.path{font:12px/1.4 ui-monospace,monospace;color:var(--fg2);word-break:break-all}
+button{font:600 13px/1 system-ui;color:#050A14;background:linear-gradient(135deg,#00C896,#00D4FF);border:0;border-radius:9px;padding:10px 16px;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.msg{font:12px/1.4 ui-monospace,monospace;color:var(--fg2)}
+</style></head><body><main>
+<header><div class="logo">⇄</div><div><h1>OBSIDIAN ⇄ brain</h1><div class="sub">vault ↔ sqlite-vec brain · bidirectional idempotent mirror</div></div>
+<div class="badges" id="badges"><span class="badge dim">yükleniyor…</span></div></header>
+<div class="card"><label>Vault</label><div class="path" id="vault">—</div></div>
+<div class="card"><label>Notlar (tier)</label><div class="tiers" id="tiers"></div></div>
+<div class="card"><label>Senkronizasyon</label>
+<div class="row">
+<button id="both" onclick="sync('both')">Sync (both)</button>
+<button id="pull" onclick="sync('pull')">Pull (vault→brain)</button>
+<button id="push" onclick="sync('push')">Push (brain→vault)</button>
+<span class="msg" id="msg"></span></div></div>
+</main><script>
+const $=id=>document.getElementById(id);
+function fmtAge(ts){if(!ts)return"hiç";const s=Math.round((Date.now()-ts)/1000);if(s<60)return s+"sn önce";if(s<3600)return Math.round(s/60)+"dk önce";return Math.round(s/3600)+"sa önce"}
+async function load(){
+ try{const r=await fetch('/api/brain/obsidian/status');const d=await r.json();
+  $('vault').textContent=d.vault+(d.exists?'  ✓ mevcut':'  ✗ yok');
+  const tiers=d.notes||{};const ents=d.entities||0;
+  $('tiers').innerHTML=Object.entries(tiers).map(([k,v])=>'<div class="tier"><div class="n">'+v+'</div><div class="k">'+k+'</div></div>').join('')
+    +'<div class="tier"><div class="n">'+ents+'</div><div class="k">entities</div></div>';
+  const drift=d.drift||0,conf=d.conflicts||0;
+  $('badges').innerHTML=
+    '<span class="badge '+(d.exists?'ok':'bad')+'">vault '+(d.exists?'ok':'yok')+'</span>'+
+    '<span class="badge dim">'+(d.brainMemories||0)+' memory</span>'+
+    '<span class="badge '+(drift>0?'warn':'ok')+'">drift '+drift+'</span>'+
+    '<span class="badge '+(conf>0?'bad':'ok')+'">conflict '+conf+'</span>'+
+    '<span class="badge dim">sync '+fmtAge(d.lastSync)+'</span>';
+ }catch(e){$('badges').innerHTML='<span class="badge bad">status hatası</span>'}
+}
+async function sync(dir){
+ ['both','pull','push'].forEach(i=>$(i).disabled=true);$('msg').textContent=dir+' çalışıyor…';
+ try{const r=await fetch('/api/brain/obsidian/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({direction:dir})});
+  const d=await r.json();
+  if(r.ok){$('msg').textContent=dir+' ✓ push:'+(d.push?.written||0)+'yaz/'+(d.push?.entities||0)+'ent · pull:'+(d.pull?.ingested||0)+'al/'+(d.pull?.conflicts||0)+'çakışma';await load()}
+  else{$('msg').textContent='hata: '+(d.error||r.status)}
+ }catch(e){$('msg').textContent='hata: '+e.message}
+ finally{['both','pull','push'].forEach(i=>$(i).disabled=false)}
+}
+load();setInterval(load,15000);
+</script></body></html>`);
+});
+
 // BRAIN panel (G3) — read-only introspection over /api/brain/overview + /api/brain/graph,
 // same self-contained inline-HTML shape as /org (module top level: reachable under
 // OLLAMAS_NO_AUTOBOOT=1 in-process tests, no vite/frontend build involved).
