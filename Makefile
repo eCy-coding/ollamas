@@ -116,6 +116,9 @@ brain-code-audit: ## olu-kod + orphan modul denetimi (rapor-only)
 brain-loop: ## ortak-brain ogrenme dongusu (tek tur, butceli)
 	@npx tsx scripts/brain-loop.ts
 
+brain-capabilities: ## yetenek terfi defteri (sandbox->candidate->autonomous)
+	@npx tsx scripts/brain-capabilities.ts $(ARGS)
+
 brain-loop-health: ## loop olculen durum (yazim orani, kuru tur, atlama siniflari)
 	@npx tsx scripts/brain-loop-health.ts $(ARGS)
 
