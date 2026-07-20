@@ -17,7 +17,7 @@
     "oracle:verify": "bash scripts/oracle-verify-gate.sh",
     "cli": "tsx cli/index.ts",
     "content:gen": "node scripts/content-pipeline.mjs",
-    "doctor": "node bin/host-bridge/doctor.mjs",
+    "doctor:host-bridge": "node bin/host-bridge/doctor.mjs",
     "monitor": "node scripts/system-monitor.mjs",
     "ops": "node scripts/ops.mjs",
     "ready": "node scripts/ready.mjs",
