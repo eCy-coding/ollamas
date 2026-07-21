@@ -49,6 +49,9 @@ export interface SharedAskResult {
   /** Sandbox egzersizcisinin ReAtt kolu için sorgu vektörü — yeniden gömme YOK.
    *  ASLA loglanmaz/metriğe yazılmaz: 768 float, log'u da metriği de şişirir. */
   qVec?: number[];
+  /** KİŞİSELLEŞTİRME ÖNCESİ ham sorgu gömmesi (q, q* DEĞİL). HTTP route bunu profile
+   *  yazar; q* yazmak profili kendi çıktısıyla besleyip λ'yı büyütürdü (drift). */
+  baseQVec?: number[];
   /** Ağırlıklandırılmamış KAYNAKLAR bloğu — ragseq sandbox'ının karşılaştırma tabanı. */
   context?: string;
 }
@@ -128,10 +131,12 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   // Böylece eksik bağımlılık tüm zinciri öldürmez, sadece kendi katkısını düşürür.
   let personalized = false;
   let qVec: number[] | null = null;
+  let baseQVec: number[] | null = null;
   const lambda = personalizeLambda();
   if (deps.embed) {
     try {
       qVec = await deps.embed(q);
+      baseQVec = qVec; // kişiselleştirmeden ÖNCE — profile bunu yazılır (q, q* değil)
       if (lambda > 0 && deps.profileVectors) {
         const history = await deps.profileVectors();
         if (history.length) {
@@ -218,7 +223,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
       expert: "", weights: picked.weights, sources: ctx.sources, confidence: 0,
       mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, personalized, abstained: true,
       scores: scoreMap, explored: explore.explored, pRet,
-      qVec: qVec ?? undefined, context: ctx.context,
+      qVec: qVec ?? undefined, baseQVec: baseQVec ?? undefined, context: ctx.context,
     };
   }
 
@@ -251,6 +256,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     explored: explore.explored,
     pRet,
     qVec: qVec ?? undefined,
+    baseQVec: baseQVec ?? undefined,
     context: ctx.context,
   };
 }

@@ -4329,7 +4329,8 @@ app.post("/api/brain/ask-shared", async (req, res) => {
     const { llmActive } = await import("./server/gpu-coordinator");
     // Gate kalıcılığı loop ile AYNI dosyayı paylaşır: canlı sorular ve otonom loop
     // turları tek bir öğrenilmiş W_g biriktirir, iki ayrı yarım-öğrenmiş gate değil.
-    const { loadGate: loadLearnedGate, saveGate: persistLearnedGate } = await import("./server/brain-gate-store");
+    const { loadGate: loadLearnedGate } = await import("./server/brain-gate-store");
+    const { loadProfileVectors } = await import("./server/brain-profile-store");
     const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
       (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
     const r = await askShared(question, {
@@ -4339,15 +4340,16 @@ app.post("/api/brain/ask-shared", async (req, res) => {
       recall: (q, o) => brain.brainRecall(q, { ...o, ...(ns ? { ns } : {}) }),
       searchFacts: (q, o) => brain.brainSearchFacts(q, { ...o, ...(ns ? { ns } : {}) }),
       generate: gen(resolveDistillProvider(process.env)),
-      // F3b/F3c — canlı yol da ÖĞRENİR. Bunlar verilmediği için qVec daima null
-      // kalıyor, W_g hiç çarpılmıyor ve gate kalıcı olarak yalnız regex biasıydı.
-      // embed → gate gerçek vektör alır; recallVec → q* retrieval'ı gerçekten sürer;
-      // gate/saveGate → öğrenilen ağırlık turlar arası KALICI olur.
+      // F3b/F3c — canlı yol da ÖĞRENİR + KİŞİSELLEŞTİRİR. embed → gate gerçek vektör alır;
+      // recallVec → q* retrieval'ı gerçekten sürer; profileVectors → F3c q*=q+λ·p_u canlı
+      // API'de de çalışır (eskiden yalnız loop'ta bağlıydı → API personalized hep false idi).
+      // NOT: gate SALT-OKUNUR (askShared saveGate ÇAĞIRMAZ, öz-doğrulama kaldırıldı); gate
+      // eğitimi loop'ta gate-ce-train otonom yeteneğinin işi — bu yüzden saveGate BAĞLANMAZ.
       embed: brain.brainEmbedQuery,
       recallVec: (vec: number[], o?: { k?: number; graphExpand?: boolean; ns?: string }) =>
         brain.brainRecall(question, { ...o, vector: vec, ...(ns ? { ns } : {}) }),
       gate: loadLearnedGate() ?? undefined,
-      saveGate: persistLearnedGate,
+      profileVectors: async () => loadProfileVectors(),
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // Yerel model GPU'yu paylaşır — canlı generation varken uzman devre dışı.
@@ -4359,7 +4361,18 @@ app.post("/api/brain/ask-shared", async (req, res) => {
         },
       },
     } as any);
-    res.json(r);
+    // F3c profil güncelle: BASE sorgu vektörünü (q, q* DEĞİL) yaz → bir sonraki soru
+    // p_u ile kişiselleşir. best-effort: profil yazımı yanıtı düşürmez.
+    if (r.baseQVec) {
+      try {
+        const { recordQueryVector } = await import("./server/brain-profile-store");
+        recordQueryVector(r.baseQVec);
+      } catch { /* profil yazımı best-effort */ }
+    }
+    // İç 768-float vektörleri (qVec/baseQVec) HTTP yanıtından çıkar — payload şişirir,
+    // dışarıya sızdırılmamalı (yorum: qVec "ASLA loglanmaz").
+    const { qVec: _q, baseQVec: _b, ...pub } = r as any;
+    res.json(pub);
   } catch (err: any) {
     const msg = String(err?.message || "");
     if (/embed|503/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
