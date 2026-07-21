@@ -22,7 +22,8 @@ const getJson = async (url: string, ms = 8000): Promise<{ ok: boolean; status: n
 
 /** launchd job liveness: PASS if last exit was 0 and (KeepAlive job running | periodic
  *  job ran recently). We read `launchctl print` — the single source of truth. */
-function jobHealth(label: string, expectRunning: boolean): Check {
+function jobHealth(label: string, expectRunning: boolean, sevOverride?: Sev): Check {
+  const sev: Sev = sevOverride ?? (expectRunning ? "CRITICAL" : "MED");
   try {
     const out = execSync(`launchctl print gui/$(id -u)/${label} 2>/dev/null`, { encoding: "utf8", shell: "/bin/zsh" });
     const state = /state = (\S+)/.exec(out)?.[1] || "unknown";
@@ -36,10 +37,10 @@ function jobHealth(label: string, expectRunning: boolean): Check {
     const ok = expectRunning ? running : exitOk;
     const status: Check["status"] = ok ? "PASS" : drift ? "WARN" : "FAIL";
     const note = drift ? " — DRIFT: run `make brain-reembed`" : "";
-    return { name: `launchd:${label}`, sev: expectRunning ? "CRITICAL" : "MED",
+    return { name: `launchd:${label}`, sev,
       status, detail: `state=${state} lastExit=${lastExit} runs=${runs}${note}` };
   } catch (e: any) {
-    return { name: `launchd:${label}`, sev: expectRunning ? "CRITICAL" : "MED", status: "FAIL", detail: `not loaded: ${e?.message || e}` };
+    return { name: `launchd:${label}`, sev, status: "FAIL", detail: `not loaded: ${e?.message || e}` };
   }
 }
 
@@ -65,7 +66,17 @@ async function run(): Promise<Check[]> {
     checks.push({ name: "ollama.runtime", sev: "HIGH", status: "FAIL", detail: `unreachable: ${e?.message || e}` });
   }
 
-  // 3. Brain + Obsidian mirror — memory integrity + human-facing vault freshness.
+  // 3. Host terminal-bridge — the :7345 osascript bridge that lets tools drive iTerm2/
+  //    Terminal.app. tokenRequired must be true (loopback-without-token is a soft-fail).
+  try {
+    const b = await getJson(`${process.env.HOST_BRIDGE_URL || "http://127.0.0.1:7345"}/health`);
+    const ok = b.status === 200 && b.body?.ok === true && b.body?.tokenRequired === true;
+    checks.push({ name: "host.bridge", sev: "MED", status: ok ? "PASS" : "WARN", detail: `ok=${b.body?.ok} tokenRequired=${b.body?.tokenRequired} iterm2=${b.body?.terminals?.iterm2} terminal=${b.body?.terminals?.terminal}` });
+  } catch (e: any) {
+    checks.push({ name: "host.bridge", sev: "MED", status: "WARN", detail: `unreachable: ${e?.message || e}` });
+  }
+
+  // 4. Brain + Obsidian mirror — memory integrity + human-facing vault freshness.
   try {
     const s = await getJson(`${APP}/api/brain/obsidian/status`);
     const drift = Number(s.body?.drift ?? -1);
@@ -79,6 +90,7 @@ async function run(): Promise<Check[]> {
 
   // 4. Always-on + periodic launchd agents.
   checks.push(jobHealth("com.ollamas.server", true));
+  checks.push(jobHealth("com.missioncontrol.terminalbridge", true, "MED"));
   checks.push(jobHealth("com.ollamas.brain-loop", false));
   checks.push(jobHealth("com.ollamas.brain-obsidian-sync", false));
   checks.push(jobHealth("com.ollamas.brain-maintain", false));
