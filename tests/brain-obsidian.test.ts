@@ -109,6 +109,46 @@ describe("non-destructive: deleted note re-materializes on push", () => {
   });
 });
 
+describe("prune: memory consolidated out of brain removes its stale note (safe)", () => {
+  test("a memory forgotten from the brain has its note pruned on push", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath });
+    expect(existsSync(join(vault, "working", "work-tmp.md"))).toBe(true);
+    const b = createBrainStore({ dbPath, embed: fakeEmbed });
+    b.forget({ contains: "scratch note" }); // consolidated/evicted out of the brain
+    b.close();
+    const r = await syncObsidian("push", { vault, dbPath });
+    expect(r.push.pruned).toBe(1);
+    expect(existsSync(join(vault, "working", "work-tmp.md"))).toBe(false);
+  });
+
+  test("a human-authored note (never synced from brain) is NOT pruned", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath });
+    writeFileSync(
+      join(vault, "learned", "human.md"),
+      "---\nid: hand:x\nns: manual\ntier: learned\nsource: \ncreated: 2026-07-21T00:00:00.000Z\ncreated_ms: 1784600000000\nhits: 0\ncontent_hash: sha1:0\ntags: [tier/learned, ns/manual]\n---\n\nhuman note\n",
+    );
+    const r = await syncObsidian("push", { vault, dbPath });
+    expect(existsSync(join(vault, "learned", "human.md"))).toBe(true); // preserved (no manifest entry)
+    expect(r.push.pruned).toBe(0);
+  });
+});
+
+describe("tier move: one memory = exactly one note (no cross-tier duplicate)", () => {
+  test("a memory that changes tier leaves no stale note in the old tier folder", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath });
+    expect(existsSync(join(vault, "working", "work-tmp.md"))).toBe(true);
+    const b = createBrainStore({ dbPath, embed: fakeEmbed });
+    await b.remember({ id: "work:tmp", tier: "learned", content: "scratch note promoted" }); // same id, new tier
+    b.close();
+    await syncObsidian("push", { vault, dbPath });
+    expect(existsSync(join(vault, "working", "work-tmp.md"))).toBe(false); // old-tier note removed
+    expect(existsSync(join(vault, "learned", "work-tmp.md"))).toBe(true);  // new-tier note present
+  });
+});
+
 describe("status", () => {
   test("reports note counts, entities, and zero drift after a full push", async () => {
     await seed(dbPath);

@@ -26,7 +26,7 @@ async function main() {
     const r = await api("/api/brain/obsidian/sync", { direction: DIRECTION });
     console.log(JSON.stringify({
       event: "obsidian.sync", at, ms: Date.now() - at, direction: r.direction,
-      written: r.push?.written, skipped: r.push?.skipped, entities: r.push?.entities,
+      written: r.push?.written, skipped: r.push?.skipped, pruned: r.push?.pruned, entities: r.push?.entities,
       ingested: r.pull?.ingested, conflicts: r.pull?.conflicts, memories: r.memories, vault: r.vault,
     }));
     if (r.pull?.conflicts > 0) console.error(JSON.stringify({ event: "obsidian.conflicts", n: r.pull.conflicts, vault: r.vault }));

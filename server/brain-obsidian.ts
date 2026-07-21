@@ -13,7 +13,7 @@
 // so an accidental vault edit can't erase a memory. Reuses exportBrain (server/brain-portable)
 // for enumeration and brainRemember (server/brain.ts:1156) for the write choke-point.
 import {
-  mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, statSync,
+  mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, statSync, rmSync,
 } from "node:fs";
 import { join } from "node:path";
 import { exportBrain, type BrainDump } from "./brain-portable";
@@ -26,7 +26,7 @@ export function defaultDbPath(): string {
   return process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
 }
 
-interface ManifestEntry { brainHash: string; vaultHash: string }
+interface ManifestEntry { brainHash: string; vaultHash: string; tier?: string }
 type Manifest = Record<string, ManifestEntry>;
 
 interface SyncOpts {
@@ -39,7 +39,7 @@ export type Direction = "both" | "push" | "pull";
 
 export interface SyncResult {
   direction: Direction;
-  push: { written: number; skipped: number; entities: number };
+  push: { written: number; skipped: number; entities: number; pruned: number };
   pull: { ingested: number; skipped: number; conflicts: number };
   vault: string;
   memories: number;
@@ -95,20 +95,52 @@ function writeMoc(vault: string, dump: BrainDump, entities: number): void {
 }
 
 // ── push: brain → vault (authoritative mirror, idempotent by content hash) ──
-function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest): SyncResult["push"] {
+// pruneUntracked: when pull already ran this cycle (both-mode), every human note is
+// already in the brain, so ANY note absent from the brain is a genuine orphan and safe
+// to drop even without a manifest entry (covers pre-manifest legacy notes). push-only
+// keeps the conservative manifest guard so an un-pulled human note is never deleted.
+function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, pruneUntracked = false): SyncResult["push"] {
   let written = 0, skipped = 0;
   for (const m of dump.memories) {
     const mem: NoteMemory = { id: m.id, ns: m.ns, tier: m.tier, content: m.content, source: m.source, createdAt: m.createdAt, hits: m.hits };
     const h = contentHash(m.content);
-    const file = join(vault, TIERS.includes(m.tier as any) ? m.tier : "working", noteFilename(m.id));
-    if (manifest[m.id]?.brainHash === h && existsSync(file)) { skipped++; continue; }
+    const tier = TIERS.includes(m.tier as any) ? m.tier : "working";
+    const noteName = noteFilename(m.id);
+    const prev = manifest[m.id];
+    // Tier moved (episodic→learned promote, etc.) or a legacy entry with no recorded tier:
+    // sweep the same-id note out of every OTHER tier folder so one memory = exactly one
+    // note (else a promoted memory leaves a stale duplicate in its old tier).
+    if (!prev || prev.tier !== tier) {
+      for (const t of TIERS) if (t !== tier) { const f = join(vault, t, noteName); if (existsSync(f)) rmSync(f); }
+    }
+    const file = join(vault, tier, noteName);
+    if (prev?.brainHash === h && prev?.tier === tier && existsSync(file)) { skipped++; continue; }
     writeFileSync(file, toMarkdown(mem));
-    manifest[m.id] = { brainHash: h, vaultHash: h };
+    manifest[m.id] = { brainHash: h, vaultHash: h, tier };
     written++;
+  }
+  // Prune orphan notes: a memory CONSOLIDATED out of the brain (dedup/merge/evict) leaves
+  // a stale note. brain is the source of truth for EXISTENCE, so its note is safe to drop —
+  // distinct from a hand-DELETED note (re-materialized above). Two guards prevent data loss:
+  //   1. never prune when the dump is empty (a failed export must not wipe the vault)
+  //   2. only prune notes WE wrote (id present in the manifest) — a human-authored note
+  //      not yet pulled has no manifest entry and is left untouched.
+  let pruned = 0;
+  const liveIds = new Set(dump.memories.map((m) => m.id));
+  if (liveIds.size > 0) {
+    for (const tier of TIERS) {
+      const dir = join(vault, tier);
+      if (!existsSync(dir)) continue;
+      for (const fname of readdirSync(dir)) {
+        if (!fname.endsWith(".md")) continue;
+        const id = parseMarkdown(readFileSync(join(dir, fname), "utf8")).memory?.id;
+        if (id && !liveIds.has(id) && (manifest[id] || pruneUntracked)) { rmSync(join(dir, fname)); delete manifest[id]; pruned++; }
+      }
+    }
   }
   const entities = writeEntityNotes(vault, dump.facts);
   writeMoc(vault, dump, entities);
-  return { written, skipped, entities };
+  return { written, skipped, entities, pruned };
 }
 
 // ── pull: vault → brain (human edits/new notes upsert into the store) ──
@@ -150,7 +182,7 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
   });
 
   let pull: SyncResult["pull"] = { ingested: 0, skipped: 0, conflicts: 0 };
-  let push: SyncResult["push"] = { written: 0, skipped: 0, entities: 0 };
+  let push: SyncResult["push"] = { written: 0, skipped: 0, entities: 0, pruned: 0 };
 
   // pull FIRST (ingest human edits) so the subsequent mirror can't clobber them.
   if (direction === "pull" || direction === "both") {
@@ -160,7 +192,7 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
   }
   if (direction === "push" || direction === "both") {
     const dump = exportBrain(dbPath); // re-read: reflects anything pull just ingested
-    push = pushBrainToVault(vault, dump, manifest);
+    push = pushBrainToVault(vault, dump, manifest, direction === "both");
   }
 
   saveManifest(vault, manifest);
