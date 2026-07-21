@@ -1,2816 +1,3061 @@
 {
- "_meta": {
-  "version": 1,
-  "count": 100,
-  "note": "Sıralama: lane-frekansı x ajan-eyleme-gecirilebilirligi x yerine-konulamazlik. Populerlik degil.",
-  "safety": "safe alani agent-policy + ecym-guard.isGuiRisky kesisiminden TURETILIR, burada yazilmaz."
- },
- "cards": [
-  {
-   "rank": 1,
-   "app": "iTerm",
-   "scriptable": true,
-   "category": "terminal",
-   "purpose": "Ajanların her eylemi burada iner; AppleScript sözlüğü var.",
-   "capabilities": [
-    "yeni sekme/pencere",
-    "komut gönderme",
-    "oturum yönetimi"
-   ],
-   "drive": [
-    "AppleScript",
-    "CLI"
-   ],
-   "ops": [
+  "_meta": {
+    "version": 1,
+    "count": 100,
+    "note": "Sıralama: lane-frekansı x ajan-eyleme-gecirilebilirligi x yerine-konulamazlik. Populerlik degil.",
+    "safety": "safe alani agent-policy + ecym-guard.isGuiRisky kesisiminden TURETILIR, burada yazilmaz."
+  },
+  "cards": [
     {
-     "opId": "iterm.open",
-     "riskClass": "launch",
-     "triggers": [
-      "iterm ac",
-      "terminal ac"
-     ],
-     "cmd": "open -a \"iTerm\"",
-     "arg": "yok",
-     "desc": "iTerm'i açar",
-     "level": "baslangic",
-     "verify": "appExists"
+      "rank": 1,
+      "app": "iTerm",
+      "scriptable": true,
+      "category": "terminal",
+      "purpose": "Ajanların her eylemi burada iner; AppleScript sözlüğü var.",
+      "capabilities": [
+        "yeni sekme/pencere",
+        "komut gönderme",
+        "oturum yönetimi"
+      ],
+      "drive": [
+        "AppleScript",
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "iterm.open",
+          "riskClass": "launch",
+          "triggers": [
+            "iterm ac",
+            "terminal ac"
+          ],
+          "cmd": "open -a \"iTerm\"",
+          "arg": "yok",
+          "desc": "iTerm'i açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "terminali aç",
+            "iTerm başlat"
+          ]
+        },
+        {
+          "opId": "iterm.new-tab",
+          "riskClass": "mutate-local",
+          "triggers": [
+            "iterm yeni sekme"
+          ],
+          "cmd": "osascript -e 'tell application \"iTerm\" to create window with default profile'",
+          "arg": "yok",
+          "desc": "yeni pencere açar",
+          "level": "orta",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "yeni sekmede test çalıştır",
+            "iTerm'de yeni sekme aç"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Komut çalıştırma ve otomasyonun ana terminali; aç, yeni sekmede komut dizisi sür, panelleri böl.",
+        "canDo": [
+          "yeni sekmede komut çalıştır",
+          "bölünmüş panel ile paralel iş",
+          "ssh/uzak oturum",
+          "script ile tekrar eden işi otomatikleştir"
+        ]
+      }
     },
     {
-     "opId": "iterm.new-tab",
-     "riskClass": "mutate-local",
-     "triggers": [
-      "iterm yeni sekme"
-     ],
-     "cmd": "osascript -e 'tell application \"iTerm\" to create window with default profile'",
-     "arg": "yok",
-     "desc": "yeni pencere açar",
-     "level": "orta",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 2,
-   "app": "Visual Studio Code",
-   "scriptable": false,
-   "category": "editör",
-   "purpose": "ollamas'ın birincil editörü. AppleScript sözlüğü YOK, CLI ile sürülür.",
-   "capabilities": [
-    "dosya/klasör açma",
-    "diff",
-    "eklenti"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "vscode.open",
-     "riskClass": "launch",
-     "triggers": [
-      "vscode ac",
-      "kod editoru ac"
-     ],
-     "cmd": "open -a \"Visual Studio Code\"",
-     "arg": "yok",
-     "desc": "VS Code açar",
-     "level": "baslangic",
-     "verify": "appExists"
+      "rank": 2,
+      "app": "Visual Studio Code",
+      "scriptable": false,
+      "category": "editör",
+      "purpose": "ollamas'ın birincil editörü. AppleScript sözlüğü YOK, CLI ile sürülür.",
+      "capabilities": [
+        "dosya/klasör açma",
+        "diff",
+        "eklenti"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "vscode.open",
+          "riskClass": "launch",
+          "triggers": [
+            "vscode ac",
+            "kod editoru ac"
+          ],
+          "cmd": "open -a \"Visual Studio Code\"",
+          "arg": "yok",
+          "desc": "VS Code açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "projeyi VS Code'da aç",
+            "geçerli klasörü editörde aç"
+          ]
+        },
+        {
+          "opId": "vscode.open-path",
+          "riskClass": "mutate-local",
+          "triggers": [
+            "vscode ile klasor ac"
+          ],
+          "cmd": "code {{path}}",
+          "arg": "path",
+          "desc": "verilen yolu açar",
+          "level": "orta",
+          "examples": [
+            "server.ts dosyasını aç",
+            "belirli bir dosyayı editörde aç"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "`code` CLI ile dosya/klasör aç; entegre terminal, diff ve uzantılarla geliştir.",
+        "canDo": [
+          "klasör/proje aç",
+          "belirli dosyaya git",
+          "iki dosyayı diff karşılaştır",
+          "entegre terminalde komut çalıştır"
+        ]
+      }
     },
     {
-     "opId": "vscode.open-path",
-     "riskClass": "mutate-local",
-     "triggers": [
-      "vscode ile klasor ac"
-     ],
-     "cmd": "code {{path}}",
-     "arg": "path",
-     "desc": "verilen yolu açar",
-     "level": "orta"
-    }
-   ]
-  },
-  {
-   "rank": 3,
-   "app": "Google Chrome",
-   "scriptable": true,
-   "category": "tarayıcı",
-   "purpose": "Varsayılan tarayıcı; AppleScript sözlüğü var.",
-   "capabilities": [
-    "sekme yönetimi",
-    "URL açma",
-    "JS çalıştırma"
-   ],
-   "drive": [
-    "AppleScript",
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "chrome.open",
-     "riskClass": "launch",
-     "triggers": [
-      "chrome ac"
-     ],
-     "cmd": "open -a \"Google Chrome\"",
-     "arg": "yok",
-     "desc": "Chrome açar",
-     "level": "baslangic",
-     "verify": "appExists"
+      "rank": 3,
+      "app": "Google Chrome",
+      "scriptable": true,
+      "category": "tarayıcı",
+      "purpose": "Varsayılan tarayıcı; AppleScript sözlüğü var.",
+      "capabilities": [
+        "sekme yönetimi",
+        "URL açma",
+        "JS çalıştırma"
+      ],
+      "drive": [
+        "AppleScript",
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "chrome.open",
+          "riskClass": "launch",
+          "triggers": [
+            "chrome ac"
+          ],
+          "cmd": "open -a \"Google Chrome\"",
+          "arg": "yok",
+          "desc": "Chrome açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "chrome ile localhost:3000 aç",
+            "tarayıcıda bir sayfa aç"
+          ]
+        },
+        {
+          "opId": "chrome.list-tabs",
+          "riskClass": "read",
+          "triggers": [
+            "chrome sekmeleri",
+            "chrome acik sekmeler"
+          ],
+          "cmd": "osascript -e 'tell application \"Google Chrome\" to get URL of tabs of window 1'",
+          "arg": "yok",
+          "desc": "1. penceredeki sekme URL'lerini listeler",
+          "level": "orta",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "açık chrome sekmelerini say",
+            "tüm sekme URL'lerini al"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Varsayılan tarayıcı; URL aç, açık sekmeleri AppleScript ile listele/oku, otomasyon sür.",
+        "canDo": [
+          "URL aç",
+          "açık sekmeleri listele",
+          "aktif sekme başlığı/URL'sini al",
+          "otomasyon için sekme sür"
+        ]
+      }
     },
     {
-     "opId": "chrome.list-tabs",
-     "riskClass": "read",
-     "triggers": [
-      "chrome sekmeleri",
-      "chrome acik sekmeler"
-     ],
-     "cmd": "osascript -e 'tell application \"Google Chrome\" to get URL of tabs of window 1'",
-     "arg": "yok",
-     "desc": "1. penceredeki sekme URL'lerini listeler",
-     "level": "orta",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 4,
-   "app": "Finder",
-   "scriptable": true,
-   "category": "dosya yöneticisi",
-   "purpose": "Tüm varlık taşımaları buradan; SİLME TEHLİKESİ burada (rm desenine uğramaz).",
-   "capabilities": [
-    "dosya taşıma",
-    "etiketleme",
-    "çöp kutusu"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "finder.reveal",
-     "riskClass": "mutate-local",
-     "triggers": [
-      "finder da goster"
-     ],
-     "cmd": "open -R {{path}}",
-     "arg": "path",
-     "desc": "dosyayı Finder'da gösterir",
-     "level": "baslangic"
+      "rank": 4,
+      "app": "Finder",
+      "scriptable": true,
+      "category": "dosya yöneticisi",
+      "purpose": "Tüm varlık taşımaları buradan; SİLME TEHLİKESİ burada (rm desenine uğramaz).",
+      "capabilities": [
+        "dosya taşıma",
+        "etiketleme",
+        "çöp kutusu"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "finder.reveal",
+          "riskClass": "mutate-local",
+          "triggers": [
+            "finder da goster"
+          ],
+          "cmd": "open -R {{path}}",
+          "arg": "path",
+          "desc": "dosyayı Finder'da gösterir",
+          "level": "baslangic",
+          "examples": [
+            "bu dosyayı Finder'da göster",
+            "indirilenler klasörünü aç"
+          ]
+        },
+        {
+          "opId": "finder.selection",
+          "riskClass": "read",
+          "triggers": [
+            "finder secili dosyalar"
+          ],
+          "cmd": "osascript -e 'tell application \"Finder\" to get selection as alias list'",
+          "arg": "yok",
+          "desc": "seçili dosyaları verir",
+          "level": "orta",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "Finder'da seçili öğeleri al"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Dosya yöneticisi; bir yolu Finder'da göster, mevcut seçimi oku.",
+        "canDo": [
+          "bir dosya/klasörü Finder'da göster",
+          "geçerli seçimi oku",
+          "yol açıklaması al"
+        ]
+      }
     },
     {
-     "opId": "finder.selection",
-     "riskClass": "read",
-     "triggers": [
-      "finder secili dosyalar"
-     ],
-     "cmd": "osascript -e 'tell application \"Finder\" to get selection as alias list'",
-     "arg": "yok",
-     "desc": "seçili dosyaları verir",
-     "level": "orta",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 5,
-   "app": "Ollama",
-   "scriptable": false,
-   "category": "AI çalışma zamanı",
-   "purpose": "$0 yerel model şeridi; brain'in embed ve uzman kaynağı.",
-   "capabilities": [
-    "model çalıştırma",
-    "embed",
-    "model listesi"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "ollama.list",
-     "riskClass": "inspect",
-     "triggers": [
-      "ollama modelleri",
-      "yerel modeller"
-     ],
-     "cmd": "ollama list",
-     "arg": "yok",
-     "desc": "yüklü modelleri listeler",
-     "level": "baslangic"
+      "rank": 5,
+      "app": "Ollama",
+      "scriptable": false,
+      "category": "AI çalışma zamanı",
+      "purpose": "$0 yerel model şeridi; brain'in embed ve uzman kaynağı.",
+      "capabilities": [
+        "model çalıştırma",
+        "embed",
+        "model listesi"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "ollama.list",
+          "riskClass": "inspect",
+          "triggers": [
+            "ollama modelleri",
+            "yerel modeller"
+          ],
+          "cmd": "ollama list",
+          "arg": "yok",
+          "desc": "yüklü modelleri listeler",
+          "level": "baslangic",
+          "examples": [
+            "ollama modellerini listele",
+            "hangi modeller kurulu"
+          ]
+        },
+        {
+          "opId": "ollama.ps",
+          "riskClass": "inspect",
+          "triggers": [
+            "ollama calisan model",
+            "gpu da ne var"
+          ],
+          "cmd": "ollama ps",
+          "arg": "yok",
+          "desc": "bellekteki modelleri gösterir",
+          "level": "baslangic",
+          "examples": [
+            "çalışan ollama modellerini gör",
+            "aktif inference süreçleri"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Yerel AI çalışma zamanı; kurulu modelleri ve çalışan model süreçlerini listele.",
+        "canDo": [
+          "kurulu modelleri listele",
+          "çalışan model süreçlerini gör",
+          "GPU/bellek kullanımını tahmin et"
+        ]
+      }
     },
     {
-     "opId": "ollama.ps",
-     "riskClass": "inspect",
-     "triggers": [
-      "ollama calisan model",
-      "gpu da ne var"
-     ],
-     "cmd": "ollama ps",
-     "arg": "yok",
-     "desc": "bellekteki modelleri gösterir",
-     "level": "baslangic"
-    }
-   ]
-  },
-  {
-   "rank": 6,
-   "app": "DaVinci Resolve",
-   "scriptable": false,
-   "category": "video",
-   "purpose": "Stüdyo şeridi; AppleScript sözlüğü YOK, dosya sistemi + CLI ile sürülür.",
-   "capabilities": [
-    "montaj",
-    "renk",
-    "render"
-   ],
-   "drive": [
-    "CLI",
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "resolve.open",
-     "riskClass": "launch",
-     "triggers": [
-      "resolve ac",
-      "davinci ac",
-      "montaj ac"
-     ],
-     "cmd": "open -a \"DaVinci Resolve\"",
-     "arg": "yok",
-     "desc": "Resolve açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 7,
-   "app": "System Settings",
-   "scriptable": false,
-   "category": "sistem",
-   "purpose": "TCC/Otomasyon izinleri buradan verilir — her şeyin kapısı.",
-   "capabilities": [
-    "gizlilik izinleri",
-    "ağ",
-    "kullanıcılar"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "settings.privacy",
-     "riskClass": "system-change",
-     "triggers": [
-      "gizlilik ayarlari ac",
-      "otomasyon izni"
-     ],
-     "cmd": "open \"x-apple.systempreferences:com.apple.preference.security?Privacy_Automation\"",
-     "arg": "yok",
-     "desc": "Otomasyon izin panelini açar",
-     "level": "orta"
-    }
-   ]
-  },
-  {
-   "rank": 8,
-   "app": "Docker",
-   "scriptable": false,
-   "category": "geliştirici",
-   "purpose": "brain servislerinin konteyner katmanı.",
-   "capabilities": [
-    "konteyner",
-    "imaj",
-    "compose"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "docker.ps",
-     "riskClass": "inspect",
-     "triggers": [
-      "docker konteynerleri"
-     ],
-     "cmd": "docker ps",
-     "arg": "yok",
-     "desc": "çalışan konteynerleri listeler",
-     "level": "baslangic"
-    }
-   ]
-  },
-  {
-   "rank": 9,
-   "app": "Safari",
-   "scriptable": true,
-   "category": "tarayıcı",
-   "purpose": "En güvenilir AppleScript hedefi; Chrome'a alternatif.",
-   "capabilities": [
-    "sekme yönetimi",
-    "okuma listesi"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "safari.list-tabs",
-     "riskClass": "read",
-     "triggers": [
-      "safari sekmeleri"
-     ],
-     "cmd": "osascript -e 'tell application \"Safari\" to get URL of tabs of window 1'",
-     "arg": "yok",
-     "desc": "sekme URL'lerini listeler",
-     "level": "orta",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 10,
-   "app": "Claude",
-   "scriptable": false,
-   "category": "AI",
-   "purpose": "Ajan yüzeyi. AppleScript sözlüğü YOK.",
-   "capabilities": [
-    "sohbet",
-    "proje"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "claude.open",
-     "riskClass": "launch",
-     "triggers": [
-      "claude ac"
-     ],
-     "cmd": "open -a \"Claude\"",
-     "arg": "yok",
-     "desc": "Claude açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 11,
-   "app": "Preview",
-   "scriptable": true,
-   "category": "belge",
-   "purpose": "CV ve TÜBİTAK PDF'lerini okuma/yazdırma.",
-   "capabilities": [
-    "PDF",
-    "görsel",
-    "imza"
-   ],
-   "drive": [
-    "CLI",
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "preview.open",
-     "riskClass": "launch",
-     "triggers": [
-      "preview ac"
-     ],
-     "cmd": "open -a \"Preview\"",
-     "arg": "yok",
-     "desc": "Preview açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 12,
-   "app": "Mail",
-   "scriptable": true,
-   "category": "iletişim",
-   "purpose": "İş başvuruları. EN YÜKSEK RİSK: dışa iletim, geri alınamaz.",
-   "capabilities": [
-    "taslak",
-    "gönderme",
-    "arama"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "mail.draft",
-     "riskClass": "communicate-outward",
-     "triggers": [
-      "mail taslagi olustur",
-      "basvuru maili hazirla"
-     ],
-     "cmd": "osascript -e 'tell application \"Mail\" to make new outgoing message with properties {visible:true}'",
-     "arg": "yok",
-     "desc": "GÖRÜNÜR taslak açar — GÖNDERMEZ",
-     "level": "ileri",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 13,
-   "app": "Calendar",
-   "scriptable": true,
-   "category": "üretkenlik",
-   "purpose": "TÜBİTAK ve başvuru tarihleri.",
-   "capabilities": [
-    "etkinlik",
-    "takvim"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "calendar.today",
-     "riskClass": "read",
-     "triggers": [
-      "bugun takvimde ne var",
-      "takvim bugun"
-     ],
-     "cmd": "osascript -e 'tell application \"Calendar\" to get summary of events of calendar 1'",
-     "arg": "yok",
-     "desc": "etkinlik başlıklarını verir",
-     "level": "orta",
-     "requiresTcc": "automation",
-     "verify": "compile"
-    }
-   ]
-  },
-  {
-   "rank": 14,
-   "app": "Reminders",
-   "scriptable": true,
-   "category": "üretkenlik",
-   "purpose": "Görev şeridi.",
-   "capabilities": [
-    "hatırlatıcı",
-    "liste"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "reminders.open",
-     "riskClass": "launch",
-     "triggers": [
-      "hatirlaticilar ac"
-     ],
-     "cmd": "open -a \"Reminders\"",
-     "arg": "yok",
-     "desc": "Reminders açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 15,
-   "app": "Notes",
-   "scriptable": true,
-   "category": "üretkenlik",
-   "purpose": "Hızlı yakalama.",
-   "capabilities": [
-    "not",
-    "klasör"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "notes.open",
-     "riskClass": "launch",
-     "triggers": [
-      "notlar uygulamasini ac"
-     ],
-     "cmd": "open -a \"Notes\"",
-     "arg": "yok",
-     "desc": "Notes açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 16,
-   "app": "Shortcuts",
-   "scriptable": false,
-   "category": "otomasyon",
-   "purpose": "macOS'un YETKİLENDİRİLMİŞ otomasyon köprüsü. Şu an 0 kısayol var — temiz sayfa.",
-   "capabilities": [
-    "kısayol çalıştırma",
-    "paylaşım"
-   ],
-   "drive": [
-    "CLI",
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "shortcuts.list",
-     "riskClass": "inspect",
-     "triggers": [
-      "kisayollari listele"
-     ],
-     "cmd": "shortcuts list",
-     "arg": "yok",
-     "desc": "tanımlı kısayolları listeler",
-     "level": "baslangic"
-    }
-   ]
-  },
-  {
-   "rank": 17,
-   "app": "QuickTime Player",
-   "scriptable": true,
-   "category": "medya",
-   "purpose": "İçerik fabrikası için ekran/ses kaydı.",
-   "capabilities": [
-    "ekran kaydı",
-    "kırpma"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "quicktime.open",
-     "riskClass": "launch",
-     "triggers": [
-      "quicktime ac"
-     ],
-     "cmd": "open -a \"QuickTime Player\"",
-     "arg": "yok",
-     "desc": "QuickTime açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 18,
-   "app": "Activity Monitor",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Ollama ile GPU/RAM çekişmesi — yerel-önce şeridin 1 numaralı arıza sebebi.",
-   "capabilities": [
-    "CPU/RAM",
-    "GPU",
-    "süreç"
-   ],
-   "drive": [
-    "CLI",
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "activity.top-cpu",
-     "riskClass": "inspect",
-     "triggers": [
-      "en cok cpu yiyen",
-      "aktivite monitor yuk"
-     ],
-     "cmd": "ps -Aceo pid,pcpu,comm -r | head -12",
-     "arg": "yok",
-     "desc": "en çok CPU kullanan süreçler",
-     "level": "baslangic"
-    }
-   ]
-  },
-  {
-   "rank": 19,
-   "app": "Cursor",
-   "scriptable": false,
-   "category": "editör",
-   "purpose": "İkincil editör, CLI ile sürülebilir.",
-   "capabilities": [
-    "AI düzenleme"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "cursor.open",
-     "riskClass": "launch",
-     "triggers": [
-      "cursor ac"
-     ],
-     "cmd": "open -a \"Cursor\"",
-     "arg": "yok",
-     "desc": "Cursor açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 20,
-   "app": "CapCut",
-   "scriptable": false,
-   "category": "video",
-   "purpose": "Shorts kurgusu.",
-   "capabilities": [
-    "kurgu",
-    "altyazı"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "capcut.open",
-     "riskClass": "launch",
-     "triggers": [
-      "capcut ac"
-     ],
-     "cmd": "open -a \"CapCut\"",
-     "arg": "yok",
-     "desc": "CapCut açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 21,
-   "app": "Microsoft Word",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "CV ve TÜBİTAK formları; AppleScript sözlüğü var.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "microsoft-word.open",
-     "riskClass": "launch",
-     "triggers": [
-      "microsoft word ac"
-     ],
-     "cmd": "open -a \"Microsoft Word\"",
-     "arg": "yok",
-     "desc": "Microsoft Word açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 22,
-   "app": "Microsoft Excel",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "Gelir takibi; AppleScript sözlüğü var.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "microsoft-excel.open",
-     "riskClass": "launch",
-     "triggers": [
-      "microsoft excel ac"
-     ],
-     "cmd": "open -a \"Microsoft Excel\"",
-     "arg": "yok",
-     "desc": "Microsoft Excel açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 23,
-   "app": "LM Studio",
-   "scriptable": false,
-   "category": "AI",
-   "purpose": "Alternatif yerel çalışma zamanı, GGUF incelemesi.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "lm-studio.open",
-     "riskClass": "launch",
-     "triggers": [
-      "lm studio ac"
-     ],
-     "cmd": "open -a \"LM Studio\"",
-     "arg": "yok",
-     "desc": "LM Studio açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 24,
-   "app": "Raycast",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Başlatıcı ve pano geçmişi.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "raycast.open",
-     "riskClass": "launch",
-     "triggers": [
-      "raycast ac"
-     ],
-     "cmd": "open -a \"Raycast\"",
-     "arg": "yok",
-     "desc": "Raycast açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 25,
-   "app": "Rectangle",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Çoklu ajan sekmeleri için pencere düzeni.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "rectangle.open",
-     "riskClass": "launch",
-     "triggers": [
-      "rectangle ac"
-     ],
-     "cmd": "open -a \"Rectangle\"",
-     "arg": "yok",
-     "desc": "Rectangle açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 26,
-   "app": "Photos",
-   "scriptable": true,
-   "category": "medya",
-   "purpose": "Küçük görsel varlıklar; AppleScript ile dışa aktarım.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "photos.open",
-     "riskClass": "launch",
-     "triggers": [
-      "photos ac"
-     ],
-     "cmd": "open -a \"Photos\"",
-     "arg": "yok",
-     "desc": "Photos açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 27,
-   "app": "Music",
-   "scriptable": true,
-   "category": "medya",
-   "purpose": "Altyapı sesi kaynağı.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "music.open",
-     "riskClass": "launch",
-     "triggers": [
-      "music ac"
-     ],
-     "cmd": "open -a \"Music\"",
-     "arg": "yok",
-     "desc": "Music açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 28,
-   "app": "Audacity",
-   "scriptable": false,
-   "category": "ses",
-   "purpose": "Seslendirme temizliği.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "audacity.open",
-     "riskClass": "launch",
-     "triggers": [
-      "audacity ac"
-     ],
-     "cmd": "open -a \"Audacity\"",
-     "arg": "yok",
-     "desc": "Audacity açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 29,
-   "app": "Xcode",
-   "scriptable": true,
-   "category": "geliştirici",
-   "purpose": "AppleScript sözlüğü var; xcrun/simctl araç zincirinin sahibi.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "CLI"
-   ],
-   "ops": [
-    {
-     "opId": "xcode.open",
-     "riskClass": "launch",
-     "triggers": [
-      "xcode ac"
-     ],
-     "cmd": "open -a \"Xcode\"",
-     "arg": "yok",
-     "desc": "Xcode açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 30,
-   "app": "Automator",
-   "scriptable": false,
-   "category": "otomasyon",
-   "purpose": "Quick Action — riskli işlemler için yetkilendirilmiş sarmalayıcı.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "automator.open",
-     "riskClass": "launch",
-     "triggers": [
-      "automator ac"
-     ],
-     "cmd": "open -a \"Automator\"",
-     "arg": "yok",
-     "desc": "Automator açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 31,
-   "app": "Microsoft Outlook",
-   "scriptable": true,
-   "category": "iletişim",
-   "purpose": "Microsoft Outlook — iletişim kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "microsoft-outlook.open",
-     "riskClass": "launch",
-     "triggers": [
-      "microsoft outlook ac"
-     ],
-     "cmd": "open -a \"Microsoft Outlook\"",
-     "arg": "yok",
-     "desc": "Microsoft Outlook açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 32,
-   "app": "Microsoft PowerPoint",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "Microsoft PowerPoint — ofis kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "microsoft-powerpoint.open",
-     "riskClass": "launch",
-     "triggers": [
-      "microsoft powerpoint ac"
-     ],
-     "cmd": "open -a \"Microsoft PowerPoint\"",
-     "arg": "yok",
-     "desc": "Microsoft PowerPoint açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 33,
-   "app": "Microsoft Teams",
-   "scriptable": false,
-   "category": "iletişim",
-   "purpose": "Microsoft Teams — iletişim kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "microsoft-teams.open",
-     "riskClass": "launch",
-     "triggers": [
-      "microsoft teams ac"
-     ],
-     "cmd": "open -a \"Microsoft Teams\"",
-     "arg": "yok",
-     "desc": "Microsoft Teams açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 34,
-   "app": "OneDrive",
-   "scriptable": false,
-   "category": "depolama",
-   "purpose": "OneDrive — depolama kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "onedrive.open",
-     "riskClass": "launch",
-     "triggers": [
-      "onedrive ac"
-     ],
-     "cmd": "open -a \"OneDrive\"",
-     "arg": "yok",
-     "desc": "OneDrive açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 35,
-   "app": "Pages",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "Pages — ofis kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "pages.open",
-     "riskClass": "launch",
-     "triggers": [
-      "pages ac"
-     ],
-     "cmd": "open -a \"Pages\"",
-     "arg": "yok",
-     "desc": "Pages açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 36,
-   "app": "Numbers",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "Numbers — ofis kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "numbers.open",
-     "riskClass": "launch",
-     "triggers": [
-      "numbers ac"
-     ],
-     "cmd": "open -a \"Numbers\"",
-     "arg": "yok",
-     "desc": "Numbers açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 37,
-   "app": "Keynote",
-   "scriptable": true,
-   "category": "ofis",
-   "purpose": "Keynote — ofis kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "keynote.open",
-     "riskClass": "launch",
-     "triggers": [
-      "keynote ac"
-     ],
-     "cmd": "open -a \"Keynote\"",
-     "arg": "yok",
-     "desc": "Keynote açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 38,
-   "app": "Firefox",
-   "scriptable": false,
-   "category": "tarayıcı",
-   "purpose": "Firefox — tarayıcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "firefox.open",
-     "riskClass": "launch",
-     "triggers": [
-      "firefox ac"
-     ],
-     "cmd": "open -a \"Firefox\"",
-     "arg": "yok",
-     "desc": "Firefox açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 39,
-   "app": "Yandex",
-   "scriptable": false,
-   "category": "tarayıcı",
-   "purpose": "Yandex — tarayıcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "yandex.open",
-     "riskClass": "launch",
-     "triggers": [
-      "yandex ac"
-     ],
-     "cmd": "open -a \"Yandex\"",
-     "arg": "yok",
-     "desc": "Yandex açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 40,
-   "app": "Books",
-   "scriptable": false,
-   "category": "okuma",
-   "purpose": "Books — okuma kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "books.open",
-     "riskClass": "launch",
-     "triggers": [
-      "books ac"
-     ],
-     "cmd": "open -a \"Books\"",
-     "arg": "yok",
-     "desc": "Books açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 41,
-   "app": "Contacts",
-   "scriptable": true,
-   "category": "iletişim",
-   "purpose": "Contacts — iletişim kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "contacts.open",
-     "riskClass": "launch",
-     "triggers": [
-      "contacts ac"
-     ],
-     "cmd": "open -a \"Contacts\"",
-     "arg": "yok",
-     "desc": "Contacts açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 42,
-   "app": "Messages",
-   "scriptable": true,
-   "category": "iletişim",
-   "purpose": "Messages — iletişim kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "messages.open",
-     "riskClass": "launch",
-     "triggers": [
-      "messages ac"
-     ],
-     "cmd": "open -a \"Messages\"",
-     "arg": "yok",
-     "desc": "Messages açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 43,
-   "app": "FaceTime",
-   "scriptable": false,
-   "category": "iletişim",
-   "purpose": "FaceTime — iletişim kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "facetime.open",
-     "riskClass": "launch",
-     "triggers": [
-      "facetime ac"
-     ],
-     "cmd": "open -a \"FaceTime\"",
-     "arg": "yok",
-     "desc": "FaceTime açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 44,
-   "app": "Maps",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Maps — yardımcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "maps.open",
-     "riskClass": "launch",
-     "triggers": [
-      "maps ac"
-     ],
-     "cmd": "open -a \"Maps\"",
-     "arg": "yok",
-     "desc": "Maps açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 45,
-   "app": "Weather",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Weather — yardımcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "weather.open",
-     "riskClass": "launch",
-     "triggers": [
-      "weather ac"
-     ],
-     "cmd": "open -a \"Weather\"",
-     "arg": "yok",
-     "desc": "Weather açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 46,
-   "app": "Calculator",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Calculator — yardımcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "calculator.open",
-     "riskClass": "launch",
-     "triggers": [
-      "calculator ac"
-     ],
-     "cmd": "open -a \"Calculator\"",
-     "arg": "yok",
-     "desc": "Calculator açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 47,
-   "app": "TextEdit",
-   "scriptable": true,
-   "category": "editör",
-   "purpose": "TextEdit — editör kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "AppleScript"
-   ],
-   "ops": [
-    {
-     "opId": "textedit.open",
-     "riskClass": "launch",
-     "triggers": [
-      "textedit ac"
-     ],
-     "cmd": "open -a \"TextEdit\"",
-     "arg": "yok",
-     "desc": "TextEdit açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 48,
-   "app": "Stickies",
-   "scriptable": false,
-   "category": "yardımcı",
-   "purpose": "Stickies — yardımcı kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "stickies.open",
-     "riskClass": "launch",
-     "triggers": [
-      "stickies ac"
-     ],
-     "cmd": "open -a \"Stickies\"",
-     "arg": "yok",
-     "desc": "Stickies açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 49,
-   "app": "Freeform",
-   "scriptable": false,
-   "category": "tasarım",
-   "purpose": "Freeform — tasarım kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "freeform.open",
-     "riskClass": "launch",
-     "triggers": [
-      "freeform ac"
-     ],
-     "cmd": "open -a \"Freeform\"",
-     "arg": "yok",
-     "desc": "Freeform açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 50,
-   "app": "Console",
-   "scriptable": false,
-   "category": "geliştirici",
-   "purpose": "Console — geliştirici kategorisinde sık kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "console.open",
-     "riskClass": "launch",
-     "triggers": [
-      "console ac"
-     ],
-     "cmd": "open -a \"Console\"",
-     "arg": "yok",
-     "desc": "Console açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 51,
-   "app": "Time Machine",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Time Machine — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "time-machine.open",
-     "riskClass": "launch",
-     "triggers": [
-      "time machine ac"
-     ],
-     "cmd": "open -a \"Time Machine\"",
-     "arg": "yok",
-     "desc": "Time Machine açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 52,
-   "app": "Image Capture",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Image Capture — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "image-capture.open",
-     "riskClass": "launch",
-     "triggers": [
-      "image capture ac"
-     ],
-     "cmd": "open -a \"Image Capture\"",
-     "arg": "yok",
-     "desc": "Image Capture açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 53,
-   "app": "Font Book",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Font Book — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "font-book.open",
-     "riskClass": "launch",
-     "triggers": [
-      "font book ac"
-     ],
-     "cmd": "open -a \"Font Book\"",
-     "arg": "yok",
-     "desc": "Font Book açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 54,
-   "app": "Dictionary",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Dictionary — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "dictionary.open",
-     "riskClass": "launch",
-     "triggers": [
-      "dictionary ac"
-     ],
-     "cmd": "open -a \"Dictionary\"",
-     "arg": "yok",
-     "desc": "Dictionary açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 55,
-   "app": "Podcasts",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Podcasts — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "podcasts.open",
-     "riskClass": "launch",
-     "triggers": [
-      "podcasts ac"
-     ],
-     "cmd": "open -a \"Podcasts\"",
-     "arg": "yok",
-     "desc": "Podcasts açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 56,
-   "app": "TV",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "TV — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "tv.open",
-     "riskClass": "launch",
-     "triggers": [
-      "tv ac"
-     ],
-     "cmd": "open -a \"TV\"",
-     "arg": "yok",
-     "desc": "TV açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 57,
-   "app": "VoiceMemos",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "VoiceMemos — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "voicememos.open",
-     "riskClass": "launch",
-     "triggers": [
-      "voicememos ac"
-     ],
-     "cmd": "open -a \"VoiceMemos\"",
-     "arg": "yok",
-     "desc": "VoiceMemos açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 58,
-   "app": "Passwords",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Passwords — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "passwords.open",
-     "riskClass": "launch",
-     "triggers": [
-      "passwords ac"
-     ],
-     "cmd": "open -a \"Passwords\"",
-     "arg": "yok",
-     "desc": "Passwords açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 59,
-   "app": "Home",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Home — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "home.open",
-     "riskClass": "launch",
-     "triggers": [
-      "home ac"
-     ],
-     "cmd": "open -a \"Home\"",
-     "arg": "yok",
-     "desc": "Home açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 60,
-   "app": "Screenshot",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Screenshot — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "screenshot.open",
-     "riskClass": "launch",
-     "triggers": [
-      "screenshot ac"
-     ],
-     "cmd": "open -a \"Screenshot\"",
-     "arg": "yok",
-     "desc": "Screenshot açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 61,
-   "app": "Disk Utility",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Disk Utility — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "disk-utility.open",
-     "riskClass": "launch",
-     "triggers": [
-      "disk utility ac"
-     ],
-     "cmd": "open -a \"Disk Utility\"",
-     "arg": "yok",
-     "desc": "Disk Utility açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 62,
-   "app": "Terminal",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Terminal — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "terminal.open",
-     "riskClass": "launch",
-     "triggers": [
-      "terminal uygulamasini ac",
-      "apple terminal ac"
-     ],
-     "cmd": "open -a \"Terminal\"",
-     "arg": "yok",
-     "desc": "Terminal açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 63,
-   "app": "Hyper",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Hyper — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "hyper.open",
-     "riskClass": "launch",
-     "triggers": [
-      "hyper ac"
-     ],
-     "cmd": "open -a \"Hyper\"",
-     "arg": "yok",
-     "desc": "Hyper açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 64,
-   "app": "PowerShell",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "PowerShell — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "powershell.open",
-     "riskClass": "launch",
-     "triggers": [
-      "powershell ac"
-     ],
-     "cmd": "open -a \"PowerShell\"",
-     "arg": "yok",
-     "desc": "PowerShell açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 65,
-   "app": "Multipass",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Multipass — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "multipass.open",
-     "riskClass": "launch",
-     "triggers": [
-      "multipass ac"
-     ],
-     "cmd": "open -a \"Multipass\"",
-     "arg": "yok",
-     "desc": "Multipass açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 66,
-   "app": "Tailscale",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Tailscale — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "tailscale.open",
-     "riskClass": "launch",
-     "triggers": [
-      "tailscale ac"
-     ],
-     "cmd": "open -a \"Tailscale\"",
-     "arg": "yok",
-     "desc": "Tailscale açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 67,
-   "app": "Stats",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Stats — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "stats.open",
-     "riskClass": "launch",
-     "triggers": [
-      "stats ac"
-     ],
-     "cmd": "open -a \"Stats\"",
-     "arg": "yok",
-     "desc": "Stats açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 68,
-   "app": "AltTab",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "AltTab — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "alttab.open",
-     "riskClass": "launch",
-     "triggers": [
-      "alttab ac"
-     ],
-     "cmd": "open -a \"AltTab\"",
-     "arg": "yok",
-     "desc": "AltTab açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 69,
-   "app": "Bruno",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Bruno — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "bruno.open",
-     "riskClass": "launch",
-     "triggers": [
-      "bruno ac"
-     ],
-     "cmd": "open -a \"Bruno\"",
-     "arg": "yok",
-     "desc": "Bruno açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 70,
-   "app": "Blackbox",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Blackbox — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "blackbox.open",
-     "riskClass": "launch",
-     "triggers": [
-      "blackbox ac"
-     ],
-     "cmd": "open -a \"Blackbox\"",
-     "arg": "yok",
-     "desc": "Blackbox açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 71,
-   "app": "OpenCode",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "OpenCode — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "opencode.open",
-     "riskClass": "launch",
-     "triggers": [
-      "opencode ac"
-     ],
-     "cmd": "open -a \"OpenCode\"",
-     "arg": "yok",
-     "desc": "OpenCode açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 72,
-   "app": "Windsurf",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Windsurf — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "windsurf.open",
-     "riskClass": "launch",
-     "triggers": [
-      "windsurf ac"
-     ],
-     "cmd": "open -a \"Windsurf\"",
-     "arg": "yok",
-     "desc": "Windsurf açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 73,
-   "app": "Antigravity",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Antigravity — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "antigravity.open",
-     "riskClass": "launch",
-     "triggers": [
-      "antigravity ac"
-     ],
-     "cmd": "open -a \"Antigravity\"",
-     "arg": "yok",
-     "desc": "Antigravity açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 74,
-   "app": "AnythingLLM",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "AnythingLLM — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "anythingllm.open",
-     "riskClass": "launch",
-     "triggers": [
-      "anythingllm ac"
-     ],
-     "cmd": "open -a \"AnythingLLM\"",
-     "arg": "yok",
-     "desc": "AnythingLLM açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 75,
-   "app": "Kimi",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Kimi — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "kimi.open",
-     "riskClass": "launch",
-     "triggers": [
-      "kimi ac"
-     ],
-     "cmd": "open -a \"Kimi\"",
-     "arg": "yok",
-     "desc": "Kimi açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 76,
-   "app": "ChatGPT",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "ChatGPT — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "chatgpt.open",
-     "riskClass": "launch",
-     "triggers": [
-      "chatgpt ac"
-     ],
-     "cmd": "open -a \"ChatGPT\"",
-     "arg": "yok",
-     "desc": "ChatGPT açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 77,
-   "app": "Pinokio",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Pinokio — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "pinokio.open",
-     "riskClass": "launch",
-     "triggers": [
-      "pinokio ac"
-     ],
-     "cmd": "open -a \"Pinokio\"",
-     "arg": "yok",
-     "desc": "Pinokio açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 78,
-   "app": "GarageBand",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "GarageBand — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "garageband.open",
-     "riskClass": "launch",
-     "triggers": [
-      "garageband ac"
-     ],
-     "cmd": "open -a \"GarageBand\"",
-     "arg": "yok",
-     "desc": "GarageBand açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 79,
-   "app": "iMovie",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "iMovie — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "imovie.open",
-     "riskClass": "launch",
-     "triggers": [
-      "imovie ac"
-     ],
-     "cmd": "open -a \"iMovie\"",
-     "arg": "yok",
-     "desc": "iMovie açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 80,
-   "app": "Reel Maker",
-   "scriptable": false,
-   "category": "ara sıra",
-   "purpose": "Reel Maker — ara sıra kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "reel-maker.open",
-     "riskClass": "launch",
-     "triggers": [
-      "reel maker ac"
-     ],
-     "cmd": "open -a \"Reel Maker\"",
-     "arg": "yok",
-     "desc": "Reel Maker açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 81,
-   "app": "RODE Connect",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "RODE Connect — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "rode-connect.open",
-     "riskClass": "launch",
-     "triggers": [
-      "rode connect ac"
-     ],
-     "cmd": "open -a \"RODE Connect\"",
-     "arg": "yok",
-     "desc": "RODE Connect açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 82,
-   "app": "RODE PadsMobile",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "RODE PadsMobile — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "rode-padsmobile.open",
-     "riskClass": "launch",
-     "triggers": [
-      "rode padsmobile ac"
-     ],
-     "cmd": "open -a \"RODE PadsMobile\"",
-     "arg": "yok",
-     "desc": "RODE PadsMobile açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 83,
-   "app": "Focusrite Control",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Focusrite Control — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "focusrite-control.open",
-     "riskClass": "launch",
-     "triggers": [
-      "focusrite control ac"
-     ],
-     "cmd": "open -a \"Focusrite Control\"",
-     "arg": "yok",
-     "desc": "Focusrite Control açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 84,
-   "app": "Focusrite Control 2",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Focusrite Control 2 — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "focusrite-control-2.open",
-     "riskClass": "launch",
-     "triggers": [
-      "focusrite control 2 ac"
-     ],
-     "cmd": "open -a \"Focusrite Control 2\"",
-     "arg": "yok",
-     "desc": "Focusrite Control 2 açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 85,
-   "app": "Image Playground",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Image Playground — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "image-playground.open",
-     "riskClass": "launch",
-     "triggers": [
-      "image playground ac"
-     ],
-     "cmd": "open -a \"Image Playground\"",
-     "arg": "yok",
-     "desc": "Image Playground açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 86,
-   "app": "Script Editor",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Script Editor — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "script-editor.open",
-     "riskClass": "launch",
-     "triggers": [
-      "script editor ac"
-     ],
-     "cmd": "open -a \"Script Editor\"",
-     "arg": "yok",
-     "desc": "Script Editor açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 87,
-   "app": "Keychain Access",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Keychain Access — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "keychain-access.open",
-     "riskClass": "launch",
-     "triggers": [
-      "keychain access ac"
-     ],
-     "cmd": "open -a \"Keychain Access\"",
-     "arg": "yok",
-     "desc": "Keychain Access açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 88,
-   "app": "ColorSync Utility",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "ColorSync Utility — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "colorsync-utility.open",
-     "riskClass": "launch",
-     "triggers": [
-      "colorsync utility ac"
-     ],
-     "cmd": "open -a \"ColorSync Utility\"",
-     "arg": "yok",
-     "desc": "ColorSync Utility açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 89,
-   "app": "Digital Color Meter",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Digital Color Meter — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "digital-color-meter.open",
-     "riskClass": "launch",
-     "triggers": [
-      "digital color meter ac"
-     ],
-     "cmd": "open -a \"Digital Color Meter\"",
-     "arg": "yok",
-     "desc": "Digital Color Meter açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 90,
-   "app": "Audio MIDI Setup",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Audio MIDI Setup — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "audio-midi-setup.open",
-     "riskClass": "launch",
-     "triggers": [
-      "audio midi setup ac"
-     ],
-     "cmd": "open -a \"Audio MIDI Setup\"",
-     "arg": "yok",
-     "desc": "Audio MIDI Setup açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 91,
-   "app": "Screen Sharing",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Screen Sharing — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "screen-sharing.open",
-     "riskClass": "launch",
-     "triggers": [
-      "screen sharing ac"
-     ],
-     "cmd": "open -a \"Screen Sharing\"",
-     "arg": "yok",
-     "desc": "Screen Sharing açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 92,
-   "app": "Feedback Assistant",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Feedback Assistant — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "feedback-assistant.open",
-     "riskClass": "launch",
-     "triggers": [
-      "feedback assistant ac"
-     ],
-     "cmd": "open -a \"Feedback Assistant\"",
-     "arg": "yok",
-     "desc": "Feedback Assistant açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 93,
-   "app": "Wireless Diagnostics",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Wireless Diagnostics — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "wireless-diagnostics.open",
-     "riskClass": "launch",
-     "triggers": [
-      "wireless diagnostics ac"
-     ],
-     "cmd": "open -a \"Wireless Diagnostics\"",
-     "arg": "yok",
-     "desc": "Wireless Diagnostics açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 94,
-   "app": "Migration Assistant",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Migration Assistant — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "migration-assistant.open",
-     "riskClass": "launch",
-     "triggers": [
-      "migration assistant ac"
-     ],
-     "cmd": "open -a \"Migration Assistant\"",
-     "arg": "yok",
-     "desc": "Migration Assistant açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 95,
-   "app": "VoiceOver Utility",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "VoiceOver Utility — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "voiceover-utility.open",
-     "riskClass": "launch",
-     "triggers": [
-      "voiceover utility ac"
-     ],
-     "cmd": "open -a \"VoiceOver Utility\"",
-     "arg": "yok",
-     "desc": "VoiceOver Utility açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 96,
-   "app": "Ticket Viewer",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Ticket Viewer — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "ticket-viewer.open",
-     "riskClass": "launch",
-     "triggers": [
-      "ticket viewer ac"
-     ],
-     "cmd": "open -a \"Ticket Viewer\"",
-     "arg": "yok",
-     "desc": "Ticket Viewer açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 97,
-   "app": "Grapher",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Grapher — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "grapher.open",
-     "riskClass": "launch",
-     "triggers": [
-      "grapher ac"
-     ],
-     "cmd": "open -a \"Grapher\"",
-     "arg": "yok",
-     "desc": "Grapher açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 98,
-   "app": "Chess",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Chess — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "chess.open",
-     "riskClass": "launch",
-     "triggers": [
-      "chess ac"
-     ],
-     "cmd": "open -a \"Chess\"",
-     "arg": "yok",
-     "desc": "Chess açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 99,
-   "app": "Photo Booth",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Photo Booth — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "photo-booth.open",
-     "riskClass": "launch",
-     "triggers": [
-      "photo booth ac"
-     ],
-     "cmd": "open -a \"Photo Booth\"",
-     "arg": "yok",
-     "desc": "Photo Booth açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  },
-  {
-   "rank": 100,
-   "app": "Siri",
-   "scriptable": false,
-   "category": "durumsal",
-   "purpose": "Siri — duruma göre kullanılan uygulama.",
-   "capabilities": [
-    "temel kullanım"
-   ],
-   "drive": [
-    "yalnız GUI"
-   ],
-   "ops": [
-    {
-     "opId": "siri.open",
-     "riskClass": "launch",
-     "triggers": [
-      "siri ac"
-     ],
-     "cmd": "open -a \"Siri\"",
-     "arg": "yok",
-     "desc": "Siri açar",
-     "level": "baslangic",
-     "verify": "appExists"
-    }
-   ]
-  }
- ]
+      "rank": 6,
+      "app": "DaVinci Resolve",
+      "scriptable": false,
+      "category": "video",
+      "purpose": "Stüdyo şeridi; AppleScript sözlüğü YOK, dosya sistemi + CLI ile sürülür.",
+      "capabilities": [
+        "montaj",
+        "renk",
+        "render"
+      ],
+      "drive": [
+        "CLI",
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "resolve.open",
+          "riskClass": "launch",
+          "triggers": [
+            "resolve ac",
+            "davinci ac",
+            "montaj ac"
+          ],
+          "cmd": "open -a \"DaVinci Resolve\"",
+          "arg": "yok",
+          "desc": "Resolve açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "video montaj programını aç",
+            "DaVinci Resolve başlat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Profesyonel video düzenleme/renk; uygulamayı aç (proje otomasyonu scriptable API ister, kurulum operatörün).",
+        "canDo": [
+          "montaj/renk için Resolve'u aç",
+          "proje ortamını hazırla"
+        ]
+      }
+    },
+    {
+      "rank": 7,
+      "app": "System Settings",
+      "scriptable": false,
+      "category": "sistem",
+      "purpose": "TCC/Otomasyon izinleri buradan verilir — her şeyin kapısı.",
+      "capabilities": [
+        "gizlilik izinleri",
+        "ağ",
+        "kullanıcılar"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "settings.privacy",
+          "riskClass": "system-change",
+          "triggers": [
+            "gizlilik ayarlari ac",
+            "otomasyon izni"
+          ],
+          "cmd": "open \"x-apple.systempreferences:com.apple.preference.security?Privacy_Automation\"",
+          "arg": "yok",
+          "desc": "Otomasyon izin panelini açar",
+          "level": "orta",
+          "examples": [
+            "Gizlilik ayarlarını aç",
+            "TCC izin panelini göster"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Sistem ayarları; belirli bölmeyi (ör. Gizlilik & Güvenlik) aç — ayar DEĞİŞTİRME operatörün.",
+        "canDo": [
+          "belirli ayar bölmesini aç",
+          "Gizlilik & Güvenlik'i göster"
+        ]
+      }
+    },
+    {
+      "rank": 8,
+      "app": "Docker",
+      "scriptable": false,
+      "category": "geliştirici",
+      "purpose": "brain servislerinin konteyner katmanı.",
+      "capabilities": [
+        "konteyner",
+        "imaj",
+        "compose"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "docker.ps",
+          "riskClass": "inspect",
+          "triggers": [
+            "docker konteynerleri"
+          ],
+          "cmd": "docker ps",
+          "arg": "yok",
+          "desc": "çalışan konteynerleri listeler",
+          "level": "baslangic",
+          "examples": [
+            "çalışan docker konteynerlerini listele",
+            "hangi servisler ayakta"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Konteyner çalışma zamanı; çalışan konteynerleri listele (durdurma/başlatma riskli, gated).",
+        "canDo": [
+          "çalışan konteynerleri listele",
+          "konteyner durumunu gör"
+        ]
+      }
+    },
+    {
+      "rank": 9,
+      "app": "Safari",
+      "scriptable": true,
+      "category": "tarayıcı",
+      "purpose": "En güvenilir AppleScript hedefi; Chrome'a alternatif.",
+      "capabilities": [
+        "sekme yönetimi",
+        "okuma listesi"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "safari.list-tabs",
+          "riskClass": "read",
+          "triggers": [
+            "safari sekmeleri"
+          ],
+          "cmd": "osascript -e 'tell application \"Safari\" to get URL of tabs of window 1'",
+          "arg": "yok",
+          "desc": "sekme URL'lerini listeler",
+          "level": "orta",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "safari sekmelerini listele",
+            "açık safari sayfalarını say"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Apple tarayıcısı; açık sekmeleri AppleScript ile oku.",
+        "canDo": [
+          "açık safari sekmelerini listele",
+          "sekme URL/başlıklarını al"
+        ]
+      }
+    },
+    {
+      "rank": 10,
+      "app": "Claude",
+      "scriptable": false,
+      "category": "AI",
+      "purpose": "Ajan yüzeyi. AppleScript sözlüğü YOK.",
+      "capabilities": [
+        "sohbet",
+        "proje"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "claude.open",
+          "riskClass": "launch",
+          "triggers": [
+            "claude ac"
+          ],
+          "cmd": "open -a \"Claude\"",
+          "arg": "yok",
+          "desc": "Claude açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "Claude'u aç",
+            "Claude masaüstünü başlat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "AI masaüstü uygulaması; uygulamayı aç (sohbet otomasyonu yoktur).",
+        "canDo": [
+          "Claude uygulamasını aç"
+        ]
+      }
+    },
+    {
+      "rank": 11,
+      "app": "Preview",
+      "scriptable": true,
+      "category": "belge",
+      "purpose": "CV ve TÜBİTAK PDF'lerini okuma/yazdırma.",
+      "capabilities": [
+        "PDF",
+        "görsel",
+        "imza"
+      ],
+      "drive": [
+        "CLI",
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "preview.open",
+          "riskClass": "launch",
+          "triggers": [
+            "preview ac"
+          ],
+          "cmd": "open -a \"Preview\"",
+          "arg": "yok",
+          "desc": "Preview açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "bu PDF'i Preview'da aç",
+            "görseli önizle"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Belge/görsel görüntüleyici; bir PDF/görseli Preview'da aç.",
+        "canDo": [
+          "PDF/görsel aç",
+          "belgeyi görüntüle"
+        ]
+      }
+    },
+    {
+      "rank": 12,
+      "app": "Mail",
+      "scriptable": true,
+      "category": "iletişim",
+      "purpose": "İş başvuruları. EN YÜKSEK RİSK: dışa iletim, geri alınamaz.",
+      "capabilities": [
+        "taslak",
+        "gönderme",
+        "arama"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "mail.draft",
+          "riskClass": "communicate-outward",
+          "triggers": [
+            "mail taslagi olustur",
+            "basvuru maili hazirla"
+          ],
+          "cmd": "osascript -e 'tell application \"Mail\" to make new outgoing message with properties {visible:true}'",
+          "arg": "yok",
+          "desc": "GÖRÜNÜR taslak açar — GÖNDERMEZ",
+          "level": "ileri",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "yeni e-posta taslağı oluştur",
+            "taslak hazırla (gönderme yok)"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "E-posta; taslak OLUŞTUR (gönderme gated — operatör onayı). Kart taslağı hazırlar, göndermez.",
+        "canDo": [
+          "taslak e-posta hazırla (göndermez)",
+          "gelen kutusunu aç"
+        ]
+      }
+    },
+    {
+      "rank": 13,
+      "app": "Calendar",
+      "scriptable": true,
+      "category": "üretkenlik",
+      "purpose": "TÜBİTAK ve başvuru tarihleri.",
+      "capabilities": [
+        "etkinlik",
+        "takvim"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "calendar.today",
+          "riskClass": "read",
+          "triggers": [
+            "bugun takvimde ne var",
+            "takvim bugun"
+          ],
+          "cmd": "osascript -e 'tell application \"Calendar\" to get summary of events of calendar 1'",
+          "arg": "yok",
+          "desc": "etkinlik başlıklarını verir",
+          "level": "orta",
+          "requiresTcc": "automation",
+          "verify": "compile",
+          "examples": [
+            "bugün ne var göster",
+            "bugünkü takvimi aç"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Takvim; bugünkü etkinlikleri göster (etkinlik oluşturma riskli).",
+        "canDo": [
+          "bugünkü etkinlikleri göster",
+          "takvimi aç"
+        ]
+      }
+    },
+    {
+      "rank": 14,
+      "app": "Reminders",
+      "scriptable": true,
+      "category": "üretkenlik",
+      "purpose": "Görev şeridi.",
+      "capabilities": [
+        "hatırlatıcı",
+        "liste"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "reminders.open",
+          "riskClass": "launch",
+          "triggers": [
+            "hatirlaticilar ac"
+          ],
+          "cmd": "open -a \"Reminders\"",
+          "arg": "yok",
+          "desc": "Reminders açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "hatırlatıcıları aç",
+            "yapılacaklar listesini göster"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Hatırlatıcılar; uygulamayı aç (liste okuma/yazma otomasyonu ileri seviye).",
+        "canDo": [
+          "hatırlatıcıları aç",
+          "görev listesini göster"
+        ]
+      }
+    },
+    {
+      "rank": 15,
+      "app": "Notes",
+      "scriptable": true,
+      "category": "üretkenlik",
+      "purpose": "Hızlı yakalama.",
+      "capabilities": [
+        "not",
+        "klasör"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "notes.open",
+          "riskClass": "launch",
+          "triggers": [
+            "notlar uygulamasini ac"
+          ],
+          "cmd": "open -a \"Notes\"",
+          "arg": "yok",
+          "desc": "Notes açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "notları aç",
+            "Notes uygulamasını başlat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Notlar; uygulamayı aç (not oluşturma/okuma otomasyonu ileri seviye).",
+        "canDo": [
+          "notları aç",
+          "not defterini göster"
+        ]
+      }
+    },
+    {
+      "rank": 16,
+      "app": "Shortcuts",
+      "scriptable": false,
+      "category": "otomasyon",
+      "purpose": "macOS'un YETKİLENDİRİLMİŞ otomasyon köprüsü. Şu an 0 kısayol var — temiz sayfa.",
+      "capabilities": [
+        "kısayol çalıştırma",
+        "paylaşım"
+      ],
+      "drive": [
+        "CLI",
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "shortcuts.list",
+          "riskClass": "inspect",
+          "triggers": [
+            "kisayollari listele"
+          ],
+          "cmd": "shortcuts list",
+          "arg": "yok",
+          "desc": "tanımlı kısayolları listeler",
+          "level": "baslangic",
+          "examples": [
+            "kısayolları listele",
+            "hangi kısayollar var"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Apple Kısayolları; mevcut kısayolları listele, otomasyon köprüsü (kullanıcı kısayolu yoksa boş).",
+        "canDo": [
+          "kurulu kısayolları listele",
+          "otomasyon köprüsü keşfet"
+        ]
+      }
+    },
+    {
+      "rank": 17,
+      "app": "QuickTime Player",
+      "scriptable": true,
+      "category": "medya",
+      "purpose": "İçerik fabrikası için ekran/ses kaydı.",
+      "capabilities": [
+        "ekran kaydı",
+        "kırpma"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "quicktime.open",
+          "riskClass": "launch",
+          "triggers": [
+            "quicktime ac"
+          ],
+          "cmd": "open -a \"QuickTime Player\"",
+          "arg": "yok",
+          "desc": "QuickTime açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "bu videoyu QuickTime'da aç",
+            "medya dosyasını oynat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Medya oynatıcı/kayıt; bir medya dosyasını aç (ekran/ses kaydı ileri seviye).",
+        "canDo": [
+          "video/ses dosyası aç",
+          "medya oynat"
+        ]
+      }
+    },
+    {
+      "rank": 18,
+      "app": "Activity Monitor",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Ollama ile GPU/RAM çekişmesi — yerel-önce şeridin 1 numaralı arıza sebebi.",
+      "capabilities": [
+        "CPU/RAM",
+        "GPU",
+        "süreç"
+      ],
+      "drive": [
+        "CLI",
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "activity.top-cpu",
+          "riskClass": "inspect",
+          "triggers": [
+            "en cok cpu yiyen",
+            "aktivite monitor yuk"
+          ],
+          "cmd": "ps -Aceo pid,pcpu,comm -r | head -12",
+          "arg": "yok",
+          "desc": "en çok CPU kullanan süreçler",
+          "level": "baslangic",
+          "examples": [
+            "en çok CPU kullanan süreçleri göster",
+            "sistemi ne yavaşlatıyor"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Sistem izleyici; en çok CPU kullanan süreçleri göster (teşhis).",
+        "canDo": [
+          "CPU'yu en çok yiyen süreçleri gör",
+          "sistem yükünü teşhis et"
+        ]
+      }
+    },
+    {
+      "rank": 19,
+      "app": "Cursor",
+      "scriptable": false,
+      "category": "editör",
+      "purpose": "İkincil editör, CLI ile sürülebilir.",
+      "capabilities": [
+        "AI düzenleme"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "cursor.open",
+          "riskClass": "launch",
+          "triggers": [
+            "cursor ac"
+          ],
+          "cmd": "open -a \"Cursor\"",
+          "arg": "yok",
+          "desc": "Cursor açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "projeyi Cursor'da aç",
+            "Cursor editörünü başlat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "AI kod editörü; klasör/dosya aç (`cursor` CLI), VS Code benzeri sür.",
+        "canDo": [
+          "projeyi Cursor'da aç",
+          "AI destekli düzenleme"
+        ]
+      }
+    },
+    {
+      "rank": 20,
+      "app": "CapCut",
+      "scriptable": false,
+      "category": "video",
+      "purpose": "Shorts kurgusu.",
+      "capabilities": [
+        "kurgu",
+        "altyazı"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "capcut.open",
+          "riskClass": "launch",
+          "triggers": [
+            "capcut ac"
+          ],
+          "cmd": "open -a \"CapCut\"",
+          "arg": "yok",
+          "desc": "CapCut açar",
+          "level": "baslangic",
+          "verify": "appExists",
+          "examples": [
+            "CapCut'ı aç",
+            "video editörünü başlat"
+          ]
+        }
+      ],
+      "usage": {
+        "guide": "Video düzenleme; uygulamayı aç (proje otomasyonu yoktur).",
+        "canDo": [
+          "kısa video düzenlemek için CapCut'ı aç"
+        ]
+      }
+    },
+    {
+      "rank": 21,
+      "app": "Microsoft Word",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "CV ve TÜBİTAK formları; AppleScript sözlüğü var.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "microsoft-word.open",
+          "riskClass": "launch",
+          "triggers": [
+            "microsoft word ac"
+          ],
+          "cmd": "open -a \"Microsoft Word\"",
+          "arg": "yok",
+          "desc": "Microsoft Word açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 22,
+      "app": "Microsoft Excel",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "Gelir takibi; AppleScript sözlüğü var.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "microsoft-excel.open",
+          "riskClass": "launch",
+          "triggers": [
+            "microsoft excel ac"
+          ],
+          "cmd": "open -a \"Microsoft Excel\"",
+          "arg": "yok",
+          "desc": "Microsoft Excel açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 23,
+      "app": "LM Studio",
+      "scriptable": false,
+      "category": "AI",
+      "purpose": "Alternatif yerel çalışma zamanı, GGUF incelemesi.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "lm-studio.open",
+          "riskClass": "launch",
+          "triggers": [
+            "lm studio ac"
+          ],
+          "cmd": "open -a \"LM Studio\"",
+          "arg": "yok",
+          "desc": "LM Studio açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 24,
+      "app": "Raycast",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Başlatıcı ve pano geçmişi.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "raycast.open",
+          "riskClass": "launch",
+          "triggers": [
+            "raycast ac"
+          ],
+          "cmd": "open -a \"Raycast\"",
+          "arg": "yok",
+          "desc": "Raycast açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 25,
+      "app": "Rectangle",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Çoklu ajan sekmeleri için pencere düzeni.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "rectangle.open",
+          "riskClass": "launch",
+          "triggers": [
+            "rectangle ac"
+          ],
+          "cmd": "open -a \"Rectangle\"",
+          "arg": "yok",
+          "desc": "Rectangle açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 26,
+      "app": "Photos",
+      "scriptable": true,
+      "category": "medya",
+      "purpose": "Küçük görsel varlıklar; AppleScript ile dışa aktarım.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "photos.open",
+          "riskClass": "launch",
+          "triggers": [
+            "photos ac"
+          ],
+          "cmd": "open -a \"Photos\"",
+          "arg": "yok",
+          "desc": "Photos açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 27,
+      "app": "Music",
+      "scriptable": true,
+      "category": "medya",
+      "purpose": "Altyapı sesi kaynağı.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "music.open",
+          "riskClass": "launch",
+          "triggers": [
+            "music ac"
+          ],
+          "cmd": "open -a \"Music\"",
+          "arg": "yok",
+          "desc": "Music açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 28,
+      "app": "Audacity",
+      "scriptable": false,
+      "category": "ses",
+      "purpose": "Seslendirme temizliği.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "audacity.open",
+          "riskClass": "launch",
+          "triggers": [
+            "audacity ac"
+          ],
+          "cmd": "open -a \"Audacity\"",
+          "arg": "yok",
+          "desc": "Audacity açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 29,
+      "app": "Xcode",
+      "scriptable": true,
+      "category": "geliştirici",
+      "purpose": "AppleScript sözlüğü var; xcrun/simctl araç zincirinin sahibi.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "CLI"
+      ],
+      "ops": [
+        {
+          "opId": "xcode.open",
+          "riskClass": "launch",
+          "triggers": [
+            "xcode ac"
+          ],
+          "cmd": "open -a \"Xcode\"",
+          "arg": "yok",
+          "desc": "Xcode açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 30,
+      "app": "Automator",
+      "scriptable": false,
+      "category": "otomasyon",
+      "purpose": "Quick Action — riskli işlemler için yetkilendirilmiş sarmalayıcı.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "automator.open",
+          "riskClass": "launch",
+          "triggers": [
+            "automator ac"
+          ],
+          "cmd": "open -a \"Automator\"",
+          "arg": "yok",
+          "desc": "Automator açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 31,
+      "app": "Microsoft Outlook",
+      "scriptable": true,
+      "category": "iletişim",
+      "purpose": "Microsoft Outlook — iletişim kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "microsoft-outlook.open",
+          "riskClass": "launch",
+          "triggers": [
+            "microsoft outlook ac"
+          ],
+          "cmd": "open -a \"Microsoft Outlook\"",
+          "arg": "yok",
+          "desc": "Microsoft Outlook açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 32,
+      "app": "Microsoft PowerPoint",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "Microsoft PowerPoint — ofis kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "microsoft-powerpoint.open",
+          "riskClass": "launch",
+          "triggers": [
+            "microsoft powerpoint ac"
+          ],
+          "cmd": "open -a \"Microsoft PowerPoint\"",
+          "arg": "yok",
+          "desc": "Microsoft PowerPoint açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 33,
+      "app": "Microsoft Teams",
+      "scriptable": false,
+      "category": "iletişim",
+      "purpose": "Microsoft Teams — iletişim kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "microsoft-teams.open",
+          "riskClass": "launch",
+          "triggers": [
+            "microsoft teams ac"
+          ],
+          "cmd": "open -a \"Microsoft Teams\"",
+          "arg": "yok",
+          "desc": "Microsoft Teams açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 34,
+      "app": "OneDrive",
+      "scriptable": false,
+      "category": "depolama",
+      "purpose": "OneDrive — depolama kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "onedrive.open",
+          "riskClass": "launch",
+          "triggers": [
+            "onedrive ac"
+          ],
+          "cmd": "open -a \"OneDrive\"",
+          "arg": "yok",
+          "desc": "OneDrive açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 35,
+      "app": "Pages",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "Pages — ofis kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "pages.open",
+          "riskClass": "launch",
+          "triggers": [
+            "pages ac"
+          ],
+          "cmd": "open -a \"Pages\"",
+          "arg": "yok",
+          "desc": "Pages açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 36,
+      "app": "Numbers",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "Numbers — ofis kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "numbers.open",
+          "riskClass": "launch",
+          "triggers": [
+            "numbers ac"
+          ],
+          "cmd": "open -a \"Numbers\"",
+          "arg": "yok",
+          "desc": "Numbers açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 37,
+      "app": "Keynote",
+      "scriptable": true,
+      "category": "ofis",
+      "purpose": "Keynote — ofis kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "keynote.open",
+          "riskClass": "launch",
+          "triggers": [
+            "keynote ac"
+          ],
+          "cmd": "open -a \"Keynote\"",
+          "arg": "yok",
+          "desc": "Keynote açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 38,
+      "app": "Firefox",
+      "scriptable": false,
+      "category": "tarayıcı",
+      "purpose": "Firefox — tarayıcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "firefox.open",
+          "riskClass": "launch",
+          "triggers": [
+            "firefox ac"
+          ],
+          "cmd": "open -a \"Firefox\"",
+          "arg": "yok",
+          "desc": "Firefox açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 39,
+      "app": "Yandex",
+      "scriptable": false,
+      "category": "tarayıcı",
+      "purpose": "Yandex — tarayıcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "yandex.open",
+          "riskClass": "launch",
+          "triggers": [
+            "yandex ac"
+          ],
+          "cmd": "open -a \"Yandex\"",
+          "arg": "yok",
+          "desc": "Yandex açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 40,
+      "app": "Books",
+      "scriptable": false,
+      "category": "okuma",
+      "purpose": "Books — okuma kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "books.open",
+          "riskClass": "launch",
+          "triggers": [
+            "books ac"
+          ],
+          "cmd": "open -a \"Books\"",
+          "arg": "yok",
+          "desc": "Books açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 41,
+      "app": "Contacts",
+      "scriptable": true,
+      "category": "iletişim",
+      "purpose": "Contacts — iletişim kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "contacts.open",
+          "riskClass": "launch",
+          "triggers": [
+            "contacts ac"
+          ],
+          "cmd": "open -a \"Contacts\"",
+          "arg": "yok",
+          "desc": "Contacts açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 42,
+      "app": "Messages",
+      "scriptable": true,
+      "category": "iletişim",
+      "purpose": "Messages — iletişim kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "messages.open",
+          "riskClass": "launch",
+          "triggers": [
+            "messages ac"
+          ],
+          "cmd": "open -a \"Messages\"",
+          "arg": "yok",
+          "desc": "Messages açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 43,
+      "app": "FaceTime",
+      "scriptable": false,
+      "category": "iletişim",
+      "purpose": "FaceTime — iletişim kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "facetime.open",
+          "riskClass": "launch",
+          "triggers": [
+            "facetime ac"
+          ],
+          "cmd": "open -a \"FaceTime\"",
+          "arg": "yok",
+          "desc": "FaceTime açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 44,
+      "app": "Maps",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Maps — yardımcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "maps.open",
+          "riskClass": "launch",
+          "triggers": [
+            "maps ac"
+          ],
+          "cmd": "open -a \"Maps\"",
+          "arg": "yok",
+          "desc": "Maps açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 45,
+      "app": "Weather",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Weather — yardımcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "weather.open",
+          "riskClass": "launch",
+          "triggers": [
+            "weather ac"
+          ],
+          "cmd": "open -a \"Weather\"",
+          "arg": "yok",
+          "desc": "Weather açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 46,
+      "app": "Calculator",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Calculator — yardımcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "calculator.open",
+          "riskClass": "launch",
+          "triggers": [
+            "calculator ac"
+          ],
+          "cmd": "open -a \"Calculator\"",
+          "arg": "yok",
+          "desc": "Calculator açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 47,
+      "app": "TextEdit",
+      "scriptable": true,
+      "category": "editör",
+      "purpose": "TextEdit — editör kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "AppleScript"
+      ],
+      "ops": [
+        {
+          "opId": "textedit.open",
+          "riskClass": "launch",
+          "triggers": [
+            "textedit ac"
+          ],
+          "cmd": "open -a \"TextEdit\"",
+          "arg": "yok",
+          "desc": "TextEdit açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 48,
+      "app": "Stickies",
+      "scriptable": false,
+      "category": "yardımcı",
+      "purpose": "Stickies — yardımcı kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "stickies.open",
+          "riskClass": "launch",
+          "triggers": [
+            "stickies ac"
+          ],
+          "cmd": "open -a \"Stickies\"",
+          "arg": "yok",
+          "desc": "Stickies açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 49,
+      "app": "Freeform",
+      "scriptable": false,
+      "category": "tasarım",
+      "purpose": "Freeform — tasarım kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "freeform.open",
+          "riskClass": "launch",
+          "triggers": [
+            "freeform ac"
+          ],
+          "cmd": "open -a \"Freeform\"",
+          "arg": "yok",
+          "desc": "Freeform açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 50,
+      "app": "Console",
+      "scriptable": false,
+      "category": "geliştirici",
+      "purpose": "Console — geliştirici kategorisinde sık kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "console.open",
+          "riskClass": "launch",
+          "triggers": [
+            "console ac"
+          ],
+          "cmd": "open -a \"Console\"",
+          "arg": "yok",
+          "desc": "Console açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 51,
+      "app": "Time Machine",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Time Machine — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "time-machine.open",
+          "riskClass": "launch",
+          "triggers": [
+            "time machine ac"
+          ],
+          "cmd": "open -a \"Time Machine\"",
+          "arg": "yok",
+          "desc": "Time Machine açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 52,
+      "app": "Image Capture",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Image Capture — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "image-capture.open",
+          "riskClass": "launch",
+          "triggers": [
+            "image capture ac"
+          ],
+          "cmd": "open -a \"Image Capture\"",
+          "arg": "yok",
+          "desc": "Image Capture açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 53,
+      "app": "Font Book",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Font Book — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "font-book.open",
+          "riskClass": "launch",
+          "triggers": [
+            "font book ac"
+          ],
+          "cmd": "open -a \"Font Book\"",
+          "arg": "yok",
+          "desc": "Font Book açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 54,
+      "app": "Dictionary",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Dictionary — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "dictionary.open",
+          "riskClass": "launch",
+          "triggers": [
+            "dictionary ac"
+          ],
+          "cmd": "open -a \"Dictionary\"",
+          "arg": "yok",
+          "desc": "Dictionary açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 55,
+      "app": "Podcasts",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Podcasts — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "podcasts.open",
+          "riskClass": "launch",
+          "triggers": [
+            "podcasts ac"
+          ],
+          "cmd": "open -a \"Podcasts\"",
+          "arg": "yok",
+          "desc": "Podcasts açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 56,
+      "app": "TV",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "TV — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "tv.open",
+          "riskClass": "launch",
+          "triggers": [
+            "tv ac"
+          ],
+          "cmd": "open -a \"TV\"",
+          "arg": "yok",
+          "desc": "TV açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 57,
+      "app": "VoiceMemos",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "VoiceMemos — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "voicememos.open",
+          "riskClass": "launch",
+          "triggers": [
+            "voicememos ac"
+          ],
+          "cmd": "open -a \"VoiceMemos\"",
+          "arg": "yok",
+          "desc": "VoiceMemos açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 58,
+      "app": "Passwords",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Passwords — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "passwords.open",
+          "riskClass": "launch",
+          "triggers": [
+            "passwords ac"
+          ],
+          "cmd": "open -a \"Passwords\"",
+          "arg": "yok",
+          "desc": "Passwords açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 59,
+      "app": "Home",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Home — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "home.open",
+          "riskClass": "launch",
+          "triggers": [
+            "home ac"
+          ],
+          "cmd": "open -a \"Home\"",
+          "arg": "yok",
+          "desc": "Home açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 60,
+      "app": "Screenshot",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Screenshot — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "screenshot.open",
+          "riskClass": "launch",
+          "triggers": [
+            "screenshot ac"
+          ],
+          "cmd": "open -a \"Screenshot\"",
+          "arg": "yok",
+          "desc": "Screenshot açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 61,
+      "app": "Disk Utility",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Disk Utility — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "disk-utility.open",
+          "riskClass": "launch",
+          "triggers": [
+            "disk utility ac"
+          ],
+          "cmd": "open -a \"Disk Utility\"",
+          "arg": "yok",
+          "desc": "Disk Utility açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 62,
+      "app": "Terminal",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Terminal — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "terminal.open",
+          "riskClass": "launch",
+          "triggers": [
+            "terminal uygulamasini ac",
+            "apple terminal ac"
+          ],
+          "cmd": "open -a \"Terminal\"",
+          "arg": "yok",
+          "desc": "Terminal açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 63,
+      "app": "Hyper",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Hyper — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "hyper.open",
+          "riskClass": "launch",
+          "triggers": [
+            "hyper ac"
+          ],
+          "cmd": "open -a \"Hyper\"",
+          "arg": "yok",
+          "desc": "Hyper açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 64,
+      "app": "PowerShell",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "PowerShell — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "powershell.open",
+          "riskClass": "launch",
+          "triggers": [
+            "powershell ac"
+          ],
+          "cmd": "open -a \"PowerShell\"",
+          "arg": "yok",
+          "desc": "PowerShell açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 65,
+      "app": "Multipass",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Multipass — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "multipass.open",
+          "riskClass": "launch",
+          "triggers": [
+            "multipass ac"
+          ],
+          "cmd": "open -a \"Multipass\"",
+          "arg": "yok",
+          "desc": "Multipass açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 66,
+      "app": "Tailscale",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Tailscale — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "tailscale.open",
+          "riskClass": "launch",
+          "triggers": [
+            "tailscale ac"
+          ],
+          "cmd": "open -a \"Tailscale\"",
+          "arg": "yok",
+          "desc": "Tailscale açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 67,
+      "app": "Stats",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Stats — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "stats.open",
+          "riskClass": "launch",
+          "triggers": [
+            "stats ac"
+          ],
+          "cmd": "open -a \"Stats\"",
+          "arg": "yok",
+          "desc": "Stats açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 68,
+      "app": "AltTab",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "AltTab — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "alttab.open",
+          "riskClass": "launch",
+          "triggers": [
+            "alttab ac"
+          ],
+          "cmd": "open -a \"AltTab\"",
+          "arg": "yok",
+          "desc": "AltTab açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 69,
+      "app": "Bruno",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Bruno — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "bruno.open",
+          "riskClass": "launch",
+          "triggers": [
+            "bruno ac"
+          ],
+          "cmd": "open -a \"Bruno\"",
+          "arg": "yok",
+          "desc": "Bruno açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 70,
+      "app": "Blackbox",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Blackbox — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "blackbox.open",
+          "riskClass": "launch",
+          "triggers": [
+            "blackbox ac"
+          ],
+          "cmd": "open -a \"Blackbox\"",
+          "arg": "yok",
+          "desc": "Blackbox açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 71,
+      "app": "OpenCode",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "OpenCode — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "opencode.open",
+          "riskClass": "launch",
+          "triggers": [
+            "opencode ac"
+          ],
+          "cmd": "open -a \"OpenCode\"",
+          "arg": "yok",
+          "desc": "OpenCode açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 72,
+      "app": "Windsurf",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Windsurf — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "windsurf.open",
+          "riskClass": "launch",
+          "triggers": [
+            "windsurf ac"
+          ],
+          "cmd": "open -a \"Windsurf\"",
+          "arg": "yok",
+          "desc": "Windsurf açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 73,
+      "app": "Antigravity",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Antigravity — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "antigravity.open",
+          "riskClass": "launch",
+          "triggers": [
+            "antigravity ac"
+          ],
+          "cmd": "open -a \"Antigravity\"",
+          "arg": "yok",
+          "desc": "Antigravity açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 74,
+      "app": "AnythingLLM",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "AnythingLLM — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "anythingllm.open",
+          "riskClass": "launch",
+          "triggers": [
+            "anythingllm ac"
+          ],
+          "cmd": "open -a \"AnythingLLM\"",
+          "arg": "yok",
+          "desc": "AnythingLLM açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 75,
+      "app": "Kimi",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Kimi — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "kimi.open",
+          "riskClass": "launch",
+          "triggers": [
+            "kimi ac"
+          ],
+          "cmd": "open -a \"Kimi\"",
+          "arg": "yok",
+          "desc": "Kimi açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 76,
+      "app": "ChatGPT",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "ChatGPT — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "chatgpt.open",
+          "riskClass": "launch",
+          "triggers": [
+            "chatgpt ac"
+          ],
+          "cmd": "open -a \"ChatGPT\"",
+          "arg": "yok",
+          "desc": "ChatGPT açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 77,
+      "app": "Pinokio",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Pinokio — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "pinokio.open",
+          "riskClass": "launch",
+          "triggers": [
+            "pinokio ac"
+          ],
+          "cmd": "open -a \"Pinokio\"",
+          "arg": "yok",
+          "desc": "Pinokio açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 78,
+      "app": "GarageBand",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "GarageBand — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "garageband.open",
+          "riskClass": "launch",
+          "triggers": [
+            "garageband ac"
+          ],
+          "cmd": "open -a \"GarageBand\"",
+          "arg": "yok",
+          "desc": "GarageBand açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 79,
+      "app": "iMovie",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "iMovie — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "imovie.open",
+          "riskClass": "launch",
+          "triggers": [
+            "imovie ac"
+          ],
+          "cmd": "open -a \"iMovie\"",
+          "arg": "yok",
+          "desc": "iMovie açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 80,
+      "app": "Reel Maker",
+      "scriptable": false,
+      "category": "ara sıra",
+      "purpose": "Reel Maker — ara sıra kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "reel-maker.open",
+          "riskClass": "launch",
+          "triggers": [
+            "reel maker ac"
+          ],
+          "cmd": "open -a \"Reel Maker\"",
+          "arg": "yok",
+          "desc": "Reel Maker açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 81,
+      "app": "RODE Connect",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "RODE Connect — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "rode-connect.open",
+          "riskClass": "launch",
+          "triggers": [
+            "rode connect ac"
+          ],
+          "cmd": "open -a \"RODE Connect\"",
+          "arg": "yok",
+          "desc": "RODE Connect açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 82,
+      "app": "RODE PadsMobile",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "RODE PadsMobile — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "rode-padsmobile.open",
+          "riskClass": "launch",
+          "triggers": [
+            "rode padsmobile ac"
+          ],
+          "cmd": "open -a \"RODE PadsMobile\"",
+          "arg": "yok",
+          "desc": "RODE PadsMobile açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 83,
+      "app": "Focusrite Control",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Focusrite Control — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "focusrite-control.open",
+          "riskClass": "launch",
+          "triggers": [
+            "focusrite control ac"
+          ],
+          "cmd": "open -a \"Focusrite Control\"",
+          "arg": "yok",
+          "desc": "Focusrite Control açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 84,
+      "app": "Focusrite Control 2",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Focusrite Control 2 — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "focusrite-control-2.open",
+          "riskClass": "launch",
+          "triggers": [
+            "focusrite control 2 ac"
+          ],
+          "cmd": "open -a \"Focusrite Control 2\"",
+          "arg": "yok",
+          "desc": "Focusrite Control 2 açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 85,
+      "app": "Image Playground",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Image Playground — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "image-playground.open",
+          "riskClass": "launch",
+          "triggers": [
+            "image playground ac"
+          ],
+          "cmd": "open -a \"Image Playground\"",
+          "arg": "yok",
+          "desc": "Image Playground açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 86,
+      "app": "Script Editor",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Script Editor — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "script-editor.open",
+          "riskClass": "launch",
+          "triggers": [
+            "script editor ac"
+          ],
+          "cmd": "open -a \"Script Editor\"",
+          "arg": "yok",
+          "desc": "Script Editor açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 87,
+      "app": "Keychain Access",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Keychain Access — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "keychain-access.open",
+          "riskClass": "launch",
+          "triggers": [
+            "keychain access ac"
+          ],
+          "cmd": "open -a \"Keychain Access\"",
+          "arg": "yok",
+          "desc": "Keychain Access açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 88,
+      "app": "ColorSync Utility",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "ColorSync Utility — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "colorsync-utility.open",
+          "riskClass": "launch",
+          "triggers": [
+            "colorsync utility ac"
+          ],
+          "cmd": "open -a \"ColorSync Utility\"",
+          "arg": "yok",
+          "desc": "ColorSync Utility açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 89,
+      "app": "Digital Color Meter",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Digital Color Meter — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "digital-color-meter.open",
+          "riskClass": "launch",
+          "triggers": [
+            "digital color meter ac"
+          ],
+          "cmd": "open -a \"Digital Color Meter\"",
+          "arg": "yok",
+          "desc": "Digital Color Meter açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 90,
+      "app": "Audio MIDI Setup",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Audio MIDI Setup — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "audio-midi-setup.open",
+          "riskClass": "launch",
+          "triggers": [
+            "audio midi setup ac"
+          ],
+          "cmd": "open -a \"Audio MIDI Setup\"",
+          "arg": "yok",
+          "desc": "Audio MIDI Setup açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 91,
+      "app": "Screen Sharing",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Screen Sharing — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "screen-sharing.open",
+          "riskClass": "launch",
+          "triggers": [
+            "screen sharing ac"
+          ],
+          "cmd": "open -a \"Screen Sharing\"",
+          "arg": "yok",
+          "desc": "Screen Sharing açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 92,
+      "app": "Feedback Assistant",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Feedback Assistant — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "feedback-assistant.open",
+          "riskClass": "launch",
+          "triggers": [
+            "feedback assistant ac"
+          ],
+          "cmd": "open -a \"Feedback Assistant\"",
+          "arg": "yok",
+          "desc": "Feedback Assistant açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 93,
+      "app": "Wireless Diagnostics",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Wireless Diagnostics — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "wireless-diagnostics.open",
+          "riskClass": "launch",
+          "triggers": [
+            "wireless diagnostics ac"
+          ],
+          "cmd": "open -a \"Wireless Diagnostics\"",
+          "arg": "yok",
+          "desc": "Wireless Diagnostics açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 94,
+      "app": "Migration Assistant",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Migration Assistant — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "migration-assistant.open",
+          "riskClass": "launch",
+          "triggers": [
+            "migration assistant ac"
+          ],
+          "cmd": "open -a \"Migration Assistant\"",
+          "arg": "yok",
+          "desc": "Migration Assistant açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 95,
+      "app": "VoiceOver Utility",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "VoiceOver Utility — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "voiceover-utility.open",
+          "riskClass": "launch",
+          "triggers": [
+            "voiceover utility ac"
+          ],
+          "cmd": "open -a \"VoiceOver Utility\"",
+          "arg": "yok",
+          "desc": "VoiceOver Utility açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 96,
+      "app": "Ticket Viewer",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Ticket Viewer — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "ticket-viewer.open",
+          "riskClass": "launch",
+          "triggers": [
+            "ticket viewer ac"
+          ],
+          "cmd": "open -a \"Ticket Viewer\"",
+          "arg": "yok",
+          "desc": "Ticket Viewer açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 97,
+      "app": "Grapher",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Grapher — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "grapher.open",
+          "riskClass": "launch",
+          "triggers": [
+            "grapher ac"
+          ],
+          "cmd": "open -a \"Grapher\"",
+          "arg": "yok",
+          "desc": "Grapher açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 98,
+      "app": "Chess",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Chess — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "chess.open",
+          "riskClass": "launch",
+          "triggers": [
+            "chess ac"
+          ],
+          "cmd": "open -a \"Chess\"",
+          "arg": "yok",
+          "desc": "Chess açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 99,
+      "app": "Photo Booth",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Photo Booth — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "photo-booth.open",
+          "riskClass": "launch",
+          "triggers": [
+            "photo booth ac"
+          ],
+          "cmd": "open -a \"Photo Booth\"",
+          "arg": "yok",
+          "desc": "Photo Booth açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    },
+    {
+      "rank": 100,
+      "app": "Siri",
+      "scriptable": false,
+      "category": "durumsal",
+      "purpose": "Siri — duruma göre kullanılan uygulama.",
+      "capabilities": [
+        "temel kullanım"
+      ],
+      "drive": [
+        "yalnız GUI"
+      ],
+      "ops": [
+        {
+          "opId": "siri.open",
+          "riskClass": "launch",
+          "triggers": [
+            "siri ac"
+          ],
+          "cmd": "open -a \"Siri\"",
+          "arg": "yok",
+          "desc": "Siri açar",
+          "level": "baslangic",
+          "verify": "appExists"
+        }
+      ]
+    }
+  ]
 }

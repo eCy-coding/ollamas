@@ -28,6 +28,9 @@ export interface AppOp {
   /** İlk çalıştırmada macOS'un soracağı izin — kart bunu AÇIKLAR, etrafından dolanmaz. */
   requiresTcc?: "automation" | "screen" | "files";
   verify?: "compile" | "appExists" | "parse" | "none";
+  /** DERİNLİK: bu op için çoklu örnek kullanım (Türkçe niyet ya da komut varyasyonu).
+   *  Sistemler tek `cmd`+tek-satır `desc` yerine "nasıl kullanılır" örnekleri öğrenir. */
+  examples?: string[];
 }
 
 export interface AppCard {
@@ -42,6 +45,9 @@ export interface AppCard {
   /** Nasıl sürülür: CLI / AppleScript / Shortcuts / yalnız-GUI. */
   drive: string[];
   ops: AppOp[];
+  /** DERİNLİK: kullanım kılavuzu — "app X'i nasıl kullanırım" adım-anlatı + "ne yaparım"
+   *  maddeleri. Top-20 kart elle zengin; kalanı loop self-author (app-usage-author). */
+  usage?: { guide: string; canDo: string[] };
 }
 
 export interface TeachRecord {
@@ -67,6 +73,11 @@ export function buildAppLiteracyRecords(cards: AppCard[]): TeachRecord[] {
   const out: TeachRecord[] = [];
   for (const c of cards) {
     const slug = c.app.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    // DERİNLİK: usage varsa "nasıl kullanılır" kılavuzu + "app X ile ne yaparım" eklenir;
+    // yoksa sığ içerik (geriye uyum — usage'sız kartlar aynen öğretilir).
+    const usageBlock = c.usage
+      ? ` Kullanım: ${c.usage.guide} Neler yapabilir: ${c.usage.canDo.join("; ")}.`
+      : "";
     out.push({
       id: `teach:app:${slug}`,
       actor: "macos",
@@ -74,19 +85,23 @@ export function buildAppLiteracyRecords(cards: AppCard[]): TeachRecord[] {
         `${c.app} (#${c.rank}, ${c.category}): ${c.purpose} ` +
         `Yapabildikleri: ${c.capabilities.join("; ")}. ` +
         `Nasıl sürülür: ${c.drive.join("; ")}. ` +
-        `AppleScript sözlüğü: ${c.scriptable ? "VAR" : "YOK"}.`,
+        `AppleScript sözlüğü: ${c.scriptable ? "VAR" : "YOK"}.${usageBlock}`,
       fact: { subject: c.app, predicate: "kategori", object: c.category },
     });
     for (const op of c.ops) {
       const tcc = op.requiresTcc
         ? ` İlk çalıştırmada macOS "${op.requiresTcc}" izni soracak — kabul etmek operatöre aittir.`
         : "";
+      // DERİNLİK: örnek komutlar op kaydına eklenir (çoklu kullanım biçimi öğrenilir).
+      const examplesBlock = op.examples?.length
+        ? ` Örnek kullanımlar: ${op.examples.join("; ")}.`
+        : "";
       out.push({
         id: `teach:app:${slug}:op:${op.opId.split(".").pop()}`,
         actor: "macos",
         content:
           `${c.app} · ${op.desc} — komut: ${op.cmd} ` +
-          `(risk sınıfı: ${op.riskClass}, seviye: ${op.level}).${tcc}`,
+          `(risk sınıfı: ${op.riskClass}, seviye: ${op.level}).${tcc}${examplesBlock}`,
       });
     }
   }

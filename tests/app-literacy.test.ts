@@ -43,6 +43,38 @@ describe("buildAppLiteracyRecords", () => {
   test("AppleScript sözlüğünün varlığı kaydedilir", () => {
     expect(buildAppLiteracyRecords([card({ scriptable: false })])[0].content).toContain("YOK");
   });
+
+  // DERİNLİK: kartlarda usage (kullanım kılavuzu + "ne yaparım") ve op'larda examples
+  // (çoklu örnek komut) → sistemler app'i KULLANMAYI öğrenir, tek satır desc değil.
+  test("usage VARSA kart kaydına kılavuz + canDo ('app X ile ne yaparım') girer", () => {
+    const r = buildAppLiteracyRecords([card({
+      usage: { guide: "iTerm'i geliştirme için böyle kullan", canDo: ["çoklu sekme", "ssh oturumu"] },
+    })]);
+    expect(r[0].content).toContain("iTerm'i geliştirme için böyle kullan");
+    expect(r[0].content).toContain("çoklu sekme");
+    expect(r[0].content).toContain("ssh oturumu");
+  });
+
+  test("op examples VARSA kullanım kaydına örnek komutlar girer", () => {
+    const r = buildAppLiteracyRecords([card({
+      ops: [{
+        opId: "chrome.list-tabs", riskClass: "read", triggers: ["chrome sekmeleri"],
+        cmd: "osascript -e 'x'", arg: "yok", desc: "listeler", level: "baslangic",
+        examples: ["chrome sekmelerini say", "aktif sekme URL'sini al"],
+      }],
+    })]);
+    const opRec = r.find((x) => x.id.includes(":op:"))!;
+    expect(opRec.content).toContain("chrome sekmelerini say");
+    expect(opRec.content).toContain("aktif sekme URL'sini al");
+  });
+
+  test("usage/examples YOKSA sığ içerik (geriye uyum — mevcut kartlar bozulmaz)", () => {
+    const r = buildAppLiteracyRecords([card()]);
+    // Yeni alanların hiçbiri yoksa eski davranış: kart + op kaydı, ekstra kılavuz yok.
+    expect(r).toHaveLength(2);
+    expect(r[0].content).not.toContain("Kullanım:");
+    expect(r[0].content).toContain("Varsayılan tarayıcı"); // eski içerik korunur
+  });
 });
 
 describe("buildAppEcymCommands — İKİ kapının kesişimi", () => {
