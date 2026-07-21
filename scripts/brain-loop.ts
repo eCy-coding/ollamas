@@ -196,7 +196,10 @@ async function exerciseSandbox(
   // gate-ce-train'in KENDİ dalı var (adım 3.5, turn%10). Egzersizci rotasyonuna da
   // girerse sandbox slotlarının 1/3'ü "tanımsız koşu" diye boşa gider — canlı ilk
   // turda görüldü. Egzersizci yalnız kendi koşusu OLMAYAN yetenekleri döndürür.
-  const OWN_PATH = new Set(["gate-ce-train"]);
+  // KENDİ dalı olan yetenekler egzersizci rotasyonundan ÇIKARILIR (yoksa sandboxIdFor
+  // onları seçip prepareSandboxRun'da "tanımsız" fırlatır): gate-ce-train (turn%10),
+  // app-usage-author (turn%7). logprob-pfinal DAHİL DEĞİL — o prepareSandboxRun'dan geçer.
+  const OWN_PATH = new Set(["gate-ce-train", "app-usage-author"]);
   const eligible = { ...ledger, caps: Object.fromEntries(Object.entries(ledger.caps).filter(([k]) => !OWN_PATH.has(k))) };
   const id = sandboxIdFor(eligible, turn);
   if (!id) return; // terfi bekleyen yetenek yok
@@ -313,6 +316,32 @@ async function prepareSandboxRun(
         return { citedRetention: citedRetentionInSet(cited, sourceIds, ctx), len: ctx.length };
       },
       metricOf: (x) => x?.citedRetention,
+    };
+  }
+
+  if (id === "logprob-pfinal") {
+    // F7 GERÇEK p_final: p_final = Σ_j w_j·p_j, p_j = exp(ortalama token logprob).
+    // METRİK SINIFI: KALİTE DEĞİL — coverage (hesaplanabilirlik). Yalnız ollamas (yerel
+    // ollama /v1/chat/completions) logprob verir; ecym/odysseus DIŞLANIR (null, sıfır
+    // DEĞİL — sıfır "kesinlikle yanlış" ilan ederdi, oysa yalnız ÖLÇÜLEMEDİ). coverage<1
+    // dürüstçe raporlanır; "tam p_final" diye sunulmaz.
+    const { fetchAvgLogprob } = await import("../server/brain-logprob");
+    const { perTokenMixture, EXPERTS } = await import("../server/brain-formulas");
+    const weights: number[] = EXPERTS.map((e: string) => Number(r?.weights?.[e] ?? 0));
+    const ctxText = sources.slice(0, 4).map((s) => s.excerpt).join("\n").slice(0, 1200);
+    const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+    const model = process.env.ECY_DISTILL_MODEL || process.env.ECY_MODEL || "qwen3:8b";
+    return {
+      run: async () => {
+        // ollamas uzmanının kısa yanıtının per-token logprob'u (yerel ollama).
+        const avg = await fetchAvgLogprob(ollamaUrl, model,
+          [{ role: "user", content: `KAYNAKLAR:\n${ctxText}\n\nKaynaklara dayanarak kısa yanıtla.` }],
+          { maxTokens: 48, timeoutMs: 25_000 });
+        // Yalnız ollamas slot'u dolar; ecym/odysseus bu yolda logprob VERMEZ → null → dışlanır.
+        const mix = perTokenMixture([avg, null, null], weights);
+        return { coverage: mix.coverage, pFinal: mix.pFinal, ollamasAvg: avg };
+      },
+      metricOf: (x) => x?.coverage,
     };
   }
 
