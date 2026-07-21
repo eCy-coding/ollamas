@@ -50,13 +50,14 @@ describe("toMarkdown / parseMarkdown round-trip", () => {
     expect(p.frontmatter.tags).toContain("ns/loop");
   });
   test("Related [[wikilinks]] render but never leak into the parsed body", () => {
-    const md = toMarkdown(mem(), ["core:emre", "loop:7d9e"]);
+    const md = toMarkdown(mem(), ["core-emre", "loop-7d9e"]); // resolved basenames
     expect(md).toContain("## Related");
     expect(md).toContain("[[core-emre]]");
+    expect(md).toContain("[[loop-7d9e]]");
     expect(parseMarkdown(md).memory!.content).toBe("gate persists via W_g store");
   });
   test("self-link and duplicates are dropped from Related", () => {
-    const md = toMarkdown(mem(), ["loop:a1b2", "core:emre", "core:emre"]);
+    const md = toMarkdown(mem(), ["loop-a1b2", "core-emre", "core-emre"]); // self basename + dup
     expect(md.match(/\[\[core-emre\]\]/g)).toHaveLength(1);
     expect(md).not.toContain("[[loop-a1b2]]");
   });

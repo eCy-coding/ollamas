@@ -135,6 +135,57 @@ describe("prune: memory consolidated out of brain removes its stale note (safe)"
   });
 });
 
+describe("rich graph: dense linking + .obsidian config + MOC", () => {
+  test("neighbor memories become [[wikilinks]] in the note (graph density)", async () => {
+    await seed(dbPath);
+    const neighbors = () => new Map([["core:emre", ["loop:a1b2"]]]);
+    await syncObsidian("push", { vault, dbPath, neighbors });
+    const note = readFileSync(join(vault, "core", "core-emre.md"), "utf8");
+    expect(note).toContain("## Related");
+    expect(note).toContain("[[loop-a1b2]]"); // linked to its nearest neighbor
+  });
+
+  test("entity mentioned in content becomes an [[entity-X]] link", async () => {
+    await seed(dbPath); // facts: Emre operates ollamas ⇒ entities emre/ollamas/brain
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    const note = readFileSync(join(vault, "core", "core-emre.md"), "utf8");
+    expect(note).toContain("[[entity-emre]]"); // "Emre is the sovereign operator" mentions emre
+  });
+
+  test("ships a .obsidian graph config with tier color groups", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    const graph = JSON.parse(readFileSync(join(vault, ".obsidian", "graph.json"), "utf8"));
+    expect(graph.colorGroups.some((g: any) => g.query === "tag:#tier/core")).toBe(true);
+    expect(graph.colorGroups.some((g: any) => g.query === "tag:#entity")).toBe(true);
+    expect(existsSync(join(vault, ".obsidian", "core-plugins.json"))).toBe(true);
+  });
+
+  test("neighborsFromDb returns self-excluded neighbors from stored vectors", async () => {
+    await seed(dbPath);
+    const { neighborsFromDb } = await import("../server/brain-portable");
+    const nb = neighborsFromDb(dbPath, 2);
+    expect(nb.size).toBeGreaterThan(0);
+    for (const [id, near] of nb) { expect(near).not.toContain(id); expect(near.length).toBeLessThanOrEqual(2); }
+  });
+
+  test("MOC has Dataview dashboards", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    const moc = readFileSync(join(vault, "_index", "MOC.md"), "utf8");
+    expect(moc).toContain("```dataview");
+    expect(moc).toContain("#tier/learned");
+  });
+
+  test("links change → note re-rendered (linksHash tracked)", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map([["core:emre", ["loop:a1b2"]]]) });
+    const r = await syncObsidian("push", { vault, dbPath, neighbors: () => new Map([["core:emre", ["work:tmp"]]]) });
+    expect(r.push.written).toBeGreaterThanOrEqual(1); // core-emre re-rendered for the new neighbor
+    expect(readFileSync(join(vault, "core", "core-emre.md"), "utf8")).toContain("[[work-tmp]]");
+  });
+});
+
 describe("tier move: one memory = exactly one note (no cross-tier duplicate)", () => {
   test("a memory that changes tier leaves no stale note in the old tier folder", async () => {
     await seed(dbPath);

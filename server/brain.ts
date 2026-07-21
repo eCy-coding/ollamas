@@ -150,6 +150,8 @@ export interface BrainStore {
   /** Entity graph (V1) for the namespace: live facts + recent superseded, reified into
    *  nodes/edges with degree centrality. Feeds the live brain map. */
   graph(opts?: { ns?: string; at?: number; limit?: number }): Promise<BrainGraph>;
+  /** memory→memory nearest neighbors (stored-vector KNN, no re-embed): memId → neighbor memIds. */
+  neighbors(k?: number): Map<string, string[]>;
   close(): void;
 }
 
@@ -956,6 +958,25 @@ export function createBrainStore(
       return (db.prepare("SELECT DISTINCT ns FROM brain_memories ORDER BY ns").all() as { ns: string }[]).map((r) => r.ns);
     },
 
+    neighbors(k = 5) {
+      // memory→memory nearest neighbors over the STORED vectors (no re-embedding — reuse
+      // what's already in brain_vec). One KNN per live memory; self excluded. This is the
+      // density source for the Obsidian graph (otherwise notes are isolated dots).
+      const mems = db.prepare("SELECT rowid, mem_id AS id FROM brain_memories WHERE superseded_at IS NULL").all() as { rowid: number; id: string }[];
+      const idByRow = new Map<number, string>(mems.map((m) => [m.rowid, m.id]));
+      const readVec = db.prepare("SELECT embedding FROM brain_vec WHERE rowid=?");
+      const knn = db.prepare("SELECT rowid FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?");
+      const out = new Map<string, string[]>();
+      for (const m of mems) {
+        const vrow = readVec.get(BigInt(m.rowid)) as { embedding: Uint8Array } | undefined;
+        if (!vrow) continue; // lexical-only memory (no vector) — no neighbors
+        const rows = knn.all(vrow.embedding, k + 1) as { rowid: number }[];
+        const near = rows.map((r) => idByRow.get(r.rowid)).filter((id): id is string => !!id && id !== m.id).slice(0, k);
+        if (near.length) out.set(m.id, near);
+      }
+      return out;
+    },
+
     factsAbout(subject, { ns, at } = {}) {
       const t = at ?? now();
       const rows = db
@@ -1206,3 +1227,4 @@ export const brainAuditTail = (limit?: number) => store().auditTail(limit);
 export const brainStats = () => store().stats();
 export const brainOverview = (o?: { recent?: number }) => store().overview(o);
 export const brainGraph = (o?: { ns?: string; at?: number; limit?: number }) => store().graph(o);
+export const brainNeighbors = (k?: number) => store().neighbors(k);

@@ -16,7 +16,7 @@ import {
   mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, statSync, rmSync,
 } from "node:fs";
 import { join } from "node:path";
-import { exportBrain, type BrainDump } from "./brain-portable";
+import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, TIERS, type NoteMemory } from "./brain-obsidian-note";
 
 export function defaultVaultPath(): string {
@@ -26,7 +26,7 @@ export function defaultDbPath(): string {
   return process.env.BRAIN_DB_PATH || `${process.env.HOME}/.llm-mission-control/brain.db`;
 }
 
-interface ManifestEntry { brainHash: string; vaultHash: string; tier?: string }
+interface ManifestEntry { brainHash: string; vaultHash: string; tier?: string; linksHash?: string }
 type Manifest = Record<string, ManifestEntry>;
 
 interface SyncOpts {
@@ -34,6 +34,8 @@ interface SyncOpts {
   dbPath?: string;
   /** injected for tests — defaults to the real in-process brainRemember. */
   remember?: (m: { id: string; tier: any; content: string; source?: string; ns?: string; createdAt?: number; hits?: number }) => Promise<unknown>;
+  /** injected for tests — memId → neighbor memIds; defaults to the live brainNeighbors. */
+  neighbors?: () => Map<string, string[]>;
 }
 export type Direction = "both" | "push" | "pull";
 
@@ -62,6 +64,42 @@ function ensureDirs(vault: string): void {
   mkdirSync(join(vault, "_index", "conflicts"), { recursive: true });
 }
 
+const entityBase = (label: string) => `entity-${noteFilename(label.toLowerCase().trim()).replace(/\.md$/, "")}`;
+const memBase = (id: string) => noteFilename(id).replace(/\.md$/, "");
+
+// Distinct entity labels (subjects+objects of live facts) → { basename, matchers }. Short
+// labels (<4 chars) are dropped to avoid linking every note to "a"/"os"-type noise.
+interface EntityIndex { labels: { lower: string; base: string }[] }
+function buildEntityIndex(facts: BrainDump["facts"]): EntityIndex {
+  const seen = new Set<string>();
+  const labels: { lower: string; base: string }[] = [];
+  for (const f of facts.filter((x) => x.invalidatedAt === null)) {
+    for (const raw of [f.subject, f.object]) {
+      const lower = raw.toLowerCase().trim();
+      if (lower.length < 4 || seen.has(lower)) continue;
+      seen.add(lower);
+      labels.push({ lower, base: entityBase(raw) });
+    }
+  }
+  return { labels };
+}
+
+/** entity notes mentioned in a memory's content (word-ish, case-insensitive), capped. */
+function mentionsOf(content: string, idx: EntityIndex, cap = 8): string[] {
+  const lc = content.toLowerCase();
+  const out: string[] = [];
+  for (const l of idx.labels) {
+    if (lc.includes(l.lower)) { out.push(l.base); if (out.length >= cap) break; }
+  }
+  return out;
+}
+
+/** resolved link basenames for a memory note: nearest-neighbor memories + entity mentions. */
+function linksFor(id: string, content: string, neighbors: Map<string, string[]>, idx: EntityIndex): string[] {
+  const nb = (neighbors.get(id) || []).map(memBase);
+  return [...new Set([...nb, ...mentionsOf(content, idx)])].sort();
+}
+
 // ── Entity graph (fact side) → linked notes so Obsidian's graph = the brain fact graph ──
 function writeEntityNotes(vault: string, facts: BrainDump["facts"]): number {
   const live = facts.filter((f) => f.invalidatedAt === null);
@@ -85,12 +123,58 @@ function writeEntityNotes(vault: string, facts: BrainDump["facts"]): number {
   return written;
 }
 
+// Per-tier graph node color (decimal RGB) — mirrors the ollamas dashboard palette so the
+// Obsidian graph reads as tiered clusters, not a grey blob.
+const TIER_RGB: Record<string, number> = {
+  core: 0xffd700, learned: 0x00d4ff, procedural: 0x7b5ea7, episodic: 0x00c896, working: 0x8a9bb0,
+};
+
+// create-once: ship a beautiful default graph (color groups + plugins) but never clobber
+// the user's own Obsidian tweaks on a later sync.
+function writeObsidianConfig(vault: string): void {
+  const dir = join(vault, ".obsidian");
+  mkdirSync(dir, { recursive: true });
+  const writeOnce = (name: string, content: string) => { const f = join(dir, name); if (!existsSync(f)) writeFileSync(f, content); };
+  const colorGroups = [
+    ...TIERS.map((t) => ({ query: `tag:#tier/${t}`, color: { a: 1, rgb: TIER_RGB[t] } })),
+    { query: "tag:#entity", color: { a: 1, rgb: 0xf5a623 } },
+  ];
+  writeOnce("graph.json", JSON.stringify({
+    collapse: false, search: "", showTags: true, showAttachments: false, hideUnresolved: false,
+    showOrphans: true, collapseColorGroups: false, colorGroups,
+    nodeSizeMultiplier: 1.1, lineSizeMultiplier: 1, centerStrength: 0.52,
+    repelStrength: 12, linkStrength: 1, linkDistance: 250, scale: 0.6,
+  }, null, 2));
+  writeOnce("core-plugins.json", JSON.stringify(
+    ["file-explorer", "global-search", "graph", "backlink", "outgoing-link", "tag-pane", "command-palette", "page-preview"], null, 2));
+  writeOnce("app.json", JSON.stringify({ alwaysUpdateLinks: true, promptDelete: false, showFrontmatter: true }, null, 2));
+  writeOnce("appearance.json", JSON.stringify({ theme: "obsidian", baseFontSize: 15 }, null, 2));
+  writeOnce("community-plugins.json", JSON.stringify([], null, 2));
+  writeOnce("README.md",
+    "# ollamas brain vault\n\nAuto-mirrored from the ollamas sqlite-vec brain. Open the **Graph view** (Ctrl/Cmd+G)\n"
+    + "to navigate — nodes are colour-grouped by memory tier + entities.\n\n"
+    + "For the dashboards in `_index/MOC.md`, install the **Dataview** community plugin\n"
+    + "(Settings → Community plugins → Browse → Dataview). Without it the queries render as\n"
+    + "plain code blocks; everything else works unchanged.\n\n"
+    + "Do not hand-delete notes to forget a memory — deletions are re-materialized from the\n"
+    + "brain. Edit a note's body to update the memory (synced back within ~5 min).\n");
+}
+
 function writeMoc(vault: string, dump: BrainDump, entities: number): void {
-  const counts = TIERS.map((t) => `- **${t}**: ${dump.memories.filter((m) => m.tier === t).length}`).join("\n");
-  const md = `---\ntype: moc\ntags: [moc]\n---\n\n# ollamas brain — Map of Content\n\n`
-    + `Memories: ${dump.memories.length} · Facts: ${dump.facts.length} · Entities: ${entities}\n\n`
-    + `## Tiers\n${counts}\n\n## Folders\n`
-    + TIERS.map((t) => `- [[${t}]]`).join("\n") + `\n- [[entities]]\n`;
+  const count = (t: string) => dump.memories.filter((m) => m.tier === t).length;
+  const dv = (q: string) => "```dataview\n" + q + "\n```";
+  const md = `---\ntype: moc\ntags: [moc]\n---\n\n# 🧠 ollamas brain — Map of Content\n\n`
+    + `> **${dump.memories.length}** memories · **${dump.facts.length}** facts · **${entities}** entities\n\n`
+    + `## Tiers\n`
+    + TIERS.map((t) => `- [[${t}]] — **${count(t)}** · \`#tier/${t}\``).join("\n")
+    + `\n- [[entities]] — **${entities}** · \`#entity\`\n\n`
+    + `## Recently learned\n`
+    + dv("TABLE created AS \"When\", ns AS \"NS\", hits AS \"Hits\"\nFROM #tier/learned OR #tier/core\nSORT created_ms DESC\nLIMIT 15")
+    + `\n\n## Most-recalled memories\n`
+    + dv("TABLE tier AS \"Tier\", hits AS \"Hits\"\nWHERE hits > 5\nSORT hits DESC\nLIMIT 15")
+    + `\n\n## Working scratchpad (volatile)\n`
+    + dv("LIST FROM #tier/working SORT created_ms DESC")
+    + `\n\n---\n*Dataview plugin gerekli (dashboard için). Kurmadan da graf + linkler çalışır.*\n`;
   writeFileSync(join(vault, "_index", "MOC.md"), md);
 }
 
@@ -99,11 +183,13 @@ function writeMoc(vault: string, dump: BrainDump, entities: number): void {
 // already in the brain, so ANY note absent from the brain is a genuine orphan and safe
 // to drop even without a manifest entry (covers pre-manifest legacy notes). push-only
 // keeps the conservative manifest guard so an un-pulled human note is never deleted.
-function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, pruneUntracked = false): SyncResult["push"] {
+function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, neighbors: Map<string, string[]>, entityIdx: EntityIndex, pruneUntracked = false): SyncResult["push"] {
   let written = 0, skipped = 0;
   for (const m of dump.memories) {
     const mem: NoteMemory = { id: m.id, ns: m.ns, tier: m.tier, content: m.content, source: m.source, createdAt: m.createdAt, hits: m.hits };
     const h = contentHash(m.content);
+    const links = linksFor(m.id, m.content, neighbors, entityIdx);
+    const lh = contentHash(links.join("|"));
     const tier = TIERS.includes(m.tier as any) ? m.tier : "working";
     const noteName = noteFilename(m.id);
     const prev = manifest[m.id];
@@ -114,9 +200,12 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, pr
       for (const t of TIERS) if (t !== tier) { const f = join(vault, t, noteName); if (existsSync(f)) rmSync(f); }
     }
     const file = join(vault, tier, noteName);
-    if (prev?.brainHash === h && prev?.tier === tier && existsSync(file)) { skipped++; continue; }
-    writeFileSync(file, toMarkdown(mem));
-    manifest[m.id] = { brainHash: h, vaultHash: h, tier };
+    // Skip only when BOTH content and links are unchanged — so the first enrich pass (no
+    // linksHash yet) rewrites every note with its [[wikilinks]], and later neighbour drift
+    // re-renders just the affected notes.
+    if (prev?.brainHash === h && prev?.linksHash === lh && prev?.tier === tier && existsSync(file)) { skipped++; continue; }
+    writeFileSync(file, toMarkdown(mem, links));
+    manifest[m.id] = { brainHash: h, vaultHash: h, tier, linksHash: lh };
     written++;
   }
   // Prune orphan notes: a memory CONSOLIDATED out of the brain (dedup/merge/evict) leaves
@@ -192,7 +281,12 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
   }
   if (direction === "push" || direction === "both") {
     const dump = exportBrain(dbPath); // re-read: reflects anything pull just ingested
-    push = pushBrainToVault(vault, dump, manifest, direction === "both");
+    // Density sources: memory→memory nearest neighbors (stored-vector KNN, no re-embed) +
+    // memory→entity mentions. Injectable for tests; defaults to the live brain.
+    const neighbors = opts.neighbors ? opts.neighbors() : neighborsFromDb(dbPath, 5);
+    const entityIdx = buildEntityIndex(dump.facts);
+    push = pushBrainToVault(vault, dump, manifest, neighbors, entityIdx, direction === "both");
+    writeObsidianConfig(vault); // create-once: graph color-groups, plugins, appearance
   }
 
   saveManifest(vault, manifest);

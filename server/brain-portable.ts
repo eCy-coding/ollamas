@@ -6,7 +6,37 @@
 // All writes go through the BrainStore choke-point (remember/assertFact with the
 // createdAt/hits/validFrom/invalidatedAt import overrides) — no duplicated SQL.
 import { DatabaseSync } from "node:sqlite";
+import * as sqliteVec from "sqlite-vec";
 import type { BrainStore } from "./brain";
+
+/** memory→memory nearest neighbors over a db at `dbPath` (stored-vector KNN, no re-embed).
+ *  dbPath-scoped (unlike the singleton brainNeighbors) so the Obsidian sync links neighbors
+ *  from the SAME db it is mirroring — including a test's temp store. Returns memId → memIds. */
+export function neighborsFromDb(dbPath: string, k = 5): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  let db: DatabaseSync;
+  try {
+    db = new DatabaseSync(dbPath, { readOnly: true, allowExtension: true });
+    db.enableLoadExtension(true);
+    sqliteVec.load(db);
+  } catch { return out; }
+  try {
+    const mems = db.prepare("SELECT rowid, mem_id AS id FROM brain_memories WHERE superseded_at IS NULL").all() as { rowid: number; id: string }[];
+    const idByRow = new Map<number, string>(mems.map((m) => [m.rowid, m.id]));
+    const readVec = db.prepare("SELECT embedding FROM brain_vec WHERE rowid=?");
+    const knn = db.prepare("SELECT rowid FROM brain_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?");
+    for (const m of mems) {
+      const vrow = readVec.get(BigInt(m.rowid)) as { embedding: Uint8Array } | undefined;
+      if (!vrow) continue;
+      const rows = knn.all(vrow.embedding, k + 1) as { rowid: number }[];
+      const near = rows.map((r) => idByRow.get(r.rowid)).filter((id): id is string => !!id && id !== m.id).slice(0, k);
+      if (near.length) out.set(m.id, near);
+    }
+  } catch { /* missing brain_vec (fresh/empty store) → no neighbors */ } finally {
+    db.close();
+  }
+  return out;
+}
 
 export interface BrainDumpMemory {
   id: string;
