@@ -222,12 +222,14 @@ export const BRAIN_SERVICES: BrainServiceSpec[] = [
     }),
   },
   {
-    id: "health-drift", kind: "io", role: "self-recall drift probe, ns-correct", deps: ["recall-hybrid"],
+    id: "health-drift", kind: "io", role: "space-match drift probe (cosine, prefix/ns-agnostic)", deps: ["recall-hybrid"],
     source: "server/brain.ts",
     selftest: () => withStore(async (b) => {
       await b.remember({ id: "h-1", tier: "learned", content: "probe row", ns: "ops" });
       const h = await b.health({ probes: 4 });
-      return expectThat(h.selfHitRate === 1 && !h.drift, "self-hit 100% incl. non-default ns", `selfHit=${h.selfHitRate}`);
+      // Continuous cosine (stored float32 vs fresh float64 ⇒ ~0.9999, not exactly 1);
+      // an unchanged embedder must report ≈1 and no drift.
+      return expectThat(h.selfHitRate > 0.99 && !h.drift, "space-match ≈100% incl. non-default ns", `selfHit=${h.selfHitRate}`);
     }),
   },
   {

@@ -908,28 +908,40 @@ export function createBrainStore(
     },
 
     async health({ probes = 8, threshold = 0.8 } = {}) {
-      // Probe rows carry their ns: recall() is namespace-scoped, so probing an org/tenant
-      // memory through the default ns can NEVER self-hit — that false DRIFT fired the
-      // first time a non-default ns gained recent learned rows (ledger migration).
+      // TRUE space-drift test: does a FRESH document-role embedding of the stored content
+      // still match the STORED vector (cosine ~1)? That is exactly what "the embedding
+      // space matches stored vectors" means. The prior probe used recall-self-hit, which
+      // false-alarmed by design: nomic's asymmetric query/document prefixes + unnormalized
+      // L2 mean a doc need NOT rank #1 for its own content-as-query, yet real recall MRR
+      // stays ~0.88 (make eval-brain-mrr). This check is prefix-consistent (doc vs doc)
+      // and norm-agnostic (cosine), so it catches a real model/space change and nothing else.
       const rows = db
         .prepare(
-          "SELECT mem_id AS id, content, ns FROM brain_memories WHERE tier IN ('learned','core') AND superseded_at IS NULL ORDER BY created_at DESC, rowid DESC LIMIT ?",
+          "SELECT rowid, mem_id AS id, content FROM brain_memories WHERE tier IN ('learned','core') AND superseded_at IS NULL ORDER BY created_at DESC, rowid DESC LIMIT ?",
         )
-        .all(probes) as { id: string; content: string; ns: string }[];
+        .all(probes) as { rowid: number; id: string; content: string }[];
       if (rows.length === 0) return { selfHitRate: 1, drift: false, probes: 0 };
-      let hits = 0;
+      const readVec = db.prepare("SELECT embedding FROM brain_vec WHERE rowid=?");
+      let sum = 0, n = 0;
       for (const p of rows) {
-        const top = await this.recall(p.content, { k: 1, fresh: true, ns: p.ns });
-        if (top[0]?.id === p.id) hits++;
+        const vrow = readVec.get(BigInt(p.rowid)) as { embedding: Uint8Array } | undefined;
+        if (!vrow) continue; // memory without a vector row (lexical-only write) — skip
+        const stored = new Float32Array(vrow.embedding.buffer, vrow.embedding.byteOffset, vrow.embedding.byteLength / 4);
+        const fresh = await rawEmbed(p.content, "document"); // live embedder, uncached, doc role
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < fresh.length; i++) { dot += fresh[i] * stored[i]; na += fresh[i] * fresh[i]; nb += stored[i] * stored[i]; }
+        sum += dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+        n++;
       }
-      const selfHitRate = hits / rows.length;
+      if (n === 0) return { selfHitRate: 1, drift: false, probes: 0 };
+      const selfHitRate = sum / n; // mean stored-vs-fresh cosine (kept field name for callers)
       const drift = selfHitRate < threshold;
       if (drift) {
         console.warn(
-          `[brain] DRIFT: self-hit ${(selfHitRate * 100).toFixed(0)}% < ${threshold * 100}% — embedding space no longer matches stored vectors; consider re-embedding the store`,
+          `[brain] DRIFT: space-match ${(selfHitRate * 100).toFixed(0)}% < ${threshold * 100}% — fresh embeddings no longer match stored vectors (model/space changed); re-embed the store`,
         );
       }
-      return { selfHitRate, drift, probes: rows.length };
+      return { selfHitRate, drift, probes: n };
     },
 
     memoriesBySource(source, { limit = 50 } = {}) {
