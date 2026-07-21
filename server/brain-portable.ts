@@ -46,6 +46,8 @@ export interface BrainDumpMemory {
   source: string | null;
   createdAt: number;
   hits: number;
+  actor: string | null;
+  confidence: number | null;
 }
 
 export interface BrainDumpFact {
@@ -70,7 +72,8 @@ export function exportBrain(dbPath: string): BrainDump {
   try {
     const memories = db
       .prepare(
-        `SELECT mem_id AS id, ns, tier, content, source, created_at AS createdAt, access_count AS hits
+        `SELECT mem_id AS id, ns, tier, content, source, created_at AS createdAt, access_count AS hits,
+                actor, confidence
          FROM brain_memories ORDER BY created_at, rowid`,
       )
       .all() as unknown as BrainDumpMemory[];

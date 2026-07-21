@@ -44,7 +44,7 @@ describe("push: brain → vault (authoritative mirror)", () => {
     await seed(dbPath);
     const r = await syncObsidian("push", { vault, dbPath });
     expect(r.push.entities).toBeGreaterThanOrEqual(2);
-    expect(existsSync(join(vault, "_index", "MOC.md"))).toBe(true);
+    expect(existsSync(join(vault, "Home.md"))).toBe(true);
     const emreEntity = readFileSync(join(vault, "entities", "entity-emre.md"), "utf8");
     expect(emreEntity).toContain("operates");
     expect(emreEntity).toContain("[[entity-ollamas]]"); // wikilink into the graph
@@ -65,7 +65,7 @@ describe("pull: vault → brain (human edits upsert, ids stable)", () => {
     await syncObsidian("push", { vault, dbPath });
     // human edits the note body in Obsidian
     const file = join(vault, "learned", "loop-a1b2.md");
-    writeFileSync(file, readFileSync(file, "utf8").replace("gate persists via W_g store", "gate persists via learned W_g weight"));
+    writeFileSync(file, readFileSync(file, "utf8").replaceAll("gate persists via W_g store", "gate persists via learned W_g weight"));
 
     const calls: any[] = [];
     const r = await syncObsidian("pull", { vault, dbPath, remember: async (m) => { calls.push(m); } });
@@ -169,12 +169,35 @@ describe("rich graph: dense linking + .obsidian config + MOC", () => {
     for (const [id, near] of nb) { expect(near).not.toContain(id); expect(near.length).toBeLessThanOrEqual(2); }
   });
 
-  test("MOC has Dataview dashboards", async () => {
+  test("Home dashboard + Bases DB + per-tier index + CSS snippet shipped", async () => {
     await seed(dbPath);
     await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
-    const moc = readFileSync(join(vault, "_index", "MOC.md"), "utf8");
-    expect(moc).toContain("```dataview");
-    expect(moc).toContain("#tier/learned");
+    const home = readFileSync(join(vault, "Home.md"), "utf8");
+    expect(home).toContain("# 🧠 ollamas brain");
+    expect(home).toContain("![[brain.base]]"); // embedded database
+    expect(home).toContain("```dataview");
+    // Obsidian Bases database file with multiple views
+    const base = readFileSync(join(vault, "_index", "brain.base"), "utf8");
+    expect(base).toContain("views:");
+    expect(base).toContain("file.hasTag(\"tier/core\")");
+    expect(base).toContain("name: Yüksek güven");
+    // per-tier hub note
+    expect(existsSync(join(vault, "_index", "tier-learned.md"))).toBe(true);
+    // CSS snippet + it is enabled
+    expect(existsSync(join(vault, ".obsidian", "snippets", "ollamas-brain.css"))).toBe(true);
+    const app = JSON.parse(readFileSync(join(vault, ".obsidian", "appearance.json"), "utf8"));
+    expect(app.enabledCssSnippets).toContain("ollamas-brain");
+  });
+
+  test("memory note carries readable alias + confidence, entity hub has Mentioned-in", async () => {
+    await seed(dbPath);
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    const note = readFileSync(join(vault, "core", "core-emre.md"), "utf8");
+    expect(note).toMatch(/aliases: \[/);
+    expect(note).toContain("cssclasses: [brain, tier-core]");
+    const ent = readFileSync(join(vault, "entities", "entity-emre.md"), "utf8");
+    expect(ent).toContain("## Mentioned in");
+    expect(ent).toContain("degree:");
   });
 
   test("links change → note re-rendered (linksHash tracked)", async () => {

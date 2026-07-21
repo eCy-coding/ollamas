@@ -82,8 +82,40 @@ describe("parseMarkdown — rejects malformed / bad-tier notes", () => {
   });
   test("human edit to body changes bodyHash (drives re-ingest)", () => {
     const original = parseMarkdown(toMarkdown(mem()));
-    const edited = toMarkdown(mem()).replace("gate persists via W_g store", "gate persists via learned W_g");
+    const edited = toMarkdown(mem()).replaceAll("gate persists via W_g store", "gate persists via learned W_g");
     expect(parseMarkdown(edited).bodyHash).not.toBe(original.bodyHash);
+  });
+});
+
+describe("rich note: readable identity + typed properties + callout", () => {
+  test("frontmatter carries aliases (readable title), cssclasses, confidence, actor", () => {
+    const p = parseMarkdown(toMarkdown(mem({ confidence: 0.7, actor: "loop" })));
+    expect(p.frontmatter.aliases).toContain("gate persists via W_g store");
+    expect(p.frontmatter.cssclasses).toContain("tier-learned");
+    expect(p.frontmatter.confidence).toBe("0.7");
+    expect(p.frontmatter.actor).toBe("loop");
+  });
+  test("body opens with an H1 title + a callout banner", () => {
+    const md = toMarkdown(mem({ tier: "learned", source: "brain-loop", confidence: 0.7 }));
+    expect(md).toMatch(/# gate persists via W_g store/);
+    expect(md).toMatch(/> \[!abstract\] learned · brain-loop · conf 0\.70 · 3× recall/);
+  });
+  test("title H1 + callout are stripped on parse (pure content recovered)", () => {
+    const p = parseMarkdown(toMarkdown(mem({ confidence: 0.9, actor: "loop" })));
+    expect(p.memory!.content).toBe("gate persists via W_g store"); // no #, no >, no meta
+    expect(p.memory!.confidence).toBe(0.9);
+    expect(p.memory!.actor).toBe("loop");
+  });
+  test("long content → title truncated to ≤60 chars with ellipsis", () => {
+    const long = "a".repeat(120);
+    const p = parseMarkdown(toMarkdown(mem({ content: long })));
+    expect(p.frontmatter.aliases.length).toBeLessThanOrEqual(64);
+    expect(p.memory!.content).toBe(long); // full content still recovered
+  });
+  test("no confidence/actor → those keys are omitted (not null strings)", () => {
+    const md = toMarkdown(mem());
+    expect(md).not.toMatch(/\nconfidence:/);
+    expect(md).not.toMatch(/\nactor:/);
   });
 });
 
