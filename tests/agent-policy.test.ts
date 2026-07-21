@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { loadPolicy, savePolicy, policyPath } from "../server/agent-policy-store";
 import {
   RISK_CLASSES, AUTONOMY_LEVELS, defaultPolicy, decide, validatePolicy, toSafeField,
-  mergePolicy, type AgentPolicy, type RiskClass,
+  mergePolicy, safePreset, type AgentPolicy, type RiskClass,
 } from "../server/agent-policy";
 
 describe("defaultPolicy — hiçbir şey AÇIK doğmaz", () => {
@@ -249,5 +249,25 @@ describe("loadPolicyStrict — okunamadı ≠ kısıtlı", () => {
     savePolicy({ ...defaultPolicy(), principles: ["x"] });          // ana → ikinci, yedek → ilk
     writeFileSync(policyPath(), "çöp");                             // ana boz
     expect(loadPolicyStrict()).not.toBeNull();                     // yedekten kurtar
+  });
+});
+
+describe("safePreset — panelin tek-tık güvenli tabanı", () => {
+  test("tam 6 sınıf, geçerli politika olarak validate olur", () => {
+    const p = safePreset();
+    expect(Object.keys(p).sort()).toEqual([...RISK_CLASSES].sort());
+    expect(validatePolicy({ version: 1, updatedAt: 0, classes: p }).ok).toBe(true);
+  });
+  test("zararsız sınıflar auto, mutate onaylı, dışa-iletim/sistem ASLA auto (güvenlik)", () => {
+    const p = safePreset();
+    expect(p.inspect).toBe("auto");
+    expect(p.launch).toBe("auto");
+    expect(p.read).toBe("auto");
+    expect(p["mutate-local"]).toBe("gated");
+    expect(p["communicate-outward"]).toBe("deny");
+    expect(p["system-change"]).toBe("deny");
+    // DEĞİŞMEZ: geri-alınamaz sınıflar preset'te otonom OLAMAZ.
+    expect(p["communicate-outward"]).not.toBe("auto");
+    expect(p["system-change"]).not.toBe("auto");
   });
 });

@@ -4198,10 +4198,10 @@ app.post("/api/brain/recall", async (req, res) => {
 app.get("/api/agent/policy", async (_req, res) => {
   try {
     const { loadPolicy } = await import("./server/agent-policy-store");
-    const { RISK_CLASSES, AUTONOMY_LEVELS } = await import("./server/agent-policy");
+    const { RISK_CLASSES, AUTONOMY_LEVELS, safePreset } = await import("./server/agent-policy");
     // Şemayı da döndür: panel seçenekleri sunucudan gelsin, iki yerde
-    // elle senkron tutulan bir liste olmasın.
-    res.json({ policy: loadPolicy(), riskClasses: RISK_CLASSES, autonomyLevels: AUTONOMY_LEVELS });
+    // elle senkron tutulan bir liste olmasın. safePreset = panelin tek-tık güvenli tabanı.
+    res.json({ policy: loadPolicy(), riskClasses: RISK_CLASSES, autonomyLevels: AUTONOMY_LEVELS, safePreset: safePreset() });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "policy read failed" });
   }

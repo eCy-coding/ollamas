@@ -2,7 +2,7 @@
 import { describe, test, expect } from "vitest";
 import {
   buildAppLiteracyRecords, buildAppEcymCommands, validateCards, triggerCollision, reconcileAppSafety,
-  filterCards,
+  filterCards, appRiskClasses,
   type AppCard,
 } from "../server/app-literacy";
 import { defaultPolicy } from "../server/agent-policy";
@@ -251,5 +251,21 @@ describe("filterCards — odysseus/eCym/ollamas ortak salt-okunur erişim (Faz 4
   });
   test("eşleşme yok → boş (çökmez)", () => {
     expect(filterCards(cards, { app: "yokboyle" })).toEqual([]);
+  });
+});
+
+describe("appRiskClasses — per-app override hangi sınıfları etkiler (panel)", () => {
+  const mk = (classes: string[]): AppCard => ({
+    rank: 1, app: "X", scriptable: true, category: "c", purpose: "p", capabilities: [], drive: [],
+    ops: classes.map((rc, i) => ({ opId: `x.op${i}`, riskClass: rc as any, triggers: ["t"], cmd: "open -a X", arg: "y", desc: "d", level: "baslangic" as const })),
+  });
+  test("op riskClass'larını tekilleştirir (RISK_CLASSES sırasında)", () => {
+    expect(appRiskClasses(mk(["launch", "mutate-local", "launch"]))).toEqual(["launch", "mutate-local"]);
+  });
+  test("tek sınıf → tek eleman", () => {
+    expect(appRiskClasses(mk(["read"]))).toEqual(["read"]);
+  });
+  test("op yoksa boş (çökmez)", () => {
+    expect(appRiskClasses(mk([]))).toEqual([]);
   });
 });

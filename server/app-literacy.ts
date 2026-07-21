@@ -109,6 +109,16 @@ export function buildAppLiteracyRecords(cards: AppCard[]): TeachRecord[] {
 }
 
 /**
+ * Bir kartın op'larının risk sınıfları (tekilleştirilmiş, RISK_CLASSES sırasında).
+ * Panelin per-app override kontrolü YALNIZ bu sınıfları etkiler — bir app'i "otonom"
+ * yapmak onun FİİLEN kullandığı sınıfları (ör. launch+mutate-local) set eder, hepsini değil.
+ */
+export function appRiskClasses(card: AppCard): RiskClass[] {
+  const present = new Set(card.ops.map((o) => o.riskClass));
+  return RISK_CLASSES.filter((rc) => present.has(rc));
+}
+
+/**
  * Kartları salt-okunur filtrele — `GET /api/app-literacy/cards`'ın çekirdeği.
  * ÜÇ sistem (ollamas·eCym·odysseus) EŞİT erişimle app'leri listeler/keşfeder.
  * `app` harf-duyarsız alt-dize eşler; `q` app/purpose/capability/usage üzerinde

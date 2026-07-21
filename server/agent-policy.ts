@@ -68,6 +68,25 @@ export function defaultPolicy(now = 0): AgentPolicy {
 }
 
 /**
+ * Panelin tek-tık "güvenli preset"i — Emre'nin makul bir tabana hızlı dönüşü.
+ *
+ * Zararsız sınıflar (inspect/launch/read) `auto` — ajan sormadan inceler/açar/okur.
+ * `mutate-local` `gated` (yerel değişiklik onay ister). GERİ-ALINAMAZ sınıflar
+ * (communicate-outward/system-change) `deny` — DEĞİŞMEZ: preset asla dışa-iletimi ya da
+ * sistem-değişikliğini otonom yapmaz; onları Emre bilerek ve tek tek açmalı.
+ */
+export function safePreset(): Record<RiskClass, Autonomy> {
+  return {
+    inspect: "auto",
+    launch: "auto",
+    read: "auto",
+    "mutate-local": "gated",
+    "communicate-outward": "deny",
+    "system-change": "deny",
+  };
+}
+
+/**
  * Bir (uygulama, sınıf) çifti için geçerli otonomi.
  *
  * Uygulama istisnası sınıf kuralını ezer. İstisna BOZUKSA sınıf kuralına DÜŞMEZ —
