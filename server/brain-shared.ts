@@ -17,7 +17,11 @@ import { exploreSelect } from "./brain-explore";
  *  öğrenilmiş gate'i kullanmaktansa sıfırdan başlarız — sessiz bozulmaktansa görünür
  *  soğuk başlangıç. Saf ve dışa açık: davranış doğrudan test edilebilsin. */
 export function usableGate(supplied: Gate | undefined, dim: number): Gate {
-  return supplied && supplied.W[0]?.length === dim ? supplied : emptyGate(dim);
+  // Reject on dim mismatch AND on expert-count (row) mismatch: after a new expert is added
+  // the persisted gate has too few rows, which would silently zero-weight the newcomer.
+  // Falling back to emptyGate cold-starts a correctly-sized gate that re-calibrates.
+  const ok = supplied && supplied.W[0]?.length === dim && supplied.W.length === EXPERTS.length;
+  return ok ? supplied : emptyGate(dim);
 }
 
 /** Keşif seçimi: ağırlıklar yine renormalize edilir ama KAZANAN zorlanır.

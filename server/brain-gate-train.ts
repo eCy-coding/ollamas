@@ -113,7 +113,10 @@ export function trainGate(
   // (brain-shared.ts gateLogits'e l2normalize(qVec) verir) — yoksa eğitim ile
   // çıkarım farklı uzaylarda olur.
   const usable = rows
-    .filter((r) => targetDistribution(r.scores) !== null && Array.isArray(r.q) && r.q.length > 0)
+    // Width guard: after an expert is added, old ledger rows have a shorter `scores` vector.
+    // Training on them would misalign gradients (t[j] undefined for the new row) — skip them;
+    // fresh full-width rows accumulate and calibrate the new expert without a manual reset.
+    .filter((r) => r.scores.length === init.W.length && targetDistribution(r.scores) !== null && Array.isArray(r.q) && r.q.length > 0)
     .map((r) => ({ ...r, q: l2normalize(r.q) }));
   if (!usable.length) return { gate: { W: init.W.map((r) => r.slice()), b: init.b.slice() }, losses: [] };
 

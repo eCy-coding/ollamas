@@ -13,7 +13,7 @@
 // eriştiğimiz gün doğrudan kullanılır — formül kılık değiştirmiyor, yaklaşım işaretli.
 
 /** Ortak-brain uzmanları — sıra gate vektörlerinin sırasıdır (W satırları bu sırada). */
-export const EXPERTS = ["ollamas", "ecym", "odysseus"] as const;
+export const EXPERTS = ["ollamas", "ecym", "odysseus", "claudecode"] as const;
 export type Expert = (typeof EXPERTS)[number];
 
 /** Sayısal-kararlı softmax (max çıkarımı). T = sıcaklık: <1 keskinleştirir, >1 düzleştirir. */
@@ -70,6 +70,7 @@ const SIGNALS: Record<Expert, RegExp> = {
   ollamas: /\b(kod|code|modül|module|route|api|test|commit|repo|typescript|server|brain|import|fonksiyon|schema|env)\b/iu,
   ecym: /\b(terminal|komut|command|shell|disk|klasör|dosya|launchd|servis|makbook|macbook|sistem|kur|çalıştır|başlat)\b/iu,
   odysseus: /\b(araştır|research|analiz|derin|uzun|rapor|karşılaştır|strateji|plan|neden|niçin|açıkla)\b/iu,
+  claudecode: /\b(review|incele|pr|pull.?request|refactor|debug|hata.?ayıkla|mimari|architecture|güvenlik|security|optimize|iyileştir|düzelt|git|rebase|merge|diff)\b/iu,
 };
 
 /** Soru metninden uzman-başı bias vektörü (soğuk başlangıç yönlendirmesi). */

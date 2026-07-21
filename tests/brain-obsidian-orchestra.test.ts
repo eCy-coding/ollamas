@@ -92,10 +92,16 @@ describe("orchestra artifacts via live sync (council + hub + canvas)", () => {
     // Canvas must be valid JSON Canvas with nodes + edges
     const canvas = JSON.parse(readFileSync(join(vault, "orchestra.canvas"), "utf8"));
     expect(Array.isArray(canvas.nodes)).toBe(true);
-    expect(canvas.nodes.some((n: any) => n.id === "ollamas")).toBe(true);
-    expect(canvas.nodes.some((n: any) => n.id === "ecym")).toBe(true);
-    expect(canvas.nodes.some((n: any) => n.id === "odysseus")).toBe(true);
-    expect(canvas.edges.length).toBeGreaterThan(4);
+    for (const sys of ["ollamas", "ecym", "odysseus", "claudecode"]) {
+      expect(canvas.nodes.some((n: any) => n.id === sys)).toBe(true); // all 4 experts
+    }
+    expect(canvas.edges.length).toBeGreaterThan(6);
+    // Dalga-2 artifacts
+    expect(existsSync(join(vault, "orchestra", "status.md"))).toBe(true);
+    expect(existsSync(join(vault, "templates", "memory.md"))).toBe(true);
+    expect(existsSync(join(vault, "_index", "namespaces.md"))).toBe(true);
+    expect(hub).toContain("🔴 **claudecode**"); // 4th expert role card
+    expect(hub).toContain("R --> C[🔴 claudecode]"); // mermaid 4th branch
     // eCym catalog federated
     expect(existsSync(join(vault, "ecym", "ecym-disk-temizle.md"))).toBe(true);
     // odysseus-origin memory got system/odysseus

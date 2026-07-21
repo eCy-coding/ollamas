@@ -24,7 +24,7 @@ describe("askShared — ortak brain, çok uzman", () => {
     } as any);
     expect(r.abstained).toBeUndefined();
     expect(seen[0]).toContain("SORU: brain kodu");
-    expect(["ollamas", "ecym", "odysseus"]).toContain(r.expert);
+    expect(["ollamas", "ecym", "odysseus", "claudecode"]).toContain(r.expert);
     expect(r.expert).toBe("ollamas"); // 'kod/modül' sinyali → heuristik bias ollamas
     expect(Object.values(r.weights).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 3);
     expect(r.sources[0].id).toBe("m-1");
@@ -120,7 +120,7 @@ describe("askShared — q* ve gate canlı (F3b/F3c)", () => {
     expect(saved).toBeNull();
     // Kanıt: qVec üretiliyor ve dışsal puanlar raporlanıyor (öğrenme sinyali AKIYOR).
     expect(r.scores).toBeDefined();
-    expect(Object.keys(r.scores!)).toEqual(["ollamas", "ecym", "odysseus"]);
+    expect(Object.keys(r.scores!)).toEqual(["ollamas", "ecym", "odysseus", "claudecode"]);
     // profil/recallVec yok → kişiselleştirme dürüstçe false raporlanır.
     expect(r.personalized).toBe(false);
   });
@@ -154,7 +154,7 @@ describe("askShared — q* ve gate canlı (F3b/F3c)", () => {
       },
     } as any);
     expect(seen).not.toBeNull();
-    expect(seen.scores.length).toBe(3);
+    expect(seen.scores.length).toBe(4);
     expect(seen.q.length).toBeGreaterThan(0);
     expect(seen.scores[1]).toBe(0);                          // abstain sert 0
     expect(seen.scores[0]).toBeGreaterThan(seen.scores[2]);  // atıflı > temelsiz
@@ -198,9 +198,12 @@ describe("askShared — q* ve gate canlı (F3b/F3c)", () => {
   test("boyutu uyuşmayan bayat gate sessizce kullanılmaz, sıfırdan başlanır", () => {
     // Doğrudan saf fonksiyon: eskiden bu davranış yalnız saveGate üzerinden gözlenebiliyordu,
     // ama askShared artık gate'e yazmıyor. Koruma dışa açıldı, gözlem doğrudan.
-    const bayat = { W: [[1, 2], [3, 4], [5, 6]], b: [0, 0, 0] };      // 2 boyutlu
-    expect(usableGate(bayat, 3).W[0]).toEqual([0, 0, 0]);              // reddedildi
-    expect(usableGate(bayat, 2)).toBe(bayat);                          // uyuyorsa aynen kullanılır
+    const bayat = { W: [[1, 2], [3, 4], [5, 6]], b: [0, 0, 0] };      // 2 boyutlu, 3 satır
+    expect(usableGate(bayat, 3).W[0]).toEqual([0, 0, 0]);              // dim uyuşmaz → reddedildi
+    // dim uysa bile satır-sayısı (uzman) uyuşmazsa reddedilir → 4-satır soğuk başlangıç
+    expect(usableGate(bayat, 2).W.length).toBe(4);
+    const iyi = { W: [[1, 1], [2, 2], [3, 3], [4, 4]], b: [0, 0, 0, 0] }; // 2-dim, 4 satır (doğru)
+    expect(usableGate(iyi, 2)).toBe(iyi);                             // dim+satır uyar → aynen kullanılır
     expect(usableGate(undefined, 4).W[0].length).toBe(4);              // yoksa soğuk başlangıç
   });
 

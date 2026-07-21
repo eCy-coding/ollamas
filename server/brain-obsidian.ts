@@ -73,6 +73,7 @@ function ensureDirs(vault: string): void {
 function systemOf(source: string | null, actor: string | null): string {
   const s = `${source || ""} ${actor || ""}`.toLowerCase();
   if (s.includes("odysseus")) return "odysseus";
+  if (s.includes("claude")) return "claudecode";
   if (s.includes("ecym") || s.includes("ecy-")) return "ecym";
   return "ollamas";
 }
@@ -159,6 +160,7 @@ function writeObsidianConfig(vault: string): void {
     // orchestra systems first (broadest) so tier tints layer on top in the graph legend
     { query: "tag:#system/ecym", color: { a: 1, rgb: SYSTEM_RGB.ecym } },
     { query: "tag:#system/odysseus", color: { a: 1, rgb: SYSTEM_RGB.odysseus } },
+    { query: "tag:#system/claudecode", color: { a: 1, rgb: SYSTEM_RGB.claudecode } },
     { query: "tag:#orchestra", color: { a: 1, rgb: SYSTEM_RGB.orchestra } },
     ...TIERS.map((t) => ({ query: `tag:#tier/${t}`, color: { a: 1, rgb: TIER_RGB[t] } })),
     { query: "tag:#entity", color: { a: 1, rgb: 0xf5a623 } },
@@ -212,6 +214,8 @@ const TIER_DESC: Record<string, string> = {
 // view, and Dataview panels. Overwritten each sync (generated), unlike the .obsidian config.
 function writeHome(vault: string, dump: BrainDump, entities: number, ecymCount = 0): void {
   const count = (t: string) => dump.memories.filter((m) => m.tier === t).length;
+  const staleMoc = join(vault, "_index", "MOC.md"); // FAZ-4 leftover, superseded by Home.md
+  if (existsSync(staleMoc)) rmSync(staleMoc);
   const md = `---\ncssclasses: [brain, brain-home]\ntags: [moc]\naliases: [Brain Home, ollamas brain]\n---\n\n`
     + `# 🧠 ollamas brain\n\n`
     + `> [!abstract] Canlı hafıza aynası\n`
@@ -263,8 +267,49 @@ function writeTierIndexes(vault: string, dump: BrainDump): void {
   }
 }
 
+// Templater-compatible note templates (create-once) so hand-added notes match the schema.
+function writeTemplates(vault: string): void {
+  const dir = join(vault, "templates");
+  mkdirSync(dir, { recursive: true });
+  const once = (name: string, body: string) => { const f = join(dir, name); if (!existsSync(f)) writeFileSync(f, body); };
+  once("memory.md", `---\nid: manual:<% tp.date.now("YYYYMMDDHHmmss") %>\nsystem: ollamas\nns: manual\ntier: learned\nsource: obsidian\ncreated: <% tp.date.now("YYYY-MM-DDTHH:mm:ss") %>\nconfidence: 0.85\ncssclasses: [brain, tier-learned, system-ollamas]\ntags: [tier/learned, ns/manual, system/ollamas]\n---\n\n# <% tp.file.title %>\n\n> [!abstract] learned · manual\n\n`);
+  once("daily.md", `---\ncssclasses: [brain]\ntags: [journal]\n---\n\n# <% tp.file.title %>\n\n## Bugün öğrenilenler\n\`\`\`dataview\nLIST FROM #tier/episodic WHERE created_ms\n\`\`\`\n`);
+}
+
+// Daily-note journal: episodic memories grouped by day → journal/YYYY-MM-DD.md (Calendar-
+// plugin compatible). Each day lists links to that day's episodic notes.
+function writeJournal(vault: string, dump: BrainDump): number {
+  const dir = join(vault, "journal");
+  mkdirSync(dir, { recursive: true });
+  const byDay = new Map<string, string[]>();
+  for (const m of dump.memories) {
+    if (m.tier !== "episodic") continue;
+    const day = new Date(m.createdAt).toISOString().slice(0, 10);
+    (byDay.get(day) || byDay.set(day, []).get(day)!).push(memBase(m.id));
+  }
+  const days = [...byDay.keys()];
+  const live = new Set(days.map((d) => `${d}.md`));
+  for (const [day, ids] of byDay) {
+    const links = [...new Set(ids)].sort().map((b) => `- [[${b}]]`).join("\n");
+    writeFileSync(join(dir, `${day}.md`),
+      `---\ncssclasses: [brain]\ntags: [journal]\naliases: [${day}]\n---\n\n# 📅 ${day}\n\n> [!quote] ${ids.length} episodic anı\n\n${links}\n`);
+  }
+  if (live.size > 0) for (const f of readdirSync(dir)) if (f.endsWith(".md") && !live.has(f)) rmSync(join(dir, f));
+  return days.length;
+}
+
+// Namespace index — a hub grouping memories by ns (the brain's logical partitions).
+function writeNamespaceIndex(vault: string, dump: BrainDump): void {
+  const byNs = new Map<string, number>();
+  for (const m of dump.memories) byNs.set(m.ns, (byNs.get(m.ns) || 0) + 1);
+  const rows = [...byNs.entries()].sort((a, b) => b[1] - a[1]).map(([ns, n]) => `- \`ns/${ns}\` — **${n}**`).join("\n");
+  writeFileSync(join(vault, "_index", "namespaces.md"),
+    `---\ncssclasses: [brain]\ntags: [moc]\naliases: [Namespaces]\n---\n\n# 🗂️ Namespace'ler\n\n[[Home]]\n\n${rows}\n\n`
+    + "```dataview\nTABLE length(rows) AS \"Count\"\nWHERE ns\nGROUP BY ns\n```\n");
+}
+
 // System palette (decimal RGB for the graph, hex for CSS, canvas color codes).
-const SYSTEM_RGB: Record<string, number> = { ollamas: 0x00d4ff, ecym: 0x00c896, odysseus: 0x7b5ea7, orchestra: 0xffd700 };
+const SYSTEM_RGB: Record<string, number> = { ollamas: 0x00d4ff, ecym: 0x00c896, odysseus: 0x7b5ea7, claudecode: 0xff6b6b, orchestra: 0xffd700 };
 const COUNCIL_SEATS: Record<string, number> = { ecy: 0.30, ollamas: 0.25, odysseus: 0.23, claudecode: 0.22 };
 
 // ── Orchestra federation: the 3-system whole (ollamas + eCym + odysseus) + council history ──
@@ -298,7 +343,9 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     + `> [!info]+ 🔵 **ollamas** — sovereign brain + MCP gateway (:3000)\n> ${memCount} memory · sqlite-vec · ask-shared retrieval sahibi · [[Home]]\n\n`
     + `> [!tip]+ 🟢 **eCym** — $0 yerel komut-uzmanı (qwen3:8b)\n> ${ecymCount} komut (\`ecym/\` klasörü) · triggers→intent → cmd\n\n`
     + `> [!note]+ 🟣 **odysseus** — deterministik araştırma/generation uzmanı (:7860)\n> kendi store'u yok (harici Khoj); council-koltuğu + ask-shared uzmanı\n\n`
-    + `## ask-shared akışı\n\`\`\`mermaid\nflowchart LR\n  Q[Soru] --> R[(brain retrieval)]\n  R --> O[🔵 ollamas]\n  R --> E[🟢 eCym]\n  R --> D[🟣 odysseus]\n  O --> G{MoE gate w_j}\n  E --> G\n  D --> G\n  G --> A[✅ p_final]\n\`\`\`\n\n`
+    + `> [!danger]+ 🔴 **claudecode** — kod/PR/refactor uzmanı (github-models, keyless)\n> ask-shared 4. uzmanı + council-koltuğu (%22); soğuk-başlangıç → gate ledger'dan kalibre\n\n`
+    + `## ask-shared akışı\n\`\`\`mermaid\nflowchart LR\n  Q[Soru] --> R[(brain retrieval)]\n  R --> O[🔵 ollamas]\n  R --> E[🟢 eCym]\n  R --> D[🟣 odysseus]\n  R --> C[🔴 claudecode]\n  O --> G{MoE gate w_j}\n  E --> G\n  D --> G\n  C --> G\n  G --> A[✅ p_final]\n\`\`\`\n\n`
+    + `[[runs|Son ask-shared koşuları]] · [[status|Canlı durum]]\n\n`
     + `## Konsey\n[[council]] — koltuklar: `
     + Object.entries(COUNCIL_SEATS).map(([o, w]) => `${o} ${(w * 100).toFixed(0)}%`).join(" · ")
     + `\n`;
@@ -311,10 +358,11 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     nodes: [
       node("q", "## ❓ Soru\nask-shared / council girişi", -560, -40, "6"),
       node("retr", "## 🧠 brain retrieval\n" + memCount + " memory · sqlite-vec (q*)", -260, -40, "5"),
-      node("ollamas", "## 🔵 ollamas\nsovereign brain + MCP :3000", 120, -240, "5"),
-      node("ecym", "## 🟢 eCym\n" + ecymCount + " komut · $0 qwen3:8b", 120, -40, "4"),
-      node("odysseus", "## 🟣 odysseus\nresearch/generation :7860", 120, 160, "6"),
-      node("gate", "## ⚖️ MoE gate\nw_j = softmax(W_g·q)", 480, -40, "3"),
+      node("ollamas", "## 🔵 ollamas\nsovereign brain + MCP :3000", 120, -280, "5"),
+      node("ecym", "## 🟢 eCym\n" + ecymCount + " komut · $0 qwen3:8b", 120, -100, "4"),
+      node("odysseus", "## 🟣 odysseus\nresearch/generation :7860", 120, 80, "6"),
+      node("claudecode", "## 🔴 claudecode\nkod/PR/refactor · github-models", 120, 260, "1"),
+      node("gate", "## ⚖️ MoE gate\nw_j = softmax(W_g·q) · 4 uzman", 480, -100, "3"),
       node("final", "## ✅ p_final\nkazanan uzman cevabı", 800, -40, "4"),
       node("council", "## 🏛️ Council\n" + (ledger?.tasks ?? 0) + " görev · " + Object.entries(COUNCIL_SEATS).map(([o, w]) => o + " " + (w * 100).toFixed(0) + "%").join(" · "), 120, 380, "3", 620, 90),
     ],
@@ -323,14 +371,42 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
       { id: "e1", fromNode: "retr", toNode: "ollamas", label: "context" },
       { id: "e2", fromNode: "retr", toNode: "ecym", label: "context" },
       { id: "e3", fromNode: "retr", toNode: "odysseus", label: "context" },
+      { id: "e3b", fromNode: "retr", toNode: "claudecode", label: "context" },
       { id: "e4", fromNode: "ollamas", toNode: "gate", label: "uzman" },
       { id: "e5", fromNode: "ecym", toNode: "gate", label: "uzman" },
       { id: "e6", fromNode: "odysseus", toNode: "gate", label: "uzman" },
+      { id: "e6b", fromNode: "claudecode", toNode: "gate", label: "uzman" },
       { id: "e7", fromNode: "gate", toNode: "final", label: "argmax w_j" },
       { id: "e8", fromNode: "council", toNode: "gate", label: "ödül→ağırlık" },
     ],
   };
   writeFileSync(join(vault, "orchestra.canvas"), JSON.stringify(canvas, null, 2));
+
+  // runs.md — readable tail of the ask-shared orchestra runs (which expert won, weights).
+  let runs: any[] = [];
+  try {
+    const raw = readFileSync(`${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/ask-shared-runs.jsonl`, "utf8");
+    runs = raw.trim().split("\n").filter(Boolean).slice(-30).reverse().map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { /* no runs yet */ }
+  const runRows = runs.map((r) => {
+    const w = r.weights && typeof r.weights === "object" ? Object.entries(r.weights).map(([k, v]) => `${k} ${(Number(v) * 100).toFixed(0)}%`).join(" ") : "";
+    return `| ${String(r.winner || "?")} | ${String(r.q || "").slice(0, 50).replace(/\|/g, "/")} | ${r.confidence != null ? Number(r.confidence).toFixed(2) : ""} | ${w} |`;
+  }).join("\n");
+  writeFileSync(join(dir, "runs.md"),
+    `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [ask-shared runs]\n---\n\n`
+    + `# 🎯 Son ask-shared koşuları\n\n> [!info] Son ${runs.length} koşu · kazanan uzman + gate ağırlıkları\n\n`
+    + `| Kazanan | Soru | Güven | Ağırlıklar |\n|---|---|---|---|\n${runRows || "| — | henüz koşu yok | | |"}\n\n[[Orchestra]]\n`);
+
+  // status.md — sync-time snapshot of the 4-system orchestra health.
+  writeFileSync(join(dir, "status.md"),
+    `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [orchestra status]\n---\n\n`
+    + `# 🚦 Orkestra durumu\n\n> [!abstract] Sync anındaki anlık görüntü\n\n`
+    + `| Sistem | Rol | Durum |\n|---|---|---|\n`
+    + `| 🔵 ollamas | brain + gateway :3000 | ${dump.memories.length} memory |\n`
+    + `| 🟢 eCym | komut uzmanı :11434 | ${ecymCount} komut |\n`
+    + `| 🟣 odysseus | research :7860 | harici Khoj |\n`
+    + `| 🔴 claudecode | kod uzmanı | github-models (keyless) |\n\n`
+    + `**Council:** seviye ${ledger?.level ?? "?"} · ${ledger?.tasks ?? 0} görev · [[council]]\n\n[[Orchestra]]\n`);
 }
 
 // ── push: brain → vault (authoritative mirror, idempotent by content hash) ──
@@ -388,6 +464,9 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   writeHome(vault, dump, entities, ecymCount);
   writeBase(vault);
   writeTierIndexes(vault, dump);
+  writeTemplates(vault);
+  writeJournal(vault, dump);
+  writeNamespaceIndex(vault, dump);
   return { written, skipped, entities, pruned };
 }
 

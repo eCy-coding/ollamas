@@ -121,7 +121,7 @@ describe("scoreAll — üç uzman aynı anda", () => {
       ],
       SOURCES,
     );
-    expect(scores.length).toBe(3);
+    expect(scores.length).toBe(4);
     expect(scores[1]).toBe(0);                       // erişilemez
     expect(scores[0]).toBeGreaterThan(scores[2]);    // temelli > temelsiz
   });
@@ -135,6 +135,6 @@ describe("scoreAll — üç uzman aynı anda", () => {
       ],
       SOURCES,
     );
-    expect(scores).toEqual([0, 0, 0]);
+    expect(scores).toEqual([0, 0, 0, 0]);
   });
 });

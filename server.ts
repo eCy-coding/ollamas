@@ -4373,8 +4373,24 @@ app.post("/api/brain/ask-shared", async (req, res) => {
             { prompt: messages[1].content, model: "ollamas-auto" }, { source: "ask-shared" } as any);
           return typeof out === "string" ? out : JSON.stringify(out).slice(0, 4000);
         },
+        // 4th orchestra expert — Claude Code via the github-models provider (keyless, gh
+        // token). Best-effort like the others: a throttle/failure degrades this seat, it
+        // does not fail the answer. Strong on code review / PR / refactor / git questions.
+        claudecode: gen("github-models"),
       },
     } as any);
+    // Readable orchestra-run ledger (the gate-outcomes.jsonl only stores vectors). One line
+    // per ask-shared: which expert won, the gate weights, confidence. Mirrored into the
+    // Obsidian orchestra/runs.md. Best-effort — never blocks the response.
+    try {
+      const { appendFileSync, mkdirSync } = await import("node:fs");
+      const dir = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}`;
+      mkdirSync(dir, { recursive: true });
+      appendFileSync(`${dir}/ask-shared-runs.jsonl`, JSON.stringify({
+        at: Date.now(), q: String(question).slice(0, 200), winner: r.expert,
+        weights: r.weights, confidence: r.confidence, degraded: r.degraded,
+      }) + "\n");
+    } catch { /* ledger is best-effort */ }
     // F3c profil güncelle: BASE sorgu vektörünü (q, q* DEĞİL) yaz → bir sonraki soru
     // p_u ile kişiselleşir. best-effort: profil yazımı yanıtı düşürmez.
     if (r.baseQVec) {
