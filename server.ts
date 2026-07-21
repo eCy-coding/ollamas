@@ -3516,6 +3516,20 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
   // ----------------------------------------------------
   app.post("/api/odysseus/run", async (req, res) => {
     const b = req.body || {};
+    // app-help — odysseus'un app'leri KULLANMAYI öğrenmesi (üçüncü sistem). Kartı
+    // (usage+ops) BAĞLAM yapıp odysseus_chat'e verir → odysseus kart-temelli açıklar.
+    // Böylece ollamas (loadAppCards) · eCym (komutlar) · odysseus (app-help) EŞİT erişir.
+    if (b.type === "app-help") {
+      const { loadAppCards } = await import("./scripts/app-literacy-load");
+      const { filterCards } = await import("./server/app-literacy");
+      const card = filterCards(loadAppCards(), { app: String(b.app || ""), limit: 1 })[0];
+      if (!card) return res.status(404).json({ ok: false, error: `app '${b.app}' bulunamadı` });
+      const ctx = `Uygulama: ${card.app} (${card.category}). Amaç: ${card.purpose} `
+        + (card.usage ? `Kullanım: ${card.usage.guide} Yapabilir: ${card.usage.canDo.join("; ")}. ` : "")
+        + `Komutlar: ${card.ops.map((o) => `${o.desc} [${o.cmd}]`).join("; ")}.`;
+      b.type = "chat";
+      b.prompt = `${ctx}\n\nSoru: ${b.question || "bu uygulamayı nasıl kullanırım? örnek komutlarla açıkla"}\nYalnız yukarıdaki karta dayan, uydurma.`;
+    }
     const ROUTES: Record<string, [string, Record<string, any>]> = {
       chat: ["odysseus_chat", { prompt: b.prompt, model: b.model }],
       research: ["odysseus_research", { query: b.query, model: b.model }],
@@ -4377,6 +4391,23 @@ app.post("/api/brain/ask-shared", async (req, res) => {
     const msg = String(err?.message || "");
     if (/embed|503/i.test(msg)) return res.status(503).json({ error: "embedder busy — retry shortly" });
     res.status(500).json({ error: msg || "ask-shared failed" });
+  }
+});
+
+// App-literacy salt-okunur erişim — üç sistem (ollamas·eCym·odysseus) app'leri
+// listeler/keşfeder. ÇALIŞTIRMA YOK (yalnız kart+usage okuma). ?app= alt-dize,
+// ?q= lexical arama, ?limit= tavan. Modül düzeyinde (NO_AUTOBOOT 404 gotcha'sı).
+app.get("/api/app-literacy/cards", async (req, res) => {
+  try {
+    const { loadAppCards } = await import("./scripts/app-literacy-load");
+    const { filterCards } = await import("./server/app-literacy");
+    const app = typeof req.query.app === "string" ? req.query.app : undefined;
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const cards = filterCards(loadAppCards(), { app, q, limit });
+    res.json({ count: cards.length, cards });
+  } catch (e: any) {
+    res.status(500).json({ error: String(e?.message ?? e) });
   }
 });
 

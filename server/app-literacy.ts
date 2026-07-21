@@ -109,6 +109,33 @@ export function buildAppLiteracyRecords(cards: AppCard[]): TeachRecord[] {
 }
 
 /**
+ * Kartları salt-okunur filtrele — `GET /api/app-literacy/cards`'ın çekirdeği.
+ * ÜÇ sistem (ollamas·eCym·odysseus) EŞİT erişimle app'leri listeler/keşfeder.
+ * `app` harf-duyarsız alt-dize eşler; `q` app/purpose/capability/usage üzerinde
+ * lexical arar (semantik DEĞİL — semantik için /api/brain/recall). Çalıştırma YOK.
+ */
+export function filterCards(
+  cards: AppCard[], opts: { app?: string; q?: string; limit?: number } = {},
+): AppCard[] {
+  const byRank = [...cards].sort((a, b) => a.rank - b.rank);
+  const app = opts.app?.trim().toLowerCase();
+  const q = opts.q?.trim().toLowerCase();
+  let out = byRank;
+  if (app) out = out.filter((c) => c.app.toLowerCase().includes(app));
+  if (q) {
+    out = out.filter((c) => {
+      const hay = [
+        c.app, c.category, c.purpose, ...c.capabilities, ...(c.drive ?? []),
+        c.usage?.guide ?? "", ...(c.usage?.canDo ?? []),
+        ...c.ops.flatMap((o) => [o.desc, ...(o.examples ?? [])]),
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  return opts.limit && opts.limit > 0 ? out.slice(0, opts.limit) : out;
+}
+
+/**
  * Kart → eCym komutları. `safe` alanı İKİ kapının kesişimidir.
  *
  * Politika `auto` dese bile `isGuiRisky` evet diyorsa sonuç "False" olur:

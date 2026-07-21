@@ -2,6 +2,7 @@
 import { describe, test, expect } from "vitest";
 import {
   buildAppLiteracyRecords, buildAppEcymCommands, validateCards, triggerCollision, reconcileAppSafety,
+  filterCards,
   type AppCard,
 } from "../server/app-literacy";
 import { defaultPolicy } from "../server/agent-policy";
@@ -227,5 +228,28 @@ describe("reconcileAppSafety — politika değişikliği eCym'e yansısın", () 
     const { commands, changed } = reconcileAppSafety(ds as any, cards, defaultPolicy());
     expect(changed).toEqual([]);
     expect(commands[0].safe).toBe("False"); // olduğu gibi
+  });
+});
+
+describe("filterCards — odysseus/eCym/ollamas ortak salt-okunur erişim (Faz 4)", () => {
+  const cards: AppCard[] = [
+    { rank: 1, app: "iTerm", scriptable: true, category: "terminal", purpose: "komut çalıştırma", capabilities: ["sekme"], drive: ["CLI"], ops: [], usage: { guide: "terminali böyle kullan", canDo: ["ssh oturumu"] } },
+    { rank: 2, app: "Google Chrome", scriptable: true, category: "tarayıcı", purpose: "web gezinme", capabilities: ["sekme"], drive: ["AppleScript"], ops: [] },
+    { rank: 3, app: "DaVinci Resolve", scriptable: false, category: "video", purpose: "montaj ve renk", capabilities: ["kurgu"], drive: ["GUI"], ops: [] },
+  ];
+  test("app filtresi (harf duyarsız alt-dize)", () => {
+    expect(filterCards(cards, { app: "chrome" }).map((c) => c.app)).toEqual(["Google Chrome"]);
+    expect(filterCards(cards, { app: "iterm" }).map((c) => c.app)).toEqual(["iTerm"]);
+  });
+  test("q lexical arama app/purpose/capability/usage üzerinde", () => {
+    expect(filterCards(cards, { q: "montaj" }).map((c) => c.app)).toEqual(["DaVinci Resolve"]);
+    expect(filterCards(cards, { q: "ssh" }).map((c) => c.app)).toEqual(["iTerm"]); // usage.canDo'dan
+  });
+  test("filtre yoksa rank sırasında hepsi; limit uygulanır", () => {
+    expect(filterCards(cards, {}).map((c) => c.rank)).toEqual([1, 2, 3]);
+    expect(filterCards(cards, { limit: 2 })).toHaveLength(2);
+  });
+  test("eşleşme yok → boş (çökmez)", () => {
+    expect(filterCards(cards, { app: "yokboyle" })).toEqual([]);
   });
 });
