@@ -82,4 +82,24 @@ export function writeEcymNotes(vault: string, path = ecymDatasetPath()): number 
   return live.size;
 }
 
+// L10: eCym learning queue — the misses.log holds questions eCym could not answer locally
+// (`<question>\t<tier>`), which ecy-learn drafts into new commands (manual-approve). Mirror
+// the tail so the growth pipeline is visible in the vault. Read-only.
+export function writeEcymLearningQueue(vault: string, missesPath = `${process.env.HOME}/ecy-model/misses.log`): number {
+  const dir = join(vault, "ecym");
+  mkdirSync(dir, { recursive: true });
+  let rows: { q: string; tier: string }[] = [];
+  try {
+    rows = readFileSync(missesPath, "utf8").trim().split("\n").filter(Boolean).slice(-40).reverse()
+      .map((l) => { const [q, tier] = l.split("\t"); return { q: (q || "").replace(/^<|>$/g, ""), tier: tier || "" }; })
+      .filter((r) => r.q);
+  } catch { /* no misses yet */ }
+  const list = rows.map((r) => `- [ ] ${r.q.slice(0, 100).replace(/\|/g, "/")} \`${r.tier}\``).join("\n");
+  writeFileSync(join(dir, "_learning-queue.md"),
+    `---\ncssclasses: [brain, system-ecym]\ntags: [system/ecym, ecym/learning]\naliases: [eCym learning queue]\n---\n\n`
+    + `# 🌱 eCym öğrenme kuyruğu\n\n> [!tip] eCym'in yerel çözemediği ${rows.length} soru. \`ecy-learn\` bunları yeni komut taslağına çevirir → onay → \`terminal-dataset.json\`.\n\n`
+    + `${list || "_(henüz kaçırılan yok)_"}\n\n[[Orchestra]] · kaynak: \`~/ecy-model/misses.log\` (read-only)\n`);
+  return rows.length;
+}
+
 export const _ecymInternals = { toEcymNote, ecymBase };

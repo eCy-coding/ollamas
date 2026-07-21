@@ -17,7 +17,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
-import { writeEcymNotes } from "./brain-obsidian-ecym";
+import { writeEcymNotes, writeEcymLearningQueue } from "./brain-obsidian-ecym";
+import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, TIERS, type NoteMemory } from "./brain-obsidian-note";
 
 export function defaultVaultPath(): string {
@@ -317,6 +318,14 @@ const COUNCIL_SEATS: Record<string, number> = { ecy: 0.30, ollamas: 0.25, odysse
 function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void {
   const dir = join(vault, "orchestra");
   mkdirSync(dir, { recursive: true });
+  mkdirSync(join(dir, "answers"), { recursive: true });
+  // L9: ask queue (create-once so human questions survive re-sync). The sync loop reads
+  // `- [ ]` lines, asks ask-shared, writes answers/, marks `- [x]`.
+  const askPath = join(dir, "ask.md");
+  if (!existsSync(askPath)) writeFileSync(askPath,
+    `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [Ask, Sor]\n---\n\n`
+    + `# 🎤 Orkestra'ya sor\n\n> [!tip] Bir satır ekle: \`- [ ] sorun\` → ~5 dk içinde ask-shared cevaplar → [[answers]] klasörü + \`- [x]\` işaretlenir.\n\n`
+    + `- [ ] <sorunu buraya yaz>\n`);
   let ledger: any = null;
   try { ledger = JSON.parse(readFileSync(`${process.env.HOME}/.ollamas/council-ledger.json`, "utf8")); } catch { /* no council yet */ }
 
@@ -407,6 +416,15 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     + `| 🟣 odysseus | research :7860 | harici Khoj |\n`
     + `| 🔴 claudecode | kod uzmanı | github-models (keyless) |\n\n`
     + `**Council:** seviye ${ledger?.level ?? "?"} · ${ledger?.tasks ?? 0} görev · [[council]]\n\n[[Orchestra]]\n`);
+
+  // L12: Kanban-plugin compatible sprint board — orchestra work lanes. Static scaffold the
+  // human/agents fill; the Kanban plugin renders `## Lane` + `- [ ]` as draggable cards.
+  const sprintPath = join(dir, "sprint.md");
+  if (!existsSync(sprintPath)) writeFileSync(sprintPath,
+    `---\nkanban-plugin: board\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, kanban]\n---\n\n`
+    + `## 📥 Backlog\n\n- [ ] eCym misses → yeni komut onayı\n- [ ] odysseus Khoj online\n\n`
+    + `## 🔨 Doing\n\n\n## ✅ Done\n\n- [x] claudecode 4. uzman\n- [x] orkestra federasyonu\n\n`
+    + `%% kanban:settings\n\`\`\`\n{"kanban-plugin":"board","show-checkboxes":true}\n\`\`\`\n%%\n`);
 }
 
 // ── push: brain → vault (authoritative mirror, idempotent by content hash) ──
@@ -460,7 +478,8 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   }
   const entities = writeEntityNotes(vault, dump.facts);
   const ecymCount = writeEcymNotes(vault);          // federate the eCym command catalog
-  writeOrchestra(vault, dump, ecymCount);           // council mirror + hub + canvas
+  writeEcymLearningQueue(vault);                     // L10: eCym misses → learning queue
+  writeOrchestra(vault, dump, ecymCount);           // council mirror + hub + canvas + sprint
   writeHome(vault, dump, entities, ecymCount);
   writeBase(vault);
   writeTierIndexes(vault, dump);
@@ -498,6 +517,39 @@ async function pullVaultToBrain(vault: string, manifest: Manifest, brainIds: Set
   return { ingested, skipped, conflicts };
 }
 
+export interface AskResult { answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number }
+
+// L9: process the Obsidian-side ask queue. A human writes `- [ ] <question>` into
+// orchestra/ask.md; each pending line is sent through askFn (ask-shared), the answer is
+// written to orchestra/answers/<ts>.md, and the question is marked `- [x]` (idempotent —
+// answered lines are skipped on the next run). Returns how many were answered.
+export async function processAskQueue(vault: string, askFn: (q: string) => Promise<AskResult>): Promise<number> {
+  const askPath = join(vault, "orchestra", "ask.md");
+  if (!existsSync(askPath)) return 0;
+  const lines = readFileSync(askPath, "utf8").replace(/\r\n/g, "\n").split("\n");
+  const ansDir = join(vault, "orchestra", "answers");
+  mkdirSync(ansDir, { recursive: true });
+  let answered = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*-\s*\[ \]\s*(.+?)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    const q = m[1].trim();
+    if (!q || q.startsWith("<")) continue; // skip the template placeholder
+    let r: AskResult; try { r = await askFn(q); } catch (e: any) { r = { answer: `⚠️ hata: ${e?.message || e}` }; }
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const slug = noteFilename(q.slice(0, 40)).replace(/\.md$/, "");
+    const w = r.weights ? Object.entries(r.weights).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(" · ") : "";
+    writeFileSync(join(ansDir, `${ts}-${slug}.md`),
+      `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, answer]\naliases: [${JSON.stringify(q.slice(0, 60))}]\n---\n\n`
+      + `# ❓ ${q}\n\n> [!success] Kazanan: **${r.expert || "?"}**${r.confidence != null ? ` · güven ${r.confidence.toFixed(2)}` : ""}\n> ${w}\n\n`
+      + `${r.answer || "_(cevap yok)_"}\n\n[[Orchestra]] · [[runs]]\n`);
+    lines[i] = lines[i].replace("- [ ]", "- [x]");
+    answered++;
+  }
+  if (answered > 0) writeFileSync(askPath, lines.join("\n"));
+  return answered;
+}
+
 export async function syncObsidian(direction: Direction = "both", opts: SyncOpts = {}): Promise<SyncResult> {
   const vault = opts.vault || defaultVaultPath();
   const dbPath = opts.dbPath || defaultDbPath();
@@ -524,6 +576,7 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
     const neighbors = opts.neighbors ? opts.neighbors() : neighborsFromDb(dbPath, 5);
     const entityIdx = buildEntityIndex(dump.facts);
     push = pushBrainToVault(vault, dump, manifest, neighbors, entityIdx, direction === "both");
+    await writeOdysseusNotes(vault); // L11: Khoj federation (graceful — offline → placeholder)
     writeObsidianConfig(vault); // create-once: graph color-groups, plugins, appearance
   }
 

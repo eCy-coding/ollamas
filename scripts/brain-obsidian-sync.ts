@@ -30,6 +30,14 @@ async function main() {
       ingested: r.pull?.ingested, conflicts: r.pull?.conflicts, memories: r.memories, vault: r.vault,
     }));
     if (r.pull?.conflicts > 0) console.error(JSON.stringify({ event: "obsidian.conflicts", n: r.pull.conflicts, vault: r.vault }));
+
+    // L9: process the Obsidian ask queue — human `- [ ]` questions in orchestra/ask.md get
+    // answered via ask-shared, written to answers/, and marked done. Best-effort.
+    try {
+      const { processAskQueue } = await import("../server/brain-obsidian");
+      const answered = await processAskQueue(r.vault, (q) => api("/api/brain/ask-shared", { question: q }, 90_000));
+      if (answered > 0) console.log(JSON.stringify({ event: "obsidian.ask", answered }));
+    } catch (e: any) { console.error(JSON.stringify({ event: "obsidian.ask.error", msg: String(e?.message || e) })); }
   } catch (e: any) {
     // Non-fatal: the server may be mid-restart. launchd fires again next interval.
     console.error(JSON.stringify({ event: "obsidian.sync.error", at, msg: String(e?.message || e) }));

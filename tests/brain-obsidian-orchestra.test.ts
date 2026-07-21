@@ -4,8 +4,10 @@ import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createBrainStore } from "../server/brain";
-import { syncObsidian } from "../server/brain-obsidian";
-import { writeEcymNotes, readEcymCommands } from "../server/brain-obsidian-ecym";
+import { syncObsidian, processAskQueue } from "../server/brain-obsidian";
+import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue } from "../server/brain-obsidian-ecym";
+import { writeOdysseusNotes } from "../server/brain-obsidian-khoj";
+import { mkdirSync } from "node:fs";
 import { toMarkdown, parseMarkdown, type NoteMemory } from "../server/brain-obsidian-note";
 
 const fakeEmbed = async (t: string) => { const v = [0, 0, 0]; v[t.length % 3] = 1; return v; };
@@ -51,6 +53,65 @@ describe("eCym federation — command catalog → notes", () => {
   });
   test("readEcymCommands returns [] when the dataset is absent", () => {
     expect(readEcymCommands(join(dir, "nope.json"))).toEqual([]);
+  });
+});
+
+describe("L9 — ask queue (vault → ask-shared → vault)", () => {
+  test("pending '- [ ]' question is answered, written, and marked '- [x]'", async () => {
+    mkdirSync(join(vault, "orchestra"), { recursive: true });
+    writeFileSync(join(vault, "orchestra", "ask.md"), "# Ask\n\n- [ ] ollamas nedir\n- [x] eski soru\n");
+    const calls: string[] = [];
+    const n = await processAskQueue(vault, async (q) => { calls.push(q); return { answer: "cevap", expert: "ollamas", weights: { ollamas: 0.5 }, confidence: 0.8 }; });
+    expect(n).toBe(1);
+    expect(calls).toEqual(["ollamas nedir"]);
+    expect(readFileSync(join(vault, "orchestra", "ask.md"), "utf8")).toContain("- [x] ollamas nedir");
+    const ans = require("node:fs").readdirSync(join(vault, "orchestra", "answers"));
+    expect(ans.length).toBe(1);
+    expect(readFileSync(join(vault, "orchestra", "answers", ans[0]), "utf8")).toContain("Kazanan: **ollamas**");
+  });
+  test("no pending questions → 0, no ask.md → 0", async () => {
+    expect(await processAskQueue(vault, async () => ({}))).toBe(0);
+  });
+});
+
+describe("L10 — eCym learning queue", () => {
+  test("misses.log tail → _learning-queue.md checkboxes", () => {
+    const misses = join(dir, "misses.log");
+    writeFileSync(misses, "<calculator yap>\ttier4-fallback\n<disk temizle>\ttier2\n");
+    const n = writeEcymLearningQueue(vault, misses);
+    expect(n).toBe(2);
+    const q = readFileSync(join(vault, "ecym", "_learning-queue.md"), "utf8");
+    expect(q).toContain("- [ ] calculator yap");
+    expect(q).toContain("tier4-fallback");
+  });
+});
+
+describe("L11 — odysseus Khoj federation (graceful)", () => {
+  test("Khoj offline → honest placeholder", async () => {
+    const r = await writeOdysseusNotes(vault, { fetcher: async () => null });
+    expect(r.online).toBe(false);
+    expect(readFileSync(join(vault, "odysseus", "_khoj.md"), "utf8")).toContain("erişilemez");
+  });
+  test("Khoj online → entries mirrored", async () => {
+    const r = await writeOdysseusNotes(vault, { fetcher: async () => [{ id: "k1", entry: "odysseus araştırma notu" }] });
+    expect(r.online).toBe(true);
+    expect(r.notes).toBe(1);
+    expect(existsSync(join(vault, "odysseus", "khoj-k1.md"))).toBe(true);
+  });
+});
+
+describe("L12 — Kanban sprint board", () => {
+  test("sync writes a kanban-plugin board with lanes", async () => {
+    process.env.ECY_DATASET = ecymFixture;
+    const b = createBrainStore({ dbPath, embed: fakeEmbed });
+    await b.remember({ id: "c:1", tier: "core", content: "x" });
+    b.close();
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    delete process.env.ECY_DATASET;
+    const sprint = readFileSync(join(vault, "orchestra", "sprint.md"), "utf8");
+    expect(sprint).toContain("kanban-plugin: board");
+    expect(sprint).toContain("## 📥 Backlog");
+    expect(sprint).toContain("## ✅ Done");
   });
 });
 
