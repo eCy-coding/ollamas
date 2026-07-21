@@ -194,7 +194,7 @@ describe("rich graph: dense linking + .obsidian config + MOC", () => {
     await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
     const note = readFileSync(join(vault, "core", "core-emre.md"), "utf8");
     expect(note).toMatch(/aliases: \[/);
-    expect(note).toContain("cssclasses: [brain, tier-core]");
+    expect(note).toContain("cssclasses: [brain, tier-core, system-ollamas]");
     const ent = readFileSync(join(vault, "entities", "entity-emre.md"), "utf8");
     expect(ent).toContain("## Mentioned in");
     expect(ent).toContain("degree:");
