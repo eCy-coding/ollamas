@@ -69,6 +69,9 @@ export function subjectsFrom(hits: { content: string }[]): string[] {
 const PROFILE_REFRESH_TURNS = 20;
 /** Gate eğitimi bu kadar turda bir koşar — her tur eğitmek gereksiz, veri yavaş birikir. */
 const GATE_TRAIN_EVERY = Number(process.env.BRAIN_GATE_TRAIN_EVERY) || 10;
+// App usage self-authoring cadence — gate-train'den ofsetli (aynı turda yığılmasın).
+const APP_AUTHOR_EVERY = Number(process.env.BRAIN_APP_AUTHOR_EVERY) || 7;
+const APP_AUTHOR_MIN_RATE = Number(process.env.BRAIN_APP_AUTHOR_MIN_RATE) || 0.5;
 
 export interface LoopState {
   turn: number;
@@ -551,6 +554,68 @@ async function main() {
         console.log(JSON.stringify({ event: "brain.gate.train", mode, persist, ...res }));
       } catch (e: any) {
         console.warn(JSON.stringify({ event: "brain.gate.train", error: String(e?.message ?? e).slice(0, 120) }));
+      }
+    }
+
+    // 3.7) APP-USAGE-AUTHOR — loop kalan 80 kartı SELF-AUTHOR eder ($0). Top-20 elle
+    // yazıldı; gerisi burada: bir kart seç → modele "nasıl kullanılır, örnek komutlar"
+    // sor → örnek komutları GÜVENLİ-YAPI ile doğrula (osacompile/appExists) → YALNIZ
+    // doğrulananı brain'e zengin usage yaz. Terfi kapısının arkasında: candidate ölçer
+    // (canlı-gölge, brain'e YAZMAZ), autonomous yazar. gate-ce-train ile aynı desen.
+    if (state.turn % APP_AUTHOR_EVERY === 0 && Date.now() - t0 < budgetMs) {
+      try {
+        const { loadLedger, ensureCap, withCapability } = await import("../server/brain-capability-runner");
+        const { gateTrainPolicy } = await import("../server/brain-gate-train");
+        const { isInfraFailure } = await import("../server/brain-sandbox");
+        const { loadAppCards } = await import("./app-literacy-load");
+        const { cardsNeedingUsage, extractCommandCandidates, verifiedExampleRate, buildAuthoredUsageRecord } =
+          await import("../server/app-usage-author");
+        const { execFileSync } = await import("node:child_process");
+
+        const needing = cardsNeedingUsage(loadAppCards());
+        if (needing.length) {
+          const ledger = loadLedger();
+          const { mode, persist } = gateTrainPolicy(ensureCap(ledger, "app-usage-author").status);
+          const card = needing[state.turn % needing.length];
+          const slug = card.app.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+          // GÜVENLİ-YAPI doğrulaması: open -a → app-var-mı; osascript → derlenir-mi. Çalıştırma YOK.
+          const verifyCmd = (cmd: string): boolean => {
+            const app = cmd.match(/open\s+-a\s+"([^"]+)"/)?.[1];
+            if (app) { try { execFileSync("osascript", ["-e", `id of app "${app}"`], { stdio: "ignore", timeout: 8_000 }); return true; } catch { return false; } }
+            const osa = cmd.match(/osascript\s+-e\s+'([\s\S]+)'/);
+            if (osa) {
+              try { const out = execFileSync("osacompile", ["-o", "/dev/null", "-e", osa[1]], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 }); return !/compilation error|syntax error/i.test(String(out)); }
+              catch (e: any) { return !/compilation error|syntax error/i.test(String(e?.stderr ?? "")); }
+            }
+            return false;
+          };
+
+          const res = await withCapability("app-usage-author", async () => {
+            const prompt = `macOS uygulaması "${card.app}" (${card.category}, ${card.purpose}). Bu uygulamayı nasıl kullanırım? Kısa bir kullanım kılavuzu ver ve 1-3 GERÇEK örnek komut yaz (yalnız 'open -a "${card.app}"' ya da 'osascript -e '...'' biçiminde, uydurma). Kılavuz + komutlar.`;
+            const answer = await gen(resolveDistillProvider(process.env))([
+              { role: "system", content: "macOS uygulama kullanım rehberi. Yalnız gerçek, çalışan komutlar. Uydurma app adı YOK." },
+              { role: "user", content: prompt },
+            ]);
+            const candidates = extractCommandCandidates(answer);
+            const { rate, verified, total } = verifiedExampleRate(candidates, verifyCmd);
+            const verifiedExamples = candidates.filter(verifyCmd);
+            // YALNIZ autonomous (persist) + eşik geçen + doğrulanmış örnek varsa YAZ.
+            let wrote = false;
+            if (persist && (rate ?? 0) >= APP_AUTHOR_MIN_RATE && verifiedExamples.length) {
+              const guide = answer.replace(/```[\s\S]*?```/g, "").split("\n").filter((l) => l.trim() && !extractCommandCandidates(l).length).slice(0, 2).join(" ").slice(0, 400);
+              const rec = buildAuthoredUsageRecord(card.app, slug, guide || card.purpose, verifiedExamples);
+              await api("/api/brain/remember", { id: rec.id, ns: rec.ns, tier: "procedural", confidence: 0.7, source: "loop-app-author", content: rec.content });
+              wrote = true;
+            }
+            return { app: card.app, verified, total, rate, wrote };
+          }, async () => ({ app: card.app, rate: undefined, wrote: false }),
+            { ledger, turn: state.turn, mode, metricOf: (r: any) => r?.rate, isInfraError: isInfraFailure });
+
+          console.log(JSON.stringify({ event: "brain.app.author", mode, persist, needing: needing.length, ...res }));
+        }
+      } catch (e: any) {
+        console.warn(JSON.stringify({ event: "brain.app.author", error: String(e?.message ?? e).slice(0, 120) }));
       }
     }
 
