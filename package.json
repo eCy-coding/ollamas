@@ -46,6 +46,7 @@
     "doctor": "tsx scripts/stack-health.ts",
     "obsidian:sync": "tsx scripts/brain-obsidian-sync.ts",
     "obsidian:plugins": "tsx scripts/obsidian-plugins.ts",
+    "obsidian:trust": "tsx scripts/obsidian-trust.ts",
     "obsidian:plugins:verify": "tsx scripts/obsidian-plugins.ts --verify",
     "start": "node dist/server.cjs",
     "test": "vitest run",
