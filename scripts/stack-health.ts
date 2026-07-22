@@ -88,6 +88,28 @@ async function run(): Promise<Check[]> {
     checks.push({ name: "brain.obsidian", sev: "MED", status: "WARN", detail: `status unavailable: ${e?.message || e}` });
   }
 
+  // 4b. odysseus Khoj federation (external second-brain) — down-tolerant, so WARN not FAIL.
+  try {
+    const k = await getJson(`${process.env.KHOJ_URL || "http://127.0.0.1:42110"}/api/content/size`);
+    const mb = Number(k.body?.indexed_data_size_in_mb ?? 0);
+    checks.push({ name: "odysseus.khoj", sev: "MED", status: k.status === 200 ? "PASS" : "WARN",
+      detail: `Khoj :42110 -> ${k.status} · indexed=${mb}MB${mb === 0 ? " (boş — khoj-index çalıştır)" : ""}` });
+  } catch (e: any) {
+    checks.push({ name: "odysseus.khoj", sev: "MED", status: "WARN", detail: `offline (best-effort): ${e?.message || e}` });
+  }
+  // 4c. eCym learning loop — approvals should reach ecy-learn drafts (misses.review.json fresh).
+  try {
+    const { statSync } = await import("node:fs");
+    const home = process.env.HOME;
+    const review = statSync(`${home}/ecy-model/misses.review.json`).mtimeMs;
+    const misses = statSync(`${home}/ecy-model/misses.log`).mtimeMs;
+    // healthy = review no older than the misses it drafts from (loop is keeping up).
+    checks.push({ name: "ecym.learn-loop", sev: "MED", status: review >= misses ? "PASS" : "WARN",
+      detail: review >= misses ? "misses.review.json güncel" : "misses.review.json bayat — ecym-vault-learn çalıştır" });
+  } catch {
+    checks.push({ name: "ecym.learn-loop", sev: "MED", status: "WARN", detail: "misses.review.json yok (henüz taslak üretilmedi)" });
+  }
+
   // 4. Always-on + periodic launchd agents.
   checks.push(jobHealth("com.ollamas.server", true));
   checks.push(jobHealth("com.missioncontrol.terminalbridge", true, "MED"));

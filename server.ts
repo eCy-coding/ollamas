@@ -4389,6 +4389,9 @@ app.post("/api/brain/ask-shared", async (req, res) => {
       appendFileSync(`${dir}/ask-shared-runs.jsonl`, JSON.stringify({
         at: Date.now(), q: String(question).slice(0, 200), winner: r.expert,
         weights: r.weights, confidence: r.confidence, degraded: r.degraded,
+        // L27: which experts actually returned a non-empty answer this run — lets the status
+        // derive per-expert liveness (claudecode throttle) from evidence, not a static flag.
+        experts: Object.keys((r as any).expertAnswers || {}),
       }) + "\n");
     } catch { /* ledger is best-effort */ }
     // F3c profil güncelle: BASE sorgu vektörünü (q, q* DEĞİL) yaz → bir sonraki soru

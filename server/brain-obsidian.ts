@@ -261,6 +261,7 @@ function writeHome(vault: string, dump: BrainDump, entities: number, ecymCount =
     + `\n- 🟠 [[entities|entities]] — **${entities}**\n\n`
     + `## 🗃️ Veritabanı görünümü\n![[brain.base]]\n\n`
     + `## 🗺️ Görsel haritalar\n[[orchestra.canvas|Orkestra akışı]] · [[entity-map.canvas|Bilgi haritası]]\n\n`
+    + `## 🧭 Keşif\n[[hubs|🕸️ Merkez düğümler]] · [[review|🔁 Gözden-geçir]] · [[namespaces|🗂️ Namespace'ler]] · 📆 rollup: \`journal/weekly\` · \`journal/monthly\`\n\n`
     + `## 🕐 Son eklenenler\n`
     + dv("TABLE tier AS \"Katman\", hits AS \"Recall\", confidence AS \"Güven\"\nWHERE tier\nSORT created_ms DESC\nLIMIT 12")
     + `\n\n## 🔥 En çok hatırlananlar\n`
@@ -365,7 +366,75 @@ function writeJournal(vault: string, dump: BrainDump): number {
       `---\ncssclasses: [brain]\ntags: [journal]\naliases: [${day}]\n---\n\n# 📅 ${day}\n\n> [!quote] ${ids.length} episodic anı\n\n${links}\n`);
   }
   if (live.size > 0) for (const f of readdirSync(dir)) if (f.endsWith(".md") && !live.has(f)) rmSync(join(dir, f));
+  // L26: periodic rollups — world-class second-brains summarise by week + month, not just day.
+  writePeriodicRollup(dir, "weekly", byDay, isoWeek);
+  writePeriodicRollup(dir, "monthly", byDay, (d) => d.slice(0, 7));
   return days.length;
+}
+
+// ISO-8601 week key (YYYY-Www) for a YYYY-MM-DD day string.
+function isoWeek(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  const th = new Date(d); th.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7)); // nearest Thursday
+  const yStart = new Date(Date.UTC(th.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil(((th.getTime() - yStart.getTime()) / 86400000 + 1) / 7);
+  return `${th.getUTCFullYear()}-W${String(wk).padStart(2, "0")}`;
+}
+
+// L26: roll daily episodic counts up into journal/<period>/<key>.md (week or month) with a
+// day-by-day breakdown + total. Pruned like the daily notes so removed history disappears.
+function writePeriodicRollup(journalDir: string, period: "weekly" | "monthly", byDay: Map<string, string[]>, keyOf: (day: string) => string): void {
+  const dir = join(journalDir, period);
+  mkdirSync(dir, { recursive: true });
+  const byKey = new Map<string, { day: string; n: number }[]>();
+  for (const [day, ids] of byDay) {
+    const k = keyOf(day);
+    (byKey.get(k) || byKey.set(k, []).get(k)!).push({ day, n: new Set(ids).size });
+  }
+  const live = new Set([...byKey.keys()].map((k) => `${k}.md`));
+  for (const [k, rows] of byKey) {
+    rows.sort((a, b) => a.day.localeCompare(b.day));
+    const total = rows.reduce((s, r) => s + r.n, 0);
+    const list = rows.map((r) => `- [[${r.day}]] — ${r.n} anı`).join("\n");
+    const icon = period === "weekly" ? "🗓️" : "📆";
+    writeFileSync(join(dir, `${k}.md`),
+      `---\ncssclasses: [brain]\ntags: [journal, journal/${period}]\naliases: [${k}]\n---\n\n# ${icon} ${k}\n\n> [!abstract] ${total} episodic anı · ${rows.length} gün\n\n${list}\n\n[[Home]]\n`);
+  }
+  if (live.size > 0) for (const f of readdirSync(dir)) if (f.endsWith(".md") && !live.has(f)) rmSync(join(dir, f));
+}
+
+// L26: hub notes — surface the most-connected memories (graph centrality by neighbor degree).
+// A world-class vault has "maps of content" anchored on its densest nodes; this derives them
+// from the same neighbor data the notes already link by.
+function writeHubs(vault: string, dump: BrainDump, neighbors: Map<string, string[]>): void {
+  const byId = new Map(dump.memories.map((m) => [m.id, m]));
+  const ranked = [...neighbors.entries()]
+    .map(([id, nb]) => ({ id, deg: nb.length, m: byId.get(id) }))
+    .filter((r) => r.m && r.deg > 0)
+    .sort((a, b) => b.deg - a.deg)
+    .slice(0, 20);
+  const rows = ranked.map((r) => `- [[${memBase(r.id)}]] — **${r.deg}** bağ · \`${r.m!.tier}\` · ${r.m!.hits ?? 0}× recall`).join("\n");
+  writeFileSync(join(vault, "_index", "hubs.md"),
+    `---\ncssclasses: [brain]\ntags: [moc]\naliases: [Hubs, Merkez düğümler]\n---\n\n# 🕸️ Merkez düğümler (en-bağlı anılar)\n\n`
+    + `> [!info] Graf-merkezliliği en yüksek ${ranked.length} anı — beynin ana kavşakları. [[Home]]\n\n${rows || "_(henüz bağ yok)_"}\n`);
+}
+
+// L26: review queue — high-value (often-recalled) but ageing memories, surfaced for a
+// spaced-repetition-style review. Read-only suggestion; never mutates the brain.
+function writeReviewQueue(vault: string, dump: BrainDump): void {
+  const now = Date.now();
+  const AGE = 30 * 86400000; // 30 gün
+  const stale = dump.memories
+    .filter((m) => (m.hits ?? 0) >= 3 && now - m.createdAt > AGE && m.tier !== "episodic")
+    .sort((a, b) => (b.hits ?? 0) - (a.hits ?? 0))
+    .slice(0, 25);
+  const rows = stale.map((m) => {
+    const days = Math.floor((now - m.createdAt) / 86400000);
+    return `- [[${memBase(m.id)}]] — ${m.hits ?? 0}× · ${days}g önce · \`${m.tier}\``;
+  }).join("\n");
+  writeFileSync(join(vault, "_index", "review.md"),
+    `---\ncssclasses: [brain]\ntags: [moc]\naliases: [Review, Gözden geçir]\n---\n\n# 🔁 Gözden-geçirme kuyruğu\n\n`
+    + `> [!tip] Sık-kullanılan ama eskiyen ${stale.length} anı (≥3 recall · >30g). Doğrula/güncelle. [[Home]]\n\n${rows || "_(kuyruk boş)_"}\n`);
 }
 
 // Namespace index — a hub grouping memories by ns (the brain's logical partitions).
@@ -565,9 +634,11 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   writeBase(vault);
   writeTierIndexes(vault, dump);
   writeTemplates(vault);
-  writeJournal(vault, dump);
+  writeJournal(vault, dump);                        // + L26 weekly/monthly rollups
   writeNamespaceIndex(vault, dump);
   writeEntityMapCanvas(vault, dump.facts);          // L18: visual knowledge map
+  writeHubs(vault, dump, neighbors);                // L26: graph-centrality hub notes
+  writeReviewQueue(vault, dump);                    // L26: spaced-review queue
   return { written, skipped, entities, pruned };
 }
 
@@ -764,11 +835,20 @@ export function computeSystemUsage(vault: string): ObsidianStatus["systemUsage"]
   const approved = mtimeOr(`${home}/ecy-model/approved-learning.jsonl`);
   const misses = mtimeOr(`${home}/ecy-model/misses.log`);
   const ecymAct = [approved, misses].filter((n): n is number => n != null).sort((a, b) => b - a)[0] ?? null;
+  // L27: claudecode liveness from evidence, not a static flag — did it actually answer in any of
+  // the recent ask-shared runs? A throttled/degraded claudecode (github-models quota) then shows
+  // offline honestly instead of a permanent green.
+  const runsPath = `${dataDir}/ask-shared-runs.jsonl`;
+  let ccOnline = false;
+  try {
+    const recent = readFileSync(runsPath, "utf8").trim().split("\n").filter(Boolean).slice(-10);
+    ccOnline = recent.some((l) => { try { return (JSON.parse(l).experts || []).includes("claudecode"); } catch { return false; } });
+  } catch { /* no runs yet → offline */ }
   return {
     ollamas: { lastActivity: mtimeOr(manifestPath(vault)), online: true, detail: "brain⇄vault çift-yönlü sync (read+write)" },
     ecym: { lastActivity: ecymAct, online: existsSync(ecymDatasetPath()), detail: "katalog mirror + onay + ecy-learn kuyruğu" },
     odysseus: { lastActivity: mtimeOr(khojNote), online: khojOnline, detail: khojOnline ? "Khoj federe (online)" : "Khoj federasyon (offline placeholder)" },
-    claudecode: { lastActivity: mtimeOr(`${dataDir}/ask-shared-runs.jsonl`), online: true, detail: "ask-shared cevap ledger'ı" },
+    claudecode: { lastActivity: mtimeOr(runsPath), online: ccOnline, detail: ccOnline ? "ask-shared cevap veriyor" : "ask-shared (son 10 run'da cevap yok — throttle?)" },
   };
 }
 

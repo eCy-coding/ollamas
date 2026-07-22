@@ -140,6 +140,23 @@ describe("prune: memory consolidated out of brain removes its stale note (safe)"
   });
 });
 
+describe("L26 — world-class Dalga-3: hubs + review + periodic rollups", () => {
+  test("push emits hub notes (graph centrality), review queue, and weekly/monthly journal dirs", async () => {
+    await seed(dbPath);
+    // give core:emre two neighbors → it's the densest node → tops the hub list.
+    const neighbors = () => new Map([["core:emre", ["loop:a1b2", "work:tmp"]], ["loop:a1b2", ["core:emre"]]]);
+    await syncObsidian("push", { vault, dbPath, neighbors });
+    const hubs = readFileSync(join(vault, "_index", "hubs.md"), "utf8");
+    expect(hubs).toContain("Merkez düğümler");
+    expect(hubs).toContain("[[core-emre]]");     // densest node surfaced
+    expect(hubs).toContain("**2** bağ");          // its degree
+    const review = readFileSync(join(vault, "_index", "review.md"), "utf8");
+    expect(review).toContain("Gözden-geçirme");
+    expect(existsSync(join(vault, "journal", "weekly"))).toBe(true);   // rollup dirs created
+    expect(existsSync(join(vault, "journal", "monthly"))).toBe(true);
+  });
+});
+
 describe("rich graph: dense linking + .obsidian config + MOC", () => {
   test("neighbor memories become [[wikilinks]] in the note (graph density)", async () => {
     await seed(dbPath);

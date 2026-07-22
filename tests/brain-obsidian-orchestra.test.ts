@@ -1,5 +1,5 @@
 // Orchestra federation — eCym command mirror + council/hub/canvas + system dimension.
-import { describe, test, expect, beforeEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +7,7 @@ import { createBrainStore } from "../server/brain";
 import { syncObsidian, processAskQueue } from "../server/brain-obsidian";
 import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses } from "../server/brain-obsidian-ecym";
 import { computeSystemUsage } from "../server/brain-obsidian";
-import { writeOdysseusNotes } from "../server/brain-obsidian-khoj";
+import { writeOdysseusNotes, pushVaultToKhoj, collectVaultKnowledge } from "../server/brain-obsidian-khoj";
 import { mkdirSync } from "node:fs";
 import { toMarkdown, parseMarkdown, type NoteMemory } from "../server/brain-obsidian-note";
 
@@ -134,6 +134,35 @@ describe("L16 — eCym approval handoff (vault → approved-learning.jsonl)", ()
   });
 });
 
+describe("L25 — odysseus Khoj vault indexing (push knowledge)", () => {
+  test("collectVaultKnowledge skips empty + episodic; pushVaultToKhoj batches non-empty notes", async () => {
+    mkdirSync(join(vault, "core"), { recursive: true });
+    mkdirSync(join(vault, "episodic"), { recursive: true });
+    writeFileSync(join(vault, "core", "a.md"), "x".repeat(300));      // real knowledge
+    writeFileSync(join(vault, "core", "empty.md"), "sm");             // <100c → skipped
+    writeFileSync(join(vault, "episodic", "log.md"), "y".repeat(300)); // episodic → excluded
+    const files = collectVaultKnowledge(vault);
+    expect(files.map((f) => f.name)).toContain("core/a.md");
+    expect(files.some((f) => f.name.startsWith("episodic/"))).toBe(false);
+    expect(files.some((f) => f.name === "core/empty.md")).toBe(false);
+    const seen: number[] = [];
+    const r = await pushVaultToKhoj(vault, { batch: 1, poster: async (fs) => { seen.push(fs.length); return true; } });
+    expect(r.ok).toBe(true);
+    expect(r.pushed).toBe(files.length);
+    expect(r.batches).toBe(files.length); // batch=1 → one per file
+  });
+  test("empty vault → no push, ok", async () => {
+    const r = await pushVaultToKhoj(vault, { poster: async () => true });
+    expect(r).toEqual({ ok: true, pushed: 0, batches: 0 });
+  });
+  test("poster failure surfaces ok:false", async () => {
+    mkdirSync(join(vault, "core"), { recursive: true });
+    writeFileSync(join(vault, "core", "a.md"), "z".repeat(300));
+    const r = await pushVaultToKhoj(vault, { poster: async () => false });
+    expect(r.ok).toBe(false);
+  });
+});
+
 describe("L23 — eCym closed loop (approvals → misses.log → ecy-learn)", () => {
   test("approved questions queue into misses.log, deduped, and no-op when empty", () => {
     const approvedPath = join(dir, "approved.jsonl");
@@ -169,6 +198,22 @@ describe("L24 — systemUsage proves all 4 systems use the vault", () => {
     mkdirSync(join(vault, "odysseus"), { recursive: true });
     writeFileSync(join(vault, "odysseus", "_khoj.md"), "# odysseus\n> [!warning] erişilemez (offline)\n");
     expect(computeSystemUsage(vault).odysseus.online).toBe(false);
+  });
+});
+
+describe("L27 — claudecode liveness from ask-shared evidence", () => {
+  const prevDir = process.env.MISSION_CONTROL_DATA_DIR;
+  afterEach(() => { if (prevDir === undefined) delete process.env.MISSION_CONTROL_DATA_DIR; else process.env.MISSION_CONTROL_DATA_DIR = prevDir; });
+  test("online only when claudecode answered in a recent run", () => {
+    process.env.MISSION_CONTROL_DATA_DIR = dir;
+    // no runs → offline
+    expect(computeSystemUsage(vault).claudecode.online).toBe(false);
+    // a run where claudecode did NOT answer → still offline (throttle honesty)
+    writeFileSync(join(dir, "ask-shared-runs.jsonl"), JSON.stringify({ at: 1, experts: ["ollamas", "ecym"] }) + "\n");
+    expect(computeSystemUsage(vault).claudecode.online).toBe(false);
+    // a run where claudecode answered → online
+    writeFileSync(join(dir, "ask-shared-runs.jsonl"), JSON.stringify({ at: 2, experts: ["ollamas", "claudecode"] }) + "\n");
+    expect(computeSystemUsage(vault).claudecode.online).toBe(true);
   });
 });
 
