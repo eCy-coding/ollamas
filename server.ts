@@ -4382,6 +4382,11 @@ app.post("/api/brain/ask-shared", async (req, res) => {
         // L27: which experts actually returned a non-empty answer this run — lets the status
         // derive per-expert liveness (claudecode throttle) from evidence, not a static flag.
         experts: Object.keys((r as any).expertAnswers || {}),
+        // L33/L34: the ledger used to record only WHO won. Now it records why a seat sat out
+        // and every time measured quality overruled the gate — so the gate's error rate is
+        // measurable and the veto threshold can be calibrated from evidence later.
+        scores: (r as any).scores, veto: (r as any).veto ?? null,
+        degradedReasons: (r as any).degradedReasons,
       }) + "\n");
     } catch { /* ledger is best-effort */ }
     // F3c profil güncelle: BASE sorgu vektörünü (q, q* DEĞİL) yaz → bir sonraki soru

@@ -6,10 +6,10 @@
 import { gatherContext, type AskDeps, type AskSource } from "./brain-ask";
 import {
   EXPERTS, emptyGate, gateLogits, gateWeights, heuristicBias, mixtureSelect,
-  personalizeQuery, profileVector, l2normalize, sequenceWeights, weightedContext,
-  type Candidate, type Expert, type MixtureResult,
+  personalizeQuery, profileVector, l2normalize, sequenceWeights, weightedContext, qualityVeto,
+  type Candidate, type Expert, type MixtureResult, type Veto,
 } from "./brain-formulas";
-import { scoreAll } from "./brain-answer-score";
+import { scoreAll, isFailurePayload, failureReason } from "./brain-answer-score";
 import { exploreSelect } from "./brain-explore";
 
 /** Boyut koruması: `gateLogits` eksik boyutu `?? 0` ile doldurur, yani 8-boyutlu bayat
@@ -50,6 +50,10 @@ export interface SharedAskResult {
   expertAnswers?: Record<string, string>;
   /** Bu tur keşif amaçlı argmax DIŞI bir uzman mı seçildi. */
   explored?: boolean;
+  /** L33: NEDEN her düşen uzman düştü — `degraded[]` sadece kim olduğunu söylüyordu. */
+  degradedReasons?: Record<string, string>;
+  /** L34: ölçülen kalite gate'in seçimini ezdiyse ne olduğu (yoksa gate kazandı). */
+  veto?: Veto | null;
   /** Formül 3a: kaynak başına p_ret(z|x) — bağlam payının dayanağı. */
   pRet?: number[];
   /** Sandbox egzersizcisinin ReAtt kolu için sorgu vektörü — yeniden gömme YOK.
@@ -173,15 +177,22 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   ];
 
   // (3b) Uzman çıktıları — paralel, her biri best-effort.
+  // L33: a seat that FAILED is recorded with its reason rather than being passed off as an
+  // opinion. Previously a tool-error envelope was non-empty text, so it counted as a usable
+  // candidate, `degraded` came back empty, and the raw error JSON was rendered in the vault
+  // as that expert's view. Silence and failure now look different, and both are named.
+  const degradedReasons: Record<string, string> = {};
   const answers = await Promise.all(
     EXPERTS.map(async (e) => {
       const fn = deps.experts[e];
-      if (!fn) return { expert: e, answer: "", available: false };
+      if (!fn) { degradedReasons[e] = "erişilemez (uzman bağlı değil)"; return { expert: e, answer: "", available: false }; }
       try {
         const raw = (await bounded(fn(messages), expertTimeoutMs()))?.trim() ?? "";
-        const usable = !!raw && !/BİLGİ_YOK|BILGI_YOK/.test(raw);
-        return { expert: e, answer: usable ? raw : "", available: usable };
-      } catch {
+        if (isFailurePayload(raw)) { degradedReasons[e] = failureReason(raw); return { expert: e, answer: "", available: false }; }
+        if (/BİLGİ_YOK|BILGI_YOK/.test(raw)) { degradedReasons[e] = "kaynaklarda cevap bulamadı"; return { expert: e, answer: "", available: false }; }
+        return { expert: e, answer: raw, available: true };
+      } catch (err: any) {
+        degradedReasons[e] = `hata: ${String(err?.message ?? err).slice(0, 120)}`;
         return { expert: e, answer: "", available: false };
       }
     }),
@@ -218,9 +229,17 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   const explore = epsilon > 0 && deps.rng
     ? exploreSelect(w, EXPERTS.map((e) => answers.find((a) => a.expert === e)?.available ?? false), { epsilon, rng: deps.rng })
     : { index: -1, explored: false };
-  const picked = explore.explored && explore.index >= 0
+  const gatePicked = explore.explored && explore.index >= 0
     ? forcePick(answers, w, explore.index)
     : mixtureSelect(answers, w);
+
+  // L34: measured quality may overrule the gate's argmax. Exploration is left alone — when a
+  // turn is deliberately off-policy, second-guessing it would defeat the point.
+  const usableExperts = answers.filter((a) => a.available && a.answer.trim()).map((a) => String(a.expert));
+  const veto = explore.explored ? null : qualityVeto(scoreMap, gatePicked.expert, usableExperts);
+  const picked = veto
+    ? { ...gatePicked, expert: veto.to, answer: answers.find((a) => a.expert === veto.to)?.answer ?? gatePicked.answer }
+    : gatePicked;
 
   const confidence = ctx.sources.length
     ? Number((ctx.sources.reduce((a, s) => a + (s.conf ?? s.score ?? 0), 0) / ctx.sources.length).toFixed(3))
@@ -230,7 +249,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     return {
       answer: "Kayıtlarımda bu konuda güvenilir bilgi yok.",
       expert: "", weights: picked.weights, sources: ctx.sources, confidence: 0,
-      mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, personalized, abstained: true,
+      mode: ctx.mode, hops: ctx.hops, degraded: picked.degraded, degradedReasons, personalized, abstained: true,
       scores: scoreMap, explored: explore.explored, pRet,
       qVec: qVec ?? undefined, baseQVec: baseQVec ?? undefined, context: ctx.context,
     };
@@ -261,6 +280,8 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     mode: ctx.mode,
     hops: ctx.hops,
     degraded: picked.degraded,
+    degradedReasons,
+    veto,
     personalized,
     scores: scoreMap,
     explored: explore.explored,

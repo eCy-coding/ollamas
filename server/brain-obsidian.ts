@@ -815,7 +815,15 @@ function reapAdoptedOriginals(vault: string, adopted: AdoptedOriginal[]): number
   return reaped;
 }
 
-export interface AskResult { answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number; expertAnswers?: Record<string, string> }
+export interface AskResult {
+  answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number;
+  expertAnswers?: Record<string, string>;
+  /** L33/L34 transparency: what was measured, who sat out and why, and whether the
+   *  measurement overruled the gate. Optional — an older caller simply renders less. */
+  scores?: Record<string, number>;
+  degradedReasons?: Record<string, string>;
+  veto?: { from: string; to: string; delta: number; fromScore: number; toScore: number } | null;
+}
 
 const SYS_EMOJI: Record<string, string> = { ollamas: "🔵", ecym: "🟢", odysseus: "🟣", claudecode: "🔴" };
 
@@ -842,6 +850,19 @@ export async function processAskQueue(vault: string, askFn: (q: string) => Promi
     writeFileSync(join(ansDir, `${ts}-${slug}.md`),
       `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, answer]\naliases: [${JSON.stringify(q.slice(0, 60))}]\n---\n\n`
       + `# ❓ ${q}\n\n> [!success] Kazanan: **${r.expert || "?"}**${r.confidence != null ? ` · güven ${r.confidence.toFixed(2)}` : ""}\n> ${w}\n\n`
+      // L34: when measured quality overruled the gate, say so plainly — a silent swap would
+      // be just as opaque as the silent gate-always-wins it replaced.
+      + (r.veto
+          ? `> [!important] ⚡ Kalite vetosu — gate **${r.veto.from}** dedi, ölçüm **${r.veto.to}** dedi (Δ${r.veto.delta.toFixed(3)}: ${r.veto.fromScore.toFixed(3)} → ${r.veto.toScore.toFixed(3)}). Ölçüm kazandı.\n\n`
+          : "")
+      // L33: scores next to weights, and every absent seat named with its reason. The panel
+      // used to report `degraded: []` while quoting a tool-error envelope as an opinion.
+      + (r.scores && Object.keys(r.scores).length
+          ? `> [!note]- Ölçülen kalite\n> ${Object.entries(r.scores).map(([e, s]) => `${e} ${Number(s).toFixed(3)}`).join(" · ")}\n\n`
+          : "")
+      + (r.degradedReasons && Object.keys(r.degradedReasons).length
+          ? `> [!warning]- Katılmayan uzmanlar\n` + Object.entries(r.degradedReasons).map(([e, why]) => `> - **${e}** — ${why}`).join("\n") + "\n\n"
+          : "")
       + `${r.answer || "_(cevap yok)_"}\n\n`
       + (r.expertAnswers && Object.keys(r.expertAnswers).length
           ? `## Uzman cevapları\n` + Object.entries(r.expertAnswers).map(([e, a]) =>

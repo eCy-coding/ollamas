@@ -97,6 +97,57 @@ export interface MixtureResult {
   degraded: string[];
 }
 
+export interface Veto { from: string; to: string; delta: number; fromScore: number; toScore: number }
+
+/** Veto eşiği. 999 (ya da ∞) = veto tamamen kapalı → davranış bit-aynı (kill-switch). */
+export const vetoDelta = (env: { BRAIN_VETO_DELTA?: string } = process.env): number => {
+  const n = Number(env.BRAIN_VETO_DELTA);
+  return Number.isFinite(n) && n >= 0 ? n : 0.15;
+};
+
+/**
+ * L34 — measured quality may overrule the gate.
+ *
+ * askShared already scores EVERY expert's answer externally (brain-answer-score: grounded
+ * citations, corpus overlap, abstention). Until now that number was only a training label:
+ * selection went to the gate's argmax. Measured live, that meant eCym scoring 0.881 lost to
+ * ollamas scoring 0.694, and every recorded run in the ledger was won by the same expert —
+ * not because it was better, but because the gate never let anyone else through.
+ *
+ * The gate is NOT modified and offline training is untouched. This is a guard on top: when
+ * another usable expert beats the gate's pick by a clear margin, quality wins and the swap is
+ * recorded so the gate's error rate becomes measurable instead of invisible.
+ *
+ * Only candidates that are actually usable can win — a failed seat (L33) scores 0 and is
+ * excluded, so this can never promote an error payload.
+ */
+export function qualityVeto(
+  scores: Record<string, number>,
+  gatePick: string,
+  usable: string[],
+  threshold = vetoDelta(),
+): Veto | null {
+  if (!gatePick || !Number.isFinite(threshold)) return null;
+  const eligible = usable.filter((e) => e !== gatePick);
+  if (!eligible.length) return null;
+  const gateScore = scores[gatePick] ?? 0;
+  // Ties resolve to the gate: a veto must be an improvement, not a coin flip.
+  let best = { expert: "", score: -Infinity };
+  for (const e of eligible) {
+    const s = scores[e] ?? 0;
+    if (s > best.score) best = { expert: e, score: s };
+  }
+  const delta = best.score - gateScore;
+  // `delta > 0` is required independently of the threshold: with threshold 0 a dead-even tie
+  // would otherwise flip the winner for no measured reason. A veto must be an improvement.
+  if (delta <= 0 || delta < threshold) return null;
+  return {
+    from: gatePick, to: best.expert,
+    delta: Number(delta.toFixed(4)),
+    fromScore: Number(gateScore.toFixed(4)), toScore: Number(best.score.toFixed(4)),
+  };
+}
+
 /** Çalışan p_final biçimi: erişilebilir uzmanlar üzerinden ağırlık renormalize edilir,
  *  en yüksek w_j'li cevap seçilir. Hiçbiri yoksa boş sonuç (çağıran abstain eder). */
 export function mixtureSelect(candidates: Candidate[], w: number[]): MixtureResult {

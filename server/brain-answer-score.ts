@@ -30,6 +30,54 @@ export interface AnswerScore {
 const ABSTAIN = /BİLGİ_YOK|BILGI_YOK/;
 const CITE = /\[mem:([^\]\s]{1,120})\]/g;
 
+/**
+ * L33 — an expert that FAILED did not give an opinion.
+ *
+ * Observed live: the odysseus seat returned `{"ok":false,"output":{"error":"fetch failed"},
+ * "diff":"","applied":false,"halt":false}`. That is a tool envelope reporting its own failure,
+ * but because it is non-empty text, mixtureSelect counted it as a usable candidate, `degraded`
+ * came back EMPTY, and the string was carried into expertAnswers to be rendered in the vault
+ * as that expert's view. The panel could not tell a dead member from a quiet one.
+ *
+ * Detection is deliberately narrow: a JSON envelope that declares failure, or a bare transport
+ * error. Prose that merely discusses errors is NOT a failure — an expert explaining `fetch
+ * failed` to the user is doing its job. Hence the requirement that the whole payload parse as
+ * a failure envelope, rather than a substring match anywhere in the text.
+ */
+export function isFailurePayload(text: string): boolean {
+  const s = String(text ?? "").trim();
+  if (!s) return true;
+  if (s.startsWith("{") || s.startsWith("[")) {
+    try {
+      const j = JSON.parse(s);
+      const o = Array.isArray(j) ? j[0] : j;
+      if (o && typeof o === "object") {
+        if (o.ok === false || o.success === false) return true;
+        // `{error: ...}` with no answer-bearing field is a failure, not a reply.
+        const err = (o as any).error ?? (o as any).output?.error;
+        if (err && !(o as any).answer && !(o as any).text && !(o as any).content) return true;
+      }
+    } catch { /* not JSON after all — fall through to the prose checks */ }
+  }
+  // A bare transport error with no surrounding explanation.
+  if (/^(fetch failed|econnrefused|etimedout|socket hang up|network error)\.?$/i.test(s)) return true;
+  return false;
+}
+
+/** Why an expert is not participating — phrased for a human reading the vault note. */
+export function failureReason(text: string): string {
+  const s = String(text ?? "").trim();
+  if (!s) return "boş cevap";
+  try {
+    const j = JSON.parse(s);
+    const o = Array.isArray(j) ? j[0] : j;
+    const err = o?.error ?? o?.output?.error;
+    if (err) return `upstream: ${String(typeof err === "string" ? err : JSON.stringify(err)).slice(0, 120)}`;
+    if (o?.ok === false || o?.success === false) return "upstream ok:false";
+  } catch { /* not JSON */ }
+  return s.slice(0, 120);
+}
+
 /** Cevaptaki [mem:ID] atıfları — sırayı koruyarak tekilleştirilmiş. */
 export function citationIds(answer: string): string[] {
   const out: string[] = [];
