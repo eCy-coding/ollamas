@@ -21,6 +21,7 @@ import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApp
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, adoptHumanNote, ROOT_RESERVED, TIERS, type NoteMemory } from "./brain-obsidian-note";
 import { syncAudio, type AudioSyncResult } from "./brain-obsidian-audio";
+import { ROLE_CARDS } from "./orchestra-roles";
 
 export function defaultVaultPath(): string {
   return process.env.OBSIDIAN_VAULT || `${process.env.HOME}/ollamas-vault`;
@@ -484,7 +485,7 @@ const COUNCIL_SEATS: Record<string, number> = { ecy: 0.30, ollamas: 0.25, odysse
 
 // ── Orchestra federation: the 3-system whole (ollamas + eCym + odysseus) + council history ──
 // Mirrors the council ledger (~/.ollamas/council-ledger.json) + a hub note + a visual Canvas.
-function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void {
+function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number, obsidianUp = false, obsidianTools = 0): void {
   const dir = join(vault, "orchestra");
   mkdirSync(dir, { recursive: true });
   mkdirSync(join(dir, "answers"), { recursive: true });
@@ -531,6 +532,12 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     + `> [!tip]+ 🟢 **eCym** — $0 yerel komut-uzmanı (qwen3:8b)\n> ${ecymCount} komut (\`ecym/\` klasörü) · triggers→intent → cmd\n\n`
     + `> [!note]+ 🟣 **odysseus** — deterministik araştırma/generation uzmanı (:7860)\n> kendi store'u yok (harici Khoj); council-koltuğu + ask-shared uzmanı\n\n`
     + `> [!danger]+ 🔴 **claudecode** — kod/PR/refactor uzmanı (github-models, keyless)\n> ask-shared 4. uzmanı + council-koltuğu (%22); soğuk-başlangıç → gate ledger'dan kalibre\n\n`
+    // L36: obsidian is a MEMBER, not the stage. It is not an ask-shared seat (adding one would
+    // resize the gate); it holds a ROLE — the only member that sees resolved backlinks and can
+    // write human-facing notes. Health is probed live, so a closed app reads as offline.
+    + `> [!warning]+ 🟠 **obsidian** — kasa (Local REST + MCP :27124)\n> ${obsidianTools} canlı araç · ${obsidianUp ? "🟢 çevrimiçi" : "🔴 çevrimdışı"} · çözümlenmiş backlink + etiket indeksi; vault'a YAZABİLEN tek üye\n\n`
+    + `## Roller — klon değil, uzman\n`
+    + ROLE_CARDS.map((c) => `- **${c.title}** — ${c.capability}\n  _${c.unique}_`).join("\n") + `\n\n`
     + `## ask-shared akışı\n\`\`\`mermaid\nflowchart LR\n  Q[Soru] --> R[(brain retrieval)]\n  R --> O[🔵 ollamas]\n  R --> E[🟢 eCym]\n  R --> D[🟣 odysseus]\n  R --> C[🔴 claudecode]\n  O --> G{MoE gate w_j}\n  E --> G\n  D --> G\n  C --> G\n  G --> A[✅ p_final]\n\`\`\`\n\n`
     + `[[runs|Son ask-shared koşuları]] · [[status|Canlı durum]]\n\n`
     + `## Konsey\n[[council]] — koltuklar: `
@@ -622,7 +629,7 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
 // already in the brain, so ANY note absent from the brain is a genuine orphan and safe
 // to drop even without a manifest entry (covers pre-manifest legacy notes). push-only
 // keeps the conservative manifest guard so an un-pulled human note is never deleted.
-function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, neighbors: Map<string, string[]>, entityIdx: EntityIndex, pruneUntracked = false): SyncResult["push"] {
+function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, neighbors: Map<string, string[]>, entityIdx: EntityIndex, pruneUntracked = false, opts: { obsidianUp?: boolean; obsidianTools?: number } = {}): SyncResult["push"] {
   let written = 0, skipped = 0;
   for (const m of dump.memories) {
     const mem: NoteMemory = { id: m.id, ns: m.ns, tier: m.tier, content: m.content, source: m.source, createdAt: m.createdAt, hits: m.hits, actor: m.actor, confidence: m.confidence, system: systemOf(m.source, m.actor) };
@@ -669,7 +676,7 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   const entities = writeEntityNotes(vault, dump.facts);
   const ecymCount = writeEcymNotes(vault);          // federate the eCym command catalog
   writeEcymLearningQueue(vault);                     // L10: eCym misses → learning queue
-  writeOrchestra(vault, dump, ecymCount);           // council mirror + hub + canvas + sprint
+  writeOrchestra(vault, dump, ecymCount, opts.obsidianUp ?? false, opts.obsidianTools ?? 0); // hub + roles + council + canvas + sprint
   writeHome(vault, dump, entities, ecymCount);
   writeBase(vault);
   writeTierIndexes(vault, dump);
@@ -979,7 +986,15 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
     // memory→entity mentions. Injectable for tests; defaults to the live brain.
     const neighbors = opts.neighbors ? opts.neighbors() : neighborsFromDb(dbPath, 5);
     const entityIdx = buildEntityIndex(dump.facts);
-    push = pushBrainToVault(vault, dump, manifest, neighbors, entityIdx, direction === "both");
+    // L36: probe the live vault so the hub can show obsidian's REAL membership state rather
+    // than a hardcoded badge. A closed app renders as offline, never as silently absent.
+    let obsidianUp = false, obsidianTools = 0;
+    try {
+      const { obsidianHealth } = await import("./obsidian-rest");
+      const h = await obsidianHealth();
+      obsidianUp = h.ok; obsidianTools = h.ok ? 16 : 0;
+    } catch { /* best-effort */ }
+    push = pushBrainToVault(vault, dump, manifest, neighbors, entityIdx, direction === "both", { obsidianUp, obsidianTools });
     await writeOdysseusNotes(vault); // L11: Khoj federation (graceful — offline → placeholder)
     writeObsidianConfig(vault); // create-once: graph color-groups, plugins, appearance
     // Safe only here: the tier note now exists on disk, so dropping the loose copy the human
