@@ -98,6 +98,36 @@ await check("ecym:v1", async () => {
   return { ok: status === 200, detail: `/v1/models status=${status}` };
 });
 
+// 10. machine memory — the constraint that silently invalidates every leg above it.
+//     Measured 2026-07-22: with swap at 22.4G/23.5G, com.odysseus.server bound :7860,
+//     served for about a minute and was SIGKILLed, 668 times over. The gate reported only
+//     "odysseus-bridge red", so the watchdog, the orchestrator, a double bind and PATH were
+//     all investigated and eliminated before the machine itself was looked at. This leg
+//     names the condition so that search never has to be repeated.
+await check("memory", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { parseSwapUsage, assessMemory } = await import("../server/memory-pressure");
+
+  let swap = null;
+  try {
+    swap = parseSwapUsage(execFileSync("sysctl", ["-n", "vm.swapusage"], { encoding: "utf8", timeout: 4000 }));
+  } catch { /* probe failed — assessMemory reports it rather than failing the leg */ }
+
+  let topRssGb = 0;
+  let topName = "?";
+  try {
+    const ps = execFileSync("ps", ["-axo", "rss=,comm="], { encoding: "utf8", timeout: 6000 });
+    for (const line of ps.split("\n")) {
+      const m = /^\s*(\d+)\s+(.*)$/.exec(line);
+      if (!m) continue;
+      const gb = Number(m[1]) / 1048576;
+      if (gb > topRssGb) { topRssGb = gb; topName = m[2].split("/").pop() || m[2]; }
+    }
+  } catch { /* leave the defaults; the swap number is the one that matters */ }
+
+  return assessMemory({ swap, topRssGb, topName });
+});
+
 const green = checks.every((c) => c.ok);
 const out = { green, ts: Date.now(), iso: new Date(Date.now()).toISOString(), red: checks.filter((c) => !c.ok).map((c) => c.name), checks };
 console.log(JSON.stringify(out, null, 2));
