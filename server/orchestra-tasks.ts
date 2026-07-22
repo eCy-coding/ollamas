@@ -200,6 +200,9 @@ export interface TaskDeps {
   /** L42: does the shell allowlist permit this command? Follow-ups it would refuse are never
    *  offered — naming one spends a round to earn a refusal we can predict. */
   commandAllowed?: (cmd: string) => boolean;
+  /** L43: append one outcome record per task. Without it "is the orchestra actually useful?"
+   *  has no answer but an opinion. */
+  ledger?: (row: TaskOutcome) => void;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + `\n… (${s.length - n} karakter kırpıldı)` : s);
@@ -312,6 +315,24 @@ export function readApprovals(noteText: string): Set<string> {
 export const taskNotePath = (vault: string, id: string, title: string): string =>
   join(vault, "orchestra", "tasks", `${id}-${title.toLowerCase().replace(/[^a-z0-9ğüşiöç]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task"}.md`);
 
+/** One task's outcome, as evidence rather than impression. */
+export interface TaskOutcome {
+  at: number;
+  task: string;
+  id: string;
+  rounds: number;
+  /** Which members actually contributed something this run. */
+  members: StepRole[];
+  ms: number;
+  answered: boolean;
+  expert?: string;
+  vetoed?: boolean;
+  gated: number;
+  failed: number;
+  remembered: boolean;
+  reported: boolean;
+}
+
 export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number }
 
 /**
@@ -387,6 +408,21 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
 
     const pending = results.some((r) => r.gated);
     const failed = results.some((r) => !r.ok && !r.gated && !r.degraded);
+    // L43: record the outcome BEFORE the lane move, so the row describes this run either way.
+    try {
+      deps.ledger?.({
+        at: now(), task: title, id, rounds,
+        members: [...new Set(results.filter((r) => r.ok && !r.gated).map((r) => r.role))],
+        ms: totalMs,
+        answered: !!synthesis && !synthesis.abstained && !!synthesis.answer,
+        expert: synthesis?.expert || undefined,
+        vetoed: !!synthesis?.veto,
+        gated: results.filter((r) => r.gated).length,
+        failed: results.filter((r) => !r.ok && !r.gated && !r.degraded).length,
+        remembered: false, reported: false,
+      });
+    } catch { /* the ledger must never fail a task */ }
+
     board.lanes[lane] = board.lanes[lane].filter((l) => l !== line);
     if (pending || failed) {
       // Stays visible as work-in-progress with a pointer to why.

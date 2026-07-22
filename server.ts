@@ -4540,6 +4540,17 @@ app.post("/api/orchestra/tasks", async (req, res) => {
       // L42: only offer follow-ups the shell will actually run. Naming an id the allowlist
       // refuses would spend a round to earn a refusal we can predict here.
       commandAllowed: (cmd: string) => isAllowedBinary(cmd),
+
+      // L43: one row per task. "Is the orchestra actually useful?" should be answerable from
+      // evidence — how often a task reaches an answer, which members contribute, how often the
+      // measurement overrules the gate — not from whoever last looked at a note.
+      ledger: (row) => {
+        try {
+          const dir = process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`;
+          fs.mkdirSync(dir, { recursive: true });
+          fs.appendFileSync(`${dir}/orchestra-tasks.jsonl`, JSON.stringify(row) + "\n");
+        } catch { /* the ledger must never fail a task */ }
+      },
       runCommand: async (cmd: string) => {
         // Re-derive the verdict from the catalog rather than believing the plan.
         if (isRiskyCommand(cmd)) throw new Error(`denylist reddetti: ${cmd}`);

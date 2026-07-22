@@ -9,7 +9,7 @@
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { obsidianHealth } from "../server/obsidian-rest";
-import { ecymPropose, isCatalogSafeCommand } from "../server/orchestra-roles";
+import { ecymPropose, isCatalogSafeCommand, queryFor } from "../server/orchestra-roles";
 import { isRiskyCommand, parseBoard, taskId, taskNotePath } from "../server/orchestra-tasks";
 import { readEcymCommands } from "../server/brain-obsidian-ecym";
 import { defaultVaultPath } from "../server/brain-obsidian";
@@ -123,6 +123,23 @@ async function main(): Promise<void> {
         !board.lanes.Backlog.some((l) => l.includes(probeTask)),
         `Backlog=${board.lanes.Backlog.length} Doing=${board.lanes.Doing.length} Done=${board.lanes.Done.length}`);
 
+      // L39-L43: the task must ANSWER, remember, report — not just gather.
+      add("task.synthesis", "CRITICAL", /## ✅ Sonuç|## ⚠️ Sonuç/.test(body),
+        /## ✅ Sonuç/.test(body) ? "kanıttan sonuç üretildi" : /## ⚠️ Sonuç/.test(body) ? "dürüst çekimser" : "SONUÇ BÖLÜMÜ YOK");
+      add("task.remembered", "HIGH", (t?.remembered ?? 0) >= 1 || !/## ✅ Sonuç/.test(body),
+        `remembered=${t?.remembered ?? 0} (sonuçsuz görev yazmaz — doğru)`);
+      add("task.reported", "MED", (t?.reported ?? 0) >= 1 || !oh.ok,
+        oh.ok ? `obsidian raporu=${t?.reported ?? 0}` : "vault kapalı — rapor atlandı (dürüst)");
+      // The loop must be visible: the brain should now recall what the task concluded.
+      try {
+        const rec = await api("/api/brain/recall", { query: "disk doluluk", k: 5 }, 30_000);
+        const ids = (rec?.hits ?? []).map((h: any) => String(h.id));
+        add("task.loop-closed", "HIGH", ids.some((i: string) => i.startsWith("task-")),
+          ids.length ? `recall → ${ids.slice(0, 3).join(", ")}` : "recall boş");
+      } catch (e: any) { add("task.loop-closed", "HIGH", false, `recall başarısız: ${e?.message}`); }
+      add("task.chain-bounded", "HIGH", (Number(/(\d+) tur/.exec(body)?.[1] ?? 1)) <= 2,
+        `tur sayısı ${/(\d+) tur/.exec(body)?.[1] ?? 1} ≤ ${2}`);
+
       const again = await api("/api/orchestra/tasks", {});
       add("task.idempotent", "CRITICAL", (again?.ran ?? 0) === 0, `2. tur ran=${again?.ran}`);
     } catch (e: any) {
@@ -137,6 +154,19 @@ async function main(): Promise<void> {
   } else {
     add("task.roundtrip", "MED", false, "sprint.md yok (henüz sync çalışmadı)");
   }
+
+  // ── 7. the query fix and the outcome ledger ────────────────────────────────
+  const noisy = queryFor("e2e kanıt görevi disk doluluk durumu nedir");
+  add("role.query-cleanup", "HIGH", noisy === "disk doluluk",
+    `"e2e kanıt görevi disk doluluk durumu nedir" → "${noisy}"`);
+
+  try {
+    const p = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/orchestra-tasks.jsonl`;
+    const rows = existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean) : [];
+    const last = rows.length ? JSON.parse(rows[rows.length - 1]) : null;
+    add("task.ledger", "MED", rows.length > 0,
+      last ? `${rows.length} kayıt · son: answered=${last.answered} üyeler=[${(last.members ?? []).join(",")}]` : "defter boş");
+  } catch (e: any) { add("task.ledger", "MED", false, `defter okunamadı: ${e?.message}`); }
 
   // ── report ─────────────────────────────────────────────────────────────────
   const pad = (s: string, n: number) => s + " ".repeat(Math.max(0, n - s.length));
