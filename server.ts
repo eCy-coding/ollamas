@@ -4537,6 +4537,9 @@ app.post("/api/orchestra/tasks", async (req, res) => {
     const isLive = CURRENT_MODE !== "demo";
 
     const out = await processTaskBoard(defaultVaultPath(), {
+      // L42: only offer follow-ups the shell will actually run. Naming an id the allowlist
+      // refuses would spend a round to earn a refusal we can predict here.
+      commandAllowed: (cmd: string) => isAllowedBinary(cmd),
       runCommand: async (cmd: string) => {
         // Re-derive the verdict from the catalog rather than believing the plan.
         if (isRiskyCommand(cmd)) throw new Error(`denylist reddetti: ${cmd}`);
@@ -4561,7 +4564,7 @@ app.post("/api/orchestra/tasks", async (req, res) => {
       // L39: the conclusion is drawn by the SAME panel that answers questions — quality veto,
       // honest degradation and external scoring all apply, because it IS askShared with the
       // task's own evidence injected as the retrieval.
-      synthesize: async (title, results) => {
+      synthesize: async (title, results, followupIds) => {
         const { synthesizeTask } = await import("./server/orchestra-synthesis");
         const { resolveEcym } = await import("./server/ecym-availability");
         const { resolveDistillProvider } = await import("./server/brain-active");
@@ -4577,7 +4580,7 @@ app.post("/api/orchestra/tasks", async (req, res) => {
             ecym: seat.generate ?? undefined,
             claudecode: gen("github-models"),
           },
-        } as any);
+        } as any, followupIds);
       },
 
       // L40: a finished, conclusive task becomes a memory through the one write choke-point.

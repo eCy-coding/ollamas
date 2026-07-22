@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { ecymPropose, obsidianContribute, type EcymProposal } from "./orchestra-roles";
+import { readEcymCommands } from "./brain-obsidian-ecym";
 import type { SynthesisResult } from "./orchestra-synthesis";
 
 /**
@@ -131,6 +132,43 @@ export function planTask(title: string): Step[] {
   return steps;
 }
 
+/**
+ * A task may deepen ONCE. Two rounds is enough for "measure, then look closer" — which is the
+ * pattern the gap actually showed — and a hard ceiling means no amount of enthusiasm from a
+ * model can walk the machine down a chain of its own devising.
+ */
+export const MAX_ROUNDS = 2;
+
+/**
+ * Catalog ids the panel may name for a follow-up: read-only entries the shell will genuinely
+ * run. Offering an id that would be refused anyway just invites a wasted round, and offering
+ * a gated one invites a chain that stalls on approval by construction.
+ */
+export function followupCandidates(catalog = readEcymCommands(), allowed: (cmd: string) => boolean = () => true): string[] {
+  return catalog
+    .filter((c) => (c.safe === true || String(c.safe).toLowerCase() === "true"))
+    .map((c) => ({ id: c.id, cmd: c.arg && c.arg !== "yok" ? `${c.cmd} ${c.arg}` : c.cmd }))
+    .filter((c) => !/\{\{[^}]+\}\}/.test(c.cmd) && !isRiskyCommand(c.cmd) && allowed(c.cmd))
+    .map((c) => c.id)
+    .sort();
+}
+
+/** Turn a validated catalog id into a step. Returns null for an id that is not auto-runnable. */
+export function followupStep(id: string, catalog = readEcymCommands()): Step | null {
+  const c = catalog.find((x) => x.id === id);
+  if (!c) return null;
+  const cmd = c.arg && c.arg !== "yok" ? `${c.cmd} ${c.arg}` : c.cmd;
+  const proposal: EcymProposal = {
+    cmd, id: c.id, safe: !!c.safe && !/\{\{[^}]+\}\}/.test(cmd),
+    desc: c.desc ?? "", score: 1,
+  };
+  const auto = isAutoRunnable(proposal);
+  return {
+    role: "command", invocation: cmd, auto, proposal,
+    ...(auto ? {} : { gateReason: "takip komutu otomatik çalıştırılamaz" }),
+  };
+}
+
 // ── execution ─────────────────────────────────────────────────────────────────
 export interface StepResult {
   role: StepRole;
@@ -152,12 +190,16 @@ export interface TaskDeps {
   approved?: Set<string>;
   maxOutput?: number;
   now?: () => number;
-  /** L39: panel synthesis over the step evidence. Absent → the note keeps only raw blocks. */
-  synthesize?: (title: string, results: StepResult[]) => Promise<SynthesisResult | null>;
+  /** L39/L42: panel synthesis over the step evidence; `followupIds` offers the catalog ids it
+   *  may name for a second round. Absent → the note keeps only raw blocks. */
+  synthesize?: (title: string, results: StepResult[], followupIds: string[]) => Promise<SynthesisResult | null>;
   /** L40: write a finished task's conclusion back into the brain (the choke-point). */
   remember?: (m: { id: string; tier: string; content: string; source: string }) => Promise<unknown>;
   /** L41: let obsidian write the human-facing report ITSELF, via its own REST surface. */
   vaultWrite?: (path: string, content: string) => Promise<boolean>;
+  /** L42: does the shell allowlist permit this command? Follow-ups it would refuse are never
+   *  offered — naming one spends a round to earn a refusal we can predict. */
+  commandAllowed?: (cmd: string) => boolean;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + `\n… (${s.length - n} karakter kırpıldı)` : s);
@@ -206,7 +248,7 @@ const ROLE_LABEL: Record<StepRole, string> = { recall: "🔵 ollamas (beyin)", c
  * The evidence note. Pending approvals are `- [ ] ONAY: <command>` checkboxes read back on the
  * next run, reusing the idempotent checkbox contract from the ask queue.
  */
-export function evidenceNote(title: string, id: string, results: StepResult[], totalMs: number, at: string, synthesis?: SynthesisResult | null): string {
+export function evidenceNote(title: string, id: string, results: StepResult[], totalMs: number, at: string, synthesis?: SynthesisResult | null, rounds = 1): string {
   const sum = results.reduce((a, r) => a + r.ms, 0);
   const gated = results.filter((r) => r.gated);
   const failed = results.filter((r) => !r.ok && !r.gated && !r.degraded);
@@ -218,7 +260,7 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
 
   return `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, task]\naliases: [${JSON.stringify(title.slice(0, 60))}]\ntask_id: ${id}\n---\n\n`
     + `# 🎯 ${title}\n\n`
-    + `> [!abstract] ${status} · ${results.length} adım · toplam **${totalMs}ms** (adımların toplamı ${sum}ms → paralel kazanç ${Math.max(0, sum - totalMs)}ms)\n> ${at}\n\n`
+    + `> [!abstract] ${status} · ${rounds > 1 ? `${rounds} tur · ` : ""}${results.length} adım · toplam **${totalMs}ms** (adımların toplamı ${sum}ms → paralel kazanç ${Math.max(0, sum - totalMs)}ms)\n> ${at}\n\n`
     + (gated.length
         ? `> [!warning] Onay bekleyen adımlar — işaretle, sonraki turda çalışır\n\n`
           + gated.map((g) => `- [ ] ONAY: \`${g.invocation}\`  _(${g.gateReason})_`).join("\n") + "\n\n"
@@ -311,15 +353,36 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
 
     const steps = planTask(title);
     const t0 = now();
-    const results = await runSteps(steps, { ...deps, approved });
-    const totalMs = now() - t0;
+    const round1 = await runSteps(steps, { ...deps, approved });
+    const round1Ms = now() - t0;
 
     // L39: draw the conclusion the note was missing. Best-effort — losing the raw evidence
     // because the summary step fell over would be the wrong trade.
-    const synthesis = deps.synthesize ? await deps.synthesize(title, results) : null;
+    //
+    // L42: the panel may name ONE catalog id to run next. `df -h` reporting a volume at 70%
+    // and nobody following up was the gap; a second round closes it. MAX_ROUNDS is a hard 2,
+    // so an enthusiastic model cannot walk the machine down a chain of its own devising.
+    let results = round1;
+    let totalMs = round1Ms;
+    let synthesis = deps.synthesize ? await deps.synthesize(title, results, followupCandidates(undefined, deps.commandAllowed)) : null;
+    let rounds = 1;
+
+    if (synthesis?.followup && rounds < MAX_ROUNDS) {
+      const next = followupStep(synthesis.followup);
+      if (next) {
+        rounds++;
+        const t1 = now();
+        const r2 = await runSteps([next], { ...deps, approved });
+        totalMs += now() - t1;
+        results = [...results, ...r2];
+        // Re-synthesise over BOTH rounds, and offer no further follow-up: the ceiling is
+        // enforced by not asking again, not by hoping the model stops.
+        synthesis = deps.synthesize ? await deps.synthesize(title, results, []) : synthesis;
+      }
+    }
 
     mkdirSync(join(vault, "orchestra", "tasks"), { recursive: true });
-    writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString(), synthesis));
+    writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString(), synthesis, rounds));
     res.ran++;
 
     const pending = results.some((r) => r.gated);

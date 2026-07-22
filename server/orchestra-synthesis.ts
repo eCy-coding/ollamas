@@ -42,16 +42,52 @@ export function stepsAsSources(results: StepResult[], now = 0): SynthesisSource[
     }));
 }
 
-/** The task's question restated for the panel, with the evidence contract spelled out. */
-export function synthesisQuestion(title: string): string {
-  return `GÖREV: ${title}\n\n`
+/** The task's question restated for the panel, with the evidence contract spelled out.
+ *  When `followupIds` is given the panel may ALSO name one catalog command to run next. */
+export function synthesisQuestion(title: string, followupIds: string[] = []): string {
+  const base = `GÖREV: ${title}\n\n`
     + `Yukarıdaki görevi yürüten üyelerin HAM çıktıları KAYNAK olarak verildi. `
     + `Görevin sorusunu SADECE bu kanıta dayanarak, tek paragrafta ve somut sayılarla cevapla. `
     + `Kanıtta cevap yoksa BİLGİ_YOK yaz.`;
+  if (!followupIds.length) return base;
+  // Only an ID from this list is accepted. Asking for a free-form command here would put an
+  // unvetted string on a path to a real shell; a catalog id cannot express anything the
+  // catalog has not already been reviewed for.
+  // An optional directive gets under-used. Measured: asked "sistem yükü nedir ve hangi işlem
+  // sorumlu", the panel answered the first half from `uptime` and hedged the second with
+  // "genellikle CPU yoğunluğu yapan süreçlerdir" — while `ps_cpu` sat in the candidate list
+  // and would have answered it exactly. The hedge IS the signal that the evidence fell short,
+  // so the rule is tied to that instead of left to taste.
+  return base
+    + `\n\nKANIT görevin sorusunu TAM cevaplamıyorsa (bir kısmını tahmin/genelleme ile geçiştiriyorsan),`
+    + ` son satıra MUTLAKA şunu ekle:\n`
+    + `FOLLOWUP: <id>\n`
+    + `Yalnız şu id'ler geçerlidir: ${followupIds.join(", ")}\n`
+    + `Kanıt soruyu tam cevaplıyorsa FOLLOWUP satırını hiç yazma.`;
 }
+
+/**
+ * Parse a `FOLLOWUP: <id>` line. PURE.
+ *
+ * An id outside `allowed` is dropped silently rather than passed along: a model naming a
+ * command that is not in the catalog is exactly the case this design exists to refuse, and
+ * treating it as an error would only tempt a caller into "handling" it.
+ */
+export function parseFollowup(answer: string, allowed: string[]): string | null {
+  const m = /^\s*FOLLOWUP:\s*([A-Za-z0-9_.\-]+)\s*$/m.exec(String(answer ?? ""));
+  if (!m) return null;
+  const id = m[1].trim();
+  return allowed.includes(id) ? id : null;
+}
+
+/** The FOLLOWUP directive is machinery, not part of the answer a human should read. */
+export const stripFollowup = (answer: string): string =>
+  String(answer ?? "").replace(/^\s*FOLLOWUP:.*$/gm, "").trim();
 
 export interface SynthesisResult {
   answer: string;
+  /** L42: a catalog id the panel asked to run next, already validated against the catalog. */
+  followup?: string | null;
   expert: string;
   scores?: Record<string, number>;
   veto?: SharedAskResult["veto"];
@@ -71,12 +107,13 @@ export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespa
  */
 export async function synthesizeTask(
   title: string, results: StepResult[], deps: SynthesisDeps,
+  followupIds: string[] = [],
 ): Promise<SynthesisResult | null> {
   const sources = stepsAsSources(results);
   if (!sources.length) return null;
 
   try {
-    const r = await askShared(synthesisQuestion(title), {
+    const r = await askShared(synthesisQuestion(title, followupIds), {
       ...deps,
       namespaces: () => ["default"],
       // The evidence IS the retrieval. No store lookup: the panel must answer from what this
@@ -85,11 +122,29 @@ export async function synthesizeTask(
       searchFacts: async () => [],
     } as SharedDeps);
 
-    const answer = String(r.answer ?? "").trim();
+    const raw = String(r.answer ?? "").trim();
+    // Read the follow-up from ANY expert, winner first.
+    //
+    // Parsing only the winner put the decision through a popularity contest: an expert could
+    // notice the evidence fell short and name a command, lose the vote on prose quality, and
+    // the signal was discarded. Measured — asked "sistem yükü nedir ve hangi işlem sorumlu",
+    // the winning answer hedged the second half with "genellikle CPU yoğunluğu yapan
+    // süreçlerdir" while `ps_cpu` sat unused in the candidate list.
+    //
+    // Widening this adds no risk: the id is still validated against the catalog, and the
+    // resulting step still goes through the same safety table as any other command.
+    const followup = followupIds.length
+      ? parseFollowup(raw, followupIds)
+        ?? Object.values(r.expertAnswers ?? {})
+            .map((a) => parseFollowup(String(a), followupIds))
+            .find((x): x is string => !!x)
+        ?? null
+      : null;
+    const answer = stripFollowup(raw);
     const abstained = !!r.abstained || !answer || /BİLGİ_YOK|BILGI_YOK/.test(answer);
     return {
       answer, expert: r.expert ?? "", scores: r.scores, veto: r.veto,
-      degradedReasons: r.degradedReasons, abstained,
+      degradedReasons: r.degradedReasons, abstained, followup,
     };
   } catch {
     return null;
