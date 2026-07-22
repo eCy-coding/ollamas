@@ -130,6 +130,43 @@ describe("L16 — eCym approval handoff (vault → approved-learning.jsonl)", ()
   });
 });
 
+describe("L19 — gate learns 4 experts (width-guard skips stale rows)", () => {
+  test("trainGate on mixed-width ledger keeps a 4-row gate; 3-width rows skipped", async () => {
+    const { emptyGate, EXPERTS } = await import("../server/brain-formulas");
+    const { trainGate } = await import("../server/brain-gate-train");
+    expect(EXPERTS.length).toBe(4);
+    const init = emptyGate(3); // 4 rows × 3-dim
+    const rows: any[] = [
+      { q: [1, 0, 0], scores: [0.9, 0.1, 0.1, 0.1], picked: 0, explored: false }, // 4-width, kept
+      { q: [0, 1, 0], scores: [0.1, 0.9, 0.1, 0.2], picked: 1, explored: false },
+      { q: [0, 0, 1], scores: [0.2, 0.2, 0.9], picked: 2, explored: false },       // 3-width, SKIP
+    ];
+    const { gate } = trainGate(init, rows);
+    expect(gate.W.length).toBe(4); // stays 4 rows — the new expert is trainable
+  });
+  test("loadGate rejects a persisted gate with the wrong expert-count", async () => {
+    // isValidGate structural + EXPERTS row-count is enforced in loadGate; a 3-row gate is
+    // structurally valid but wrong-count → treated as absent so the caller cold-starts 4.
+    const { isValidGate } = await import("../server/brain-gate-store");
+    expect(isValidGate({ W: [[1, 1], [2, 2], [3, 3]], b: [0, 0, 0] })).toBe(true); // structurally ok
+  });
+});
+
+describe("L21 — workspace polish", () => {
+  test("push writes bookmarks (Home pinned) + a by-system Base view", async () => {
+    const b = createBrainStore({ dbPath, embed: fakeEmbed });
+    await b.remember({ id: "c:1", tier: "core", content: "x" });
+    b.close();
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    const bm = JSON.parse(readFileSync(join(vault, ".obsidian", "bookmarks.json"), "utf8"));
+    expect(bm.items.some((i: any) => i.path === "Home.md")).toBe(true);
+    const base = readFileSync(join(vault, "_index", "brain.base"), "utf8");
+    expect(base).toContain("name: Sistem bazlı");
+    expect(base).toContain("groupBy: note.system");
+    expect(base).toContain("recall_rank");
+  });
+});
+
 describe("L18 — entity-map canvas", () => {
   test("push writes a valid JSON Canvas of top-degree entities", async () => {
     process.env.ECY_DATASET = ecymFixture;

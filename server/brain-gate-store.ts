@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, copyFileSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { EXPERTS } from "./brain-formulas";
 
 export interface Gate { W: number[][]; b: number[] }
 
@@ -35,7 +36,10 @@ export function loadGate(): Gate | null {
     try {
       if (!existsSync(f)) continue;
       const g = JSON.parse(readFileSync(f, "utf8"));
-      if (isValidGate(g)) return g;
+      // Structurally sound AND the right expert-count: a stale gate with fewer rows than
+      // EXPERTS (e.g. after a 4th expert was added) is rejected → the caller cold-starts a
+      // correctly-sized gate that trainGate then calibrates (self-migration, no manual reset).
+      if (isValidGate(g) && g.W.length === EXPERTS.length) return g;
     } catch { /* bir sonraki adaya düş */ }
   }
   return null;

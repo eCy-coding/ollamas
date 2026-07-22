@@ -177,6 +177,14 @@ function writeObsidianConfig(vault: string): void {
   writeOnce("app.json", JSON.stringify({ alwaysUpdateLinks: true, promptDelete: false, showFrontmatter: true }, null, 2));
   writeOnce("appearance.json", JSON.stringify({ theme: "obsidian", baseFontSize: 15, cssTheme: "", enabledCssSnippets: ["ollamas-brain"] }, null, 2));
   writeOnce("community-plugins.json", JSON.stringify([], null, 2));
+  // L21: bookmarks — pin the key navigation surfaces so the vault opens finished.
+  writeOnce("bookmarks.json", JSON.stringify({ items: [
+    { type: "file", path: "Home.md", title: "🧠 Home" },
+    { type: "file", path: "orchestra/Orchestra.md", title: "🎼 Orchestra" },
+    { type: "file", path: "orchestra.canvas", title: "🎼 Orchestra map" },
+    { type: "file", path: "entity-map.canvas", title: "🗺️ Entity map" },
+    { type: "file", path: "_index/brain.base", title: "🗃️ Brain DB" },
+  ] }, null, 2));
   // CSS snippet: left-border accent per tier (cssclasses tier-*), so a note's colour matches
   // its graph node. Applies in reading + live-preview via the `.tier-*` body classes.
   mkdirSync(join(dir, "snippets"), { recursive: true });
@@ -241,6 +249,7 @@ function writeHome(vault: string, dump: BrainDump, entities: number, ecymCount =
 function writeBase(vault: string): void {
   const tierFilter = TIERS.map((t) => `      - file.hasTag("tier/${t}")`).join("\n");
   const base = `filters:\n  or:\n${tierFilter}\n`
+    + `formulas:\n  recall_rank: 'if(note.hits > 10, "🔥 hot", if(note.hits > 3, "warm", "cold"))'\n`
     + `properties:\n`
     + `  note.tier:\n    displayName: Katman\n`
     + `  note.hits:\n    displayName: Recall\n`
@@ -251,7 +260,8 @@ function writeBase(vault: string): void {
     + `  - type: table\n    name: Katman bazlı\n    groupBy: note.tier\n    order:\n      - file.name\n      - note.hits\n      - note.confidence\n`
     + `  - type: table\n    name: En çok recall\n    filters:\n      and:\n        - note.hits > 5\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n    limit: 50\n`
     + `  - type: table\n    name: Yüksek güven\n    filters:\n      and:\n        - note.confidence >= 0.8\n    order:\n      - file.name\n      - note.tier\n      - note.confidence\n    limit: 50\n`
-    + `  - type: cards\n    name: Working scratchpad\n    filters:\n      and:\n        - file.hasTag("tier/working")\n    order:\n      - file.name\n`;
+    + `  - type: cards\n    name: Working scratchpad\n    filters:\n      and:\n        - file.hasTag("tier/working")\n    order:\n      - file.name\n`
+    + `  - type: table\n    name: Sistem bazlı\n    groupBy: note.system\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n      - formula.recall_rank\n`;
   writeFileSync(join(vault, "_index", "brain.base"), base);
 }
 

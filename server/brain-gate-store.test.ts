@@ -18,7 +18,8 @@ afterEach(() => {
   try { rmSync(dir, { recursive: true, force: true }); } catch { /* geçici dizin */ }
 });
 
-const gate = (dim = 3) => ({ W: [Array(dim).fill(0.1), Array(dim).fill(0.2), Array(dim).fill(0.3)], b: [0, 0, 0] });
+// 4 rows to match EXPERTS.length (loadGate rejects a wrong-expert-count gate → cold-start).
+const gate = (dim = 3) => ({ W: [Array(dim).fill(0.1), Array(dim).fill(0.2), Array(dim).fill(0.3), Array(dim).fill(0.4)], b: [0, 0, 0, 0] });
 
 describe("isValidGate", () => {
   test("sağlam gate kabul", () => expect(isValidGate(gate())).toBe(true));
@@ -49,7 +50,7 @@ describe("saveGate / loadGate", () => {
 
   test("bozuk gate.json son-iyi yedeğe düşer (loop düşmez)", () => {
     saveGate(gate(3));            // sağlam sürüm
-    saveGate({ ...gate(3), b: [1, 1, 1] }); // ikinci yazım → birincisi yedeğe geçer
+    saveGate({ ...gate(3), b: [1, 1, 1, 1] }); // ikinci yazım → birincisi yedeğe geçer
     writeFileSync(gatePath(), "{ bozuk json");  // dosya bozuldu
     const g = loadGate();
     expect(g).not.toBeNull();     // yedekten kurtarıldı
