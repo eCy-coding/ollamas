@@ -445,6 +445,29 @@ function writeReviewQueue(vault: string, dump: BrainDump): void {
     + `> [!tip] Sık-kullanılan ama eskiyen ${stale.length} anı (≥3 recall · >30g). Doğrula/güncelle. [[Home]]\n\n${rows || "_(kuyruk boş)_"}\n`);
 }
 
+/**
+ * L29 — the recall dashboard. These Dataview blocks were dead code fences until L25 installed
+ * the plugin; now they are live tables over the frontmatter every note already carries.
+ * `neighbours` is passed in rather than recomputed: the push step already did the KNN.
+ */
+function writeRecallIndex(vault: string, dump: BrainDump, neighbors: Map<string, string[]>): void {
+  const orphans = dump.memories.filter((m) => !(neighbors.get(m.id) || []).length);
+  const lowConf = dump.memories.filter((m) => typeof m.confidence === "number" && (m.confidence as number) < 0.6);
+  const list = (rows: typeof dump.memories, n = 15) =>
+    rows.slice(0, n).map((m) => `- [[${memBase(m.id)}]] · \`${m.tier}\``).join("\n") || "_(yok)_";
+  writeFileSync(join(vault, "_index", "recall.md"),
+    `---\ncssclasses: [brain]\ntags: [moc]\naliases: [Recall, Hatırlama]\n---\n\n`
+    + `# 🔎 Hatırlama panosu\n\n> [!tip] Soru sormak için [[search]] · sentez için [[ask]]. [[Home]]\n\n`
+    + `## 🔥 En çok hatırlananlar\n`
+    + "```dataview\nTABLE tier AS \"Katman\", hits AS \"Recall\", confidence AS \"Güven\"\nWHERE hits > 3\nSORT hits DESC\nLIMIT 20\n```\n\n"
+    + `## ⚠️ Düşük güven (<0.6) — **${lowConf.length}**\n`
+    + "```dataview\nTABLE tier AS \"Katman\", confidence AS \"Güven\", source AS \"Kaynak\"\nWHERE confidence AND confidence < 0.6\nSORT confidence ASC\nLIMIT 20\n```\n\n"
+    + `## 🝟 Yetim (komşusuz) — **${orphans.length}**\n`
+    + `_Hiçbir anıya yeterince benzemeyen kayıtlar; ya çok özgün ya da gürültü._\n\n${list(orphans)}\n\n`
+    + `## 🎙️ Ses kaynaklı\n`
+    + "```dataview\nTABLE tier AS \"Katman\", created AS \"Tarih\"\nWHERE contains(source, \"voice/\")\nSORT created DESC\n```\n");
+}
+
 // Namespace index — a hub grouping memories by ns (the brain's logical partitions).
 function writeNamespaceIndex(vault: string, dump: BrainDump): void {
   const byNs = new Map<string, number>();
@@ -472,6 +495,15 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [Ask, Sor]\n---\n\n`
     + `# 🎤 Orkestra'ya sor\n\n> [!tip] Bir satır ekle: \`- [ ] sorun\` → ~5 dk içinde ask-shared cevaplar → [[answers]] klasörü + \`- [x]\` işaretlenir.\n\n`
     + `- [ ] <sorunu buraya yaz>\n`);
+  // L29: recall queue. Distinct from ask.md on purpose — ask.md spends four experts to
+  // SYNTHESISE an answer; this one just retrieves, and shows the semantic and lexical
+  // channels side by side so you can see which one found what.
+  const searchPath = join(dir, "search.md");
+  if (!existsSync(searchPath)) writeFileSync(searchPath,
+    `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [Search, Ara]\n---\n\n`
+    + `# 🔎 Hafızada ara\n\n> [!tip] \`- [ ] arama\` satırı ekle → brain anlamsal recall + Obsidian sözcüksel arama → [[answers]] · \`- [x]\` işaretlenir.\n`
+    + `> Sentezlenmiş cevap istiyorsan [[ask]] kullan; burası ham kaynakları getirir.\n\n`
+    + `- [ ] <aramanı buraya yaz>\n`);
   let ledger: any = null;
   try { ledger = JSON.parse(readFileSync(`${process.env.HOME}/.ollamas/council-ledger.json`, "utf8")); } catch { /* no council yet */ }
 
@@ -644,6 +676,7 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   writeTemplates(vault);
   writeJournal(vault, dump);                        // + L26 weekly/monthly rollups
   writeNamespaceIndex(vault, dump);
+  writeRecallIndex(vault, dump, neighbors);         // L29: recall dashboard (live Dataview)
   writeEntityMapCanvas(vault, dump.facts);          // L18: visual knowledge map
   writeHubs(vault, dump, neighbors);                // L26: graph-centrality hub notes
   writeReviewQueue(vault, dump);                    // L26: spaced-review queue
@@ -819,6 +852,71 @@ export async function processAskQueue(vault: string, askFn: (q: string) => Promi
     answered++;
   }
   if (answered > 0) writeFileSync(askPath, lines.join("\n"));
+  return answered;
+}
+
+export interface RecallHit { id: string; tier: string; score: number; excerpt: string }
+export interface RecallQueueDeps {
+  /** Semantic recall over the brain — authoritative, MRR 0.877. */
+  recall: (q: string, k: number) => Promise<RecallHit[]>;
+  /** Obsidian's own lexical search. Optional: absent/offline simply yields no lexical rows. */
+  lexical?: (q: string, k: number) => Promise<{ path: string; score: number; context: string }[]>;
+}
+
+/**
+ * L29 — ask the brain a question from inside Obsidian.
+ *
+ * The brain has semantic recall the vault cannot match, and the vault has an exact-string
+ * index the embedding space blurs over. This is where the two are combined, and the reason
+ * it happens HERE rather than inside askShared is honesty about scale: askShared's sources
+ * feed p_ret, and a lexical score is not a cosine similarity. Mixing them there would
+ * silently distort the weighting. In a note, the two lists simply sit side by side, each
+ * labelled with where it came from, and the reader can see which channel found what.
+ *
+ * Same contract as processAskQueue: `- [ ] query` → answer note → `- [x]`, so re-running is
+ * idempotent and a question is never answered twice.
+ */
+export async function processSearchQueue(vault: string, deps: RecallQueueDeps): Promise<number> {
+  const qPath = join(vault, "orchestra", "search.md");
+  if (!existsSync(qPath)) return 0;
+  const lines = readFileSync(qPath, "utf8").replace(/\r\n/g, "\n").split("\n");
+  const ansDir = join(vault, "orchestra", "answers");
+  mkdirSync(ansDir, { recursive: true });
+  let answered = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*-\s*\[ \]\s*(.+?)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    const q = m[1].trim();
+    if (!q || q.startsWith("<")) continue; // template placeholder
+
+    let sem: RecallHit[] = [];
+    let lex: { path: string; score: number; context: string }[] = [];
+    let err = "";
+    try { sem = await deps.recall(q, 8); } catch (e: any) { err = `recall: ${e?.message || e}`; }
+    // Lexical is strictly a bonus channel — a closed Obsidian must not fail the query.
+    if (deps.lexical) { try { lex = await deps.lexical(q, 8); } catch { /* vault offline */ } }
+
+    const semBlock = sem.length
+      ? sem.map((h) => `- **[[${memBase(h.id)}|${h.id}]]** · ${h.tier} · ${h.score.toFixed(3)}\n  > ${h.excerpt.replace(/\s+/g, " ").slice(0, 220)}`).join("\n")
+      : "_(anlamsal isabet yok)_";
+    const lexBlock = lex.length
+      ? lex.map((h) => `- [[${h.path.replace(/\.md$/, "")}]] · ${h.score.toFixed(3)}\n  > ${h.context.slice(0, 220)}`).join("\n")
+      : "_(sözcüksel isabet yok — Obsidian kapalı olabilir)_";
+
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const slug = noteFilename(q.slice(0, 40)).replace(/\.md$/, "");
+    writeFileSync(join(ansDir, `search-${ts}-${slug}.md`),
+      `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, search]\naliases: [${JSON.stringify(q.slice(0, 60))}]\n---\n\n`
+      + `# 🔎 ${q}\n\n`
+      + (err ? `> [!warning] ${err}\n\n` : `> [!info] ${sem.length} anlamsal · ${lex.length} sözcüksel isabet\n\n`)
+      + `## 🧠 Anlamsal (brain)\n${semBlock}\n\n`
+      + `## 🔤 Sözcüksel (Obsidian)\n${lexBlock}\n\n`
+      + `[[Orchestra]] · [[recall]]\n`);
+    lines[i] = lines[i].replace("- [ ]", "- [x]");
+    answered++;
+  }
+  if (answered > 0) writeFileSync(qPath, lines.join("\n"));
   return answered;
 }
 

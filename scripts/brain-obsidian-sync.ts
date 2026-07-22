@@ -38,6 +38,28 @@ async function main() {
       const answered = await processAskQueue(r.vault, (q) => api("/api/brain/ask-shared", { question: q }, 90_000));
       if (answered > 0) console.log(JSON.stringify({ event: "obsidian.ask", answered }));
     } catch (e: any) { console.error(JSON.stringify({ event: "obsidian.ask.error", msg: String(e?.message || e) })); }
+
+    // L29: the recall queue (orchestra/search.md). Retrieval only — no expert synthesis — so
+    // it stays cheap enough to run every tick. Both channels go through :3000 rather than
+    // opening brain.db here (same thin-client rule as the sync itself).
+    try {
+      const { processSearchQueue } = await import("../server/brain-obsidian");
+      const found = await processSearchQueue(r.vault, {
+        recall: async (q, k) => {
+          const res = await api("/api/brain/recall", { query: q, k }, 30_000);
+          const rows = Array.isArray(res) ? res : (res?.hits ?? []);
+          return rows.map((m: any) => ({
+            id: String(m.id ?? ""), tier: String(m.tier ?? "?"),
+            score: Number(m.score ?? m.similarity ?? 0), excerpt: String(m.content ?? m.excerpt ?? ""),
+          })).filter((m: any) => m.id);
+        },
+        lexical: async (q, k) => {
+          const { vaultSearch } = await import("../server/obsidian-rest");
+          return vaultSearch(q, k);
+        },
+      });
+      if (found > 0) console.log(JSON.stringify({ event: "obsidian.search", answered: found }));
+    } catch (e: any) { console.error(JSON.stringify({ event: "obsidian.search.error", msg: String(e?.message || e) })); }
   } catch (e: any) {
     // Non-fatal: the server may be mid-restart. launchd fires again next interval.
     console.error(JSON.stringify({ event: "obsidian.sync.error", at, msg: String(e?.message || e) }));
