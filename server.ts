@@ -29,7 +29,7 @@ import { ProviderRouter, repairJson, getToolArgError } from "./server/providers"
 import { keyedCloudProviders, catalogEntry, catalogBaseUrl, trainsOnData, keySignupUrl, envKeyFor, capabilitiesFor } from "./server/provider-catalog";
 import { deriveCloudflareAccountId } from "./server/cloudflare";
 import { setCloudflareAccountId, getCloudflareAccountId } from "./server/provider-catalog";
-import { sttEntryFor, buildTranscribeForm, STT_CATALOG } from "./server/stt-catalog";
+import { transcribeAudio } from "./server/stt";
 import { runDoctor, productionDoctorDeps } from "./server/key-doctor";
 import { recentEvents, rollup, onRequestEvent, redactDeep } from "./server/telemetry";
 import { formatTelemetryFrame, telemetrySnapshot } from "./server/telemetry-sse";
@@ -1846,33 +1846,14 @@ async function initializeServer() {
    * provider pick a decoder). No key -> honest 503; oversize -> 400 with the real cap.
    */
   app.post("/api/ai/transcribe", async (req, res) => {
-    // Env first; else any STT provider whose key lives in the VAULT (keyPool covers both).
-    const entry = sttEntryFor() ?? Object.values(STT_CATALOG).find((e) => ProviderRouter.keyPool(e.id).length > 0) ?? null;
-    if (!entry) {
-      return res.status(503).json({ error: "no STT provider key configured (set GROQ_API_KEY \u2014 free tier: console.groq.com/keys)" });
-    }
     const audio: Buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     if (!audio.byteLength) return res.status(400).json({ error: "raw audio body required (POST bytes, e.g. curl --data-binary @sample.wav)" });
-    try {
-      const filename = String(req.query.filename || "audio.wav");
-      const form = buildTranscribeForm(entry, audio, filename);
-      const key = ProviderRouter.getDecryptedKey(entry.id);
-      const r = await fetch(`${entry.baseUrl}/audio/transcriptions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}` },
-        body: form,
-        signal: AbortSignal.timeout(120_000),
-      });
-      if (!r.ok) {
-        const detail = (await r.text().catch(() => "")).slice(0, 200);
-        return res.status(502).json({ error: `${entry.id} transcription error ${r.status}`, detail });
-      }
-      const j: any = await r.json();
-      return res.json({ text: String(j.text ?? ""), provider: entry.id, model: entry.defaultModel });
-    } catch (e: any) {
-      const msg = String(e?.message ?? e);
-      return res.status(/too large/.test(msg) ? 400 : 500).json({ error: msg.slice(0, 300) });
-    }
+    // L28: one shared transcription path (server/stt.ts) \u2014 the Obsidian audio bridge calls
+    // the exact same function, so provider selection and error mapping cannot drift apart.
+    const r = await transcribeAudio(audio, String(req.query.filename || "audio.wav"));
+    if (r.ok) return res.json({ text: r.text, provider: r.provider, model: r.model });
+    const status = r.kind === "unconfigured" ? 503 : r.kind === "too_large" ? 400 : r.kind === "provider" ? 502 : 500;
+    return res.status(status).json({ error: r.error });
   });
 
   app.post("/api/ai/generate", async (req, res) => {

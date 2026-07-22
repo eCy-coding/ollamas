@@ -20,6 +20,7 @@ import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
 import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses, ecymDatasetPath } from "./brain-obsidian-ecym";
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, adoptHumanNote, ROOT_RESERVED, TIERS, type NoteMemory } from "./brain-obsidian-note";
+import { syncAudio, type AudioSyncResult } from "./brain-obsidian-audio";
 
 export function defaultVaultPath(): string {
   return process.env.OBSIDIAN_VAULT || `${process.env.HOME}/ollamas-vault`;
@@ -48,6 +49,8 @@ export interface SyncResult {
   direction: Direction;
   push: { written: number; skipped: number; entities: number; pruned: number; adopted?: number };
   pull: { ingested: number; skipped: number; conflicts: number };
+  /** L28 voice-memo transcription outcome for this run (absent on push-only). */
+  audio?: AudioSyncResult;
   vault: string;
   memories: number;
 }
@@ -200,6 +203,11 @@ function writeObsidianConfig(vault: string): void {
     + "\n.brain-home .view-content, .system-orchestra .view-content { border-left: 4px solid #ffd700; }\n";
   const snip = join(dir, "snippets", "ollamas-brain.css");
   if (!existsSync(snip)) writeFileSync(snip, css);
+  // L28: the CORE daily-notes plugin defaults its folder to the vault ROOT, which is how
+  // `2026-07-22.md` appeared next to Home.md. Left alone it re-litters the root every day and
+  // fights periodic-notes for the same file. Point both at journal/ with one format.
+  writeOnce("daily-notes.json", JSON.stringify(
+    { folder: "journal", format: "YYYY-MM-DD", template: "templates/daily.md" }, null, 2));
   // L25: per-plugin settings for the runtime installed by scripts/obsidian-plugins.ts.
   // create-once as well — Obsidian owns these files once the user touches a settings tab.
   // Only plugins whose defaults would MISS our generated layout are configured; the rest
@@ -702,6 +710,61 @@ async function pullVaultToBrain(
 interface AdoptedOriginal { path: string; id: string; tier: string }
 
 /**
+ * L28 — sweep the empty shells Obsidian leaves behind. Clicking "new canvas"/"new base" and
+ * changing your mind writes `Başlıksız.canvas`, `Başlıksız 1.base`, and so on; nine of them
+ * had accumulated in the root. They are MOVED to _index/attic/, never deleted: emptiness is
+ * inferred from bytes, and being wrong about that must stay recoverable.
+ * Only untitled-shaped names are eligible, and only if they carry no content at all.
+ */
+const UNTITLED = /^(Başlıksız|Untitled|Sin título|Sans titre)( \d+)?\.(canvas|base)$/;
+
+/**
+ * Emptiness is STRUCTURAL, not byte-length. Obsidian does not write an empty file when you
+ * create a canvas or base — it writes its default scaffold: a base gets `views: [table]`, a
+ * canvas gets text nodes whose `text` is "". Comparing bytes left six of nine shells behind.
+ * Any real signal — a filter, a formula, a data source, node text, a file reference, an edge —
+ * means the user actually started something, and the file is left exactly where it is.
+ */
+export function isAbandonedShell(filename: string, body: string): boolean {
+  const s = body.trim();
+  if (!s || s === "{}" || s === "[]") return true;
+  if (filename.endsWith(".canvas")) {
+    try {
+      const c = JSON.parse(s);
+      if (Array.isArray(c?.edges) && c.edges.length) return false;
+      const nodes = Array.isArray(c?.nodes) ? c.nodes : [];
+      return nodes.every((n: any) => !String(n?.text ?? "").trim() && !n?.file && !n?.url);
+    } catch { return false; } // unparseable → not ours to move
+  }
+  if (filename.endsWith(".base")) {
+    // The default scaffold is view-only. A base the user shaped names a source or a rule.
+    return !/^\s*(filters|formulas|properties|source|from)\s*:/m.test(s);
+  }
+  return false;
+}
+
+export function sweepEmptyShells(vault: string): { moved: string[] } {
+  const moved: string[] = [];
+  if (!existsSync(vault)) return { moved };
+  const attic = join(vault, "_index", "attic");
+  for (const f of readdirSync(vault)) {
+    if (!UNTITLED.test(f)) continue;
+    const src = join(vault, f);
+    try {
+      const st = statSync(src);
+      if (!st.isFile()) continue;
+      const body = readFileSync(src, "utf8");
+      if (!isAbandonedShell(f, body)) continue;
+      mkdirSync(attic, { recursive: true });
+      writeFileSync(join(attic, f), body);
+      rmSync(src);
+      moved.push(f);
+    } catch { /* skip anything we cannot read or move */ }
+  }
+  return { moved };
+}
+
+/**
  * Remove a hand-written original ONLY once the brain has materialised it as a proper tier
  * note. Ordering is the safety property: pull adopts → push writes <tier>/<id>.md → and only
  * then is the loose copy dropped. If the push failed, the original is left exactly where the
@@ -772,6 +835,14 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
   let pull: SyncResult["pull"] = { ingested: 0, skipped: 0, conflicts: 0 };
   let push: SyncResult["push"] = { written: 0, skipped: 0, entities: 0, pruned: 0 };
   const adopted: AdoptedOriginal[] = [];
+  let audio: AudioSyncResult | undefined;
+
+  // L28: transcribe BEFORE pull. A voice memo becomes an inbox note, and the very same pull
+  // that follows adopts it — one capture path, no second ingestion route.
+  if (direction === "pull" || direction === "both") {
+    try { audio = await syncAudio(vault); } catch { /* STT is best-effort; never fail a sync tick */ }
+    try { sweepEmptyShells(vault); } catch { /* cosmetic */ }
+  }
 
   // pull FIRST (ingest human edits) so the subsequent mirror can't clobber them.
   if (direction === "pull" || direction === "both") {
@@ -799,7 +870,7 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
 
   saveManifest(vault, manifest);
   const memories = exportBrain(dbPath).memories.length;
-  return { direction, push, pull, vault, memories };
+  return { direction, push, pull, vault, memories, ...(audio ? { audio } : {}) };
 }
 
 export interface SystemUsage {
