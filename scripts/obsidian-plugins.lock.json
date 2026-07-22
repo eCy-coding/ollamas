@@ -1,0 +1,89 @@
+{
+  "templater-obsidian": {
+    "version": "2.24.0",
+    "sha256": {
+      "main.js": "03b7654a3021ad8ee43faffb140c8b4caf3fc66b0a31a05dd58533c0f86b7e12",
+      "manifest.json": "3041605cb200f24f5d371cef86270e007c6e8aa52878ea743875150512c89943",
+      "styles.css": "eb94063be602679f397e3e35fcb7f6a4b027da82e17c213bb44a267c6b45d8de"
+    }
+  },
+  "obsidian-kanban": {
+    "version": "2.0.51",
+    "sha256": {
+      "main.js": "a7e3bd4cf25f9b7f53a841c44ce990db0ef5f7954ebcab17ae6dca80310c39ac",
+      "manifest.json": "24976787097ead467969e014a35654e7a80e4db49a977689a48afadfa15e1854",
+      "styles.css": "ecf6dd31f1727c441cce6f54794b0d3916dcfffc87fa17b855c79ba04a85d9a7"
+    }
+  },
+  "periodic-notes": {
+    "version": "0.0.17",
+    "sha256": {
+      "main.js": "ccf1a18673693d1036fc7614c3af9d23e5edfe425d1053df81dddcc29b1f8b0e",
+      "manifest.json": "bda29323f75d3b3fcbda489335825b97fe4b574914d04635e9a7e67f2414049c",
+      "styles.css": "613f3985d4c84900ed2e25d8a46efb7b3ace6889fb71217055084084eb146238"
+    }
+  },
+  "obsidian-tasks-plugin": {
+    "version": "8.2.2",
+    "sha256": {
+      "main.js": "5c68dd0f4e1838f3bd263df39aa508d66ed94e85cc4a48bb338170be2955e077",
+      "manifest.json": "db6fe0eb4f033955cdae3e545a39f69748c87262ea8b352805662c4ccbcb714b",
+      "styles.css": "32b3d394b697a058f2dcaef0d38476b3c3e585aea63549a816bcc237cf3e3872"
+    }
+  },
+  "obsidian-local-rest-api": {
+    "version": "4.1.7",
+    "sha256": {
+      "main.js": "52bdfbb99afc8dfc2a5080776947a77fddae9caad9d710221bd2c3c5cc03bdc5",
+      "manifest.json": "1c09e919f599eb918fc6b6c1f407b6e1f319ae0e117c12fd9f2ceacf7040762b",
+      "styles.css": "1180db8e819c757a858e5591eb0a2f9b1fbe2e5db7fa642da576360c4b6c2c3b"
+    }
+  },
+  "omnisearch": {
+    "version": "1.29.3",
+    "sha256": {
+      "main.js": "d87ceddfe9fc429fe0b64f3d480be488c1e491f2889d24370061d3a2e5afcf4c",
+      "manifest.json": "f9b2791c44ea02e6347383cd02719309f59792eb39361f32ccaafc6f49753b7b",
+      "styles.css": "818e6b361e426ab3a868a4524a20df5a6416bf614876b61ede340d0f78c9ebc8"
+    }
+  },
+  "obsidian-excalidraw-plugin": {
+    "version": "2.25.3",
+    "sha256": {
+      "main.js": "684cf6da43f6e3b2a7646d5a50d14f7a43eb5d859d073dc6a375c4a1b0990dd6",
+      "manifest.json": "43f18bc17c5c3f76af1a9a4191daa1c3566e2875aa4430561d57b7828785282e",
+      "styles.css": "236a113fee3581ec59856af22c6cecf79faf3521afae66227a40f6ff6cd98969"
+    }
+  },
+  "obsidian-git": {
+    "version": "2.38.6",
+    "sha256": {
+      "main.js": "31ad89d3d973cb5520647d527f50d8c23fcd42176768361741a543af56d56287",
+      "manifest.json": "67391efa84093d56011f43764ff4f1c846dd8ad52b1f1dfd010ab628b217c2a3",
+      "styles.css": "f5ab93f4d5b4dd1bd1e577864c5c79087f7adfd448ac346e0489e5847ce6922d"
+    }
+  },
+  "obsidian-spaced-repetition": {
+    "version": "1.15.4",
+    "sha256": {
+      "main.js": "e2af1a3477ad54bf063ee8787a465661cf6725d88394e9f2f15e78e0bc29993b",
+      "manifest.json": "6b4bf78256cd0ef8816fa2cf4f00248c01b18066f8e69fee969d48a3791bcd65",
+      "styles.css": "c62ae5fab547d74d8446e05aa20cb55efebbfa7cd0e0743c951dcc2b77b49abd"
+    }
+  },
+  "dataview": {
+    "version": "0.5.70",
+    "sha256": {
+      "main.js": "6bb1cf7010afad830e73575fca0e2bfbd3279c562e3d9d24f2d2f45161eb7d00",
+      "manifest.json": "9235db47112da81b85591c79ecb9ae2574e5e72207056e976472f90616286185",
+      "styles.css": "3306dd9032e00f989ba7233a37fd255bc4d3f4340cee661762e952f3f6aa1de9"
+    }
+  },
+  "calendar": {
+    "version": "1.5.10",
+    "sha256": {
+      "main.js": "7fb339e9cf9fdbe5a801fa2b8ab85b366b5b3777fbd193cbc8728bc27711d125",
+      "manifest.json": "f3e9581338648512baa12d5b458490f7fd367918f7bdb6bd86171ce57be7d08b"
+    }
+  }
+}

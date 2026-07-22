@@ -199,6 +199,30 @@ function writeObsidianConfig(vault: string): void {
     + "\n.brain-home .view-content, .system-orchestra .view-content { border-left: 4px solid #ffd700; }\n";
   const snip = join(dir, "snippets", "ollamas-brain.css");
   if (!existsSync(snip)) writeFileSync(snip, css);
+  // L25: per-plugin settings for the runtime installed by scripts/obsidian-plugins.ts.
+  // create-once as well — Obsidian owns these files once the user touches a settings tab.
+  // Only plugins whose defaults would MISS our generated layout are configured; the rest
+  // ship sane defaults. obsidian-git is intentionally left un-configured until L32, and
+  // local-rest-api mints its own API key on first load (consumed in L26).
+  const pluginSettings: Record<string, unknown> = {
+    // Journals live in journal/ as YYYY-MM-DD; weekly rollups land there too (L31).
+    "periodic-notes": {
+      daily: { format: "YYYY-MM-DD", folder: "journal", template: "templates/daily.md", enabled: true },
+      weekly: { format: "[weekly-]GGGG-[W]WW", folder: "journal", template: "", enabled: true },
+    },
+    calendar: { shouldConfirmBeforeCreate: false, weekStart: "monday" },
+    // Inline queries power the compact stats on Home; JS queries stay OFF (they execute
+    // arbitrary code from note bodies, and the brain writes those bodies).
+    dataview: { enableDataviewJs: false, enableInlineDataviewJs: false, enableInlineDataview: true, refreshEnabled: true },
+    "templater-obsidian": { templates_folder: "templates", trigger_on_file_creation: false },
+  };
+  for (const [id, cfg] of Object.entries(pluginSettings)) {
+    const pdir = join(dir, "plugins", id);
+    // Only write next to a plugin that is actually installed — never conjure an empty dir.
+    if (!existsSync(pdir)) continue;
+    const f = join(pdir, "data.json");
+    if (!existsSync(f)) writeFileSync(f, JSON.stringify(cfg, null, 2) + "\n");
+  }
   writeOnce("README.md",
     "# ollamas brain vault\n\nAuto-mirrored from the ollamas sqlite-vec brain. Start at **[[Home]]** and open the\n"
     + "**Graph view** (Ctrl/Cmd+G) — nodes are colour-grouped by memory tier + entities.\n\n"
