@@ -2,7 +2,7 @@
 // the two properties this client must never lose: TLS verification stays on, and a closed
 // Obsidian degrades honestly instead of throwing or inventing data.
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,6 +12,21 @@ import {
 
 let vault: string;
 const pluginDir = (v: string) => join(v, ".obsidian", "plugins", "obsidian-local-rest-api");
+
+// mirrorToken() writes to $HOME by design — that is the whole point of the mirror. So every
+// test that touches it MUST run under a throwaway HOME, or the suite overwrites the operator's
+// live bearer credential with the fixture key and the running vault starts answering 40101.
+// (That regression was real: a green suite left ~/.llm-mission-control/obsidian-rest.token
+// holding 64 'k's while the plugin's key was something else entirely.)
+const REAL_HOME = process.env.HOME;
+const realMirror = REAL_HOME
+  ? join(REAL_HOME, ".llm-mission-control", "obsidian-rest.token")
+  : "";
+/** Snapshot taken once, before any test can write: the guard below compares against it. */
+const realMirrorAtStart =
+  realMirror && existsSync(realMirror) ? readFileSync(realMirror, "utf8") : null;
+
+let fakeHome: string;
 
 /** A settings file shaped exactly like the plugin's own (verified against the live one). */
 function writeSettings(v: string, over: Record<string, unknown> = {}): void {
@@ -24,8 +39,17 @@ function writeSettings(v: string, over: Record<string, unknown> = {}): void {
   }));
 }
 
-beforeEach(() => { vault = mkdtempSync(join(tmpdir(), "obs-rest-")); __resetObsidianRest(); });
-afterEach(() => { __resetObsidianRest(); });
+beforeEach(() => {
+  vault = mkdtempSync(join(tmpdir(), "obs-rest-"));
+  fakeHome = mkdtempSync(join(tmpdir(), "obs-home-"));
+  mkdirSync(join(fakeHome, ".llm-mission-control"), { recursive: true });
+  process.env.HOME = fakeHome;                     // tokenMirrorPath() reads this at call time
+  __resetObsidianRest();
+});
+afterEach(() => {
+  if (REAL_HOME === undefined) delete process.env.HOME; else process.env.HOME = REAL_HOME;
+  __resetObsidianRest();
+});
 
 describe("credentials", () => {
   test("are read from the plugin's own settings — nothing for a human to copy", () => {
@@ -53,8 +77,18 @@ describe("credentials", () => {
   test("the mirrored token file is owner-only — it is a bearer credential", () => {
     writeSettings(vault);
     mirrorToken(readObsidianCreds(vault)!);
-    if (!existsSync(tokenMirrorPath())) return; // no HOME in a sandboxed runner
+    expect(tokenMirrorPath()).toBe(join(fakeHome, ".llm-mission-control", "obsidian-rest.token"));
     expect(readFileSync(tokenMirrorPath(), "utf8")).toHaveLength(64);
+    // The title's actual claim, now actually asserted: no group or other bits.
+    expect(statSync(tokenMirrorPath()).mode & 0o777).toBe(0o600);
+  });
+
+  test("mirroring never touches the operator's real HOME — the suite is not allowed to revoke live access", () => {
+    writeSettings(vault);
+    mirrorToken(readObsidianCreds(vault)!);
+    if (realMirrorAtStart === null) return;        // operator has no mirror yet; nothing to protect
+    expect(readFileSync(realMirror, "utf8")).toBe(realMirrorAtStart);
+    expect(readFileSync(realMirror, "utf8")).not.toBe("k".repeat(64));
   });
 });
 

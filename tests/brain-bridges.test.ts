@@ -22,6 +22,8 @@ const writer: BridgeWriter = {
   assertFact: async (f) => { facts.push(f); return { changed: true }; },
 };
 
+const REAL_HOME = process.env.HOME;
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "bridges-"));
   mems = [];
@@ -35,6 +37,9 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.BRAIN_KEV_INGEST;
   delete process.env.HIERARCHY_POLICY_PATH;
+  // HOME must go back, and before rmSync — otherwise every later test file in this worker
+  // resolves ~ to a directory that no longer exists, which fails in file-order-dependent ways.
+  if (REAL_HOME === undefined) delete process.env.HOME; else process.env.HOME = REAL_HOME;
   rmSync(dir, { recursive: true, force: true });
 });
 
