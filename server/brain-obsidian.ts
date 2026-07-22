@@ -17,7 +17,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
-import { writeEcymNotes, writeEcymLearningQueue } from "./brain-obsidian-ecym";
+import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning } from "./brain-obsidian-ecym";
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, TIERS, type NoteMemory } from "./brain-obsidian-note";
 
@@ -227,6 +227,7 @@ function writeHome(vault: string, dump: BrainDump, entities: number, ecymCount =
     + TIERS.map((t) => `- ${TIER_EMOJI[t]} [[tier-${t}|${t}]] — **${count(t)}** · _${TIER_DESC[t]}_`).join("\n")
     + `\n- 🟠 [[entities|entities]] — **${entities}**\n\n`
     + `## 🗃️ Veritabanı görünümü\n![[brain.base]]\n\n`
+    + `## 🗺️ Görsel haritalar\n[[orchestra.canvas|Orkestra akışı]] · [[entity-map.canvas|Bilgi haritası]]\n\n`
     + `## 🕐 Son eklenenler\n`
     + dv("TABLE tier AS \"Katman\", hits AS \"Recall\", confidence AS \"Güven\"\nWHERE tier\nSORT created_ms DESC\nLIMIT 12")
     + `\n\n## 🔥 En çok hatırlananlar\n`
@@ -266,6 +267,39 @@ function writeTierIndexes(vault: string, dump: BrainDump): void {
       + "\n";
     writeFileSync(join(vault, "_index", `tier-${t}.md`), md);
   }
+}
+
+// L18: entity-map.canvas — a visual knowledge map of the top-degree fact-graph entities.
+// Nodes sized by degree, laid out on a grid; edges are the live facts among them. Native
+// JSON Canvas (no plugin). Complements orchestra.canvas (systems) with the knowledge graph.
+function writeEntityMapCanvas(vault: string, facts: BrainDump["facts"]): number {
+  const live = facts.filter((f) => f.invalidatedAt === null);
+  const deg = new Map<string, number>();
+  const label = new Map<string, string>();
+  for (const f of live) for (const raw of [f.subject, f.object]) {
+    const k = raw.toLowerCase().trim(); if (!k) continue;
+    deg.set(k, (deg.get(k) || 0) + 1); if (!label.has(k)) label.set(k, raw);
+  }
+  const top = [...deg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+  const topSet = new Set(top.map(([k]) => k));
+  const idOf = (k: string) => `e_${noteFilename(k).replace(/\.md$/, "")}`;
+  const cols = 6;
+  const nodes = top.map(([k, d], i) => {
+    const size = Math.min(70 + d * 6, 200);
+    return { id: idOf(k), type: "file" as const, file: `entities/entity-${noteFilename(k).replace(/\.md$/, "")}.md`,
+      x: (i % cols) * 320, y: Math.floor(i / cols) * 240, width: size, height: 80,
+      color: String(((d % 6) + 1)) };
+  });
+  const edges: any[] = [];
+  let ei = 0;
+  for (const f of live) {
+    const s = f.subject.toLowerCase().trim(), o = f.object.toLowerCase().trim();
+    if (topSet.has(s) && topSet.has(o) && s !== o && ei < 120) {
+      edges.push({ id: `me${ei++}`, fromNode: idOf(s), toNode: idOf(o), label: f.predicate.slice(0, 24) });
+    }
+  }
+  writeFileSync(join(vault, "entity-map.canvas"), JSON.stringify({ nodes, edges }, null, 2));
+  return nodes.length;
 }
 
 // Templater-compatible note templates (create-once) so hand-added notes match the schema.
@@ -486,6 +520,7 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   writeTemplates(vault);
   writeJournal(vault, dump);
   writeNamespaceIndex(vault, dump);
+  writeEntityMapCanvas(vault, dump.facts);          // L18: visual knowledge map
   return { written, skipped, entities, pruned };
 }
 
@@ -517,7 +552,9 @@ async function pullVaultToBrain(vault: string, manifest: Manifest, brainIds: Set
   return { ingested, skipped, conflicts };
 }
 
-export interface AskResult { answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number }
+export interface AskResult { answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number; expertAnswers?: Record<string, string> }
+
+const SYS_EMOJI: Record<string, string> = { ollamas: "🔵", ecym: "🟢", odysseus: "🟣", claudecode: "🔴" };
 
 // L9: process the Obsidian-side ask queue. A human writes `- [ ] <question>` into
 // orchestra/ask.md; each pending line is sent through askFn (ask-shared), the answer is
@@ -542,7 +579,12 @@ export async function processAskQueue(vault: string, askFn: (q: string) => Promi
     writeFileSync(join(ansDir, `${ts}-${slug}.md`),
       `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, answer]\naliases: [${JSON.stringify(q.slice(0, 60))}]\n---\n\n`
       + `# ❓ ${q}\n\n> [!success] Kazanan: **${r.expert || "?"}**${r.confidence != null ? ` · güven ${r.confidence.toFixed(2)}` : ""}\n> ${w}\n\n`
-      + `${r.answer || "_(cevap yok)_"}\n\n[[Orchestra]] · [[runs]]\n`);
+      + `${r.answer || "_(cevap yok)_"}\n\n`
+      + (r.expertAnswers && Object.keys(r.expertAnswers).length
+          ? `## Uzman cevapları\n` + Object.entries(r.expertAnswers).map(([e, a]) =>
+              `> [!quote]- ${SYS_EMOJI[e] || ""} ${e}\n> ${String(a).replace(/\n/g, "\n> ")}`).join("\n\n") + "\n\n"
+          : "")
+      + `[[Orchestra]] · [[runs]]\n`);
     lines[i] = lines[i].replace("- [ ]", "- [x]");
     answered++;
   }
@@ -568,6 +610,7 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
     const dump0 = exportBrain(dbPath);
     const brainIds = new Set(dump0.memories.map((m) => m.id));
     pull = await pullVaultToBrain(vault, manifest, brainIds, remember);
+    try { readApprovedLearning(vault); } catch { /* L16 handoff best-effort */ } // vault → eCym learn queue
   }
   if (direction === "push" || direction === "both") {
     const dump = exportBrain(dbPath); // re-read: reflects anything pull just ingested

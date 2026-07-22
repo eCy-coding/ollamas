@@ -2,7 +2,7 @@
 // into the Obsidian vault under `ecym/` so the orchestra's second system appears in the
 // same graph as the ollamas brain. READ-ONLY: eCym owns the dataset (grown via ecy-learn),
 // so these notes are never pulled back — they mirror the source of truth one way.
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { noteFilename } from "./brain-obsidian-note";
 
@@ -100,6 +100,30 @@ export function writeEcymLearningQueue(vault: string, missesPath = `${process.en
     + `# 🌱 eCym öğrenme kuyruğu\n\n> [!tip] eCym'in yerel çözemediği ${rows.length} soru. \`ecy-learn\` bunları yeni komut taslağına çevirir → onay → \`terminal-dataset.json\`.\n\n`
     + `${list || "_(henüz kaçırılan yok)_"}\n\n[[Orchestra]] · kaynak: \`~/ecy-model/misses.log\` (read-only)\n`);
   return rows.length;
+}
+
+// L16: vault → eCym learning handoff. When a human checks `- [x] <question>` in
+// ecym/_learning-queue.md, append it to ~/ecy-model/approved-learning.jsonl — the queue
+// ecy-learn consumes to draft new commands. We ONLY write the approval signal; we never
+// touch terminal-dataset.json (that's ecy-learn's job, with its own draft+approve step).
+// Deduped by question so re-syncs don't pile up. Returns how many NEW approvals were added.
+export function readApprovedLearning(vault: string, outPath = `${process.env.HOME}/ecy-model/approved-learning.jsonl`): number {
+  const qPath = join(vault, "ecym", "_learning-queue.md");
+  let content = "";
+  try { content = readFileSync(qPath, "utf8"); } catch { return 0; }
+  const approved = [...content.matchAll(/^\s*-\s*\[x\]\s*(.+?)(?:\s+`[^`]*`)?\s*$/gim)].map((m) => m[1].trim()).filter(Boolean);
+  if (!approved.length) return 0;
+  const seen = new Set<string>();
+  try { for (const l of readFileSync(outPath, "utf8").trim().split("\n")) { try { seen.add(JSON.parse(l).q); } catch { /* skip */ } } } catch { /* new file */ }
+  let added = 0;
+  const at = Date.now();
+  for (const q of approved) {
+    if (seen.has(q)) continue;
+    seen.add(q);
+    appendFileSync(outPath, JSON.stringify({ q, at, approved: true, via: "obsidian" }) + "\n");
+    added++;
+  }
+  return added;
 }
 
 export const _ecymInternals = { toEcymNote, ecymBase };

@@ -46,6 +46,8 @@ export interface SharedAskResult {
   abstained?: boolean;
   /** Uzman başına DIŞSAL kalite puanı (EXPERTS sırasında) — gate'in öğrenme etiketi. */
   scores?: Record<string, number>;
+  /** L14 şeffaflık: her uzmanın (boş-olmayan) cevabı — kazanan seçilmeden önce. */
+  expertAnswers?: Record<string, string>;
   /** Bu tur keşif amaçlı argmax DIŞI bir uzman mı seçildi. */
   explored?: boolean;
   /** Formül 3a: kaynak başına p_ret(z|x) — bağlam payının dayanağı. */
@@ -204,6 +206,9 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   // Gate'in öğrenmesi gereken sinyal budur, kendi argmax'ı değil.
   const scores = scoreAll(answers, ctx.sources);
   const scoreMap = Object.fromEntries(EXPERTS.map((x, j) => [x, scores[j] ?? 0]));
+  // L14: every expert's non-empty answer, for transparency (the Obsidian answer note shows
+  // all four, not just the winner). Trimmed so a note stays readable.
+  const expertAnswers = Object.fromEntries(answers.filter((a) => a.answer).map((a) => [a.expert, a.answer.slice(0, 1200)]));
 
   // (F3b keşif) ε olasılıkla argmax DIŞI bir uzman seçilir. Gerekçe: gate hep
   // argmax'ı seçerse kaybeden uzmanların cevabı hiç değerlendirilmez ve eğitim
@@ -250,6 +255,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     answer: picked.answer,
     expert: picked.expert,
     weights: picked.weights,
+    expertAnswers,
     sources: ctx.sources,
     confidence,
     mode: ctx.mode,

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createBrainStore } from "../server/brain";
 import { syncObsidian, processAskQueue } from "../server/brain-obsidian";
-import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue } from "../server/brain-obsidian-ecym";
+import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue, readApprovedLearning } from "../server/brain-obsidian-ecym";
 import { writeOdysseusNotes } from "../server/brain-obsidian-khoj";
 import { mkdirSync } from "node:fs";
 import { toMarkdown, parseMarkdown, type NoteMemory } from "../server/brain-obsidian-note";
@@ -97,6 +97,53 @@ describe("L11 — odysseus Khoj federation (graceful)", () => {
     expect(r.online).toBe(true);
     expect(r.notes).toBe(1);
     expect(existsSync(join(vault, "odysseus", "khoj-k1.md"))).toBe(true);
+  });
+});
+
+describe("L14 — per-expert answers in the answer note", () => {
+  test("answer note renders each expert's answer", async () => {
+    mkdirSync(join(vault, "orchestra"), { recursive: true });
+    writeFileSync(join(vault, "orchestra", "ask.md"), "- [ ] test sorusu\n");
+    await processAskQueue(vault, async () => ({
+      answer: "kazanan cevap", expert: "claudecode", weights: { claudecode: 0.6 },
+      expertAnswers: { ollamas: "o cevabı", claudecode: "cc cevabı" },
+    }));
+    const ans = require("node:fs").readdirSync(join(vault, "orchestra", "answers"));
+    const note = readFileSync(join(vault, "orchestra", "answers", ans[0]), "utf8");
+    expect(note).toContain("## Uzman cevapları");
+    expect(note).toContain("ollamas");
+    expect(note).toContain("o cevabı");
+    expect(note).toContain("cc cevabı");
+  });
+});
+
+describe("L16 — eCym approval handoff (vault → approved-learning.jsonl)", () => {
+  test("checked '- [x]' items append to the approval queue, deduped", () => {
+    mkdirSync(join(vault, "ecym"), { recursive: true });
+    writeFileSync(join(vault, "ecym", "_learning-queue.md"), "# Q\n\n- [x] calculator yap `t4`\n- [ ] henüz onaysız\n- [x] disk temizle\n");
+    const out = join(dir, "approved.jsonl");
+    expect(readApprovedLearning(vault, out)).toBe(2);
+    expect(readApprovedLearning(vault, out)).toBe(0); // dedup on re-run
+    const lines = readFileSync(out, "utf8").trim().split("\n").map((l) => JSON.parse(l).q);
+    expect(lines).toContain("calculator yap");
+    expect(lines).not.toContain("henüz onaysız");
+  });
+});
+
+describe("L18 — entity-map canvas", () => {
+  test("push writes a valid JSON Canvas of top-degree entities", async () => {
+    process.env.ECY_DATASET = ecymFixture;
+    const b = createBrainStore({ dbPath, embed: fakeEmbed });
+    await b.remember({ id: "c:1", tier: "core", content: "x" });
+    await b.assertFact({ subject: "Emre", predicate: "operates", object: "ollamas" });
+    await b.assertFact({ subject: "ollamas", predicate: "serves", object: "brain" });
+    b.close();
+    await syncObsidian("push", { vault, dbPath, neighbors: () => new Map() });
+    delete process.env.ECY_DATASET;
+    const canvas = JSON.parse(readFileSync(join(vault, "entity-map.canvas"), "utf8"));
+    expect(Array.isArray(canvas.nodes)).toBe(true);
+    expect(canvas.nodes.length).toBeGreaterThan(0);
+    expect(canvas.nodes.every((n: any) => n.type === "file")).toBe(true);
   });
 });
 
