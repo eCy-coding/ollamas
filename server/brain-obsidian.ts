@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
 import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses, ecymDatasetPath } from "./brain-obsidian-ecym";
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
-import { toMarkdown, parseMarkdown, noteFilename, contentHash, TIERS, type NoteMemory } from "./brain-obsidian-note";
+import { toMarkdown, parseMarkdown, noteFilename, contentHash, adoptHumanNote, ROOT_RESERVED, TIERS, type NoteMemory } from "./brain-obsidian-note";
 
 export function defaultVaultPath(): string {
   return process.env.OBSIDIAN_VAULT || `${process.env.HOME}/ollamas-vault`;
@@ -46,7 +46,7 @@ export type Direction = "both" | "push" | "pull";
 
 export interface SyncResult {
   direction: Direction;
-  push: { written: number; skipped: number; entities: number; pruned: number };
+  push: { written: number; skipped: number; entities: number; pruned: number; adopted?: number };
   pull: { ingested: number; skipped: number; conflicts: number };
   vault: string;
   memories: number;
@@ -64,6 +64,7 @@ function saveManifest(vault: string, m: Manifest): void {
 
 function ensureDirs(vault: string): void {
   for (const t of TIERS) mkdirSync(join(vault, t), { recursive: true });
+  mkdirSync(join(vault, "inbox"), { recursive: true }); // L27: the human capture drop zone
   mkdirSync(join(vault, "entities"), { recursive: true });
   mkdirSync(join(vault, "_index"), { recursive: true });
   mkdirSync(join(vault, "_index", "conflicts"), { recursive: true });
@@ -571,7 +572,11 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
 }
 
 // ── pull: vault → brain (human edits/new notes upsert into the store) ──
-async function pullVaultToBrain(vault: string, manifest: Manifest, brainIds: Set<string>, remember: NonNullable<SyncOpts["remember"]>): Promise<SyncResult["pull"]> {
+async function pullVaultToBrain(
+  vault: string, manifest: Manifest, brainIds: Set<string>,
+  remember: NonNullable<SyncOpts["remember"]>,
+  adopted?: AdoptedOriginal[],
+): Promise<SyncResult["pull"]> {
   let ingested = 0, skipped = 0, conflicts = 0;
   for (const tier of TIERS) {
     const dir = join(vault, tier);
@@ -595,7 +600,52 @@ async function pullVaultToBrain(vault: string, manifest: Manifest, brainIds: Set
       ingested++;
     }
   }
+
+  // L27 — human capture. inbox/ is the advertised drop zone; the vault ROOT is scanned too
+  // because that is simply where Obsidian's "new note" button puts things, and four such
+  // notes had been sitting unreachable by the brain.
+  for (const rel of ["inbox", ""]) {
+    const dir = rel ? join(vault, rel) : vault;
+    if (!existsSync(dir)) continue;
+    for (const fname of readdirSync(dir)) {
+      if (!fname.endsWith(".md") || ROOT_RESERVED.has(fname)) continue;
+      const src = join(dir, fname);
+      if (!statSync(src).isFile()) continue;
+      const text = readFileSync(src, "utf8");
+      const mem = adoptHumanNote(fname, text, { createdAt: statSync(src).birthtimeMs || statSync(src).mtimeMs });
+      // null = already a brain note (handled above), or an empty note nobody meant to write.
+      if (!mem) { skipped++; continue; }
+      await remember({
+        id: mem.id, tier: mem.tier, content: mem.content,
+        source: mem.source ?? "human/obsidian", ns: mem.ns, createdAt: mem.createdAt, hits: 0,
+      });
+      const h = contentHash(mem.content);
+      manifest[mem.id] = { brainHash: h, vaultHash: h };
+      adopted?.push({ path: src, id: mem.id, tier: mem.tier });
+      ingested++;
+    }
+  }
   return { ingested, skipped, conflicts };
+}
+
+interface AdoptedOriginal { path: string; id: string; tier: string }
+
+/**
+ * Remove a hand-written original ONLY once the brain has materialised it as a proper tier
+ * note. Ordering is the safety property: pull adopts → push writes <tier>/<id>.md → and only
+ * then is the loose copy dropped. If the push failed, the original is left exactly where the
+ * human put it, so a capture can never evaporate between the two steps.
+ */
+function reapAdoptedOriginals(vault: string, adopted: AdoptedOriginal[]): number {
+  let reaped = 0;
+  for (const a of adopted) {
+    const materialised = join(vault, a.tier, noteFilename(a.id));
+    if (!existsSync(materialised) || !existsSync(a.path)) continue;
+    if (materialised === a.path) continue;
+    rmSync(a.path);
+    reaped++;
+  }
+  return reaped;
 }
 
 export interface AskResult { answer?: string; expert?: string; weights?: Record<string, number>; confidence?: number; expertAnswers?: Record<string, string> }
@@ -650,12 +700,13 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
 
   let pull: SyncResult["pull"] = { ingested: 0, skipped: 0, conflicts: 0 };
   let push: SyncResult["push"] = { written: 0, skipped: 0, entities: 0, pruned: 0 };
+  const adopted: AdoptedOriginal[] = [];
 
   // pull FIRST (ingest human edits) so the subsequent mirror can't clobber them.
   if (direction === "pull" || direction === "both") {
     const dump0 = exportBrain(dbPath);
     const brainIds = new Set(dump0.memories.map((m) => m.id));
-    pull = await pullVaultToBrain(vault, manifest, brainIds, remember);
+    pull = await pullVaultToBrain(vault, manifest, brainIds, remember, adopted);
     try { readApprovedLearning(vault); } catch { /* L16 handoff best-effort */ } // vault → eCym learn queue
     // L23: close the loop — feed fresh vault approvals into misses.log so ecy-learn drafts them.
     // Only queues misses (never edits the dataset); the actual drafting runs out-of-band.
@@ -670,6 +721,9 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
     push = pushBrainToVault(vault, dump, manifest, neighbors, entityIdx, direction === "both");
     await writeOdysseusNotes(vault); // L11: Khoj federation (graceful — offline → placeholder)
     writeObsidianConfig(vault); // create-once: graph color-groups, plugins, appearance
+    // Safe only here: the tier note now exists on disk, so dropping the loose copy the human
+    // typed cannot lose the capture. Never runs on a pull-only sync (nothing was mirrored).
+    if (adopted.length) push.adopted = reapAdoptedOriginals(vault, adopted);
   }
 
   saveManifest(vault, manifest);
