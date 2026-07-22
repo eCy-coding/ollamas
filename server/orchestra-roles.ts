@@ -125,6 +125,23 @@ export function ecymPropose(question: string, catalog = readEcymCommands()): Ecy
 export const freeFormProposal = (cmd: string): EcymProposal =>
   ({ cmd, id: null, safe: false, desc: "katalog dışı (incelenmemiş)", score: 0 });
 
+/**
+ * Is this EXACT command a vetted, safe catalog entry?
+ *
+ * Used at the point of execution to re-derive the verdict instead of trusting the plan that
+ * produced it. Matching is on the resolved command string, so a caller cannot smuggle
+ * something through by claiming a catalog id it does not correspond to.
+ */
+export function isCatalogSafeCommand(cmd: string, catalog = readEcymCommands()): boolean {
+  const target = String(cmd ?? "").trim();
+  if (!target || /\{\{[^}]+\}\}/.test(target)) return false;
+  return catalog.some((c) => {
+    if (!(c.safe === true || String(c.safe).toLowerCase() === "true")) return false;
+    const resolved = c.arg && c.arg !== "yok" ? `${c.cmd} ${c.arg}` : c.cmd;
+    return String(resolved).trim() === target;
+  });
+}
+
 export interface VaultFinding {
   path: string;
   score: number;

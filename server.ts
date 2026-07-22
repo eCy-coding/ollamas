@@ -43,7 +43,7 @@ import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignatu
 import { notify } from "./server/notify";
 import { sanitizeModelOverride } from "./server/model-overrides";
 import { FilesystemManager } from "./server/files";
-import { TerminalManager } from "./server/terminal";
+import { TerminalManager, isAllowedBinary } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
@@ -4512,6 +4512,54 @@ app.post("/api/brain/obsidian/sync", async (req, res) => {
     res.json(await syncObsidian(dir));
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "obsidian sync failed" });
+  }
+});
+
+/**
+ * L37 — run the orchestra sprint board. Loopback-only, like the obsidian sync beside it.
+ *
+ * Task execution lives HERE rather than in the sync script because the command role needs the
+ * server's TerminalManager context. The safety gate is re-applied at the moment of execution
+ * and does NOT trust its caller: a command reaches the shell only if eCym's catalog vetted it
+ * AND the ported denylist is clean, whatever the planner decided upstream. Defense in depth —
+ * this endpoint is the last thing between a plan and a real machine.
+ */
+app.post("/api/orchestra/tasks", async (req, res) => {
+  try {
+    const loopback = req.ip === "127.0.0.1" || req.ip === "::1" || req.ip === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).json({ error: "orchestra task execution is a loopback-only operator action" });
+    const { processTaskBoard } = await import("./server/orchestra-tasks");
+    const { isRiskyCommand } = await import("./server/orchestra-tasks");
+    const { isCatalogSafeCommand } = await import("./server/orchestra-roles");
+    const brain = await import("./server/brain");
+    const { defaultVaultPath } = await import("./server/brain-obsidian");
+    const isLive = CURRENT_MODE !== "demo";
+
+    const out = await processTaskBoard(defaultVaultPath(), {
+      runCommand: async (cmd: string) => {
+        // Re-derive the verdict from the catalog rather than believing the plan.
+        if (isRiskyCommand(cmd)) throw new Error(`denylist reddetti: ${cmd}`);
+        if (!isCatalogSafeCommand(cmd)) throw new Error(`katalogda safe değil, çalıştırılmadı: ${cmd}`);
+        // eCym's catalog (220 commands) is far wider than the shell allowlist (~40 binaries).
+        // Say so up front: discovering the mismatch through a 126 exit code reads as "the
+        // command ran and produced this", which is the opposite of what happened.
+        if (!isAllowedBinary(cmd)) {
+          throw new Error(`terminal allowlist'inde yok: "${cmd.split(/\s+/)[0]}" — komut çalıştırılmadı (eCym kataloğu bu binary'yi tanıyor, kabuk paneli tanımıyor)`);
+        }
+        const r: any = await TerminalManager.execute(isLive, db.data.workspacePath, cmd);
+        // A non-zero exit is a FAILED step. Returning the text regardless marked the task ✅
+        // done while its command had actually been refused.
+        if (r && typeof r === "object" && Number(r.exitCode) !== 0) {
+          throw new Error(`exit ${r.exitCode}: ${String(r.stderr || r.stdout || "").slice(0, 300)}`);
+        }
+        return typeof r === "string" ? r : String(r?.stdout ?? JSON.stringify(r));
+      },
+      recall: async (q: string) => (await brain.brainRecall(q, { k: 5 }))
+        .map((h: any) => ({ id: String(h.id), excerpt: String(h.content ?? "") })),
+    });
+    res.json(out);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "orchestra task run failed" });
   }
 });
 

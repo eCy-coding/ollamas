@@ -60,6 +60,14 @@ async function main() {
       });
       if (found > 0) console.log(JSON.stringify({ event: "obsidian.search", answered: found }));
     } catch (e: any) { console.error(JSON.stringify({ event: "obsidian.search.error", msg: String(e?.message || e) })); }
+
+    // L37: the sprint board. Execution lives in the server (POST /api/orchestra/tasks) because
+    // the command role needs its TerminalManager context — this stays a thin client, same rule
+    // as the sync itself. The server re-applies the safety gate; it does not trust this caller.
+    try {
+      const t = await api("/api/orchestra/tasks", {}, 180_000);
+      if (t?.ran > 0) console.log(JSON.stringify({ event: "obsidian.tasks", ...t }));
+    } catch (e: any) { console.error(JSON.stringify({ event: "obsidian.tasks.error", msg: String(e?.message || e) })); }
   } catch (e: any) {
     // Non-fatal: the server may be mid-restart. launchd fires again next interval.
     console.error(JSON.stringify({ event: "obsidian.sync.error", at, msg: String(e?.message || e) }));

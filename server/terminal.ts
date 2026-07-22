@@ -6,7 +6,7 @@ import { resolveOutputCtx, formatDoctor } from "../cli/lib/output";
 import { buildSnapshot, renderDashboard } from "../cli/commands/top";
 
 // Allowed structural commands
-const ALLOWED_BINARIES = [
+export const ALLOWED_BINARIES = [
   "git", "pytest", "python", "python3", "pip", "pip3", "ls", "pwd", "echo",
   "cat", "head", "tail", "wc", "grep", "find", "which", "node", "npm",
   "npx", "tsc", "ruff", "black", "mkdir", "date", "whoami", "uname",
@@ -14,6 +14,16 @@ const ALLOWED_BINARIES = [
   "sed", "awk", "sort", "uniq", "cut", "tr", "diff", "env", "make",
   "realpath", "basename", "dirname", "test", "jq", "vitest", "printf", "sleep", "true", "false"
 ];
+
+/** Does the shell allowlist permit this command's binary?
+ *  Exported so a CALLER can find out BEFORE running — eCym's 220-command catalog is far wider
+ *  than this ~40-binary developer panel, and discovering the mismatch via a 126 exit code
+ *  produces a misleading "the command ran" record. */
+export function isAllowedBinary(command: string): boolean {
+  const first = String(command ?? "").trim().split(/\s+/)[0] ?? "";
+  return ALLOWED_BINARIES.includes(first);
+}
+
 
 // Structural dangerous tokens or shell bindings
 const BLOCKED_METACHARACTERS = [";", "&", "|", "`", "$", ">", "<"];
