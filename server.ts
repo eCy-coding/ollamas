@@ -4558,8 +4558,8 @@ app.post("/api/orchestra/tasks", async (req, res) => {
         // eCym's catalog (220 commands) is far wider than the shell allowlist (~40 binaries).
         // Say so up front: discovering the mismatch through a 126 exit code reads as "the
         // command ran and produced this", which is the opposite of what happened.
-        if (!isAllowedBinary(cmd)) {
-          throw new Error(`terminal allowlist'inde yok: "${cmd.split(/\s+/)[0]}" — komut çalıştırılmadı (eCym kataloğu bu binary'yi tanıyor, kabuk paneli tanımıyor)`);
+        if (!isShellRunnable(cmd)) {
+          throw new Error(`kabuk çalıştıramaz: "${cmd}" — allowlist ya da yasak metakarakter (eCym kataloğu tanıyor, kabuk paneli tanımıyor)`);
         }
         const r: any = await TerminalManager.execute(isLive, db.data.workspacePath, cmd);
         // A non-zero exit is a FAILED step. Returning the text regardless marked the task ✅

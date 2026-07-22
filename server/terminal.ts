@@ -42,10 +42,34 @@ export function isAllowedBinary(command: string): boolean {
  * both rules to find out.
  */
 export function isShellRunnable(command: string): boolean {
-  const c = String(command ?? "").trim();
+  const c = splitHeadSuffix(String(command ?? "").trim())?.base ?? String(command ?? "").trim();
   if (!c || !isAllowedBinary(c)) return false;
   return !BLOCKED_METACHARACTERS.some((ch) => c.includes(ch))
     && !BLOCKED_TOKENS.some((t) => c.split(/\s+/).includes(t));
+}
+
+/**
+ * Split a trailing `| head -n N` off a command. PURE. Returns null when the shape is anything
+ * else at all.
+ *
+ * WHY this one exception exists: five genuinely useful catalog entries (`ps_cpu`, `ps_mem`,
+ * `ps_tree`, `vm_stat`, `routes`) end in exactly this suffix, and refusing the pipe made them
+ * unrunnable — the orchestra's first real follow-up picked `ps_cpu` and earned a 126. Rather
+ * than open the shell, execute() takes the suffix off, runs the base through execFile as usual
+ * (still no shell, still every other check) and applies the line limit to stdout ITSELF.
+ *
+ * The pattern is anchored to the end and the count must be digits, so nothing can ride along
+ * behind it: `foo | head -n 5; rm -rf /` does not match and is refused as before. The base is
+ * re-checked for pipes too, so only a SINGLE trailing head is ever accepted.
+ */
+export function splitHeadSuffix(command: string): { base: string; lines: number } | null {
+  const m = /^(.*?)\s*\|\s*head\s+-n\s+(\d{1,5})\s*$/.exec(String(command ?? "").trim());
+  if (!m) return null;
+  const base = m[1].trim();
+  if (!base || base.includes("|")) return null; // a single trailing head, nothing more
+  const lines = Number(m[2]);
+  if (!Number.isInteger(lines) || lines <= 0) return null;
+  return { base, lines };
 }
 
 
@@ -85,6 +109,15 @@ export class TerminalManager {
     if (!isLive) {
       // Simulate typical commands beautiful and clean
       return this.simulateDemoCommand(trimmed);
+    }
+
+    // A trailing `| head -n N` is peeled off HERE and applied to stdout below, so the command
+    // that reaches every security check is the plain base — no shell is opened and `|` stays
+    // forbidden everywhere else. See splitHeadSuffix for why this single exception exists.
+    const head = splitHeadSuffix(trimmed);
+    if (head) {
+      const r = await this.execute(isLive, workspaceRoot, head.base);
+      return { ...r, stdout: r.stdout.split("\n").slice(0, head.lines).join("\n") };
     }
 
     // 1. Check server-level toggle

@@ -48,6 +48,10 @@ export function synthesisQuestion(title: string, followupIds: string[] = []): st
   const base = `GÖREV: ${title}\n\n`
     + `Yukarıdaki görevi yürüten üyelerin HAM çıktıları KAYNAK olarak verildi. `
     + `Görevin sorusunu SADECE bu kanıta dayanarak, tek paragrafta ve somut sayılarla cevapla. `
+    // Measured: after a follow-up round delivered `node 184.7%`, the answer still said the
+    // responsible process "could be assumed" — the data was in the evidence and went unused.
+    + `KAYNAKLAR birden çok turdan gelebilir; HEPSİNİ kullan ve sorunun her parçasını `
+    + `somut isim/sayı ile karşıla, "varsayılabilir/genellikle" gibi kaçamak kullanma. `
     + `Kanıtta cevap yoksa BİLGİ_YOK yaz.`;
   if (!followupIds.length) return base;
   // Only an ID from this list is accepted. Asking for a free-form command here would put an

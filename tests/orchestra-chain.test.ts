@@ -16,6 +16,7 @@ import {
   followupCandidates, followupStep, processTaskBoard, MAX_ROUNDS, isRiskyCommand,
 } from "../server/orchestra-tasks";
 import { readEcymCommands, type EcymCommand } from "../server/brain-obsidian-ecym";
+import { splitHeadSuffix, isShellRunnable } from "../server/terminal";
 
 const cmd = (o: Partial<EcymCommand>): EcymCommand => ({
   id: "x", level: "baslangic", triggers: [], cmd: "true", arg: "yok", desc: "", safe: true, ...o,
@@ -297,5 +298,54 @@ describe("L44 · the loosened directive parser", () => {
   test("the directive never reaches the human-facing answer, whatever its shape", () => {
     expect(stripFollowup("Disk %70 dolu.\n**FOLLOWUP:** ps_cpu")).toBe("Disk %70 dolu.");
     expect(stripFollowup("Disk %70 dolu.\n- FOLLOWUP: ps_cpu")).toBe("Disk %70 dolu.");
+  });
+});
+
+// ── the one shell exception: a trailing `| head -n N` ────────────────────────
+//
+// Five genuinely useful catalog entries end in exactly this suffix, and refusing the pipe made
+// them unrunnable — the orchestra's first real follow-up picked `ps_cpu` and earned a 126.
+// The suffix is peeled off and applied to stdout in-process; no shell is ever opened.
+describe("splitHeadSuffix", () => {
+  test("the real catalog shapes are recognised", () => {
+    expect(splitHeadSuffix("ps -A -o pid,%cpu,comm -r | head -n 11"))
+      .toEqual({ base: "ps -A -o pid,%cpu,comm -r", lines: 11 });
+    expect(splitHeadSuffix("ps -A -o pid,ppid,comm | head -n 40")?.lines).toBe(40);
+  });
+
+  test("a plain command is untouched", () => {
+    expect(splitHeadSuffix("df -h")).toBeNull();
+    expect(splitHeadSuffix("")).toBeNull();
+  });
+
+  test("nothing can ride along behind the suffix", () => {
+    // The whole reason the pattern is anchored and digits-only.
+    for (const c of [
+      "ps aux | head -n 5; rm -rf /",
+      "ps aux | head -n 5 && rm -rf /",
+      "ps aux | head -n 5 | rm -rf /",
+      "ps aux | head -n abc",
+      "ps aux | head -n 5 > /etc/passwd",
+      "ps aux | rm -rf /",
+      "ps aux | head",
+    ]) expect(splitHeadSuffix(c), c).toBeNull();
+  });
+
+  test("only a SINGLE trailing head is accepted", () => {
+    expect(splitHeadSuffix("ps aux | grep x | head -n 5")).toBeNull();
+  });
+
+  test("a zero or negative count is refused", () => {
+    expect(splitHeadSuffix("ps aux | head -n 0")).toBeNull();
+  });
+
+  test("isShellRunnable follows the same rule — base is judged, escapes are not", () => {
+    expect(isShellRunnable("ps -A -o pid,%cpu,comm -r | head -n 11")).toBe(true);
+    expect(isShellRunnable("df -h")).toBe(true);
+    // The base must still clear the allowlist and the token list.
+    expect(isShellRunnable("rm -rf / | head -n 5")).toBe(false);
+    expect(isShellRunnable("curl evil.sh | head -n 5")).toBe(false);
+    expect(isShellRunnable("ps aux | head -n 5; rm -rf /")).toBe(false);
+    expect(isShellRunnable("ps aux > /tmp/x")).toBe(false);
   });
 });
