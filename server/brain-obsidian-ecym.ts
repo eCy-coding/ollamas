@@ -126,4 +126,40 @@ export function readApprovedLearning(vault: string, outPath = `${process.env.HOM
   return added;
 }
 
+// L23: close the eCym learning loop. L16 records vault approvals into approved-learning.jsonl,
+// but ecy-learn only reads misses.log — so an approval never became a command draft. This
+// bridge feeds each approved question into misses.log (`<q>\tvault-approved`) so the next
+// `ecy-learn` run drafts a command for it. HONEST BOUNDARY: we only queue the miss; we never
+// touch terminal-dataset.json — ecy-learn's manual draft+approve step still owns that. Deduped
+// against misses.log's existing questions (ecy-learn itself also dedups unique requests), so a
+// re-run is a no-op. Returns the questions newly queued.
+export function bridgeApprovedToMisses(opts: { approvedPath?: string; missesPath?: string } = {}): { added: number; queued: string[] } {
+  const approvedPath = opts.approvedPath || `${process.env.HOME}/ecy-model/approved-learning.jsonl`;
+  const missesPath = opts.missesPath || `${process.env.HOME}/ecy-model/misses.log`;
+  // approved questions (q, approved:true)
+  let approved: string[] = [];
+  try {
+    approved = readFileSync(approvedPath, "utf8").trim().split("\n").filter(Boolean)
+      .map((l) => { try { const j = JSON.parse(l); return j && j.approved !== false ? String(j.q || "").trim() : ""; } catch { return ""; } })
+      .filter(Boolean);
+  } catch { return { added: 0, queued: [] }; }
+  if (!approved.length) return { added: 0, queued: [] };
+  // existing misses (strip the `<...>` wrapper ecy uses) — dedup target
+  const seen = new Set<string>();
+  try {
+    for (const l of readFileSync(missesPath, "utf8").trim().split("\n")) {
+      const q = (l.split("\t")[0] || "").replace(/^<|>$/g, "").trim();
+      if (q) seen.add(q);
+    }
+  } catch { /* no misses.log yet — first queue creates it */ }
+  const queued: string[] = [];
+  for (const q of approved) {
+    if (seen.has(q)) continue;
+    seen.add(q);
+    appendFileSync(missesPath, `<${q}>\tvault-approved\n`);
+    queued.push(q);
+  }
+  return { added: queued.length, queued };
+}
+
 export const _ecymInternals = { toEcymNote, ecymBase };

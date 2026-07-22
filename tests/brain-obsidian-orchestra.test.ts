@@ -5,10 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createBrainStore } from "../server/brain";
 import { syncObsidian, processAskQueue } from "../server/brain-obsidian";
-import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue, readApprovedLearning } from "../server/brain-obsidian-ecym";
+import { writeEcymNotes, readEcymCommands, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses } from "../server/brain-obsidian-ecym";
+import { computeSystemUsage } from "../server/brain-obsidian";
 import { writeOdysseusNotes } from "../server/brain-obsidian-khoj";
 import { mkdirSync } from "node:fs";
 import { toMarkdown, parseMarkdown, type NoteMemory } from "../server/brain-obsidian-note";
+
+// Isolate the live-sync test from a running local Khoj (fast ECONNREFUSED, not a 3s search).
+process.env.KHOJ_URL = "http://127.0.0.1:59999";
 
 const fakeEmbed = async (t: string) => { const v = [0, 0, 0]; v[t.length % 3] = 1; return v; };
 let dir: string, vault: string, dbPath: string, ecymFixture: string;
@@ -127,6 +131,44 @@ describe("L16 — eCym approval handoff (vault → approved-learning.jsonl)", ()
     const lines = readFileSync(out, "utf8").trim().split("\n").map((l) => JSON.parse(l).q);
     expect(lines).toContain("calculator yap");
     expect(lines).not.toContain("henüz onaysız");
+  });
+});
+
+describe("L23 — eCym closed loop (approvals → misses.log → ecy-learn)", () => {
+  test("approved questions queue into misses.log, deduped, and no-op when empty", () => {
+    const approvedPath = join(dir, "approved.jsonl");
+    const missesPath = join(dir, "misses.log");
+    writeFileSync(approvedPath, JSON.stringify({ q: "calculator yap", approved: true }) + "\n"
+      + JSON.stringify({ q: "disk temizle", approved: true }) + "\n"
+      + JSON.stringify({ q: "reddedilen", approved: false }) + "\n");
+    writeFileSync(missesPath, "<disk temizle>\ttier2\n"); // already known → must dedup
+    const r = bridgeApprovedToMisses({ approvedPath, missesPath });
+    expect(r.added).toBe(1);                     // only the genuinely-new approval
+    expect(r.queued).toEqual(["calculator yap"]);
+    const log = readFileSync(missesPath, "utf8");
+    expect(log).toContain("<calculator yap>\tvault-approved");
+    expect(log).not.toContain("reddedilen");     // approved:false skipped
+    // re-run is a no-op (idempotent)
+    expect(bridgeApprovedToMisses({ approvedPath, missesPath }).added).toBe(0);
+    // empty approvals → no-op, never throws
+    expect(bridgeApprovedToMisses({ approvedPath: join(dir, "nope.jsonl"), missesPath }).added).toBe(0);
+  });
+});
+
+describe("L24 — systemUsage proves all 4 systems use the vault", () => {
+  test("computeSystemUsage returns 4 systems with detail + online + reflects Khoj marker", () => {
+    mkdirSync(join(vault, "odysseus"), { recursive: true });
+    writeFileSync(join(vault, "odysseus", "_khoj.md"), "# odysseus\n> [!success] 3 entry federe edildi ✅ online\n");
+    const u = computeSystemUsage(vault);
+    expect(Object.keys(u).sort()).toEqual(["claudecode", "ecym", "odysseus", "ollamas"]);
+    for (const k of Object.keys(u)) expect(typeof (u as any)[k].detail).toBe("string");
+    expect(u.odysseus.online).toBe(true); // parsed the "✅ online" marker
+    expect(u.ollamas.detail).toContain("sync");
+  });
+  test("odysseus offline when the Khoj note has no online marker", () => {
+    mkdirSync(join(vault, "odysseus"), { recursive: true });
+    writeFileSync(join(vault, "odysseus", "_khoj.md"), "# odysseus\n> [!warning] erişilemez (offline)\n");
+    expect(computeSystemUsage(vault).odysseus.online).toBe(false);
   });
 });
 

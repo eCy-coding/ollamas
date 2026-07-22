@@ -9,6 +9,11 @@ import { createBrainStore } from "../server/brain";
 import { syncObsidian, obsidianStatus } from "../server/brain-obsidian";
 import { parseMarkdown } from "../server/brain-obsidian-note";
 
+// Isolate from a live Khoj: syncObsidian's push federates odysseus via a real fetchKhoj.
+// Point it at a closed port so it fails fast (ECONNREFUSED, instant) instead of blocking on a
+// running local Khoj daemon and tripping the 5s test timeout.
+process.env.KHOJ_URL = "http://127.0.0.1:59999";
+
 const fakeEmbed = async (t: string) => { const v = [0, 0, 0]; v[t.length % 3] = 1; return v; };
 
 async function seed(dbPath: string) {

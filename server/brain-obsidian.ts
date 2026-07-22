@@ -17,7 +17,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
-import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning } from "./brain-obsidian-ecym";
+import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses, ecymDatasetPath } from "./brain-obsidian-ecym";
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, TIERS, type NoteMemory } from "./brain-obsidian-note";
 
@@ -450,15 +450,27 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number): void
     + `# 🎯 Son ask-shared koşuları\n\n> [!info] Son ${runs.length} koşu · kazanan uzman + gate ağırlıkları\n\n`
     + `| Kazanan | Soru | Güven | Ağırlıklar |\n|---|---|---|---|\n${runRows || "| — | henüz koşu yok | | |"}\n\n[[Orchestra]]\n`);
 
-  // status.md — sync-time snapshot of the 4-system orchestra health.
+  // status.md — sync-time snapshot of the 4-system orchestra health + L24 vault-usage proof.
+  const usage = computeSystemUsage(vault);
+  const now = Date.now();
+  const ago = (ms: number | null): string => {
+    if (ms == null) return "—";
+    const d = now - ms;
+    if (d < 0) return "şimdi";
+    const m = Math.floor(d / 60000), h = Math.floor(m / 60), day = Math.floor(h / 24);
+    return day > 0 ? `${day}g önce` : h > 0 ? `${h}s önce` : m > 0 ? `${m}dk önce` : "az önce";
+  };
+  const usageRows = [
+    ["🔵 ollamas", "brain + gateway :3000", `${dump.memories.length} memory`, usage.ollamas],
+    ["🟢 eCym", "komut uzmanı :11434", `${ecymCount} komut`, usage.ecym],
+    ["🟣 odysseus", "research + Khoj :42110", usage.odysseus.online ? "Khoj online" : "Khoj offline", usage.odysseus],
+    ["🔴 claudecode", "kod uzmanı (github-models)", "ask-shared cevap", usage.claudecode],
+  ].map(([sys, rol, durum, u]: any) =>
+    `| ${sys} | ${rol} | ${durum} | ${u.online ? "🟢" : "🔴"} ${u.detail} | ${ago(u.lastActivity)} |`).join("\n");
   writeFileSync(join(dir, "status.md"),
     `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [orchestra status]\n---\n\n`
-    + `# 🚦 Orkestra durumu\n\n> [!abstract] Sync anındaki anlık görüntü\n\n`
-    + `| Sistem | Rol | Durum |\n|---|---|---|\n`
-    + `| 🔵 ollamas | brain + gateway :3000 | ${dump.memories.length} memory |\n`
-    + `| 🟢 eCym | komut uzmanı :11434 | ${ecymCount} komut |\n`
-    + `| 🟣 odysseus | research :7860 | harici Khoj |\n`
-    + `| 🔴 claudecode | kod uzmanı | github-models (keyless) |\n\n`
+    + `# 🚦 Orkestra durumu\n\n> [!abstract] Sync anındaki anlık görüntü — her sistemin vault'u nasıl kullandığı\n\n`
+    + `| Sistem | Rol | Durum | Vault kullanımı | Son aktivite |\n|---|---|---|---|---|\n${usageRows}\n\n`
     + `**Council:** seviye ${ledger?.level ?? "?"} · ${ledger?.tasks ?? 0} görev · [[council]]\n\n[[Orchestra]]\n`);
 
   // L12: Kanban-plugin compatible sprint board — orchestra work lanes. Static scaffold the
@@ -621,6 +633,9 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
     const brainIds = new Set(dump0.memories.map((m) => m.id));
     pull = await pullVaultToBrain(vault, manifest, brainIds, remember);
     try { readApprovedLearning(vault); } catch { /* L16 handoff best-effort */ } // vault → eCym learn queue
+    // L23: close the loop — feed fresh vault approvals into misses.log so ecy-learn drafts them.
+    // Only queues misses (never edits the dataset); the actual drafting runs out-of-band.
+    try { bridgeApprovedToMisses(); } catch { /* best-effort */ }
   }
   if (direction === "push" || direction === "both") {
     const dump = exportBrain(dbPath); // re-read: reflects anything pull just ingested
@@ -638,6 +653,12 @@ export async function syncObsidian(direction: Direction = "both", opts: SyncOpts
   return { direction, push, pull, vault, memories };
 }
 
+export interface SystemUsage {
+  lastActivity: number | null; // epoch ms of the most recent vault read/write by this system
+  online: boolean;             // is the system currently participating
+  detail: string;              // how this system uses the vault
+}
+
 export interface ObsidianStatus {
   vault: string;
   exists: boolean;
@@ -647,6 +668,30 @@ export interface ObsidianStatus {
   drift: number; // brainMemories - total notes (unmirrored)
   conflicts: number;
   lastSync: number | null;
+  systemUsage: Record<"ollamas" | "ecym" | "odysseus" | "claudecode", SystemUsage>; // L24
+}
+
+const mtimeOr = (p: string): number | null => { try { return statSync(p).mtimeMs; } catch { return null; } };
+
+// L24: prove each of the 4 systems actively uses the vault, derived from real artifacts (no
+// self-report). ollamas: the sync manifest it read+writes. eCym: the approval/learn queue files
+// it feeds. odysseus: its Khoj federation note (+ its `✅ online` marker). claudecode: the
+// ask-shared run ledger it answers into.
+export function computeSystemUsage(vault: string): ObsidianStatus["systemUsage"] {
+  const home = process.env.HOME;
+  const dataDir = process.env.MISSION_CONTROL_DATA_DIR || `${home}/.llm-mission-control`;
+  const khojNote = join(vault, "odysseus", "_khoj.md");
+  let khojOnline = false;
+  try { khojOnline = /✅\s*online/.test(readFileSync(khojNote, "utf8")); } catch { /* no note yet */ }
+  const approved = mtimeOr(`${home}/ecy-model/approved-learning.jsonl`);
+  const misses = mtimeOr(`${home}/ecy-model/misses.log`);
+  const ecymAct = [approved, misses].filter((n): n is number => n != null).sort((a, b) => b - a)[0] ?? null;
+  return {
+    ollamas: { lastActivity: mtimeOr(manifestPath(vault)), online: true, detail: "brain⇄vault çift-yönlü sync (read+write)" },
+    ecym: { lastActivity: ecymAct, online: existsSync(ecymDatasetPath()), detail: "katalog mirror + onay + ecy-learn kuyruğu" },
+    odysseus: { lastActivity: mtimeOr(khojNote), online: khojOnline, detail: khojOnline ? "Khoj federe (online)" : "Khoj federasyon (offline placeholder)" },
+    claudecode: { lastActivity: mtimeOr(`${dataDir}/ask-shared-runs.jsonl`), online: true, detail: "ask-shared cevap ledger'ı" },
+  };
 }
 
 export function obsidianStatus(opts: SyncOpts = {}): ObsidianStatus {
@@ -663,5 +708,5 @@ export function obsidianStatus(opts: SyncOpts = {}): ObsidianStatus {
   try { brainMemories = exportBrain(dbPath).memories.length; } catch { /* db may be absent in fresh installs */ }
   let lastSync: number | null = null;
   try { lastSync = statSync(manifestPath(vault)).mtimeMs; } catch { /* never synced */ }
-  return { vault, exists: existsSync(vault), notes, entities, brainMemories, drift: brainMemories - total, conflicts, lastSync };
+  return { vault, exists: existsSync(vault), notes, entities, brainMemories, drift: brainMemories - total, conflicts, lastSync, systemUsage: computeSystemUsage(vault) };
 }

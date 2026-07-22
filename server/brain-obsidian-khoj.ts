@@ -13,8 +13,10 @@ export function khojBase(): string {
 
 export interface KhojEntry { id?: string; entry?: string; note?: string; additional?: any }
 
-/** Best-effort Khoj fetch. Returns null when unreachable (down / no key). */
-export async function fetchKhoj(base = khojBase(), ms = 2500): Promise<KhojEntry[] | null> {
+/** Best-effort Khoj fetch. Returns null when unreachable (down / no key). Timeout is generous:
+ * Khoj's markdown search cold-loads the embedding model and a `t=all` scan can take ~3s, so a
+ * tight 2.5s budget spuriously read "offline" while the daemon was up. 8s tolerates that. */
+export async function fetchKhoj(base = khojBase(), ms = 8000): Promise<KhojEntry[] | null> {
   try {
     const r = await fetch(`${base}/api/search?q=*&n=40&t=all`, { signal: AbortSignal.timeout(ms) });
     if (!r.ok) return null;
