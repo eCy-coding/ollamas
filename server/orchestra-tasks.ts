@@ -192,7 +192,7 @@ export interface TaskDeps {
   now?: () => number;
   /** L39/L42: panel synthesis over the step evidence; `followupIds` offers the catalog ids it
    *  may name for a second round. Absent → the note keeps only raw blocks. */
-  synthesize?: (title: string, results: StepResult[], followupIds: string[]) => Promise<SynthesisResult | null>;
+  synthesize?: (title: string, results: StepResult[], followupIds: string[], alreadyRun: string[]) => Promise<SynthesisResult | null>;
   /** L40: write a finished task's conclusion back into the brain (the choke-point). */
   remember?: (m: { id: string; tier: string; content: string; source: string }) => Promise<unknown>;
   /** L41: let obsidian write the human-facing report ITSELF, via its own REST surface. */
@@ -270,6 +270,9 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
         : "")
     // L39: the CONCLUSION, above the raw blocks. The evidence stays below it untouched — a
     // summary that replaced the evidence would be the same failure in the other direction.
+    + (synthesis?.followup && rounds > 1
+        ? `> [!tip] 🔗 Takip: \`${synthesis.followup}\` — ${synthesis.followupVia === "decision" ? "denetçi kararı" : "sentez direktifi"}\n\n`
+        : "")
     + (synthesis
         ? (synthesis.abstained
             ? `## ⚠️ Sonuç\n\n> [!warning] Panel kanıttan cevap çıkaramadı (BİLGİ_YOK). Ham adımlar aşağıda.\n\n`
@@ -385,7 +388,12 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     // so an enthusiastic model cannot walk the machine down a chain of its own devising.
     let results = round1;
     let totalMs = round1Ms;
-    let synthesis = deps.synthesize ? await deps.synthesize(title, results, followupCandidates(undefined, deps.commandAllowed)) : null;
+    // Commands this task already ran: re-proposing the one that produced the evidence is the
+    // most common wrong follow-up, so it is withheld rather than argued against in a prompt.
+    const ranIds = steps.map((s) => s.proposal?.id).filter((x): x is string => !!x);
+    let synthesis = deps.synthesize
+      ? await deps.synthesize(title, results, followupCandidates(undefined, deps.commandAllowed), ranIds)
+      : null;
     let rounds = 1;
 
     if (synthesis?.followup && rounds < MAX_ROUNDS) {
@@ -398,7 +406,13 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
         results = [...results, ...r2];
         // Re-synthesise over BOTH rounds, and offer no further follow-up: the ceiling is
         // enforced by not asking again, not by hoping the model stops.
-        synthesis = deps.synthesize ? await deps.synthesize(title, results, []) : synthesis;
+        //
+        // The final synthesis is therefore asked with no candidates and comes back with no
+        // followup — so the id that CAUSED the second round is carried over explicitly.
+        // Without this the evidence note could never name what it just ran.
+        const cause = { followup: synthesis.followup, followupVia: synthesis.followupVia };
+        const final = deps.synthesize ? await deps.synthesize(title, results, [], ranIds) : null;
+        synthesis = final ? { ...final, ...cause } : synthesis;
       }
     }
 

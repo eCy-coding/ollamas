@@ -74,20 +74,108 @@ export function synthesisQuestion(title: string, followupIds: string[] = []): st
  * treating it as an error would only tempt a caller into "handling" it.
  */
 export function parseFollowup(answer: string, allowed: string[]): string | null {
-  const m = /^\s*FOLLOWUP:\s*([A-Za-z0-9_.\-]+)\s*$/m.exec(String(answer ?? ""));
+  // Deliberately forgiving about SHAPE, strict about VALUE. The original demanded a line
+  // containing exactly `FOLLOWUP: id`, which a model breaks by writing `**FOLLOWUP:** ps_cpu`,
+  // or by ending the sentence with a period. Losing a valid signal to markdown emphasis is a
+  // parser bug, not a model one — while an id outside `allowed` is still refused outright.
+  const m = /FOLLOWUP\s*:?\s*\**\s*:?\s*([A-Za-z0-9_.-]+)/i.exec(String(answer ?? ""));
   if (!m) return null;
-  const id = m[1].trim();
+  const id = m[1].trim().replace(/[.,;:]+$/, "");
   return allowed.includes(id) ? id : null;
 }
 
 /** The FOLLOWUP directive is machinery, not part of the answer a human should read. */
 export const stripFollowup = (answer: string): string =>
-  String(answer ?? "").replace(/^\s*FOLLOWUP:.*$/gm, "").trim();
+  String(answer ?? "")
+    .replace(/^\s*[-*]?\s*\**\s*FOLLOWUP\s*:?\**.*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+/**
+ * L44 — the dedicated follow-up decision.
+ *
+ * The in-band directive never fired. The panel's answers were normal and complete; every one
+ * of them simply lacked the line. The cause is structural rather than a model quirk: the
+ * directive is asked for in the USER message while askShared's SYSTEM message imposes a terse
+ * contract ("SADECE… kısa ve net", "süsleme yapma"), and a model follows the system message.
+ *
+ * So the decision is asked separately, with its OWN system prompt and a one-word answer. That
+ * removes all three suspects at once — no competing contract, no 1200-char truncation of a
+ * trailing line, and an output too small to mis-parse. askShared is left untouched: its terse
+ * contract exists for good reasons on the question-answering path.
+ *
+ * The decision is split in TWO. Asking one call to both judge completeness AND pick from 19
+ * ids was measured and it is simply too much at once: prompt tuning moved the errors around
+ * without removing them (a complete disk answer drew `df`, then `ps_tree`; a genuinely
+ * incomplete one once produced the literal string "A"). Separating the judgement from the
+ * selection made it exact — 12/12 correct across four cases, three runs each.
+ *
+ * The common case also got cheaper: a complete answer costs ONE small call, and the second is
+ * only spent when there is actually something to select.
+ */
+export const COMPLETENESS_PROMPT =
+  "Sen bir cevap denetçisisin. Tek işin: CEVAP, SORUNUN sorduğu HER ŞEYİ somut veriyle (sayı, isim, yol) söylüyor mu?\n"
+  + "EKSIK say: sorulan bir parça hiç yok, ya da \"genellikle / tipik olarak / muhtemelen / çeşitli\" gibi bir genelleme somut verinin yerine geçmiş.\n"
+  + "TAM say: sorulan her şey somut veriyle cevaplanmış.\n"
+  + "SADECE tek kelime yaz: TAM veya EKSIK.";
+
+export const PICK_PROMPT =
+  "Sen bir komut seçicisin. Verilen EKSİĞİ kapatacak TEK komut id'sini seçersin.\n"
+  + "SADECE listeden tek bir id yaz. Açıklama, cümle YAZMA.";
+
+/** TAM/EKSIK verdict → is something still open? PURE. Anything unclear reads as complete. */
+export function parseCompleteness(text: string): boolean {
+  const t = String(text ?? "").trim().toUpperCase();
+  // Turkish "EKSİK" folds to EKSIK; accept both, and require the word rather than a substring.
+  return /\bEKS[İI]K\b/.test(t.replace(/İ/g, "I"));
+}
+
+/** One-word pick → a validated catalog id, or null. PURE. */
+export function parseDecision(text: string, allowed: string[]): string | null {
+  const first = String(text ?? "").trim().split(/\s+/)[0] ?? "";
+  const id = first.replace(/^[`*"'\-]+|[`*"'.,;:]+$/g, "");
+  if (!id || /^none$/i.test(id)) return null;
+  return allowed.includes(id) ? id : null;
+}
+
+/**
+ * Judge, then select. Returns null on anything unclear — a follow-up has to be earned, and
+ * "the judge was ambiguous" is not a reason to run a command.
+ *
+ * `alreadyRun` ids are withheld from the picker: re-proposing the command that produced the
+ * evidence is the most common wrong answer, and excluding it is more reliable than asking a
+ * model not to.
+ */
+export async function decideFollowup(
+  title: string, answer: string, allowed: string[],
+  generate: (messages: { role: string; content: string }[]) => Promise<string>,
+  alreadyRun: string[] = [],
+): Promise<string | null> {
+  const pool = allowed.filter((id) => !alreadyRun.includes(id));
+  if (!pool.length || !answer.trim()) return null;
+  try {
+    const verdict = await generate([
+      { role: "system", content: COMPLETENESS_PROMPT },
+      { role: "user", content: `SORU: ${title}\n\nCEVAP:\n${answer}\n\nTek kelime:` },
+    ]);
+    if (!parseCompleteness(verdict)) return null; // complete → one round, no second call
+
+    const pick = await generate([
+      { role: "system", content: PICK_PROMPT },
+      { role: "user", content: `SORU: ${title}\n\nEKSİK KALAN CEVAP:\n${answer}\n\nGEÇERLİ ID'LER:\n${pool.join(", ")}\n\nid:` },
+    ]);
+    return parseDecision(pick, pool);
+  } catch {
+    return null; // the judge being unavailable means one round, not a guessed command
+  }
+}
 
 export interface SynthesisResult {
   answer: string;
-  /** L42: a catalog id the panel asked to run next, already validated against the catalog. */
+  /** L42: a catalog id to run next, already validated against the catalog. */
   followup?: string | null;
+  /** L44: which path produced it — the in-band directive, or the dedicated decision call. */
+  followupVia?: "directive" | "decision";
   expert: string;
   scores?: Record<string, number>;
   veto?: SharedAskResult["veto"];
@@ -96,7 +184,10 @@ export interface SynthesisResult {
   abstained: boolean;
 }
 
-export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespaces">;
+export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespaces"> & {
+  /** L44: the dedicated follow-up judge. Absent → in-band directive only (old behaviour). */
+  decide?: (messages: { role: string; content: string }[]) => Promise<string>;
+};
 
 /**
  * Run the panel over a task's evidence. Returns null when there is nothing to synthesise —
@@ -107,7 +198,7 @@ export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespa
  */
 export async function synthesizeTask(
   title: string, results: StepResult[], deps: SynthesisDeps,
-  followupIds: string[] = [],
+  followupIds: string[] = [], alreadyRun: string[] = [],
 ): Promise<SynthesisResult | null> {
   const sources = stepsAsSources(results);
   if (!sources.length) return null;
@@ -133,18 +224,30 @@ export async function synthesizeTask(
     //
     // Widening this adds no risk: the id is still validated against the catalog, and the
     // resulting step still goes through the same safety table as any other command.
-    const followup = followupIds.length
+    //
+    // NOTE on truncation: expertAnswers is sliced to 1200 chars by askShared, so a directive on
+    // the last line of a LOSING expert's long answer can be cut. The winner's `raw` is full, and
+    // the decision call below does not depend on this path at all — so askShared is left
+    // untouched rather than widened for a secondary route.
+    let followup = followupIds.length
       ? parseFollowup(raw, followupIds)
         ?? Object.values(r.expertAnswers ?? {})
             .map((a) => parseFollowup(String(a), followupIds))
             .find((x): x is string => !!x)
         ?? null
       : null;
+    let followupVia: SynthesisResult["followupVia"] = followup ? "directive" : undefined;
     const answer = stripFollowup(raw);
+
+    // L44: nobody wrote the directive — ask directly, in a call built for exactly this question.
+    if (!followup && followupIds.length && deps.decide && answer && !/BİLGİ_YOK|BILGI_YOK/.test(answer)) {
+      followup = await decideFollowup(title, answer, followupIds, deps.decide, alreadyRun);
+      if (followup) followupVia = "decision";
+    }
     const abstained = !!r.abstained || !answer || /BİLGİ_YOK|BILGI_YOK/.test(answer);
     return {
       answer, expert: r.expert ?? "", scores: r.scores, veto: r.veto,
-      degradedReasons: r.degradedReasons, abstained, followup,
+      degradedReasons: r.degradedReasons, abstained, followup, followupVia,
     };
   } catch {
     return null;

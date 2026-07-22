@@ -32,6 +32,22 @@ export function isAllowedBinary(command: string): boolean {
   return ALLOWED_BINARIES.includes(first);
 }
 
+/**
+ * Will this command survive execute()'s structural checks at all?
+ *
+ * The allowlist is only half of it: execute() also refuses every shell operator, so a catalog
+ * entry like `ps -A -o pid,%cpu,comm -r | head -n 11` passes the binary check and is then
+ * rejected for the pipe. Measured — the orchestra's first real follow-up chose exactly that
+ * command and earned a 126. A caller that can ask BEFORE running should not have to reproduce
+ * both rules to find out.
+ */
+export function isShellRunnable(command: string): boolean {
+  const c = String(command ?? "").trim();
+  if (!c || !isAllowedBinary(c)) return false;
+  return !BLOCKED_METACHARACTERS.some((ch) => c.includes(ch))
+    && !BLOCKED_TOKENS.some((t) => c.split(/\s+/).includes(t));
+}
+
 
 // Structural dangerous tokens or shell bindings
 const BLOCKED_METACHARACTERS = [";", "&", "|", "`", "$", ">", "<"];

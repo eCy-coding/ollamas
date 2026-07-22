@@ -8,7 +8,10 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseFollowup, stripFollowup, synthesisQuestion } from "../server/orchestra-synthesis";
+import {
+  parseFollowup, stripFollowup, synthesisQuestion, parseDecision, decideFollowup,
+  parseCompleteness, COMPLETENESS_PROMPT, PICK_PROMPT,
+} from "../server/orchestra-synthesis";
 import {
   followupCandidates, followupStep, processTaskBoard, MAX_ROUNDS, isRiskyCommand,
 } from "../server/orchestra-tasks";
@@ -180,5 +183,119 @@ describe("the two-round loop", () => {
     });
     expect(call).toBe(1); // no second synthesis, because no second round happened
     expect(ran.every((c) => !c.includes("kesinlikle-yok"))).toBe(true);
+  });
+});
+
+// ── L44: the chain must actually trigger ─────────────────────────────────────
+//
+// The in-band directive never fired live. The panel's answers were normal and complete; every
+// one simply lacked the line. Cause: the directive is asked for in the USER message while
+// askShared's SYSTEM message imposes a terse contract, and a model follows the system message.
+// The decision is therefore asked separately, in a call built for exactly that question.
+describe("L44 · the dedicated decision call", () => {
+  const allowed = ["ps_cpu", "du", "df"];
+
+  test("a one-word answer is taken at face value", () => {
+    expect(parseDecision("ps_cpu", allowed)).toBe("ps_cpu");
+    expect(parseDecision("  ps_cpu  \n", allowed)).toBe("ps_cpu");
+  });
+
+  test("NONE means one round, in any casing", () => {
+    for (const s of ["NONE", "none", "None.", " none "]) expect(parseDecision(s, allowed)).toBeNull();
+  });
+
+  test("an id outside the catalog is refused — this is the whole point", () => {
+    expect(parseDecision("rm_everything", allowed)).toBeNull();
+    expect(parseDecision("rm -rf /", allowed)).toBeNull();
+  });
+
+  test("decoration around the word does not lose a valid id", () => {
+    expect(parseDecision("`ps_cpu`", allowed)).toBe("ps_cpu");
+    expect(parseDecision("**ps_cpu**", allowed)).toBe("ps_cpu");
+    expect(parseDecision('"ps_cpu"', allowed)).toBe("ps_cpu");
+  });
+
+  test("a chatty judge is read by its first word, and still validated", () => {
+    expect(parseDecision("ps_cpu — çünkü hangi işlem sorumlu belirsiz", allowed)).toBe("ps_cpu");
+    expect(parseDecision("Bence NONE olmalı", allowed)).toBeNull(); // first word is not an id
+  });
+
+  test("empty or absent output means one round", () => {
+    expect(parseDecision("", allowed)).toBeNull();
+    expect(parseDecision("   ", allowed)).toBeNull();
+    expect(parseDecision("ps_cpu", [])).toBeNull(); // nothing is allowed
+  });
+
+  test("TAM/EKSIK is read as a word, and anything unclear counts as complete", () => {
+    expect(parseCompleteness("EKSIK")).toBe(true);
+    expect(parseCompleteness("EKSİK")).toBe(true);
+    expect(parseCompleteness("eksik")).toBe(true);
+    expect(parseCompleteness("TAM")).toBe(false);
+    // Silence, noise, or a hedging judge must not spend a command.
+    for (const s of ["", "   ", "bilmiyorum", "A"]) expect(parseCompleteness(s), s).toBe(false);
+  });
+
+  test("a complete answer costs ONE call — the picker is never reached", async () => {
+    const calls: string[] = [];
+    const r = await decideFollowup("disk doluluk nedir", "Disk 926 GB, 17 GB dolu, %7.", allowed,
+      async (m) => { calls.push(String(m[0].content).slice(0, 20)); return "TAM"; });
+    expect(r).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  test("an incomplete answer judges, then selects", async () => {
+    let n = 0;
+    const r = await decideFollowup("sistem yükü ve hangi işlem", "yük 10.8; işlemler genellikle CPU yoğun", allowed,
+      async () => (++n === 1 ? "EKSIK" : "ps_cpu"));
+    expect(r).toBe("ps_cpu");
+    expect(n).toBe(2);
+  });
+
+  test("the command that produced the evidence is withheld from the picker", async () => {
+    // Re-proposing it was the most common wrong follow-up; excluding it is more reliable than
+    // asking a model not to.
+    let offered = "";
+    const r = await decideFollowup("disk", "eksik cevap", ["df", "du"],
+      async (m) => { const c = String(m[1].content); if (c.includes("GEÇERLİ")) offered = c; return c.includes("GEÇERLİ") ? "df" : "EKSIK"; },
+      ["df"]);
+    expect(offered).not.toContain("df,");
+    expect(r).toBeNull(); // df was not on offer, so naming it is refused
+  });
+
+  test("an unavailable judge means one round, never a guessed command", async () => {
+    expect(await decideFollowup("t", "cevap", allowed,
+      async () => { throw new Error("provider down"); })).toBeNull();
+    expect(await decideFollowup("t", "", allowed, async () => "EKSIK")).toBeNull();
+    expect(await decideFollowup("t", "cevap", [], async () => "EKSIK")).toBeNull();
+  });
+
+  test("the prompts are their own — neither inherits the panel's terse contract", () => {
+    expect(COMPLETENESS_PROMPT).toContain("TAM");
+    expect(COMPLETENESS_PROMPT).toContain("EKSIK");
+    expect(COMPLETENESS_PROMPT).not.toContain("BİLGİ_YOK"); // the contract that suppressed the line
+    expect(PICK_PROMPT).toContain("id");
+  });
+});
+
+describe("L44 · the loosened directive parser", () => {
+  const allowed = ["ps_cpu"];
+
+  test("markdown emphasis and trailing punctuation no longer lose the signal", () => {
+    for (const s of [
+      "FOLLOWUP: ps_cpu",
+      "**FOLLOWUP:** ps_cpu",
+      "FOLLOWUP: ps_cpu.",
+      "- FOLLOWUP: ps_cpu",
+      "Cevap eksik.\n**FOLLOWUP**: ps_cpu",
+    ]) expect(parseFollowup(s, allowed), s).toBe("ps_cpu");
+  });
+
+  test("forgiving about shape, strict about value", () => {
+    expect(parseFollowup("**FOLLOWUP:** rm_everything", allowed)).toBeNull();
+  });
+
+  test("the directive never reaches the human-facing answer, whatever its shape", () => {
+    expect(stripFollowup("Disk %70 dolu.\n**FOLLOWUP:** ps_cpu")).toBe("Disk %70 dolu.");
+    expect(stripFollowup("Disk %70 dolu.\n- FOLLOWUP: ps_cpu")).toBe("Disk %70 dolu.");
   });
 });

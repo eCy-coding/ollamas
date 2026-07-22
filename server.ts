@@ -43,7 +43,7 @@ import { getAppCreds, getInstallationToken, createCheckRun, verifyWebhookSignatu
 import { notify } from "./server/notify";
 import { sanitizeModelOverride } from "./server/model-overrides";
 import { FilesystemManager } from "./server/files";
-import { TerminalManager, isAllowedBinary } from "./server/terminal";
+import { TerminalManager, isAllowedBinary, isShellRunnable } from "./server/terminal";
 import { BackupService } from "./server/backup";
 import { OrchestratorCoordinator } from "./server/orchestrator";
 import { ToolRegistry, type ToolDeps, type ToolCtx, type ToolTier } from "./server/tool-registry";
@@ -4539,7 +4539,7 @@ app.post("/api/orchestra/tasks", async (req, res) => {
     const out = await processTaskBoard(defaultVaultPath(), {
       // L42: only offer follow-ups the shell will actually run. Naming an id the allowlist
       // refuses would spend a round to earn a refusal we can predict here.
-      commandAllowed: (cmd: string) => isAllowedBinary(cmd),
+      commandAllowed: (cmd: string) => isShellRunnable(cmd),
 
       // L43: one row per task. "Is the orchestra actually useful?" should be answerable from
       // evidence — how often a task reaches an answer, which members contribute, how often the
@@ -4575,7 +4575,7 @@ app.post("/api/orchestra/tasks", async (req, res) => {
       // L39: the conclusion is drawn by the SAME panel that answers questions — quality veto,
       // honest degradation and external scoring all apply, because it IS askShared with the
       // task's own evidence injected as the retrieval.
-      synthesize: async (title, results, followupIds) => {
+      synthesize: async (title, results, followupIds, alreadyRun) => {
         const { synthesizeTask } = await import("./server/orchestra-synthesis");
         const { resolveEcym } = await import("./server/ecym-availability");
         const { resolveDistillProvider } = await import("./server/brain-active");
@@ -4586,12 +4586,15 @@ app.post("/api/orchestra/tasks", async (req, res) => {
         return synthesizeTask(title, results, {
           generate: gen(resolveDistillProvider(process.env)),
           expertNotes: seat.reason ? { ecym: seat.reason } : undefined,
+          // L44: the follow-up judge — its own small call with its own system prompt, because
+          // the in-band directive loses to askShared's terse contract every time.
+          decide: gen(resolveDistillProvider(process.env)),
           experts: {
             ollamas: gen(resolveDistillProvider(process.env)),
             ecym: seat.generate ?? undefined,
             claudecode: gen("github-models"),
           },
-        } as any, followupIds);
+        } as any, followupIds, alreadyRun);
       },
 
       // L40: a finished, conclusive task becomes a memory through the one write choke-point.
