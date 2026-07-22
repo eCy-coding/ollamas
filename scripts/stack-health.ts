@@ -88,6 +88,22 @@ async function run(): Promise<Check[]> {
     checks.push({ name: "brain.obsidian", sev: "MED", status: "WARN", detail: `status unavailable: ${e?.message || e}` });
   }
 
+  // 4a-bis. L26 live vault surface. Distinct from brain.obsidian above: that one grades the
+  // FILE mirror, this one asks whether the vault is actually ANSWERING. Obsidian is a desktop
+  // app the user may have closed, so a miss is WARN — the orchestra degrades to brain-only
+  // recall rather than failing.
+  try {
+    const s = await getJson(`${APP}/api/brain/obsidian/status`);
+    const r = s.body?.rest;
+    checks.push({ name: "obsidian.rest", sev: "MED",
+      status: r?.ok ? "PASS" : "WARN",
+      detail: r?.ok
+        ? `:${r.port} ${r.service} v${r.pluginVersion} (obsidian ${r.obsidianVersion})`
+        : `not answering (${r?.error ?? "unknown"}) — brain-only recall` });
+  } catch (e: any) {
+    checks.push({ name: "obsidian.rest", sev: "MED", status: "WARN", detail: `unavailable: ${e?.message || e}` });
+  }
+
   // 4b. odysseus Khoj federation (external second-brain) — down-tolerant, so WARN not FAIL.
   try {
     const k = await getJson(`${process.env.KHOJ_URL || "http://127.0.0.1:42110"}/api/content/size`);

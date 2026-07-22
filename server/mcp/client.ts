@@ -18,6 +18,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CreateMessageRequestSchema, ListRootsRequestSchema, ListRootsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
+import { Agent as UndiciAgent, fetch as undiciFetch } from "undici";
 import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ToolRegistry } from "../tool-registry";
@@ -102,6 +103,14 @@ export interface UpstreamConfig {
   env?: Record<string, string>;
   /** http: server URL. */
   url?: string;
+  /** http: extra request headers (e.g. a bearer token for a local, key-authenticated server). */
+  headers?: Record<string, string>;
+  /**
+   * http: PEM to pin as the CA for this upstream. Lets us talk to a loopback server that mints
+   * its own certificate (Obsidian's Local REST API) with verification left ON — the alternative
+   * would be disabling TLS checks or dropping to plaintext, and neither is acceptable.
+   */
+  ca?: string;
   /** Only register these upstream tool names (raw, un-namespaced). Empty = all. */
   allowedTools?: string[];
 }
@@ -152,6 +161,16 @@ export function sanitizeUpstreamOutput(text: string): string {
 
 const builtinNames = new Set(ToolRegistry.list().filter(t => t.tier !== "host_upstream").map(t => t.name));
 
+// One undici Agent per pinned CA — rebuilding a TLS context per request would be wasteful,
+// and the transport calls fetch many times over a session's lifetime.
+const caDispatchers = new Map<string, UndiciAgent>();
+/** fetch that trusts exactly one extra CA. Used for loopback servers with self-signed certs. */
+export function caPinnedFetch(ca: string): typeof undiciFetch {
+  let agent = caDispatchers.get(ca);
+  if (!agent) { agent = new UndiciAgent({ connect: { ca } }); caDispatchers.set(ca, agent); }
+  return ((url: any, init: any) => undiciFetch(url, { ...(init || {}), dispatcher: agent })) as typeof undiciFetch;
+}
+
 /** Connect one upstream MCP server and register its tools. Never throws. When
  *  `owner` (a tenantId) is given, the merged tools are tenant-scoped (Faz 24):
  *  visible to and invokable by only that tenant. Omit for global/shared upstreams. */
@@ -179,7 +198,12 @@ export async function connectUpstream(cfg: UpstreamConfig, owner?: string): Prom
     transport =
       cfg.transport === "stdio"
         ? new StdioClientTransport({ command: cfg.command!, args: cfg.args || [], env: cfg.env })
-        : new StreamableHTTPClientTransport(new URL(cfg.url!));
+        : new StreamableHTTPClientTransport(new URL(cfg.url!), {
+            ...(cfg.headers ? { requestInit: { headers: cfg.headers } } : {}),
+            // A pinned CA needs its own dispatcher, so the transport gets a fetch that carries
+            // it. Verification stays enabled — this widens *who* we trust, not *whether* we check.
+            ...(cfg.ca ? { fetch: caPinnedFetch(cfg.ca) as any } : {}),
+          });
 
     // FIX B1: explicit bounded timeouts — a dead/hung upstream must fail fast
     // instead of inheriting the SDK's 60s-per-call default.

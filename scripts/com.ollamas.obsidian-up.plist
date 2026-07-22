@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- L26: keep the vault's live surface reachable. obsidian-local-rest-api is desktop-only,
+     so :27124 (REST + /mcp/) exists exactly as long as Obsidian.app is running. Without this,
+     "all 4 experts can read the vault" silently becomes "…whenever Emre happens to have the
+     app open".
+
+     Deliberately NOT KeepAlive on Obsidian itself: launchd would fight the user every time
+     they quit it on purpose. Instead a 5-min nudge relaunches it only when it is not running,
+     via `open -g` so it never steals focus or jumps to the front of the desktop.
+
+     Activate once:  cp scripts/com.ollamas.obsidian-up.plist ~/Library/LaunchAgents/ &&
+                     launchctl load -w ~/Library/LaunchAgents/com.ollamas.obsidian-up.plist
+     Disable:        launchctl bootout gui/$UID/com.ollamas.obsidian-up
+     Skip per-shell: OBSIDIAN_UP=0 -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ollamas.obsidian-up</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string><string>-lc</string>
+    <string>[ "$OBSIDIAN_UP" = "0" ] &amp;&amp; exit 0; pgrep -x Obsidian &gt;/dev/null || open -g -a Obsidian</string>
+  </array>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>Nice</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/tmp/ollamas-obsidian-up.log</string>
+  <key>StandardErrorPath</key><string>/tmp/ollamas-obsidian-up.err</string>
+</dict>
+</plist>

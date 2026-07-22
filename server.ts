@@ -56,6 +56,7 @@ import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
+import { obsidianUpstreamConfig, obsidianHealth } from "./server/obsidian-rest";
 import { memoryUsage } from "./server/memory-stats";
 import { decorateCatalog } from "./server/mcp/catalog";
 import { getFeedItems } from "./server/threatfeed";
@@ -1012,7 +1013,15 @@ async function initializeServer() {
       // reconnect). Global tools.json upstreams are ownerless (shared); per-tenant
       // store upstreams keep owner=tenant_id so reconnect preserves isolation (Faz 24).
       // Parallel connect (was sequential): a slow/dead upstream no longer adds its timeout to the sum.
-      await Promise.all(upstreams.map(async (cfg) => {
+      // L26: the Obsidian vault is an upstream too. Its credentials are minted by the plugin
+      // into its own data.json, so there is nothing to configure in tools.json — we derive the
+      // config at boot, or skip silently when the plugin was never installed. Supervision is
+      // the point: Obsidian is a desktop app the user closes, and the circuit-breaker
+      // reconnect brings its 16 vault tools back whenever it returns.
+      const obsidian = obsidianUpstreamConfig();
+      const all: UpstreamConfig[] = obsidian ? [...upstreams, obsidian as UpstreamConfig] : upstreams;
+      if (!obsidian) console.log("[MCP-Consume] obsidian: skipped (Local REST API plugin not configured)");
+      await Promise.all(all.map(async (cfg) => {
         const r = await superviseUpstream(cfg);
         console.log(`[MCP-Consume] ${r.name}: ${r.ok ? r.tools + " tools merged" : "FAILED — " + r.error}`);
       }));
@@ -4513,7 +4522,9 @@ app.post("/api/brain/obsidian/sync", async (req, res) => {
 app.get("/api/brain/obsidian/status", async (_req, res) => {
   try {
     const { obsidianStatus } = await import("./server/brain-obsidian");
-    res.json(obsidianStatus());
+    // L26: mirror health (files on disk) and LIVE health (is the app answering?) side by
+    // side. They fail independently — the mirror can be perfect while the vault is closed.
+    res.json({ ...obsidianStatus(), rest: await obsidianHealth() });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "obsidian status failed" });
   }
