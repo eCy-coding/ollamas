@@ -12,7 +12,15 @@ export const ALLOWED_BINARIES = [
   "npx", "tsc", "ruff", "black", "mkdir", "date", "whoami", "uname",
   // expanded safe text/dev utilities (read/transform only; blocklist still applies)
   "sed", "awk", "sort", "uniq", "cut", "tr", "diff", "env", "make",
-  "realpath", "basename", "dirname", "test", "jq", "vitest", "printf", "sleep", "true", "false"
+  "realpath", "basename", "dirname", "test", "jq", "vitest", "printf", "sleep", "true", "false",
+  // L37: read-only DIAGNOSTICS. eCym's machine role answers "how is this machine doing?" from a
+  // 220-command catalog, and none of it could run — `df -h` was refused with exit 126, so the
+  // member existed on paper only. Every binary here inspects and reports; none writes, deletes,
+  // installs, or opens a network connection. The denylist still applies on top, and gated
+  // catalog entries still require approval, so this widens WHAT can be observed, not what can
+  // be changed.
+  "df", "du", "ps", "top", "uptime", "lsof", "netstat", "vm_stat",
+  "sw_vers", "id", "hostname", "stat", "file", "sysctl"
 ];
 
 /** Does the shell allowlist permit this command's binary?

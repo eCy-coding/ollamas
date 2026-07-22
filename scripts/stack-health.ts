@@ -104,6 +104,19 @@ async function run(): Promise<Check[]> {
     checks.push({ name: "obsidian.rest", sev: "MED", status: "WARN", detail: `unavailable: ${e?.message || e}` });
   }
 
+  // 4a-ter. L38 orchestra task board. A task stuck in Doing is not an outage — it is usually
+  // waiting on an approval Emre has not ticked yet — so this reports rather than fails.
+  try {
+    const { readFileSync } = await import("node:fs");
+    const { parseBoard } = await import("../server/orchestra-tasks");
+    const { defaultVaultPath } = await import("../server/brain-obsidian");
+    const b = parseBoard(readFileSync(`${defaultVaultPath()}/orchestra/sprint.md`, "utf8"));
+    checks.push({ name: "orchestra.tasks", sev: "MED", status: "PASS",
+      detail: `backlog=${b.lanes.Backlog.length} doing=${b.lanes.Doing.length} done=${b.lanes.Done.length}` });
+  } catch (e: any) {
+    checks.push({ name: "orchestra.tasks", sev: "MED", status: "WARN", detail: `sprint board okunamadı: ${e?.message || e}` });
+  }
+
   // 4b. odysseus Khoj federation (external second-brain) — down-tolerant, so WARN not FAIL.
   try {
     const k = await getJson(`${process.env.KHOJ_URL || "http://127.0.0.1:42110"}/api/content/size`);

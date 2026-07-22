@@ -47,6 +47,7 @@
     "obsidian:sync": "tsx scripts/brain-obsidian-sync.ts",
     "obsidian:plugins": "tsx scripts/obsidian-plugins.ts",
     "obsidian:trust": "tsx scripts/obsidian-trust.ts",
+    "orchestra:e2e": "tsx scripts/orchestra-e2e.ts",
     "obsidian:plugins:verify": "tsx scripts/obsidian-plugins.ts --verify",
     "start": "node dist/server.cjs",
     "test": "vitest run",
