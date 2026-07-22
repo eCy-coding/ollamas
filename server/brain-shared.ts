@@ -91,6 +91,10 @@ export interface SharedDeps extends AskDeps {
   /** Formül 3a: bağlamı p_ret'e göre yeniden paylaştır. Varsayılan kapalı —
    *  `ragseq-weighting` yeteneği terfi edene dek canlıya inmez. */
   ragSeq?: boolean;
+  /** L35: uzman-başı durum notu (ör. eCym hafif modele düştü / GPU meşgul). Katılan uzman
+   *  için bilgi, katılmayan için degradedReasons'a düşen SEBEP. Çağıran seat'i çözerken
+   *  öğrendiğini panele taşır — yoksa "neden yoktu" bilgisi çağıranda hapsolur. */
+  expertNotes?: Partial<Record<Expert, string>>;
   // `recallVec` artık AskDeps'ten miras alınır. Buradaki yinelenen bildirim
   // `Promise<unknown>` dönüyordu; hiç çağrılmadığı için uyuşmazlık yıllarca
   // görünmedi. Tek tanım = tek doğruluk kaynağı.
@@ -182,10 +186,13 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
   // candidate, `degraded` came back empty, and the raw error JSON was rendered in the vault
   // as that expert's view. Silence and failure now look different, and both are named.
   const degradedReasons: Record<string, string> = {};
+  // Seat notes the caller already knows (L35). A note for an expert that DOES answer stays
+  // informational; for one that does not, it becomes the reason it is missing.
+  const seatNotes: Record<string, string> = { ...(deps.expertNotes ?? {}) } as Record<string, string>;
   const answers = await Promise.all(
     EXPERTS.map(async (e) => {
       const fn = deps.experts[e];
-      if (!fn) { degradedReasons[e] = "erişilemez (uzman bağlı değil)"; return { expert: e, answer: "", available: false }; }
+      if (!fn) { degradedReasons[e] = seatNotes[e] ?? "erişilemez (uzman bağlı değil)"; return { expert: e, answer: "", available: false }; }
       try {
         const raw = (await bounded(fn(messages), expertTimeoutMs()))?.trim() ?? "";
         if (isFailurePayload(raw)) { degradedReasons[e] = failureReason(raw); return { expert: e, answer: "", available: false }; }

@@ -4337,6 +4337,12 @@ app.post("/api/brain/ask-shared", async (req, res) => {
     const { loadProfileVectors } = await import("./server/brain-profile-store");
     const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
       (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
+    // L35: resolve the eCym seat BEFORE the panel runs — it may need a bounded wait for the GPU.
+    const { resolveEcym } = await import("./server/ecym-availability");
+    const ecymSeat = await resolveEcym({
+      busy: () => llmActive(),
+      makeGenerator: (model) => gen("ollama-local", model),
+    });
     const r = await askShared(question, {
       ns,
       namespaces: brain.brainListNamespaces,
@@ -4354,10 +4360,14 @@ app.post("/api/brain/ask-shared", async (req, res) => {
         brain.brainRecall(question, { ...o, vector: vec, ...(ns ? { ns } : {}) }),
       gate: loadLearnedGate() ?? undefined,
       profileVectors: async () => loadProfileVectors(),
+      // L35: whether eCym waited, fell back to a lighter model, or could not run at all,
+      // the panel is told — a seat never disappears without an explanation again.
+      expertNotes: ecymSeat.reason ? { ecym: ecymSeat.reason } : undefined,
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
-        // Yerel model GPU'yu paylaşır — canlı generation varken uzman devre dışı.
-        ecym: llmActive() ? undefined : gen("ollama-local", process.env.ECY_MODEL || "ecy"),
+        // L35: eCym no longer vanishes under GPU contention. Bounded wait → lighter local
+        // model → and only then an honest absence with a reason.
+        ecym: ecymSeat.generate ?? undefined,
         odysseus: async (messages: { role: string; content: string }[]) => {
           const out = await ToolRegistry.execute("mcp__odysseus__odysseus_chat",
             { prompt: messages[1].content, model: "ollamas-auto" }, { source: "ask-shared" } as any);

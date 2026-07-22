@@ -470,6 +470,13 @@ async function main() {
     // Recheck right before dispatch (fresher than the top-of-turn gate above — recall/
     // embed/profile-refresh took real time, GPU state may have moved on since).
     const ecymGpuBusy = await checkGpuActive();
+    // L35: same ladder as the live HTTP path (bounded wait → lighter model → honest absence),
+    // resolved through the ONE helper so the two callers cannot drift apart.
+    const { resolveEcym } = await import("../server/ecym-availability");
+    const ecymSeat = await resolveEcym({
+      busy: () => ecymGpuBusy,
+      makeGenerator: (model) => gen("ollama-local", model),
+    });
 
     const askPromise = askShared(question, {
       recall: (q: string, o: any) => httpRecall(q, o),
@@ -494,10 +501,11 @@ async function main() {
       // Turun DIŞSAL sonucu deftere — gate eğitiminin ham verisi (kendi argmax'ı DEĞİL).
       onOutcome: (o: { q: number[]; scores: number[] }) =>
         appendOutcome({ at: Date.now(), turn: state.turn, q: o.q, scores: o.scores }),
+      expertNotes: ecymSeat.reason ? { ecym: ecymSeat.reason } : undefined,
       experts: {
         ollamas: gen(resolveDistillProvider(process.env)),
         // eCym yerel modeldir: GPU'yu chat LLM ile paylaşır → yalnız boştayken katılır.
-        ecym: ecymGpuBusy ? undefined : gen("ollama-local", process.env.ECY_MODEL || "ecy"),
+        ecym: ecymSeat.generate ?? undefined,
         odysseus: async (messages: { role: string; content: string }[]) => {
           const { ToolRegistry } = await import("../server/tool-registry");
           const out = await ToolRegistry.execute("mcp__odysseus__odysseus_chat",
