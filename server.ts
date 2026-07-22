@@ -4582,6 +4582,12 @@ app.post("/api/orchestra/tasks", async (req, res) => {
 
       // L40: a finished, conclusive task becomes a memory through the one write choke-point.
       remember: async (m) => brain.brainRemember(m as any),
+
+      // L41: obsidian writes the readable report itself, through its own REST surface.
+      vaultWrite: async (path: string, content: string) => {
+        const { vaultWrite } = await import("./server/obsidian-rest");
+        return vaultWrite(path, content);
+      },
     });
     res.json(out);
   } catch (err: any) {

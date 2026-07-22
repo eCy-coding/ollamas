@@ -37,6 +37,35 @@ export function fold(s: string): string {
     .trim();
 }
 
+/**
+ * Words that carry no retrieval signal: Turkish question/function words plus the scaffolding
+ * people put in task titles. Kept in FOLDED form, since that is what `fold` produces.
+ */
+const QUERY_NOISE = new Set([
+  // question + function words
+  "nedir", "nasil", "neden", "kim", "kimdir", "hangi", "kac", "kacta", "mi", "mu", "mi",
+  "ne", "nerede", "nereden", "nereye", "var", "yok", "olan", "icin", "ile", "ve", "veya",
+  "bir", "bu", "su", "o", "da", "de", "ki", "gibi", "daha", "cok", "az",
+  // task scaffolding — "e2e kanıt görevi …" is framing, not subject
+  "e2e", "kanit", "gorev", "gorevi", "test", "kontrol", "yap", "yapil", "cikar", "olustur",
+  "getir", "bul", "goster", "raporu", "rapor", "durumu", "durum",
+]);
+
+/**
+ * A task TITLE is a sentence; a search query is not.
+ *
+ * Measured: obsidian was handed "e2e kanıt görevi disk doluluk durumu nedir" verbatim and
+ * returned no hits at all, burning 135ms — the member's whole contribution was dead because of
+ * the query, not because the vault lacked the material. Keeping only content words fixes that.
+ * Falls back to the folded title when everything would be stripped, so a title made entirely of
+ * common words still searches for something rather than nothing.
+ */
+export function queryFor(title: string): string {
+  const folded = fold(title);
+  const kept = folded.split(" ").filter((w) => w.length > 2 && !QUERY_NOISE.has(w));
+  return kept.length ? kept.join(" ") : folded;
+}
+
 export interface CommandMatch {
   command: EcymCommand;
   /** 0..1 — share of the trigger's words present in the question, longest trigger wins ties. */
@@ -169,7 +198,8 @@ export async function obsidianContribute(question: string, limit = 3): Promise<V
   const health = await obsidianHealth();
   if (!health.ok) return { ok: false, findings: [], reason: health.error ?? "offline" };
 
-  const hits: VaultHit[] = await vaultSearch(question, limit);
+  // Search with content words, not the whole sentence — see queryFor.
+  const hits: VaultHit[] = await vaultSearch(queryFor(question), limit);
   const findings = await Promise.all(hits.map(async (h) => {
     const note = await vaultRead(h.path);
     return {

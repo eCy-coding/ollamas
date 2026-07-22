@@ -171,6 +171,38 @@ export async function vaultRead(path: string, opts: RestOpts = {}): Promise<Vaul
   } catch { return null; }
 }
 
+/**
+ * Reject anything that could escape the vault. The REST API is scoped to the vault by the
+ * plugin, but the path is ours to build and a `..` slipping into a generated filename should
+ * fail here, loudly, rather than rely on the far end noticing.
+ */
+export function isSafeVaultPath(path: string): boolean {
+  const p = String(path ?? "").trim();
+  if (!p || p.startsWith("/") || p.startsWith("\\")) return false;
+  if (p.includes("\0") || /^[a-zA-Z]:/.test(p)) return false;
+  return !p.split(/[\\/]/).some((seg) => seg === ".." || seg === "");
+}
+
+/**
+ * L41 — obsidian WRITES.
+ *
+ * The role card called it "the only member that can write to the vault" while it had never
+ * written anything: the whole write half of its 16 tools was unused and the evidence notes were
+ * produced by node's fs. This is the member doing what only it can do, through the same
+ * authenticated, CA-pinned channel as its reads.
+ *
+ * Returns false rather than throwing when the vault is closed — a report is a bonus on top of
+ * the evidence note, never a reason to fail a finished task.
+ */
+export async function vaultWrite(path: string, content: string, opts: RestOpts = {}): Promise<boolean> {
+  if (!isSafeVaultPath(path)) { warnOnce(`unsafe vault path refused: ${path}`); return false; }
+  const r = await obsidianRequest(
+    `/vault/${path.split("/").map(encodeURIComponent).join("/")}`,
+    { method: "PUT", body: content, headers: { "content-type": "text/markdown" } },
+    opts);
+  return !!r && r.status >= 200 && r.status < 300;
+}
+
 export async function vaultList(dir = "", opts: RestOpts = {}): Promise<string[]> {
   const r = await obsidianRequest(`/vault/${dir ? dir.replace(/\/?$/, "/") : ""}`, {}, opts);
   if (!r || r.status !== 200) return [];

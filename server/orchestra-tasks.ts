@@ -156,6 +156,8 @@ export interface TaskDeps {
   synthesize?: (title: string, results: StepResult[]) => Promise<SynthesisResult | null>;
   /** L40: write a finished task's conclusion back into the brain (the choke-point). */
   remember?: (m: { id: string; tier: string; content: string; source: string }) => Promise<unknown>;
+  /** L41: let obsidian write the human-facing report ITSELF, via its own REST surface. */
+  vaultWrite?: (path: string, content: string) => Promise<boolean>;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + `\n… (${s.length - n} karakter kırpıldı)` : s);
@@ -244,6 +246,20 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
     + `\n\n[[Orchestra]] · [[sprint]]\n`;
 }
 
+/**
+ * The human-facing report obsidian writes for itself. Deliberately short: the evidence note is
+ * the record, this is the thing you actually want to read, and it links back rather than
+ * duplicating. Deterministic path so a re-run overwrites instead of accumulating.
+ */
+export const reportPath = (title: string, day: string): string =>
+  `orchestra/reports/${day}-${title.toLowerCase().replace(/[^a-z0-9ğüşiöç]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task"}.md`;
+
+export function reportNote(title: string, answer: string, expert: string, noteBase: string, at: string): string {
+  return `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra, report]\naliases: [${JSON.stringify(title.slice(0, 60))}]\n---\n\n`
+    + `# 📋 ${title}\n\n> [!success] **${expert || "panel"}** · ${at}\n\n${answer}\n\n`
+    + `Ham kanıt: [[${noteBase}]] · [[Orchestra]] · [[sprint]]\n`;
+}
+
 /** Approvals a human ticked in a previously written evidence note. */
 export function readApprovals(noteText: string): Set<string> {
   const out = new Set<string>();
@@ -254,7 +270,7 @@ export function readApprovals(noteText: string): Set<string> {
 export const taskNotePath = (vault: string, id: string, title: string): string =>
   join(vault, "orchestra", "tasks", `${id}-${title.toLowerCase().replace(/[^a-z0-9ğüşiöç]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task"}.md`);
 
-export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number }
+export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number }
 
 /**
  * One pass over the board. Backlog tasks are executed; a task with pending approvals lands in
@@ -335,6 +351,17 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
           });
           res.remembered = (res.remembered ?? 0) + 1;
         } catch { /* the brain being busy must not fail a finished task */ }
+      }
+      // L41: obsidian writes the readable report through its OWN surface — the one thing only
+      // it can do. A closed vault simply skips it; the evidence note is already on disk.
+      if (deps.vaultWrite && synthesis && !synthesis.abstained && synthesis.answer) {
+        try {
+          const day = new Date(now()).toISOString().slice(0, 10);
+          const base = notePath.split("/").pop()!.replace(/\.md$/, "");
+          const ok = await deps.vaultWrite(reportPath(title, day),
+            reportNote(title, synthesis.answer, synthesis.expert, base, new Date(now()).toISOString()));
+          if (ok) res.reported = (res.reported ?? 0) + 1;
+        } catch { /* report is a bonus, never a failure mode */ }
       }
     }
   }
