@@ -7,10 +7,11 @@
 # KeepAlive; hard-kicking it was the original churn bug). Only self-contained, safe-to-
 # restart companions are healed automatically. Everything else is notify-only.
 set -u
-REPO="$HOME/Desktop/ollamas"
+# Overridable so the watchdog can be exercised from a worktree without pointing at the
+# checkout launchd happens to run against.
+REPO="${OLLAMAS_REPO:-$HOME/Desktop/ollamas}"
 STATE="$HOME/.llm-mission-control/e2e-watchdog-state.json"
 HEARTBEAT="$HOME/.llm-mission-control/e2e-gate-heartbeat.json"
-THRESH=3
 cd "$REPO" || exit 0
 
 OUT="$(npx tsx scripts/e2e-gate.ts 2>/dev/null)"
@@ -25,32 +26,22 @@ if [ "$GREEN" = "True" ]; then
   exit 0
 fi
 
-# map a red check -> a safe launchd label to kickstart (hub/ollama/chroma = notify-only)
-label_for(){ case "$1" in
-  odysseus-bridge) echo "com.odysseus.server" ;;
-  pulse:4777)      echo "com.ody.pulse" ;;
-  brain|brain-loop-fresh) echo "com.ollamas.brain-loop" ;;
-  obsidian)        echo "com.ollamas.brain-obsidian-sync" ;;
-  *) echo "" ;; esac }
-
+# The counting + restart decision lives in server/e2e-watchdog-policy.ts (pure, tested in
+# tests/e2e-watchdog-policy.test.ts). It also owns the check -> launchd label map, so the
+# hub / ollama / chroma stay notify-only exactly as before.
+#
+# The decision it adds over the old inline shell: after a service is kickstarted, it gets a
+# grace window to finish booting before it can be kickstarted again. Without it, odysseus
+# (~210s to bind :7860, measured) was re-killed every 300s gate run and could never reach
+# green — the healer was causing the "odysseus :7860 intermittent" outage it was reacting to.
 uid="$(id -u)"
-prev="$(cat "$STATE" 2>/dev/null || echo '{}')"
-newstate="{"
-for chk in ${(s: :)RED}; do
-  n="$(printf '%s' "$prev" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$chk',0))" 2>/dev/null || echo 0)"
-  n=$((n+1))
-  newstate="$newstate\"$chk\":$n,"
-  if [ "$n" -ge "$THRESH" ]; then
-    lbl="$(label_for "$chk")"
-    if [ -n "$lbl" ]; then
-      launchctl kickstart -k "gui/$uid/$lbl" 2>/dev/null && notify "self-heal: restarted $lbl (red x$n on $chk)"
-      newstate="${newstate%,}"; newstate="$newstate," # keep, counter resets next green
-    else
-      notify "e2e RED x$n on $chk (notify-only, no auto-restart)"
-    fi
-  fi
+ACTIONS="$(npx tsx scripts/e2e-watchdog-decide.ts "$STATE" ${(s: :)RED} 2>/dev/null)"
+
+printf '%s\n' "$ACTIONS" | while IFS=' ' read -r kind a b c; do
+  case "$kind" in
+    kick)   launchctl kickstart -k "gui/$uid/$a" 2>/dev/null \
+              && notify "self-heal: restarted $a (red x$c on $b)" ;;
+    notify) notify "e2e RED x$b on $a (notify-only, no auto-restart)" ;;
+  esac
 done
-newstate="${newstate%,}}"
-[ "$newstate" = "}" ] && newstate="{}"
-printf '%s\n' "$newstate" > "$STATE"
 exit 1
