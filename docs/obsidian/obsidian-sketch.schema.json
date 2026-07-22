@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local/obsidian-sketch.schema.json",
+  "title": "ObsidianSketchGuide",
+  "description": "Structure of ~/Desktop/obsidian-sketch.md. The guide's XML is reduced to JSON by obsidian-sketch-reduce.py and validated here (gate S8). The rules encode the guide's own contract: a decision with one option is not a decision, an unmeasured claim must say why, a blind spot without evidence is a guess, and nothing is declared out of scope without a reason.",
+  "type": "object",
+  "required": ["version", "environment", "corrections", "pipeline", "inventory", "decisions", "phases", "sandboxRun", "blindSpots", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+
+    "environment": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["key", "value", "probe"],
+        "description": "every environment claim carries the command that reproduces it",
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "value": { "type": "string" },
+          "probe": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+
+    "corrections": {
+      "type": "array",
+      "minItems": 1,
+      "description": "what the hand-written draft claimed, and the command that disproves it",
+      "items": {
+        "type": "object",
+        "required": ["id", "claimed", "actual", "proof"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^C[0-9]+$" },
+          "claimed": { "type": "string", "minLength": 4 },
+          "actual": { "type": "string", "minLength": 4 },
+          "proof": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+
+    "pipeline": {
+      "type": "array",
+      "minItems": 20,
+      "description": "the requested hierarchy, each stage pointing at where it was honoured",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "did", "where"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": {
+            "enum": ["search", "think", "analyz", "plan", "todo", "phase", "jsonprompt",
+                     "sandboxtest", "test", "code", "merge_commit_push"]
+          },
+          "did": { "type": "string", "minLength": 10 },
+          "where": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+
+    "inventory": {
+      "type": "object",
+      "required": ["helpPages", "sketchCommands", "excalidrawSettings", "symCatalogue"],
+      "additionalProperties": false,
+      "properties": {
+        "helpPages": {
+          "type": "object",
+          "required": ["count", "siteTotal", "delegated", "pages"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1 },
+            "siteTotal": { "type": "integer", "minimum": 1 },
+            "delegated": { "type": "integer", "minimum": 0 },
+            "delegatedReason": { "type": "string", "minLength": 8 },
+            "pages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["path", "class"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "class": { "enum": ["depth", "inventory", "out-of-scope"] },
+                  "reason": { "type": "string", "minLength": 8 },
+                  "sharedWith": { "type": "string", "minLength": 3 },
+                  "lens": { "type": "string", "minLength": 20 }
+                },
+                "allOf": [
+                  {
+                    "if": { "properties": { "class": { "const": "out-of-scope" } } },
+                    "then": { "required": ["reason"] }
+                  },
+                  {
+                    "if": { "required": ["sharedWith"] },
+                    "then": {
+                      "required": ["lens"],
+                      "description": "a page covered by both guides must say what each lens adds, or the overlap is duplication"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+
+        "sketchCommands": {
+          "type": "object",
+          "required": ["count", "registryTotal", "commands"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1 },
+            "registryTotal": { "type": "integer", "minimum": 1 },
+            "commands": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["id", "risk", "evidence"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 3 },
+                  "name": { "type": "string" },
+                  "risk": { "enum": ["readonly", "ui", "mutating", "destructive", "dev", "paid"] },
+                  "evidence": { "enum": ["measured", "measured-sandbox", "doc", "code", "unmeasurable"] },
+                  "note": { "type": "string", "minLength": 8 }
+                },
+                "allOf": [{
+                  "if": { "properties": { "evidence": { "enum": ["doc", "unmeasurable"] } } },
+                  "then": {
+                    "required": ["note"],
+                    "description": "a command that was not run must say why it was not run"
+                  }
+                }]
+              }
+            }
+          }
+        },
+
+        "excalidrawSettings": {
+          "type": "object",
+          "required": ["count", "groups"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1 },
+            "groups": {
+              "type": "array",
+              "minItems": 5,
+              "items": {
+                "type": "object",
+                "required": ["name", "count", "meaning", "keys"],
+                "description": "a group without a meaning is a bucket, not a classification",
+                "properties": {
+                  "name": { "type": "string", "minLength": 2 },
+                  "count": { "type": "integer", "minimum": 1 },
+                  "meaning": { "type": "string", "minLength": 10 },
+                  "keys": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "value"],
+                      "properties": {
+                        "name": { "type": "string", "minLength": 1 },
+                        "value": { "type": "string" },
+                        "critical": { "type": "boolean" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "symCatalogue": {
+          "type": "object",
+          "required": ["count", "host", "products"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1 },
+            "host": { "type": "string", "format": "uri" },
+            "products": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["id", "title", "url", "tier", "http", "evidence", "desc"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "title": { "type": "string", "minLength": 3 },
+                  "url": { "type": "string", "format": "uri" },
+                  "tier": { "enum": ["free", "paid"] },
+                  "http": { "type": "string", "pattern": "^(200|301|302)$",
+                            "description": "a 404 here means the guide cites a topic that does not exist" },
+                  "evidence": { "enum": ["measured", "unmeasurable"] },
+                  "desc": { "type": "string", "minLength": 10 },
+                  "note": { "type": "string" }
+                },
+                "allOf": [{
+                  "if": { "properties": { "tier": { "const": "paid" } } },
+                  "then": {
+                    "properties": { "evidence": { "const": "unmeasurable" } },
+                    "required": ["note"],
+                    "description": "paid content cannot be verified from this machine and must not be claimed"
+                  }
+                }]
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "decisions": {
+      "type": "array",
+      "minItems": 20,
+      "description": "the 'if you use X you get Y' matrix — the guide's reason for existing",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "options", "recommend"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^SD[0-9]+$" },
+          "question": { "type": "string", "minLength": 8 },
+          "recommend": { "type": "string", "minLength": 10 },
+          "options": {
+            "type": "array",
+            "minItems": 2,
+            "description": "a decision with one option is not a decision",
+            "items": {
+              "type": "object",
+              "required": ["id", "use", "evidence", "then"],
+              "properties": {
+                "id": { "type": "string" },
+                "use": { "type": "string", "minLength": 1 },
+                "evidence": { "enum": ["measured", "measured-sandbox", "doc", "code", "unmeasurable"] },
+                "then": { "type": "string", "minLength": 10 },
+                "else": { "type": "string" },
+                "cost": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "phases": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "steps"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string", "minLength": 4 },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "action", "evidence"],
+              "anyOf": [{ "required": ["cmd"] }, { "required": ["desc"] }],
+              "description": "a step is either runnable or explanatory — never empty",
+              "properties": {
+                "id": { "type": "string" },
+                "action": { "type": "string", "minLength": 2 },
+                "cmd": { "type": "string" },
+                "desc": { "type": "string" },
+                "expect": { "type": "string" },
+                "affects": { "type": "string" },
+                "evidence": { "enum": ["measured", "measured-sandbox", "doc", "code", "unmeasurable"] },
+                "source": { "type": "string", "format": "uri" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "sandboxRun": {
+      "type": "object",
+      "required": ["ran", "passed", "total", "checks"],
+      "description": "the write measurements. ran=false is honest; a false 'measured-sandbox' is not.",
+      "properties": {
+        "ran": { "type": "boolean" },
+        "passed": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "ok", "detail"],
+            "properties": {
+              "name": { "type": "string", "minLength": 3 },
+              "ok": { "type": "boolean" },
+              "detail": { "type": "string", "minLength": 5 }
+            }
+          }
+        }
+      },
+      "allOf": [{
+        "if": { "properties": { "ran": { "const": true } } },
+        "then": {
+          "properties": { "checks": { "minItems": 8 } },
+          "description": "a sandbox run that claims to have run must show its checks"
+        }
+      }]
+    },
+
+    "blindSpots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "status", "title", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^SB[0-9]+$" },
+          "severity": { "enum": ["critical", "high", "medium", "low", "informational"] },
+          "status": { "type": "string", "minLength": 3 },
+          "title": { "type": "string", "minLength": 8 },
+          "evidence": {
+            "type": "string",
+            "minLength": 40,
+            "description": "a blind spot without measured evidence is a guess, not a finding"
+          },
+          "impact": { "type": "string" },
+          "fix": { "type": "string" },
+          "next": { "type": "string" },
+          "verify": { "type": "string" }
+        }
+      }
+    },
+
+    "gates": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "cmd"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^S[0-9]+$" },
+          "name": { "type": "string", "minLength": 3 },
+          "cmd": { "type": "string", "minLength": 3 },
+          "why": { "type": "string" }
+        }
+      }
+    }
+  }
+}
