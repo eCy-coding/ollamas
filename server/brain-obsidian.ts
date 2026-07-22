@@ -17,7 +17,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { exportBrain, neighborsFromDb, type BrainDump } from "./brain-portable";
-import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses, ecymDatasetPath } from "./brain-obsidian-ecym";
+import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApprovedToMisses, ecymDatasetPath, writeEcymBase, writeEcymHub, ecymSplit, readEcymCommands } from "./brain-obsidian-ecym";
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, adoptHumanNote, ROOT_RESERVED, TIERS, type NoteMemory } from "./brain-obsidian-note";
 import { syncAudio, type AudioSyncResult } from "./brain-obsidian-audio";
@@ -264,7 +264,7 @@ function writeHome(vault: string, dump: BrainDump, entities: number, ecymCount =
     + `> [!abstract] Canlı hafıza aynası\n`
     + `> **${dump.memories.length}** memory · **${dump.facts.length}** fact · **${entities}** entity · 5 katman\n\n`
     + `## 🎼 Orkestra\n> [!example] ollamas + eCym + odysseus tek beyin\n`
-    + `> [[Orchestra]] — 3-sistem hub + Canvas · [[council]] — ödül defteri · 🟢 eCym ${ecymCount} komut\n\n`
+    + `> [[Orchestra]] — 3-sistem hub + Canvas · [[council]] — ödül defteri · 🟢 [[eCym]] ${ecymCount} komut\n\n`
     + `## Katmanlar\n`
     + TIERS.map((t) => `- ${TIER_EMOJI[t]} [[tier-${t}|${t}]] — **${count(t)}** · _${TIER_DESC[t]}_`).join("\n")
     + `\n- 🟠 [[entities|entities]] — **${entities}**\n\n`
@@ -292,11 +292,15 @@ function writeBase(vault: string): void {
     + `  note.source:\n    displayName: Kaynak\n`
     + `views:\n`
     + `  - type: table\n    name: Tümü\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n      - note.confidence\n      - note.source\n    limit: 200\n`
-    + `  - type: table\n    name: Katman bazlı\n    groupBy: note.tier\n    order:\n      - file.name\n      - note.hits\n      - note.confidence\n`
+    // groupBy must be an OBJECT carrying both property and direction. Obsidian's own parser
+    // (obsidian.asar) throws "groupBy bir object olmalıdır" otherwise, and a base that throws
+    // is unqueryable — `obsidian base:query file=brain.base` failed on every run before this.
+    // The bare scalar form that shipped here silently broke two of the six views.
+    + `  - type: table\n    name: Katman bazlı\n    groupBy:\n      property: note.tier\n      direction: ASC\n    order:\n      - file.name\n      - note.hits\n      - note.confidence\n`
     + `  - type: table\n    name: En çok recall\n    filters:\n      and:\n        - note.hits > 5\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n    limit: 50\n`
     + `  - type: table\n    name: Yüksek güven\n    filters:\n      and:\n        - note.confidence >= 0.8\n    order:\n      - file.name\n      - note.tier\n      - note.confidence\n    limit: 50\n`
     + `  - type: cards\n    name: Working scratchpad\n    filters:\n      and:\n        - file.hasTag("tier/working")\n    order:\n      - file.name\n`
-    + `  - type: table\n    name: Sistem bazlı\n    groupBy: note.system\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n      - formula.recall_rank\n`;
+    + `  - type: table\n    name: Sistem bazlı\n    groupBy:\n      property: note.system\n      direction: ASC\n    order:\n      - file.name\n      - note.tier\n      - note.hits\n      - formula.recall_rank\n`;
   writeFileSync(join(vault, "_index", "brain.base"), base);
 }
 
@@ -679,6 +683,28 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
   writeOrchestra(vault, dump, ecymCount, opts.obsidianUp ?? false, opts.obsidianTools ?? 0); // hub + roles + council + canvas + sprint
   writeHome(vault, dump, entities, ecymCount);
   writeBase(vault);
+  // The surfaces ollamas and eCym are actually browsed through. Until these existed the
+  // vault had exactly one database view (brain.base, tier-scoped), so 221 eCym commands,
+  // 305 entities and every journal rollup were invisible to Bases despite already carrying
+  // the properties a view needs.
+  writeEcymBase(vault);
+  writeEcymHub(vault, ecymCount, ecymSplit(readEcymCommands()));
+  writeEntitiesBase(vault);
+  writeJournalBase(vault);
+  // The FULL pin set, not just the new entries. bookmarks.json is otherwise seeded by a
+  // write-once during config init, and this merge can land first — which would create the
+  // file, make the write-once skip, and silently lose Home from the sidebar.
+  mergeBookmarks(vault, [
+    { type: "file", path: "Home.md", title: "🧠 Home" },
+    { type: "file", path: "orchestra/Orchestra.md", title: "🎼 Orchestra" },
+    { type: "file", path: "orchestra.canvas", title: "🎼 Orchestra map" },
+    { type: "file", path: "entity-map.canvas", title: "🗺️ Entity map" },
+    { type: "file", path: "_index/brain.base", title: "🗃️ Brain DB" },
+    { type: "file", path: "ecym/eCym.md", title: "🟢 eCym" },
+    { type: "file", path: "_index/ecym.base", title: "🗃️ eCym katalog" },
+    { type: "file", path: "_index/entities.base", title: "🗺️ Varlıklar" },
+    { type: "file", path: "_index/journal.base", title: "📅 Günlük" },
+  ]);
   writeTierIndexes(vault, dump);
   writeTemplates(vault);
   writeJournal(vault, dump);                        // + L26 weekly/monthly rollups
@@ -781,6 +807,80 @@ export function isAbandonedShell(filename: string, body: string): boolean {
     return !/^\s*(filters|formulas|properties|source|from)\s*:/m.test(s);
   }
   return false;
+}
+
+/**
+ * entities.base — the 305 entity notes brain.base deliberately leaves out.
+ *
+ * brain.base is scoped to tier-tagged memories, which is correct: entities are a different
+ * kind of thing. But that left the whole fact-graph with no tabular view, so the only way to
+ * find the well-connected nodes was to open entity-map.canvas and squint. `degree` is already
+ * on every entity note; this exposes it.
+ */
+export function writeEntitiesBase(vault: string): void {
+  const base = `filters:\n  and:\n      - file.hasTag("entity")\n`
+    + `formulas:\n  reach: 'if(note.degree > 8, "🌟 hub", if(note.degree > 2, "bağlı", "yaprak"))'\n`
+    + `properties:\n`
+    + `  note.degree:\n    displayName: Derece\n`
+    + `  note.name:\n    displayName: Varlık\n`
+    + `views:\n`
+    + `  - type: table\n    name: Tümü\n    order:\n      - note.name\n      - note.degree\n      - formula.reach\n    limit: 400\n`
+    + `  - type: table\n    name: 🌟 Hub'lar\n    filters:\n      and:\n        - note.degree > 8\n    order:\n      - note.name\n      - note.degree\n    limit: 50\n`
+    + `  - type: table\n    name: Yapraklar\n    filters:\n      and:\n        - note.degree <= 2\n    order:\n      - note.name\n      - note.degree\n    limit: 200\n`
+    + `  - type: cards\n    name: Kartlar\n    order:\n      - note.name\n      - note.degree\n`;
+  mkdirSync(join(vault, "_index"), { recursive: true });
+  writeFileSync(join(vault, "_index", "entities.base"), base);
+}
+
+/**
+ * journal.base — daily notes, ISO-week rollups and month rollups are three different
+ * questions ("what happened Tuesday", "what did last week amount to", "what is this month").
+ * They already carry distinct tags; this gives each one its own view instead of one flat list.
+ */
+export function writeJournalBase(vault: string): void {
+  const base = `filters:\n  and:\n      - file.hasTag("journal")\n`
+    + `properties:\n`
+    + `  file.name:\n    displayName: Dönem\n`
+    + `views:\n`
+    + `  - type: table\n    name: Günlük\n    filters:\n      and:\n        - '!file.hasTag("journal/weekly")'\n        - '!file.hasTag("journal/monthly")'\n    order:\n      - file.name\n    limit: 120\n`
+    + `  - type: table\n    name: 🗓️ Haftalık\n    filters:\n      and:\n        - file.hasTag("journal/weekly")\n    order:\n      - file.name\n    limit: 60\n`
+    + `  - type: table\n    name: 📆 Aylık\n    filters:\n      and:\n        - file.hasTag("journal/monthly")\n    order:\n      - file.name\n    limit: 36\n`;
+  mkdirSync(join(vault, "_index"), { recursive: true });
+  writeFileSync(join(vault, "_index", "journal.base"), base);
+}
+
+export interface BookmarkItem { type: string; path: string; title: string }
+
+/**
+ * Add generated surfaces to the vault's bookmarks WITHOUT touching what the operator put
+ * there. The existing setup writes bookmarks.json only when it is absent (writeOnce), which
+ * means new surfaces never appeared for anyone whose vault was already initialised — and a
+ * plain overwrite would have deleted their own pins instead.
+ *
+ * Matching is by path: a bookmark the operator renamed keeps their title.
+ */
+export function mergeBookmarks(vault: string, add: BookmarkItem[]): void {
+  const p = join(vault, ".obsidian", "bookmarks.json");
+  let doc: any = { items: [] };
+  if (existsSync(p)) {
+    try {
+      doc = JSON.parse(readFileSync(p, "utf8"));
+    } catch {
+      return; // unparseable — someone else's file, leave it exactly as it is
+    }
+  }
+  if (!Array.isArray(doc?.items)) doc = { ...doc, items: [] };
+  const have = new Set(doc.items.map((i: any) => String(i?.path ?? "")));
+  let changed = false;
+  for (const item of add) {
+    if (have.has(item.path)) continue;
+    doc.items.push(item);
+    have.add(item.path);
+    changed = true;
+  }
+  if (!changed && existsSync(p)) return;
+  mkdirSync(join(vault, ".obsidian"), { recursive: true });
+  writeFileSync(p, JSON.stringify(doc, null, 2));
 }
 
 export function sweepEmptyShells(vault: string): { moved: string[] } {

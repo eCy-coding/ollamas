@@ -249,7 +249,11 @@ describe("L21 — workspace polish", () => {
     expect(bm.items.some((i: any) => i.path === "Home.md")).toBe(true);
     const base = readFileSync(join(vault, "_index", "brain.base"), "utf8");
     expect(base).toContain("name: Sistem bazlı");
-    expect(base).toContain("groupBy: note.system");
+    // This used to assert the scalar `groupBy: note.system`, which is what Obsidian rejects:
+    // its parser requires an object with property AND direction, so `base:query` threw on
+    // brain.base every single run. The test encoded the bug; now it encodes the schema.
+    expect(base).toContain("property: note.system");
+    expect(base).toMatch(/direction: (ASC|DESC)/);
     expect(base).toContain("recall_rank");
   });
 });

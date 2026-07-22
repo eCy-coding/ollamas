@@ -162,4 +162,69 @@ export function bridgeApprovedToMisses(opts: { approvedPath?: string; missesPath
   return { added: queued.length, queued };
 }
 
+/** Gated vs safe counts, using the same normalisation the notes are written with —
+ *  a naive truthy check reads the dataset's "False" strings as safe. */
+export function ecymSplit(commands: EcymCommand[]): { gated: number; safe: number } {
+  let safe = 0;
+  for (const c of commands) if (isSafe(c.safe)) safe++;
+  return { gated: commands.length - safe, safe };
+}
+
+/**
+ * ecym.base — an Obsidian Bases database over the eCym command catalog.
+ *
+ * The catalog was 221 notes with no view at all. Every note already carried `level`, `safe`
+ * and `id`, so the data for a proper database was there the whole time; nothing was reading
+ * it. brain.base cannot cover this — it is scoped to tier-tagged memories on purpose.
+ *
+ * Written by code rather than by hand because a base that declares no structure is swept
+ * into _index/attic by sweepEmptyShells(); the `filters:` block below is what keeps it.
+ */
+export function writeEcymBase(vault: string): void {
+  const base = `filters:\n  and:\n      - file.hasTag("system/ecym")\n`
+    + `formulas:\n  risk: 'if(note.safe, "✅ güvenli", "⚠️ gated")'\n`
+    + `properties:\n`
+    + `  note.level:\n    displayName: Seviye\n`
+    + `  note.safe:\n    displayName: Güvenli\n`
+    + `  note.id:\n    displayName: Komut id\n`
+    + `views:\n`
+    + `  - type: table\n    name: Tümü\n    order:\n      - file.name\n      - note.level\n      - formula.risk\n      - note.id\n    limit: 300\n`
+    + `  - type: table\n    name: Seviye bazlı\n    groupBy:\n      property: note.level\n      direction: ASC\n    order:\n      - file.name\n      - formula.risk\n`
+    + `  - type: table\n    name: ⚠️ Gated\n    filters:\n      and:\n        - note.safe == false\n    order:\n      - file.name\n      - note.level\n      - note.id\n`
+    + `  - type: table\n    name: ✅ Güvenli\n    filters:\n      and:\n        - note.safe == true\n    order:\n      - file.name\n      - note.level\n`
+    + `  - type: cards\n    name: Kartlar\n    order:\n      - file.name\n      - note.level\n`;
+  mkdirSync(join(vault, "_index"), { recursive: true });
+  writeFileSync(join(vault, "_index", "ecym.base"), base);
+}
+
+/**
+ * eCym.md — the human entry point for the catalog, mirroring how Orchestra.md fronts the
+ * orchestra. Counts are passed in from the writer that just produced the notes, so the page
+ * can never disagree with what is actually on disk.
+ *
+ * The learning queue is rendered as a Tasks query rather than a static list: the queue is a
+ * set of open checkboxes and obsidian-tasks-plugin is installed, so this turns it into a
+ * board that stays correct as items are ticked off in the vault.
+ */
+export function writeEcymHub(
+  vault: string,
+  total: number,
+  split: { gated: number; safe: number } = { gated: 0, safe: 0 },
+): void {
+  const dir = join(vault, "ecym");
+  mkdirSync(dir, { recursive: true });
+  const md = `---\ncssclasses: [brain, system-ecym]\ntags: [system/ecym, moc]\naliases: [eCym, eCym komut merkezi]\n---\n\n`
+    + `# 🟢 eCym komut merkezi\n\n`
+    + `> [!abstract] Yerel komut kataloğu\n`
+    + `> **${total}** komut · ⚠️ **${split.gated}** gated · ✅ **${split.safe}** güvenli\n\n`
+    + `> [!warning] Gated komutlar onay ister\n`
+    + `> \`safe: false\` olan her komut çalıştırılmadan önce ECY_YES kapısından geçer.\n\n`
+    + `## 🗃️ Katalog\n![[ecym.base]]\n\n`
+    + `## 🌱 Öğrenme kuyruğu\n`
+    + `> [!tip] eCym'in yerel çözemediği sorular. Onaylananlar \`ecy-learn\` taslağına döner.\n\n`
+    + "```tasks\nnot done\npath includes ecym\nshort mode\n```\n\n"
+    + `[[Home]] · [[_learning-queue]]\n`;
+  writeFileSync(join(dir, "eCym.md"), md);
+}
+
 export const _ecymInternals = { toEcymNote, ecymBase };
