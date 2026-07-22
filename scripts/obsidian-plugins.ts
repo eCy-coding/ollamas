@@ -18,7 +18,7 @@
 //   --no-enable   write plugin files but leave community-plugins.json untouched.
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,6 +117,38 @@ export function obsidianRunning(): boolean {
   catch { return false; }
 }
 
+/**
+ * Restricted Mode check. Installing plugin files is NOT enough: Obsidian refuses to load
+ * community plugins until the vault owner trusts them, and it records that consent outside
+ * the vault, in the app's LevelDB under `enable-plugin-<vaultId>`. Without this probe the
+ * failure is silent and baffling — every plugin present, correct and inert.
+ *
+ * Read-only on purpose. Flipping the flag ourselves would forge the user's consent to run
+ * third-party code, so it stays a one-click human action.
+ * Returns null when the state can't be determined (non-macOS, app never launched).
+ */
+export function pluginsTrusted(vault = vaultPath()): boolean | null {
+  try {
+    const support = `${process.env.HOME}/Library/Application Support/obsidian`;
+    const reg = JSON.parse(readFileSync(join(support, "obsidian.json"), "utf8"));
+    const id = Object.entries(reg.vaults ?? {}).find(([, v]: any) => v?.path === vault)?.[0];
+    if (!id) return null;
+    const ldb = join(support, "Local Storage", "leveldb");
+    // The log is append-only, so the LAST write of the key is the current value.
+    let last: boolean | null = null;
+    for (const f of readdirSync(ldb).filter((f) => f.endsWith(".log"))) {
+      const buf = readFileSync(join(ldb, f));
+      const needle = Buffer.from(`enable-plugin-${id}`);
+      for (let i = buf.indexOf(needle); i !== -1; i = buf.indexOf(needle, i + 1)) {
+        const tail = buf.subarray(i + needle.length, i + needle.length + 16).toString("latin1");
+        if (tail.includes("true")) last = true;
+        else if (tail.includes("false")) last = false;
+      }
+    }
+    return last;
+  } catch { return null; }
+}
+
 export interface InstallReport {
   written: string[];
   skipped: string[];
@@ -204,7 +236,19 @@ function verify(): number {
     if (drift.length) { console.log(`✗ ${p.id}@${p.version}: ${drift.join(", ")}`); bad++; }
     else console.log(`✓ ${p.id}@${p.version}`);
   }
+  reportTrust();
   return bad;
+}
+
+/** Files-on-disk is only half the story; say so loudly when Obsidian is refusing to load them. */
+function reportTrust(): void {
+  const trusted = pluginsTrusted();
+  if (trusted === true) { console.log("✓ community plugins trusted for this vault"); return; }
+  if (trusted === null) { console.log("· plugin trust state unknown (app never launched?)"); return; }
+  console.log("");
+  console.log("⚠️  RESTRICTED MODE: Obsidian will NOT load these plugins until you trust them.");
+  console.log("   Obsidian → Settings → Community plugins → 'Turn on community plugins'.");
+  console.log("   One click, by design: it is your consent to run third-party code.");
 }
 
 async function main(): Promise<void> {
@@ -228,6 +272,7 @@ async function main(): Promise<void> {
   for (const f of report.failed) console.log(`  ✗ ${f.id}: ${f.reason}`);
   if (report.written.length) console.log(`  ✓ written: ${report.written.join(", ")}`);
   if (report.skipped.length) console.log(`  · skipped (up to date): ${report.skipped.join(", ")}`);
+  reportTrust();
   if (report.failed.length) process.exit(1);
 }
 

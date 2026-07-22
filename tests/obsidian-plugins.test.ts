@@ -3,7 +3,7 @@
 import { describe, test, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { PLUGINS, loadLock, lockEntryFor, sha256, assetUrl, lockPath, vaultPath } from "../scripts/obsidian-plugins";
+import { PLUGINS, loadLock, lockEntryFor, sha256, assetUrl, lockPath, vaultPath, pluginsTrusted } from "../scripts/obsidian-plugins";
 
 describe("pinned plugin set", () => {
   test("every plugin is fully pinned and uniquely id'd", () => {
@@ -81,6 +81,13 @@ describe("installed runtime", () => {
         expect(sha256(readFileSync(dst)), `${p.id}/${f}`).toBe(e.sha256[f]);
       }
     }
+  });
+
+  test("trust probe is read-only and total — unknown vault yields null, never a throw", () => {
+    // The probe must never crash a sync tick just because the app was never launched.
+    expect(pluginsTrusted("/nonexistent/vault/path")).toBeNull();
+    const v = pluginsTrusted();
+    expect(v === true || v === false || v === null).toBe(true);
   });
 
   test.skipIf(!has)("every installed plugin is enabled", () => {
