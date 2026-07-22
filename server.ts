@@ -2223,6 +2223,7 @@ OLLAMAS OPERATING CONTRACT (see AGENTS.md — the single source of truth):
             setImmediate(async () => {
               try {
                 const { resolveDistillProvider } = await import("./server/brain-active");
+        const { llmActive } = await import("./server/gpu-coordinator");
                 const { distillSession } = await import("./server/brain-distill");
                 await distillSession(snapshot, {
                   generate: async (messages) => {
@@ -4556,6 +4557,31 @@ app.post("/api/orchestra/tasks", async (req, res) => {
       },
       recall: async (q: string) => (await brain.brainRecall(q, { k: 5 }))
         .map((h: any) => ({ id: String(h.id), excerpt: String(h.content ?? "") })),
+
+      // L39: the conclusion is drawn by the SAME panel that answers questions — quality veto,
+      // honest degradation and external scoring all apply, because it IS askShared with the
+      // task's own evidence injected as the retrieval.
+      synthesize: async (title, results) => {
+        const { synthesizeTask } = await import("./server/orchestra-synthesis");
+        const { resolveEcym } = await import("./server/ecym-availability");
+        const { resolveDistillProvider } = await import("./server/brain-active");
+        const { llmActive: gpuBusy } = await import("./server/gpu-coordinator");
+        const gen = (provider: string, model?: string) => async (messages: { role: string; content: string }[]) =>
+          (await ProviderRouter.generate({ provider, model: model || "openai", messages, stream: false } as any)).text || "";
+        const seat = await resolveEcym({ busy: () => gpuBusy(), makeGenerator: (m) => gen("ollama-local", m) });
+        return synthesizeTask(title, results, {
+          generate: gen(resolveDistillProvider(process.env)),
+          expertNotes: seat.reason ? { ecym: seat.reason } : undefined,
+          experts: {
+            ollamas: gen(resolveDistillProvider(process.env)),
+            ecym: seat.generate ?? undefined,
+            claudecode: gen("github-models"),
+          },
+        } as any);
+      },
+
+      // L40: a finished, conclusive task becomes a memory through the one write choke-point.
+      remember: async (m) => brain.brainRemember(m as any),
     });
     res.json(out);
   } catch (err: any) {

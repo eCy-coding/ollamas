@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { ecymPropose, obsidianContribute, type EcymProposal } from "./orchestra-roles";
+import type { SynthesisResult } from "./orchestra-synthesis";
 
 /**
  * Ported from the denylist in ~/.local/bin/ecy-orchestra, which has been guarding real command
@@ -151,6 +152,10 @@ export interface TaskDeps {
   approved?: Set<string>;
   maxOutput?: number;
   now?: () => number;
+  /** L39: panel synthesis over the step evidence. Absent → the note keeps only raw blocks. */
+  synthesize?: (title: string, results: StepResult[]) => Promise<SynthesisResult | null>;
+  /** L40: write a finished task's conclusion back into the brain (the choke-point). */
+  remember?: (m: { id: string; tier: string; content: string; source: string }) => Promise<unknown>;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + `\n… (${s.length - n} karakter kırpıldı)` : s);
@@ -199,7 +204,7 @@ const ROLE_LABEL: Record<StepRole, string> = { recall: "🔵 ollamas (beyin)", c
  * The evidence note. Pending approvals are `- [ ] ONAY: <command>` checkboxes read back on the
  * next run, reusing the idempotent checkbox contract from the ask queue.
  */
-export function evidenceNote(title: string, id: string, results: StepResult[], totalMs: number, at: string): string {
+export function evidenceNote(title: string, id: string, results: StepResult[], totalMs: number, at: string, synthesis?: SynthesisResult | null): string {
   const sum = results.reduce((a, r) => a + r.ms, 0);
   const gated = results.filter((r) => r.gated);
   const failed = results.filter((r) => !r.ok && !r.gated && !r.degraded);
@@ -215,6 +220,20 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
     + (gated.length
         ? `> [!warning] Onay bekleyen adımlar — işaretle, sonraki turda çalışır\n\n`
           + gated.map((g) => `- [ ] ONAY: \`${g.invocation}\`  _(${g.gateReason})_`).join("\n") + "\n\n"
+        : "")
+    // L39: the CONCLUSION, above the raw blocks. The evidence stays below it untouched — a
+    // summary that replaced the evidence would be the same failure in the other direction.
+    + (synthesis
+        ? (synthesis.abstained
+            ? `## ⚠️ Sonuç\n\n> [!warning] Panel kanıttan cevap çıkaramadı (BİLGİ_YOK). Ham adımlar aşağıda.\n\n`
+            : `## ✅ Sonuç\n\n> [!success] **${synthesis.expert || "?"}** · kanıta dayalı\n\n${synthesis.answer}\n\n`)
+          + (synthesis.veto
+              ? `> [!important] ⚡ Kalite vetosu — gate **${synthesis.veto.from}** dedi, ölçüm **${synthesis.veto.to}** dedi (Δ${synthesis.veto.delta.toFixed(3)}).\n\n`
+              : "")
+          + (synthesis.degradedReasons && Object.keys(synthesis.degradedReasons).length
+              ? `> [!note]- Sentezde katılmayan uzmanlar\n` + Object.entries(synthesis.degradedReasons).map(([e, why]) => `> - **${e}** — ${why}`).join("\n") + "\n\n"
+              : "")
+          + `---\n\n### Ham kanıt\n\n`
         : "")
     + results.map((r) => {
         const head = `## ${ROLE_LABEL[r.role]} — ${r.gated ? "⏸ atlandı" : r.ok ? "✅" : r.degraded ? "🔌 çevrimdışı" : "❌"} ${r.ms}ms`;
@@ -235,7 +254,7 @@ export function readApprovals(noteText: string): Set<string> {
 export const taskNotePath = (vault: string, id: string, title: string): string =>
   join(vault, "orchestra", "tasks", `${id}-${title.toLowerCase().replace(/[^a-z0-9ğüşiöç]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task"}.md`);
 
-export interface TaskRunResult { ran: number; gated: number; done: number }
+export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number }
 
 /**
  * One pass over the board. Backlog tasks are executed; a task with pending approvals lands in
@@ -279,8 +298,12 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     const results = await runSteps(steps, { ...deps, approved });
     const totalMs = now() - t0;
 
+    // L39: draw the conclusion the note was missing. Best-effort — losing the raw evidence
+    // because the summary step fell over would be the wrong trade.
+    const synthesis = deps.synthesize ? await deps.synthesize(title, results) : null;
+
     mkdirSync(join(vault, "orchestra", "tasks"), { recursive: true });
-    writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString()));
+    writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString(), synthesis));
     res.ran++;
 
     const pending = results.some((r) => r.gated);
@@ -293,6 +316,26 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     } else {
       board.lanes.Done.push(`- [x] ${title}`);
       res.done++;
+      // L40: close the loop. Before this, the orchestra did the work and forgot it instantly —
+      // asked the same question again, the brain recalled a commit ABOUT disk surveying rather
+      // than the disk figure it had produced minutes earlier.
+      //
+      // Only a task that finished AND reached a real conclusion is worth remembering: an
+      // abstention ("BİLGİ_YOK") is not knowledge, and a gated or failed task has not finished.
+      // The id is derived from the task, so re-running upserts one memory instead of breeding
+      // a new one every tick.
+      if (deps.remember && synthesis && !synthesis.abstained && synthesis.answer) {
+        try {
+          const who = results.filter((r) => r.ok && !r.gated).map((r) => r.role).join(", ");
+          await deps.remember({
+            id: `task-${id}`,
+            tier: "episodic",
+            source: "orchestra/task",
+            content: `Görev: ${title}\nSonuç (${synthesis.expert || "panel"}): ${synthesis.answer}\nKatkı veren üyeler: ${who || "yok"}`,
+          });
+          res.remembered = (res.remembered ?? 0) + 1;
+        } catch { /* the brain being busy must not fail a finished task */ }
+      }
     }
   }
 
