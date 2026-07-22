@@ -73,10 +73,15 @@ export function writeEcymNotes(vault: string, path = ecymDatasetPath()): number 
     live.add(name);
     writeFileSync(join(dir, name), toEcymNote(c));
   }
-  // prune stale eCym notes (command removed from catalog) — guarded: never on empty catalog
+  // Prune stale COMMAND notes only — a command dropped from the catalog should not linger.
+  // Guarded twice: never on an empty catalog, and never outside the `ecym-` namespace this
+  // function owns. The second guard is not theoretical: everything else in this folder (the
+  // eCym hub, the learning queue, anything the operator writes) was being deleted on every
+  // sync and only survived because it happened to be rewritten later in the same push.
+  // Relying on write order to undo a delete is not a design.
   if (live.size > 0) {
     for (const f of readdirSync(dir)) {
-      if (f.endsWith(".md") && !live.has(f)) rmSync(join(dir, f));
+      if (f.startsWith("ecym-") && f.endsWith(".md") && !live.has(f)) rmSync(join(dir, f));
     }
   }
   return live.size;

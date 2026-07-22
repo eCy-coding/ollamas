@@ -121,6 +121,38 @@ describe("eCym hub — the human entry point", () => {
   });
 });
 
+describe("the catalog pruner must not eat everything else in ecym/", () => {
+  // Measured: after a sync the hub was simply gone. writeEcymNotes deletes every .md in
+  // ecym/ that is not a current command, and the hub, the learning queue and any human note
+  // all live there. They only survived because they were rewritten later in the same push —
+  // so a sync from older code, or any reordering, silently destroyed them.
+  test("a stale command note is still pruned", () => {
+    writeEcymNotes(vault, ecymFixture);
+    const stale = join(vault, "ecym", "ecym-kaldirilmis-komut.md");
+    writeFileSync(stale, "eski");
+    writeEcymNotes(vault, ecymFixture);
+    expect(existsSync(stale)).toBe(false);
+  });
+
+  test("the hub survives a catalog rewrite", () => {
+    writeEcymNotes(vault, ecymFixture);
+    writeEcymHub(vault, 3);
+    writeEcymNotes(vault, ecymFixture);
+    expect(existsSync(join(vault, "ecym", "eCym.md"))).toBe(true);
+  });
+
+  test("the learning queue and a hand-written note survive too", () => {
+    writeEcymNotes(vault, ecymFixture);
+    for (const f of ["_learning-queue.md", "kendi-notum.md"]) {
+      writeFileSync(join(vault, "ecym", f), "korunmalı");
+    }
+    writeEcymNotes(vault, ecymFixture);
+    for (const f of ["_learning-queue.md", "kendi-notum.md"]) {
+      expect(readFileSync(join(vault, "ecym", f), "utf8")).toBe("korunmalı");
+    }
+  });
+});
+
 describe("ecymSplit — the gated/safe counts the hub prints", () => {
   test("counts from the dataset, honouring the Python-repr strings it contains", () => {
     // The dataset stores `safe` inconsistently; a naive truthy check calls "False" safe.
