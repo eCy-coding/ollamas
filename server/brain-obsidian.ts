@@ -358,6 +358,10 @@ function writeTemplates(vault: string): void {
   const once = (name: string, body: string) => { const f = join(dir, name); if (!existsSync(f)) writeFileSync(f, body); };
   once("memory.md", `---\nid: manual:<% tp.date.now("YYYYMMDDHHmmss") %>\nsystem: ollamas\nns: manual\ntier: learned\nsource: obsidian\ncreated: <% tp.date.now("YYYY-MM-DDTHH:mm:ss") %>\nconfidence: 0.85\ncssclasses: [brain, tier-learned, system-ollamas]\ntags: [tier/learned, ns/manual, system/ollamas]\n---\n\n# <% tp.file.title %>\n\n> [!abstract] learned · manual\n\n`);
   once("daily.md", `---\ncssclasses: [brain]\ntags: [journal]\n---\n\n# <% tp.file.title %>\n\n## Bugün öğrenilenler\n\`\`\`dataview\nLIST FROM #tier/episodic WHERE created_ms\n\`\`\`\n`);
+  // eCym command draft. The catalog notes carry level/safe/id, so a new command written by
+  // hand should start with the same shape — otherwise it will not show up in ecym.base. `safe`
+  // defaults to false: a command is gated until someone decides it isn't, never the reverse.
+  once("ecym-command.md", `---\nid: "ecym:<% tp.file.title %>"\nsystem: ecym\nlevel: baslangic\nsafe: false\ncssclasses: [brain, system-ecym]\ntags: [system/ecym, ecym/baslangic, ecym/gated]\naliases: []\n---\n\n# <% tp.file.title %>\n\n> [!warning] eCym · baslangic · gated\n\n\`\`\`bash\n\n\`\`\`\n`);
 }
 
 // Daily-note journal: episodic memories grouped by day → journal/YYYY-MM-DD.md (Calendar-
@@ -704,7 +708,18 @@ function pushBrainToVault(vault: string, dump: BrainDump, manifest: Manifest, ne
     { type: "file", path: "_index/ecym.base", title: "🗃️ eCym katalog" },
     { type: "file", path: "_index/entities.base", title: "🗺️ Varlıklar" },
     { type: "file", path: "_index/journal.base", title: "📅 Günlük" },
+    { type: "file", path: "_index/ops.md", title: "🩺 Operasyon" },
   ]);
+  // Operations surface + property types + a saved review layout. These read from the same
+  // status the sync just produced, so they can never disagree with what was mirrored.
+  writeOpsNote(vault, obsidianStatus({ vault }));
+  mergeTypes(vault, {
+    safe: "checkbox",
+    degree: "number", hits: "number", confidence: "number",
+    created: "datetime",
+    level: "text", tier: "text", system: "text", id: "text", ns: "text", source: "text", name: "text",
+  });
+  writeBrainReviewWorkspace(vault);
   writeTierIndexes(vault, dump);
   writeTemplates(vault);
   writeJournal(vault, dump);                        // + L26 weekly/monthly rollups
@@ -879,6 +894,144 @@ export function mergeBookmarks(vault: string, add: BookmarkItem[]): void {
     changed = true;
   }
   if (!changed && existsSync(p)) return;
+  mkdirSync(join(vault, ".obsidian"), { recursive: true });
+  writeFileSync(p, JSON.stringify(doc, null, 2));
+}
+
+/**
+ * ops.md — the vault's own operations view. Until now the only way to see whether the mirror
+ * was healthy was to leave Obsidian and run the CLI; this brings drift, conflicts and the
+ * four systems' liveness into the graph itself, from obsidianStatus() so it can never
+ * disagree with the source.
+ *
+ * It is deliberately HONEST about what it does not know: the e2e legs (odysseus reachability,
+ * memory pressure) are not part of a sync, so instead of printing a fabricated green this
+ * renders the command to run. A dashboard that invents a status is worse than no dashboard.
+ */
+export function renderOpsNote(status: ObsidianStatus): string {
+  const su = status.systemUsage;
+  const when = (ms: number | null): string => {
+    if (!ms) return "—";
+    const mins = Math.round((Date.now() - ms) / 60000);
+    return mins < 1 ? "az önce" : mins < 60 ? `${mins} dk önce` : `${Math.round(mins / 60)} sa önce`;
+  };
+  const sysLine = (name: string, u: { online: boolean; lastActivity: number | null; detail: string }): string =>
+    `> ${u.online ? "🟢" : "🔴"} **${name}** — ${u.online ? "online" : "offline"} · ${when(u.lastActivity)} · ${u.detail}`;
+
+  const tierLines = Object.entries(status.notes)
+    .map(([t, n]) => `- \`${t}\` — **${n}**`).join("\n");
+
+  const driftLine = status.drift === 0
+    ? "> [!success] Senkron — drift **0**"
+    : `> [!warning] ⚠️ Drift **${status.drift}** — ${status.drift > 0 ? "aynalanmamış hafıza" : "fazla not"} var`;
+  const conflictLine = status.conflicts === 0
+    ? "> [!note] Çakışma yok"
+    : `> [!danger] **${status.conflicts}** çakışma — \`_index/conflicts/\` bak`;
+
+  return `---\ncssclasses: [brain]\ntags: [moc, ops]\naliases: [ops, operasyon]\n---\n\n`
+    + `# 🩺 Operasyon\n\n`
+    + `> [!abstract] Canlı ayna durumu\n`
+    + `> **${status.brainMemories}** hafıza · **${status.entities}** varlık · son sync ${when(status.lastSync)}\n\n`
+    + `${driftLine}\n\n${conflictLine}\n\n`
+    + `## Katmanlar\n${tierLines}\n\n`
+    + `## Sistemler\n`
+    + `${sysLine("ollamas", su.ollamas)}\n`
+    + `${sysLine("eCym", su.ecym)}\n`
+    + `${sysLine("odysseus", su.odysseus)}\n`
+    + `${sysLine("claudecode", su.claudecode)}\n\n`
+    + `## E2E sağlık\n`
+    + `> [!tip] Bu leg'ler sync'in bilgisi değil — ölçmek için çalıştır:\n`
+    + `> \`cd ~/Desktop/ollamas && npx tsx scripts/e2e-gate.ts\`\n\n`
+    + `[[Home]] · [[brain.base]] · [[eCym]]\n`;
+}
+
+export function writeOpsNote(vault: string, status: ObsidianStatus): void {
+  mkdirSync(join(vault, "_index"), { recursive: true });
+  writeFileSync(join(vault, "_index", "ops.md"), renderOpsNote(status));
+}
+
+/**
+ * Register property types WITHOUT clobbering what is already there. The Tasks plugin owns 25
+ * TQ_* entries in types.json; a plain overwrite would wipe them. Same rule as mergeBookmarks:
+ * merge by key, a type the operator set by hand wins, an unparseable file is left alone.
+ *
+ * This is polish, not a fix — measured, brain.base's numeric filters already work because
+ * Obsidian infers the type from the YAML value. Typing them makes the property panel show
+ * `safe` as a checkbox and `degree` as a number, nothing more.
+ */
+export function mergeTypes(vault: string, add: Record<string, string>): void {
+  const p = join(vault, ".obsidian", "types.json");
+  let doc: any = { types: {} };
+  if (existsSync(p)) {
+    try { doc = JSON.parse(readFileSync(p, "utf8")); } catch { return; }
+  }
+  if (!doc || typeof doc.types !== "object" || doc.types === null) doc = { ...doc, types: {} };
+  let changed = false;
+  for (const [k, v] of Object.entries(add)) {
+    if (Object.prototype.hasOwnProperty.call(doc.types, k)) continue; // operator/plugin wins
+    doc.types[k] = v;
+    changed = true;
+  }
+  if (!changed && existsSync(p)) return;
+  mkdirSync(join(vault, ".obsidian"), { recursive: true });
+  writeFileSync(p, JSON.stringify(doc, null, 2));
+}
+
+// A leaf node in an Obsidian workspace layout. Shape verified against a workspace saved by
+// the live app (obsidian workspace:save), not guessed: every leaf needs a state.type or the
+// app silently drops the layout on load.
+function wsLeaf(id: string, viewType: string, extra: Record<string, unknown> = {}): unknown {
+  return { id, type: "leaf", state: { type: viewType, state: extra, title: viewType } };
+}
+function wsTabs(id: string, children: unknown[]): unknown {
+  return { id, type: "tabs", children };
+}
+function wsSplit(id: string, direction: string, children: unknown[]): unknown {
+  return { id, type: "split", children, direction };
+}
+
+/**
+ * brain-review — a saved workspace: file-explorer + Home in the centre, the eCym catalog to
+ * the side. The vault had none ("No workspaces saved."), so there was no one-key way back to
+ * the review layout after wandering off into a note.
+ *
+ * The layout is intentionally minimal and every id is fixed, so the write is idempotent (a
+ * second sync produces byte-identical JSON) and the merge never steals the operator's active
+ * workspace. Ids are static strings — the schema needs them present, not unique-per-run.
+ */
+export function writeBrainReviewWorkspace(vault: string): void {
+  const p = join(vault, ".obsidian", "workspaces.json");
+  let doc: any = { workspaces: {}, active: "" };
+  if (existsSync(p)) {
+    try { doc = JSON.parse(readFileSync(p, "utf8")); } catch { return; }
+  }
+  if (!doc || typeof doc.workspaces !== "object" || doc.workspaces === null) doc = { ...doc, workspaces: {} };
+
+  doc.workspaces["brain-review"] = {
+    main: wsSplit("br-main", "vertical", [
+      wsTabs("br-main-tabs", [
+        wsLeaf("br-home", "markdown", { file: "Home.md", mode: "preview" }),
+        wsLeaf("br-ecym", "bases", { file: "_index/ecym.base" }),
+      ]),
+    ]),
+    left: wsSplit("br-left", "horizontal", [
+      wsTabs("br-left-tabs", [
+        wsLeaf("br-fe", "file-explorer"),
+        wsLeaf("br-search", "search"),
+        wsLeaf("br-bm", "bookmarks"),
+      ]),
+    ]),
+    right: wsSplit("br-right", "horizontal", [
+      wsTabs("br-right-tabs", [
+        wsLeaf("br-bl", "backlink"),
+        wsLeaf("br-tag", "tag"),
+      ]),
+    ]),
+    active: "br-home",
+  };
+  // Do not steal focus: only set active if the vault had no active workspace at all.
+  if (!doc.active) doc.active = "brain-review";
+
   mkdirSync(join(vault, ".obsidian"), { recursive: true });
   writeFileSync(p, JSON.stringify(doc, null, 2));
 }

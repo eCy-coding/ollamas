@@ -16,6 +16,8 @@ import { join } from "node:path";
 import { writeEcymBase, writeEcymHub, writeEcymNotes, ecymSplit } from "../server/brain-obsidian-ecym";
 import {
   writeEntitiesBase, writeJournalBase, mergeBookmarks, isAbandonedShell,
+  renderOpsNote, writeOpsNote, mergeTypes, writeBrainReviewWorkspace,
+  type ObsidianStatus,
 } from "../server/brain-obsidian";
 
 let dir: string, vault: string, ecymFixture: string;
@@ -245,6 +247,15 @@ describe("the sync flow wires the surfaces together", () => {
     }
   });
 
+  test("the push flow wires ops, types and workspace", () => {
+    const src = readFileSync(new URL("../server/brain-obsidian.ts", import.meta.url), "utf8");
+    // Guards that these actually run in pushBrainToVault, not just exist as functions.
+    expect(src).toMatch(/writeOpsNote\(vault/);
+    expect(src).toMatch(/mergeTypes\(vault/);
+    expect(src).toMatch(/writeBrainReviewWorkspace\(vault/);
+    expect(src).toContain('"_index/ops.md"');   // ops is bookmarked too
+  });
+
   test("the merge carries the ORIGINAL pins too — order must not be able to drop Home", () => {
     // bookmarks.json is also seeded by a write-once during config init. If this merge runs
     // first it creates the file, the write-once then skips, and anything only the write-once
@@ -300,5 +311,165 @@ describe("mergeBookmarks — the operator's own bookmarks must survive", () => {
     mkdirSync(join(vault, ".obsidian"), { recursive: true });
     mergeBookmarks(vault, [{ type: "file", path: "_index/ecym.base", title: "eCym DB" }]);
     expect(JSON.parse(readFileSync(bmPath(vault), "utf8")).items).toHaveLength(1);
+  });
+});
+
+
+const sampleStatus = (over: Partial<ObsidianStatus> = {}): ObsidianStatus => ({
+  vault: "/v",
+  exists: true,
+  notes: { core: 4, learned: 311, procedural: 1494, episodic: 227, working: 12 },
+  entities: 305,
+  brainMemories: 2053,
+  drift: 0,
+  conflicts: 0,
+  lastSync: 1784727897000,
+  systemUsage: {
+    ollamas:    { lastActivity: 1784727897000, online: true,  detail: "brain⇄vault" },
+    ecym:       { lastActivity: 1784711718000, online: true,  detail: "katalog" },
+    odysseus:   { lastActivity: null,           online: false, detail: "Khoj offline" },
+    claudecode: { lastActivity: 1784718589000, online: true,  detail: "ask-shared" },
+  },
+  ...over,
+});
+
+describe("ops.md — the vault's own operations view", () => {
+  test("every number comes from the status object, not a literal", () => {
+    const md = renderOpsNote(sampleStatus());
+    expect(md).toContain("2053");        // brainMemories
+    expect(md).toContain("305");         // entities
+    expect(md).toContain("1494");        // procedural
+  });
+
+  test("drift 0 reads as in-sync; drift > 0 warns", () => {
+    expect(renderOpsNote(sampleStatus({ drift: 0 }))).toMatch(/senkron|drift.*0/i);
+    const drifted = renderOpsNote(sampleStatus({ drift: 17 }));
+    expect(drifted).toContain("17");
+    expect(drifted).toMatch(/⚠|uyar|drift/i);
+  });
+
+  test("a conflict is surfaced, not buried", () => {
+    const md = renderOpsNote(sampleStatus({ conflicts: 3 }));
+    expect(md).toContain("3");
+    expect(md).toMatch(/conflict|çakış/i);
+  });
+
+  test("an offline system is written as offline — never a fabricated green", () => {
+    const md = renderOpsNote(sampleStatus());
+    // odysseus is offline in the sample; it must not be shown as online.
+    const odyLine = md.split("\n").find((l) => /odysseus/i.test(l)) || "";
+    expect(odyLine).toMatch(/offline|🔴|çevrimdışı/i);
+    expect(odyLine).not.toMatch(/🟢/);
+  });
+
+  test("the e2e legs the sync cannot know are shown as a command to RUN, not a result", () => {
+    const md = renderOpsNote(sampleStatus());
+    expect(md).toContain("e2e-gate.ts");            // tells the operator how to check
+    expect(md).not.toMatch(/odysseus-bridge.*🟢/);  // never claims a leg it did not measure
+  });
+
+  test("links back to Home so the note is reachable", () => {
+    expect(renderOpsNote(sampleStatus())).toContain("[[Home]]");
+  });
+
+  test("writeOpsNote puts it under _index where the other generated views live", () => {
+    writeOpsNote(vault, sampleStatus());
+    expect(existsSync(join(vault, "_index", "ops.md"))).toBe(true);
+  });
+});
+
+describe("mergeTypes — property types without clobbering Tasks' own", () => {
+  const typesPath = (v: string) => join(v, ".obsidian", "types.json");
+  const seed = (v: string, types: unknown) => {
+    mkdirSync(join(v, ".obsidian"), { recursive: true });
+    writeFileSync(typesPath(v), typeof types === "string" ? types : JSON.stringify({ types }));
+  };
+
+  test("registers the brain property types the notes actually use", () => {
+    seed(vault, {});
+    mergeTypes(vault, { safe: "checkbox", degree: "number", created: "datetime" });
+    const t = JSON.parse(readFileSync(typesPath(vault), "utf8")).types;
+    expect(t.safe).toBe("checkbox");
+    expect(t.degree).toBe("number");
+    expect(t.created).toBe("datetime");
+  });
+
+  test("the Tasks plugin's 25 TQ_* types survive untouched", () => {
+    seed(vault, { TQ_explain: "checkbox", TQ_short_mode: "checkbox", aliases: "aliases" });
+    mergeTypes(vault, { degree: "number" });
+    const t = JSON.parse(readFileSync(typesPath(vault), "utf8")).types;
+    expect(t.TQ_explain).toBe("checkbox");
+    expect(t.TQ_short_mode).toBe("checkbox");
+    expect(t.aliases).toBe("aliases");
+    expect(t.degree).toBe("number");
+  });
+
+  test("a type the operator set by hand wins over ours", () => {
+    seed(vault, { degree: "text" });   // operator chose text
+    mergeTypes(vault, { degree: "number" });
+    expect(JSON.parse(readFileSync(typesPath(vault), "utf8")).types.degree).toBe("text");
+  });
+
+  test("a corrupt types.json is left untouched rather than overwritten", () => {
+    seed(vault, "{ not json");
+    mergeTypes(vault, { degree: "number" });
+    expect(readFileSync(typesPath(vault), "utf8")).toBe("{ not json");
+  });
+
+  test("a vault with no types.json yet gets one", () => {
+    mkdirSync(join(vault, ".obsidian"), { recursive: true });
+    mergeTypes(vault, { safe: "checkbox" });
+    expect(JSON.parse(readFileSync(typesPath(vault), "utf8")).types.safe).toBe("checkbox");
+  });
+});
+
+describe("brain-review workspace — saved layout, merged not clobbered", () => {
+  const wsPath = (v: string) => join(v, ".obsidian", "workspaces.json");
+  const seed = (v: string, doc: unknown) => {
+    mkdirSync(join(v, ".obsidian"), { recursive: true });
+    writeFileSync(wsPath(v), typeof doc === "string" ? doc : JSON.stringify(doc));
+  };
+
+  test("adds brain-review with the schema Obsidian actually writes (main/left/right)", () => {
+    seed(vault, { workspaces: {}, active: "" });
+    writeBrainReviewWorkspace(vault);
+    const w = JSON.parse(readFileSync(wsPath(vault), "utf8")).workspaces["brain-review"];
+    expect(w).toBeDefined();
+    for (const k of ["main", "left", "right"]) expect(w[k]).toBeDefined();
+    expect(w.main.type).toBe("split");
+  });
+
+  test("every leaf carries a state.type — an empty leaf makes Obsidian drop the layout", () => {
+    seed(vault, { workspaces: {}, active: "" });
+    writeBrainReviewWorkspace(vault);
+    const w = JSON.parse(readFileSync(wsPath(vault), "utf8")).workspaces["brain-review"];
+    const leafTypes: string[] = [];
+    const walk = (n: any) => { if (n?.type === "leaf") leafTypes.push(n?.state?.type); (n?.children || []).forEach(walk); };
+    ["main", "left", "right"].forEach((k) => walk(w[k]));
+    expect(leafTypes.length).toBeGreaterThan(0);
+    expect(leafTypes.every((t) => typeof t === "string" && t.length > 0)).toBe(true);
+  });
+
+  test("an existing workspace the operator saved is preserved", () => {
+    seed(vault, { workspaces: { "kendi-düzenim": { main: { type: "split", children: [] } } }, active: "kendi-düzenim" });
+    writeBrainReviewWorkspace(vault);
+    const doc = JSON.parse(readFileSync(wsPath(vault), "utf8"));
+    expect(doc.workspaces["kendi-düzenim"]).toBeDefined();
+    expect(doc.workspaces["brain-review"]).toBeDefined();
+    expect(doc.active).toBe("kendi-düzenim");   // the merge does not steal focus
+  });
+
+  test("is idempotent — a second run does not change what the first wrote", () => {
+    seed(vault, { workspaces: {}, active: "" });
+    writeBrainReviewWorkspace(vault);
+    const first = readFileSync(wsPath(vault), "utf8");
+    writeBrainReviewWorkspace(vault);
+    expect(readFileSync(wsPath(vault), "utf8")).toBe(first);
+  });
+
+  test("a corrupt workspaces.json is left untouched", () => {
+    seed(vault, "{ not json");
+    writeBrainReviewWorkspace(vault);
+    expect(readFileSync(wsPath(vault), "utf8")).toBe("{ not json");
   });
 });
