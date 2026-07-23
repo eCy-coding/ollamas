@@ -12,6 +12,7 @@
 // role attribution: [mem:step:ecym] reads as "the machine said this".
 import { askShared, type SharedDeps, type SharedAskResult } from "./brain-shared";
 import type { StepResult, StepRole } from "./orchestra-tasks";
+import { gradeGrounding, regroundMessages } from "./orchestra-grounding";
 
 /** Ranking hint for the panel: the machine's raw output is the most direct evidence a task
  *  has, the brain's recall is background, the vault is context. Not a truth ordering —
@@ -186,11 +187,15 @@ export interface SynthesisResult {
   degradedReasons?: Record<string, string>;
   /** True when the panel honestly reported it could not answer from the evidence. */
   abstained: boolean;
+  /** L45: how well the answer used its own evidence, and whether a re-ask was needed. */
+  grounding?: { score: number; regrounded: boolean; weak: boolean };
 }
 
 export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespaces"> & {
   /** L44: the dedicated follow-up judge. Absent → in-band directive only (old behaviour). */
   decide?: (messages: { role: string; content: string }[]) => Promise<string>;
+  /** L45: strict re-ask when the answer ignored its evidence. Absent → grade only, no re-ask. */
+  reground?: (messages: { role: string; content: string }[]) => Promise<string>;
 };
 
 /**
@@ -248,10 +253,33 @@ export async function synthesizeTask(
       followup = await decideFollowup(title, answer, followupIds, deps.decide, alreadyRun);
       if (followup) followupVia = "decision";
     }
+    let finalAnswer = answer;
     const abstained = !!r.abstained || !answer || /BİLGİ_YOK|BILGI_YOK/.test(answer);
+
+    // L45: grade grounding, and re-ask ONCE if the answer talked around its evidence. Skipped
+    // for an abstention (there is nothing to ground) and when no reground path is wired.
+    let grounding: SynthesisResult["grounding"];
+    if (!abstained) {
+      let g = gradeGrounding(finalAnswer, sources);
+      let regrounded = false;
+      if (g.weak && deps.reground) {
+        try {
+          const retry = stripFollowup(String(await deps.reground(regroundMessages(title, sources))).trim());
+          // Only accept the retry if it is genuinely better grounded — a worse re-ask is discarded.
+          if (retry && !/BİLGİ_YOK|BILGI_YOK/.test(retry)) {
+            const g2 = gradeGrounding(retry, sources);
+            // Strictly better only: a re-ask that ties (both ungrounded, score 0) is no
+            // improvement, so the original is kept rather than swapped for an equal weak one.
+            if (g2.score > g.score) { finalAnswer = retry; g = g2; regrounded = true; }
+          }
+        } catch { /* reground best-effort — keep the first answer and mark it weak */ }
+      }
+      grounding = { score: g.score, regrounded, weak: g.weak };
+    }
+
     return {
-      answer, expert: r.expert ?? "", scores: r.scores, veto: r.veto,
-      degradedReasons: r.degradedReasons, abstained, followup, followupVia,
+      answer: finalAnswer, expert: r.expert ?? "", scores: r.scores, veto: r.veto,
+      degradedReasons: r.degradedReasons, abstained, followup, followupVia, grounding,
     };
   } catch {
     return null;

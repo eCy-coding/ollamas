@@ -276,7 +276,12 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
     + (synthesis
         ? (synthesis.abstained
             ? `## ⚠️ Sonuç\n\n> [!warning] Panel kanıttan cevap çıkaramadı (BİLGİ_YOK). Ham adımlar aşağıda.\n\n`
-            : `## ✅ Sonuç\n\n> [!success] **${synthesis.expert || "?"}** · kanıta dayalı\n\n${synthesis.answer}\n\n`)
+            : `## ${synthesis.grounding?.weak ? "⚠️" : "✅"} Sonuç\n\n> [!${synthesis.grounding?.weak ? "warning" : "success"}] **${synthesis.expert || "?"}**${synthesis.grounding?.regrounded ? " · yeniden-soruldu" : ""} · kanıta dayalı\n\n${synthesis.answer}\n\n`)
+          // L45: an answer that talked around its evidence is flagged, not passed off as solid.
+          // It stays in the note (a human can still read it) but is kept out of the brain.
+          + (synthesis.grounding?.weak
+              ? `> [!warning] ⚠️ zayıf-grounding: cevap kanıttaki somut sayıları tam kullanmadı (skor ${synthesis.grounding.score.toFixed(2)}). Brain'e yazılmadı.\n\n`
+              : "")
           + (synthesis.veto
               ? `> [!important] ⚡ Kalite vetosu — gate **${synthesis.veto.from}** dedi, ölçüm **${synthesis.veto.to}** dedi (Δ${synthesis.veto.delta.toFixed(3)}).\n\n`
               : "")
@@ -453,7 +458,13 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
       // abstention ("BİLGİ_YOK") is not knowledge, and a gated or failed task has not finished.
       // The id is derived from the task, so re-running upserts one memory instead of breeding
       // a new one every tick.
-      if (deps.remember && synthesis && !synthesis.abstained && synthesis.answer) {
+      //
+      // L45: a weakly-grounded answer is not remembered either. If the synthesis talked around
+      // its own evidence, writing it into the brain would poison recall with an unreliable
+      // "fact" — the exact thing L40's loop was built to feed. Weak stays visible in the note,
+      // out of the store.
+      const conclusive = !!synthesis && !synthesis.abstained && !!synthesis.answer && !synthesis.grounding?.weak;
+      if (deps.remember && conclusive && synthesis) {
         try {
           const who = results.filter((r) => r.ok && !r.gated).map((r) => r.role).join(", ");
           await deps.remember({

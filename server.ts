@@ -4636,6 +4636,9 @@ app.post("/api/orchestra/tasks", async (req, res) => {
           // L44: the follow-up judge — its own small call with its own system prompt, because
           // the in-band directive loses to askShared's terse contract every time.
           decide: gen(resolveDistillProvider(process.env)),
+          // L45: strict re-ask when the answer talked around its evidence. Same $0 model, its
+          // own grounding-enforcing prompt — no model upgrade, just one more chance to be exact.
+          reground: gen(resolveDistillProvider(process.env)),
           experts: {
             ollamas: gen(resolveDistillProvider(process.env)),
             ecym: seat.generate ?? undefined,
