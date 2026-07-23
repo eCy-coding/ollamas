@@ -396,8 +396,14 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     // Commands this task already ran: re-proposing the one that produced the evidence is the
     // most common wrong follow-up, so it is withheld rather than argued against in a prompt.
     const ranIds = steps.map((s) => s.proposal?.id).filter((x): x is string => !!x);
+    // Only offer a follow-up when the task is actually a MACHINE question — i.e. the catalog
+    // matched and a command ran this round. Measured: "felsefede özgür irade var mı" and
+    // "orkestra nasıl çalışıyor" plan no command (they are vault/recall tasks), yet the judge,
+    // seeing a hedge-heavy answer with no concrete numbers, still picked one — running `df` on a
+    // philosophy question. A task with no command in round one gets no follow-up in round two.
+    const followupPool = ranIds.length ? followupCandidates(undefined, deps.commandAllowed) : [];
     let synthesis = deps.synthesize
-      ? await deps.synthesize(title, results, followupCandidates(undefined, deps.commandAllowed), ranIds)
+      ? await deps.synthesize(title, results, followupPool, ranIds)
       : null;
     let rounds = 1;
 

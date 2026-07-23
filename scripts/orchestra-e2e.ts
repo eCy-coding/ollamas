@@ -15,6 +15,7 @@ import { readEcymCommands } from "../server/brain-obsidian-ecym";
 import { defaultVaultPath } from "../server/brain-obsidian";
 import { qualityVeto, vetoDelta } from "../server/brain-formulas";
 import { isFailurePayload } from "../server/brain-answer-score";
+import { SCENARIOS } from "../server/orchestra-scenarios";
 
 const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 type Sev = "CRITICAL" | "HIGH" | "MED";
@@ -167,6 +168,48 @@ async function main(): Promise<void> {
     add("task.ledger", "MED", rows.length > 0,
       last ? `${rows.length} kayıt · son: answered=${last.answered} üyeler=[${(last.members ?? []).join(",")}]` : "defter boş");
   } catch (e: any) { add("task.ledger", "MED", false, `defter okunamadı: ${e?.message}`); }
+
+  // ── 8. the scenario matrix — resilience across task shapes ─────────────────
+  //
+  // The ledger held only two distinct tasks, both test tasks. A task fails in more ways than it
+  // succeeds; each scenario states a STRUCTURAL expectation an observer can check without
+  // depending on the model's wording. Structural checks (gated, no-command) are HIGH; anything
+  // that rides on model quality (did it answer, is it grounded) is reported but WARN.
+  if (existsSync(boardPath)) {
+    for (const sc of SCENARIOS) {
+      const before = readFileSync(boardPath, "utf8");
+      try {
+        writeFileSync(boardPath, before.replace(/(##\s*\S*\s*Backlog\s*\n)/i, `$1\n- [ ] ${sc.title}\n`));
+        const t = await api("/api/orchestra/tasks", {});
+        const note = taskNotePath(vault, taskId(sc.title), sc.title);
+        const body = existsSync(note) ? readFileSync(note, "utf8") : "";
+        const hasCommandStep = /🟢 eCym \(makine\)/.test(body);
+        const isGatedNote = /ONAY:/.test(body) || /🔨 Doing[\s\S]*?ONAY|onay bekliyor/.test(body);
+
+        // Structural: the plan matched what the scenario spec derives.
+        const cmdOk = hasCommandStep === sc.expect.hasCommand;
+        add(`scn:${sc.expect.kind}`, sc.expect.gated || !sc.expect.hasCommand ? "HIGH" : "MED", cmdOk,
+          `"${sc.title.slice(0, 30)}" komut-adımı gözlenen=${hasCommandStep} beklenen=${sc.expect.hasCommand}`);
+        if (sc.expect.gated) {
+          add(`scn:gated-waits`, "HIGH", (t?.gated ?? 0) >= 1 || isGatedNote,
+            `gated görev ONAY bekliyor (gated=${t?.gated}, ran=${t?.ran})`);
+        }
+        // Model-quality: was the answer grounded? Reported, never blocking.
+        if (sc.expect.hasCommand && !sc.expect.gated) {
+          const weak = /zayıf-grounding/.test(body);
+          add(`scn:grounded:${sc.expect.kind}`, "MED", true,
+            weak ? `"${sc.title.slice(0, 24)}" ⚠️ zayıf-grounding (dürüst işaret)` : `"${sc.title.slice(0, 24)}" grounded ✓`);
+        }
+      } catch (e: any) {
+        add(`scn:${sc.expect.kind}`, "HIGH", false, `"${sc.title.slice(0, 24)}" → ${e?.message}`);
+      } finally {
+        try {
+          const after = readFileSync(boardPath, "utf8");
+          writeFileSync(boardPath, after.split("\n").filter((l) => !l.includes(sc.title)).join("\n"));
+        } catch { /* best-effort cleanup */ }
+      }
+    }
+  }
 
   // ── report ─────────────────────────────────────────────────────────────────
   const pad = (s: string, n: number) => s + " ".repeat(Math.max(0, n - s.length));
