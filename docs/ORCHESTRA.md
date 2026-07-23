@@ -154,3 +154,35 @@ Karar bu yüzden **ayrı** sorulur, kendi sistem prompt'uyla. Ve tek çağrı ye
 ### Yeni GOTCHA
 - Takip direktifi **yalnız kazanandan** okunuyordu → bir uzman eksiği görüp komut adlandırsa bile üslupta kaybedince sinyal çöpe gidiyordu. Artık **her uzmandan**, kazanan önce. Risk artmaz: id yine katalogla doğrulanır, adım yine güvenlik tablosundan geçer.
 - Opsiyonel direktif az kullanılır. Kural "kanıt soruyu tam cevaplamıyorsa MUTLAKA" diye kaçamağa bağlandı — kaçamağın kendisi kanıtın yetmediğinin işaretidir.
+
+---
+
+## Sentez güvenilir, dayanıklılık kanıtlı, yaşam döngüsü tam (L45–L47)
+
+### L45 — grounding guardrail
+Ölçüldü: bir takip turu `ps -A -o %cpu`'yu getirdi (`node 184.7% · next-server 98.1%`) ama sentez hâlâ *"sorumlu olduğu varsayılabilir"* dedi ve yük ortalamalarını yanlış etiketledi. Modern RAG değerlendirmesi buna *groundedness* diyor.
+
+`orchestra-grounding.ts` **deterministik** bir guardrail (başka bir model "iyi mi" diye sorulmaz): (1) kaçamak dil var mı (`varsayılabilir/genellikle/muhtemelen/çeşitli`, folded ASCII regex), (2) kanıttaki somut token'ları (sayı, süreç adı) kullanıyor mu — token'lar kaynaklardan çıkarılır, tablo iskeleti (PID/%CPU/COMM) elenir. Zayıfsa kendi sistem prompt'uyla **tek** yeniden-sorar; yalnız **kesinlikle daha iyi** skorlu cevap kabul edilir. Hâlâ zayıfsa `⚠️ zayıf-grounding` işaretlenir.
+
+**En kritik sonuç:** zayıf-grounding cevap **brain'e YAZILMAZ**. L40 döngüsü görev sonuçlarını recall'a besliyor; kanıtını kullanmayan bir cevabı hafızaya almak, recall'ı güvenilmez bir "gerçek"le zehirlerdi.
+
+GOTCHA: JS `` sadece ASCII → `çeşitli` hiç eşleşmiyordu (`ç` non-`\w`). Kaçamak tespiti artık folded cevapta çalışır.
+
+### L46 — senaryo matrisi
+Sonuç defterinde yalnız **2 benzersiz görev** (ikisi de test) vardı. `orchestra-scenarios.ts` 8 senaryo türü tanımlar (tek-komut, çok-parçalı-zincir, gated, katalog-yok, recall-only); her `expect` **aynı planlayıcıdan** (planTask/ecymPropose) türetilir → spec davranıştan sapamaz. e2e canlı koşar.
+
+**İki davranış hatası buldu:** `felsefede özgür irade var mı` ve `orkestra nasıl çalışıyor` komut planlamıyor (vault/recall görevi), ama denetçi kaçamak-dolu cevap görünce yine de komut seçiyordu — felsefe sorusuna `df` çalıştırıyordu. Fix: ilk turda komut çalışmadıysa 2. turda takip önerilmez.
+
+### L47 — yaşam döngüsü
+- **Stale-freeze:** Doing'de `ORCHESTRA_STALE_DAYS` (vars. 7) günden eski gated görev → ❄️ işaret + not satırı. Silinmez; onay işaretlenince çözülür. Idempotent.
+- **Canlı panel:** `status.md` sync-anı snapshot'ın altına cevap oranı, üye-başı katkı/kazanma, ort. tur, veto, bekleyen onay ekler — defterden türetilir. Canlı: *"Son 30 görev · cevap %100 · ort. tur 1.57 · veto 1"*.
+
+### Ölçülen önce/sonra
+| | Önce | Sonra |
+|---|---|---|
+| Sentez `node 184.7%` var, cevap | "varsayılabilir", brain'e yazılır | ⚠️ zayıf işaretli, brain'e YAZILMAZ |
+| Yük ortalaması etiketi | "10/5/1 dakika" (yanlış) | "1/5/15 dakika" (doğru) |
+| Denenen görev türü | 2 (ikisi test) | 8 senaryo, e2e'de kanıtlı |
+| Gated görev Doing'de | süresiz takılı | 7 gün → ❄️ dondu |
+| status.md | 4-sistem snapshot | + canlı görev metrikleri |
+| orchestra:e2e | 26 kontrol | **42 kontrol** |

@@ -16,6 +16,8 @@ import { defaultVaultPath } from "../server/brain-obsidian";
 import { qualityVeto, vetoDelta } from "../server/brain-formulas";
 import { isFailurePayload } from "../server/brain-answer-score";
 import { SCENARIOS } from "../server/orchestra-scenarios";
+import { gradeGrounding } from "../server/orchestra-grounding";
+import { orchestraPanel, readOutcomes } from "../server/orchestra-status";
 
 const API = process.env.OLLAMAS_URL || "http://127.0.0.1:3000";
 type Sev = "CRITICAL" | "HIGH" | "MED";
@@ -168,6 +170,24 @@ async function main(): Promise<void> {
     add("task.ledger", "MED", rows.length > 0,
       last ? `${rows.length} kayıt · son: answered=${last.answered} üyeler=[${(last.members ?? []).join(",")}]` : "defter boş");
   } catch (e: any) { add("task.ledger", "MED", false, `defter okunamadı: ${e?.message}`); }
+
+  // ── 7b. grounding guardrail + live panel ───────────────────────────────────
+  {
+    // The grader must separate the real live before/after — no model call, pure.
+    const src = [{ id: "step:command", tier: "working", distance: 0, score: 1, createdAt: 0,
+      content: "[command] ps ...\n80515 184.7 /usr/local/bin/node\n 4675 98.1 next-server" }];
+    const hedged = gradeGrounding("Sorumlu süreç genellikle varsayılabilir. [x]", src as any);
+    const good = gradeGrounding("En yüksek node (%184.7). [mem:step:command]", src as any);
+    add("grounding.guardrail", "HIGH", hedged.weak && !good.weak,
+      `kaçamak weak=${hedged.weak} · grounded weak=${good.weak}`);
+  }
+  try {
+    const led = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/orchestra-tasks.jsonl`;
+    const panel = orchestraPanel(readOutcomes(existsSync(led) ? readFileSync(led, "utf8") : ""),
+      parseBoard(readFileSync(boardPath, "utf8")));
+    add("panel.metrics", "MED", panel.total > 0 && panel.members.length === 3,
+      `${panel.total} görev · cevap %${Math.round(panel.answerRate * 100)} · ort.tur ${panel.avgRounds} · veto ${panel.vetoes}`);
+  } catch (e: any) { add("panel.metrics", "MED", false, `panel türetilemedi: ${e?.message}`); }
 
   // ── 8. the scenario matrix — resilience across task shapes ─────────────────
   //
