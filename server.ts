@@ -57,6 +57,7 @@ import { OllamasOAuthProvider } from "./server/mcp/oauth-provider";
 import { listUpstreams, type UpstreamConfig } from "./server/mcp/client";
 import { superviseUpstream, removeUpstream, startSupervisor, stopSupervisor, getUpstreamStatus } from "./server/mcp/supervisor";
 import { obsidianUpstreamConfig, obsidianHealth } from "./server/obsidian-rest";
+import { deriveOperation, obsidianGate } from "./server/obsidian-gate";
 import { memoryUsage } from "./server/memory-stats";
 import { decorateCatalog } from "./server/mcp/catalog";
 import { getFeedItems } from "./server/threatfeed";
@@ -312,6 +313,47 @@ app.use(
     "/api/modules", // INV-O0-1: ALL module routes live under this ONE prefix (O0 Faz 2)
   ],
   localOwnerGuard,
+);
+
+// Mandatory SOFT Obsidian gate (server/obsidian-gate.ts): before every real operation — LLM
+// chat/agent/pipeline/v1 + terminal exec + file ops — attempt a vault READ (recall) and a
+// vault WRITE (operation-record note). If Obsidian is unreachable it records a "miss" and
+// PROCEEDS; it must never block a request. eCym inherits this for free since it reaches
+// ollamas only through /v1/chat/completions. Defined inline (not in the gate module) because
+// `logSeyir` and `db` are module-scoped here; the gate module stays pure/IO-shell only.
+// Mounted AFTER localOwnerGuard so owner-auth runs first.
+const obsidianGateMiddleware: express.RequestHandler = async (req, res, next) => {
+  try {
+    // Shallow-merge on load (db.ts `load()`) means an existing config.json predating this
+    // field would leave `obsidianGate` as `undefined` — treat that as "on" (SOFT gate is
+    // default-enabled; only an explicit `false` disables it).
+    if (db.data.permissions.obsidianGate === false) return next();
+    // NOTE: req.path is relative to this middleware's mount prefix (Express rebases req.url
+    // for every app.use(path, ...) layer, same as a sub-router) — use req.originalUrl (the
+    // untouched incoming path) so deriveOperation sees the real route, e.g. "/api/generate"
+    // rather than "/".
+    const fullPath = req.originalUrl.split("?")[0];
+    const op = deriveOperation(req.method, fullPath, req.body);
+    if (!op) return next(); // not a gated operation (health/status/metrics/keys-pool polls, etc.)
+    const result = await obsidianGate(op, new Date().toISOString());
+    (req as any).obsidianContext = result.findings; // handlers MAY use recalled context — bonus, not required
+    if (!result.touched) {
+      logSeyir({ kind: "obsidian-gate-miss", op: op.kind, summary: op.summary.slice(0, 80), reason: result.reason });
+    } else {
+      logSeyir({ kind: "obsidian-gate", op: op.kind, note: result.notePath, findings: result.findings.length });
+    }
+  } catch {
+    /* SOFT: never block the request on gate failure */
+  }
+  next();
+};
+app.use(
+  [
+    "/api/generate", "/api/ai", "/api/agent", "/api/pipeline", "/v1/chat/completions",
+    "/api/brain/ask", "/api/brain/ask-shared", "/api/terminal",
+    "/api/workspace/file", "/api/workspace/upload", "/api/workspace/download",
+  ],
+  obsidianGateMiddleware,
 );
 
 // --- Multi-agent pipeline (M3) — registered at module top-level (M-050) so in-process route
@@ -1323,6 +1365,11 @@ async function initializeServer() {
       fileWrite: !!fileWrite,
       commandExec: !!commandExec,
       git: !!git,
+      // Unlike the other toggles, this one defaults ON (SOFT gate — safe to default-enable):
+      // the frontend security panel doesn't send this field yet, so treat "absent" as
+      // "leave enabled" and only an explicit `false` turns it off. Prevents every unrelated
+      // toggle save from silently disabling the vault gate.
+      obsidianGate: req.body.obsidianGate !== false,
     };
     db.logSecurity(
       "permission_change",

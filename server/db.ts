@@ -75,6 +75,8 @@ export interface DBConfig {
     fileWrite: boolean;
     commandExec: boolean;
     git: boolean;
+    /** Mandatory SOFT Obsidian vault gate before every operation (obsidian-gate.ts). Default on: SOFT means an unreachable vault never blocks, so default-true is safe. */
+    obsidianGate: boolean;
   };
   sessions: ChatSession[];
   securityLog: SecurityEvent[];
@@ -126,6 +128,7 @@ const DEFAULT_CONFIG: DBConfig = {
     fileWrite: true,
     commandExec: true,
     git: true,
+    obsidianGate: true,
   },
   sessions: [],
   securityLog: [],
