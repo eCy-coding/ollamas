@@ -180,6 +180,17 @@ async function main(): Promise<void> {
     const good = gradeGrounding("En yüksek node (%184.7). [mem:step:command]", src as any);
     add("grounding.guardrail", "HIGH", hedged.weak && !good.weak,
       `kaçamak weak=${hedged.weak} · grounded weak=${good.weak}`);
+
+    // L49/L50: the two false positives that started this — a correct pwd answer and a cited
+    // philosophy answer must NOT be weak, and the one true weak must stay weak.
+    const pwd = [{ id: "step:command", tier: "working", distance: 0, score: 1, createdAt: 0,
+      content: "[command] pwd\n/Users/x/Desktop/ollamas" },
+      { id: "step:vault", tier: "working", distance: 0, score: 1, createdAt: 0, content: "[vault] 2026-07-22 · 4 görev" }];
+    const phil = [{ id: "step:recall", tier: "working", distance: 0, score: 1, createdAt: 0, content: "[recall] felsefe notu" }];
+    const p1 = gradeGrounding("Dizin /Users/x/Desktop/ollamas [mem:step:command]", pwd as any);
+    const p2 = gradeGrounding("Özgür irade tartışmalı [mem:step:recall]", phil as any);
+    add("grounding.no-false-positive", "HIGH", !p1.weak && !p2.weak,
+      `pwd(sayı-modu) weak=${p1.weak} · felsefe(${p2.mode}) weak=${p2.weak}`);
   }
   try {
     const led = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/orchestra-tasks.jsonl`;

@@ -286,7 +286,7 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
           // L45: an answer that talked around its evidence is flagged, not passed off as solid.
           // It stays in the note (a human can still read it) but is kept out of the brain.
           + (synthesis.grounding?.weak
-              ? `> [!warning] ⚠️ zayıf-grounding: cevap kanıttaki somut sayıları tam kullanmadı (skor ${synthesis.grounding.score.toFixed(2)}). Brain'e yazılmadı.\n\n`
+              ? `> [!warning] ⚠️ zayıf-grounding (${synthesis.grounding.mode === "citation" ? "atıf ölçütü: kaynak atfı yok/kaçamak" : `sayı ölçütü: komut çıktısı kullanılmadı, skor ${synthesis.grounding.score.toFixed(2)}`}). Brain'e yazılmadı.\n\n`
               : "")
           + (synthesis.veto
               ? `> [!important] ⚡ Kalite vetosu — gate **${synthesis.veto.from}** dedi, ölçüm **${synthesis.veto.to}** dedi (Δ${synthesis.veto.delta.toFixed(3)}).\n\n`

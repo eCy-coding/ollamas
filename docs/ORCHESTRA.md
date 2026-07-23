@@ -186,3 +186,28 @@ Sonuç defterinde yalnız **2 benzersiz görev** (ikisi de test) vardı. `orches
 | Gated görev Doing'de | süresiz takılı | 7 gün → ❄️ dondu |
 | status.md | 4-sistem snapshot | + canlı görev metrikleri |
 | orchestra:e2e | 26 kontrol | **42 kontrol** |
+
+---
+
+## Grounding guardrail DÜZELTİLDİ — yanlış pozitif (L49–L51)
+
+L45 guardrail'ı **fazla agresifti**: 11 canlı görevden 3'ü weak damgalıydı ama **sadece 1'i gerçekti**.
+
+| Görev | Eski | Kök | Yeni |
+|---|---|---|---|
+| sistem yükü (ps kullanmıyor) | weak | ✅ gerçek | weak ✓ (korundu) |
+| hangi dizindeyim (`/Users/.../ollamas` doğru) | weak | ❌ `citesEvidence` vault sprint tarihlerini arıyordu | **grounded** ✓ |
+| felsefe/recall (sayısal değil) | weak | ❌ sayısal ölçüt zorlanıyordu | atıf ölçütü → grounded (kaçamaksızsa) |
+
+**~%67 yanlış pozitif** = doğru cevaplar da brain'e yazılmıyordu → L40 öğrenme döngüsü kırık. Web (chunk-attribution): *"yalnız ilgili chunk cevabı destekler, hepsi değil"*.
+
+### L49 — ilgili-kaynak
+Komut adımı varsa grounding YALNIZ komut çıktısının token'larıyla ölçülür (görevin asıl cevabı orada). Vault/recall token'ları score'a **eklenebilir** (destekleyici bonus) ama asla düşürmez. `hangi dizindeyim` → pwd yolunu içeriyor → grounded.
+
+### L50 — atıf-tabanlı (komut-yok görevler)
+Felsefe/recall görevinin somut sayısı yok. Komut kaynağı yoksa ölçüt sayıdan **atıfa** döner: `[mem:...]` atfı var + kaçamak yok → grounded. `citationIds` (brain-answer-score) yeniden kullanılır. `mode: numeric|citation` alanı nota+e2e'ye taşınır. **Kaçamak her iki modda yakalanır** — canlı felsefe cevabı "genellikle" dediği için hâlâ (doğru) weak.
+
+### L51 — doğruluk ölçüldü
+`tests/orchestra-grounding-accuracy.test.ts`: 12 etiketli canlı vaka, **precision/recall ≥0.9** assert. Guardrail bir daha sessizce yanlış olamaz. e2e `grounding.no-false-positive` kontrolü.
+
+**Canlı sonuç:** `hangi dizindeyim` → grounded (brain'e yazıldı), `sistem yükü` → weak (ps kullanmıyor, doğru), `felsefe` → weak (kaçamak, doğru). orchestra:e2e 42→**43 kontrol**.

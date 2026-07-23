@@ -11,6 +11,7 @@
 // tokens (numbers, process names) the evidence contains. When it fails, the caller re-asks once
 // with a strict prompt; if it still fails, the note says so honestly rather than pretending.
 import type { SynthesisSource } from "./orchestra-synthesis";
+import { citationIds } from "./brain-answer-score";
 
 /**
  * Turkish hedging that stands in for evidence — the "talked around the question" signal.
@@ -57,11 +58,16 @@ const STOP = new Set([
 ]);
 
 export interface Grounding {
-  /** 0..1 — how much of the evidence's concrete tokens the answer actually reuses. */
+  /** 0..1 — how much of the RELEVANT evidence's concrete tokens the answer reuses. */
   score: number;
   hedged: boolean;
-  /** At least some concrete evidence token made it into the answer. */
+  /** At least some relevant evidence token (numeric mode) or a citation (citation mode) is present. */
   citesEvidence: boolean;
+  /**
+   * Which yardstick was applied. A machine task is graded on the command's numbers; a
+   * vault/recall task has no numbers of its own, so it is graded on whether it cites a source.
+   */
+  mode: "numeric" | "citation";
   /** The verdict: the answer talks around the evidence rather than using it. */
   weak: boolean;
 }
@@ -69,29 +75,52 @@ export interface Grounding {
 /**
  * Grade one synthesised answer against the evidence it was given. PURE.
  *
- * `weak` when the answer hedges OR fails to cite any concrete evidence token. The number
- * threshold is intentionally forgiving — partial reuse counts — because the aim is to catch
- * answers that ignore the evidence entirely, not to demand every figure be quoted.
+ * L49 — score the RELEVANT source, not vault noise. Measured: "hangi dizindeyim" answered
+ * correctly with the pwd path, but the grader also pulled numbers out of the vault step (a
+ * sprint board full of dates) and, finding the answer did not repeat those, marked it weak. A
+ * correct answer was then withheld from the brain. Only the chunk that actually answers a task
+ * supports it: when a command ran, its output IS the answer, so grounding is measured against
+ * the command sources alone. Vault/recall tokens can still ADD to the score (a bonus) but can
+ * never drag it down.
+ *
+ * L50 — a vault/recall task has no numbers of its own to reuse. "felsefede özgür irade" cannot
+ * be grounded in a figure; forcing a numeric yardstick marked every such answer weak. With no
+ * command source, grounding switches to CITATION: an answer that cites a source ([mem:...]) and
+ * does not hedge is grounded. Hedging is caught in both modes.
  */
 export function gradeGrounding(answer: string, sources: SynthesisSource[]): Grounding {
   const a = String(answer ?? "");
   const foldedA = fold(a);
-  const { numbers, names } = evidenceTokens(sources);
-
   const hedged = HEDGE.test(foldedA);
 
-  // Numbers are the strongest signal — `184.7` in the evidence and in the answer is hard to
-  // fake. Names are weaker (partial matches), so they only reinforce.
-  const numHit = numbers.filter((n) => a.includes(n)).length;
-  const nameHit = names.filter((n) => foldedA.includes(n)).length;
-  const total = numbers.length + Math.min(names.length, 8); // cap name weight
-  const hits = numHit + Math.min(nameHit, 8);
-  const score = total > 0 ? Number((hits / total).toFixed(3)) : (a.trim() ? 1 : 0);
+  const commandSources = sources.filter((s) => s.id === "step:command" || /(^|:)command(:|$)/.test(s.id));
 
-  // "Cites evidence" needs a real token, preferring numbers when the evidence has any.
-  const citesEvidence = numbers.length ? numHit > 0 : nameHit > 0 || total === 0;
+  // ── citation mode: no command ran, so there are no task-numbers to reuse ──────────────────
+  if (!commandSources.length) {
+    const cites = citationIds(a).length > 0;
+    return { score: cites ? 1 : 0, hedged, citesEvidence: cites, mode: "citation", weak: hedged || !cites };
+  }
 
-  return { score, hedged, citesEvidence, weak: hedged || !citesEvidence };
+  // ── numeric mode: grade against the COMMAND output; other sources only reinforce ──────────
+  const relevant = evidenceTokens(commandSources);
+  const supporting = evidenceTokens(sources); // full set, for the bonus only
+
+  const numHit = relevant.numbers.filter((n) => a.includes(n)).length;
+  const nameHit = relevant.names.filter((n) => foldedA.includes(n)).length;
+  const total = relevant.numbers.length + Math.min(relevant.names.length, 8);
+  let hits = numHit + Math.min(nameHit, 8);
+  // Bonus: a token from a non-command source the answer also used (never lowers the score).
+  const extra = new Set([...supporting.numbers, ...supporting.names]);
+  for (const n of relevant.numbers) extra.delete(n);
+  for (const n of relevant.names) extra.delete(n);
+  const bonus = [...extra].filter((t) => (/^\d/.test(t) ? a.includes(t) : foldedA.includes(t))).length;
+  hits += Math.min(bonus, 3);
+
+  const score = total > 0 ? Number((Math.min(hits, total + 3) / total).toFixed(3)) : (a.trim() ? 1 : 0);
+  // Cites evidence = used a relevant token; numbers preferred when the command produced any.
+  const citesEvidence = relevant.numbers.length ? numHit > 0 : nameHit > 0 || total === 0;
+
+  return { score, hedged, citesEvidence, mode: "numeric", weak: hedged || !citesEvidence };
 }
 
 /**

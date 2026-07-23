@@ -188,7 +188,7 @@ export interface SynthesisResult {
   /** True when the panel honestly reported it could not answer from the evidence. */
   abstained: boolean;
   /** L45: how well the answer used its own evidence, and whether a re-ask was needed. */
-  grounding?: { score: number; regrounded: boolean; weak: boolean };
+  grounding?: { score: number; regrounded: boolean; weak: boolean; mode?: "numeric" | "citation" };
 }
 
 export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespaces"> & {
@@ -274,7 +274,7 @@ export async function synthesizeTask(
           }
         } catch { /* reground best-effort — keep the first answer and mark it weak */ }
       }
-      grounding = { score: g.score, regrounded, weak: g.weak };
+      grounding = { score: g.score, regrounded, weak: g.weak, mode: g.mode };
     }
 
     return {
