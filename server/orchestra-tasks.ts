@@ -347,7 +347,7 @@ export interface TaskOutcome {
   reported: boolean;
 }
 
-export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number; froze?: number }
+export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number; froze?: number; wallMs?: number; parallelMs?: number }
 
 /**
  * One pass over the board. Backlog tasks are executed; a task with pending approvals lands in
@@ -403,22 +403,40 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
   });
   if (froze) res.froze = (res.froze ?? 0) + froze;
 
-  // L52: each task now runs through runOneTask, which touches NO shared board state — it writes
-  // its own isolated evidence note and returns a pure TaskAction. The board transitions are
-  // applied HERE, by the single writer, after the batch. L53 makes the batch parallel; keeping
-  // the board mutation out of the per-task path is what makes that safe.
+  // L53: run the batch in BOUNDED-parallel chunks. Each task writes its own isolated note and
+  // returns a board-free TaskAction (L52), so a chunk is a plain Promise.all with no shared
+  // mutation. The board is applied by the single writer AFTER all chunks — races are structurally
+  // impossible. Concurrency is bounded (default 3) because the alternative — every Backlog task
+  // at once — is N×4 simultaneous LLM calls (pollinations rate-limit) and a terminal flood.
+  //
+  // Chunks run sequentially so the wall-clock measurement below is honest, and so a huge Backlog
+  // cannot open unbounded fan-out.
+  const N = orchestraConcurrency();
   const actions: TaskAction[] = [];
-  for (const { lane, line } of queue) {
-    const a = await runOneTask(vault, line, lane, deps);
-    if (a) actions.push(a);
+  const wall0 = now();
+  let stepSum = 0;
+  for (let i = 0; i < queue.length; i += N) {
+    const chunk = queue.slice(i, i + N);
+    const t = now();
+    const settled = await Promise.all(chunk.map((q) => runOneTask(vault, q.line, q.lane, deps)));
+    stepSum += (now() - t) * chunk.length; // if serial, each would have cost ~this chunk's wall
+    for (const a of settled) if (a) actions.push(a);
   }
+  const wallMs = now() - wall0;
   applyActions(board, actions, res);
+  if (actions.length > 1) { res.wallMs = wallMs; res.parallelMs = Math.max(0, stepSum - wallMs); }
 
   // Write the board when work moved OR a task was frozen — a freeze that only lived in memory
   // would never reach the file, so the ❄️ marker (and the panel that reads it) would be lost.
   if (res.ran || res.froze) writeFileSync(boardPath, renderBoard(board));
   return res;
 }
+
+/** Max tasks run at once. Bounded to protect pollinations rate-limits and the terminal. */
+export const orchestraConcurrency = (env = process.env): number => {
+  const n = Number(env.ORCHESTRA_CONCURRENCY);
+  return Number.isInteger(n) && n >= 1 && n <= 8 ? n : 3;
+};
 
 /** The board-free result of running one task: what the single writer needs to move the lane. */
 export interface TaskAction {
