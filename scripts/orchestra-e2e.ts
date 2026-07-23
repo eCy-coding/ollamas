@@ -16,6 +16,7 @@ import { defaultVaultPath } from "../server/brain-obsidian";
 import { qualityVeto, vetoDelta } from "../server/brain-formulas";
 import { isFailurePayload } from "../server/brain-answer-score";
 import { SCENARIOS } from "../server/orchestra-scenarios";
+import { summariseFromSteps } from "../server/orchestra-fallback";
 import { gradeGrounding } from "../server/orchestra-grounding";
 import { orchestraPanel, readOutcomes } from "../server/orchestra-status";
 
@@ -191,6 +192,12 @@ async function main(): Promise<void> {
     const p2 = gradeGrounding("Özgür irade tartışmalı [mem:step:recall]", phil as any);
     add("grounding.no-false-positive", "HIGH", !p1.weak && !p2.weak,
       `pwd(sayı-modu) weak=${p1.weak} · felsefe(${p2.mode}) weak=${p2.weak}`);
+
+    // L54: the deterministic fallback rescues a weak machine answer. `ps` with node at 184.7%
+    // that the model ignored must come back grounded from the parser.
+    const det = summariseFromSteps([{ role: "command", invocation: "ps -A -o pid,%cpu,comm -r", output: "80515 184.7 node", ok: true }]);
+    add("synthesis.fallback", "HIGH", !!det && !gradeGrounding(det, src as any).weak,
+      det ? `deterministik: ${det.slice(0, 40)}…` : "fallback üretmedi");
   }
   try {
     const led = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/orchestra-tasks.jsonl`;

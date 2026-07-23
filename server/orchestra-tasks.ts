@@ -282,7 +282,7 @@ export function evidenceNote(title: string, id: string, results: StepResult[], t
     + (synthesis
         ? (synthesis.abstained
             ? `## ⚠️ Sonuç\n\n> [!warning] Panel kanıttan cevap çıkaramadı (BİLGİ_YOK). Ham adımlar aşağıda.\n\n`
-            : `## ${synthesis.grounding?.weak ? "⚠️" : "✅"} Sonuç\n\n> [!${synthesis.grounding?.weak ? "warning" : "success"}] **${synthesis.expert || "?"}**${synthesis.grounding?.regrounded ? " · yeniden-soruldu" : ""} · kanıta dayalı\n\n${synthesis.answer}\n\n`)
+            : `## ${synthesis.grounding?.weak ? "⚠️" : "✅"} Sonuç\n\n> [!${synthesis.grounding?.weak ? "warning" : "success"}] **${synthesis.grounding?.via === "deterministic" ? "deterministik özet" : synthesis.expert || "?"}**${synthesis.grounding?.regrounded ? " · yeniden-soruldu" : ""} · kanıta dayalı\n\n${synthesis.answer}\n\n`)
           // L45: an answer that talked around its evidence is flagged, not passed off as solid.
           // It stays in the note (a human can still read it) but is kept out of the brain.
           + (synthesis.grounding?.weak

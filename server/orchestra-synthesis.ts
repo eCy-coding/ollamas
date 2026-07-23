@@ -13,6 +13,7 @@
 import { askShared, type SharedDeps, type SharedAskResult } from "./brain-shared";
 import type { StepResult, StepRole } from "./orchestra-tasks";
 import { gradeGrounding, regroundMessages } from "./orchestra-grounding";
+import { summariseFromSteps } from "./orchestra-fallback";
 
 /** Ranking hint for the panel: the machine's raw output is the most direct evidence a task
  *  has, the brain's recall is background, the vault is context. Not a truth ordering —
@@ -188,7 +189,7 @@ export interface SynthesisResult {
   /** True when the panel honestly reported it could not answer from the evidence. */
   abstained: boolean;
   /** L45: how well the answer used its own evidence, and whether a re-ask was needed. */
-  grounding?: { score: number; regrounded: boolean; weak: boolean; mode?: "numeric" | "citation" };
+  grounding?: { score: number; regrounded: boolean; weak: boolean; mode?: "numeric" | "citation"; via?: "model" | "deterministic" };
 }
 
 export type SynthesisDeps = Omit<SharedDeps, "recall" | "searchFacts" | "namespaces"> & {
@@ -274,7 +275,18 @@ export async function synthesizeTask(
           }
         } catch { /* reground best-effort — keep the first answer and mark it weak */ }
       }
-      grounding = { score: g.score, regrounded, weak: g.weak, mode: g.mode };
+      // L54: the model still ignored its evidence. For a machine question the answer is right
+      // there in the command output — parse it deterministically ($0, model-independent) rather
+      // than leave the task with no answer. An unparseable command keeps the honest weak label.
+      let via: "model" | "deterministic" = "model";
+      if (g.weak) {
+        const det = summariseFromSteps(results.map((s) => ({ role: s.role, invocation: s.invocation, output: s.output, ok: s.ok, gated: s.gated })));
+        if (det) {
+          const gd = gradeGrounding(det, sources);
+          if (!gd.weak) { finalAnswer = det; g = gd; via = "deterministic"; }
+        }
+      }
+      grounding = { score: g.score, regrounded, weak: g.weak, mode: g.mode, via };
     }
 
     return {

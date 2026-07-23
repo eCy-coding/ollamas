@@ -93,8 +93,14 @@ describe("synthesizeTask · re-ask flow", () => {
     expect(r!.grounding).toMatchObject({ weak: false, regrounded: true });
   });
 
-  test("no reground path → graded but not re-asked (old behaviour preserved)", async () => {
-    const r = await synthesizeTask("sistem yükü", [step(PS)], {
+  // These two isolate the RE-ASK path from L54's deterministic fallback: the fallback only
+  // fires for a command it can parse, so a `git status` command (no parser) keeps the answer
+  // exactly as the model / reground left it, which is what these assert.
+  const gitStep: StepResult = { role: "command", invocation: "git status", ok: true, ms: 4,
+    output: "[command] git status\non branch main, working tree clean" };
+
+  test("no reground path, no fallback → graded weak, not re-asked (old behaviour preserved)", async () => {
+    const r = await synthesizeTask("git durumu", [gitStep], {
       generate: async () => HEDGED,
       experts: { ollamas: async () => HEDGED },
     } as any);
@@ -103,12 +109,12 @@ describe("synthesizeTask · re-ask flow", () => {
   });
 
   test("a re-ask that is no better is discarded — the score must not go backwards", async () => {
-    const r = await synthesizeTask("sistem yükü", [step(PS)], {
+    const r = await synthesizeTask("git durumu", [gitStep], {
       generate: async () => HEDGED,
       experts: { ollamas: async () => HEDGED },
       reground: async () => "Yine belirsiz, muhtemelen bir şeyler. [x]",
     } as any);
-    expect(r!.answer).toBe(HEDGED); // original kept
+    expect(r!.answer).toBe(HEDGED); // original kept — no better re-ask, no parseable command
     expect(r!.grounding!.weak).toBe(true);
   });
 

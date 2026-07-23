@@ -211,3 +211,20 @@ Felsefe/recall görevinin somut sayısı yok. Komut kaynağı yoksa ölçüt say
 `tests/orchestra-grounding-accuracy.test.ts`: 12 etiketli canlı vaka, **precision/recall ≥0.9** assert. Guardrail bir daha sessizce yanlış olamaz. e2e `grounding.no-false-positive` kontrolü.
 
 **Canlı sonuç:** `hangi dizindeyim` → grounded (brain'e yazıldı), `sistem yükü` → weak (ps kullanmıyor, doğru), `felsefe` → weak (kaçamak, doğru). orchestra:e2e 42→**43 kontrol**.
+
+---
+
+## GERÇEK eş-zamanlılık + deterministik sentez-fallback (L52–L54)
+
+### L52-L53 — bounded-paralel görevler
+Görevler `for...await` ile SIRAYLA koşuyordu; bir görevin 3 adımı paralel ama Backlog'daki N görev seri. `runOneTask` board'a dokunmayan saf-sonuç fonksiyonuna ayrıldı (L52); görevler `ORCHESTRA_CONCURRENCY` (vars. 3, clamp 1-8) parti hâlinde paralel koşar (L53). Her görev KENDİ izole kanıt notunu yazar; board (sprint.md) **tek yazıcı** ile parti sonu güncellenir → race yapısal olarak imkansız. Sınırsız paralel YASAK (N×4 eşzamanlı LLM = pollinations rate-limit + terminal-flood; test: N=2'de en fazla 2 komut canlı). **Canlı: 5 görev → parallelMs ~370sn kazanç** (seri ~610sn → paralel ~240sn duvar).
+
+### L54 — deterministik sentez-fallback
+Aylardır çözülemeyen sınır: $0 model (pollinations) komut çıktısını kullanmıyor — `sistem yükü` `ps` node %184.7 döndürüyor ama sentez "varsayılabilir" diyor → grounding weak → brain'e yazılmıyor → görev cevapsız.
+
+`orchestra-fallback.ts` yaygın makine komutlarını **deterministik parse eder** ($0, model-bağımsız): df (en dolu birim %), ps %cpu/%mem (en yüksek süreç), uptime (1/5/15 yük), pwd, hostname. Sentez weak-grounding olursa komut çıktısından özet çıkarılır; grounded ise cevabı onunla değiştirir (`grounding.via='deterministic'`), brain'e yazılır. Tanımadığı komut → null, dürüst weak kalır.
+
+**Canlı sonuç:** `sistem yükü` görevi artık →
+> **deterministik özet** · Sistem yükü ortalamaları — 1 dk: 15.27, 5 dk: 22.76, 15 dk: 22.01 · En yüksek CPU kullanan süreç: Obsidian Helper (Renderer) (%137.8) [mem:step:command]
+
+Tam da modelin veremediği: doğru etiketli yük ortalamaları + sorumlu süreç adı + %. `remembered=1` (brain'e yazıldı). orchestra:e2e 43→**45 kontrol**.
