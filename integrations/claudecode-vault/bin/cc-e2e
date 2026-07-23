@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""cc-e2e: eCym+ollamas+alt-modeller Obsidian Claude Code KB'sini e2e kullanir.
+gorev -> recall(claude-code KB) -> alt-model cozer -> vault'a yaz (graph-linkli, recall-queryable)."""
+import sys, os, json, time, urllib.request, argparse, ssl
+
+BRAIN = "http://localhost:3000"
+
+def _ctx():
+    c = ssl.create_default_context(); c.check_hostname = False; c.verify_mode = ssl.CERT_NONE
+    return c
+
+def _key():
+    p = os.path.expanduser("~/ollamas-vault/.obsidian/plugins/obsidian-local-rest-api/data.json")
+    try: return json.load(open(p)).get("apiKey", "")
+    except Exception: return ""
+
+def post(url, obj, timeout=90, headers=None):
+    h = {"content-type": "application/json"}; h.update(headers or {})
+    r = urllib.request.Request(url, data=json.dumps(obj).encode(), headers=h)
+    return urllib.request.urlopen(r, timeout=timeout, context=_ctx())
+
+def recall(task, k=4):
+    try:
+        d = json.load(post(f"{BRAIN}/api/brain/recall", {"query": task, "k": k}))
+        return [h for h in d.get("hits", []) if str(h.get("id", "")).startswith("claude-code")]
+    except Exception as e:
+        print(f"[cc-e2e] recall hata: {e}", file=sys.stderr); return []
+
+def solve(task, ctx, model):
+    ctx_txt = "\n\n".join(f"### {h['id']}\n{h.get('content','')[:700]}" for h in ctx)
+    sys_p = ("Sen Claude Code uzmanisin. ASAGIDAKI Obsidian Claude Code vault bilgisini KULLAN, "
+             "uydurma; kaynak notu belirt. Turkce, kisa + kod ornekli cevap ver.\n\n" + ctx_txt)
+    d = json.load(post(f"{BRAIN}/v1/chat/completions",
+        {"model": model, "messages": [{"role": "system", "content": sys_p},
+                                       {"role": "user", "content": task}], "max_tokens": 600},
+        timeout=75))
+    return d.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+def write_vault(task, answer, ctx, model):
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    slug = f"cc-e2e-{ts}"
+    links = " · ".join(f"[[{h['id'].replace('claude-code:','claude-code-')}]]" for h in ctx[:5])
+    body = (f"# Claude Code E2E: {task[:60]}\n\n"
+            f"> [!question] gorev · model: {model} · {ts}\n\n{task}\n\n## Cevap ({model})\n\n{answer}\n\n"
+            f"---\n**Hub:** [[claude-code]] · **Kaynak notlar:** {links}\n**system:** claudecode · e2e")
+    fm = (f'---\nid: "claude-code:{slug}"\nns: default\ntier: episodic\nsource: claude-code\n'
+          f'created_ms: {int(time.time()*1000)}\ncssclasses: [brain, tier-episodic, system-claudecode]\n'
+          f'tags: [tier/episodic, ns/default, system/claudecode, cc/e2e]\naliases: ["e2e {task[:40]}"]\n---\n\n')
+    relpath = f"orchestra/reports/{slug}.md"
+    key = _key(); rest_ok = False
+    try:
+        req = urllib.request.Request(f"https://127.0.0.1:27124/vault/{relpath}", data=(fm + body).encode(),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "text/markdown"}, method="PUT")
+        urllib.request.urlopen(req, timeout=15, context=_ctx()); rest_ok = True
+    except Exception:
+        open(os.path.expanduser(f"~/ollamas-vault/{relpath}"), "w").write(fm + body)
+    try:
+        post(f"{BRAIN}/api/brain/remember", {"id": f"claude-code:{slug}", "content": body,
+             "ns": "default", "tier": "episodic", "source": "claude-code"}, timeout=20)
+    except Exception:
+        pass
+    return relpath, rest_ok
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("task", nargs="+")
+    ap.add_argument("--model", default="cerebras")
+    ap.add_argument("--dry", action="store_true")
+    a = ap.parse_args()
+    task = " ".join(a.task)
+    ctx = recall(task)
+    print(f"recall: {len(ctx)} claude-code notu -> {[h['id'].replace('claude-code:','') for h in ctx[:5]]}")
+    if a.dry:
+        print(f"[DRY] model={a.model} · solve+write ATLANDI · context hazir ({len(ctx)} not)"); return
+    ans = solve(task, ctx, a.model)
+    print(f"\n=== Cevap ({a.model}) ===\n{ans}\n")
+    path, rest = write_vault(task, ans, ctx, a.model)
+    print(f"vault: {path}  (REST={'OK' if rest else 'fallback-disk'})  · ecy-cc ile sorabilirsin")
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,13 @@
+{
+  "name": "cc-e2e",
+  "role": "eCym+ollamas+alt-modeller Obsidian Claude Code KB'sini e2e kullanır",
+  "input": { "task": "string (kod görevi/soru)", "model": "ollamas-auto|groq|gemini|cerebras|github-models|sambanova", "dry": "bool" },
+  "steps": [
+    {"id":"recall","do":"POST :3000/api/brain/recall {query:task,k:6} → claude-code notları (context)"},
+    {"id":"solve","do":"POST :3000/v1/chat/completions {model, system:KB-context, user:task} → çözüm"},
+    {"id":"write","do":"REST PUT :27124 vault/orchestra/reports/cc-e2e-<ts>.md (system/claudecode, ns:default, [[claude-code]]+[[cc-*]]+kaynak) + brain remember"},
+    {"id":"verify","do":"ecy-cc queryable + REST GET görünür"}
+  ],
+  "io": {"stdout":"çözüm + vault-path", "sideeffect":"vault note (graph-linkli, recall-queryable)"},
+  "guard": {"dry":"recall+prompt planı göster, chat/write YOK", "sustainable":"yeni motor yok; recall+chat+REST reuse"}
+}

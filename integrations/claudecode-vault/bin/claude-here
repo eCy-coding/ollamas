@@ -1,0 +1,4 @@
+#!/bin/bash
+# Claude Code'u verilen dizinde (yoksa PWD) başlat
+cd "${1:-$PWD}" || exit 1
+exec "/Users/emrecnyngmail.com/.local/bin/claude" "${@:2}"

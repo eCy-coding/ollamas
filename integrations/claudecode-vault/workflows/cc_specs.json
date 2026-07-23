@@ -1,0 +1,1378 @@
+[
+ {
+  "slug": "accessibility",
+  "url": "https://code.claude.com/docs/en/accessibility.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Use Claude Code with a screen reader",
+  "desc": "Set up Claude Code for screen readers such as VoiceOver and NVDA, plus settings for screen magnifiers, reduced motion, and colorblind-friendly themes."
+ },
+ {
+  "slug": "admin-setup",
+  "url": "https://code.claude.com/docs/en/admin-setup.md",
+  "category": "enterprise",
+  "tier": "learned",
+  "title": "Set up Claude Code for your organization",
+  "desc": "A decision map for administrators deploying Claude Code, covering API providers, managed settings, policy enforcement, usage monitoring, and data handling."
+ },
+ {
+  "slug": "advisor",
+  "url": "https://code.claude.com/docs/en/advisor.md",
+  "category": "review",
+  "tier": "procedural",
+  "title": "Escalate hard decisions with the advisor tool",
+  "desc": "Pair your main model with a stronger advisor model that Claude consults at key moments during a task."
+ },
+ {
+  "slug": "sdk-agent-loop",
+  "url": "https://code.claude.com/docs/en/agent-sdk/agent-loop.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "How the agent loop works",
+  "desc": "Understand the message lifecycle, tool execution, context window, and architecture that power your SDK agents."
+ },
+ {
+  "slug": "sdk-claude-code-features",
+  "url": "https://code.claude.com/docs/en/agent-sdk/claude-code-features.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Use Claude Code features in the SDK",
+  "desc": "Load project instructions, skills, hooks, and other Claude Code features into your SDK agents."
+ },
+ {
+  "slug": "sdk-cost-tracking",
+  "url": "https://code.claude.com/docs/en/agent-sdk/cost-tracking.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Track cost and usage",
+  "desc": "Learn how to track token usage, estimate costs, and configure prompt caching with the Claude Agent SDK."
+ },
+ {
+  "slug": "sdk-custom-tools",
+  "url": "https://code.claude.com/docs/en/agent-sdk/custom-tools.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Give Claude custom tools",
+  "desc": "Define custom tools with the Claude Agent SDK's in-process MCP server so Claude can call your functions, hit your APIs, and perform domain-specific operations."
+ },
+ {
+  "slug": "sdk-file-checkpointing",
+  "url": "https://code.claude.com/docs/en/agent-sdk/file-checkpointing.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Rewind file changes with checkpointing",
+  "desc": "Track file changes during agent sessions and restore files to any previous state"
+ },
+ {
+  "slug": "sdk-hooks",
+  "url": "https://code.claude.com/docs/en/agent-sdk/hooks.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Intercept and control agent behavior with hooks",
+  "desc": "Intercept and customize agent behavior at key execution points with hooks"
+ },
+ {
+  "slug": "sdk-hosting",
+  "url": "https://code.claude.com/docs/en/agent-sdk/hosting.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Hosting the Agent SDK",
+  "desc": "Deploy the Agent SDK in production: subprocess architecture, session persistence, scaling, observability, and multi-tenant isolation for Docker, Kubernetes, and sandbox providers."
+ },
+ {
+  "slug": "sdk-mcp",
+  "url": "https://code.claude.com/docs/en/agent-sdk/mcp.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Connect to external tools with MCP",
+  "desc": "Configure MCP servers to extend your agent with external tools. Covers transport types, tool search for large tool sets, authentication, and error handling."
+ },
+ {
+  "slug": "sdk-migration-guide",
+  "url": "https://code.claude.com/docs/en/agent-sdk/migration-guide.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Migrate to Claude Agent SDK",
+  "desc": "Guide for migrating the Claude Code TypeScript and Python SDKs to the Claude Agent SDK"
+ },
+ {
+  "slug": "sdk-modifying-system-prompts",
+  "url": "https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Modifying system prompts",
+  "desc": "Choose between the `claude_code` preset and a custom system prompt, and customize behavior with CLAUDE.md, output styles, append, or a fully custom prompt."
+ },
+ {
+  "slug": "sdk-observability",
+  "url": "https://code.claude.com/docs/en/agent-sdk/observability.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Observability with OpenTelemetry",
+  "desc": "Export traces, metrics, and events from the Agent SDK to your observability backend using OpenTelemetry."
+ },
+ {
+  "slug": "sdk-overview",
+  "url": "https://code.claude.com/docs/en/agent-sdk/overview.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Agent SDK overview",
+  "desc": "Build production AI agents with Claude Code as a library"
+ },
+ {
+  "slug": "sdk-permissions",
+  "url": "https://code.claude.com/docs/en/agent-sdk/permissions.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Configure permissions",
+  "desc": "Control how your agent uses tools with permission modes, hooks, and declarative allow/deny rules."
+ },
+ {
+  "slug": "sdk-plugins",
+  "url": "https://code.claude.com/docs/en/agent-sdk/plugins.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Plugins in the SDK",
+  "desc": "Load custom plugins to extend Claude Code with skills, agents, hooks, and MCP servers through the Agent SDK"
+ },
+ {
+  "slug": "sdk-python",
+  "url": "https://code.claude.com/docs/en/agent-sdk/python.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Agent SDK reference - Python",
+  "desc": "Complete API reference for the Python Agent SDK, including all functions, types, and classes."
+ },
+ {
+  "slug": "sdk-quickstart",
+  "url": "https://code.claude.com/docs/en/agent-sdk/quickstart.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Quickstart",
+  "desc": "Get started with the Python or TypeScript Agent SDK to build AI agents that work autonomously"
+ },
+ {
+  "slug": "sdk-secure-deployment",
+  "url": "https://code.claude.com/docs/en/agent-sdk/secure-deployment.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Securely deploying AI agents",
+  "desc": "A guide to securing Claude Code and Agent SDK deployments with isolation, credential management, and network controls"
+ },
+ {
+  "slug": "sdk-session-storage",
+  "url": "https://code.claude.com/docs/en/agent-sdk/session-storage.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Persist sessions to external storage",
+  "desc": "Mirror session transcripts to S3, Redis, or your own backend so any host can resume them."
+ },
+ {
+  "slug": "sdk-sessions",
+  "url": "https://code.claude.com/docs/en/agent-sdk/sessions.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Work with sessions",
+  "desc": "How sessions persist agent conversation history, and when to use continue, resume, and fork to return to a prior run."
+ },
+ {
+  "slug": "sdk-skills",
+  "url": "https://code.claude.com/docs/en/agent-sdk/skills.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Agent Skills in the SDK",
+  "desc": "Extend Claude with specialized capabilities using Agent Skills in the Claude Agent SDK"
+ },
+ {
+  "slug": "sdk-slash-commands",
+  "url": "https://code.claude.com/docs/en/agent-sdk/slash-commands.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Slash Commands in the SDK",
+  "desc": "Learn how to use slash commands to control Claude Code sessions through the SDK"
+ },
+ {
+  "slug": "sdk-streaming-output",
+  "url": "https://code.claude.com/docs/en/agent-sdk/streaming-output.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Stream responses in real-time",
+  "desc": "Get real-time responses from the Agent SDK as text and tool calls stream in"
+ },
+ {
+  "slug": "sdk-streaming-vs-single-mode",
+  "url": "https://code.claude.com/docs/en/agent-sdk/streaming-vs-single-mode.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Streaming Input",
+  "desc": "Understanding the two input modes for Claude Agent SDK and when to use each"
+ },
+ {
+  "slug": "sdk-structured-outputs",
+  "url": "https://code.claude.com/docs/en/agent-sdk/structured-outputs.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Get structured output from agents",
+  "desc": "Return validated JSON from agent workflows using JSON Schema, Zod, or Pydantic. Get type-safe, structured data after multi-turn tool use."
+ },
+ {
+  "slug": "sdk-subagents",
+  "url": "https://code.claude.com/docs/en/agent-sdk/subagents.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Subagents in the SDK",
+  "desc": "Define and invoke subagents to isolate context, run tasks in parallel, and apply specialized instructions in your Claude Agent SDK applications."
+ },
+ {
+  "slug": "sdk-todo-tracking",
+  "url": "https://code.claude.com/docs/en/agent-sdk/todo-tracking.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Todo Lists",
+  "desc": "Track and display todos using the Claude Agent SDK for organized task management"
+ },
+ {
+  "slug": "sdk-tool-search",
+  "url": "https://code.claude.com/docs/en/agent-sdk/tool-search.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Scale to many tools with tool search",
+  "desc": "Scale your agent to thousands of tools by discovering and loading only what's needed, on demand."
+ },
+ {
+  "slug": "sdk-typescript",
+  "url": "https://code.claude.com/docs/en/agent-sdk/typescript.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Agent SDK reference - TypeScript",
+  "desc": "Complete API reference for the TypeScript Agent SDK, including all functions, types, and interfaces."
+ },
+ {
+  "slug": "sdk-typescript-v2-preview",
+  "url": "https://code.claude.com/docs/en/agent-sdk/typescript-v2-preview.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "TypeScript SDK V2 session API (removed)",
+  "desc": "Reference for the removed V2 TypeScript Agent SDK session API, with session-based send/stream patterns for multi-turn conversations."
+ },
+ {
+  "slug": "sdk-user-input",
+  "url": "https://code.claude.com/docs/en/agent-sdk/user-input.md",
+  "category": "sdk",
+  "tier": "learned",
+  "title": "Handle approvals and user input",
+  "desc": "Surface Claude's approval requests and clarifying questions to users, then return their decisions to the SDK."
+ },
+ {
+  "slug": "agent-teams",
+  "url": "https://code.claude.com/docs/en/agent-teams.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Orchestrate teams of Claude Code sessions",
+  "desc": "Coordinate multiple Claude Code instances working together as a team, with shared tasks, inter-agent messaging, and centralized management."
+ },
+ {
+  "slug": "agent-view",
+  "url": "https://code.claude.com/docs/en/agent-view.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Manage multiple agents with agent view",
+  "desc": "Dispatch and manage many Claude Code sessions from one screen. Agent view shows what every session is doing and which ones need your input."
+ },
+ {
+  "slug": "agents",
+  "url": "https://code.claude.com/docs/en/agents.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Run agents in parallel",
+  "desc": "Compare the ways Claude Code can take on multiple tasks at once: subagents, agent view, agent teams, and dynamic workflows."
+ },
+ {
+  "slug": "amazon-bedrock",
+  "url": "https://code.claude.com/docs/en/amazon-bedrock.md",
+  "category": "cloud",
+  "tier": "learned",
+  "title": "Claude Code on Amazon Bedrock",
+  "desc": "Learn about configuring Claude Code through Amazon Bedrock, including setup, IAM configuration, and troubleshooting."
+ },
+ {
+  "slug": "analytics",
+  "url": "https://code.claude.com/docs/en/analytics.md",
+  "category": "costs",
+  "tier": "learned",
+  "title": "Track team usage with analytics",
+  "desc": "View Claude Code usage metrics, track adoption, and measure engineering velocity in the analytics dashboard."
+ },
+ {
+  "slug": "artifacts",
+  "url": "https://code.claude.com/docs/en/artifacts.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Share session output as artifacts",
+  "desc": "Artifacts turn Claude Code's work into live, interactive pages on claude.ai that you can keep private, share with your organization, or publish to a public link."
+ },
+ {
+  "slug": "authentication",
+  "url": "https://code.claude.com/docs/en/authentication.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "Authentication",
+  "desc": "Log in to Claude Code and configure authentication for individuals, teams, and organizations."
+ },
+ {
+  "slug": "auto-mode-config",
+  "url": "https://code.claude.com/docs/en/auto-mode-config.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Configure auto mode",
+  "desc": "Tell the auto mode classifier which repos, buckets, and domains your organization trusts. Set environment context, override the default block and allow rules, and inspect your effective config with the auto-mode CLI subcommands."
+ },
+ {
+  "slug": "best-practices",
+  "url": "https://code.claude.com/docs/en/best-practices.md",
+  "category": "adoption",
+  "tier": "learned",
+  "title": "Best practices for Claude Code",
+  "desc": "Tips and patterns for getting the most out of Claude Code, from configuring your environment to scaling across parallel sessions."
+ },
+ {
+  "slug": "champion-kit",
+  "url": "https://code.claude.com/docs/en/champion-kit.md",
+  "category": "adoption",
+  "tier": "learned",
+  "title": "Champion kit",
+  "desc": "A playbook for engineers advocating Claude Code internally: what to share, how to answer questions, and how to grow adoption on your team."
+ },
+ {
+  "slug": "changelog",
+  "url": "https://code.claude.com/docs/en/changelog.md",
+  "category": "misc",
+  "tier": "learned",
+  "title": "Claude Code changelog",
+  "desc": "Release notes for Claude Code, including new features, improvements, and bug fixes by version."
+ },
+ {
+  "slug": "channels",
+  "url": "https://code.claude.com/docs/en/channels.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Push events into a running session with channels",
+  "desc": "Use channels to push messages, alerts, and webhooks into your Claude Code session from an MCP server. Forward CI results, chat messages, and monitoring events so Claude can react while you're away."
+ },
+ {
+  "slug": "channels-reference",
+  "url": "https://code.claude.com/docs/en/channels-reference.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Channels reference",
+  "desc": "Build an MCP server that pushes webhooks, alerts, and chat messages into a Claude Code session. Reference for the channel contract: capability declaration, notification events, reply tools, sender gating, and permission relay."
+ },
+ {
+  "slug": "checkpointing",
+  "url": "https://code.claude.com/docs/en/checkpointing.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Checkpointing",
+  "desc": "Track, rewind, and summarize Claude's edits and conversation to manage session state."
+ },
+ {
+  "slug": "chrome",
+  "url": "https://code.claude.com/docs/en/chrome.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Use Claude Code with Chrome",
+  "desc": "Connect Claude Code to your Chrome browser to test web apps, debug with console logs, automate form filling, and extract data from web pages."
+ },
+ {
+  "slug": "claude-apps-gateway",
+  "url": "https://code.claude.com/docs/en/claude-apps-gateway.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Claude apps gateway for Amazon Bedrock, Claude Platform on AWS, Google Cloud, and Microsoft Foundry",
+  "desc": "Run Claude Code through Amazon Bedrock, Claude Platform on AWS, Google Cloud, or Microsoft Foundry behind a self-hosted gateway with SSO sign-in, per-group model access, and OTLP telemetry."
+ },
+ {
+  "slug": "claude-apps-gateway-config",
+  "url": "https://code.claude.com/docs/en/claude-apps-gateway-config.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Claude apps gateway configuration",
+  "desc": "Reference for every gateway.yaml option: listener and TLS, OIDC, session, Postgres store, Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, and Microsoft Foundry upstreams, model routing, managed policies, and telemetry."
+ },
+ {
+  "slug": "claude-apps-gateway-deploy",
+  "url": "https://code.claude.com/docs/en/claude-apps-gateway-deploy.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Claude apps gateway deployment and operations",
+  "desc": "Register the gateway with your IdP, build the container, deploy on Kubernetes or Cloud Run, and operate it: health checks, secret rotation, upgrades, and security."
+ },
+ {
+  "slug": "claude-apps-gateway-on-gcp",
+  "url": "https://code.claude.com/docs/en/claude-apps-gateway-on-gcp.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Deploy Claude apps gateway on Google Cloud",
+  "desc": "A worked example of running Claude apps gateway on Google Cloud: Cloud Run or GKE, Cloud SQL for PostgreSQL, Secret Manager, and service-account auth to Google Cloud's Agent Platform."
+ },
+ {
+  "slug": "claude-apps-gateway-spend-limits",
+  "url": "https://code.claude.com/docs/en/claude-apps-gateway-spend-limits.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Claude apps gateway spend limits",
+  "desc": "Cap each developer's spend through the Claude apps gateway by day, week, or month. Set limits with an Admin API and the gateway enforces them live on every request."
+ },
+ {
+  "slug": "claude-code-on-the-web",
+  "url": "https://code.claude.com/docs/en/claude-code-on-the-web.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Use Claude Code on the web",
+  "desc": "Configure cloud environments, setup scripts, network access, and Docker in Anthropic's sandbox. Move sessions between web and terminal with `--cloud` and `--teleport`."
+ },
+ {
+  "slug": "claude-directory",
+  "url": "https://code.claude.com/docs/en/claude-directory.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Explore the .claude directory",
+  "desc": "Where Claude Code reads CLAUDE.md, settings.json, hooks, skills, commands, subagents, workflows, rules, and auto memory. Explore the .claude directory in your project and ~/.claude in your home directory."
+ },
+ {
+  "slug": "claude-platform-on-aws",
+  "url": "https://code.claude.com/docs/en/claude-platform-on-aws.md",
+  "category": "cloud",
+  "tier": "learned",
+  "title": "Claude Code on Claude Platform on AWS",
+  "desc": "Configure Claude Code to use the Anthropic-operated Claude API with AWS authentication, IAM access control, and AWS Marketplace billing."
+ },
+ {
+  "slug": "claude-security",
+  "url": "https://code.claude.com/docs/en/claude-security.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Scan your codebase for vulnerabilities",
+  "desc": "Install the Claude Security plugin to scan your codebase for vulnerabilities in a Claude Code session and turn findings into patches you review and apply."
+ },
+ {
+  "slug": "cli-reference",
+  "url": "https://code.claude.com/docs/en/cli-reference.md",
+  "category": "cli",
+  "tier": "procedural",
+  "title": "CLI reference",
+  "desc": "Complete reference for Claude Code command-line interface, including commands and flags."
+ },
+ {
+  "slug": "code-review",
+  "url": "https://code.claude.com/docs/en/code-review.md",
+  "category": "review",
+  "tier": "procedural",
+  "title": "Code Review",
+  "desc": "Set up automated PR reviews that catch logic errors, security vulnerabilities, and regressions using multi-agent analysis of your full codebase"
+ },
+ {
+  "slug": "commands",
+  "url": "https://code.claude.com/docs/en/commands.md",
+  "category": "cli",
+  "tier": "procedural",
+  "title": "Commands",
+  "desc": "Complete reference for commands available in Claude Code, including built-in commands and bundled skills."
+ },
+ {
+  "slug": "common-workflows",
+  "url": "https://code.claude.com/docs/en/common-workflows.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Common workflows",
+  "desc": "Step-by-step guides for exploring codebases, fixing bugs, refactoring, testing, and other everyday tasks with Claude Code."
+ },
+ {
+  "slug": "communications-kit",
+  "url": "https://code.claude.com/docs/en/communications-kit.md",
+  "category": "adoption",
+  "tier": "learned",
+  "title": "Communications kit",
+  "desc": "Launch announcements, drip-campaign messages, and FAQ responses for rolling Claude Code out to your engineering organization."
+ },
+ {
+  "slug": "computer-use",
+  "url": "https://code.claude.com/docs/en/computer-use.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Let Claude use your computer from the CLI",
+  "desc": "Enable computer use in the Claude Code CLI so Claude can open apps, click, type, and see your screen on macOS. Test native apps, debug visual issues, and automate GUI-only tools without leaving your terminal."
+ },
+ {
+  "slug": "context-window",
+  "url": "https://code.claude.com/docs/en/context-window.md",
+  "category": "memory",
+  "tier": "learned",
+  "title": "Explore the context window",
+  "desc": "An interactive simulation of how Claude Code's context window fills during a session. See what loads automatically, what each file read costs, and when rules and hooks fire."
+ },
+ {
+  "slug": "corporate-launcher",
+  "url": "https://code.claude.com/docs/en/corporate-launcher.md",
+  "category": "enterprise",
+  "tier": "learned",
+  "title": "Run Claude Code behind a corporate launcher",
+  "desc": "Route the processes Claude Code starts from its own binary, including the background service and every agent view session, through a required launcher with CLAUDE_CODE_PROCESS_WRAPPER or the processWrapper setting."
+ },
+ {
+  "slug": "costs",
+  "url": "https://code.claude.com/docs/en/costs.md",
+  "category": "costs",
+  "tier": "learned",
+  "title": "Manage costs effectively",
+  "desc": "Track token usage, set team spend limits, and reduce Claude Code costs with context management, model selection, extended thinking settings, and preprocessing hooks."
+ },
+ {
+  "slug": "data-usage",
+  "url": "https://code.claude.com/docs/en/data-usage.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Data usage",
+  "desc": "Learn about Anthropic's data usage policies for Claude"
+ },
+ {
+  "slug": "debug-your-config",
+  "url": "https://code.claude.com/docs/en/debug-your-config.md",
+  "category": "troubleshoot",
+  "tier": "procedural",
+  "title": "Debug your configuration",
+  "desc": "Diagnose why CLAUDE.md, settings, hooks, MCP servers, or skills aren't taking effect. Use /context, /doctor, /hooks, and /mcp to see what actually loaded."
+ },
+ {
+  "slug": "deep-links",
+  "url": "https://code.claude.com/docs/en/deep-links.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Launch sessions from links",
+  "desc": "Open a Claude Code terminal session from a URL. Embed `claude-cli://` links in runbooks, alerts, and dashboards so a click opens Claude Code in the right repo with the right prompt."
+ },
+ {
+  "slug": "desktop",
+  "url": "https://code.claude.com/docs/en/desktop.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Desktop application",
+  "desc": "Get more out of Claude Code Desktop: parallel sessions with Git isolation, drag-and-drop pane layout, integrated terminal and file editor, side chats, computer use, Dispatch sessions from your phone, visual diff review, app previews, PR monitoring, connectors, and enterprise configuration."
+ },
+ {
+  "slug": "desktop-ios-simulator",
+  "url": "https://code.claude.com/docs/en/desktop-ios-simulator.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Test iOS apps in the simulator",
+  "desc": "Claude Code Desktop opens your app in the iOS Simulator pane when Claude builds, runs, or checks it, with a separate simulator for each session."
+ },
+ {
+  "slug": "desktop-linux",
+  "url": "https://code.claude.com/docs/en/desktop-linux.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Claude Desktop on Linux (beta)",
+  "desc": "Install and update the Claude desktop app on Ubuntu and Debian"
+ },
+ {
+  "slug": "desktop-quickstart",
+  "url": "https://code.claude.com/docs/en/desktop-quickstart.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Get started with the desktop app",
+  "desc": "Install Claude Code on desktop and start your first coding session"
+ },
+ {
+  "slug": "desktop-scheduled-tasks",
+  "url": "https://code.claude.com/docs/en/desktop-scheduled-tasks.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Schedule recurring tasks in Claude Code Desktop",
+  "desc": "Set up scheduled tasks in Claude Code Desktop to run Claude automatically on a recurring basis for daily code reviews, dependency audits, or morning briefings."
+ },
+ {
+  "slug": "desktop-wsl",
+  "url": "https://code.claude.com/docs/en/desktop-wsl.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Claude Code Desktop in WSL",
+  "desc": "Run Code sessions inside a WSL 2 distribution on Windows"
+ },
+ {
+  "slug": "devcontainer",
+  "url": "https://code.claude.com/docs/en/devcontainer.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Development containers",
+  "desc": "Run Claude Code inside a dev container for consistent, isolated environments across your team."
+ },
+ {
+  "slug": "discover-plugins",
+  "url": "https://code.claude.com/docs/en/discover-plugins.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Discover and install prebuilt plugins through marketplaces",
+  "desc": "Find and install plugins from marketplaces to extend Claude Code with new skills, agents, and capabilities."
+ },
+ {
+  "slug": "env-vars",
+  "url": "https://code.claude.com/docs/en/env-vars.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Environment variables",
+  "desc": "Reference for environment variables that control Claude Code behavior."
+ },
+ {
+  "slug": "errors",
+  "url": "https://code.claude.com/docs/en/errors.md",
+  "category": "troubleshoot",
+  "tier": "procedural",
+  "title": "Error reference",
+  "desc": "Look up Claude Code runtime error messages with what each one means and how to fix it."
+ },
+ {
+  "slug": "fast-mode",
+  "url": "https://code.claude.com/docs/en/fast-mode.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Speed up responses with fast mode",
+  "desc": "Get faster Opus responses in Claude Code by toggling fast mode."
+ },
+ {
+  "slug": "feature-availability",
+  "url": "https://code.claude.com/docs/en/feature-availability.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Feature availability",
+  "desc": "Compare which Claude Code features are available across Anthropic subscription plans, the Anthropic Console, Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, and Microsoft Foundry."
+ },
+ {
+  "slug": "features-overview",
+  "url": "https://code.claude.com/docs/en/features-overview.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "Extend Claude Code",
+  "desc": "Understand when to use CLAUDE.md, Skills, subagents, hooks, MCP, and plugins."
+ },
+ {
+  "slug": "fullscreen",
+  "url": "https://code.claude.com/docs/en/fullscreen.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Fullscreen rendering",
+  "desc": "Enable a smoother, flicker-free rendering mode with mouse support and stable memory usage in long conversations."
+ },
+ {
+  "slug": "gateways",
+  "url": "https://code.claude.com/docs/en/gateways.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Run Claude Code through a gateway",
+  "desc": "Route Claude Code through a self-hosted gateway for centralized credentials, usage tracking, and cost controls. Covers the architecture, Anthropic's Claude apps gateway, and using other gateway products."
+ },
+ {
+  "slug": "github-actions",
+  "url": "https://code.claude.com/docs/en/github-actions.md",
+  "category": "cicd",
+  "tier": "procedural",
+  "title": "Claude Code GitHub Actions",
+  "desc": "Learn about integrating Claude Code into your development workflow with Claude Code GitHub Actions"
+ },
+ {
+  "slug": "github-enterprise-server",
+  "url": "https://code.claude.com/docs/en/github-enterprise-server.md",
+  "category": "cicd",
+  "tier": "procedural",
+  "title": "Claude Code with GitHub Enterprise Server",
+  "desc": "Connect Claude Code to your self-hosted GitHub Enterprise Server instance for web sessions, code review, and plugin marketplaces."
+ },
+ {
+  "slug": "gitlab-ci-cd",
+  "url": "https://code.claude.com/docs/en/gitlab-ci-cd.md",
+  "category": "cicd",
+  "tier": "procedural",
+  "title": "Claude Code GitLab CI/CD",
+  "desc": "Learn about integrating Claude Code into your development workflow with GitLab CI/CD"
+ },
+ {
+  "slug": "glossary",
+  "url": "https://code.claude.com/docs/en/glossary.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Glossary",
+  "desc": "Definitions for Claude Code terminology. Learn what agentic loop, compaction, CLAUDE.md, hooks, subagents, MCP, and other core concepts mean."
+ },
+ {
+  "slug": "goal",
+  "url": "https://code.claude.com/docs/en/goal.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Keep Claude working toward a goal",
+  "desc": "Set a completion condition with /goal and Claude keeps working across turns until the condition is met."
+ },
+ {
+  "slug": "google-vertex-ai",
+  "url": "https://code.claude.com/docs/en/google-vertex-ai.md",
+  "category": "cloud",
+  "tier": "learned",
+  "title": "Claude Code on Google Cloud's Agent Platform",
+  "desc": "Learn about configuring Claude Code through Google Cloud's Agent Platform, formerly Vertex AI, including setup, IAM configuration, and troubleshooting."
+ },
+ {
+  "slug": "headless",
+  "url": "https://code.claude.com/docs/en/headless.md",
+  "category": "cli",
+  "tier": "procedural",
+  "title": "Run Claude Code programmatically",
+  "desc": "Use the Agent SDK to run Claude Code programmatically from the CLI, Python, or TypeScript."
+ },
+ {
+  "slug": "hooks",
+  "url": "https://code.claude.com/docs/en/hooks.md",
+  "category": "hooks",
+  "tier": "procedural",
+  "title": "Hooks reference",
+  "desc": "Reference for Claude Code hook events, configuration schema, JSON input/output formats, exit codes, async hooks, HTTP hooks, prompt hooks, and MCP tool hooks."
+ },
+ {
+  "slug": "hooks-guide",
+  "url": "https://code.claude.com/docs/en/hooks-guide.md",
+  "category": "hooks",
+  "tier": "procedural",
+  "title": "Automate actions with hooks",
+  "desc": "Run shell commands automatically when Claude Code edits files, finishes tasks, or needs input. Format code, send notifications, validate commands, and enforce project rules."
+ },
+ {
+  "slug": "how-claude-code-works",
+  "url": "https://code.claude.com/docs/en/how-claude-code-works.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "How Claude Code works",
+  "desc": "Understand the agentic loop, built-in tools, and how Claude Code interacts with your project."
+ },
+ {
+  "slug": "interactive-mode",
+  "url": "https://code.claude.com/docs/en/interactive-mode.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Interactive mode",
+  "desc": "Complete reference for keyboard shortcuts, input modes, and interactive features in Claude Code sessions."
+ },
+ {
+  "slug": "jetbrains",
+  "url": "https://code.claude.com/docs/en/jetbrains.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "JetBrains IDEs",
+  "desc": "Use Claude Code with JetBrains IDEs including IntelliJ, PyCharm, WebStorm, and more"
+ },
+ {
+  "slug": "keybindings",
+  "url": "https://code.claude.com/docs/en/keybindings.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Customize keyboard shortcuts",
+  "desc": "Customize keyboard shortcuts in Claude Code with a keybindings configuration file."
+ },
+ {
+  "slug": "large-codebases",
+  "url": "https://code.claude.com/docs/en/large-codebases.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Set up Claude Code in a monorepo or large codebase",
+  "desc": "Configure Claude Code for monorepos and large single-tree codebases with nested CLAUDE.md files, sparse worktrees, code intelligence, and per-package skills so Claude stays focused on the code you're working in."
+ },
+ {
+  "slug": "legal-and-compliance",
+  "url": "https://code.claude.com/docs/en/legal-and-compliance.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Legal and compliance",
+  "desc": "Legal agreements, compliance certifications, and security information for Claude Code."
+ },
+ {
+  "slug": "llm-gateway",
+  "url": "https://code.claude.com/docs/en/llm-gateway.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Other LLM gateways",
+  "desc": "Route Claude Code through an LLM gateway your organization already runs. Covers connecting Claude Code to a gateway, rolling one out for your organization, and what Claude Code sends to a gateway."
+ },
+ {
+  "slug": "llm-gateway-connect",
+  "url": "https://code.claude.com/docs/en/llm-gateway-connect.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Connect Claude Code to an LLM gateway",
+  "desc": "Point Claude Code at your organization's LLM gateway. Check whether your admin already configured it, or set the base URL and credential yourself, then verify the connection and fix gateway errors."
+ },
+ {
+  "slug": "llm-gateway-protocol",
+  "url": "https://code.claude.com/docs/en/llm-gateway-protocol.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Gateway protocol reference",
+  "desc": "The API contract between Claude Code and an LLM gateway: endpoints, headers and body fields to forward, feature degradation when fields are stripped, attribution headers for cost tracking, and model discovery."
+ },
+ {
+  "slug": "llm-gateway-rollout",
+  "url": "https://code.claude.com/docs/en/llm-gateway-rollout.md",
+  "category": "gateways",
+  "tier": "learned",
+  "title": "Roll out an LLM gateway for your organization",
+  "desc": "Deploy a gateway product for Claude Code: configure it to forward what Claude Code sends, issue developer credentials, distribute the configuration through managed settings, and verify the rollout."
+ },
+ {
+  "slug": "managed-mcp",
+  "url": "https://code.claude.com/docs/en/managed-mcp.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Control MCP server access for your organization",
+  "desc": "Restrict which MCP servers users can add or connect to with managed configuration files, allowlists, and denylists."
+ },
+ {
+  "slug": "mcp",
+  "url": "https://code.claude.com/docs/en/mcp.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Connect Claude Code to tools via MCP",
+  "desc": "Learn how to connect Claude Code to your tools with the Model Context Protocol."
+ },
+ {
+  "slug": "mcp-quickstart",
+  "url": "https://code.claude.com/docs/en/mcp-quickstart.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Connect to MCP servers",
+  "desc": "Add an MCP server to Claude Code, verify the connection, and find the configuration on disk."
+ },
+ {
+  "slug": "memory",
+  "url": "https://code.claude.com/docs/en/memory.md",
+  "category": "memory",
+  "tier": "learned",
+  "title": "How Claude remembers your project",
+  "desc": "Give Claude persistent instructions with CLAUDE.md files, and let Claude accumulate learnings automatically with auto memory."
+ },
+ {
+  "slug": "microsoft-foundry",
+  "url": "https://code.claude.com/docs/en/microsoft-foundry.md",
+  "category": "cloud",
+  "tier": "learned",
+  "title": "Claude Code on Microsoft Foundry",
+  "desc": "Learn about configuring Claude Code through Microsoft Foundry, including setup, configuration, and troubleshooting."
+ },
+ {
+  "slug": "mobile",
+  "url": "https://code.claude.com/docs/en/mobile.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Claude Code on mobile",
+  "desc": "Start, monitor, and steer Claude Code tasks from your phone with the Claude app for iOS and Android."
+ },
+ {
+  "slug": "model-config",
+  "url": "https://code.claude.com/docs/en/model-config.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Model configuration",
+  "desc": "Learn about the Claude Code model configuration, including model aliases like `opusplan`"
+ },
+ {
+  "slug": "monitoring-usage",
+  "url": "https://code.claude.com/docs/en/monitoring-usage.md",
+  "category": "costs",
+  "tier": "learned",
+  "title": "Monitoring",
+  "desc": "Learn how to enable and configure OpenTelemetry for Claude Code."
+ },
+ {
+  "slug": "network-config",
+  "url": "https://code.claude.com/docs/en/network-config.md",
+  "category": "enterprise",
+  "tier": "learned",
+  "title": "Enterprise network configuration",
+  "desc": "Configure Claude Code for enterprise environments with proxy servers, custom Certificate Authorities (CA), and mutual Transport Layer Security (mTLS) authentication."
+ },
+ {
+  "slug": "output-styles",
+  "url": "https://code.claude.com/docs/en/output-styles.md",
+  "category": "misc",
+  "tier": "learned",
+  "title": "Output styles",
+  "desc": "Adapt Claude Code for uses beyond software engineering"
+ },
+ {
+  "slug": "overview",
+  "url": "https://code.claude.com/docs/en/overview.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "Overview",
+  "desc": "Claude Code is an agentic coding tool that reads your codebase, edits files, runs commands, and integrates with your development tools. Available in your terminal, IDE, desktop app, and browser."
+ },
+ {
+  "slug": "permission-modes",
+  "url": "https://code.claude.com/docs/en/permission-modes.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Choose a permission mode",
+  "desc": "Control whether Claude asks before editing files or running commands. Cycle modes with Shift+Tab in the CLI or use the mode selector in VS Code, Desktop, and claude.ai."
+ },
+ {
+  "slug": "permissions",
+  "url": "https://code.claude.com/docs/en/permissions.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Configure permissions",
+  "desc": "Control what Claude Code can access and do with fine-grained permission rules, modes, and managed policies."
+ },
+ {
+  "slug": "platforms",
+  "url": "https://code.claude.com/docs/en/platforms.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Platforms and integrations",
+  "desc": "Choose where to run Claude Code and what to connect it to. Compare the CLI, Desktop, VS Code, JetBrains, web, mobile, and integrations like Chrome, Slack, and CI/CD."
+ },
+ {
+  "slug": "plugin-dependencies",
+  "url": "https://code.claude.com/docs/en/plugin-dependencies.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Constrain plugin dependency versions",
+  "desc": "Declare version constraints on plugin dependencies, and bundle a curated plugin set behind one install."
+ },
+ {
+  "slug": "plugin-hints",
+  "url": "https://code.claude.com/docs/en/plugin-hints.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Recommend your plugin from your CLI",
+  "desc": "Emit a one-line marker from your CLI so Claude Code prompts users to install your official plugin."
+ },
+ {
+  "slug": "plugin-marketplaces",
+  "url": "https://code.claude.com/docs/en/plugin-marketplaces.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Create and distribute a plugin marketplace",
+  "desc": "Build and host plugin marketplaces to distribute Claude Code extensions across teams and communities."
+ },
+ {
+  "slug": "plugin-relevance",
+  "url": "https://code.claude.com/docs/en/plugin-relevance.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Recommend plugins for your org",
+  "desc": "Add a relevance block to marketplace plugin entries so Claude Code suggests them when a user's work matches."
+ },
+ {
+  "slug": "plugins",
+  "url": "https://code.claude.com/docs/en/plugins.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Create plugins",
+  "desc": "Create custom plugins to extend Claude Code with skills, agents, hooks, and MCP servers."
+ },
+ {
+  "slug": "plugins-reference",
+  "url": "https://code.claude.com/docs/en/plugins-reference.md",
+  "category": "plugins",
+  "tier": "procedural",
+  "title": "Plugins reference",
+  "desc": "Complete technical reference for Claude Code plugin system, including schemas, CLI commands, and component specifications."
+ },
+ {
+  "slug": "prompt-caching",
+  "url": "https://code.claude.com/docs/en/prompt-caching.md",
+  "category": "memory",
+  "tier": "learned",
+  "title": "How Claude Code uses prompt caching",
+  "desc": "Claude Code manages prompt caching automatically. See why a model switch triggers a slow uncached turn, what `/compact` costs, why CLAUDE.md edits don't apply mid-session, and how to check your cache hit rate."
+ },
+ {
+  "slug": "prompt-library",
+  "url": "https://code.claude.com/docs/en/prompt-library.md",
+  "category": "adoption",
+  "tier": "learned",
+  "title": "Prompt library",
+  "desc": "Copy-paste prompts for Claude Code, tagged by task and role."
+ },
+ {
+  "slug": "quickstart",
+  "url": "https://code.claude.com/docs/en/quickstart.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "Quickstart",
+  "desc": "Welcome to Claude Code!"
+ },
+ {
+  "slug": "remote-control",
+  "url": "https://code.claude.com/docs/en/remote-control.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Continue local sessions from any device with Remote Control",
+  "desc": "Continue a local Claude Code session from your phone, tablet, or any browser using Remote Control. Works with claude.ai/code and the Claude mobile app."
+ },
+ {
+  "slug": "routines",
+  "url": "https://code.claude.com/docs/en/routines.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Automate work with routines",
+  "desc": "Put Claude Code on autopilot. Define routines that run on a schedule, trigger on API calls, or react to GitHub events from Anthropic-managed cloud infrastructure."
+ },
+ {
+  "slug": "sandbox-environments",
+  "url": "https://code.claude.com/docs/en/sandbox-environments.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Choose a sandbox environment",
+  "desc": "Compare Claude Code sandbox options: the built-in sandboxed Bash tool, sandbox runtime, dev containers, Docker, and VMs. Choose the right isolation for your threat model."
+ },
+ {
+  "slug": "sandboxing",
+  "url": "https://code.claude.com/docs/en/sandboxing.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Configure the sandboxed Bash tool",
+  "desc": "Learn how Claude Code's sandboxed Bash tool provides filesystem and network isolation for safer, more autonomous agent execution."
+ },
+ {
+  "slug": "scheduled-tasks",
+  "url": "https://code.claude.com/docs/en/scheduled-tasks.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Run prompts on a schedule",
+  "desc": "Use /loop and the cron scheduling tools to run prompts repeatedly, poll for status, or set one-time reminders within a Claude Code session."
+ },
+ {
+  "slug": "security",
+  "url": "https://code.claude.com/docs/en/security.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Security",
+  "desc": "Learn about Claude Code's security safeguards and best practices for safe usage."
+ },
+ {
+  "slug": "security-guidance",
+  "url": "https://code.claude.com/docs/en/security-guidance.md",
+  "category": "security",
+  "tier": "procedural",
+  "title": "Catch security issues as Claude writes code",
+  "desc": "Install the security-guidance plugin to have Claude review its own code changes for vulnerabilities and fix them in the same session."
+ },
+ {
+  "slug": "server-managed-settings",
+  "url": "https://code.claude.com/docs/en/server-managed-settings.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Configure server-managed settings",
+  "desc": "Centrally configure Claude Code for your organization through server-delivered settings, without requiring device management infrastructure."
+ },
+ {
+  "slug": "sessions",
+  "url": "https://code.claude.com/docs/en/sessions.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Manage sessions",
+  "desc": "Name, resume, branch, and switch between Claude Code conversations. Covers `--continue`, `--resume`, `--from-pr`, the `/resume` picker, session naming, exporting transcripts, and where transcripts are stored."
+ },
+ {
+  "slug": "settings",
+  "url": "https://code.claude.com/docs/en/settings.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Claude Code settings",
+  "desc": "Configure Claude Code with global and project-level settings, and environment variables."
+ },
+ {
+  "slug": "setup",
+  "url": "https://code.claude.com/docs/en/setup.md",
+  "category": "getting-started",
+  "tier": "procedural",
+  "title": "Advanced setup",
+  "desc": "System requirements, platform-specific installation, version management, and uninstallation for Claude Code."
+ },
+ {
+  "slug": "skills",
+  "url": "https://code.claude.com/docs/en/skills.md",
+  "category": "skills",
+  "tier": "procedural",
+  "title": "Extend Claude with skills",
+  "desc": "Create, manage, and share skills to extend Claude's capabilities in Claude Code. Includes custom commands and bundled skills."
+ },
+ {
+  "slug": "slack",
+  "url": "https://code.claude.com/docs/en/slack.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Claude Code in Slack",
+  "desc": "Delegate coding tasks directly from your Slack workspace"
+ },
+ {
+  "slug": "statusline",
+  "url": "https://code.claude.com/docs/en/statusline.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Customize your status line",
+  "desc": "Configure a custom status bar to monitor context window usage, costs, and git status in Claude Code"
+ },
+ {
+  "slug": "sub-agents",
+  "url": "https://code.claude.com/docs/en/sub-agents.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Create custom subagents",
+  "desc": "Create and use specialized AI subagents in Claude Code for task-specific workflows and improved context management."
+ },
+ {
+  "slug": "terminal-config",
+  "url": "https://code.claude.com/docs/en/terminal-config.md",
+  "category": "config",
+  "tier": "procedural",
+  "title": "Configure your terminal for Claude Code",
+  "desc": "Fix Shift+Enter for newlines, get a terminal bell when Claude finishes, configure tmux, match the color theme, and enable Vim mode in the Claude Code CLI."
+ },
+ {
+  "slug": "third-party-integrations",
+  "url": "https://code.claude.com/docs/en/third-party-integrations.md",
+  "category": "enterprise",
+  "tier": "learned",
+  "title": "Enterprise deployment overview",
+  "desc": "Learn how Claude Code can integrate with various third-party services and infrastructure to meet enterprise deployment requirements."
+ },
+ {
+  "slug": "tools-reference",
+  "url": "https://code.claude.com/docs/en/tools-reference.md",
+  "category": "mcp",
+  "tier": "procedural",
+  "title": "Tools reference",
+  "desc": "Complete reference for the tools Claude Code can use, including permission requirements and per-tool behavior."
+ },
+ {
+  "slug": "troubleshoot-install",
+  "url": "https://code.claude.com/docs/en/troubleshoot-install.md",
+  "category": "troubleshoot",
+  "tier": "procedural",
+  "title": "Troubleshoot installation and login",
+  "desc": "Fix command not found, PATH, permission, network, and authentication errors when installing or signing in to Claude Code."
+ },
+ {
+  "slug": "troubleshooting",
+  "url": "https://code.claude.com/docs/en/troubleshooting.md",
+  "category": "troubleshoot",
+  "tier": "procedural",
+  "title": "Troubleshooting",
+  "desc": "Fix high CPU or memory usage, hangs, auto-compact thrashing, and search problems in Claude Code, and find the right page for other issues."
+ },
+ {
+  "slug": "ultraplan",
+  "url": "https://code.claude.com/docs/en/ultraplan.md",
+  "category": "review",
+  "tier": "procedural",
+  "title": "Plan in the cloud with ultraplan",
+  "desc": "Start a plan from your CLI, draft it on Claude Code on the web, then execute it remotely or back in your terminal"
+ },
+ {
+  "slug": "ultrareview",
+  "url": "https://code.claude.com/docs/en/ultrareview.md",
+  "category": "review",
+  "tier": "procedural",
+  "title": "Find bugs with ultrareview",
+  "desc": "Run a deep, multi-agent code review in the cloud with /code-review ultra to find and verify bugs before you merge."
+ },
+ {
+  "slug": "voice-dictation",
+  "url": "https://code.claude.com/docs/en/voice-dictation.md",
+  "category": "features",
+  "tier": "procedural",
+  "title": "Voice dictation",
+  "desc": "Speak your prompts in the Claude Code CLI with hold-to-record or tap-to-record voice dictation."
+ },
+ {
+  "slug": "vs-code",
+  "url": "https://code.claude.com/docs/en/vs-code.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Use Claude Code in VS Code",
+  "desc": "Install and configure the Claude Code extension for VS Code. Get AI coding assistance with inline diffs, @-mentions, plan review, and keyboard shortcuts."
+ },
+ {
+  "slug": "web-quickstart",
+  "url": "https://code.claude.com/docs/en/web-quickstart.md",
+  "category": "platforms",
+  "tier": "learned",
+  "title": "Get started with Claude Code on the web",
+  "desc": "Run Claude Code in the cloud from your browser or phone. Connect a GitHub repository, submit a task, and review the PR without local setup."
+ },
+ {
+  "slug": "wn-2026-w13",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w13.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 13 · March 23–27, 2026",
+  "desc": "Auto mode for hands-off permissions, computer use built in, PR auto-fix in the cloud, transcript search, and a PowerShell tool for Windows."
+ },
+ {
+  "slug": "wn-2026-w14",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w14.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 14 · March 30 – April 3, 2026",
+  "desc": "Computer use in the CLI, interactive in-product lessons, flicker-free rendering, per-tool MCP result-size overrides, and plugin executables on PATH."
+ },
+ {
+  "slug": "wn-2026-w15",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w15.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 15 · April 6–10, 2026",
+  "desc": "Ultraplan cloud planning, the Monitor tool with self-pacing /loop, /team-onboarding for packaging your setup, and /autofix-pr from your terminal."
+ },
+ {
+  "slug": "wn-2026-w16",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w16.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 16 · April 13–17, 2026",
+  "desc": "Claude Opus 4.7 with the new xhigh effort level, Routines on Claude Code on the web, mobile push notifications that ping your phone when Claude needs you, a /usage breakdown that shows what's driving your limits, and native binaries replacing the bundled JavaScript."
+ },
+ {
+  "slug": "wn-2026-w17",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w17.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 17 · April 20–24, 2026",
+  "desc": "/ultrareview opens as a research preview, automatic session recaps when you return to a terminal, custom color themes you can build and ship in plugins, and a redesigned Claude Code on the web."
+ },
+ {
+  "slug": "wn-2026-w18",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w18.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 18 · April 27 – May 1, 2026",
+  "desc": "Claude Code on Windows runs without Git Bash, claude auth login accepts a pasted OAuth code when the browser callback can't reach localhost, claude project purge cleans up local state per project, and pasting a PR URL into /resume finds the session that created it."
+ },
+ {
+  "slug": "wn-2026-w19",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w19.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 19 · May 4–8, 2026",
+  "desc": "Load plugins from .zip archives and URLs, search command history across every project with Ctrl+R, branch new worktrees from local HEAD or the remote default, and block actions unconditionally with auto mode hard deny rules."
+ },
+ {
+  "slug": "wn-2026-w20",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w20.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 20 · May 11–15, 2026",
+  "desc": "Manage every Claude Code session from one screen with agent view, keep Claude working toward a goal until a condition holds, and run fast mode on Opus 4.7 by default."
+ },
+ {
+  "slug": "wn-2026-w21",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w21.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 21 · May 18–22, 2026",
+  "desc": "Use auto mode on the Pro plan and with Sonnet 4.6, see which skills, subagents, and MCP servers drive your plan limits in /usage, and review diffs with the new /code-review command."
+ },
+ {
+  "slug": "wn-2026-w22",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w22.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 22 · May 25–29, 2026",
+  "desc": "Run Claude Code on Claude Opus 4.8, orchestrate large tasks with dynamic workflows, catch security issues with the security-guidance plugin, and use fast mode on Opus 4.8 at a lower price."
+ },
+ {
+  "slug": "wn-2026-w23",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w23.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 23 · June 1–5, 2026",
+  "desc": "Run auto mode on Amazon Bedrock, Google Cloud's Agent Platform, and Microsoft Foundry, prompt before writing files that can run code in acceptEdits mode, list installed plugins with /plugin list, and require an approved version range for managed deployments."
+ },
+ {
+  "slug": "wn-2026-w24",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w24.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 24 · June 8–12, 2026",
+  "desc": "Move a session to a new directory with /cd, let subagents spawn their own subagents, and troubleshoot a broken configuration with safe mode."
+ },
+ {
+  "slug": "wn-2026-w25",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w25.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 25 · June 15–19, 2026",
+  "desc": "Publish a live, shareable page from your session with Artifacts, match tool parameters in deny and ask rules, and set any setting from the prompt with /config."
+ },
+ {
+  "slug": "wn-2026-w26",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w26.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 26 · June 22–26, 2026",
+  "desc": "Authenticate MCP servers from your shell with claude mcp login, get a response to shell mode command output with the ! prefix, and resume a conversation from before /clear with /rewind."
+ },
+ {
+  "slug": "wn-2026-w27",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w27.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 27 · June 29 – July 3, 2026",
+  "desc": "Claude Sonnet 5 becomes the default model, Claude in Chrome reaches general availability, subagents run in the background by default, Claude Desktop arrives on Linux in beta, and /radio tunes into Claude FM."
+ },
+ {
+  "slug": "wn-2026-w28",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w28.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 28 · July 6–10, 2026",
+  "desc": "Browse external sites from the Desktop app's built-in browser, run a full setup checkup with /doctor, and pick up auto mode transcript protections and agent view upgrades."
+ },
+ {
+  "slug": "wn-2026-w29",
+  "url": "https://code.claude.com/docs/en/whats-new/2026-w29.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "Week 29 · July 13–17, 2026",
+  "desc": "Pull live data into published artifacts through MCP connectors, and use Claude Code with a screen reader in the new screen reader mode."
+ },
+ {
+  "slug": "wn-index",
+  "url": "https://code.claude.com/docs/en/whats-new/index.md",
+  "category": "whatsnew",
+  "tier": "learned",
+  "title": "What's new",
+  "desc": "A weekly digest of notable Claude Code features, with code snippets, demos, and context on why they matter."
+ },
+ {
+  "slug": "workflows",
+  "url": "https://code.claude.com/docs/en/workflows.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Orchestrate subagents at scale with dynamic workflows",
+  "desc": "Dynamic workflows orchestrate many subagents from a script Claude writes and you can rerun. Use them for codebase audits, large migrations, and cross-checked research."
+ },
+ {
+  "slug": "worktrees",
+  "url": "https://code.claude.com/docs/en/worktrees.md",
+  "category": "sessions",
+  "tier": "procedural",
+  "title": "Run parallel sessions with worktrees",
+  "desc": "Isolate parallel Claude Code sessions in separate git worktrees so changes don't collide. Covers the `--worktree` flag, subagent isolation, `.worktreeinclude`, cleanup, and non-git VCS hooks."
+ },
+ {
+  "slug": "zero-data-retention",
+  "url": "https://code.claude.com/docs/en/zero-data-retention.md",
+  "category": "reference",
+  "tier": "learned",
+  "title": "Zero data retention",
+  "desc": "Learn about Zero Data Retention (ZDR) for Claude Code, available to qualified accounts on Claude for Enterprise, including scope, disabled features, and how to request enablement."
+ }
+]

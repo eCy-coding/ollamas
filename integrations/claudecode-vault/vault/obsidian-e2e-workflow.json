@@ -1,0 +1,127 @@
+{
+  "$schema": "ollamas.obsidian.e2e/v1",
+  "name": "obsidian-e2e-workflow",
+  "version": "1.0.0",
+  "updated": "2026-07-23",
+  "purpose": "eCym + ollamas + ollamas alt-modelleri Obsidian kasasini uctan uca (read/search/write/backlink/tag) kullanir.",
+  "vault": "~/ollamas-vault",
+  "interfaces": {
+    "rest": {
+      "base": "https://127.0.0.1:27124",
+      "tls": "self-signed (curl -k / httpx verify=False)",
+      "authHeader": "Authorization: Bearer <API_KEY>",
+      "apiKeySource": ".obsidian/plugins/obsidian-local-rest-api/data.json -> .apiKey",
+      "enabled": true,
+      "insecureHttp": "27123 disabled"
+    },
+    "filesystem": {
+      "root": "~/ollamas-vault",
+      "writeContract": "write .md + YAML frontmatter(id,system,ns,tier,source,tags) -> ollamas brain ingest ~5min",
+      "readContract": "read/grep .md; graph+backlink Obsidian tarafinda cozulur"
+    },
+    "mcp": {
+      "server": "obsidian",
+      "liveTools": 16,
+      "note": "orchestra'da vault'a YAZABILEN tek uye"
+    }
+  },
+  "agents": {
+    "ollamas": {
+      "port": 3000,
+      "role": "brain sqlite-vec",
+      "model": "brain",
+      "obsidian": [
+        "read",
+        "search",
+        "write(mirror)"
+      ]
+    },
+    "ecym": {
+      "role": "komut uzmani",
+      "model": "qwen3:8b@11434",
+      "obsidian": [
+        "read",
+        "route",
+        "write ecym/*.md"
+      ]
+    },
+    "odysseus": {
+      "port": 7860,
+      "role": "arastirma/Khoj",
+      "obsidian": [
+        "read",
+        "search"
+      ]
+    },
+    "claudecode": {
+      "role": "kod/PR",
+      "model": "github-models",
+      "obsidian": [
+        "read",
+        "write"
+      ]
+    },
+    "obsidian": {
+      "port": 27124,
+      "role": "vault gateway",
+      "writer": true,
+      "obsidian": [
+        "read",
+        "search",
+        "write",
+        "backlink",
+        "tag",
+        "command"
+      ]
+    }
+  },
+  "subModels": {
+    "runtime": "ollama@11434",
+    "examples": [
+      "qwen3:8b"
+    ],
+    "obsidianAccess": "ollamas brain :3000 recall + REST :27124 uzerinden"
+  },
+  "operations": {
+    "list": "GET /vault/",
+    "read": "GET /vault/{path}",
+    "create": "PUT /vault/{path} (body=markdown)",
+    "append": "POST /vault/{path}",
+    "patch": "PATCH /vault/{path} (heading/block hedefli)",
+    "delete": "DELETE /vault/{path} (dikkat: brain re-materialize eder)",
+    "active": "GET|PUT /active/",
+    "search": "POST /search/ (dataview) | omnisearch",
+    "commands": "GET /commands/ ; POST /commands/{id}/"
+  },
+  "e2eFlow": [
+    "retrieve(brain:3000)",
+    "route(eCym qwen3:8b)",
+    "act(claude/agent)",
+    "write(REST:27124 | fs)",
+    "ingest(brain ~5min)",
+    "graph(obsidian:27124)"
+  ],
+  "conventions": {
+    "frontmatter": [
+      "id",
+      "system",
+      "ns",
+      "tier",
+      "source",
+      "created",
+      "tags"
+    ],
+    "ccTag": "#system/claudecode",
+    "durability": "silme=unut degil; govde duzenle -> brain'e sync"
+  },
+  "verification": {
+    "restLive": "curl -sk -H \"Authorization: Bearer $KEY\" https://127.0.0.1:27124/vault/  (Mac'te; sandbox'ta network yok)",
+    "fsRoundtrip": "write ollamas-vault/inbox/_probe.md -> read back -> eq"
+  },
+  "maps": [
+    "claude-code.canvas",
+    "claude-code-mimari.canvas",
+    "orchestra.canvas",
+    "entity-map.canvas"
+  ]
+}
