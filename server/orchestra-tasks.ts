@@ -403,133 +403,137 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
   });
   if (froze) res.froze = (res.froze ?? 0) + froze;
 
+  // L52: each task now runs through runOneTask, which touches NO shared board state — it writes
+  // its own isolated evidence note and returns a pure TaskAction. The board transitions are
+  // applied HERE, by the single writer, after the batch. L53 makes the batch parallel; keeping
+  // the board mutation out of the per-task path is what makes that safe.
+  const actions: TaskAction[] = [];
   for (const { lane, line } of queue) {
-    const title = taskTitle(line);
-    if (!title || title.startsWith("<")) continue;
-    const id = taskId(title);
-    const notePath = taskNotePath(vault, id, title);
-    const approved = existsSync(notePath)
-      ? readApprovals(readFileSync(notePath, "utf8"))
-      : (deps.approved ?? new Set<string>());
-
-    const steps = planTask(title);
-    const t0 = now();
-    const round1 = await runSteps(steps, { ...deps, approved });
-    const round1Ms = now() - t0;
-
-    // L39: draw the conclusion the note was missing. Best-effort — losing the raw evidence
-    // because the summary step fell over would be the wrong trade.
-    //
-    // L42: the panel may name ONE catalog id to run next. `df -h` reporting a volume at 70%
-    // and nobody following up was the gap; a second round closes it. MAX_ROUNDS is a hard 2,
-    // so an enthusiastic model cannot walk the machine down a chain of its own devising.
-    let results = round1;
-    let totalMs = round1Ms;
-    // Commands this task already ran: re-proposing the one that produced the evidence is the
-    // most common wrong follow-up, so it is withheld rather than argued against in a prompt.
-    const ranIds = steps.map((s) => s.proposal?.id).filter((x): x is string => !!x);
-    // Only offer a follow-up when the task is actually a MACHINE question — i.e. the catalog
-    // matched and a command ran this round. Measured: "felsefede özgür irade var mı" and
-    // "orkestra nasıl çalışıyor" plan no command (they are vault/recall tasks), yet the judge,
-    // seeing a hedge-heavy answer with no concrete numbers, still picked one — running `df` on a
-    // philosophy question. A task with no command in round one gets no follow-up in round two.
-    const followupPool = ranIds.length ? followupCandidates(undefined, deps.commandAllowed) : [];
-    let synthesis = deps.synthesize
-      ? await deps.synthesize(title, results, followupPool, ranIds)
-      : null;
-    let rounds = 1;
-
-    if (synthesis?.followup && rounds < MAX_ROUNDS) {
-      const next = followupStep(synthesis.followup);
-      if (next) {
-        rounds++;
-        const t1 = now();
-        const r2 = await runSteps([next], { ...deps, approved });
-        totalMs += now() - t1;
-        results = [...results, ...r2];
-        // Re-synthesise over BOTH rounds, and offer no further follow-up: the ceiling is
-        // enforced by not asking again, not by hoping the model stops.
-        //
-        // The final synthesis is therefore asked with no candidates and comes back with no
-        // followup — so the id that CAUSED the second round is carried over explicitly.
-        // Without this the evidence note could never name what it just ran.
-        const cause = { followup: synthesis.followup, followupVia: synthesis.followupVia };
-        const final = deps.synthesize ? await deps.synthesize(title, results, [], ranIds) : null;
-        synthesis = final ? { ...final, ...cause } : synthesis;
-      }
-    }
-
-    mkdirSync(join(vault, "orchestra", "tasks"), { recursive: true });
-    writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString(), synthesis, rounds));
-    res.ran++;
-
-    const pending = results.some((r) => r.gated);
-    const failed = results.some((r) => !r.ok && !r.gated && !r.degraded);
-    // L43: record the outcome BEFORE the lane move, so the row describes this run either way.
-    try {
-      deps.ledger?.({
-        at: now(), task: title, id, rounds,
-        members: [...new Set(results.filter((r) => r.ok && !r.gated).map((r) => r.role))],
-        ms: totalMs,
-        answered: !!synthesis && !synthesis.abstained && !!synthesis.answer,
-        expert: synthesis?.expert || undefined,
-        vetoed: !!synthesis?.veto,
-        gated: results.filter((r) => r.gated).length,
-        failed: results.filter((r) => !r.ok && !r.gated && !r.degraded).length,
-        remembered: false, reported: false,
-      });
-    } catch { /* the ledger must never fail a task */ }
-
-    board.lanes[lane] = board.lanes[lane].filter((l) => l !== line);
-    if (pending || failed) {
-      // Stays visible as work-in-progress with a pointer to why.
-      board.lanes.Doing.push(`- [ ] ${title}`);
-      if (pending) res.gated++;
-    } else {
-      board.lanes.Done.push(`- [x] ${title}`);
-      res.done++;
-      // L40: close the loop. Before this, the orchestra did the work and forgot it instantly —
-      // asked the same question again, the brain recalled a commit ABOUT disk surveying rather
-      // than the disk figure it had produced minutes earlier.
-      //
-      // Only a task that finished AND reached a real conclusion is worth remembering: an
-      // abstention ("BİLGİ_YOK") is not knowledge, and a gated or failed task has not finished.
-      // The id is derived from the task, so re-running upserts one memory instead of breeding
-      // a new one every tick.
-      //
-      // L45: a weakly-grounded answer is not remembered either. If the synthesis talked around
-      // its own evidence, writing it into the brain would poison recall with an unreliable
-      // "fact" — the exact thing L40's loop was built to feed. Weak stays visible in the note,
-      // out of the store.
-      const conclusive = !!synthesis && !synthesis.abstained && !!synthesis.answer && !synthesis.grounding?.weak;
-      if (deps.remember && conclusive && synthesis) {
-        try {
-          const who = results.filter((r) => r.ok && !r.gated).map((r) => r.role).join(", ");
-          await deps.remember({
-            id: `task-${id}`,
-            tier: "episodic",
-            source: "orchestra/task",
-            content: `Görev: ${title}\nSonuç (${synthesis.expert || "panel"}): ${synthesis.answer}\nKatkı veren üyeler: ${who || "yok"}`,
-          });
-          res.remembered = (res.remembered ?? 0) + 1;
-        } catch { /* the brain being busy must not fail a finished task */ }
-      }
-      // L41: obsidian writes the readable report through its OWN surface — the one thing only
-      // it can do. A closed vault simply skips it; the evidence note is already on disk.
-      if (deps.vaultWrite && synthesis && !synthesis.abstained && synthesis.answer) {
-        try {
-          const day = new Date(now()).toISOString().slice(0, 10);
-          const base = notePath.split("/").pop()!.replace(/\.md$/, "");
-          const ok = await deps.vaultWrite(reportPath(title, day),
-            reportNote(title, synthesis.answer, synthesis.expert, base, new Date(now()).toISOString()));
-          if (ok) res.reported = (res.reported ?? 0) + 1;
-        } catch { /* report is a bonus, never a failure mode */ }
-      }
-    }
+    const a = await runOneTask(vault, line, lane, deps);
+    if (a) actions.push(a);
   }
+  applyActions(board, actions, res);
 
   // Write the board when work moved OR a task was frozen — a freeze that only lived in memory
   // would never reach the file, so the ❄️ marker (and the panel that reads it) would be lost.
   if (res.ran || res.froze) writeFileSync(boardPath, renderBoard(board));
   return res;
+}
+
+/** The board-free result of running one task: what the single writer needs to move the lane. */
+export interface TaskAction {
+  line: string;
+  lane: Lane;
+  transition: "done" | "doing";
+  gated: boolean;
+  remembered: boolean;
+  reported: boolean;
+}
+
+/** Apply a batch of task actions to the board and tally the run result. The ONLY board writer. */
+function applyActions(board: Board, actions: TaskAction[], res: TaskRunResult): void {
+  for (const a of actions) {
+    board.lanes[a.lane] = board.lanes[a.lane].filter((l) => l !== a.line);
+    res.ran++;
+    if (a.transition === "doing") {
+      board.lanes.Doing.push(`- [ ] ${taskTitle(a.line)}`);
+      if (a.gated) res.gated++;
+    } else {
+      board.lanes.Done.push(`- [x] ${taskTitle(a.line)}`);
+      res.done++;
+      if (a.remembered) res.remembered = (res.remembered ?? 0) + 1;
+      if (a.reported) res.reported = (res.reported ?? 0) + 1;
+    }
+  }
+}
+
+/**
+ * Run one task end to end WITHOUT touching the shared board. Writes its own isolated evidence
+ * note and (best-effort) the ledger, memory and report; returns a TaskAction the caller applies
+ * to the board. This board-independence is exactly what lets a batch run in parallel.
+ */
+export async function runOneTask(
+  vault: string, line: string, lane: Lane, deps: TaskDeps,
+): Promise<TaskAction | null> {
+  const now = deps.now ?? Date.now;
+  const title = taskTitle(line);
+  if (!title || title.startsWith("<")) return null;
+  const id = taskId(title);
+  const notePath = taskNotePath(vault, id, title);
+  const approved = existsSync(notePath)
+    ? readApprovals(readFileSync(notePath, "utf8"))
+    : (deps.approved ?? new Set<string>());
+
+  const steps = planTask(title);
+  const t0 = now();
+  const round1 = await runSteps(steps, { ...deps, approved });
+  const round1Ms = now() - t0;
+
+  let results = round1;
+  let totalMs = round1Ms;
+  const ranIds = steps.map((s) => s.proposal?.id).filter((x): x is string => !!x);
+  const followupPool = ranIds.length ? followupCandidates(undefined, deps.commandAllowed) : [];
+  let synthesis = deps.synthesize ? await deps.synthesize(title, results, followupPool, ranIds) : null;
+  let rounds = 1;
+
+  if (synthesis?.followup && rounds < MAX_ROUNDS) {
+    const next = followupStep(synthesis.followup);
+    if (next) {
+      rounds++;
+      const t1 = now();
+      const r2 = await runSteps([next], { ...deps, approved });
+      totalMs += now() - t1;
+      results = [...results, ...r2];
+      const cause = { followup: synthesis.followup, followupVia: synthesis.followupVia };
+      const final = deps.synthesize ? await deps.synthesize(title, results, [], ranIds) : null;
+      synthesis = final ? { ...final, ...cause } : synthesis;
+    }
+  }
+
+  mkdirSync(join(vault, "orchestra", "tasks"), { recursive: true });
+  writeFileSync(notePath, evidenceNote(title, id, results, totalMs, new Date(now()).toISOString(), synthesis, rounds));
+
+  const pending = results.some((r) => r.gated);
+  const failed = results.some((r) => !r.ok && !r.gated && !r.degraded);
+  try {
+    deps.ledger?.({
+      at: now(), task: title, id, rounds,
+      members: [...new Set(results.filter((r) => r.ok && !r.gated).map((r) => r.role))],
+      ms: totalMs,
+      answered: !!synthesis && !synthesis.abstained && !!synthesis.answer,
+      expert: synthesis?.expert || undefined,
+      vetoed: !!synthesis?.veto,
+      gated: results.filter((r) => r.gated).length,
+      failed: results.filter((r) => !r.ok && !r.gated && !r.degraded).length,
+      remembered: false, reported: false,
+    });
+  } catch { /* the ledger must never fail a task */ }
+
+  if (pending || failed) {
+    return { line, lane, transition: "doing", gated: pending, remembered: false, reported: false };
+  }
+
+  let remembered = false, reported = false;
+  // L45: a weakly-grounded answer is not remembered — writing it would poison recall.
+  const conclusive = !!synthesis && !synthesis.abstained && !!synthesis.answer && !synthesis.grounding?.weak;
+  if (deps.remember && conclusive && synthesis) {
+    try {
+      const who = results.filter((r) => r.ok && !r.gated).map((r) => r.role).join(", ");
+      await deps.remember({
+        id: `task-${id}`, tier: "episodic", source: "orchestra/task",
+        content: `Görev: ${title}\nSonuç (${synthesis.expert || "panel"}): ${synthesis.answer}\nKatkı veren üyeler: ${who || "yok"}`,
+      });
+      remembered = true;
+    } catch { /* the brain being busy must not fail a finished task */ }
+  }
+  if (deps.vaultWrite && synthesis && !synthesis.abstained && synthesis.answer) {
+    try {
+      const day = new Date(now()).toISOString().slice(0, 10);
+      const base = notePath.split("/").pop()!.replace(/\.md$/, "");
+      const ok = await deps.vaultWrite(reportPath(title, day),
+        reportNote(title, synthesis.answer, synthesis.expert, base, new Date(now()).toISOString()));
+      if (ok) reported = true;
+    } catch { /* report is a bonus, never a failure mode */ }
+  }
+  return { line, lane, transition: "done", gated: false, remembered, reported };
 }
