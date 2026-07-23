@@ -12,7 +12,7 @@
 //
 // Safety (Emre's decision): catalog-safe AND denylist-clean runs automatically; anything else
 // becomes a `- [ ] ONAY:` line in the vault and does not run until he ticks it.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { ecymPropose, obsidianContribute, type EcymProposal } from "./orchestra-roles";
@@ -138,6 +138,12 @@ export function planTask(title: string): Step[] {
  * model can walk the machine down a chain of its own devising.
  */
 export const MAX_ROUNDS = 2;
+
+/** Days a gated task may sit in Doing before it is frozen (visible, not deleted). */
+export const staleDays = (env = process.env): number => {
+  const n = Number(env.ORCHESTRA_STALE_DAYS);
+  return Number.isFinite(n) && n >= 0 ? n : 7;
+};
 
 /**
  * Catalog ids the panel may name for a follow-up: read-only entries the shell will genuinely
@@ -341,7 +347,7 @@ export interface TaskOutcome {
   reported: boolean;
 }
 
-export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number }
+export interface TaskRunResult { ran: number; gated: number; done: number; remembered?: number; reported?: number; froze?: number }
 
 /**
  * One pass over the board. Backlog tasks are executed; a task with pending approvals lands in
@@ -370,6 +376,32 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     ...retryable.map((line) => ({ lane: "Doing" as Lane, line })),
     ...board.lanes.Backlog.filter((l) => /^\s*-\s*\[ \]/.test(l)).map((line) => ({ lane: "Backlog" as Lane, line })),
   ];
+
+  // L47: freeze a task that has waited too long for approval. Before this a gated task sat in
+  // Doing indefinitely with nothing marking it as stuck — "işlemi sonlandır" had been there for
+  // days. The ❄️ marker makes the stall visible (and feeds the status panel) without deleting
+  // anything: a human can still tick the approval and it thaws on the next run.
+  let froze = 0;
+  const staleMs = staleDays() * 86_400_000;
+  board.lanes.Doing = board.lanes.Doing.map((line) => {
+    if (!/^\s*-\s*\[ \]/.test(line) || line.includes("❄️")) return line;
+    const t = taskTitle(line);
+    const note = taskNotePath(vault, taskId(t), t);
+    if (!existsSync(note)) return line;
+    let ageMs = 0;
+    try { ageMs = now() - statSync(note).mtimeMs; } catch { return line; }
+    if (ageMs < staleMs) return line;
+    froze++;
+    try {
+      const body = readFileSync(note, "utf8");
+      if (!/donduruldu/.test(body)) {
+        writeFileSync(note, body.replace(/^(#\s.*)$/m,
+          `$1\n\n> [!error] ❄️ Donduruldu: ${Math.floor(ageMs / 86_400_000)} gündür onay bekliyor. Onaylanırsa çözülür.`));
+      }
+    } catch { /* note update best-effort */ }
+    return line.replace(/^(\s*-\s*\[ \]\s*)/, "$1❄️ ");
+  });
+  if (froze) res.froze = (res.froze ?? 0) + froze;
 
   for (const { lane, line } of queue) {
     const title = taskTitle(line);
@@ -496,6 +528,8 @@ export async function processTaskBoard(vault: string, deps: TaskDeps): Promise<T
     }
   }
 
-  if (res.ran) writeFileSync(boardPath, renderBoard(board));
+  // Write the board when work moved OR a task was frozen — a freeze that only lived in memory
+  // would never reach the file, so the ❄️ marker (and the panel that reads it) would be lost.
+  if (res.ran || res.froze) writeFileSync(boardPath, renderBoard(board));
   return res;
 }

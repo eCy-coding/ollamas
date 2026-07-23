@@ -21,6 +21,8 @@ import { writeEcymNotes, writeEcymLearningQueue, readApprovedLearning, bridgeApp
 import { writeOdysseusNotes } from "./brain-obsidian-khoj";
 import { toMarkdown, parseMarkdown, noteFilename, contentHash, adoptHumanNote, ROOT_RESERVED, TIERS, type NoteMemory } from "./brain-obsidian-note";
 import { syncAudio, type AudioSyncResult } from "./brain-obsidian-audio";
+import { readOutcomes, orchestraPanel, renderPanel } from "./orchestra-status";
+import { parseBoard } from "./orchestra-tasks";
 import { ROLE_CARDS } from "./orchestra-roles";
 
 export function defaultVaultPath(): string {
@@ -616,11 +618,23 @@ function writeOrchestra(vault: string, dump: BrainDump, ecymCount: number, obsid
     ["🔴 claudecode", "kod uzmanı (github-models)", "ask-shared cevap", usage.claudecode],
   ].map(([sys, rol, durum, u]: any) =>
     `| ${sys} | ${rol} | ${durum} | ${u.online ? "🟢" : "🔴"} ${u.detail} | ${ago(u.lastActivity)} |`).join("\n");
+  // L47: append the live task panel — answer rate, per-member contribution, avg rounds, vetoes,
+  // and what is waiting on a human. Derived from the outcome ledger + the board, best-effort so
+  // a missing ledger never breaks the sync.
+  let panelBlock = "";
+  try {
+    const ledgerFile = `${process.env.MISSION_CONTROL_DATA_DIR || `${process.env.HOME}/.llm-mission-control`}/orchestra-tasks.jsonl`;
+    const outcomes = existsSync(ledgerFile) ? readOutcomes(readFileSync(ledgerFile, "utf8")) : [];
+    const boardFile = join(dir, "sprint.md");
+    const board = existsSync(boardFile) ? parseBoard(readFileSync(boardFile, "utf8")) : { frontmatter: "", lanes: { Backlog: [], Doing: [], Done: [] }, trailer: "" };
+    panelBlock = "\n" + renderPanel(orchestraPanel(outcomes, board));
+  } catch { /* panel is a bonus on top of the snapshot */ }
+
   writeFileSync(join(dir, "status.md"),
     `---\ncssclasses: [brain, system-orchestra]\ntags: [orchestra]\naliases: [orchestra status]\n---\n\n`
     + `# 🚦 Orkestra durumu\n\n> [!abstract] Sync anındaki anlık görüntü — her sistemin vault'u nasıl kullandığı\n\n`
     + `| Sistem | Rol | Durum | Vault kullanımı | Son aktivite |\n|---|---|---|---|---|\n${usageRows}\n\n`
-    + `**Council:** seviye ${ledger?.level ?? "?"} · ${ledger?.tasks ?? 0} görev · [[council]]\n\n[[Orchestra]]\n`);
+    + `**Council:** seviye ${ledger?.level ?? "?"} · ${ledger?.tasks ?? 0} görev · [[council]]\n${panelBlock}\n[[Orchestra]]\n`);
 
   // L12: Kanban-plugin compatible sprint board — orchestra work lanes. Static scaffold the
   // human/agents fill; the Kanban plugin renders `## Lane` + `- [ ]` as draggable cards.
