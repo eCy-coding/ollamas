@@ -3,6 +3,7 @@
 // → p_final seçimi. Kişiselleştirme (q* = q + λ·p_u) retrieval'dan ÖNCE uygulanır.
 // Erişilemeyen uzman degrade edilir ve ağırlıklar kalanlar üzerinde renormalize olur —
 // hiçbir uzman zorunlu değildir (degrade-alive sözleşmesi).
+import { readFileSync, statSync } from "node:fs";
 import { gatherContext, type AskDeps, type AskSource } from "./brain-ask";
 import {
   EXPERTS, emptyGate, gateLogits, gateWeights, heuristicBias, mixtureSelect,
@@ -31,6 +32,63 @@ function forcePick(candidates: Candidate[], w: number[], index: number): Mixture
   const c = candidates[index];
   if (!c || !c.available || !c.answer?.trim()) return base;
   return { ...base, expert: String(c.expert), answer: c.answer };
+}
+
+// L1 (kalibrasyon turu 2): kapsül katmanı (`cc-capsules.py` → TL;DR ≤200B) Claude Code'un
+// kendi araçlarında (terminal.ts `cckb`) ve eCym'de ÖLÇÜLMÜŞ bir kazanç (terminal.ts yorumu:
+// ham `recall k=4` ~26.6 KB → `cckb ask` ~1 KB, 25,6×; bkz. `_index/cc-token.md`). ollamas'ın
+// KENDİ claudecode uzmanı bu kazancın dışındaydı: tek retrieval SHARED_PROMPT'la birlikte
+// üç uzmanla (ollamas/ecym/odysseus) BİREBİR aynı KAYNAKLAR bloğunu alıyordu. Aşağıdaki iki
+// fonksiyon YALNIZ claudecode'a giden `claude-code:<slug>` kaynaklarının gövdesini aynı
+// kapsül dosyasından okunan TL;DR'a küçültür — diğer üç uzman ve retrieval'ın kendisi
+// (ctx.sources, pRet, gate) DEĞİŞMEZ.
+const CC_ID_PREFIX = "claude-code:";
+let capsuleCache: { mtimeMs: number; bySlug: Map<string, string> } | null = null;
+
+/** `_index/cc-capsules.json`'u oku + mtime'a göre önbelleğe al (her turda diskten okumamak
+ *  için). Dosya yoksa/bozuksa ASLA fırlatmaz — boş Map döner, çağıran orijinal gövdeye düşer. */
+function capsuleTldrs(): Map<string, string> {
+  const file = `${process.env.OBSIDIAN_VAULT || `${process.env.HOME}/ollamas-vault`}/_index/cc-capsules.json`;
+  try {
+    const mtimeMs = statSync(file).mtimeMs;
+    if (capsuleCache && capsuleCache.mtimeMs === mtimeMs) return capsuleCache.bySlug;
+    const data = JSON.parse(readFileSync(file, "utf8")) as { capsules?: { slug?: string; tldr?: string }[] };
+    const bySlug = new Map<string, string>();
+    for (const c of data.capsules ?? []) {
+      if (c?.slug && typeof c.tldr === "string" && c.tldr) bySlug.set(c.slug, c.tldr);
+    }
+    capsuleCache = { mtimeMs, bySlug };
+    return bySlug;
+  } catch {
+    // Kapsül dosyası yok / bozuk / okunamıyor: son iyi önbelleğe (varsa) düş, yoksa boş Map —
+    // her iki durumda da çağıran orijinal (kırpılmamış) gövdeye zarifçe düşer.
+    return capsuleCache?.bySlug ?? new Map();
+  }
+}
+
+/** claudecode'a giden KAYNAKLAR bloğu: `claude-code:<slug>` kaynaklarının `excerpt`'i (zaten
+ *  ≤240B'ye kırpılmış, bkz. brain-ask.ts) varsa kapsül TL;DR'ı ile değiştirilir; kapsül
+ *  yoksa/slug eşleşmezse mevcut gövdeye (zaten ≤240B — spesin istediği "~400B'ye düş" burada
+ *  fiilen no-op'tur, güvenlik ağı) düşülür. Diğer kaynaklar OLDUĞU GİBİ kalır. brain-ask.ts'nin
+ *  `context` birleştirme biçimiyle (live-önek + `[mem:id] (tier) gövde` satırları) BİREBİR aynı
+ *  format — yalnız gövde değişir, format sapması riski yok. ASLA fırlatmaz (try/catch dışta). */
+function claudecodeContext(
+  sources: AskSource[],
+  live: string | null,
+  ragSeq: boolean,
+  pRet: number[],
+  budget: number,
+): string {
+  const tldrs = capsuleTldrs();
+  const shrunk: AskSource[] = sources.map((s) => {
+    if (!s.id.startsWith(CC_ID_PREFIX)) return s;
+    const slug = s.id.slice(CC_ID_PREFIX.length);
+    const tldr = tldrs.get(slug);
+    return tldr ? { ...s, excerpt: tldr } : { ...s, excerpt: s.excerpt.slice(0, 400) };
+  });
+  if (ragSeq && shrunk.length) return weightedContext(shrunk, pRet, budget);
+  return (live ? `[mem:live:system] (CANLI sistem durumu, ŞU AN) ${live}\n` : "")
+    + shrunk.filter((s) => s.id !== "live:system").map((s) => `[mem:${s.id}] (${s.tier}) ${s.excerpt}`).join("\n");
 }
 
 export interface SharedAskResult {
@@ -180,6 +238,18 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     { role: "user", content: userMsg },
   ];
 
+  // L1: claudecode'a giden KAYNAKLAR'ı kapsül boyutuna indir (bkz. claudecodeContext üstteki
+  // yorum). Best-effort — herhangi bir hata paylaşılan `messages`'a (diğer üç uzmanın aldığı
+  // BİREBİR aynı bağlam) zarifçe düşer, tur ASLA bundan dolayı bozulmaz.
+  let claudecodeContextText = contextText;
+  try {
+    claudecodeContextText = claudecodeContext(ctx.sources, ctx.live, !!deps.ragSeq, pRet, ragSeqBudget());
+  } catch { /* kapsül katmanı best-effort — paylaşılan bağlama düş */ }
+  const claudecodeMessages = claudecodeContextText === contextText ? messages : [
+    { role: "system", content: SHARED_PROMPT },
+    { role: "user", content: `SORU: ${q}\n\nKAYNAKLAR:\n${claudecodeContextText}` },
+  ];
+
   // (3b) Uzman çıktıları — paralel, her biri best-effort.
   // L33: a seat that FAILED is recorded with its reason rather than being passed off as an
   // opinion. Previously a tool-error envelope was non-empty text, so it counted as a usable
@@ -193,8 +263,11 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     EXPERTS.map(async (e) => {
       const fn = deps.experts[e];
       if (!fn) { degradedReasons[e] = seatNotes[e] ?? "erişilemez (uzman bağlı değil)"; return { expert: e, answer: "", available: false }; }
+      // L1: yalnız claudecode kapsül-küçültülmüş bağlamı alır; diğer üçü (ollamas/ecym/
+      // odysseus) BİREBİR aynı `messages`'ı almaya devam eder — davranışları değişmez.
+      const m = e === "claudecode" ? claudecodeMessages : messages;
       try {
-        const raw = (await bounded(fn(messages), expertTimeoutMs()))?.trim() ?? "";
+        const raw = (await bounded(fn(m), expertTimeoutMs()))?.trim() ?? "";
         if (isFailurePayload(raw)) { degradedReasons[e] = failureReason(raw); return { expert: e, answer: "", available: false }; }
         if (/BİLGİ_YOK|BILGI_YOK/.test(raw)) { degradedReasons[e] = "kaynaklarda cevap bulamadı"; return { expert: e, answer: "", available: false }; }
         return { expert: e, answer: raw, available: true };
