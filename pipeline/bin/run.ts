@@ -26,8 +26,12 @@ import { decide, renderGates, type Evidence } from "../lib/gates";
 import { benchmarkStart, benchmarkStep, benchmarkEnd } from "../runtime/wrap";
 import { metricsObserved } from "../runtime/metrics";
 import { renderBlock, spliceBlock } from "../lib/prompt-sync";
+import { buildDocument, validateDocument, isValid, renderIssues, type Gap, type Reference, type SearchResult } from "../lib/document";
+import { renderWorkflow } from "../lib/ci";
+import { DEFAULT_THRESHOLDS } from "../lib/gates";
 import { CacheStore } from "../runtime/cache-store";
 import { WarmPool } from "../runtime/pool";
+import { progress, shouldPrefetch, nextPlan, savedMs, renderLookahead, type LookaheadOutcome } from "../lib/lookahead";
 import * as S from "../runtime/steps";
 
 /**
@@ -40,6 +44,9 @@ const CORRECTIONS = [
   "`p95(think) ≤ 350 ms` is unreachable with real LLM inference over free cloud providers — measured 566–1991 ms. The prompt's own baseline table already lists think p95 = 420 ms, which violates its own gate.",
   "The claimed \"2–3× throughput from parallelism\" is not available on this DAG: data dependencies make the research chain strictly sequential. Measured parallelism factor 1.06× → 1.2× after marking every genuinely independent step.",
   "`merge` originally consumed only `generated_code` + `code_test_report`, so security/coverage/chaos results were computed and then ignored — gates that cannot block are decoration. They are now merge inputs.",
+  "The prompt's own Output Requirements were unmet until v4: `todo_board`, `benchmark_configuration`, `ci_cd_yaml` and `references` existed nowhere, so the pipeline passed its own gates while failing the contract it was built from. All eight keys are now emitted as `<run_id>.document.json` and validated (citations must resolve, severities must be in-schema).",
+  "A cache must be versioned with the shape it stores: `search` gained a field and runs kept reading pre-change entries, producing a document with zero sources while reporting a cache hit. `CACHE_SCHEMA` is now part of every key.",
+  "75/25 lookahead is real and measured, not a slogan: at 0.75 progress the next run's pool is warmed and its search/think cache filled while the tail finishes. Only the OVERLAPPING portion is counted as a gain (measured 555 ms) — preparation that outlived the run bought nothing.",
   "A token/byte gate alone is unsafe: a naive `cckb` replacement produced SMALLER output (418 B vs 1039 B, \"60× cheaper\") while retrieval quality collapsed to P@1 = 0.0. Cost and correctness need separate gates.",
 ]
 
@@ -78,12 +85,12 @@ async function dispatch(step: PipelineStep, ctx: S.StepCtx, o: RunOptions): Prom
   switch (step.id) {
     case "search": return S.search(ctx);
     case "think_search": return S.think(ctx, "search_results");
-    case "analyze_search": return S.analyze(ctx, ["thoughts_search", "search_results"]);
+    case "analyze_search": return S.analyzeGaps(ctx, ["thoughts_search", "search_results"], "research");
     case "plan": return S.plan(ctx, "analysis_search");
     case "todo": return S.todo(ctx, "plan_outline");
     case "sandbox_test": return S.sandboxTest(ctx, PROFILES[o.profile]?.sandboxLines ?? 200);
     case "think_sandbox": return S.think(ctx, "sandbox_result");
-    case "analyze_sandbox": return S.analyze(ctx, ["sandbox_result", "thoughts_sandbox"]);
+    case "analyze_sandbox": return S.analyzeGaps(ctx, ["sandbox_result", "thoughts_sandbox"], "verification");
     case "test": return o.light ? { skipped: true, reason: "light mode" } : S.test(ctx);
     case "true_or_false": return S.trueOrFalse(evidenceFrom(ctx));
     case "chaos_test": return S.chaosTest(ctx, o.chaosIterations);
@@ -115,6 +122,53 @@ function evidenceFrom(ctx: S.StepCtx, steps: StepRecord[] = [], wallMs = 0): Evi
   };
 }
 
+/**
+ * `references` comes from the vault anchor source, never from a second hand-written list.
+ * `_bin/pipe-anchors.py` owns the anchors and emits this JSON; TypeScript only reads it, so
+ * the document and the vault notes cannot describe different sources.
+ */
+function loadReferences(): Reference[] {
+  try {
+    const f = join(VAULT, "_index", "pipe-references.json");
+    return (JSON.parse(readFileSync(f, "utf8")) as { references?: Reference[] }).references ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Gap list produced by an `analyzeGaps` step, or [] when the step degraded. */
+const gapsOf = (v: unknown): Gap[] => ((v as { gaps?: Gap[] })?.gaps ?? []);
+
+/**
+ * The prompt asks for five gap sections but the DAG only runs two `analyze` steps.
+ *
+ * Rather than paying for three more LLM calls to manufacture findings, the remaining sections
+ * are derived from evidence the run ALREADY produced: a degraded plan/todo is a planning gap,
+ * a degraded code/test step is a development gap, and every self-audit hole is — literally —
+ * a production gap. These are measured, cite the run itself, and are marked `deterministic`
+ * so nobody mistakes them for model judgement.
+ */
+function derivedGaps(ctx: S.StepCtx, missing: string[], selfRef: string): {
+  planning_gaps: Gap[]; development_gaps: Gap[]; production_gaps: Gap[];
+} {
+  const deg = (key: string, label: string): Gap[] => {
+    const v = ctx.bag[key] as { degraded?: boolean; reason?: string } | undefined;
+    return v?.degraded
+      ? [{ issue: `${label} degraded: ${v.reason ?? "no reason given"}`, severity: "medium", evidence: selfRef, source: "deterministic" }]
+      : [];
+  };
+  return {
+    planning_gaps: [...deg("plan_outline", "plan step"), ...deg("todo_list", "todo step")],
+    development_gaps: [...deg("generated_code", "code step"), ...deg("code_test_report", "code test")],
+    production_gaps: missing.map((m) => ({
+      issue: `self-audit capability not exercised: ${m}`,
+      severity: m === "security" || m === "chaos" ? "high" : "medium",
+      evidence: selfRef,
+      source: "deterministic",
+    })),
+  };
+}
+
 export async function runOnce(o: RunOptions) {
   const wf = loadWorkflow();
   if (o.explainOnly) {
@@ -140,6 +194,54 @@ export async function runOnce(o: RunOptions) {
   const records: StepRecord[] = [];
   const byId = new Map(wf.steps.map((s) => [s.id, s]));
 
+  // ── 75/25 lookahead ──────────────────────────────────────────────────────────────────
+  // The operator's rule: at 75% of a task, compute what the NEXT one needs so the final 25%
+  // overlaps with preparing it. The tail of this DAG (merge/commit/push) is cheap and touches
+  // nothing the next run needs, so the pool and caches were idle exactly when they could have
+  // been filling. `prep` is started and deliberately NOT awaited inside the loop — a lookahead
+  // that blocks the run it is riding on has made things worse, not better.
+  const total = wf.steps.length;
+  let fired = false;
+  let prepStarted = 0;
+  let prep: Promise<void> | null = null;
+  const look: LookaheadOutcome = { fired: false };
+  let nextPool: WarmPool | null = null;
+
+  const maybeLookahead = () => {
+    const p = progress(records.length, total);
+    if (!shouldPrefetch(p, fired)) return;
+    fired = true;
+    look.fired = true;
+    look.firedAt = p.ratio;
+    const plan = nextPlan(o.profile, Object.keys(PROFILES), {
+      poolSize: o.poolSize,
+      questionOf: (pr) => PROFILES[pr]?.question ?? "",
+    });
+    if (!plan) return;
+    look.plan = plan;
+    prepStarted = Date.now();
+    prep = (async () => {
+      try {
+        // Warm the next run's containers…
+        nextPool = new WarmPool({ size: plan.poolSize });
+        const mode = await nextPool.start();
+        look.warmed = mode === "warm" ? nextPool.available : 0;
+        // …and fill the caches its first two steps would otherwise pay for.
+        const doneKeys: string[] = [];
+        const probe: S.StepCtx = { ...ctx, question: plan.question, bag: {}, invocations: [] };
+        const sr = await S.search(probe);
+        if (!(sr as { degraded?: boolean }).degraded) doneKeys.push("search");
+        probe.bag.search_results = sr;
+        const th = await S.think(probe, "search_results");
+        if (!(th as { degraded?: boolean }).degraded) doneKeys.push("think");
+        look.prefetched = doneKeys;
+      } catch (e) {
+        // A failed preparation must never fail the run: the next run simply starts cold.
+        look.error = (e as Error).message;
+      }
+    })();
+  };
+
   for (const b of batches(wf)) {
     // Parallel set first: these are the steps the plan declared safe to overlap.
     if (b.parallel.length) {
@@ -152,6 +254,7 @@ export async function runOnce(o: RunOptions) {
         records.push(record);
         ctx.bag[byId.get(b.parallel[i])!.output] = value;
       });
+      maybeLookahead();
     }
     for (const id of b.serial) {
       const step = byId.get(id)!;
@@ -161,8 +264,19 @@ export async function runOnce(o: RunOptions) {
       );
       records.push(record);
       ctx.bag[step.output] = value;
+      maybeLookahead();
     }
   }
+
+  // Tail = the work that ran AFTER the trigger. Only that much of the preparation actually
+  // overlapped, so only that much may be claimed as a gain.
+  const tailMs = prepStarted ? Date.now() - prepStarted : 0;
+  if (prep) {
+    await prep;                       // settle before teardown so nothing leaks
+    look.prepMs = Date.now() - prepStarted;
+  }
+  const lookaheadSavedMs = savedMs(look.prepMs, tailMs);
+  if (nextPool) await (nextPool as WarmPool).stop();
 
   const ended = benchmarkEnd(o.profile);
   const wallMs = totalMs(started, ended);
@@ -187,7 +301,7 @@ export async function runOnce(o: RunOptions) {
 
   const report = buildReport({
     workflow_version: wf.workflow_version,
-    env: { ...env, notes: [...(env.notes ?? []), `pool=${poolMode}`, `containers_removed=${removed}`] },
+    env: { ...env, notes: [...(env.notes ?? []), `pool=${poolMode}`, `containers_removed=${removed}`, `lookahead_saved_ms=${lookaheadSavedMs}`, renderLookahead(look, lookaheadSavedMs)] },
     profile: o.profile,
     steps: records,
     step_summaries: summarizeSteps([durationsOf(records)]),
@@ -207,6 +321,75 @@ export async function runOnce(o: RunOptions) {
   } catch {
     /* artefact write must not fail the run that produced it */
   }
+
+  // ── the master prompt's own output contract: ONE document with eight keys ────────────
+  const searchStep = ctx.bag.search_results as { search_results?: SearchResult[] } | undefined;
+  const refs = loadReferences();
+  // Anchors occupy the low ref_ids; search results were numbered from 1 by the search step,
+  // so they are re-based above the anchors to keep every citation index unique.
+  const offset = refs.length;
+  const searchResults = (searchStep?.search_results ?? []).map((r) => ({ ...r, ref_id: r.ref_id + offset }));
+  const selfRef = refs.length ? `[${refs[0].ref_id}]` : searchResults.length ? `[${searchResults[0].ref_id}]` : "";
+  const rebase = (gs: Gap[]): Gap[] =>
+    gs.map((g) => ({ ...g, evidence: g.evidence.replace(/\[(\d+)\]/g, (_m, n) => `[${Number(n) + offset}]`) }));
+  const derived = derivedGaps(ctx, a.missing, selfRef);
+
+  const doc = buildDocument({
+    meta: {
+      run_id: env.run_id,
+      timestamp: env.timestamp,
+      workflow_version: wf.workflow_version,
+      profile: o.profile,
+      git_sha: env.git_sha,
+      status: report.status,
+    },
+    search_results: searchResults,
+    thoughts: {
+      research: String((ctx.bag.thoughts_search as { text?: string })?.text ?? ""),
+      planning: String((ctx.bag.plan_outline as { text?: string })?.text ?? ""),
+      development: String((ctx.bag.generated_code as { text?: string })?.text ?? ""),
+      verification: String((ctx.bag.thoughts_sandbox as { text?: string })?.text ?? ""),
+      production: renderSummary(report).join("\n"),
+    },
+    analysis: {
+      research_gaps: rebase(gapsOf(ctx.bag.analysis_search)),
+      verification_gaps: rebase(gapsOf(ctx.bag.verification_report)),
+      ...derived,
+    },
+    dag: wf.steps,
+    todo_board: a.todo,
+    benchmark_configuration: {
+      metrics: ["duration_histogram", "cpu_seconds", "memory_bytes", "error_rate"],
+      percentiles: ["p50", "p95", "p99", "p999"],
+      runs_per_config: 5,
+      warmup_per_config: 1,
+      load_models: { closed_loop: { max_concurrency: 2 }, open_loop: { arrival_rate_rps: 1 } },
+      tools: {
+        load_generator: "pipeline/lib/loadgen.ts (zero-dep; k6 not installed)",
+        observability: "prom-client on the existing /metrics registry",
+        container_runtime: "docker (alpine:3.20 warm pool)",
+      },
+      quality_gates: DEFAULT_THRESHOLDS,
+    },
+    ci_cd_yaml: renderWorkflow(),
+    references: refs,
+  });
+
+  // The workflow file on disk is a RENDER of the same function that fills `ci_cd_yaml`, so
+  // the committed CI and the document can never describe different gates. Written every run
+  // (idempotent) rather than by a separate command someone must remember to invoke.
+  try {
+    const wfDir = join(REPO, ".github", "workflows");
+    mkdirSync(wfDir, { recursive: true });
+    const wfFile = join(wfDir, "pipeline.yml");
+    const next = renderWorkflow();
+    if (!existsSync(wfFile) || readFileSync(wfFile, "utf8") !== next) writeFileSync(wfFile, next, "utf8");
+  } catch { /* CI emission must not fail the run */ }
+
+  const docIssues = validateDocument(doc);
+  try {
+    writeFileSync(join(dir, `${env.run_id}.document.json`), JSON.stringify(doc, null, 1), "utf8");
+  } catch { /* see above */ }
 
   // "her işlemde güncelle": splice the measured numbers back into the master prompt so it can
   // never drift into quoting figures nobody re-measured. Only the delimited block is touched.
@@ -240,9 +423,16 @@ export async function runOnce(o: RunOptions) {
     console.log("\n\x1b[1mSELF-AUDIT\x1b[0m");
     console.log(renderAudit(a).join("\n"));
     console.log("\n" + renderSummary(report).join("\n"));
+    console.log(`\n\x1b[1mLOOKAHEAD\x1b[0m\n  ${renderLookahead(look, lookaheadSavedMs)}`);
+    console.log("\n\x1b[1mDOCUMENT\x1b[0m");
+    console.log(renderIssues(docIssues).join("\n"));
     console.log(`\nartifact: orchestra/runs/${artifactName(report)}`);
+    console.log(`document: orchestra/runs/${env.run_id}.document.json  (${isValid(docIssues) ? "valid" : "INVALID"})`);
   }
-  return { report, auditResult: a, wallMs, records };
+  // `ev` is returned so a multi-run driver can aggregate the SAME evidence the single-run
+  // gate used. bench.ts previously rebuilt it from the rendered gate table and lost the raw
+  // security counts, so the aggregate reported MISS while the run had actually scanned.
+  return { report, auditResult: a, wallMs, records, doc, docIssues, evidence: ev, lookahead: look, lookaheadSavedMs };
 }
 
 function parseArgs(argv: string[]): RunOptions {

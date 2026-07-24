@@ -90,12 +90,10 @@ async function benchProfile(profile: string, o: BenchOptions): Promise<ProfileRe
     });
     if (r && !item.warmup) {
       perRun.push(durationsOf(r.records));
-      evidences.push({
-        steps: summarizeSteps([durationsOf(r.records)]),
-        coveragePct: r.report.decision.gates.find((g) => g.name === "coverage")?.measured as number | undefined,
-        security: undefined,
-        chaosSuccess: r.report.decision.gates.find((g) => g.name === "chaos")?.measured as number | undefined,
-      });
+      // Use the run's OWN evidence object rather than re-deriving it from the rendered gate
+      // table: that round-trip dropped the raw security counts and the aggregate then read
+      // MISS for a scan that had run and come back clean.
+      evidences.push(r.evidence);
     }
     process.stdout.write(item.warmup ? "w" : r ? "." : "x");
   };
@@ -133,7 +131,13 @@ async function benchProfile(profile: string, o: BenchOptions): Promise<ProfileRe
     total,
     errorRatePct: load.errorRatePct,
     coveragePct: firstNumber(evidences.map((e) => e.coveragePct)),
-    security: evidences.find((e) => e.security)?.security,
+    // Union across runs: a finding in ANY run must block, so the worst count per severity wins.
+    security: evidences.some((e) => e.security)
+      ? evidences.reduce<Record<string, number>>((acc, e) => {
+          for (const [k, v] of Object.entries(e.security ?? {})) acc[k] = Math.max(acc[k] ?? 0, v);
+          return acc;
+        }, {})
+      : undefined,
     chaosSuccess: firstNumber(evidences.map((e) => e.chaosSuccess)),
     totals: load.durations,
   };

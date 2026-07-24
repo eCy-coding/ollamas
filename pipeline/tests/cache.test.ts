@@ -38,7 +38,7 @@ describe("cacheKey", () => {
 
   it("separates actions so think() never collides with analyze()", () => {
     expect(cacheKey("think", { q: "x" })).not.toBe(cacheKey("analyze", { q: "x" }));
-    expect(cacheKey("think", { q: "x" }).startsWith("think:")).toBe(true);
+    expect(cacheKey("think", { q: "x" }).startsWith("think@")).toBe(true);
   });
 
   it("separates different payloads", () => {
@@ -47,7 +47,15 @@ describe("cacheKey", () => {
 
   it("handles nested objects and undefined payloads", () => {
     expect(cacheKey("x", { o: { z: 1, a: 2 } })).toBe(cacheKey("x", { o: { a: 2, z: 1 } }));
-    expect(cacheKey("x", undefined)).toMatch(/^x:[0-9a-f]{32}$/);
+    expect(cacheKey("x", undefined)).toMatch(/^x@\d+:[0-9a-f]{32}$/);
+  });
+
+  // A cache that survives its own schema is a silent time traveller: `search` gained a field
+  // and runs kept reading pre-change entries, producing a document with zero sources while
+  // reporting a cache hit.
+  it("changes when the schema version changes, so a stale shape can never be read", () => {
+    expect(cacheKey("search", { q: "x" }, 1)).not.toBe(cacheKey("search", { q: "x" }, 2));
+    expect(cacheKey("search", { q: "x" }, 2)).toContain("search@2:");
   });
 });
 

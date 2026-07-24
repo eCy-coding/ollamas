@@ -1,4 +1,4 @@
-# eCym Pipeline — Master Prompt v3.0 (executable)
+# eCym Pipeline — Master Prompt v4.0 (executable)
 
 > **This document is executable.** Every claim below is produced by `pipeline/` on this
 > machine and re-measured on each full run. The `MEASURED` block at the bottom is written by
@@ -93,6 +93,29 @@ not a copy of the page.
 4. Artillery — CI-run load tests, warm-up discipline
 5. grafana/k6 — closed/open-loop load models, summary schema
 
+## 6b. Output contract (the prompt's own eight keys)
+
+Every full run emits `orchestra/runs/<run_id>.document.json`:
+
+| key | source |
+|---|---|
+| `search_results` | local capsules + web tier, each with a `ref_id` |
+| `thoughts` | the five phases (research/planning/development/verification/production) |
+| `analysis` | five `{issue, severity, evidence:"[n]"}` gap sets; every citation must resolve |
+| `plan.dag` | `workflow.json`, embedded |
+| `todo_board` | the self-audit's corrective tasks |
+| `benchmark_configuration` | metrics, percentiles, load models, `quality_gates` |
+| `ci_cd_yaml` | rendered from `DEFAULT_THRESHOLDS` — CI and the local gate cannot drift |
+| `references` | vault anchors with live HTTP status |
+
+`validateDocument()` treats a missing key or an unresolvable citation as an ERROR and an
+empty section as a WARNING — "we looked and found none" is a claim; "nobody looked" is not.
+
+## 6c. 75/25 lookahead
+
+At 75 % of the DAG the next run's containers are warmed and its `search`/`think` cache is
+filled, concurrently with the remaining 25 %. Only the overlapping portion counts as a gain.
+
 ## 7. Verification
 
 ```bash
@@ -110,54 +133,57 @@ npx vitest run --project pipeline --coverage
 
 ## 📊 MEASURED — last real run (auto-updated, do not hand-edit)
 
-run_id `e2ee0725-56cc-4332-b3de-547321d7e696` · 2026-07-24T10:33:21.267Z · profile `simple` · workflow v3.0
-env darwin 24.6.0/arm64 · cpu 16 · mem 51.5 GB · node v24.16.0 · git `ba427942`
+run_id `86895b92-a34a-4888-a6fc-74e93d0ad133` · 2026-07-24T11:23:35.281Z · profile `simple` · workflow v3.0
+env darwin 24.6.0/arm64 · cpu 16 · mem 51.5 GB · node v24.16.0 · git `6ad9f157`
 
 ### End-to-end latency
 
 | metric | value |
 |---|---:|
-| p50 | 1928 ms |
-| p95 | 1928 ms |
-| p99 | 1928 ms |
-| p999 | 1928 ms |
+| p50 | 7102 ms |
+| p95 | 7102 ms |
+| p99 | 7102 ms |
+| p999 | 7102 ms |
 | stddev | 0 ms |
 | cv | 0 |
-| 95% CI | [1928, 1928] ms |
+| 95% CI | [7102, 7102] ms |
 | runs (n) | 1 |
 
 ### Where the budget goes (step p95)
 
 | step | p95 ms | n |
 |---|---:|---:|
-| coverage_check | 666 | 1 |
-| test | 549 | 1 |
-| chaos_test | 542 | 1 |
-| test_code | 455 | 1 |
-| security_scan | 261 | 1 |
-| sandbox_test | 38 | 1 |
+| code | 2626 | 1 |
+| analyze_sandbox | 1101 | 1 |
+| coverage_check | 809 | 1 |
+| think_sandbox | 758 | 1 |
+| test | 686 | 1 |
+| security_scan | 647 | 1 |
 
 ### Quality gates
 
 | gate | measured / limit |
 |---|---|
-| p95(think) | PASS 5 / 350 |
-| p95(sandbox_test) | PASS 38 / 2000 |
-| p95(total) | PASS 1928 / 3000 |
+| p95(think) | FAIL 758 / 350 |
+| p95(sandbox_test) | PASS 43 / 2000 |
+| p95(total) | FAIL 7102 / 3000 |
 | error_rate | PASS 0 / 0.1 |
-| coverage | PASS 99.65 / 90 |
+| coverage | PASS 99.5 / 90 |
 | security | PASS 0 / no high/critical |
 | chaos | PASS 1 / 0.95 |
 
-**decision:** `go_ahead=true` _(weak evidence)_ — all gates pass but evidence is weak (n=1, cv=0.00)
+**decision:** `go_ahead=false` _(weak evidence)_ — failed: p95(think), p95(total)
 **status:** `incomplete` — self-audit gaps: repetition
-**efficiency:** cache hit 0.778 · parallelism 1.2× · error rate 0%
+**efficiency:** cache hit 0.545 · parallelism 1.2× · error rate 0%
 
 ### Corrections to this prompt (measured, not assumed)
 
 - `p95(think) ≤ 350 ms` is unreachable with real LLM inference over free cloud providers — measured 566–1991 ms. The prompt's own baseline table already lists think p95 = 420 ms, which violates its own gate.
 - The claimed "2–3× throughput from parallelism" is not available on this DAG: data dependencies make the research chain strictly sequential. Measured parallelism factor 1.06× → 1.2× after marking every genuinely independent step.
 - `merge` originally consumed only `generated_code` + `code_test_report`, so security/coverage/chaos results were computed and then ignored — gates that cannot block are decoration. They are now merge inputs.
+- The prompt's own Output Requirements were unmet until v4: `todo_board`, `benchmark_configuration`, `ci_cd_yaml` and `references` existed nowhere, so the pipeline passed its own gates while failing the contract it was built from. All eight keys are now emitted as `<run_id>.document.json` and validated (citations must resolve, severities must be in-schema).
+- A cache must be versioned with the shape it stores: `search` gained a field and runs kept reading pre-change entries, producing a document with zero sources while reporting a cache hit. `CACHE_SCHEMA` is now part of every key.
+- 75/25 lookahead is real and measured, not a slogan: at 0.75 progress the next run's pool is warmed and its search/think cache filled while the tail finishes. Only the OVERLAPPING portion is counted as a gain (measured 555 ms) — preparation that outlived the run bought nothing.
 - A token/byte gate alone is unsafe: a naive `cckb` replacement produced SMALLER output (418 B vs 1039 B, "60× cheaper") while retrieval quality collapsed to P@1 = 0.0. Cost and correctness need separate gates.
 
 <!-- MEASURED:END -->

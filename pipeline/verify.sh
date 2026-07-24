@@ -108,6 +108,71 @@ if docker info >/dev/null 2>&1; then
     || bad "${LEAK} artık konteyner — \`ollamas pipeline sweep\`"
 else degrade "docker doğrulanamadı"; fi
 
+head_ "9  Kanonik çıktı belgesi (master prompt'un kendi sözleşmesi)"
+DOC=$(ls -t "$V/orchestra/runs"/*.document.json 2>/dev/null | head -1)
+if [ -n "$DOC" ]; then
+  RES=$(python3 - "$DOC" <<'PYEOF'
+import json, sys, re
+d = json.load(open(sys.argv[1]))
+req = ["search_results","thoughts","analysis","plan","todo_board",
+       "benchmark_configuration","ci_cd_yaml","references"]
+missing = [k for k in req if k not in d]
+# Atıf bütünlüğü: her [n] gerçek bir ref_id'ye çözülmeli
+ids = {r["ref_id"] for r in d.get("references", [])} | {s["ref_id"] for s in d.get("search_results", [])}
+bad = []
+for sec, gaps in (d.get("analysis") or {}).items():
+    for g in gaps or []:
+        for n in re.findall(r"\[(\d+)\]", g.get("evidence", "")):
+            if int(n) not in ids:
+                bad.append(f"{sec}:[{n}]")
+print(f"{len(req)-len(missing)}/{len(req)}|{','.join(missing) or '-'}|{len(bad)}|{','.join(bad[:3]) or '-'}")
+PYEOF
+)
+  KEYS=${RES%%|*}; REST=${RES#*|}; MISS=${REST%%|*}; REST=${REST#*|}; BADN=${REST%%|*}; BADL=${REST#*|}
+  [ "$KEYS" = "8/8" ] && ok "8 anahtarın tamamı üretiliyor" || bad "belge anahtarı eksik: ${KEYS} (${MISS})"
+  [ "${BADN:-1}" = "0" ] && ok "atıf bütünlüğü: her [n] bir kaynağa çözülüyor" \
+    || bad "${BADN} çözülmeyen atıf: ${BADL}"
+else bad "hiç .document.json yok — `ollamas pipeline run` çalıştır"; fi
+
+head_ "10  CI eşikleri kaynakla aynı mı (ayrışma testi)"
+DRIFT=$(npx tsx -e "
+import { renderWorkflow, parseThresholdEnv, envName } from './pipeline/lib/ci.ts';
+import { DEFAULT_THRESHOLDS } from './pipeline/lib/gates.ts';
+const p = parseThresholdEnv(renderWorkflow());
+const bad = Object.entries(DEFAULT_THRESHOLDS).filter(([k,v]) =>
+  p[envName(k)] !== (Array.isArray(v) ? v.join(',') : String(v))).map(([k]) => k);
+console.log(bad.length ? 'DRIFT:' + bad.join(',') : 'OK');" 2>/dev/null | tail -1)
+[ "$DRIFT" = "OK" ] && ok "CI YAML eşikleri DEFAULT_THRESHOLDS ile birebir" || bad "CI ayrışması: $DRIFT"
+[ -s "$REPO/.github/workflows/pipeline.yml" ] && ok "workflow dosyası diskte" || bad ".github/workflows/pipeline.yml yok"
+
+head_ "11  75/25 lookahead ölçüldü mü"
+LA=$(python3 -c "
+import json,glob,os,sys
+fs=sorted(glob.glob(os.path.expanduser('$V/orchestra/runs/*-*.json')),key=os.path.getmtime)
+fs=[f for f in fs if not f.endswith('.document.json')]
+if not fs: print('YOK'); sys.exit()
+d=json.load(open(fs[-1]))
+# Açıklayıcı notu seç, ilk eşleşeni değil: notlar arasında hem 'lookahead_saved_ms=N'
+# hem de insan-okunur satır var; ilkini almak kapıyı yanlış-kırmızı yapıyordu.
+n=[x for x in (d.get('env',{}).get('notes') or []) if x.startswith('lookahead:')]
+print(n[0] if n else 'YOK')" 2>/dev/null)
+case "$LA" in
+  *"fired at"*) ok "lookahead: ${LA#lookahead: }" ;;
+  *"not triggered"*) skip "lookahead tetiklenmedi (koşu %75'i geçmedi)" ;;
+  *) bad "lookahead ölçümü raporda yok" ;;
+esac
+
+head_ "12  Web arama degrade dürüstlüğü"
+WS=$(npx tsx -e "
+import { webSearch } from './pipeline/runtime/websearch.ts';
+(async () => {
+  const r = await webSearch({ queries: ['x'], backend: async () => ({ source: 'stub', results: [] }) });
+  console.log(JSON.stringify({ n: r.results.length, deg: r.degraded, hasReason: Boolean(r.reason) }));
+})();" 2>/dev/null | tail -1)
+echo "$WS" | grep -q '"n":0,"deg":true,"hasReason":true' \
+  && ok "boş arama dürüstçe degrade (uydurma kaynak yok)" \
+  || bad "web arama degrade yolu bozuk: ${WS:-çıktı yok}"
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."

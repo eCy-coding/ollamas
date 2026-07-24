@@ -23,6 +23,9 @@ import { decide, type Evidence } from "../lib/gates";
 import { summarize } from "../lib/stats";
 import type { CacheStore } from "./cache-store";
 import { WarmPool, shellSnippet } from "./pool";
+import { webSearch, deriveQueries } from "./websearch";
+import { extractGaps, severityCounts } from "../lib/gapspec";
+import type { Gap, SearchResult } from "../lib/document";
 
 const exec = promisify(execFile);
 const HOME = process.env.HOME ?? "";
@@ -95,15 +98,79 @@ export async function search(ctx: StepCtx): Promise<StepValue> {
   const inv = `cckb --json ask -k 5 "${ctx.question}"`;
   ctx.invocations.push(inv);
   const r = await sh(CCKB, ["--json", "ask", "-k", "5", ctx.question], HOME, 30_000);
-  if (!r.ok) return { degraded: true, reason: "cckb miss", hits: [] };
-  try {
-    const parsed = JSON.parse(r.stdout) as { hits?: unknown[] };
-    const value = { hits: parsed.hits ?? [], bytes: r.stdout.length, invocation: inv };
-    ctx.cache.set(cached.key, value);
-    return value;
-  } catch {
-    return { degraded: true, reason: "cckb output not json", hits: [] };
+  let local: Array<{ slug: string; url?: string; tldr?: string }> = [];
+  if (r.ok) {
+    try {
+      local = (JSON.parse(r.stdout) as { hits?: typeof local }).hits ?? [];
+    } catch { /* fall through: local layer contributes nothing, web may still answer */ }
   }
+
+  // Local capsules become CITABLE sources too: they carry the canonical docs URL, so a gap
+  // can cite a vault note the same way it cites a web page. ref_ids are contiguous across
+  // both tiers, which is what makes "[3]" mean exactly one thing.
+  const localResults: SearchResult[] = local.map((h, idx) => ({
+    title: h.slug,
+    url: h.url ?? "",
+    snippet: String(h.tldr ?? "").slice(0, 400),
+    ref_id: idx + 1,
+    source: "cckb",
+  })).filter((x) => x.url);
+
+  // The prompt requires ≤5 external queries with 3-5 results each. The web tier runs AFTER
+  // the local one and starts its ref_ids where local left off.
+  const web = await webSearch({
+    queries: deriveQueries(ctx.question),
+    cache: ctx.cache,
+    startRefId: localResults.length + 1,
+  });
+
+  const search_results = [...localResults, ...web.results];
+  const value = {
+    hits: local,
+    search_results,
+    bytes: r.stdout.length,
+    web_degraded: web.degraded,
+    web_reason: web.reason,
+    queries: web.queriesUsed,
+    backends: web.sources,
+    cache_hits: web.cacheHits,
+    invocation: `${inv} ; webSearch(${web.queriesUsed.length} queries)`,
+    // Degraded only when BOTH tiers produced nothing — a working local layer with no network
+    // is a complete answer for a docs question, not a failure.
+    ...(search_results.length ? {} : { degraded: true, reason: web.reason ?? "no sources" }),
+  };
+  if (search_results.length) ctx.cache.set(cached.key, value);
+  return value;
+}
+
+/**
+ * Structured gap analysis for one phase.
+ *
+ * The model is ASKED for JSON, but the result is never trusted to be JSON: `extractGaps`
+ * falls back to citable prose findings marked `deterministic` rather than inventing a
+ * severity to satisfy the schema (severity drives the merge gate).
+ */
+export async function analyzeGaps(
+  ctx: StepCtx,
+  keys: string[],
+  phase: string,
+): Promise<StepValue> {
+  const refs = ((ctx.bag.search_results as { search_results?: SearchResult[] })?.search_results ?? []);
+  const refList = refs.slice(0, 8).map((r) => `[${r.ref_id}] ${r.title} — ${r.url}`).join("\n");
+  const system =
+    `You are auditing the ${phase} phase. Return ONLY a JSON array of objects: ` +
+    `{"issue": string, "severity": "high"|"medium"|"low", "evidence": "[n]"} where [n] cites ` +
+    `one of the sources below. No prose outside the JSON.\n\nSOURCES:\n${refList || "(none)"}`;
+  const answer = await llm(ctx, "analyze", system, keys.map((k) => brief(ctx.bag[k])).join("\n\n"), 500);
+  const fallbackCite = refs.length ? `[${refs[0].ref_id}]` : "";
+  const ex = extractGaps((answer as { text?: string }).text ?? "", { defaultEvidence: fallbackCite });
+  return {
+    gaps: ex.gaps as Gap[],
+    counts: severityCounts(ex.gaps),
+    extraction: ex.source,
+    ...(ex.reason ? { extraction_reason: ex.reason } : {}),
+    ...(answer.degraded ? { degraded: true, reason: answer.reason } : {}),
+  };
 }
 
 // ── think / analyze / plan / code (LLM-backed) ────────────────────────────────
