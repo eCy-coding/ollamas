@@ -207,6 +207,32 @@ LEAK=$(ps -Ao command 2>/dev/null | grep -c "[.]ollamas/term/.*tab\.sh" || true)
 [ "${LEAK:-0}" -le 1 ] && ok "artık sekme döngüsü yok (${LEAK})" \
   || bad "${LEAK} artık sekme döngüsü — pkill -f '.ollamas/term'"
 
+head_ "17  Log okunabilirliği (4 gerçek biçim)"
+LF=$(npx tsx -e "
+import {parseLine} from './pipeline/lib/logfmt.ts';
+const R=['2026-07-24 13:20:57  cc-verify: PASS=24  FAIL=1','2026-07-24 10:32:25,421 INFO gateway.run: x','WARNING gateway.run: y','2026-07-24T10:32:12.122+03:00 [plugins] z'];
+const p=R.map(l=>parseLine(l,'j'));
+const times=p.filter(x=>x&&x.time).length, levels=p.filter(x=>x&&!x.levelInferred).length;
+console.log(times+'|'+levels);" 2>/dev/null | tail -1)
+TIMES=${LF%%|*}; LEVELS=${LF#*|}
+[ "${TIMES:-0}" = "3" ] && [ "${LEVELS:-0}" = "3" ] \
+  && ok "4 biçim ayrıştı: 3 zaman damgası + 3 açık seviye (damgasız satır dürüstçe boş)" \
+  || bad "log ayrıştırma bozuk (zaman=${TIMES:-?} seviye=${LEVELS:-?})"
+
+head_ "18  Anlatı üretimi (algoritma akışı)"
+NR=$(npx tsx -e "
+import {narrateGates,narrateDecision} from './pipeline/lib/narrate.ts';
+import {evaluate,decide} from './pipeline/lib/gates.ts';
+import {summarize} from './pipeline/lib/stats.ts';
+const ev={steps:{think:summarize([200]),sandbox_test:summarize([40])},total:summarize([1000]),errorRatePct:0,coveragePct:99,chaosSuccess:1,totals:[1000]};
+const g=narrateGates(evaluate(ev)).some(l=>l.text.includes('ÖLÇÜLMEDİ'));
+const d=narrateDecision(decide(ev)).some(l=>l.text.includes('gevşetilmedi'));
+console.log((g?'MISS-OK':'MISS-NO')+'|'+(d?'WEAK-OK':'WEAK-NO'));" 2>/dev/null | tail -1)
+case "$NR" in
+  MISS-OK\|WEAK-OK) ok "anlatı: ÖLÇÜLMEDİ ayrımı + zayıf-kanıt uyarısı üretiliyor" ;;
+  *) bad "anlatı eksik: ${NR:-üretilemedi}" ;;
+esac
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."

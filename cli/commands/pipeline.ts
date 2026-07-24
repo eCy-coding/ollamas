@@ -118,6 +118,15 @@ export async function runPipeline(argv: string[]): Promise<number> {
       return r.status ?? 2;
     }
 
+    case "watch": {
+      // Readable background stream. Spawned so the tab outlives this process.
+      const { spawnSync } = await import("node:child_process");
+      const { join } = await import("node:path");
+      const repo = process.env.OLLAMAS_REPO ?? join(process.env.HOME ?? "", "Desktop", "ollamas");
+      const r = spawnSync("npx", ["tsx", join(repo, "pipeline", "bin", "watch.ts"), ...rest], { cwd: repo, stdio: "inherit" });
+      return r.status ?? 2;
+    }
+
     case "sweep": {
       // Explicit orphan cleanup. Deliberately NOT part of WarmPool.stop(): a broad sweep
       // during a concurrent benchmark deletes the other run's containers (measured — it
@@ -141,6 +150,9 @@ export async function runPipeline(argv: string[]): Promise<number> {
   board [--lanes ecym,ollamas,obsidian] [--target terminal|iterm2] [--headless]
                           run each lane in its own VISIBLE Terminal.app tab, plus a
                           conductor tab with a live table. --headless is CI-only.
+  watch [--only error,warn] [--source <ad>] [--plain] [--max N]
+                          arka plan işlerini OKUNABİLİR akışla izle:
+                          saat │ iş │ SEVİYE │ kaynak: mesaj (ham akış: supervise.ts)
   sweep                   remove orphaned sandbox containers from crashed runs
 
 artifacts: ~/ollamas-vault/orchestra/runs/   metrics: GET /metrics (workflow_step_*)`);

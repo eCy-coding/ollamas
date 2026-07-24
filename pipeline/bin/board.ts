@@ -11,11 +11,13 @@
 // previous succeeded); ACROSS lanes they overlap, because the three systems have no shared
 // state during verification. That is the same rule the DAG already applies to waves, applied
 // to teams.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { makeLane, renderBoard, boardVerdict, runnable, laneProgress, type Lane } from "../lib/lane";
 import { capability, openTab, pushStep, closeTab, readStatus, sweepTabs, TAB_ROOT, type TabHandle } from "../runtime/termtab";
+import { narratePlan, narrateStep, renderNarration, section } from "../lib/narrate";
+import { batches as dagBatches, parallelismFactor } from "../lib/dag";
 import type { TermTarget } from "../../orchestration/bin/lib/term-exec";
 
 const HOME = homedir();
@@ -88,6 +90,7 @@ async function openConductor(statusFile: string, target: TermTarget): Promise<vo
 }
 
 export interface BoardOptions {
+  narrate: boolean;
   lanes: string[];
   target: TermTarget;
   /** CI only: run the steps here instead of in tabs. Must be asked for explicitly. */
@@ -126,6 +129,35 @@ export async function runBoard(o: BoardOptions) {
     rmSync(`${statusFile}.done`, { force: true });
   }
   await openConductor(statusFile, o.target);
+
+  // ALGORİTMA tab: what the board is doing and WHY, not just that it is doing it. Written to
+  // a file the tab tails, so the narration keeps flowing after this process exits.
+  let narrateFile = "";
+  if (o.narrate) {
+    const ndir = join(TAB_ROOT, "_narrate");
+    mkdirSync(ndir, { recursive: true });
+    narrateFile = join(ndir, "narration.log");
+    const plan = chosen.flatMap((l) => [
+      `▸ Lane ${l.title}: ${l.steps.length} adım, SIRALI (her adım öncekinin başarısını varsayar).`,
+      ...l.steps.map((s, i) => `│ ${String(i + 1).padStart(2)}. ${s.title}${s.required === false ? "  (zorunlu değil)" : ""}`),
+    ]);
+    writeFileSync(narrateFile, [
+      "eCym ALGORİTMA — board akışı ve gerekçesi",
+      ...section("PLAN"),
+      `▸ ${chosen.length} lane EŞZAMANLI koşuyor; lane içinde adımlar SIRALI.`,
+      "▸ Bir lane kırmızıysa board kırmızı — kısmi yeşil, yeşil değildir.",
+      ...plan,
+      ...section("AKIŞ"),
+    ].join("\n") + "\n", "utf8");
+    const nscript = join(ndir, "narrate.sh");
+    writeFileSync(nscript, `#!/bin/bash\nprintf '\\033]0;eCym · ALGORİTMA\\007'\nclear\ntail -n +1 -f "${narrateFile}"\n`, { mode: 0o755 });
+    const { execFile: ef } = await import("node:child_process");
+    const { promisify: pf } = await import("node:util");
+    await pf(ef)("open", ["-a", o.target === "iterm2" ? "iTerm" : "Terminal", nscript]).catch(() => {});
+  }
+  const say = (line: string) => {
+    if (narrateFile) { try { appendFileSync(narrateFile, line + "\n"); } catch { /* tab closed */ } }
+  };
 
   const handles: TabHandle[] = [];
   for (const lane of chosen) {
@@ -167,7 +199,11 @@ export async function runBoard(o: BoardOptions) {
         step.exitCode = 124;
         step.endedMs = Date.now();
       }
-      if (step.state === "failed" && step.required !== false) break;
+      say(renderNarration([narrateStep(`${h.lane.id}/${step.title}`, "step", step.state === "ok", (step.endedMs ?? 0) - (step.startedMs ?? 0))])[0]);
+      if (step.state === "failed" && step.required !== false) {
+        say(`■ ${h.lane.title}: zorunlu adım düştü → lane durduruldu (sonraki adımlar bunun başarısını varsayıyordu).`);
+        break;
+      }
     }
     closeTab(h);
   });
@@ -189,6 +225,8 @@ export async function runBoard(o: BoardOptions) {
   writeFileSync(statusFile, lines.join("\n") + "\n", "utf8");
   writeFileSync(`${statusFile}.done`, "", "utf8");
 
+  say("");
+  say(`■ Karar: ${verdict.ok ? "GREEN" : "RED"} — ${verdict.reason}`);
   console.log(lines.join("\n"));
   for (const l of chosen) {
     for (const s of l.steps) {
@@ -233,6 +271,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     return i >= 0 ? argv[i + 1] : d;
   };
   runBoard({
+    narrate: argv.includes("--narrate"),
     lanes: get("--lanes", "ecym,ollamas,obsidian").split(",").map((s) => s.trim()).filter(Boolean),
     target: (get("--target", "terminal") as TermTarget),
     headless: argv.includes("--headless"),
