@@ -47,6 +47,8 @@ const CORRECTIONS = [
   "The prompt's own Output Requirements were unmet until v4: `todo_board`, `benchmark_configuration`, `ci_cd_yaml` and `references` existed nowhere, so the pipeline passed its own gates while failing the contract it was built from. All eight keys are now emitted as `<run_id>.document.json` and validated (citations must resolve, severities must be in-schema).",
   "A cache must be versioned with the shape it stores: `search` gained a field and runs kept reading pre-change entries, producing a document with zero sources while reporting a cache hit. `CACHE_SCHEMA` is now part of every key.",
   "75/25 lookahead is real and measured, not a slogan: at 0.75 progress the next run's pool is warmed and its search/think cache filled while the tail finishes. Only the OVERLAPPING portion is counted as a gain (measured 555 ms) — preparation that outlived the run bought nothing.",
+  "K1 dead-code: `openTabDirs()` read `${TAB_ROOT}/.index`, a file nothing ever wrote, so the tab-leak gate could never fail. It now reads the disk (a lane dir with a `queue` and no DONE marker), takes an optional root for real test isolation, and found 2 leaked smoke tabs the moment it worked.",
+  "K4 flaky doctor test: root was SEQUENTIAL probes in buildDoctorReport — health(8s)+ollama(5s)+bridge(5s)+ready(5s) reached ~23s worst-case under load, past the 15s test budget. Fixed by running the independent probes concurrently (Promise.all): 7.14s → 0.90s under load, 5/5 green. Threshold NOT relaxed; the doctor was made faster.",
   "A token/byte gate alone is unsafe: a naive `cckb` replacement produced SMALLER output (418 B vs 1039 B, \"60× cheaper\") while retrieval quality collapsed to P@1 = 0.0. Cost and correctness need separate gates.",
 ]
 

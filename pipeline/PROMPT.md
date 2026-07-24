@@ -1,4 +1,4 @@
-# eCym Pipeline — Master Prompt v4.0 (executable)
+# eCym Pipeline — Master Prompt v7.0 (executable)
 
 > **This document is executable.** Every claim below is produced by `pipeline/` on this
 > machine and re-measured on each full run. The `MEASURED` block at the bottom is written by
@@ -133,48 +133,48 @@ npx vitest run --project pipeline --coverage
 
 ## 📊 MEASURED — last real run (auto-updated, do not hand-edit)
 
-run_id `86895b92-a34a-4888-a6fc-74e93d0ad133` · 2026-07-24T11:23:35.281Z · profile `simple` · workflow v3.0
-env darwin 24.6.0/arm64 · cpu 16 · mem 51.5 GB · node v24.16.0 · git `6ad9f157`
+run_id `9985d8c1-4350-4b30-82fb-6f11d21117ee` · 2026-07-24T21:15:25.223Z · profile `simple` · workflow v3.0
+env darwin 24.6.0/arm64 · cpu 16 · mem 51.5 GB · node v24.16.0 · git `2aac1c2f`
 
 ### End-to-end latency
 
 | metric | value |
 |---|---:|
-| p50 | 7102 ms |
-| p95 | 7102 ms |
-| p99 | 7102 ms |
-| p999 | 7102 ms |
+| p50 | 3898 ms |
+| p95 | 3898 ms |
+| p99 | 3898 ms |
+| p999 | 3898 ms |
 | stddev | 0 ms |
 | cv | 0 |
-| 95% CI | [7102, 7102] ms |
+| 95% CI | [3898, 3898] ms |
 | runs (n) | 1 |
 
 ### Where the budget goes (step p95)
 
 | step | p95 ms | n |
 |---|---:|---:|
-| code | 2626 | 1 |
-| analyze_sandbox | 1101 | 1 |
-| coverage_check | 809 | 1 |
-| think_sandbox | 758 | 1 |
-| test | 686 | 1 |
-| security_scan | 647 | 1 |
+| think_sandbox | 887 | 1 |
+| coverage_check | 863 | 1 |
+| security_scan | 801 | 1 |
+| test | 759 | 1 |
+| analyze_sandbox | 616 | 1 |
+| test_code | 569 | 1 |
 
 ### Quality gates
 
 | gate | measured / limit |
 |---|---|
-| p95(think) | FAIL 758 / 350 |
-| p95(sandbox_test) | PASS 43 / 2000 |
-| p95(total) | FAIL 7102 / 3000 |
+| p95(think) | FAIL 887 / 350 |
+| p95(sandbox_test) | PASS 40 / 2000 |
+| p95(total) | FAIL 3898 / 3000 |
 | error_rate | PASS 0 / 0.1 |
-| coverage | PASS 99.5 / 90 |
+| coverage | PASS 93.55 / 90 |
 | security | PASS 0 / no high/critical |
 | chaos | PASS 1 / 0.95 |
 
 **decision:** `go_ahead=false` _(weak evidence)_ — failed: p95(think), p95(total)
 **status:** `incomplete` — self-audit gaps: repetition
-**efficiency:** cache hit 0.545 · parallelism 1.2× · error rate 0%
+**efficiency:** cache hit 0.636 · parallelism 1.2× · error rate 0%
 
 ### Corrections to this prompt (measured, not assumed)
 
@@ -184,6 +184,8 @@ env darwin 24.6.0/arm64 · cpu 16 · mem 51.5 GB · node v24.16.0 · git `6ad9f1
 - The prompt's own Output Requirements were unmet until v4: `todo_board`, `benchmark_configuration`, `ci_cd_yaml` and `references` existed nowhere, so the pipeline passed its own gates while failing the contract it was built from. All eight keys are now emitted as `<run_id>.document.json` and validated (citations must resolve, severities must be in-schema).
 - A cache must be versioned with the shape it stores: `search` gained a field and runs kept reading pre-change entries, producing a document with zero sources while reporting a cache hit. `CACHE_SCHEMA` is now part of every key.
 - 75/25 lookahead is real and measured, not a slogan: at 0.75 progress the next run's pool is warmed and its search/think cache filled while the tail finishes. Only the OVERLAPPING portion is counted as a gain (measured 555 ms) — preparation that outlived the run bought nothing.
+- K1 dead-code: `openTabDirs()` read `${TAB_ROOT}/.index`, a file nothing ever wrote, so the tab-leak gate could never fail. It now reads the disk (a lane dir with a `queue` and no DONE marker), takes an optional root for real test isolation, and found 2 leaked smoke tabs the moment it worked.
+- K4 flaky doctor test: root was SEQUENTIAL probes in buildDoctorReport — health(8s)+ollama(5s)+bridge(5s)+ready(5s) reached ~23s worst-case under load, past the 15s test budget. Fixed by running the independent probes concurrently (Promise.all): 7.14s → 0.90s under load, 5/5 green. Threshold NOT relaxed; the doctor was made faster.
 - A token/byte gate alone is unsafe: a naive `cckb` replacement produced SMALLER output (418 B vs 1039 B, "60× cheaper") while retrieval quality collapsed to P@1 = 0.0. Cost and correctness need separate gates.
 
 <!-- MEASURED:END -->

@@ -118,7 +118,7 @@ export async function runBoard(o: BoardOptions) {
 
   // Close any tabs a previous run left waiting, so a stale loop cannot consume this run's
   // queue (measured: a leftover tab silently ate the first steps of the next board).
-  await sweepTabs();
+  sweepTabs();
   await sleep(400);
 
   const statusFile = join(TAB_ROOT, "board.status");

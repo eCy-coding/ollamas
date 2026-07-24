@@ -22,7 +22,7 @@
 // each line in order. The controller appends steps and reads the log; the tab does the work
 // in front of the operator.
 import { execFile } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -198,42 +198,70 @@ export function readStatus(h: TabHandle): TabStatus {
   };
 }
 
-/** How many tab sessions are still on disk — the leak check the gate reads. */
-export function openTabDirs(): string[] {
+/** A tab dir is "open" when it has a queue and its log has not yet confirmed DONE. */
+export function isOpenTab(dir: string): boolean {
+  const q = join(dir, "queue");
+  if (!existsSync(q)) return false;                 // infra dirs (_watch, _narrate) have no queue
+  const log = join(dir, "log");
+  // The loop writes MARK_DONE when it exits. If the log already carries it, the tab has
+  // closed itself and is not a leak — even if the queue file still lies around on disk.
   try {
-    return existsSync(TAB_ROOT)
-      ? readFileSync(join(TAB_ROOT, ".index"), "utf8").split("\n").filter(Boolean)
-      : [];
+    if (existsSync(log) && readFileSync(log, "utf8").includes(MARK_DONE)) return false;
+  } catch {
+    /* unreadable log → treat as still open, the conservative choice for a leak check */
+  }
+  return true;
+}
+
+/**
+ * Session dirs that still hold a LIVE tab loop.
+ *
+ * WHY THE OLD VERSION WAS DEAD CODE: it read `${TAB_ROOT}/.index`, a file NOTHING ever wrote,
+ * so `openTabDirs()` always returned `[]` and the gate's "no tab leak" check could never
+ * fail. The real evidence is on disk: a lane dir has a `queue`, and the tab is live until its
+ * `log` shows MARK_DONE. Infra dirs (`_conductor`, `_watch`, `_supervisor`, `_narrate`) have
+ * no `queue` and are correctly excluded.
+ */
+export function openTabDirs(root: string = TAB_ROOT): string[] {
+  if (!existsSync(root)) return [];
+  try {
+    return readdirSync(root, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => join(root, e.name))
+      .filter(isOpenTab);
   } catch {
     return [];
   }
 }
 
+export interface SweepResult {
+  /** Tabs asked to finish this call. */
+  closed: number;
+  /** Tabs that could not be signalled (queue vanished mid-sweep). */
+  failed: number;
+}
+
 /**
- * Best-effort cleanup: ask every lingering tab to finish.
+ * Best-effort cleanup: ask every lingering tab to finish, and REPORT what actually happened.
  *
- * Same lesson as the container pool in v3 — a runner that leaves resources behind is a cost
- * to the operator, and on a machine with limited memory a forgotten `tail -f` per lane adds
- * up across runs.
+ * The old version returned a bare count that mixed "closed" with "was already closed", so a
+ * caller could not tell a clean sweep from a no-op. It now returns closed/failed separately,
+ * and only counts dirs that were genuinely open (via `openTabDirs`) — appending `__END__` to
+ * an already-finished tab is not a close.
+ *
+ * Same lesson as the container pool in v3: a runner that leaves resources behind costs the
+ * operator, and on a machine short on memory a forgotten `tail -F` per lane adds up.
  */
-export async function sweepTabs(): Promise<number> {
-  if (!existsSync(TAB_ROOT)) return 0;
-  let n = 0;
-  try {
-    const { stdout } = await exec("ls", [TAB_ROOT]);
-    for (const id of stdout.split("\n").map((s) => s.trim()).filter(Boolean)) {
-      const q = join(TAB_ROOT, id, "queue");
-      if (existsSync(q)) {
-        try {
-          appendFileSync(q, "__END__\n", "utf8");
-          n++;
-        } catch {
-          /* already closed */
-        }
-      }
+export function sweepTabs(root: string = TAB_ROOT): SweepResult {
+  let closed = 0;
+  let failed = 0;
+  for (const dir of openTabDirs(root)) {
+    try {
+      appendFileSync(join(dir, "queue"), "__END__\n", "utf8");
+      closed++;
+    } catch {
+      failed++;
     }
-  } catch {
-    /* nothing to sweep */
   }
-  return n;
+  return { closed, failed };
 }

@@ -118,6 +118,15 @@ export async function runPipeline(argv: string[]): Promise<number> {
       return r.status ?? 2;
     }
 
+    case "job": {
+      // Run one of MY OWN background jobs in a watchable tab. Spawned so the tab outlives us.
+      const { spawnSync } = await import("node:child_process");
+      const { join } = await import("node:path");
+      const repo = process.env.OLLAMAS_REPO ?? join(process.env.HOME ?? "", "Desktop", "ollamas");
+      const r = spawnSync("npx", ["tsx", join(repo, "pipeline", "bin", "job.ts"), ...rest], { cwd: repo, stdio: "inherit" });
+      return r.status ?? 2;
+    }
+
     case "watch": {
       // Readable background stream. Spawned so the tab outlives this process.
       const { spawnSync } = await import("node:child_process");
@@ -150,9 +159,11 @@ export async function runPipeline(argv: string[]): Promise<number> {
   board [--lanes ecym,ollamas,obsidian] [--target terminal|iterm2] [--headless]
                           run each lane in its own VISIBLE Terminal.app tab, plus a
                           conductor tab with a live table. --headless is CI-only.
-  watch [--only error,warn] [--source <ad>] [--plain] [--max N]
+  watch [--only error,warn] [--source <ad>] [--plain] [--raw] [--max N]
                           arka plan işlerini OKUNABİLİR akışla izle:
-                          saat │ iş │ SEVİYE │ kaynak: mesaj (ham akış: supervise.ts)
+                          saat │ iş │ SEVİYE │ kaynak: mesaj (ham için --raw)
+  job <ad> [--visible]    kendi arka plan işini SEKMEDE koştur: cc-health · cc-refresh ·
+                          cc-sync-all · pipeline-run (Emre'nin com.ecy* işleri hariç)
   sweep                   remove orphaned sandbox containers from crashed runs
 
 artifacts: ~/ollamas-vault/orchestra/runs/   metrics: GET /metrics (workflow_step_*)`);

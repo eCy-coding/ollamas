@@ -37,50 +37,23 @@ async function inventory(): Promise<Job[]> {
 }
 
 /**
- * The formatter the tab runs, as a standalone script.
+ * The tab script: tail every log, tag each line, pipe through ONE formatter.
  *
- * Written to disk and invoked by the tab rather than piped from here, because this process
- * exits as soon as the window is open — a formatter living in it would take the stream with
- * it. It reads `job\ttext` on stdin (the tails tag their own lines) and prints the rendered
- * form.
+ * `--raw` skips the formatter — that is the entire supervisor mode, folded in here so there
+ * is a single watch surface instead of two files (`watch.ts` + `supervise.ts`) tailing the
+ * same logs and drifting apart. The formatter is `lib/logfmt-stream.ts`, the same seam a
+ * `--visible` job uses, so a line reads identically wherever it appears.
  */
-function formatterScript(): string {
-  return `#!/usr/bin/env -S npx tsx
-import { createInterface } from "node:readline";
-import { parseLine, renderLine, isNoise, fold, levelFilter, header } from "${join(REPO, "pipeline/lib/logfmt.ts")}";
-
-const only = process.env.WATCH_ONLY || "";
-const plain = process.env.WATCH_PLAIN === "1";
-const jobWidth = Number(process.env.WATCH_JOBW || 20);
-const pass = levelFilter(only);
-let st = { lastKey: "", count: 0 };
-
-for (const h of header(jobWidth)) console.log(h);
-
-createInterface({ input: process.stdin }).on("line", (line) => {
-  const tab = line.indexOf("\\t");
-  const job = tab > 0 ? line.slice(0, tab) : "?";
-  const text = tab > 0 ? line.slice(tab + 1) : line;
-  if (isNoise(text)) return;
-  const parsed = parseLine(text, job);
-  if (!parsed || !pass(parsed.level)) return;
-  const f = fold(parsed, st);
-  st = f.state;
-  if (f.emit) console.log(f.emit);          // "  ×N" for the run that just ended
-  if (st.count === 1) console.log(renderLine(parsed, { colour: !plain, jobWidth, width: Number(process.env.COLUMNS || 140) }));
-});
-`;
-}
-
-function watchScript(jobs: Job[], fmt: string, opts: { only: string; plain: boolean; jobWidth: number }): string {
+function watchScript(jobs: Job[], opts: { only: string; plain: boolean; jobWidth: number; raw: boolean }): string {
+  const title = opts.raw ? "SÜPERVİZÖR (ham)" : "İZLEME";
   const lines = [
-    `printf '\\033]0;eCym · İZLEME\\007'`,
+    `printf '\\033]0;eCym · ${title}\\007'`,
     `clear`,
-    `echo "eCym izleme — ${jobs.length} arka plan işi, okunabilir akış"`,
+    `echo "eCym ${opts.raw ? "süpervizör — ham akış" : "izleme — okunabilir akış"} · ${jobs.length} arka plan işi"`,
     `echo "filtre: ${opts.only || "hepsi"}   ·   renk: ${opts.plain ? "kapalı" : "açık"}   ·   çıkmak: Ctrl-C"`,
-    `echo "hiçbir iş durdurulmadı — yalnız okunur hâle getirildi"`,
+    `echo "hiçbir iş durdurulmadı — yalnız ${opts.raw ? "tek pencerede toplandı" : "okunur hâle getirildi"}"`,
     `echo`,
-    `export WATCH_ONLY='${opts.only}' WATCH_PLAIN='${opts.plain ? 1 : 0}' WATCH_JOBW='${opts.jobWidth}'`,
+    `export LOGFMT_ONLY='${opts.only}' LOGFMT_PLAIN='${opts.plain ? 1 : 0}' LOGFMT_JOBW='${opts.jobWidth}'`,
     // One process group so Ctrl-C takes every tail with it — a closed tab must not leave a
     // dozen orphaned `tail` processes behind (v5 lesson, kept).
     `trap 'kill 0' EXIT INT TERM`,
@@ -94,7 +67,8 @@ function watchScript(jobs: Job[], fmt: string, opts: { only: string; plain: bool
       lines.push(`  ( tail -F -n 1 "${log}" 2>/dev/null | sed -u "s|^|${tag}\\t|" ) &`);
     }
   }
-  lines.push(`  wait`, `} | npx tsx "${fmt}"`);
+  const sink = opts.raw ? "cat" : `npx tsx "${join(REPO, "pipeline/lib/logfmt-stream.ts")}"`;
+  lines.push(`  wait`, `} | ${sink}`);
   return lines.join("\n");
 }
 
@@ -107,6 +81,7 @@ async function main(): Promise<number> {
   const only = get("--only");
   const source = get("--source");
   const plain = argv.includes("--plain");
+  const raw = argv.includes("--raw");
   const max = Number(get("--max", "24"));
 
   const cap = await capability("terminal");
@@ -129,20 +104,18 @@ async function main(): Promise<number> {
 
   const dir = join(TAB_ROOT, "_watch");
   mkdirSync(dir, { recursive: true });
-  const fmt = join(dir, "format.ts");
-  writeFileSync(fmt, formatterScript(), { mode: 0o755 });
   const jobWidth = Math.min(24, Math.max(12, ...jobs.map((j) => j.label.replace(/^com\./, "").length)));
   const script = join(dir, "watch.sh");
-  writeFileSync(script, `#!/bin/bash\n${watchScript(jobs, fmt, { only, plain, jobWidth })}\n`, { mode: 0o755 });
+  writeFileSync(script, `#!/bin/bash\n${watchScript(jobs, { only, plain, jobWidth, raw })}\n`, { mode: 0o755 });
 
   await exec("open", ["-a", "Terminal", script]);
 
   const byOwner = jobs.reduce<Record<string, number>>((a, j) => ({ ...a, [j.owner]: (a[j.owner] ?? 0) + 1 }), {});
   const files = jobs.reduce((n, j) => n + j.logs.length, 0);
-  console.log(`izleme sekmesi açıldı — ${jobs.length} iş · ${files} log dosyası`);
+  console.log(`${raw ? "süpervizör (ham)" : "izleme"} sekmesi açıldı — ${jobs.length} iş · ${files} log dosyası`);
   console.log(`  sahiplik: ${Object.entries(byOwner).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
-  console.log(`  biçim: saat │ iş │ SEVİYE │ kaynak: mesaj${only ? `   (filtre: ${only})` : ""}`);
-  console.log(`  ham akış isteniyorsa: npx tsx pipeline/bin/supervise.ts`);
+  console.log(raw ? "  biçim: ham log (etiketli)" : `  biçim: saat │ iş │ SEVİYE │ kaynak: mesaj${only ? `   (filtre: ${only})` : ""}`);
+  console.log(raw ? "  okunabilir akış: --raw'ı kaldır" : "  ham akış: --raw ekle");
   return 0;
 }
 

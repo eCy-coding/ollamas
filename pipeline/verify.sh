@@ -233,6 +233,34 @@ case "$NR" in
   *) bad "anlatı eksik: ${NR:-üretilemedi}" ;;
 esac
 
+head_ "19  Sekme sızıntı ölçümü GERÇEK (ölü .index değil)"
+# K1: openTabDirs artık diskten okuyor. Geçici bir sahte lane kurup gerçekten sayıyor mu bak.
+LEAK=$(npx tsx -e "
+import {mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {openTabDirs} from './pipeline/runtime/termtab.ts';
+import {homedir} from 'node:os';
+import {join} from 'node:path';
+const r=join(homedir(),'.ollamas','term','__probe__');
+mkdirSync(r,{recursive:true}); writeFileSync(join(r,'queue'),''); writeFileSync(join(r,'log'),'ready');
+const seen=openTabDirs().some(d=>d.endsWith('__probe__'));
+rmSync(r,{recursive:true,force:true});
+console.log(seen?'GERÇEK':'ÖLÜ');" 2>/dev/null | tail -1)
+[ "$LEAK" = "GERÇEK" ] && ok "openTabDirs canlı sekmeyi diskten görüyor (ölü .index düzeltildi)" \
+  || bad "openTabDirs hâlâ boş dönüyor (${LEAK:-?})"
+
+head_ "20  Kendi işlerim sekmede koşabiliyor (job --visible) + com.ecy* reddi"
+JN=$(npx tsx -e "import {jobNames} from './pipeline/bin/job.ts';console.log(jobNames().join(','))" 2>/dev/null | tail -1)
+echo "$JN" | grep -q "cc-health" && echo "$JN" | grep -q "pipeline-run" \
+  && ok "job katalogu: ${JN}" || bad "job katalogu eksik: ${JN:-?}"
+REJ=$(npx tsx pipeline/bin/job.ts com.ecy.guardian 2>&1 | grep -c "dokunulmaz" || true)
+[ "${REJ:-0}" -ge 1 ] && ok "com.ecy* işleri reddediliyor (dokunulmaz sınır)" \
+  || bad "com.ecy* reddi çalışmıyor"
+
+head_ "21  Tek izleme yüzeyi (watch, supervise onun --raw kabuğu)"
+grep -q "watch.ts" pipeline/bin/supervise.ts \
+  && ok "supervise → watch --raw yönlendirmesi (tek uygulama)" \
+  || bad "supervise hâlâ ayrı uygulama (iki bakım yüzeyi)"
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."

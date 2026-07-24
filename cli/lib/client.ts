@@ -635,29 +635,37 @@ export async function buildDoctorReport(
   ollamaHost: string,
   nowIso: string,
 ): Promise<DoctorReport> {
-  const gateway = await safeProbe(() => client.health());
-  const ollama = await safeProbe(async () => {
-    const r = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(5000) });
-    if (!r.ok) throw new Error(`${r.status}`);
-    return r.json();
-  });
-  const bridge = await safeProbe(async () => {
-    const r = await fetch("http://127.0.0.1:7345/health", { signal: AbortSignal.timeout(5000) }); // nosemgrep: react-insecure-request -- 127.0.0.1 loopback bridge probe, no transport risk
-    if (!r.ok) throw new Error(`${r.status}`);
-    return r.json();
-  });
-  const ready = await safeProbe(() => client.ready());
-  const agent = await safeProbe(() => client.listSessions());
-  // MCP probe via the public info endpoint (no auth) — honest about exposure.
-  const mcp = await safeProbe(() => client.mcpInfo());
-  // SaaS probe only when an admin token is configured; otherwise report skipped
-  // (don't gate overall health on it).
-  const saas = client.hasAdminToken() ? await safeProbe(() => client.listPlans()) : null;
-  // Optional Gemini-CLI bridge: is the binary present + which auth mode? Informational only.
-  const gem = await safeProbe(async () => {
-    const d = await detectGemini();
-    return { present: d.present, version: d.version, auth: detectAuthMode().mode };
-  });
+  // Probes run CONCURRENTLY. They share no state, so awaiting them one after another only
+  // added their timeouts together: with the gateway slow, health(8s) + ollama(5s) +
+  // bridge(5s) + ready(5s) reached ~23s worst-case, past the doctor test's 15s budget — a
+  // real race that read as "flaky env". Running them in parallel makes the worst case the
+  // SLOWEST SINGLE probe (~8s), which is both faster for the operator and inside the test
+  // budget. Same lesson the DAG already applies: independent work overlaps.
+  const [gateway, ollama, bridge, ready, agent, mcp, saas, gem] = await Promise.all([
+    safeProbe(() => client.health()),
+    safeProbe(async () => {
+      const r = await fetch(`${ollamaHost}/api/version`, { signal: AbortSignal.timeout(5000) });
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    }),
+    safeProbe(async () => {
+      const r = await fetch("http://127.0.0.1:7345/health", { signal: AbortSignal.timeout(5000) }); // nosemgrep: react-insecure-request -- 127.0.0.1 loopback bridge probe, no transport risk
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    }),
+    safeProbe(() => client.ready()),
+    safeProbe(() => client.listSessions()),
+    // MCP probe via the public info endpoint (no auth) — honest about exposure.
+    safeProbe(() => client.mcpInfo()),
+    // SaaS probe only when an admin token is configured; otherwise report skipped
+    // (don't gate overall health on it).
+    client.hasAdminToken() ? safeProbe(() => client.listPlans()) : Promise.resolve(null),
+    // Optional Gemini-CLI bridge: is the binary present + which auth mode? Informational only.
+    safeProbe(async () => {
+      const d = await detectGemini();
+      return { present: d.present, version: d.version, auth: detectAuthMode().mode };
+    }),
+  ]);
 
   return {
     ts: nowIso,
