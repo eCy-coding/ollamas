@@ -1,0 +1,297 @@
+{
+  "workflow_version": "3.0",
+  "description": "eCym pipeline — the master prompt's 18-step sequence as an executable DAG, wired to ollamas + eCym + obsidian + claudecode. Dependencies are DERIVED from the input/output keys below; `depends_on` carries only control edges that move no data.",
+  "steps": [
+    {
+      "id": "search",
+      "action": "search",
+      "input": null,
+      "output": "search_results",
+      "parallel": false,
+      "cache": true,
+      "ttl_seconds": 86400,
+      "parameters": {
+        "source": "cckb",
+        "k": 5,
+        "note": "obsidian KB via the capsule layer: ~1 KB and network-free, vs ~26 KB for a raw brain recall"
+      }
+    },
+    {
+      "id": "think_search",
+      "action": "think",
+      "input": [
+        "search_results"
+      ],
+      "output": "thoughts_search",
+      "parallel": false,
+      "cache": true,
+      "ttl_seconds": 86400,
+      "parameters": {
+        "temperature": 0.3,
+        "max_tokens": 250
+      }
+    },
+    {
+      "id": "analyze_search",
+      "action": "analyze",
+      "input": [
+        "thoughts_search",
+        "search_results"
+      ],
+      "output": "analysis_search",
+      "parallel": false,
+      "parameters": {
+        "focus": [
+          "risk",
+          "opportunity",
+          "assumption"
+        ]
+      }
+    },
+    {
+      "id": "plan",
+      "action": "plan",
+      "input": [
+        "analysis_search"
+      ],
+      "output": "plan_outline",
+      "parallel": true,
+      "parameters": {
+        "format": "markdown",
+        "include": [
+          "epics",
+          "stories",
+          "acceptance_criteria"
+        ]
+      }
+    },
+    {
+      "id": "todo",
+      "action": "todo",
+      "input": [
+        "plan_outline"
+      ],
+      "output": "todo_list",
+      "parallel": false,
+      "parameters": {
+        "sink": "orchestra_board",
+        "fields": [
+          "id",
+          "description",
+          "owner",
+          "estimate_h",
+          "status"
+        ]
+      }
+    },
+    {
+      "id": "sandbox_test",
+      "action": "sandbox_test",
+      "input": [
+        "todo_list"
+      ],
+      "output": "sandbox_result",
+      "parallel": true,
+      "parameters": {
+        "container_pool": "warm_sandbox_pool",
+        "max_concurrency": 5,
+        "timeout_seconds": 30
+      }
+    },
+    {
+      "id": "think_sandbox",
+      "action": "think",
+      "input": [
+        "sandbox_result"
+      ],
+      "output": "thoughts_sandbox",
+      "parallel": false,
+      "parameters": {
+        "temperature": 0.2
+      }
+    },
+    {
+      "id": "analyze_sandbox",
+      "action": "analyze",
+      "input": [
+        "sandbox_result",
+        "thoughts_sandbox"
+      ],
+      "output": "verification_report",
+      "parallel": false,
+      "parameters": {
+        "metrics": [
+          "accuracy",
+          "latency",
+          "resource_usage"
+        ]
+      }
+    },
+    {
+      "id": "test",
+      "action": "test",
+      "input": [
+        "verification_report"
+      ],
+      "output": "test_suite_output",
+      "parallel": true,
+      "parameters": {
+        "suite": "unit+integration",
+        "runner": "vitest",
+        "exit_on_fail": false,
+        "note": "read-only: runs the suite and writes only its own report, so it is safe beside security_scan/coverage_check in the same wave"
+      }
+    },
+    {
+      "id": "true_or_false",
+      "action": "true_or_false",
+      "input": [
+        "test_suite_output"
+      ],
+      "output": "go_ahead",
+      "parallel": true,
+      "parameters": {
+        "pass_threshold": 0.95,
+        "note": "pure evaluation of already-collected evidence — no I/O, safe to run beside test_code"
+      }
+    },
+    {
+      "id": "chaos_test",
+      "action": "chaos_test",
+      "input": [
+        "sandbox_result"
+      ],
+      "output": "chaos_result",
+      "parallel": false,
+      "depends_on": [
+        "true_or_false"
+      ],
+      "parameters": {
+        "faults": [
+          "latency:200ms",
+          "partition"
+        ],
+        "iterations": 10,
+        "pass_threshold": 0.95,
+        "note": "control edge on true_or_false: the prompt requires chaos to run AFTER the binary decision, and that ordering carries no data"
+      }
+    },
+    {
+      "id": "security_scan",
+      "action": "security_scan",
+      "input": [
+        "verification_report"
+      ],
+      "output": "security_report",
+      "parallel": true,
+      "parameters": {
+        "tools": [
+          "semgrep",
+          "bandit"
+        ],
+        "fail_on": [
+          "high",
+          "critical"
+        ]
+      }
+    },
+    {
+      "id": "coverage_check",
+      "action": "coverage_check",
+      "input": [
+        "verification_report"
+      ],
+      "output": "coverage_report",
+      "parallel": true,
+      "parameters": {
+        "min_coverage": 90,
+        "scope": "pipeline/lib/**"
+      }
+    },
+    {
+      "id": "code",
+      "action": "code",
+      "input": [
+        "analysis_search",
+        "verification_report"
+      ],
+      "output": "generated_code",
+      "parallel": false,
+      "parameters": {
+        "language": "typescript",
+        "style_guide": "repo",
+        "include": [
+          "docstrings",
+          "type_hints"
+        ],
+        "note": "deliberately NOT parallel: `code` is the only step that WRITES source, so it must not race the readers in its wave"
+      }
+    },
+    {
+      "id": "test_code",
+      "action": "test",
+      "input": [
+        "generated_code"
+      ],
+      "output": "code_test_report",
+      "parallel": true,
+      "parameters": {
+        "framework": "vitest",
+        "coverage_target": 0.9
+      }
+    },
+    {
+      "id": "merge",
+      "action": "merge",
+      "input": [
+        "generated_code",
+        "code_test_report",
+        "security_report",
+        "coverage_report",
+        "chaos_result",
+        "go_ahead"
+      ],
+      "output": "merge_status",
+      "parallel": false,
+      "parameters": {
+        "strategy": "squash",
+        "required_checks": [
+          "test",
+          "coverage",
+          "security",
+          "chaos",
+          "go_ahead"
+        ],
+        "note": "GAP CLOSED vs the source prompt: there, merge consumed only generated_code + code_test_report, so the security, coverage and chaos results were computed and then IGNORED — gates that cannot block are decoration. Listing them as inputs makes the DAG itself enforce the ordering."
+      }
+    },
+    {
+      "id": "commit",
+      "action": "commit",
+      "input": [
+        "merge_status"
+      ],
+      "output": "commit_id",
+      "parallel": false,
+      "parameters": {
+        "message_template": "feat: automated implementation of {{feature_name}}",
+        "tag": "v{{major}}.{{minor}}.{{patch}}"
+      }
+    },
+    {
+      "id": "push",
+      "action": "push",
+      "input": [
+        "commit_id"
+      ],
+      "output": "push_result",
+      "parallel": false,
+      "parameters": {
+        "remote": "origin",
+        "branch": "main",
+        "gated": true,
+        "note": "push is OPERATOR-GATED by default: it is the one step that leaves the machine, and an autonomous benchmark must not publish on its own. --allow-push opts in per run."
+      }
+    }
+  ]
+}

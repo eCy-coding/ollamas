@@ -9,6 +9,7 @@ import { runAgent } from "./commands/agent";
 import { runSaas } from "./commands/saas";
 import { runKeys } from "./commands/keys";
 import { runBench } from "./commands/bench";
+import { runPipeline } from "./commands/pipeline";
 import { runMcp } from "./commands/mcp";
 import { runBackup } from "./commands/backup";
 import { runShortcuts } from "./commands/shortcuts";
@@ -284,6 +285,8 @@ export async function main(argv: string[]): Promise<number> {
       return runSaas(rest);
     case "bench":
       return runBench(rest);
+    case "pipeline":
+      return runPipeline(rest);
     case "mcp":
       return runMcp(rest);
     case "backup":

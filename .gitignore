@@ -56,3 +56,4 @@ scripts-live.err
 # redirects RAG_CHUNK_MODEL_PATH to ~/.llm-mission-control/models, but guard
 # against the library's own "./models" default too)
 /models/
+coverage-pipeline/

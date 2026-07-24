@@ -41,6 +41,11 @@ export default defineConfig({
         'orchestration/bin/lib/optimize.ts',
         'orchestration/bin/lib/orchestra-fsm.ts',
         'orchestration/bin/lib/task-catalog.ts',
+        // eCym pipeline pure core (18-step benchmark DAG). Every module here is IO-free by
+        // construction — the environment, the clock and the filesystem are all passed IN —
+        // so the ≥90% the master prompt demands is reachable honestly rather than by
+        // excluding the hard parts.
+        'pipeline/lib/**/*.ts',
       ],
       exclude: [
         '**/*.test.ts',
@@ -52,7 +57,17 @@ export default defineConfig({
       // Honest floor on the pure-core lane. branches/functions start conservative
       // (below current) so a later refactor that legitimately drops a branch does
       // not red the gate; lines is the load-bearing threshold.
-      thresholds: { lines: 70, functions: 70, branches: 60 },
+      // Repo-wide floor stays at the honest 70 established for the existing pure-core lane;
+      // raising it globally would either be false or force the older modules' thresholds
+      // down to meet it. The pipeline lane carries its own, stricter contract instead —
+      // the master prompt's "coverage ≥ 90%" applied where it is actually achievable.
+      // Measured at introduction: lines 99.4 · branches 93.9 · functions 100.
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 60,
+        'pipeline/lib/**/*.ts': { lines: 90, functions: 90, branches: 85 },
+      },
     },
     projects: [
       {
@@ -94,6 +109,18 @@ export default defineConfig({
           name: 'orchestra',
           environment: 'node',
           include: ['orchestration/tests/{orchestra-fsm,orchestra-chaos,orchestra-repair,orchestra-live,joker,council-vote,autopilot-stale,task-catalog,task-progress,deps,math-properties,bench,optimize,benchmark-honesty,hierarchy,claude-dispatch,dod-lanes,lane-triage,converge,finish,build-tasks,calibrate,deps-doctor,gen-catalog,keys-health,orchestra,refresh-catalog,organization,organization-v2,org-sandbox,org-learn,brain-ledger,task-tracker,services,answer,answer-learn}.test.ts'],
+        },
+      },
+      {
+        // eCym pipeline lane — the 18-step benchmark DAG (search → … → push) from the
+        // master prompt. Whole directory, not a filename allowlist: every module here is
+        // IO-free by construction, so a new pure module joins the gate by existing rather
+        // than by someone remembering to add it to a glob.
+        extends: true,
+        test: {
+          name: 'pipeline',
+          environment: 'node',
+          include: ['pipeline/tests/**/*.test.ts'],
         },
       },
     ],
