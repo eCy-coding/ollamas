@@ -20,7 +20,15 @@ export const ALLOWED_BINARIES = [
   // catalog entries still require approval, so this widens WHAT can be observed, not what can
   // be changed.
   "df", "du", "ps", "top", "uptime", "lsof", "netstat", "vm_stat",
-  "sw_vers", "id", "hostname", "stat", "file", "sysctl"
+  "sw_vers", "id", "hostname", "stat", "file", "sysctl",
+  // Claude Code bilgi tabanı okuyucusu (`cckb ask|get|cat|map`). Salt-okuma: yalnızca
+  // ~/ollamas-vault/_index/cc-capsules.json ile o notların gövdelerini okur; yazmaz,
+  // silmez, kurulum yapmaz ve `--deep` DIŞINDA ağ açmaz. Katalogda 4 girdisi var
+  // (cckb-ask/get/cat/map); allowlist'te olmadan hepsi exit 126 ile reddediliyor ve
+  // "komut çalıştı" gibi yanıltıcı bir kayıt üretiyordu (L37'deki `df -h` hatasının aynısı).
+  // Kazanç ölçüldü: aynı soruya ham `recall k=4` ~26.600 B, `cckb ask` ~1.040 B (25,6×) —
+  // sentez artık kaynak-linkli, cümle-bütün bir bağlamla besleniyor.
+  "cckb"
 ];
 
 /** Does the shell allowlist permit this command's binary?
