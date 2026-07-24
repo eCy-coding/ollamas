@@ -173,6 +173,40 @@ echo "$WS" | grep -q '"n":0,"deg":true,"hasReason":true' \
   && ok "boş arama dürüstçe degrade (uydurma kaynak yok)" \
   || bad "web arama degrade yolu bozuk: ${WS:-çıktı yok}"
 
+head_ "13  Görünür sekme yeteneği (gizli iş yok)"
+CAP=$(npx tsx -e "
+import { capability } from './pipeline/runtime/termtab.ts';
+capability('terminal').then(c => console.log((c.ok?'OK|':'NO|') + c.reason + '|' + c.fix));" 2>/dev/null | tail -1)
+case "$CAP" in
+  OK\|*) ok "sekme açılabiliyor — ${CAP#OK|}" ;;
+  NO\|*) bad "sekme açılamıyor: ${CAP#NO|}" ;;
+  *) bad "sekme yeteneği ölçülemedi" ;;
+esac
+
+head_ "14  Board headless kapısı (aynı adımlar, pencere yok)"
+if timeout 600 npx tsx pipeline/bin/board.ts --lanes obsidian --headless >/tmp/board.txt 2>&1; then
+  ok "board obsidian lane GREEN ($(grep -c '^✓' /tmp/board.txt) adım)"
+else
+  bad "board obsidian lane RED — $(grep -m1 '^✗' /tmp/board.txt || echo 'sebep yok')"
+fi
+rm -f /tmp/board.txt
+
+head_ "15  Arka plan envanteri"
+BG=$(timeout 120 python3 "$V/_bin/bg-audit.py" --json 2>/dev/null | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+j=d['jobs']; run=[x for x in j if x['running']]
+print(f\"{len(j)}|{len(run)}|{len(d['processes'])}\")" 2>/dev/null)
+JOBS=${BG%%|*}; REST=${BG#*|}; RUN=${REST%%|*}; PROCS=${REST#*|}
+[ "${JOBS:-0}" -ge 20 ] && ok "envanter: ${JOBS} launchd işi · ${RUN} koşuyor · ${PROCS} bağımsız süreç" \
+  || bad "envanter üretilemedi (${BG:-boş})"
+[ -s "$V/_index/arkaplan.md" ] && ok "vault notu _index/arkaplan.md var" || bad "arkaplan notu yok"
+
+head_ "16  Sekme sızıntısı"
+LEAK=$(ps -Ao command 2>/dev/null | grep -c "[.]ollamas/term/.*tab\.sh" || true)
+[ "${LEAK:-0}" -le 1 ] && ok "artık sekme döngüsü yok (${LEAK})" \
+  || bad "${LEAK} artık sekme döngüsü — pkill -f '.ollamas/term'"
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."
