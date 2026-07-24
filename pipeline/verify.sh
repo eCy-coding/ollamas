@@ -261,6 +261,17 @@ grep -q "watch.ts" pipeline/bin/supervise.ts \
   && ok "supervise → watch --raw yönlendirmesi (tek uygulama)" \
   || bad "supervise hâlâ ayrı uygulama (iki bakım yüzeyi)"
 
+head_ "22  Help siteleri (obsidian.md/help standardı)"
+for sys in claude ecym ollamas; do
+  R=$(cd "$REPO" && npx tsx pipeline/bin/help-build.ts $sys --verify 2>&1 | head -1)
+  ERR=$(printf '%s' "$R" | grep -oE '[0-9]+ hata' | grep -oE '^[0-9]+')
+  [ "${ERR:-1}" = "0" ] && ok "$sys help: ${R#*· }" || bad "$sys help HATALI: $R"
+done
+for sys in claude ecym ollamas; do
+  [ -s "$V/_help/$sys/$sys-help.md" ] && ok "$sys hub'ı var" || bad "$sys hub'ı yok"
+  [ -s "$V/_help/$sys/$sys-help.docx" ] && ok "$sys .docx üretildi" || bad "$sys .docx yok"
+done
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."

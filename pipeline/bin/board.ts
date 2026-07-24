@@ -33,7 +33,19 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * must not halt the lane (a flaky service should not hide the rest of the system's state).
  */
 export function buildLanes(): Record<string, Lane> {
+  // Help-site lanes: each builds its system's help site from real sources, validates it
+  // against the obsidian.md/help standard, and exports a .docx — all in a visible tab.
+  const helpLane = (sys: string, title: string) =>
+    makeLane(sys, title, [
+      ["help sitesi kur + doğrula", `cd ${REPO} && npx tsx pipeline/bin/help-build.ts ${sys}`],
+      ["kopuk link denetimi", `cd ${REPO} && npx tsx pipeline/bin/help-build.ts ${sys} --verify`],
+      [".docx export", `cd ${REPO} && npx tsx pipeline/bin/help-export.ts ${sys}`],
+    ] as Array<[string, string]>);
+
   return {
+    claude: helpLane("claude", "Claude yardım"),
+    "ecym-help": helpLane("ecym", "eCym yardım"),
+    "ollamas-help": helpLane("ollamas", "ollamas yardım"),
     ecym: makeLane("ecym", "eCym", [
       ["dataset bütünlüğü", `python3 -c "import json,os;d=json.load(open(os.path.expanduser('~/ecy-model/terminal-dataset.json')));print('komut:',len(d['commands']))"`],
       ["pipeline rotaları 4/4", `bash -c 'n=0; for q in "pipeline calistir" "pipeline benchmark al" "kor nokta var mi" "pipeline dag goster"; do id=$(~/.local/bin/ecy-cmd "$q" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin).get(\\"id\\",\\"\\"))" 2>/dev/null); case "$id" in pipeline-*) n=$((n+1));; esac; done; echo "rota $n/4"; [ "$n" = "4" ]'`],
