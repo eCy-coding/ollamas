@@ -261,16 +261,43 @@ grep -q "watch.ts" pipeline/bin/supervise.ts \
   && ok "supervise → watch --raw yönlendirmesi (tek uygulama)" \
   || bad "supervise hâlâ ayrı uygulama (iki bakım yüzeyi)"
 
-head_ "22  Help siteleri (obsidian.md/help standardı)"
-for sys in claude ecym ollamas; do
+head_ "22  Help siteleri (obsidian.md/help standardı · 4 sistem)"
+for sys in claude ecym ollamas obsidian; do
   R=$(cd "$REPO" && npx tsx pipeline/bin/help-build.ts $sys --verify 2>&1 | head -1)
   ERR=$(printf '%s' "$R" | grep -oE '[0-9]+ hata' | grep -oE '^[0-9]+')
   [ "${ERR:-1}" = "0" ] && ok "$sys help: ${R#*· }" || bad "$sys help HATALI: $R"
 done
-for sys in claude ecym ollamas; do
+for sys in claude ecym ollamas obsidian; do
   [ -s "$V/_help/$sys/$sys-help.md" ] && ok "$sys hub'ı var" || bad "$sys hub'ı yok"
   [ -s "$V/_help/$sys/$sys-help.docx" ] && ok "$sys .docx üretildi" || bad "$sys .docx yok"
 done
+
+head_ "23  Kodlanmış help WEB SİTESİ (web/help · repo ‖ vault · referans docs standardı)"
+# The renderer's own verify: files exist, links resolve, 0 dangling, search non-empty, llms.txt.
+SITE=$(cd "$REPO" && npx tsx pipeline/bin/help-site.ts all --verify 2>&1)
+printf '%s' "$SITE" | grep -q "help-site --verify: PASS" \
+  && ok "site --verify: $(printf '%s' "$SITE" | grep -oE 'toplam [0-9]+ dosya')" \
+  || { bad "site --verify FAIL"; printf '%s\n' "$SITE" | grep HATA; }
+# Committed permanent artifacts (the operator asked for a permanent, version-controlled site).
+[ -s "$REPO/web/help/index.html" ]              && ok "açılış index.html (kart-ızgarası)"   || bad "web/help/index.html yok"
+[ -s "$REPO/web/help/assets/styles.css" ] && [ -s "$REPO/web/help/assets/app.js" ] \
+                                                && ok "assets (css+js) commit'li"           || bad "web/help/assets eksik"
+[ -s "$REPO/web/help/REFERENCES.md" ]           && ok "REFERENCES.md kalıcı kaynak listesi"  || bad "REFERENCES.md yok"
+[ -s "$REPO/web/help/llms.txt" ]                && ok "llms.txt makine indeksi"              || bad "llms.txt yok"
+for sys in claude ecym ollamas obsidian; do
+  [ -s "$REPO/web/help/$sys/index.html" ] && ok "$sys docs bölümü" || bad "$sys docs bölümü yok"
+done
+# No broken wikilink anywhere in the emitted HTML (validator parity). HTML only — the CSS
+# carries a `.wikilink-broken` rule by design, which is not a broken link.
+BROKEN=$(grep -rl --include='*.html' "wikilink-broken" "$REPO/web/help" 2>/dev/null | wc -l | tr -d ' ')
+[ "$BROKEN" = "0" ] && ok "kopuk wikilink: 0" || bad "kopuk wikilink: $BROKEN"
+# Search index is non-empty (file://-safe window.__HELP_INDEX__ assignment).
+SDOCS=$(node -e 'global.window={};require("'"$REPO"'/web/help/assets/search-index.js");console.log((global.window.__HELP_INDEX__||[]).length)' 2>/dev/null || echo 0)
+[ "${SDOCS:-0}" -gt 0 ] && ok "arama indeksi dolu ($SDOCS kayıt)" || bad "arama indeksi boş"
+# Parallel-planning loop: every gap dispatched (no pending high-severity gap left un-planned).
+grep -q "bekleyen:\*\* 0" "$REPO/web/help/GAPS.md" \
+  && ok "GAPS.md: tüm eksikler paralel planlayıcılara havale edildi (bekleyen 0)" \
+  || bad "GAPS.md: planlanmamış eksik var"
 
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \

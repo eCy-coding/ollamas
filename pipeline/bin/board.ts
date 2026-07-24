@@ -33,19 +33,30 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * must not halt the lane (a flaky service should not hide the rest of the system's state).
  */
 export function buildLanes(): Record<string, Lane> {
-  // Help-site lanes: each builds its system's help site from real sources, validates it
-  // against the obsidian.md/help standard, and exports a .docx — all in a visible tab.
+  // Help-site lanes: each builds its system's help site from real sources into the VAULT
+  // (markdown), validates it against the obsidian.md/help standard, and exports a .docx — all in
+  // a visible tab. The coded WEBSITE (repo web/help ‖ vault) is the separate `portal` lane, run
+  // concurrently: the two targets — Obsidian markdown and the HTML site — are built in parallel.
   const helpLane = (sys: string, title: string) =>
     makeLane(sys, title, [
-      ["help sitesi kur + doğrula", `cd ${REPO} && npx tsx pipeline/bin/help-build.ts ${sys}`],
+      ["vault markdown kur + doğrula", `cd ${REPO} && npx tsx pipeline/bin/help-build.ts ${sys}`],
       ["kopuk link denetimi", `cd ${REPO} && npx tsx pipeline/bin/help-build.ts ${sys} --verify`],
       [".docx export", `cd ${REPO} && npx tsx pipeline/bin/help-export.ts ${sys}`],
     ] as Array<[string, string]>);
+
+  // Portal lane: renders the ONE coded website for all four systems into BOTH targets at once
+  // (repo `web/help/` + vault `_help/` + navigation canvas), then verifies links/search/llms.txt.
+  const portalLane = makeLane("portal", "Kodlanmış site (repo ‖ vault)", [
+    ["kodlanmış site üret — repo web/help + vault (paralel)", `cd ${REPO} && npx tsx pipeline/bin/help-site.ts all --out=web/help --vault`],
+    ["site doğrula — link/arama/llms.txt/kaynaklar", `cd ${REPO} && npx tsx pipeline/bin/help-site.ts all --verify`],
+  ] as Array<[string, string]>);
 
   return {
     claude: helpLane("claude", "Claude yardım"),
     "ecym-help": helpLane("ecym", "eCym yardım"),
     "ollamas-help": helpLane("ollamas", "ollamas yardım"),
+    "obsidian-help": helpLane("obsidian", "Obsidian yardım"),
+    portal: portalLane,
     ecym: makeLane("ecym", "eCym", [
       ["dataset bütünlüğü", `python3 -c "import json,os;d=json.load(open(os.path.expanduser('~/ecy-model/terminal-dataset.json')));print('komut:',len(d['commands']))"`],
       ["pipeline rotaları 4/4", `bash -c 'n=0; for q in "pipeline calistir" "pipeline benchmark al" "kor nokta var mi" "pipeline dag goster"; do id=$(~/.local/bin/ecy-cmd "$q" 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin).get(\\"id\\",\\"\\"))" 2>/dev/null); case "$id" in pipeline-*) n=$((n+1));; esac; done; echo "rota $n/4"; [ "$n" = "4" ]'`],
