@@ -28,7 +28,19 @@ export const ALLOWED_BINARIES = [
   // "komut çalıştı" gibi yanıltıcı bir kayıt üretiyordu (L37'deki `df -h` hatasının aynısı).
   // Kazanç ölçüldü: aynı soruya ham `recall k=4` ~26.600 B, `cckb ask` ~1.040 B (25,6×) —
   // sentez artık kaynak-linkli, cümle-bütün bir bağlamla besleniyor.
-  "cckb"
+  "cckb",
+  // Kodlama öğrenme tier'ı okuyucusu ve UYGULAYICISI (`learnkb ask|get|cat|map|apply`).
+  // `ask/get/cat/map` salt-okuma ve AĞSIZ: yalnızca ~/ollamas-vault/_index/learn-capsules.json
+  // ile o derslerin gövdelerini okur. `apply <slug>` dersin TARİFİNİ çalıştırır — çalıştırılan
+  // kod yalnız vault git'i altındaki `_index/learn-recipes.json`'dan gelir, kullanıcı/model
+  // girdisi asla çalıştırılmaz; `safety != "safe"` olan tarifler `--gated` olmadan reddedilir
+  // ve yorumlayıcı liste argümanlarıyla (kabuksuz) çağrılır.
+  //
+  // Allowlist'e girmeden ollamas bu komutu exit 126 ile reddediyor ve kayıt "komut çalıştı"
+  // gibi görünüyordu (L37'deki `df -h` hatasının aynısı) — yani "ollamas önerilen kodu kendisi
+  // uygulayabilir" iddiası kâğıtta kalırdı. Ölçüldü: `learnkb ask` MAKS 1.089 B, tüm ders
+  // gövdelerini okumaya karşı 228× ucuz, P@1=1.00 / H@3=1.00 (25 etiketli soru).
+  "learnkb"
 ];
 
 /** Does the shell allowlist permit this command's binary?
@@ -228,6 +240,23 @@ export class TerminalManager {
           cwd: workspaceRoot || process.cwd(),
           timeout: 45000, // Safe 45s hard timeout for local test suites
           shell: false,
+          // PATH must include the operator's own bin directories. Under launchd the server
+          // inherits a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), so allowlisted local
+          // tools resolved to ENOENT — measured on BOTH `cckb` and `learnkb`: the allowlist
+          // let the command through and the exec then failed, producing an empty stdout with
+          // no security block. That is the same "recorded as run, never ran" failure class as
+          // the exit-126 case (L37), one layer lower. Appending (not replacing) keeps every
+          // inherited entry intact.
+          env: {
+            ...process.env,
+            PATH: [
+              process.env.PATH ?? "",
+              `${process.env.HOME}/.local/bin`,
+              `${process.env.HOME}/ollamas-vault/_bin`,
+              "/opt/homebrew/bin",
+              "/usr/local/bin",
+            ].filter(Boolean).join(":"),
+          },
         },
         (error, stdout, stderr) => {
           const exitCode = error ? ((error as NodeJS.ErrnoException & { code?: number }).code as number || 1) : 0;
