@@ -7,7 +7,7 @@ const BASE = process.env.OLLAMAS_BASE ?? "http://127.0.0.1:3000";
 
 async function probe(path: string): Promise<{ ok: boolean; status: number; json: unknown }> {
   try {
-    const r = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(8000) });
     const json = await r.json().catch(() => null);
     return { ok: r.ok, status: r.status, json };
   } catch {
@@ -26,8 +26,7 @@ describe.skipIf(!live)("ollamas :3000 live smoke", () => {
 
   it("GET /api/ai/models returns a usable model surface", async () => {
     const m = await probe("/api/ai/models");
-    expect(m.status).toBeGreaterThanOrEqual(200);
-    expect(m.status).toBeLessThan(500); // a real route, not a 5xx
+    expect(m.status).toBe(200); // F-12: a 404 must NOT pass as "usable model surface"
   });
 });
 

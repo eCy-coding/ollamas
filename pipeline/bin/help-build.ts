@@ -169,7 +169,7 @@ function buildClaude(): HelpSite {
   return { system: "claude", hubTitle: "Claude — Yardım", references: CLAUDE_URLS, sections };
 }
 
-/** eCym help site — from the terminal-dataset (235 commands) grouped by level. */
+/** eCym help site — from the terminal-dataset (~240 commands, grows as eCym learns) grouped by level. */
 function buildEcym(): HelpSite {
   const dsPath = join(HOME, "ecy-model", "terminal-dataset.json");
   const cmds = (JSON.parse(readFileSync(dsPath, "utf8")).commands ?? []) as Array<{

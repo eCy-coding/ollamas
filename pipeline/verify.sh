@@ -338,7 +338,7 @@ head_ "28  ollamas :3000 çalışma-zamanı sağlığı (canlıysa doğrular; ka
 H3=$(curl -s --max-time 4 http://127.0.0.1:3000/api/health 2>/dev/null)
 if [ -z "$H3" ]; then
   skip ":3000 kapalı (kasıtlı olabilir) — çalışma-zamanı probu atlandı"
-elif printf '%s' "$H3" | grep -q '"isLive":true'; then
+elif printf '%s' "$H3" | grep -qE '"isLive"[[:space:]]*:[[:space:]]*true'; then
   ok ":3000 canlı (isLive:true)"
 else
   bad ":3000 yanıt verdi ama isLive değil: $(printf '%s' "$H3" | head -c 80)"
