@@ -258,6 +258,20 @@ function buildEcym(): HelpSite {
           ),
           sources: ["~/.local/bin/ecym", "~/.local/bin/ecy-cmd"],
         },
+        {
+          slug: "reference/exit-codes", title: "Çıkış Kodları (Exit Codes)",
+          body: tableBody(
+            "`ecy-cmd \"<istek>\"` bir isteği komuta eşlerken çıkış koduyla sonucu bildirir (kaynak: `~/.local/bin/ecy-cmd`). Betikler bu sözleşmeye güvenebilir.",
+            ["Kod", "Anlam", "Çıktı"],
+            [
+              ["`0`", "Eşleşme bulundu", "JSON `{cmd, safe, level, desc}`"],
+              ["`1`", "Eşleşme yok → Tier2'ye devret", "(çıktı yok)"],
+              ["`2`", "Belirsiz (birden çok yakın aday)", "(belirsizlik bildirimi)"],
+              ["`3`", "Argüman eksik (`need_arg`)", "JSON `{need_arg, id, cmd_template, safe}`"],
+            ],
+          ),
+          sources: ["~/.local/bin/ecy-cmd"],
+        },
       ],
     },
     {
