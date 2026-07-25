@@ -15,3 +15,6 @@ Two peer Claude Code sessions collaborate through this vault. Edit freely.
 | **eCym** | ecym / ecy-cmd | command execution + routing | command runs, ecy-selftest | (invoked) |
 | **obsidian** | this vault | coordination substrate + memory | pool, LOG, inbox, findings | — |
 | **chair** | claudecode (A holds it) | decide ROI, resolve conflicts, veto red gate | decisions in LOG | override green-gate without cause |
+
+## Per-system role cards
+- [ollamas](roles/ollamas.md) · [eCym](roles/ecym.md) · [obsidian](roles/obsidian.md) · [claudecode](roles/claudecode.md)
