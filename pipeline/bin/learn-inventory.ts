@@ -242,12 +242,27 @@ export function buildInventory(): Inventory {
   return { entries, unused, filesScanned: files.length, bySystem, byTrack };
 }
 
+/** Curriculum totals, injected by learn-build so the gate can read both numbers from one file. */
+export interface CurriculumSummary {
+  total: number;
+  covered: number;
+  "not-used-here": number;
+  external: number;
+  coverage: number;
+  unaccounted: string[];
+}
+
 /** The machine index consumed by learn-build and re-checked by learn-verify. */
-export function inventoryJson(inv: Inventory, stamp: string): string {
+export function inventoryJson(inv: Inventory, stamp: string, curriculum?: CurriculumSummary): string {
   return JSON.stringify(
     {
       generated: stamp,
       filesScanned: inv.filesScanned,
+      // Two independent completeness numbers, deliberately both stored here: `coverage` is
+      // "every construct our code uses has a lesson"; `curriculumCoverage` is "every chapter of
+      // every source has a verdict". Neither alone answers the operator's request.
+      curriculumCoverage: curriculum?.coverage ?? null,
+      curriculum: curriculum ?? null,
       bySystem: inv.bySystem,
       byTrack: inv.byTrack,
       taught: inv.entries.length,

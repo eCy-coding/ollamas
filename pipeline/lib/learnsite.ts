@@ -76,9 +76,12 @@ export function wikilinks(body: string): string[] {
 }
 
 /** Note names this tier creates, plus the pre-existing vault notes it is allowed to link to. */
+/** The five pages every system folder gets. Kept here so the validator and the builder agree. */
+export const SYSTEM_PAGES = ["learn", "baslangic", "izlekler", "kanit", "tarifler"] as const;
+
 export function siteTargets(site: LearnSite, extra: string[] = []): Set<string> {
-  const t = new Set<string>(["learn", "learn-kaynaklar", "learn-envanter", ...extra]);
-  for (const s of site.systems) t.add(`${s}-learn`);
+  const t = new Set<string>(["learn", "learn-kaynaklar", "learn-envanter", "learn-mufredat", ...extra]);
+  for (const s of site.systems) for (const p of SYSTEM_PAGES) t.add(`${s}-${p}`);
   for (const tr of site.tracks) {
     t.add(`learn-${tr.id}`);
     for (const l of tr.lessons) t.add(`learn-${l.id}`);

@@ -7,6 +7,7 @@
 import type { Construct } from "./types";
 
 const W3 = "w3schools";
+const DEVDOCS = "devdocs";
 const ODIN = "odin";
 
 const SHFILES = /(\.sh$|\.command$|\.zsh$|\.bash$)/;
@@ -143,8 +144,8 @@ export const SHELL: Construct[] = [
     track: "shell",
     title: "Borular ve metin süzgeçleri (grep · wc · tr · sed)",
     level: "temel",
-    source: W3,
-    url: "https://www.w3schools.com/bash/bash_pipes.php",
+    source: DEVDOCS,
+    url: "https://devdocs.io/bash/pipelines",
     pattern: /\|\s*(grep|wc|head|tail|sed|awk|sort|uniq|tr|jq)\b/,
     files: SHFILES,
     what:
@@ -195,7 +196,7 @@ export const SHELL: Construct[] = [
     title: "case — desene göre dallanma",
     level: "orta",
     source: W3,
-    url: "https://www.w3schools.com/bash/bash_case.php",
+    url: "https://www.w3schools.com/bash/bash_conditions.php",
     pattern: /^\s*case\s+.*\s+in\b/m,
     files: SHFILES,
     what:
@@ -280,8 +281,8 @@ export const SHELL: Construct[] = [
     track: "shell",
     title: "Çıkış kodu — otomasyonun tek gerçeği",
     level: "orta",
-    source: ODIN,
-    url: "https://www.w3schools.com/bash/bash_exit_status.php",
+    source: DEVDOCS,
+    url: "https://devdocs.io/bash/exit-status",
     pattern: /\bexit [0-9]|\$\?/,
     files: SHFILES,
     what:
@@ -330,8 +331,8 @@ export const SHELL: Construct[] = [
     track: "shell",
     title: "Heredoc — çok satırlı gövdeyi komuta vermek",
     level: "orta",
-    source: W3,
-    url: "https://www.w3schools.com/bash/bash_heredoc.php",
+    source: DEVDOCS,
+    url: "https://devdocs.io/bash/redirections",
     pattern: /<<-?\s*['"]?[A-Z]{2,}/,
     files: SHFILES,
     what:
@@ -404,8 +405,8 @@ export const SHELL: Construct[] = [
     track: "shell",
     title: "Kilit dosyası — aynı görevin iki kopyasını engellemek",
     level: "ileri",
-    source: ODIN,
-    url: "https://www.w3schools.com/bash/bash_files.php",
+    source: DEVDOCS,
+    url: "https://devdocs.io/bash/",
     pattern: /\.lock\b|mkdir .*lock|flock/,
     files: SHFILES,
     what:
@@ -432,7 +433,7 @@ export const SHELL: Construct[] = [
     title: "Bayrak ayrıştırma — `--strict`, `--json`",
     level: "orta",
     source: W3,
-    url: "https://www.w3schools.com/bash/bash_arguments.php",
+    url: "https://www.w3schools.com/bash/bash_script.php",
     pattern: /"\$\{1:-\}"|"\$@"|shift\b/,
     files: SHFILES,
     what:
