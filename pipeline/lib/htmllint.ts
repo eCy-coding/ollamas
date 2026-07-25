@@ -32,14 +32,18 @@ export function lintHtml(html: string): A11yIssue[] {
   for (const m of s.matchAll(/<img\b[^>]*>/gi)) {
     if (!/\balt=/i.test(m[0])) err("img-alt", `<img> without alt: ${m[0].slice(0, 60)}`);
   }
-  // no heading-level skip (e.g. h1 → h3). Parse the heading sequence.
+  // headings: no forward skip (h1→h3), and the first heading must be h1 (F-6).
   const levels = [...s.matchAll(/<h([1-6])\b/gi)].map((m) => Number(m[1]));
+  if (levels.length && levels[0] !== 1) err("no-h1", `first heading is h${levels[0]}, not h1`);
   for (let i = 1; i < levels.length; i++) {
     if (levels[i] - levels[i - 1] > 1) { err("heading-skip", `heading jumps h${levels[i - 1]} → h${levels[i]}`); break; }
   }
-  // anchors must have discernible text (or an aria-label).
+  // anchors must have an accessible name: link text, an aria-label on the <a>, OR an inner
+  // <img>/<svg> that itself carries alt/title/aria-label (F-5: an icon/logo link is named by its
+  // image, not a false positive).
   for (const m of s.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
-    if (!anchorHasText(m[2]) && !/aria-label=/i.test(m[1])) { err("link-name", "empty <a> with no aria-label"); break; }
+    const namedByImg = /<(img|svg)\b[^>]*\b(?:alt|title|aria-label)=["'][^"']*\S[^"']*["']/i.test(m[2]);
+    if (!anchorHasText(m[2]) && !/aria-label=/i.test(m[1]) && !namedByImg) { err("link-name", "anchor with no accessible name"); break; }
   }
   // perf guard: a single inline <script>/<style> over ~200KB bloats first paint.
   for (const m of s.matchAll(/<(script|style)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
@@ -50,8 +54,14 @@ export function lintHtml(html: string): A11yIssue[] {
 
 export const isClean = (issues: A11yIssue[]): boolean => !issues.some((i) => i.level === "error");
 
-/** Human summary for one file. */
+/** Human summary for one file: errors AND warnings (F-8: the perf warn was computed but never shown). */
 export function renderReport(name: string, issues: A11yIssue[]): string[] {
   const errs = issues.filter((i) => i.level === "error");
-  return errs.length ? [`${name}: ${errs.length} a11y hata`, ...errs.map((i) => `  HATA  ${i.rule}: ${i.detail}`)] : [];
+  const warns = issues.filter((i) => i.level === "warn");
+  if (!errs.length && !warns.length) return [];
+  return [
+    `${name}: ${errs.length} a11y hata · ${warns.length} uyarı`,
+    ...errs.map((i) => `  HATA  ${i.rule}: ${i.detail}`),
+    ...warns.map((i) => `  uyarı ${i.rule}: ${i.detail}`),
+  ];
 }

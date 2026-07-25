@@ -24,6 +24,12 @@ describe("lintHtml", () => {
     expect(lintHtml(`<html lang="tr"><title>t</title><a href="/x"></a>`).some((i) => i.rule === "link-name")).toBe(true);
     expect(lintHtml(`<html lang="tr"><title>t</title><a href="/x" aria-label="go"></a>`).some((i) => i.rule === "link-name")).toBe(false);
   });
+  it("does NOT flag an image-only anchor named by its img alt (F-5)", () => {
+    expect(lintHtml(`<html lang="tr"><title>t</title><a href="/x"><img src="a" alt="logo"></a>`).some((i) => i.rule === "link-name")).toBe(false);
+  });
+  it("flags a page whose first heading is not h1 (F-6)", () => {
+    expect(lintHtml(`<html lang="tr"><title>t</title><h2>a</h2><h3>b</h3>`).some((i) => i.rule === "no-h1")).toBe(true);
+  });
   it("warns on an oversized inline blob (perf), not an error", () => {
     const big = `<html lang="tr"><title>t</title><style>${"x".repeat(200_001)}</style>`;
     const r = lintHtml(big);
@@ -39,5 +45,10 @@ describe("renderReport", () => {
   it("lists errors, empty when clean", () => {
     expect(renderReport("x.html", lintHtml(good))).toEqual([]);
     expect(renderReport("x.html", lintHtml("<html><body></body></html>"))[0]).toMatch(/a11y hata/);
+  });
+  it("prints warnings too, not just errors (F-8)", () => {
+    const big = `<html lang="tr"><title>t</title><h1>a</h1><style>${"x".repeat(200_001)}</style>`;
+    const lines = renderReport("x.html", lintHtml(big));
+    expect(lines.some((l) => l.includes("uyarı") && l.includes("inline-size"))).toBe(true);
   });
 });

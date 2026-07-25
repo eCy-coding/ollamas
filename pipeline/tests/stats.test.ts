@@ -101,6 +101,8 @@ describe("sufficientN — tail-percentile honesty", () => {
     expect(sufficientN(2, 50)).toBe(true);
     expect(sufficientN(1, 50)).toBe(false); // median needs ≥2 samples
     expect(sufficientN(1, 100)).toBe(true); // p100 edge: any sample
+    expect(sufficientN(333, 99.7)).toBe(false); // F-7: fractional threshold needs ⌈333.3⌉=334
+    expect(sufficientN(334, 99.7)).toBe(true);
   });
 });
 

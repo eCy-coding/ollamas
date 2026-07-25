@@ -35,8 +35,10 @@ export function percentile(xs: number[], p: number): number {
  */
 export function sufficientN(n: number, p: number): boolean {
   if (p <= 0 || p >= 100) return n >= 1;
-  // 100/(100−p) with Math.round to shed float noise (1−99.9/100 overshoots to 1000.0000057).
-  return n >= Math.round(100 / (100 - p));
+  // ⌈100/(100−p)⌉ with a 1e-6 slack: large enough to absorb float noise (100/(100−99.9) computes as
+  // 1000.0000000000057, not 1000) yet far smaller than any real fractional threshold, so p99.7 → 334
+  // stays correct (F-7: Math.round was off-by-one for non-integer percentiles).
+  return n >= Math.ceil(100 / (100 - p) - 1e-6);
 }
 
 /** Sample standard deviation (n−1). Returns 0 for fewer than 2 samples. */
