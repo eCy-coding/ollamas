@@ -72,21 +72,29 @@ export function logLine(ts: string, session: Session, action: string, why: strin
   return `${ts} · ${session} · ${clean(action)} · ${clean(why)} · ${clean(evidence)}`;
 }
 
-/** Map a backlog status marker to a role: build items → code; the rest stay code (A writes docs too). */
+/**
+ * Map a backlog item to an A-lane role. Benchmark/perf IMPLEMENTATION is the efficiency-measurer's
+ * work → `bench` (SESSION-A); everything else is `code` (SESSION-A). Seeded cards are NEVER routed
+ * to B's lanes (review/bug/research) — those are findings-driven, not pool-seeded (fixes F-1: the
+ * old regex sent benchmark *code* to B, who cannot code → deadlock, and never produced any `bench`
+ * card). Word-boundaries avoid matching "MEASURED"/"benchmark" appearing in prose.
+ */
 function roleFor(title: string): Role {
-  if (/benchmark|p99|bench|measure|efficiency/i.test(title)) return "research";
+  if (/\b(benchmark|p99|p999|latency|throughput|tok\/s)\b/i.test(title)) return "bench";
   return "code";
 }
 
 /**
  * Seed task cards from the verified master plan: every `- N.N ⬜|🔶 …` line becomes one card.
- * `slug` makes a stable id from the phase number. `body` keeps the acceptance criterion.
+ * The title is everything before the first ` [tag]` group; the acceptance criterion is kept in body.
  */
 export function seedFromBacklog(md: string): Card[] {
   const cards: Card[] = [];
   for (const m of String(md ?? "").matchAll(/^- (\d+\.\d+) (⬜|🔶) (.+)$/gm)) {
     const [num, mark, rest] = [m[1], m[2], m[3]];
-    const title = rest.split(/\s+\[(accept|lang|md|TS|zsh|json|Python|yaml)/i)[0].replace(/\*\*/g, "").trim();
+    // Cut the title at the first ` [` — strips ALL bracket tags ([md]/[txt]/[js]/[git]/[accept:…])
+    // generically (fixes F-3: the old allowlist leaked [txt]/[js] into titles).
+    const title = rest.split(/\s+\[/)[0].replace(/\*\*/g, "").trim();
     const accept = (rest.match(/\[accept:([^\]]*)\]/i)?.[1] ?? "").trim();
     cards.push({
       id: `dc-${num}`, title: title.slice(0, 120), role: roleFor(title), owner: "",

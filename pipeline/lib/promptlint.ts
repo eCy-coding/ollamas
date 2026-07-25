@@ -1,6 +1,9 @@
-// promptlint — enforce the project's founding rule as an automated gate: "a prompt that names
-// tools/paths it cannot reach is fiction." (The original eCym.md draft named gpt-4o, orchestrator.py,
-// Redis, k6 — none present here; that root error is what this catches.)
+// promptlint — enforce a slice of the project's founding rule as an automated gate: "a prompt that
+// names a FILE PATH it cannot reach is fiction." Scope is deliberately narrow and honest (MISS ≠
+// PASS): it checks path-shaped tokens (`a/b.ts`, `~/x`) against the real filesystem. It does NOT
+// verify bare tool/model names (`gpt-4o`, `Redis`, `k6`) — those need `command -v`/config lookups and
+// would false-positive on correction prose (eCym.md legitimately QUOTES `gpt-4o` in its correction
+// table). Bare-token verification is intentionally out of scope; do not claim otherwise.
 //
 // PURE: `extractRefs` finds the concrete local file/dir paths a prompt names; `lintPrompt` takes an
 // injected `isReal` predicate and flags every path that does not resolve. The filesystem check lives

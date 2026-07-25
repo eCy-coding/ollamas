@@ -73,8 +73,13 @@ describe("seedFromBacklog", () => {
     expect(cards[0].id).toBe("dc-1.5");
     expect(cards[0].reason).toMatch(/missing/);
     expect(cards[1].reason).toMatch(/partial/);
-    expect(cards[1].role).toBe("research"); // benchmark → research lane
+    expect(cards[1].role).toBe("bench"); // benchmark IMPL → A's bench lane (F-1: was misrouted to B's research)
     expect(cards[0].body).toMatch(/\[accept\]/);
+  });
+  it("never routes a seeded card into a B lane, and strips bracket tags from titles (F-1/F-3)", () => {
+    expect(cards.every((c) => c.role === "code" || c.role === "bench")).toBe(true); // A lanes only
+    expect(cards.every((c) => !c.title.includes(" ["))).toBe(true); // [md]/[txt]/[js] stripped
+    expect(cards[0].title).toBe("Naming convention `_index/NAMING.md` (MISSING)");
   });
   it("handles empty input", () => {
     expect(seedFromBacklog("")).toEqual([]);
