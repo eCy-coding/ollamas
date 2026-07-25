@@ -299,6 +299,17 @@ grep -q "bekleyen:\*\* 0" "$REPO/web/help/GAPS.md" \
   && ok "GAPS.md: tüm eksikler paralel planlayıcılara havale edildi (bekleyen 0)" \
   || bad "GAPS.md: planlanmamış eksik var"
 
+head_ "24  Prompt-lint (prompt'lar yalnız GERÇEK yolları adlandırır — fiction=HATA)"
+for pf in "$HOME/Desktop/eCym.md" "$HOME/Desktop/eCym2.md"; do
+  if [ -f "$pf" ]; then
+    L=$(cd "$REPO" && npx tsx pipeline/bin/promptlint.ts "$pf" 2>&1 | head -1)
+    FIC=$(printf '%s' "$L" | grep -oE '[0-9]+ fiction' | grep -oE '^[0-9]+')
+    [ "${FIC:-1}" = "0" ] && ok "$(basename "$pf"): 0 fiction (${L#*· })" || bad "$(basename "$pf") fiction: $L"
+  else
+    skip "$(basename "$pf") yok"
+  fi
+done
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."
