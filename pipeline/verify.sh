@@ -330,6 +330,10 @@ printf '%s' "$HL" | grep -q "htmllint: PASS" \
   && ok "a11y: ${HL#htmllint: PASS — }" \
   || { bad "a11y lint FAIL: $HL"; }
 
+head_ "27  eCym uzman kaydı (.ecym/specialists.json)"
+SP=$(cd "$REPO" && npx tsx -e "import{validateSpecialists,isValidRegistry}from'./pipeline/lib/specialists.ts';import{readFileSync}from'node:fs';const r=JSON.parse(readFileSync('.ecym/specialists.json','utf8'));const i=validateSpecialists(r);console.log(isValidRegistry(i)?'OK '+r.specialists.length+' uzman':'HATA')" 2>&1 | tail -1)
+printf '%s' "$SP" | grep -q "^OK" && ok "specialists: ${SP#OK }" || bad "specialists kaydı geçersiz: $SP"
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."

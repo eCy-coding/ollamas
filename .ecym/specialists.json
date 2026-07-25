@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "note": "eCym specialist registry — the council seats that do the work. Source: orchestra/council.md roster + dev-council roles. Weights are the reward-ledger shares.",
+  "specialists": [
+    {
+      "id": "ecy",
+      "domain": "command",
+      "invoke": "ecym",
+      "weight": 30,
+      "capabilities": ["nl->command", "route", "exec_loop", "selftest"]
+    },
+    {
+      "id": "ollamas",
+      "domain": "llm",
+      "invoke": "http://127.0.0.1:3000/v1/chat/completions",
+      "weight": 25,
+      "capabilities": ["chat", "bench", "classify", "mcp-gateway"]
+    },
+    {
+      "id": "odysseus",
+      "domain": "research",
+      "invoke": "khoj",
+      "weight": 23,
+      "capabilities": ["research", "federate", "web"]
+    },
+    {
+      "id": "claudecode",
+      "domain": "code",
+      "invoke": "claude",
+      "weight": 22,
+      "capabilities": ["code", "review", "gate", "orchestrate"]
+    }
+  ]
+}
