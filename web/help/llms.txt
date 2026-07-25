@@ -47,12 +47,12 @@
 - ecym/index.html — eCym — Yardım
 - ecym/getting-started/genel.html — eCym Nedir (Başlangıç)
 - ecym/getting-started/quickstart.html — Hızlı Başlangıç (Başlangıç)
+- ecym/guides/exec-loop.html — exec_loop — Çıktı → Onay Akışı (Rehberler)
 - ecym/komutlar/pwd.html — pwd (Rehberler)
 - ecym/komutlar/ls.html — ls (Rehberler)
 - ecym/komutlar/ls1.html — ls1 (Rehberler)
 - ecym/komutlar/count_files.html — count_files (Rehberler)
 - ecym/komutlar/cat.html — cat (Rehberler)
-- ecym/komutlar/head.html — head (Rehberler)
 - ecym/reference/baslangic.html — Komut Referansı — Başlangıç (Referans)
 - ecym/reference/orta.html — Komut Referansı — Orta (Referans)
 - ecym/reference/ileri.html — Komut Referansı — İleri (Referans)

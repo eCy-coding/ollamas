@@ -83,11 +83,13 @@ function binDesc(file: string): string {
   return any ? any.replace(/^\/\/\s*/, "").trim() : "—";
 }
 
-/** Parse `### N-043 · title` seyir-defteri gotcha headings → [id, title] rows (source-derived). */
-function seyirRows(file: string, max = 6): string[][] {
+/** Parse `### N-043 · title` seyir-defteri gotcha headings → [id, title] rows (source-derived).
+ * `kind` filters by record class: "E" = hata kayıtları, "N" = notlar, undefined = both. */
+function seyirRows(file: string, max = 6, kind?: "E" | "N"): string[][] {
   if (!existsSync(file)) return [];
   const rows: string[][] = [];
-  for (const m of readFileSync(file, "utf8").matchAll(/^#{2,3}\s+([EN]-\d+)\s+·\s+(.+?)\s*$/gm)) {
+  const re = kind ? new RegExp(`^#{2,3}\\s+(${kind}-\\d+)\\s+·\\s+(.+?)\\s*$`, "gm") : /^#{2,3}\s+([EN]-\d+)\s+·\s+(.+?)\s*$/gm;
+  for (const m of readFileSync(file, "utf8").matchAll(re)) {
     rows.push([m[1], m[2].trim()]);
     if (rows.length >= max) break;
   }
@@ -204,7 +206,26 @@ function buildEcym(): HelpSite {
         },
       ],
     },
-    { id: "guides", title: "Rehberler", summary: "Sık kullanım kalıpları", pages: byLevel("baslangic").slice(0, 6).map(page) },
+    {
+      id: "guides", title: "Rehberler", summary: "Çalışma akışı ve sık kullanım",
+      pages: [
+        {
+          slug: "guides/exec-loop", title: "exec_loop — Çıktı → Onay Akışı",
+          body: quickstartBody(
+            "eCym bir hedefi tek komutla değil, yinelemeli bir döngüyle (`exec_loop`) çözer. Akış (kaynak: `~/.local/bin/ecym`):",
+            [
+              { title: "Döngü başlar", detail: "`exec_loop <hedef>` en çok `ECY_MAX` (varsayılan 6) tur döner; her turda yerel model bir komut önerir." },
+              { title: "Güvenli mi, riskli mi", detail: "Komut `risky` ise atlanır ve tura not düşülür; güvenliyse `timeout 20 bash -c` ile çalışır, çıktının ilk 8 satırı gösterilir." },
+              { title: "Hata → ollamas delege", detail: "Komut hata verirse ollamas'a delege edilir (`groq_fix`); dönen düzeltme güvenliyse yeniden çalıştırılır." },
+              { title: "Bitti mi", detail: "Her turdan sonra `donecheck` hedefe ulaşılıp ulaşılmadığını sorar; EVET ise döngü biter. Aynı komut tekrarlanırsa ya da DONE gelirse de biter." },
+              { title: "Tek komut onayı", detail: "Tek-atış modda (`apply_match`) güvenli komut doğrudan çalışır; riskli komut çalışmaz — `ECY_YES=1 ecym \"...\"` ile açık onay ister.", cmd: 'ECY_YES=1 ecym "riskli işlemi onayla"' },
+            ],
+          ),
+          sources: ["~/.local/bin/ecym", "~/.local/bin/ecy-cmd"],
+        },
+        ...byLevel("baslangic").slice(0, 5).map(page),
+      ],
+    },
     {
       id: "reference", title: "Referans", summary: `${cmds.length} komutun referansı — seviyeye göre`,
       pages: [
@@ -367,9 +388,12 @@ function buildOllamas(): HelpSite {
         {
           slug: "troubleshooting/seyir", title: "Bilinen Sorunlar (Seyir Defteri)",
           body: (() => {
-            const rows = seyirRows(join(REPO, "cli", "CLI_SEYIR_DEFTERI.md"), 6);
+            const f = join(REPO, "cli", "CLI_SEYIR_DEFTERI.md");
+            const errs = seyirRows(f, 6, "E").map((r) => [...r, "hata (E)"]);
+            const notes = seyirRows(f, 6, "N").map((r) => [...r, "not (N)"]);
+            const rows = [...errs, ...notes];
             return rows.length
-              ? tableBody("CLI seyir defterinden kanıtlanmış gotcha'lar — her biri bir ÖNLEME kuralına bağlıdır.", ["Kayıt", "Sorun / kural"], rows)
+              ? tableBody("CLI seyir defterinden kanıtlanmış kayıtlar — E-xxx hata kayıtları ve N-xxx notlar, her biri bir ÖNLEME kuralına bağlıdır.", ["Kayıt", "Sorun / kural", "Tür"], rows)
               : "CLI seyir defteri (`cli/CLI_SEYIR_DEFTERI.md`) her kanıtlanmış hatayı bir E-xxx/N-xxx kaydı ve ÖNLEME kuralı olarak tutar; commit öncesi kalite kapısı bunlara dayanır.";
           })(),
           sources: ["~/Desktop/ollamas/cli/CLI_SEYIR_DEFTERI.md"],
@@ -388,11 +412,25 @@ function buildObsidian(): HelpSite {
   const sketch = read("obsidian-sketch.md");
 
   // Reference table from the real JSON schema's top-level properties (structured, source-true).
+  // Each field gets a Turkish one-liner grounded in the schema's own role + the guide's Kapsam
+  // kanıtı; the schema leaves 6/10 `description`s empty, so a placeholder would be dishonest.
+  const FIELD_TR: Record<string, string> = {
+    version: "Kılavuzun sürümü.",
+    environment: "Ölçülen ortam — Obsidian/Excalidraw sürümleri ve host bilgisi.",
+    corrections: "Elle-yazılmış taslağın iddiaları ve her birini çürüten komut kanıtı.",
+    pipeline: "İstenen hiyerarşi; her aşama nerede karşılandığına işaret eder.",
+    inventory: "Kapsam envanteri — komut/ayar/SYM/karar sayıları (canlı ölçüm).",
+    decisions: "'X kullanırsan Y olur' karar matrisi (SD1–SD22).",
+    phases: "Uçtan uca döngü adımları; her biri çalıştırılabilir Cmd ya da açıklayıcı Desc.",
+    sandboxRun: "Yazma ölçümleri; ran=false dürüsttür, sahte 'ölçüldü' yerine geçmez.",
+    blindSpots: "Kanıtlanmış kör noktalar (SB1–SB7) — otomasyonun sessizce başarısız olabileceği yerler.",
+    gates: "Kapılar (S1–S12); her koşuda üç bozuk kopya üretip reddedildiklerini gösterir.",
+  };
   let schemaRows: string[][] = [];
   try {
     const schema = JSON.parse(read("obsidian-sketch.schema.json"));
     const props = (schema.properties ?? schema) as Record<string, { type?: string; description?: string }>;
-    schemaRows = Object.entries(props).map(([k, v]) => [`\`${k}\``, v?.type ?? "—", v?.description ?? "şema alanı"]);
+    schemaRows = Object.entries(props).map(([k, v]) => [`\`${k}\``, v?.type ?? "—", FIELD_TR[k] ?? v?.description ?? "şema alanı"]);
   } catch {
     /* schema unreadable → table stays empty, reported not fabricated */
   }

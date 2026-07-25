@@ -12,7 +12,7 @@
   { "system": "obsidian", "area": "cli-reference", "plannedBy": "planner-obsidian", "plan": "KAPANDI · reference/envanter.html 77 komut/177 ayar/9 SYM/22 karar (SD1–SD22) envanterini canlı tabloluyor (obsidian-sketch.md)" },
   { "system": "obsidian", "area": "troubleshooting", "plannedBy": "planner-obsidian", "plan": "KAPANDI · troubleshooting/blindspot.html SB1–SB7'yi önem/durum/başlık ile tabloluyor (3 çözüldü, 4 açık)" },
   { "system": "obsidian", "area": "machine-index", "plannedBy": "planner-obsidian", "plan": "KAPANDI · web/help/llms.txt obsidian sayfalarını bölüm etiketiyle listeliyor" },
-  { "system": "ollamas", "area": "troubleshooting-errors", "plannedBy": "planner-ollamas", "plan": "YENİ (düşük) · seyir.html yalnız N-xxx sürüyor; sıradaki: E-xxx hata kayıtlarını (E-003 vb.) tabloya ekle" },
-  { "system": "ecym", "area": "cli-coverage", "plannedBy": "planner-ecym", "plan": "YENİ (düşük) · referans 42/235 komutu kapsıyor; sıradaki: derinleştir + exec_loop çıktı-onay akışını belgele" },
-  { "system": "obsidian", "area": "schema-desc", "plannedBy": "planner-obsidian", "plan": "YENİ (düşük) · sema.html 6/10 alan placeholder + İngilizce; sıradaki: schema.json'dan gerçek description türet" }
+  { "system": "ollamas", "area": "troubleshooting-errors", "plannedBy": "cycle1-ollamas", "plan": "KAPANDI · seyir.html artık E-001..E-006 hata kayıtları + N-xxx notları Tür sütunuyla listeliyor (cli/CLI_SEYIR_DEFTERI.md)" },
+  { "system": "ecym", "area": "cli-coverage", "plannedBy": "cycle1-ecym", "plan": "KISMİ · exec_loop çıktı-onay akışı guides/exec-loop.html'de belgelendi (KAPANDI); sıradaki: referans tablolarını 42/235→daha geniş kapsama derinleştir" },
+  { "system": "obsidian", "area": "schema-desc", "plannedBy": "cycle1-obsidian", "plan": "KAPANDI · sema.html 10 alanın hepsine kaynak-doğru Türkçe açıklama (0 placeholder), schema rolü + Kapsam kanıtı'na dayalı" }
 ]

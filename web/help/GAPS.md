@@ -19,6 +19,6 @@
 | ollamas | search | 🔴 yüksek | Referansların hepsinde istemci-taraflı arama var; markdown notlarında yok. | planner-ollamas | KAPANDI · app.js window.__HELP_INDEX__ ile istemci-taraflı arıyor, her başlıkta arama kutusu |
 | ecym | theme-responsive | ⚪ düşük | Referanslar tema-anahtarı + responsive; markdown export'unda ikisi de yok. | planner-ecym | KAPANDI · styles.css data-theme+prefers-color-scheme, 1000/720px media query, app.js toggle+localStorage no-flash çalışıyor |
 | obsidian | machine-index | 🔴 yüksek | code.claude.com /llms.txt makine indeksi yayımlıyor; bizim yardımın sayfa-manifestosu yok. | planner-obsidian | KAPANDI · web/help/llms.txt obsidian sayfalarını bölüm etiketiyle listeliyor |
-| ollamas | troubleshooting-errors | undefined | undefined | planner-ollamas | YENİ (düşük) · seyir.html yalnız N-xxx sürüyor; sıradaki: E-xxx hata kayıtlarını (E-003 vb.) tabloya ekle |
-| ecym | cli-coverage | undefined | undefined | planner-ecym | YENİ (düşük) · referans 42/235 komutu kapsıyor; sıradaki: derinleştir + exec_loop çıktı-onay akışını belgele |
-| obsidian | schema-desc | undefined | undefined | planner-obsidian | YENİ (düşük) · sema.html 6/10 alan placeholder + İngilizce; sıradaki: schema.json'dan gerçek description türet |
+| ollamas | troubleshooting-errors | undefined | undefined | cycle1-ollamas | KAPANDI · seyir.html artık E-001..E-006 hata kayıtları + N-xxx notları Tür sütunuyla listeliyor (cli/CLI_SEYIR_DEFTERI.md) |
+| ecym | cli-coverage | undefined | undefined | cycle1-ecym | KISMİ · exec_loop çıktı-onay akışı guides/exec-loop.html'de belgelendi (KAPANDI); sıradaki: referans tablolarını 42/235→daha geniş kapsama derinleştir |
+| obsidian | schema-desc | undefined | undefined | cycle1-obsidian | KAPANDI · sema.html 10 alanın hepsine kaynak-doğru Türkçe açıklama (0 placeholder), schema rolü + Kapsam kanıtı'na dayalı |
