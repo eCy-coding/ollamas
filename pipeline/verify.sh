@@ -334,6 +334,16 @@ head_ "27  eCym uzman kaydı (.ecym/specialists.json)"
 SP=$(cd "$REPO" && npx tsx -e "import{validateSpecialists,isValidRegistry}from'./pipeline/lib/specialists.ts';import{readFileSync}from'node:fs';const r=JSON.parse(readFileSync('.ecym/specialists.json','utf8'));const i=validateSpecialists(r);console.log(isValidRegistry(i)?'OK '+r.specialists.length+' uzman':'HATA')" 2>&1 | tail -1)
 printf '%s' "$SP" | grep -q "^OK" && ok "specialists: ${SP#OK }" || bad "specialists kaydı geçersiz: $SP"
 
+head_ "28  ollamas :3000 çalışma-zamanı sağlığı (canlıysa doğrular; kapalıysa SKIP — kapıyı redlemez)"
+H3=$(curl -s --max-time 4 http://127.0.0.1:3000/api/health 2>/dev/null)
+if [ -z "$H3" ]; then
+  skip ":3000 kapalı (kasıtlı olabilir) — çalışma-zamanı probu atlandı"
+elif printf '%s' "$H3" | grep -q '"isLive":true'; then
+  ok ":3000 canlı (isLive:true)"
+else
+  bad ":3000 yanıt verdi ama isLive değil: $(printf '%s' "$H3" | head -c 80)"
+fi
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."
