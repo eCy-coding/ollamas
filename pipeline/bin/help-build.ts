@@ -83,6 +83,37 @@ function binDesc(file: string): string {
   return any ? any.replace(/^\/\/\s*/, "").trim() : "—";
 }
 
+/** Parse `### N-043 · title` seyir-defteri gotcha headings → [id, title] rows (source-derived). */
+function seyirRows(file: string, max = 6): string[][] {
+  if (!existsSync(file)) return [];
+  const rows: string[][] = [];
+  for (const m of readFileSync(file, "utf8").matchAll(/^#{2,3}\s+([EN]-\d+)\s+·\s+(.+?)\s*$/gm)) {
+    rows.push([m[1], m[2].trim()]);
+    if (rows.length >= max) break;
+  }
+  return rows;
+}
+
+/** Parse the obsidian-sketch "Kapsam kanıtı" markdown table → [surface, coverage, how] rows. */
+function sketchInventoryRows(sketch: string): string[][] {
+  const seg = sketch.slice(sketch.indexOf("## Kapsam kanıtı"), sketch.indexOf("## Taslakta"));
+  const rows: string[][] = [];
+  for (const line of seg.split("\n")) {
+    const m = line.match(/^\|\s*([^|]+?)\s*\|\s*\*\*([^|]+?)\*\*\s*\|\s*([^|]+?)\s*\|$/);
+    if (m) rows.push([m[1].trim(), m[2].trim(), m[3].trim()]);
+  }
+  return rows;
+}
+
+/** Parse `<Spot id="SBx" severity=".." status=".."><Title>..</Title>` → [id, severity, status, title] rows. */
+function blindSpotRows(sketch: string): string[][] {
+  const rows: string[][] = [];
+  for (const m of sketch.matchAll(/<Spot id="(SB\d+)"\s+severity="([^"]+)"\s+status="([^"]+)">\s*<Title>([^<]+)<\/Title>/g)) {
+    rows.push([m[1], m[2], m[3], m[4].trim()]);
+  }
+  return rows;
+}
+
 /** Claude help site — 219 cckb notes, mapped onto the obsidian.md/help section standard. */
 function buildClaude(): HelpSite {
   // cckb category → help section. The standard four are always present; the rest fold in.
@@ -192,6 +223,20 @@ function buildEcym(): HelpSite {
           body: tableBody("İleri seviye komutlar ve rotalar.", ["Komut", "Ne yapar", "Tetikleyiciler"], cliRows("ileri")),
           sources: ["~/ecy-model/terminal-dataset.json"],
         },
+        {
+          slug: "reference/env", title: "Ortam Değişkenleri & Rota",
+          body: tableBody(
+            "eCym'in davranışını değiştiren ortam değişkenleri ve `ecy-cmd` rota katmanı (kaynak: `~/.local/bin/ecym` + `ecy-cmd`).",
+            ["Değişken", "Ne yapar", "Varsayılan"],
+            [
+              ["`ECY_YES=1`", "Riskli komutu onaysız çalıştırır; ayarsız ise önce onay ister", "kapalı (onay ister)"],
+              ["`ECY_MAX`", "`exec_loop` için maksimum iterasyon sayısı", "6"],
+              ["`ECYM_NO_TRACKER=1`", "Canlı task-tracker köprüsünü kapatır (ollamas follow ile aynı ekran)", "açık"],
+              ["`ECY_DATASET`", "Komut kataloğu JSON yolunu override eder", "~/ecy-model/terminal-dataset.json"],
+            ],
+          ),
+          sources: ["~/.local/bin/ecym", "~/.local/bin/ecy-cmd"],
+        },
       ],
     },
     {
@@ -286,24 +331,50 @@ function buildOllamas(): HelpSite {
           body: tableBody("Doğrulanmış HTTP uçları (`:3000`).", ["Uç", "Ne yapar", "Alan"], apiRows),
           sources: ["~/Desktop/ollamas/server/", "~/Desktop/ollamas/README.md"],
         },
+        {
+          slug: "reference/toplevel", title: "ollamas CLI (üst-düzey)",
+          body: tableBody(
+            "Üst-düzey `ollamas` komutları — görev kataloğu ve orkestra (kaynak: `docs/TASKS.md`, `orchestration/TASKS.json`).",
+            ["Komut", "Ne yapar", "Kaynak"],
+            [
+              ["`ollamas tasks`", "Katalogdaki tüm görevleri listeler (id + hedef; N = projenin gerçek görev yüzeyi)", "orchestration/TASKS.json"],
+              ["`ollamas do \"<id>\"`", "Bir görevi çalıştırır: hedef dosyaya çözer, yerel modeli grounder, kapılı düzeltme önerir", "docs/TASKS.md"],
+              ["`ollamas do \"<serbest metin>\"`", "En yakın katalog görevine fuzzy-çözer", "docs/TASKS.md"],
+              ["`ollamas doctor --json`", "node/ollama/bridge/app derin sağlık denetimi (paralel prob)", "cli/lib/client.ts"],
+            ],
+          ),
+          sources: ["~/Desktop/ollamas/docs/TASKS.md", "~/Desktop/ollamas/orchestration/TASKS.json"],
+        },
       ],
     },
     {
-      id: "troubleshooting", title: "Sorun Giderme", summary: "Servis, kapı ve GPU sorunları",
-      pages: [{
-        slug: "troubleshooting/servis", title: "Servis & SSS",
-        body: tableBody(
-          "ollamas çalıştırırken en sık görülen sorunlar (gerçek gotcha'lardan).",
-          ["Belirti", "Neden", "Çözüm"],
-          [
-            ["Sağlık belirsiz", "Servis durumu bilinmiyor", "`ollamas doctor --json` çalıştır — gateway/ollama/bridge/ready paralel problanır"],
-            ["Yerel LLM ~3× yavaş", "Tek-GPU'da paralel çağrı serialize oluyor", "Yerel LLM çağrılarını **sıralı** işle (README Platform notu)"],
-            [":3000 yanıt vermiyor", "Sunucu ayakta değil", "`npm run dev` veya `make up` ile başlat; ardından `npm run doctor`"],
-            ["Commit reddediliyor", "Kalite kapısı kırmızı", "`npm run lint && npm run test` yeşil olmadan commit yok"],
-          ],
-        ),
-        sources: ["~/Desktop/ollamas/README.md", "~/Desktop/ollamas/cli/lib/client.ts"],
-      }],
+      id: "troubleshooting", title: "Sorun Giderme", summary: "Servis, kapı, GPU ve bilinen sorunlar",
+      pages: [
+        {
+          slug: "troubleshooting/servis", title: "Servis & SSS",
+          body: tableBody(
+            "ollamas çalıştırırken en sık görülen sorunlar (gerçek gotcha'lardan).",
+            ["Belirti", "Neden", "Çözüm"],
+            [
+              ["Sağlık belirsiz", "Servis durumu bilinmiyor", "`ollamas doctor --json` çalıştır — gateway/ollama/bridge/ready paralel problanır"],
+              ["Yerel LLM ~3× yavaş", "Tek-GPU'da paralel çağrı serialize oluyor", "Yerel LLM çağrılarını **sıralı** işle (README Platform notu)"],
+              [":3000 yanıt vermiyor", "Sunucu ayakta değil", "`npm run dev` veya `make up` ile başlat; ardından `npm run doctor`"],
+              ["Commit reddediliyor", "Kalite kapısı kırmızı", "`npm run lint && npm run test` yeşil olmadan commit yok"],
+            ],
+          ),
+          sources: ["~/Desktop/ollamas/README.md", "~/Desktop/ollamas/cli/lib/client.ts"],
+        },
+        {
+          slug: "troubleshooting/seyir", title: "Bilinen Sorunlar (Seyir Defteri)",
+          body: (() => {
+            const rows = seyirRows(join(REPO, "cli", "CLI_SEYIR_DEFTERI.md"), 6);
+            return rows.length
+              ? tableBody("CLI seyir defterinden kanıtlanmış gotcha'lar — her biri bir ÖNLEME kuralına bağlıdır.", ["Kayıt", "Sorun / kural"], rows)
+              : "CLI seyir defteri (`cli/CLI_SEYIR_DEFTERI.md`) her kanıtlanmış hatayı bir E-xxx/N-xxx kaydı ve ÖNLEME kuralı olarak tutar; commit öncesi kalite kapısı bunlara dayanır.";
+          })(),
+          sources: ["~/Desktop/ollamas/cli/CLI_SEYIR_DEFTERI.md"],
+        },
+      ],
     },
   ];
   return { system: "ollamas", hubTitle: "ollamas — Yardım", references: ["~/Desktop/ollamas/README.md", "~/Desktop/ollamas/pipeline/PROMPT.md"], sections };
@@ -365,24 +436,48 @@ function buildObsidian(): HelpSite {
       }],
     },
     {
-      id: "reference", title: "Referans", summary: "Çizim SYM / şema alanları",
-      pages: [{
-        slug: "reference/sema", title: "Şema Referansı",
-        body: schemaRows.length
-          ? tableBody("`obsidian-sketch.schema.json` üst-düzey alanları — kapının (S8) koştuğu şema.", ["Alan", "Tip", "Açıklama"], schemaRows)
-          : "Şema okunamadı; `docs/obsidian/obsidian-sketch.schema.json` mevcut değil. Şema S8 kapısında koşar ve her çıktı alanını doğrular; version/environment/corrections/pipeline/inventory/decisions/phases/sandboxRun/blindSpots/gates alanlarını içerir.",
-        sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.schema.json"],
-      }],
+      id: "reference", title: "Referans", summary: "Envanter, SYM ve şema alanları",
+      pages: [
+        {
+          slug: "reference/envanter", title: "Kapsam Envanteri",
+          body: (() => {
+            const rows = sketchInventoryRows(sketch);
+            return rows.length
+              ? tableBody("Çizim yüzeyinin ölçülen kapsamı — her satır canlı bir komuttan türetilir, elle yazılmaz (kaynak: `obsidian-sketch.md` Kapsam kanıtı).", ["Yüzey", "Kapsam", "Nasıl"], rows)
+              : "Çizim yüzeyi: 6/6 yardım sayfası, 77/77 çizim komutu (canlı `/commands/`), 177/177 Excalidraw ayarı (15 grup), 9/9 SYM kalemi, 22 karar (SD1–SD22), 54 adım, 7 kör nokta, 12 kapı (S1–S12).";
+          })(),
+          sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
+        },
+        {
+          slug: "reference/sema", title: "Şema Referansı",
+          body: schemaRows.length
+            ? tableBody("`obsidian-sketch.schema.json` üst-düzey alanları — kapının (S8) koştuğu şema.", ["Alan", "Tip", "Açıklama"], schemaRows)
+            : "Şema okunamadı; `docs/obsidian/obsidian-sketch.schema.json` mevcut değil. Şema S8 kapısında koşar ve her çıktı alanını doğrular; version/environment/corrections/pipeline/inventory/decisions/phases/sandboxRun/blindSpots/gates alanlarını içerir.",
+          sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.schema.json"],
+        },
+      ],
     },
     {
       id: "troubleshooting", title: "Sorun Giderme", summary: "Kör noktalar ve düzeltilen uydurmalar",
-      pages: [{
-        slug: "troubleshooting/kornokta", title: "Kör Noktalar & Düzeltmeler",
-        body: corrRows.length
-          ? tableBody("Kılavuzun önceki elle-yazılmış hâlinin içerdiği ve kapının yakalayıp düzelttiği uydurmalar — her biri komut kanıtına bağlı.", ["Yanlış (uydurma)", "Doğru (kanıtlı)"], corrRows)
-          : "Kılavuzun elle-yazılmış taslağı doğrulanmamış iddialar içeriyordu (yanlış alan-adı, olmayan buton, ölü alıntı referansları). Üretici bunları canlı komut kanıtıyla değiştirdi; `zsh ~/Desktop/obsidian-sketch-verify.sh` her koşuda üç bozuk kopya üretip reddedildiklerini gösterir.",
-        sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
-      }],
+      pages: [
+        {
+          slug: "troubleshooting/kornokta", title: "Düzeltilen Uydurmalar",
+          body: corrRows.length
+            ? tableBody("Kılavuzun önceki elle-yazılmış hâlinin içerdiği ve kapının yakalayıp düzelttiği uydurmalar — her biri komut kanıtına bağlı.", ["Yanlış (uydurma)", "Doğru (kanıtlı)"], corrRows)
+            : "Kılavuzun elle-yazılmış taslağı doğrulanmamış iddialar içeriyordu (yanlış alan-adı, olmayan buton, ölü alıntı referansları). Üretici bunları canlı komut kanıtıyla değiştirdi; `zsh ~/Desktop/obsidian-sketch-verify.sh` her koşuda üç bozuk kopya üretip reddedildiklerini gösterir.",
+          sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
+        },
+        {
+          slug: "troubleshooting/blindspot", title: "Kör Noktalar (SB1–SB7)",
+          body: (() => {
+            const rows = blindSpotRows(sketch);
+            return rows.length
+              ? tableBody("Kılavuzun kanıtladığı 7 kör nokta (3 çözüldü, 4 açık) — otomasyonun sessizce başarısız olabileceği yerler.", ["Kod", "Önem", "Durum", "Başlık"], rows)
+              : "Kılavuz 7 kör nokta kanıtlar: 3'ü çözüldü, 4'ü kanıtlı açık. En kritiği SB1 — CLI 'Executed:' yazar ama komut hiç koşmamış olabilir; çözüm her komuttan sonra gözlemlenebilir değişim (bayt/satır/dosya) ölçmek.";
+          })(),
+          sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
+        },
+      ],
     },
   ];
   return {

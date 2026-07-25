@@ -56,6 +56,7 @@
 - ecym/reference/baslangic.html — Komut Referansı — Başlangıç (Referans)
 - ecym/reference/orta.html — Komut Referansı — Orta (Referans)
 - ecym/reference/ileri.html — Komut Referansı — İleri (Referans)
+- ecym/reference/env.html — Ortam Değişkenleri & Rota (Referans)
 - ecym/troubleshooting/rota.html — Rota & SSS (Sorun Giderme)
 
 ## ollamas — Yardım
@@ -65,12 +66,16 @@
 - ollamas/guides/pipeline.html — eCym Pipeline (Rehberler)
 - ollamas/reference/cli.html — Pipeline CLI Referansı (Referans)
 - ollamas/reference/api.html — HTTP API Referansı (Referans)
+- ollamas/reference/toplevel.html — ollamas CLI (üst-düzey) (Referans)
 - ollamas/troubleshooting/servis.html — Servis & SSS (Sorun Giderme)
+- ollamas/troubleshooting/seyir.html — Bilinen Sorunlar (Seyir Defteri) (Sorun Giderme)
 
 ## Obsidian — Yardım
 - obsidian/index.html — Obsidian — Yardım
 - obsidian/getting-started/genel.html — Obsidian Çizim Yüzeyi Nedir (Başlangıç)
 - obsidian/getting-started/quickstart.html — Hızlı Başlangıç (Başlangıç)
 - obsidian/guides/cizim.html — Çizim Yüzeyi Kapsamı (Rehberler)
+- obsidian/reference/envanter.html — Kapsam Envanteri (Referans)
 - obsidian/reference/sema.html — Şema Referansı (Referans)
-- obsidian/troubleshooting/kornokta.html — Kör Noktalar & Düzeltmeler (Sorun Giderme)
+- obsidian/troubleshooting/kornokta.html — Düzeltilen Uydurmalar (Sorun Giderme)
+- obsidian/troubleshooting/blindspot.html — Kör Noktalar (SB1–SB7) (Sorun Giderme)

@@ -1,15 +1,18 @@
 [
   { "system": "ollamas", "area": "quickstart", "plannedBy": "planner-ollamas", "plan": "KAPANDI · README §Hızlı başlangıç'tan numaralı ready→dev→doctor akışı quickstart.html'e işlendi" },
-  { "system": "ollamas", "area": "cli-reference", "plannedBy": "planner-ollamas", "plan": "KISMİ · cli.html 9 pipeline/bin komutu tabloda; sıradaki: `ollamas do` + orchestra satırlarını ekle" },
+  { "system": "ollamas", "area": "cli-reference", "plannedBy": "planner-ollamas", "plan": "KAPANDI · reference/toplevel.html `ollamas tasks`/`do \"<id>\"`/`doctor`'u kaynak-atıflı tabloluyor (docs/TASKS.md, orchestration/TASKS.json)" },
   { "system": "ollamas", "area": "api-reference", "plannedBy": "planner-ollamas", "plan": "KAPANDI · api.html doğrulanmış 5 uç (/v1/chat/completions,/mcp,/api/ai/*,/api/brain/ask) tabloda" },
-  { "system": "ollamas", "area": "troubleshooting", "plannedBy": "planner-ollamas", "plan": "KISMİ · servis.html 4-satır gotcha FAQ; sıradaki: CLI_SEYIR_DEFTERI.md E-xxx/N-xxx ile genişlet" },
-  { "system": "ollamas", "area": "search", "plannedBy": "planner-ollamas", "plan": "KAPANDI · app.js window.__HELP_INDEX__ ile 6 sayfa istemci-taraflı aranıyor, her başlıkta arama kutusu" },
+  { "system": "ollamas", "area": "troubleshooting", "plannedBy": "planner-ollamas", "plan": "KAPANDI · seyir.html N-040..N-046 gerçek gotcha'ları ÖNLEME kuralıyla listeliyor (cli/CLI_SEYIR_DEFTERI.md)" },
+  { "system": "ollamas", "area": "search", "plannedBy": "planner-ollamas", "plan": "KAPANDI · app.js window.__HELP_INDEX__ ile istemci-taraflı arıyor, her başlıkta arama kutusu" },
   { "system": "ecym", "area": "quickstart", "plannedBy": "planner-ecym", "plan": "KAPANDI · 3 adım (ollama pull qwen3:8b→ecy-brain --build→ecym) tam, hepsi kopyalanabilir ve kaynağa dayalı" },
-  { "system": "ecym", "area": "cli-reference", "plannedBy": "planner-ecym", "plan": "KISMİ · 42/235 komut tabloda; sıradaki: ecym binary env (ECY_YES/ECY_MAX/ECYM_NO_TRACKER) + ecy-cmd Tier1/Tier2 satırları" },
+  { "system": "ecym", "area": "cli-reference", "plannedBy": "planner-ecym", "plan": "KAPANDI · reference/env.html 4 env-var'ı (ECY_YES/ECY_MAX/ECYM_NO_TRACKER/ECY_DATASET) doğru varsayılanlarla tabloluyor, kaynakla birebir doğrulandı" },
   { "system": "ecym", "area": "troubleshooting", "plannedBy": "planner-ecym", "plan": "KAPANDI · 4 gerçek gotcha (mis-route/ECY_YES/PATH/model) tablolu" },
   { "system": "ecym", "area": "theme-responsive", "plannedBy": "planner-ecym", "plan": "KAPANDI · styles.css data-theme+prefers-color-scheme, 1000/720px media query, app.js toggle+localStorage no-flash çalışıyor" },
-  { "system": "obsidian", "area": "beginner-order", "plannedBy": "planner-obsidian", "plan": "KAPANDI · genel→quickstart→cizim→sema→kornokta prev/next zinciri README'yi beginner→advanced sıraladı" },
-  { "system": "obsidian", "area": "cli-reference", "plannedBy": "planner-obsidian", "plan": "KISMİ · sema.html üst-alanlar; sıradaki: obsidian-sketch.md'den 77-komut/9-SYM/177-ayar envanter tablosu ekle" },
-  { "system": "obsidian", "area": "troubleshooting", "plannedBy": "planner-obsidian", "plan": "KISMİ · kornokta.html corrections tablosu; sıradaki: obsidian-sketch.md blindSpots SB1–SB7 (severity/status/fix) FAQ ekle" },
-  { "system": "obsidian", "area": "machine-index", "plannedBy": "planner-obsidian", "plan": "KAPANDI · web/help/llms.txt obsidian sayfalarını bölüm etiketiyle listeliyor" }
+  { "system": "obsidian", "area": "beginner-order", "plannedBy": "planner-obsidian", "plan": "KAPANDI · genel→quickstart→cizim→envanter→sema→kornokta→blindspot prev/next zinciri beginner→advanced sıraladı" },
+  { "system": "obsidian", "area": "cli-reference", "plannedBy": "planner-obsidian", "plan": "KAPANDI · reference/envanter.html 77 komut/177 ayar/9 SYM/22 karar (SD1–SD22) envanterini canlı tabloluyor (obsidian-sketch.md)" },
+  { "system": "obsidian", "area": "troubleshooting", "plannedBy": "planner-obsidian", "plan": "KAPANDI · troubleshooting/blindspot.html SB1–SB7'yi önem/durum/başlık ile tabloluyor (3 çözüldü, 4 açık)" },
+  { "system": "obsidian", "area": "machine-index", "plannedBy": "planner-obsidian", "plan": "KAPANDI · web/help/llms.txt obsidian sayfalarını bölüm etiketiyle listeliyor" },
+  { "system": "ollamas", "area": "troubleshooting-errors", "plannedBy": "planner-ollamas", "plan": "YENİ (düşük) · seyir.html yalnız N-xxx sürüyor; sıradaki: E-xxx hata kayıtlarını (E-003 vb.) tabloya ekle" },
+  { "system": "ecym", "area": "cli-coverage", "plannedBy": "planner-ecym", "plan": "YENİ (düşük) · referans 42/235 komutu kapsıyor; sıradaki: derinleştir + exec_loop çıktı-onay akışını belgele" },
+  { "system": "obsidian", "area": "schema-desc", "plannedBy": "planner-obsidian", "plan": "YENİ (düşük) · sema.html 6/10 alan placeholder + İngilizce; sıradaki: schema.json'dan gerçek description türet" }
 ]
