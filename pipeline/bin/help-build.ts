@@ -259,6 +259,17 @@ function buildEcym(): HelpSite {
           sources: ["~/.local/bin/ecym", "~/.local/bin/ecy-cmd"],
         },
         {
+          slug: "reference/katalog", title: `Tam Komut Kataloğu (${cmds.length})`,
+          body: tableBody(
+            `${cmds.length} komutun birleşik referansı, seviyeye göre sıralı (kaynak: terminal-dataset.json). Doğal dil→komut için "\`ecym <istek>\`".`,
+            ["Komut", "Seviye", "Ne yapar"],
+            [...cmds]
+              .sort((a, b) => ({ baslangic: 0, orta: 1, ileri: 2 }[a.level] ?? 3) - ({ baslangic: 0, orta: 1, ileri: 2 }[b.level] ?? 3))
+              .map((c) => [`\`${c.cmd}\``, c.level, c.desc]),
+          ),
+          sources: ["~/ecy-model/terminal-dataset.json", "~/ollamas-vault/ecym/data/terminal-dataset.json"],
+        },
+        {
           slug: "reference/exit-codes", title: "Çıkış Kodları (Exit Codes)",
           body: tableBody(
             "`ecy-cmd \"<istek>\"` bir isteği komuta eşlerken çıkış koduyla sonucu bildirir (kaynak: `~/.local/bin/ecy-cmd`). Betikler bu sözleşmeye güvenebilir.",

@@ -57,6 +57,7 @@
 - ecym/reference/orta.html — Komut Referansı — Orta (Referans)
 - ecym/reference/ileri.html — Komut Referansı — İleri (Referans)
 - ecym/reference/env.html — Ortam Değişkenleri & Rota (Referans)
+- ecym/reference/katalog.html — Tam Komut Kataloğu (240) (Referans)
 - ecym/reference/exit-codes.html — Çıkış Kodları (Exit Codes) (Referans)
 - ecym/troubleshooting/rota.html — Rota & SSS (Sorun Giderme)
 
