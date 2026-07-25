@@ -75,6 +75,7 @@
 - obsidian/index.html — Obsidian — Yardım
 - obsidian/getting-started/genel.html — Obsidian Çizim Yüzeyi Nedir (Başlangıç)
 - obsidian/getting-started/quickstart.html — Hızlı Başlangıç (Başlangıç)
+- obsidian/guides/kanallar.html — İki Kanal — Graph, .base, Wikilink (Rehberler)
 - obsidian/guides/cizim.html — Çizim Yüzeyi Kapsamı (Rehberler)
 - obsidian/reference/envanter.html — Kapsam Envanteri (Referans)
 - obsidian/reference/sema.html — Şema Referansı (Referans)

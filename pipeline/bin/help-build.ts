@@ -479,13 +479,33 @@ function buildObsidian(): HelpSite {
       ],
     },
     {
-      id: "guides", title: "Rehberler", summary: "Canvas, Excalidraw ve SYM",
-      pages: [{
-        slug: "guides/cizim", title: "Çizim Yüzeyi Kapsamı",
-        body: toBody(sketch.slice(sketch.indexOf("## Kapsam kanıtı"), sketch.indexOf("## Taslakta")), 900) ||
-          "Çizim yardım sayfası 6/6, çizim komutu 77/77 (canlı `/commands/` kaydından), Excalidraw ayarı 177/177 (15 gruba ayrıldı), SYM ekosistem kalemi 9/9. Karar SD1–SD22, adım 54, kör nokta 7, kapı S1–S12.",
-        sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
-      }],
+      id: "guides", title: "Rehberler", summary: "İki kanal, Canvas, Excalidraw ve SYM",
+      pages: [
+        {
+          slug: "guides/kanallar", title: "İki Kanal — Graph, .base, Wikilink",
+          body: [
+            "Vault bilgiyi İKİ tamamlayıcı kanalla taşır. İkisini birlikte kullan.",
+            "",
+            "## Wikilink kanalı (graph)",
+            "Çift köşeli parantez içine alınmış not adları (wikilink) Obsidian **graph**'ını kurar; ilişki gezinmesi ve federasyon buradan çıkar. brain yalnızca `.canvas` ve wikilink yazar; **özel frontmatter/H1/callout'u SİLER**, o yüzden kaynak çapası (source_url) gövde-içi düz metin olmalı.",
+            "",
+            "## .base kanalı (yapılandırılmış)",
+            "`.base` dosyaları not-üstü **veritabanı görünümleridir** (filtre + formül + view). Örnek: `_index/claude-code.base` (filtreler/formüller/3 view). **`groupBy` bir OBJE olmalı** (skaler groupBy üretimde sorgulanamaz — kanıtlı gotcha). Obsidian `.base`/types/workspace'i BELLEKTE tutar; disk otoriterdir.",
+            "",
+            "## Hangisi ne zaman",
+            "- Serbest ilişki, keşif, graf → **wikilink**.",
+            "- Sayısal/kategorik sorgu, tablo, panel → **.base**.",
+            "Örtüşen sayfalar `sharedWith` + `lens` ile beyan edilir; kapı bunu doğrular.",
+          ].join("\n"),
+          sources: ["~/Desktop/ollamas/docs/obsidian/README.md", "~/ollamas-vault/_index/claude-code.base"],
+        },
+        {
+          slug: "guides/cizim", title: "Çizim Yüzeyi Kapsamı",
+          body: toBody(sketch.slice(sketch.indexOf("## Kapsam kanıtı"), sketch.indexOf("## Taslakta")), 900) ||
+            "Çizim yardım sayfası 6/6, çizim komutu 77/77 (canlı `/commands/` kaydından), Excalidraw ayarı 177/177 (15 gruba ayrıldı), SYM ekosistem kalemi 9/9. Karar SD1–SD22, adım 54, kör nokta 7, kapı S1–S12.",
+          sources: ["~/Desktop/ollamas/docs/obsidian/obsidian-sketch.md"],
+        },
+      ],
     },
     {
       id: "reference", title: "Referans", summary: "Envanter, SYM ve şema alanları",
