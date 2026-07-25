@@ -431,10 +431,10 @@ export function renderPortal(sites: HelpSite[], opts: PortalOptions = {}): SiteF
     .map((s) => {
       const pages = readingOrder(s).length;
       const summary = s.sections[0]?.summary ?? "";
-      return `<a class="card" href="${hubHref(s.system)}"><h3>${escapeHtml(s.hubTitle.replace(/ — Yardım$/, ""))}</h3><p>${escapeHtml(summary)}</p><span class="badge">${s.sections.length} bölüm · ${pages} sayfa</span></a>`;
+      return `<a class="card" href="${hubHref(s.system)}"><h2>${escapeHtml(s.hubTitle.replace(/ — Yardım$/, ""))}</h2><p>${escapeHtml(summary)}</p><span class="badge">${s.sections.length} bölüm · ${pages} sayfa</span></a>`;
     })
     .join("");
-  const refCard = `<a class="card card-ref" href="kaynaklar.html"><h3>Kaynaklar</h3><p>Bu sitenin referans aldığı sayfalar ve hedef özellik sözleşmesi.</p><span class="badge">kalıcı liste</span></a>`;
+  const refCard = `<a class="card card-ref" href="kaynaklar.html"><h2>Kaynaklar</h2><p>Bu sitenin referans aldığı sayfalar ve hedef özellik sözleşmesi.</p><span class="badge">kalıcı liste</span></a>`;
   const landingBody =
     topbar("") +
     `<main class="landing"><div class="hero big"><h1>Yardım Merkezi</h1><p class="lead">ollamas · eCym · Claude · Obsidian — referans docs siteleri standardında, başlangıçtan ileriye.</p></div>` +
@@ -514,7 +514,7 @@ blockquote{border-left:3px solid var(--line);margin:1em 0;padding:2px 14px;color
 .landing{max-width:1080px;margin:0 auto;padding:32px 24px}.hero.big h1{font-size:2.6rem}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:24px}
 .card{display:block;border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--card);color:var(--fg)}
-.card:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-2px);transition:.15s}.card h3{margin:.1em 0 .4em}.card p{color:var(--muted);font-size:14px;margin:.2em 0 1em}
+.card:hover{border-color:var(--accent);text-decoration:none;transform:translateY(-2px);transition:.15s}.card h2{margin:.1em 0 .4em;font-size:1.15rem}.card h3{margin:.1em 0 .4em}.card p{color:var(--muted);font-size:14px;margin:.2em 0 1em}
 .badge{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
 .card-ref{border-style:dashed}
 .ref-card{border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:12px 0;background:var(--card)}.ref-meta{color:var(--muted);font-size:13px}

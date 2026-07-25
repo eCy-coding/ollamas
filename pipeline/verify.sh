@@ -317,6 +317,12 @@ printf '%s' "$DCV" | grep -q "devcouncil --verify: PASS" \
   || { bad "dev-council substrate FAIL"; printf '%s\n' "$DCV" | grep HATA; }
 [ -s "$REPO/pipeline/dev-council/PRINCIPLES.md" ] && ok "PRINCIPLES.md (operatör-düzenlenebilir) repo'da" || bad "PRINCIPLES.md repo mirror yok"
 
+head_ "26  Kodlanmış site a11y/perf lint (zero-dep, offline)"
+HL=$(cd "$REPO" && npx tsx pipeline/bin/htmllint.ts 2>&1 | tail -1)
+printf '%s' "$HL" | grep -q "htmllint: PASS" \
+  && ok "a11y: ${HL#htmllint: PASS — }" \
+  || { bad "a11y lint FAIL: $HL"; }
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."
