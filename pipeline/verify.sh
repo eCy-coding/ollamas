@@ -33,7 +33,14 @@ COV=$(npx vitest run --project pipeline --coverage.enabled --coverage.reporter=j
 import json,os
 p='$REPO/coverage-pipeline/coverage-summary.json'
 d=json.load(open(p))
-v=[x['lines']['pct'] for k,x in d.items() if 'pipeline/lib' in k]
+import subprocess
+# Measure only git-TRACKED lib files: a background process (autopilot --heal) can drop untracked
+# scratch .ts into pipeline/lib and would otherwise red the gate on code we never ship. A real
+# untested TRACKED file still counts and still fails — only transient untracked cruft is skipped.
+tracked=set(subprocess.run(['git','-C','$REPO','ls-files','pipeline/lib'],capture_output=True,text=True).stdout.split())
+def _rel(k):
+    i=k.find('pipeline/lib'); return k[i:] if i>=0 else k
+v=[x['lines']['pct'] for k,x in d.items() if 'pipeline/lib' in k and _rel(k) in tracked]
 print(round(sum(v)/len(v),2) if v else 0)" 2>/dev/null)
 python3 -c "import sys;sys.exit(0 if float('${COV:-0}')>=90 else 1)" 2>/dev/null \
   && ok "pipeline/lib coverage ${COV}% (≥90)" || bad "pipeline/lib coverage ${COV:-?}% (<90)"
