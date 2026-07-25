@@ -310,6 +310,13 @@ for pf in "$HOME/Desktop/eCym.md" "$HOME/Desktop/eCym2.md"; do
   fi
 done
 
+head_ "25  Dev-Council (iki-oturum Obsidian işbirliği alt yapısı)"
+DCV=$(cd "$REPO" && npx tsx pipeline/bin/devcouncil.ts --verify 2>&1)
+printf '%s' "$DCV" | grep -q "devcouncil --verify: PASS" \
+  && ok "dev-council: $(printf '%s' "$DCV" | grep -oE '[0-9]+ kart' | head -1) havuzda" \
+  || { bad "dev-council substrate FAIL"; printf '%s\n' "$DCV" | grep HATA; }
+[ -s "$REPO/pipeline/dev-council/PRINCIPLES.md" ] && ok "PRINCIPLES.md (operatör-düzenlenebilir) repo'da" || bad "PRINCIPLES.md repo mirror yok"
+
 printf '\n\033[1mÖZET\033[0m  PASS=%d  FAIL=%d  SKIP=%d\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] && echo "eCym pipeline sağlam — 4 sistem bağlı." \
   || echo "Kırık — yukarıdaki FAIL'leri düzelt."
