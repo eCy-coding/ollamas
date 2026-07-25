@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { percentile, stddev, cv, ci95, summarize, runSetQuality, summarizeSteps, median, mean } from "../lib/stats";
+import { percentile, stddev, cv, ci95, summarize, runSetQuality, summarizeSteps, median, mean, sufficientN } from "../lib/stats";
 
 describe("percentile", () => {
   it("returns an OBSERVED sample, never an interpolated one", () => {
@@ -81,6 +81,26 @@ describe("summarize", () => {
   it("is all-zero for no samples", () => {
     const s = summarize([]);
     expect(s).toMatchObject({ n: 0, min: 0, max: 0, p50: 0, p95: 0, mean: 0, stddev: 0 });
+  });
+
+  it("marks tail percentiles UNreliable for tiny N (the honest N-guard)", () => {
+    const s = summarize([100, 110, 120, 130, 500]); // n=5
+    expect(s.p99Reliable).toBe(false);  // p99 needs n≥100
+    expect(s.p999Reliable).toBe(false); // p999 needs n≥1000
+  });
+});
+
+describe("sufficientN — tail-percentile honesty", () => {
+  it("requires ⌈1/(1−p/100)⌉ samples", () => {
+    expect(sufficientN(1, 99.9)).toBe(false);
+    expect(sufficientN(999, 99.9)).toBe(false);
+    expect(sufficientN(1000, 99.9)).toBe(true);
+    expect(sufficientN(100, 99)).toBe(true);
+    expect(sufficientN(99, 99)).toBe(false);
+    expect(sufficientN(20, 95)).toBe(true);
+    expect(sufficientN(2, 50)).toBe(true);
+    expect(sufficientN(1, 50)).toBe(false); // median needs ≥2 samples
+    expect(sufficientN(1, 100)).toBe(true); // p100 edge: any sample
   });
 });
 

@@ -27,6 +27,18 @@ export function percentile(xs: number[], p: number): number {
   return v[Math.min(rank, v.length) - 1];
 }
 
+/**
+ * Is N large enough for percentile `p` to be a real tail estimate rather than just the maximum?
+ * Nearest-rank needs at least ⌈1/(1−p/100)⌉ samples before the p-th percentile can fall below the
+ * observed max — p99 needs ≥100, p999 needs ≥1000. Below that, a reported "p999" is the single
+ * worst run wearing a tail-percentile label; this guard lets the report say so (MISS ≠ PASS).
+ */
+export function sufficientN(n: number, p: number): boolean {
+  if (p <= 0 || p >= 100) return n >= 1;
+  // 100/(100−p) with Math.round to shed float noise (1−99.9/100 overshoots to 1000.0000057).
+  return n >= Math.round(100 / (100 - p));
+}
+
 /** Sample standard deviation (n−1). Returns 0 for fewer than 2 samples. */
 export function stddev(xs: number[]): number {
   const v = xs.filter((n) => typeof n === "number" && Number.isFinite(n));
@@ -69,6 +81,9 @@ export interface Summary {
   cv: number;
   ci95_lo: number;
   ci95_hi: number;
+  /** True when n is large enough for that tail percentile to be a real estimate (not just the max). */
+  p99Reliable: boolean;
+  p999Reliable: boolean;
 }
 
 /** Collapse a sample set into the full distribution the report and the gates both read. */
@@ -88,6 +103,8 @@ export function summarize(xs: number[]): Summary {
     cv: Number(cv(v).toFixed(3)),
     ci95_lo: Number(c.lo.toFixed(3)),
     ci95_hi: Number(c.hi.toFixed(3)),
+    p99Reliable: sufficientN(v.length, 99),
+    p999Reliable: sufficientN(v.length, 99.9),
   };
 }
 
