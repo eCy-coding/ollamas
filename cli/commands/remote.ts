@@ -69,6 +69,22 @@ async function probeBackend(url: string): Promise<BackendProbe> {
   } catch {
     // unreachable
   }
+  // K1: the pool holds TWO kinds of backend — raw ollama (:11434) and an ollamas GATEWAY
+  // (:8090, the dispatch target for /api/agent/chat). Only ollama serves /api/version, so a
+  // healthy gateway was scored unreachable and dispatch silently failed over to the mac.
+  // Second probe: the gateway's own health endpoint. Measured on rtx-worker — /api/version
+  // there fell through to the SPA handler and returned 500 (dist/index.html missing).
+  if (!reachable) {
+    try {
+      const hRes = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(3000) });
+      if (hRes.ok) {
+        reachable = true;
+        mode = "ollamas";
+      }
+    } catch {
+      // still unreachable
+    }
+  }
   if (reachable) {
     try {
       const tRes = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(3000) });
@@ -596,8 +612,24 @@ export function localProviderForWorker(wname: string): string | null {
 
 /** Fleet workers = pool backends (remote) + the mac control plane (+ the gemini-cli backend
  *  when its binary is present). Pure. */
-export function buildWorkers(pool: Backend[], macHealthy = true, geminiHealthy = false): FleetWorker[] {
-  const remotes: FleetWorker[] = pool.map((b) => ({ name: b.name, kind: "remote", healthy: true }));
+export function buildWorkers(
+  pool: Backend[],
+  macHealthy = true,
+  geminiHealthy = false,
+  probes?: BackendProbe[],
+): FleetWorker[] {
+  // K1: without probes every pool entry was marked healthy, so a DEAD entry could win the
+  // assignment. Measured: `contract:m_0d304dbd1045fadb` (100.64.0.7) is not even a tailnet
+  // member any more, yet it was picked for a codegen task ahead of the live worker — because
+  // `tokS` is never populated, the sort falls back to localeCompare and "contract…" < "rtx".
+  // With probes present, reachability is authoritative; absent, the old behaviour is kept so
+  // existing callers/tests are unaffected.
+  const reach = new Map((probes ?? []).map((p) => [p.url, p.reachable]));
+  const remotes: FleetWorker[] = pool.map((b) => ({
+    name: b.name,
+    kind: "remote",
+    healthy: probes ? (reach.get(b.url) ?? false) : true,
+  }));
   const gemini: FleetWorker[] = geminiHealthy ? [{ name: "gemini-cli", kind: "remote", healthy: true }] : [];
   return [...remotes, ...gemini, { name: "mac", kind: "mac", healthy: macHealthy }];
 }
@@ -658,7 +690,11 @@ async function runDispatch(args: string[]): Promise<number> {
   // Include the gemini-cli backend as a fleet worker only when its binary is present, so
   // google-grounded tasks can route to it (assignWorker → S1 local-gateway execution).
   const geminiHealthy = (await detectGemini()).present;
-  const baseWorkers = buildWorkers(pool, true, geminiHealthy);
+  // K1: probe the pool BEFORE assigning, so dead entries cannot win the task. probeAll runs the
+  // backends in parallel (~3 s worst case) — cheap next to an agent turn, and it is the only way
+  // `healthy` reflects reality rather than the pool file's optimism.
+  const probes = await probeAll(pool);
+  const baseWorkers = buildWorkers(pool, true, geminiHealthy, probes);
   const client = new RemoteAgentClient();
   let fence = 1;
   const ledger: LedgerEvent[] = [];

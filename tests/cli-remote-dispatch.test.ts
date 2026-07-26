@@ -13,6 +13,7 @@
  * skip when the fleet is down, but these invariants must hold deterministically, always.
  */
 import { describe, it, expect } from "vitest";
+import { buildWorkers } from "../cli/commands/remote";
 import {
   assignWorker,
   foldLedger,
@@ -176,5 +177,64 @@ describe("parseDispatchReport — demoSuspected + verdict fold (agent-dispatch.m
     expect(() => parseDispatchReport([])).not.toThrow();
     expect(() => parseDispatchReport([null as any, 7 as any, {}])).not.toThrow();
     expect(parseDispatchReport([]).verdict).toBe("INCOMPLETE");
+  });
+});
+
+/**
+ * K1 — probe-aware worker health (regression, 2026-07-27).
+ *
+ * Measured on the live fleet: a codegen task was assigned to `contract:m_0d304dbd1045fadb`
+ * (100.64.0.7) — an entry that is not even a tailnet member any more. Two facts combined:
+ *   1) buildWorkers marked EVERY pool entry healthy:true (the pool file's optimism),
+ *   2) `tokS` is never populated, so assignWorker's sort falls through to localeCompare and
+ *      "contract…" sorts ahead of "rtx".
+ * Result: dispatch went to a dead backend, failed, and silently failed over to the mac — while
+ * `remote ls` still showed the fleet as usable. These assert the fix: with probes supplied,
+ * reachability is authoritative; without them the old behaviour is preserved.
+ */
+describe("K1: buildWorkers probe-aware health", () => {
+  const pool = [
+    { name: "rtx", url: "http://10.0.0.1:8090", priority: 10 },
+    { name: "dead", url: "http://10.0.0.9:11434", priority: 20 },
+  ];
+  const probe = (url: string, reachable: boolean) => ({ url, reachable, models: [] as string[] });
+
+  it("probes absent → legacy behaviour (every entry healthy)", () => {
+    const w = buildWorkers(pool, true, false);
+    expect(w.filter((x) => x.kind === "remote").every((x) => x.healthy)).toBe(true);
+  });
+
+  it("probes present → unreachable entry is NOT healthy", () => {
+    const w = buildWorkers(pool, true, false, [
+      probe("http://10.0.0.1:8090", true),
+      probe("http://10.0.0.9:11434", false),
+    ]);
+    expect(w.find((x) => x.name === "rtx")!.healthy).toBe(true);
+    expect(w.find((x) => x.name === "dead")!.healthy).toBe(false);
+  });
+
+  it("dead entry cannot win the assignment even when it sorts first alphabetically", () => {
+    // "dead" < "rtx" alphabetically; without the fix it would be picked (tokS is undefined
+    // for both, so the sort falls back to localeCompare).
+    const workers = buildWorkers(pool, true, false, [
+      probe("http://10.0.0.1:8090", true),
+      probe("http://10.0.0.9:11434", false),
+    ]);
+    const a = assignWorker({ id: "t1", kind: "codegen" }, workers);
+    expect(a.worker).toBe("rtx");
+  });
+
+  it("a pool entry missing from the probe list is treated as unhealthy (MISS ≠ PASS)", () => {
+    const w = buildWorkers(pool, true, false, [probe("http://10.0.0.1:8090", true)]);
+    expect(w.find((x) => x.name === "dead")!.healthy).toBe(false);
+  });
+
+  it("all remotes unreachable → mac substrate, not a dead remote", () => {
+    const workers = buildWorkers(pool, true, false, [
+      probe("http://10.0.0.1:8090", false),
+      probe("http://10.0.0.9:11434", false),
+    ]);
+    const a = assignWorker({ id: "t1", kind: "codegen" }, workers);
+    expect(a.worker).toBe("mac");
   });
 });
