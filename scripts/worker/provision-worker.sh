@@ -420,6 +420,159 @@ PSEOF
 }
 
 # ───────────────────────────────────────────────────────────────────────────────
+# FAZ 7 — kontrol düzlemi: worker'ı Mac'e TANIT (atlanırsa dispatch çalışmaz — Y-17)
+# ───────────────────────────────────────────────────────────────────────────────
+faz7_kontrol_duzlemi() {
+  say "FAZ 7 — kontrol düzlemi (havuz kaydı + ölü girdi temizliği)"
+  local pool="$HOME/.ollamas/backends.json"
+  mkdir -p "$(dirname "$pool")"
+  [ -f "$pool" ] || echo "[]" > "$pool"
+  cp "$pool" "${pool}.bak-$(date +%s)"
+
+  # Havuzdaki her girdiyi PROBE et; erisilemeyenler olu sayilir (Y-17: olu girdi dispatch'i calar).
+  # Probe iki uclu: /api/version (ollama) VEYA /api/health (ollamas gateway) — K1 fix'inin ayni mantigi.
+  local live=""
+  live="$(python3 - "$pool" <<'PY'
+import json, subprocess, sys, pathlib
+pool = json.load(open(sys.argv[1]))
+alive = []
+for b in pool:
+    url = (b.get("url") or "").rstrip("/")
+    ok = False
+    for ep in ("/api/version", "/api/health"):
+        r = subprocess.run(["curl","-s","-o","/dev/null","-w","%{http_code}","-m","4",url+ep],
+                           capture_output=True, text=True)
+        if r.stdout.strip() == "200": ok = True; break
+    print(f"  probe {b.get('name','?'):32} {url:36} {'CANLI' if ok else 'OLU'}", file=sys.stderr)
+    if ok: alive.append(b.get("name"))
+print(",".join(a for a in alive if a))
+PY
+)" || true
+
+  python3 - "$pool" "$ALIAS" "$WORKER_IP" "$live" <<'PY'
+import json, sys
+pool_path, alias, ip, live = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+live_set = {x for x in live.split(",") if x}
+pool = json.load(open(pool_path))
+# 7.2 olu girdi temizligi — yeni worker'in kendi girdileri korunur (henuz canli olmayabilir)
+keep_names = live_set | {alias, f"{alias}-ollama"}
+pool = [b for b in pool if b.get("name") in keep_names]
+# 7.1 iki girdi, amaca gore ayri (dispatch :8090 ONCE, inference :11434 sonra)
+want = [
+    {"name": alias,               "url": f"http://{ip}:8090",  "priority": 10},
+    {"name": f"{alias}-ollama",   "url": f"http://{ip}:11434", "priority": 20},
+]
+by = {b.get("name"): b for b in pool}
+for w in want: by[w["name"]] = w                       # idempotent: varsa guncelle
+ordered = want + [b for n, b in by.items() if n not in {w["name"] for w in want}]
+json.dump(ordered, open(pool_path, "w"), indent=2)
+for b in ordered: print(f"  havuz  {b['name']:32} {b['url']:36} p={b['priority']}")
+PY
+  local n; n="$(python3 -c "
+import json; p=json.load(open('$HOME/.ollamas/backends.json'))
+names={b['name'] for b in p}
+print('ok' if {'$ALIAS','${ALIAS}-ollama'} <= names else 'eksik')")"
+  gate "7" "kayit=$n" "kayit=ok"
+}
+
+# ───────────────────────────────────────────────────────────────────────────────
+# FAZ 8 — Mac watchdog: 7/24'ün kontrol makinesi tarafı
+# ───────────────────────────────────────────────────────────────────────────────
+faz8_watchdog() {
+  say "FAZ 8 — Mac watchdog (com.ecy.worker-health, 5 dk)"
+  local sh="$STATE_DIR/worker-health.sh"
+  cat > "$sh" <<HEALTH
+#!/usr/bin/env bash
+# worker-health.sh — Mac tarafi bekci (WORKER-STANDARD.md Faz 8). launchd 5 dk'da bir kosar.
+# Emre'nin mevcut com.ecy.* islerine DOKUNMAZ; yalniz bu worker'i izler.
+set -uo pipefail
+ALIAS="$ALIAS"; IP="$WORKER_IP"; SD="$STATE_DIR"
+LOG="\$SD/health.log"; FAILC="\$SD/.health-fails"; POOL="\$HOME/.ollamas/backends.json"
+[ -f "\$LOG" ] && [ "\$(wc -c < "\$LOG")" -gt 2000000 ] && mv "\$LOG" "\$LOG.1"
+ts() { date "+%Y-%m-%d %H:%M:%S"; }
+h8090=\$(curl -s -o /dev/null -w "%{http_code}" -m 8 "http://\$IP:8090/api/health" 2>/dev/null || echo 000)
+h11434=\$(curl -s -o /dev/null -w "%{http_code}" -m 8 "http://\$IP:11434/api/tags" 2>/dev/null || echo 000)
+# 8.4 termal PAUSE bayragi -> donanim korumasi Mac'e yansir
+pause=\$(ssh -o BatchMode=yes -o ConnectTimeout=8 "\$ALIAS" \\
+  'powershell -NoProfile -Command "Test-Path C:\\ecy\\worker\\PAUSE"' 2>/dev/null | tr -d '\\r' | tr '[:upper:]' '[:lower:]')
+if [ "\$pause" = "true" ]; then
+  echo "\$(ts) gateway=\$h8090 ollama=\$h11434 durum=thermal-pause" >> "\$LOG"; exit 0
+fi
+if [ "\$h8090" = "200" ] && [ "\$h11434" = "200" ]; then
+  echo 0 > "\$FAILC"
+  # 8.3 iyilesme -> priority geri al
+  python3 - "\$POOL" "\$ALIAS" <<'PY' 2>/dev/null || true
+import json,sys
+p,a=sys.argv[1],sys.argv[2]; pool=json.load(open(p)); ch=False
+for b in pool:
+    if b.get("name")==a and b.get("priority",10)!=10: b["priority"]=10; ch=True
+    if b.get("name")==f"{a}-ollama" and b.get("priority",20)!=20: b["priority"]=20; ch=True
+if ch: json.dump(pool,open(p,"w"),indent=2); print("restore")
+PY
+  echo "\$(ts) gateway=200 ollama=200 durum=OK" >> "\$LOG"; exit 0
+fi
+n=\$(( \$(cat "\$FAILC" 2>/dev/null || echo 0) + 1 )); echo "\$n" > "\$FAILC"
+# 8.2 sirali onarim: Ollama gorevi -> WSL keepalive -> worker servisi
+rep=""
+if [ "\$h11434" != "200" ]; then
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "\$ALIAS" \\
+    'powershell -NoProfile -Command "Start-ScheduledTask -TaskName ollama-serve"' >/dev/null 2>&1 && rep="\$rep ollama"
+fi
+if [ "\$h8090" != "200" ]; then
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "\$ALIAS" \\
+    'powershell -NoProfile -Command "schtasks /run /tn ecy-wsl-keepalive"' >/dev/null 2>&1 && rep="\$rep wsl"
+  ssh -o BatchMode=yes -o ConnectTimeout=15 "\$ALIAS" \\
+    'wsl -d Ubuntu -u root -- systemctl restart ollamas-worker' >/dev/null 2>&1 && rep="\$rep svc"
+fi
+# 8.3 ucuncu ardisik hatada priority dusur -> is Mac'e aksin, kuyruk tikanmasin
+if [ "\$n" -ge 3 ]; then
+  python3 - "\$POOL" "\$ALIAS" <<'PY' 2>/dev/null || true
+import json,sys
+p,a=sys.argv[1],sys.argv[2]; pool=json.load(open(p)); ch=False
+for b in pool:
+    if b.get("name") in (a,f"{a}-ollama") and b.get("priority",10)<90: b["priority"]=95; ch=True
+if ch: json.dump(pool,open(p,"w"),indent=2); print("demote")
+PY
+  echo "\$(ts) gateway=\$h8090 ollama=\$h11434 fails=\$n repair=\$rep durum=DEMOTE" >> "\$LOG"
+else
+  echo "\$(ts) gateway=\$h8090 ollama=\$h11434 fails=\$n repair=\$rep durum=REPAIR" >> "\$LOG"
+fi
+HEALTH
+  chmod +x "$sh"
+
+  local plist="$HOME/Library/LaunchAgents/com.ecy.worker-health.plist"
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.ecy.worker-health</string>
+  <key>ProgramArguments</key><array><string>/bin/bash</string><string>$sh</string></array>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardErrorPath</key><string>$STATE_DIR/health.err.log</string>
+</dict></plist>
+PLIST
+  launchctl unload "$plist" 2>/dev/null || true
+  launchctl load "$plist" 2>/dev/null || true
+  sleep 8
+  local loaded; loaded="$(launchctl list 2>/dev/null | grep -c "com.ecy.worker-health" || echo 0)"
+  echo "  script : $sh"
+  echo "  plist  : $plist"
+  [ -f "$STATE_DIR/health.log" ] && tail -1 "$STATE_DIR/health.log" | sed 's/^/  log    : /'
+  gate "8" "loaded=$loaded" "loaded=[1-9]"
+}
+
+# ───────────────────────────────────────────────────────────────────────────────
+# FAZ 9 — uçtan uca kabul kapısı
+# ───────────────────────────────────────────────────────────────────────────────
+faz9_kabul() {
+  say "FAZ 9 — uçtan uca kabul kapısı"
+  local v; v="$(dirname "$0")/verify-worker.sh"
+  [ -x "$v" ] || chmod +x "$v" 2>/dev/null || true
+  WORKER_IP="$WORKER_IP" ALIAS="$ALIAS" bash "$v"
+}
+
+# ───────────────────────────────────────────────────────────────────────────────
 main() {
   echo "provision-worker → ip=$WORKER_IP alias=$ALIAS user=$SSH_USER name=$NEW_NAME from=$FROM"
   [ "$DRY" = 1 ] && { faz0_blok; echo; echo "(--dry-run: yalnız Faz 0 bloğu üretildi)"; exit 0; }
@@ -434,10 +587,16 @@ main() {
   skip 4 || faz4_wsl      || exit 1
   skip 5 || faz5_servis   || exit 1
   skip 6 || faz6_koruma   || exit 1
+  # Faz 7-9 ATLANAMAZ: worker Mac'e tanitilmadan "kurulum bitti" denemez (Y-17).
+  skip 7 || faz7_kontrol_duzlemi || exit 1
+  skip 8 || faz8_watchdog        || exit 1
+  skip 9 || faz9_kabul           || exit 1
   say "TAMAM — tüm kapılar yeşil"
   echo "   ssh $ALIAS                      → yönetim"
   echo "   http://$WORKER_IP:11434         → Ollama (inference)"
   echo "   http://$WORKER_IP:8090          → ollamas worker (dispatch)"
   echo "   C:\\ecy  ·  /opt/ecy             → tek kök klasörler"
+  echo "   ollamas remote ls               → havuzda $ALIAS + $ALIAS-ollama"
+  echo "   $STATE_DIR/health.log           → Mac watchdog (5 dk)"
 }
 main

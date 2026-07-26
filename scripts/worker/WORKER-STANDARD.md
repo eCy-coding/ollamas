@@ -10,6 +10,33 @@
 
 ---
 
+## 00. KAPSAM ve ÖNKOŞULLAR *(script koşulmadan önce okunur)*
+
+### Kapsam — ne için doğrulandı
+| | |
+|---|---|
+| **Hedef makine** | Windows 11 (build ≥ 22621) + NVIDIA GPU. Ölçüldüğü donanım: RTX 5070 Laptop 8 GB + Ryzen 9 8945HX 16c/32t + 31 GB RAM |
+| **Kontrol makinesi** | macOS (Tailscale + SSH + git). Aynı tailnet'te olmalı |
+| **KAPSAM DIŞI (doğrulanmadı)** | Linux worker · macOS worker · AMD/Intel GPU · Windows 10 · birden çok GPU · domain'e katılmış makine. Bunlar için standart **geçerli değildir** — denenmedi, iddia edilmez |
+
+### Önkoşul 1 — K1 kod fix'i (dispatch bunu ŞART koşar)
+Worker kurulsa bile, dispatch **ölü backend'e** gidebilir. Ölçüldü: `contract:m_0d304dbd1045fadb`
+(100.64.0.7, tailnet üyesi bile değil) codegen görevini kazandı, çünkü `buildWorkers` her havuz
+girdisini `healthy: true` sayıyordu ve `tokS` boş olduğu için sıralama alfabetiğe düşüyordu.
+Ayrıca `probeBackend` yalnız ollama'yı tanıyordu (`/api/version`); ollamas gateway `:8090`'da
+o uç yok → çalışan gateway "unreachable" görünüyordu.
+
+**Gerekli commit:** `fix/k1-dispatch-probe-aware` (`16d3000`) — `probeBackend` gateway'in
+`/api/health` ucunu da dener, `buildWorkers(pool, mac, gemini, probes?)` probe'u otoriter kabul
+eder, `runDispatch` atamadan önce `probeAll` koşar. Bu fix olmadan Faz 7-9 anlamsızdır.
+
+### Önkoşul 2 — sırlar ve kimlik
+- Kontrol makinesinde worker'a **ayrı** SSH anahtarı (`~/.ssh/id_<alias>`); başka anahtar taşınmaz
+- Worker'ın `MASTER_KEY_B64`'ü **hedefte** üretilir, orada kalır
+- Hedefte ASCII adlı **adanmış servis hesabı** açılır; kişisel profil kullanılmaz
+
+---
+
 ## 0. Sözleşmeler (her fazda geçerli)
 
 | Kural | Gerekçe (ölçülmüş) |
@@ -123,6 +150,51 @@ powercfg /setactive SCHEME_CURRENT
 | 6.3 | Güç planı **Dengeli**; `NUM_THREAD`=fiziksel; systemd `CPUWeight<100` | `POWER_PLAN=Dengeli` |
 | 6.4 | Artık temizliği: installer'lar · `%TEMP%` >50 MB · boş dizinler | `SILINEN_MB=1737` · disk 67.2 → **68.3 GB** |
 
+### Faz 7 — Kontrol düzlemi entegrasyonu *(worker'ı Mac'e TANITMA — atlanırsa dispatch çalışmaz)*
+
+Faz 6'ya kadar worker ayaktadır ama **Mac onu bilmez**. Bu fazın atlanması, bu oturumda
+yaşanan en sinsi hatadır: her şey "kurulu" görünür, dispatch sessizce mac'e düşer.
+
+| # | Adım | Kabul kanıtı |
+|---|---|---|
+| 7.1 | Havuza **iki** girdi (amaca göre ayrı): `<alias>` → `http://<ip>:8090` (agent dispatch) ve `<alias>-ollama` → `http://<ip>:11434` (ham inference). İdempotent — varsa güncellenir | `ollamas remote ls` → ikisi de listede |
+| 7.2 | **Ölü girdi temizliği:** havuzdaki her girdi probe edilir; tailnet üyesi olmayan / erişilemeyen girdiler **yedek alınarak** silinir | ölçüldü: `100.64.0.7` · `100.64.0.8` tailnet üyesi değil, `curl → 000` → silindi |
+| 7.3 | Girdi sırası = fallback zinciri: dispatch girdisi (`:8090`) **önce**, inference (`:11434`) sonra | `priority` 10 / 20 |
+
+> **Neden iki girdi:** dispatch `POST /api/agent/chat` atar → bu **ollamas gateway** ucudur (`:8090`).
+> `:11434` ise ham Ollama'dır; orada böyle bir uç yok. Tek girdiyle kurulan havuz ya dispatch'i
+> ya inference'ı kaybeder (K1'in yarısı buydu).
+
+### Faz 8 — Mac watchdog *(7/24'ün Mac tarafı)*
+
+| # | Adım | Kabul kanıtı |
+|---|---|---|
+| 8.1 | `com.ecy.worker-health.plist` — 5 dk periyot, `~/.ollamas/worker/health.log` (rotasyonlu) | `launchctl list \| grep worker-health` |
+| 8.2 | Sağlık düşükse SSH ile **sırayla** onarım: Ollama görevi → WSL keepalive → `ollamas-worker` servisi | log satırı `repair=...` |
+| 8.3 | 3 ardışık başarısızlıkta worker priority'si **geçici düşürülür** (iş Mac'e akmaya devam eder, kuyruk tıkanmaz); worker dönünce priority **geri alınır** | log `demote`/`restore` |
+| 8.4 | Termal `PAUSE` bayrağı görülürse dispatch duraklatılır (donanım koruma Mac'e yansır) | log `thermal-pause` |
+| 8.5 | **Mevcut `com.ecy.*` işlerine DOKUNULMAZ** — yalnız yeni bir agent eklenir | `launchctl list` öncesi/sonrası diğer işler aynı |
+
+### Faz 9 — Uçtan uca kabul kapısı
+
+`verify-worker.sh` — Mac'ten koşan tek yeşil/kırmızı kapı. **MISS ≠ PASS:** ölçülemeyen kontrol
+"geçti" sayılmaz, `KOŞULMADI` olarak raporlanır.
+
+| # | Kontrol | PASS koşulu |
+|---|---|---|
+| 1 | Tailscale | worker `online=true` |
+| 2 | SSH | `ssh <alias> hostname` < 10 sn |
+| 3 | Güç ayarı | `SUB_SLEEP` AC index **0** (uyku kapalı) |
+| 4 | GPU | `nvidia-smi` VRAM + sürücü raporluyor |
+| 5 | Ollama | `:11434/api/tags` **200** + beklenen model seti |
+| 6 | Worker gateway | `:8090/api/health` **200** |
+| 7 | WSL2 | `systemctl is-system-running` ∈ {running, degraded} · docker `active` |
+| 8 | Havuz | `<alias>` + `<alias>-ollama` kayıtlı, ölü girdi yok |
+| 9 | **Dispatch e2e** | `worker:"<alias>"` · `failedOver:false` · `demoSuspected:false` |
+| 10 | **Failover** | worker durdurulur → görev Mac'te DONE → worker geri gelir |
+| 11 | Termal | son log satırı `durum=OK\|UYARI`, `PAUSE` bayrağı yok |
+| 12 | Disk | boş alan ≥ 40 GB (model+WSL+docker sonrası tampon) |
+
 ---
 
 ## B. YANLIŞ YÖNTEMLER — script bunları YAPMAZ
@@ -144,6 +216,20 @@ powercfg /setactive SCHEME_CURRENT
 | **Y-13** | WSL2'yi boşta bırakmak | `Ubuntu STATE=Stopped` — VM kapandı, `:8090` öldü (Ollama ayakta kaldı) | `vmIdleTimeout=-1` + kullanıcı kimlikli keepalive |
 
 ---
+
+### Y-17 — worker'ı kurup **kontrol düzlemine tanıtmamak** *(en sinsi hata: her şey "kurulu" görünür)*
+Faz 0-6 tamamlandı, worker `:8090`'da `active`, Mac'ten `/api/health` **200** döndü — yani
+"kurulum bitti" denebilirdi. Ama dispatch denendiğinde:
+```
+worker:"contract:m_0d304dbd1045fadb"   failedOver:true   errors:["fetch failed"]
+```
+İş **ölü bir backend'e** gitti, sonra sessizce mac'e düştü. Sebep: worker havuza tanıtılmamış,
+ölü girdiler temizlenmemiş, K1 fix'i uygulanmamıştı. `remote ls` fleet'i "kullanılabilir"
+gösteriyordu — **yanlış güven veren bir gösterge**.
+
+**Yerine:** Faz 7 (havuz kaydı + ölü girdi temizliği) ve Faz 9 (dispatch e2e kapısı) **zorunlu**
+fazlardır. Kurulum, `worker:"<alias>"` + `failedOver:false` kanıtı alınmadan bitmiş sayılmaz.
+"Servis ayakta" ≠ "iş worker'da koşuyor".
 
 ### Y-15 — güç ayarlarını sona bırakmak *(en pahalı hata: kurulumu kesti)*
 Güç ayarları planın **Faz 7**'sine konulmuştu. Sıra hiç gelmedi ve makine kurulumun ortasında

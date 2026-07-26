@@ -23,8 +23,23 @@ no()  { printf '  ⛔ %s\n' "$*"; FAIL=$((FAIL+1)); }
 code_only() { grep -vE '^\s*#' "$1"; }
 
 echo "── T1 sözdizimi"
-for f in provision-worker.sh lib.sh verify-standard.sh; do
+for f in provision-worker.sh lib.sh verify-standard.sh verify-worker.sh; do
   bash -n "$f" 2>/dev/null && ok "$f" || no "$f sözdizimi"
+done
+
+echo "── T0 bütünlük: standart TAM mı (Y-17: yarım standart en sinsi hata)"
+# Faz 0-9 hepsi hem dokumanda hem script'te olmali. Faz 7-9 (kontrol duzlemi/watchdog/kabul)
+# ilk surumde YOKTU: worker kuruluyor ama Mac ondan haberdar olmuyordu -> dispatch calismiyordu.
+for i in 0 1 2 3 4 5 6 7 8 9; do
+  d=$(grep -cE "^### Faz $i " WORKER-STANDARD.md 2>/dev/null || echo 0)
+  s=$(grep -cE "^faz${i}[0-9a-z_]*\(\)" provision-worker.sh 2>/dev/null || echo 0)
+  if [ "$d" -ge 1 ] && [ "$s" -ge 1 ]; then ok "Faz $i (dokuman+script)"
+  else no "Faz $i eksik" "dokuman=$d script=$s"; fi
+done
+for k in "backends.json:havuz kaydi" "worker-health:Mac watchdog" "PAUSE:termal koruma Mac'e yansiyor" "failedOver:dispatch e2e kaniti"; do
+  pat="${k%%:*}"; lbl="${k#*:}"
+  n=$(grep -lE "$pat" provision-worker.sh verify-worker.sh WORKER-STANDARD.md 2>/dev/null | wc -l | tr -d ' ')
+  [ "$n" -ge 2 ] && ok "kontrol düzlemi: $lbl" "($n dosya)" || no "kontrol düzlemi EKSİK: $lbl" "($n dosya)"
 done
 
 echo "── T2 anti-desen (bulunmamalı)"
