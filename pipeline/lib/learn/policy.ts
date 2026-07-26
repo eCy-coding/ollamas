@@ -34,6 +34,10 @@ export const POLICIES: Record<string, Omit<Policy, "id">> = {
     why: "`'İ'.lower()` iki karakter üretir (i + birleşen nokta) ve terim eşleşmesi sessizce bozulur.",
     exceptions: [
       { path: /(cckb|learnkb|learn-capsules\.py|cc-capsules\.py|learn-verbatim\.py|learn-fingerprint\.py)$/, reason: "Bu dosyalarda `.lower()` yalnız `fold()`/`norm()` içinde, TR çeviri tablosundan SONRA çağrılıyor — kural zaten uygulanmış hâli." },
+      // 2026-07-26: kapı bu dosyada regresyon yakaladı; bakınca `.lower()` yalnız `slug.lower()` /
+      // `e["slug"].lower()` karşılaştırmasında çıktı. Slug'lar kebab-case ASCII kimliklerdir
+      // (`learn-policy`, `kimlik`), Türkçe metin değil — yani kural burada uygulanamaz, ihlal yok.
+      { path: /ecy-capsule\.py$/, reason: "`.lower()` yalnız slug/id karşılaştırmasında; slug'lar kebab-case ASCII, TR metin değil." },
     ],
   },
   "py-open-with": {
