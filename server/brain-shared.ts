@@ -173,12 +173,62 @@ function bounded<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-const SHARED_PROMPT = `Sen ollamas ortak-brain uzmanısın. SADECE verilen KAYNAK kayıtlardan yararlanarak Türkçe, kısa ve net yanıtla.
+const SHARED_PROMPT_BASE = `Sen ollamas ortak-brain uzmanısın. SADECE verilen KAYNAK kayıtlardan yararlanarak Türkçe, kısa ve net yanıtla.
 Kurallar:
 - Her iddiadan sonra [mem:ID] biçiminde kaynak belirt.
 - Düşük-güven (conf≤0.5) kaynakları ihtiyatla kullan; çelişkide yüksek-güveni seç.
 - Kaynaklarda cevap yoksa SADECE: BİLGİ_YOK
 - Tahmin etme, süsleme yapma.`;
+
+/**
+ * Kod politikası bloğu — learn tier'ının ollamas'a GİRDİĞİ yer.
+ *
+ * NEDEN BURADA
+ * Learn tier'ı önce yalnız SORULABİLİR bir bilgi yığınıydı: uzman isterse `learnkb ask` diye
+ * arayabilirdi, ama davranışı değişmiyordu. Bir sistem, kuralı KARAR ANINDA görmedikçe öğrenmiş
+ * sayılmaz. Bu blok, `_index/learn-policy.json` içindeki `hata` ağırlıklı kuralları her turda
+ * sistem mesajına ekler; uzman kod önerirken kuralı ve GEREKÇESİNİ birlikte görür.
+ *
+ * Kalıp yeni değil: `capsuleTldrs()` zaten `cc-capsules.json`'u aynı biçimde (mtime önbellekli,
+ * hata durumunda sessizce boş) okuyor. Aynı disiplin: dosya yoksa/bozuksa ASLA fırlatmaz —
+ * politika bloğu boş kalır ve tur bozulmadan devam eder.
+ *
+ * Bütçe: yalnız `hata` kuralları, kural başına tek satır (~90 B). 14 kural ≈ 1.3 KB — bir
+ * `recall` yanıtının yirmide biri, ve her turda ödenmesi kabul edilen tek sabit maliyet.
+ */
+let policyCache: { mtimeMs: number; text: string } | null = null;
+
+function policyBlock(): string {
+  const file = `${process.env.OBSIDIAN_VAULT || `${process.env.HOME}/ollamas-vault`}/_index/learn-policy.json`;
+  try {
+    const mtimeMs = statSync(file).mtimeMs;
+    if (policyCache && policyCache.mtimeMs === mtimeMs) return policyCache.text;
+    const data = JSON.parse(readFileSync(file, "utf8")) as {
+      rules?: { id?: string; severity?: string; fix?: string; why?: string }[];
+    };
+    // Yalnız DÜZELTME satırı gömülür, gerekçe gömülmez. Ölçüldü: kural başına gerekçeyle
+    // birlikte blok 3.176 B, gerekçesiz 1.4 KB. Gerekçe tek `learnkb get <id>` uzakta ve blok
+    // bunu söylüyor — tier'ın kendi dersi (`agents-progressive-context`) tam olarak bunu
+    // dayatıyor: oturum bağlamı ÖZET değil İŞARET olmalı, çünkü her istekte yeniden ödenir.
+    const lines = (data.rules ?? [])
+      .filter((r) => r?.severity === "hata" && r.fix)
+      .map((r) => `- [${r.id}] ${r.fix}`);
+    const text = lines.length
+      ? `\nKOD KURALLARI (learn tier · ihlal = hata):\n${lines.join("\n")}\n` +
+        `Kod önerirken bu kurallara uy. Gerekçesi gerekiyorsa \`learnkb get <id>\`; uymayan bir şey ` +
+        `istenirse kuralın id'sini söyleyerek reddet.`
+      : "";
+    policyCache = { mtimeMs, text };
+    return text;
+  } catch {
+    return ""; // best-effort: politika dosyası yoksa uzman eskisi gibi çalışır
+  }
+}
+
+/** Ortak sistem mesajı + (varsa) kod politikası. Her çağrıda tazelenir, dosya mtime'ıyla önbellekli. */
+function sharedPrompt(): string {
+  return SHARED_PROMPT_BASE + policyBlock();
+}
 
 /** λ — kullanıcı profilinin retrieval'a etkisi (formül 3c). 0 = kapalı. */
 export const personalizeLambda = (env: { BRAIN_PERSONALIZE_LAMBDA?: string } = process.env): number => {
@@ -234,7 +284,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
 
   const userMsg = `SORU: ${q}\n\nKAYNAKLAR:\n${contextText}`;
   const messages = [
-    { role: "system", content: SHARED_PROMPT },
+    { role: "system", content: sharedPrompt() },
     { role: "user", content: userMsg },
   ];
 
@@ -246,7 +296,7 @@ export async function askShared(question: string, deps: SharedDeps): Promise<Sha
     claudecodeContextText = claudecodeContext(ctx.sources, ctx.live, !!deps.ragSeq, pRet, ragSeqBudget());
   } catch { /* kapsül katmanı best-effort — paylaşılan bağlama düş */ }
   const claudecodeMessages = claudecodeContextText === contextText ? messages : [
-    { role: "system", content: SHARED_PROMPT },
+    { role: "system", content: sharedPrompt() },
     { role: "user", content: `SORU: ${q}\n\nKAYNAKLAR:\n${claudecodeContextText}` },
   ];
 

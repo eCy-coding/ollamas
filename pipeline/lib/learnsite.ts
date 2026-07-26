@@ -16,7 +16,7 @@
 // All four are ERRORS, not warnings: a lesson that fails them must not be written to the vault.
 // Keeping this module pure (no `node:fs`) is what lets the whole contract be tested without a
 // disk, and `learn-build.ts` is then only responsible for I/O.
-import type { Occurrence, Recipe } from "./learn/types";
+import type { Occurrence, Policy, Recipe } from "./learn/types";
 
 export interface Lesson {
   /** Lesson slug (= construct id). Note file becomes `learn-<id>.md`. */
@@ -31,6 +31,11 @@ export interface Lesson {
   /** Real occurrences in our own code (≥1). */
   examples: Occurrence[];
   recipe: Recipe;
+  /** Machine-actionable rule, when the lesson has a violation form (see learn/policy.ts). */
+  policy?: Policy;
+  /** The lesson's own detector source — carried so the validator can prove the policy's
+   *  anti-pattern differs from it (same regex ⇒ correct code reported as a defect). */
+  detectSource?: string;
   /** Wikilink targets to sibling lessons. */
   related: string[];
   /** Systems this construct was actually detected in. */
@@ -196,6 +201,25 @@ export function validateLearnSite(site: LearnSite, snapshots: Record<string, str
         const hits = verbatimHits(l.body, text);
         if (hits.length) err(w, `${src} kaynağından birebir kopya: "${hits[0].slice(0, 60)}…"`);
       }
+
+      // Policy — the machine-actionable half. Optional, but if present it must be usable by a
+      // program AND arguable by a human, because these rules constrain four systems.
+      if (l.policy) {
+        const p = l.policy;
+        if (p.id !== l.id) err(w, `politika id uyuşmuyor: ${p.id}`);
+        if (!["hata", "uyarı"].includes(p.severity)) err(w, `bilinmeyen politika ağırlığı: ${p.severity}`);
+        if (!p.fix?.trim()) err(w, "politika düzeltmesi boş — 'dikkat et' bir düzeltme değildir");
+        if (!p.why?.trim()) err(w, "politika gerekçesi boş — tartışılamayan kural körü körüne uygulanır");
+        // The load-bearing check: the lesson's pattern finds CORRECT usage, the policy's finds the
+        // violation. If they are the same regex, every compliant line is reported as a defect and
+        // the linter becomes noise on its first run.
+        if (p.detect.source === l.detectSource) {
+          err(w, "politika anti-deseni dersin deseniyle AYNI — doğru kullanımı ihlal sayar");
+        }
+        for (const e of p.exceptions ?? []) {
+          if (!e.reason?.trim()) err(w, `gerekçesiz istisna: ${e.path.source}`);
+        }
+      }
     }
   }
 
@@ -224,6 +248,38 @@ export function renderLesson(l: Lesson): string {
 
   L.push(`> **İzlek:** \`${l.track}\` · **Seviye:** ${l.level} · **Bulunduğu sistemler:** ${l.systems.join(", ")}`);
   L.push("");
+
+  // ── The machine-facing block, FIRST.
+  // The audience of this tier is `ollamas`, `eCym`, `obsidian` and `claudecode` — not a person
+  // browsing the vault. So the page opens with what the lesson OBLIGES a system to do and the
+  // exact commands that deliver it; the prose below is the rationale a system cites when it
+  // refuses something, not homework for a reader.
+  L.push("## Bu ders sisteme ne dayatıyor", "");
+  if (l.policy) {
+    L.push(
+      `> **KURAL \`${l.policy.id}\`** · ağırlık \`${l.policy.severity}\`` +
+        `${l.policy.severity === "hata" ? " (kapı: ihlal sayısı artamaz)" : " (raporlanır)"}`,
+    );
+    L.push("");
+    L.push(`- **Yasak:** \`${l.policy.detect.source}\``);
+    L.push(`- **Yerine:** ${l.policy.fix}`);
+    L.push(`- **Neden:** ${l.policy.why}`);
+    for (const e of l.policy.exceptions ?? []) {
+      L.push(`- **Gerekçeli istisna:** \`${e.path.source}\` — ${e.reason}`);
+    }
+  } else {
+    L.push("> Bu dersin **yasak biçimi yok** — ihlal olarak tanımlanabilir bir anti-deseni");
+    L.push("> bulunmuyor. Dayattığı şey tarif sözleşmesidir: aşağıdaki program çalışır ve");
+    L.push("> beklenen çıktıyı verir.");
+  }
+  L.push("");
+  L.push("```bash");
+  L.push(`learnkb get ${l.id}        # ollamas · eCym · claudecode: kuralı ve gerekçesini oku`);
+  L.push(`learnkb apply ${l.id}      # tarifi çalıştır, çıktıyı beklenenle karşılaştır`);
+  if (l.policy) L.push(`learnkb lint --rule ${l.id}   # bu kuralın ihlallerini say (ihlal/gerekçeli/temiz)`);
+  L.push("```");
+  L.push("");
+
   L.push(l.body.trim());
   L.push("");
 

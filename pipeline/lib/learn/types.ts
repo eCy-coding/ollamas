@@ -40,6 +40,58 @@ export interface Recipe {
   safety: "safe" | "gated";
 }
 
+/**
+ * A machine-actionable RULE derived from a lesson — the difference between a system that can
+ * *look the answer up* and a system that *behaves differently*.
+ *
+ * WHY THIS EXISTS
+ * Waves 1–2 gave the four systems retrieval (`learnkb ask/get`) and a demo (`learnkb apply`).
+ * Neither changes what they DO. A policy closes that: it names the anti-pattern in a form a
+ * program can detect, states the fix, and carries the reason so the rule can be argued with
+ * rather than obeyed blindly.
+ *
+ * THREE VERDICTS, NOT TWO
+ * The probe that motivated this found 79 `|| <number>` sites, 37 `exec(` sites, 36 `open()`
+ * calls without `encoding=`. Many are correct in context. A rule that calls all of them
+ * violations is noise, and a noisy linter loses trust as fast as a blind one — so every policy
+ * carries `exceptions`, each with a written reason. Hits are then `violation`,
+ * `justified` or clean. This mirrors the curriculum map's three verdicts and the repo's own
+ * eslint style (`rules: off` plus a comment saying why).
+ */
+export interface PolicyException {
+  /** Paths where the anti-pattern is CORRECT. Matched against the same label as occurrences. */
+  path: RegExp;
+  /** Why it is correct there. Empty is rejected by the validator — an unexplained exemption is a hole. */
+  reason: string;
+}
+
+export interface Policy {
+  /** Same id as the lesson: one rule per lesson, addressable by `learnkb lint --rule <id>`. */
+  id: string;
+  /** `hata` = must not increase (gate); `uyarı` = reported, not gated. */
+  severity: "hata" | "uyarı";
+  /** The ANTI-PATTERN — what the violation looks like. Must differ from the lesson's `pattern`,
+   *  which matches CORRECT usage; conflating the two flags every good line as a defect. */
+  detect: RegExp;
+  /** Which files the rule applies to. */
+  files: RegExp;
+  /** What to write instead — concrete enough for a code generator to follow. */
+  fix: string;
+  /** Why the rule exists, in one sentence. Systems quote this when they refuse something. */
+  why: string;
+  /**
+   * Match against the ORIGINAL text instead of the comment-stripped one.
+   *
+   * The linter blanks comments before matching, because a rule that flags the sentence
+   * EXPLAINING it is noise. But some rules mean the opposite: `catch { /* neden * / }` is the
+   * COMPLIANT form of an empty catch, and blanking the comment turned 96 compliant sites into
+   * violations on the first run. Those rules read the raw source.
+   */
+  raw?: boolean;
+  /** Places where the anti-pattern is legitimate. */
+  exceptions?: PolicyException[];
+}
+
 export interface Construct {
   /** Lesson slug, kebab-case, globally unique across tracks. Also the recipe id. */
   id: string;
@@ -63,6 +115,14 @@ export interface Construct {
   /** A checkable exercise. */
   exercise: string;
   recipe: Recipe;
+  /**
+   * Machine-actionable rule, when the lesson HAS a violation form.
+   *
+   * Optional on purpose: `js-array-map` cannot be violated — inventing an anti-pattern for it
+   * would be the stub problem in a new costume. Coverage is therefore reported as
+   * `policies / policy-able`, and the lessons without one say so instead of pretending.
+   */
+  policy?: Policy;
   /** Optional extra wikilink targets (other lesson ids) for the graph. */
   related?: string[];
 }

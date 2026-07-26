@@ -10,6 +10,7 @@ import { HTTP_API } from "./track-http-api";
 import { JS_TS } from "./track-js-ts";
 import { JS_TS_2 } from "./track-js-ts-2";
 import { MD_OBSIDIAN } from "./track-md-obsidian";
+import { POLICIES } from "./policy";
 import { PYTHON } from "./track-python";
 import { PYTHON_2 } from "./track-python-2";
 import { REST_2 } from "./track-rest-2";
@@ -46,6 +47,15 @@ for (const c of ALL_CONSTRUCTS) {
   if (seen.has(c.id)) throw new Error(`learn catalog: duplicate lesson id '${c.id}'`);
   seen.add(c.id);
   if (c.recipe.id !== c.id) throw new Error(`learn catalog: recipe id '${c.recipe.id}' != lesson id '${c.id}'`);
+}
+
+// Policies are authored in one reviewable file and merged onto their lesson here. A rule whose
+// id has no lesson is a build error, not a silent no-op: an orphan rule would be enforced on the
+// four systems while nothing explained it.
+for (const [id, p] of Object.entries(POLICIES)) {
+  const c = ALL_CONSTRUCTS.find((x) => x.id === id);
+  if (!c) throw new Error(`learn policy: '${id}' için ders yok — kural açıklamasız dayatılamaz`);
+  c.policy = { id, ...p };
 }
 
 export function constructById(id: string): Construct | undefined {

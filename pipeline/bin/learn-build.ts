@@ -30,6 +30,7 @@ import {
   type Lesson, type LearnSite, type TrackSection,
 } from "../lib/learnsite";
 import { constructById } from "../lib/learn/index";
+import { policyIds, policyJson, renderPolicyMd } from "../lib/learn/policy";
 import { isTaught } from "../lib/learn/types";
 
 const HOME = homedir();
@@ -52,19 +53,30 @@ const SYSTEM_TITLE: Record<string, string> = {
  * checkable EXERCISE (freeCodeCamp's shape). The reader always gets the general answer before
  * the local one, so the lesson is useful even outside this repo.
  */
-function lessonBody(what: string, whyHere: string, exercise: string): string {
+function lessonBody(c: { what: string; whyHere: string; exercise: string; id: string; policy?: unknown }): string {
   return [
     "## Nedir",
     "",
-    what,
+    c.what,
     "",
     "## Bizde neden böyle yazılmış",
     "",
-    whyHere,
+    c.whyHere,
     "",
-    "## Alıştırma",
+    // Was "Alıştırma" (homework for a person). The tier's audience is the four systems, so the
+    // section is now a TASK A SYSTEM RUNS ON ITSELF and it always ends in a command whose output
+    // settles the question — the reasoning stays, the "sen dene" framing goes.
+    "## Sistem görevi",
     "",
-    exercise,
+    c.exercise,
+    "",
+    "**Kendi üzerinde koştur:**",
+    "",
+    "```bash",
+    c.policy
+      ? `learnkb lint --rule ${c.id} --json     # bu sistemde kaç ihlal / gerekçeli istisna var`
+      : `learnkb apply ${c.id}                  # tarifi koştur, çıktı beklenenle eşleşmeli`,
+    "```",
   ].join("\n");
 }
 
@@ -94,9 +106,13 @@ export function buildSite(inv: Inventory): LearnSite {
           title: c.title,
           level: c.level,
           sources: [c.url ?? sourceById(c.source).url],
-          body: lessonBody(c.what, c.whyHere, c.exercise),
+          body: lessonBody({ what: c.what, whyHere: c.whyHere, exercise: c.exercise, id: c.id, policy: c.policy }),
           examples: e.examples,
           recipe: c.recipe,
+          policy: c.policy,
+          // The lesson's own detector, carried through so the validator can prove the policy's
+          // anti-pattern is a DIFFERENT regex (identical ones would flag correct code).
+          detectSource: c.pattern.source,
           related: (c.related ?? []).filter((r) => taught.has(r)),
           systems: e.systems,
         };
@@ -472,6 +488,7 @@ function main(): void {
   console.log(
     `müfredat: ${cstats.total} bölüm · ✅ ${cstats.covered} · ➖ ${cstats["not-used-here"]} · ↗︎ ${cstats.external} · kapsama ${cstats.coverage}`,
   );
+  console.log(`politika: ${policyIds().length} kural (ders başına en fazla 1; yasak biçimi olmayan derste kural YOK)`);
   console.log(`doğrulama: HATA=${errors.length} UYARI=${warns.length}`);
   for (const i of errors.slice(0, 20)) console.log(`  HATA  ${i.where}: ${i.message}`);
   for (const i of warns.slice(0, 10)) console.log(`  uyarı ${i.where}: ${i.message}`);
@@ -534,7 +551,14 @@ function main(): void {
   writeFileSync(join(VAULT, "_index", "learn-mufredat.md"), curriculumMd, "utf8");
   writeFileSync(join(root, "CURRICULUM.md"), curriculumMd, "utf8");
   writeFileSync(join(root, "README.md"), renderReadme(site, inv, curriculumStats()), "utf8");
-  n += 10;
+
+  // 6. the policy layer — the machine-actionable half, consumed by all four systems
+  const titleOf = (id: string) => constructById(id)?.title ?? id;
+  writeFileSync(join(VAULT, "_index", "learn-policy.json"), policyJson(stamp, (id) => constructById(id)?.track ?? "?"), "utf8");
+  const policyMd = renderPolicyMd(titleOf);
+  writeFileSync(join(VAULT, "_index", "learn-policy.md"), policyMd, "utf8");
+  writeFileSync(join(root, "POLICY.md"), policyMd, "utf8");
+  n += 13;
 
   console.log(`yazıldı: _learn/ + _index/learn-* · ${n} dosya`);
 }
